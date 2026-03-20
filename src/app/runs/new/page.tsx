@@ -1,0 +1,68 @@
+import { prisma } from "@/lib/prisma";
+import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
+import { NewRunForm } from "@/components/runs/NewRunForm";
+import { hasDatabaseUrl } from "@/lib/env";
+
+export default async function NewRunPage() {
+  if (!hasDatabaseUrl()) {
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <h1 className="page-title">Log your run</h1>
+            <p className="page-subtitle">Database not configured yet.</p>
+          </div>
+        </header>
+        <section className="page-body">
+          <div className="max-w-3xl rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+            Set <span className="font-mono">DATABASE_URL</span> in a{" "}
+            <span className="font-mono">.env</span> file (Postgres) to enable
+            saving runs.
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  const user = await getOrCreateLocalUser();
+
+  const [cars, allTracks, favouriteTrackIds] = await Promise.all([
+    prisma.car.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true, setupSheetTemplate: true },
+    }),
+    prisma.track.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, location: true },
+    }),
+    getFavouriteTrackIdsForUser(user.id),
+  ]);
+
+  const favSet = new Set(favouriteTrackIds);
+  const favouriteTracks = allTracks.filter((t) => favSet.has(t.id));
+  const tracks = allTracks;
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Log your run</h1>
+          <p className="page-subtitle">
+            Trackside-fast logging. Optionally copy your last run for this car, or load a past setup only.
+          </p>
+        </div>
+      </header>
+      <section className="page-body">
+        <NewRunForm
+          cars={cars}
+          tracks={tracks}
+          favouriteTrackIds={favouriteTrackIds}
+          favouriteTracks={favouriteTracks}
+        />
+      </section>
+    </>
+  );
+}
+

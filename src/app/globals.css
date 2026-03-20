@@ -1,0 +1,76 @@
+@config "../../tailwind.config.ts";
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+.app-shell {
+  @apply flex min-h-screen bg-background text-foreground;
+}
+
+.sidebar {
+  @apply w-64 border-r border-border bg-gradient-to-b from-black to-slate-900 px-4 py-6 flex flex-col gap-6;
+}
+
+.sidebar-logo {
+  @apply text-lg font-mono tracking-tight uppercase;
+}
+
+.sidebar-nav {
+  @apply flex flex-col gap-1 text-sm;
+}
+
+.sidebar-nav a {
+  @apply flex items-center justify-between rounded-md px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors;
+}
+
+.sidebar-nav a[data-active="true"] {
+  @apply bg-primary text-primary-foreground;
+}
+
+.sidebar-footer {
+  @apply mt-auto text-[11px] text-muted-foreground font-mono;
+}
+
+.page {
+  @apply flex-1 flex flex-col;
+}
+
+.page-header {
+  @apply border-b border-border px-6 py-4 flex items-center justify-between;
+}
+
+.page-title {
+  @apply text-lg font-semibold tracking-tight;
+}
+
+.page-subtitle {
+  @apply text-xs text-muted-foreground;
+}
+
+.page-body {
+  @apply flex-1 px-6 py-4;
+}
+
+/* Setup sheet modal: when printing, show only the sheet content */
+@media print {
+  [data-setup-sheet-modal] .setup-sheet-modal-overlay {
+    background: transparent;
+    padding: 0;
+    align-items: flex-start;
+  }
+  [data-setup-sheet-modal] .setup-sheet-modal-panel {
+    box-shadow: none;
+    border: none;
+    max-height: none;
+  }
+  [data-setup-sheet-modal] .setup-sheet-modal-close {
+    display: none;
+  }
+}
+

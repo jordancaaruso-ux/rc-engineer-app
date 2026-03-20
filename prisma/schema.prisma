@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  cars            Car[]
+  runs            Run[]
+  tireSets        TireSet[]
+  snapshots       SetupSnapshot[]
+  events          Event[]
+  favouriteTracks FavouriteTrack[]
+}
+
+model Car {
+  id                 String   @id @default(cuid())
+  name               String
+  chassis            String?
+  notes              String?
+  setupSheetTemplate String?  // "awesomatix_a800rr" | null/"none" = no sheet
+  createdAt          DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  runs      Run[]
+  snapshots SetupSnapshot[]
+}
+
+model Track {
+  id        String   @id @default(cuid())
+  name      String
+  location  String?
+  layout    String?
+  createdAt DateTime @default(now())
+
+  runs            Run[]
+  events          Event[]
+  favouriteTracks FavouriteTrack[]
+}
+
+model FavouriteTrack {
+  userId    String
+  trackId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([userId, trackId])
+}
+
+model Event {
+  id         String    @id @default(cuid())
+  name       String
+  startDate  DateTime
+  endDate    DateTime
+  notes      String?
+  createdAt  DateTime  @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  trackId String?
+
+  runs Run[]
+  // Future: timetable/scheduled sessions (timetableSessions?), reminders, "most likely session" suggestions
+}
+
+model TireSet {
+  id         String   @id @default(cuid())
+  label      String   // brand + compound, e.g. "Sweep 32"
+  setNumber  Int      @default(1) // individual set number
+  initialRunCount Int @default(0) // optional starting run count (usually 0)
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  runs Run[]
+}
+
+model SetupSnapshot {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)
+  carId String?
+
+  // Flexible JSON blob with setup parameters (geometry, shocks, diff, etc.)
+  data Json
+
+  runs Run[]
+}
+
+enum SessionType {
+  TESTING
+  PRACTICE
+  RACE_MEETING
+}
+
+model Run {
+  id                   String   @id @default(cuid())
+  createdAt            DateTime @default(now())
+  sessionLabel         String?  // Optional free-text; for Race Meeting used as override/additional only
+  sessionType          SessionType  @default(TESTING)
+  meetingSessionType   String?   // PRACTICE | SEEDING | QUALIFYING | RACE (only when sessionType = RACE_MEETING)
+  meetingSessionCode   String?   // e.g. "1","2","3" for Practice/Race; "Q1","Q2","Q3" for Qualifying; enables timetableSessionId later
+  carNameSnapshot      String?
+  trackNameSnapshot    String?
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)
+  carId String?
+
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  trackId String?
+
+  event   Event?  @relation(fields: [eventId], references: [id])
+  eventId String?
+
+  tireSet   TireSet? @relation(fields: [tireSetId], references: [id])
+  tireSetId String?
+
+  // Auto-increments per tire set based on last run with that set.
+  tireRunNumber Int      @default(1)
+
+  setupSnapshot   SetupSnapshot @relation(fields: [setupSnapshotId], references: [id])
+  setupSnapshotId String
+
+  // Store raw lap times as JSON array (SQLite-compatible; was Float[] for PostgreSQL).
+  // Primary (self) laps — kept in sync with lapSession.entries[primary] when lapSession is set.
+  lapTimes Json @default("[]")
+
+  // Structured lap ingestion: source, metrics, multi-driver/field-ready entries (see src/lib/lapSession/types.ts).
+  lapSession Json?
+
+  notes            String?  // unified notes (new); legacy fields below for older runs
+  driverNotes      String?
+  handlingProblems String?
+  suggestedChanges String?
+  appliedChanges   String?
+}
+
