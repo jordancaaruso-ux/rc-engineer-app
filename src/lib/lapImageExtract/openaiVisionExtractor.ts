@@ -1,5 +1,6 @@
 import type { LapImageExtractionResult, LapImageExtractor } from "./types";
 import { normalizeAndValidatePhotoExtraction } from "./photoExtractionSchema";
+import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 
 const MODEL = "gpt-4o-mini";
 
@@ -11,7 +12,7 @@ export const openaiVisionLapExtractor: LapImageExtractor = {
   id: "openai_gpt4o_mini_vision_v1",
 
   async extract(file: File): Promise<LapImageExtractionResult> {
-    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    const apiKey = getOpenAiApiKey();
     if (!apiKey) {
       return {
         laps: [],

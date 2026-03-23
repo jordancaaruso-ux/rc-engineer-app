@@ -18,7 +18,7 @@ export function RunPickerSelect({
   onChange: (runId: string) => void;
   placeholder?: string;
   disabled?: boolean;
-  /** Default: absolute date+time. Use formatRunPickerLineRelativeWhen for Load setup. */
+  /** Default: context-first scan line + best lap. Use formatRunPickerLineRelativeWhen for Load setup (same shape). */
   formatLine?: (run: RunPickerRun) => string;
 }) {
   return (

@@ -1,0 +1,302 @@
+import { prisma } from "@/lib/prisma";
+import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
+import { computeLapMetrics, normalizeLapTimes } from "@/lib/runLaps";
+import { displayRunNotes } from "@/lib/runNotes";
+import { formatRunSessionDisplay } from "@/lib/runSession";
+
+export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
+
+function startOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/** Event calendar range includes today (local midnight boundaries). */
+export function eventIsActiveOnLocalToday(ev: { startDate: Date; endDate: Date }): boolean {
+  const today = startOfLocalDay(new Date());
+  const start = startOfLocalDay(ev.startDate);
+  const end = startOfLocalDay(ev.endDate);
+  return start.getTime() <= today.getTime() && today.getTime() <= end.getTime();
+}
+
+function localTodayBounds(): { start: Date; end: Date } {
+  const start = startOfLocalDay(new Date());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+const runPrefillInclude = {
+  track: { select: { id: true, name: true } },
+  car: { select: { id: true, name: true } },
+  tireSet: { select: { id: true, label: true, setNumber: true } },
+  event: {
+    select: {
+      id: true,
+      name: true,
+      trackId: true,
+      startDate: true,
+      endDate: true,
+      notes: true,
+      track: { select: { id: true, name: true, location: true } },
+    },
+  },
+  setupSnapshot: { select: { id: true, data: true } },
+} as const;
+
+function serializeRunForPrefill(
+  run: {
+    id: string;
+    createdAt: Date;
+    sessionType: "TESTING" | "PRACTICE" | "RACE_MEETING";
+    meetingSessionType: string | null;
+    meetingSessionCode: string | null;
+    carId: string | null;
+    car: { id: string; name: string } | null;
+    trackId: string | null;
+    eventId: string | null;
+    tireSetId: string | null;
+    tireRunNumber: number;
+    setupSnapshot: { id: string; data: unknown };
+    event: {
+      id: string;
+      name: string;
+      trackId: string | null;
+      startDate: Date;
+      endDate: Date;
+      notes: string | null;
+      track: { id: string; name: string; location: string | null } | null;
+    } | null;
+    track: { id: string; name: string } | null;
+    tireSet: { id: string; label: string; setNumber: number | null } | null;
+    notes: string | null;
+    driverNotes: string | null;
+    handlingProblems: string | null;
+    suggestedChanges: string | null;
+    lapTimes: unknown;
+    lapSession: unknown;
+  }
+): DashboardSerializedRun {
+  return {
+    id: run.id,
+    createdAt: run.createdAt.toISOString(),
+    sessionType: run.sessionType,
+    meetingSessionType: run.meetingSessionType,
+    meetingSessionCode: run.meetingSessionCode,
+    carId: run.carId ?? undefined,
+    car: run.car,
+    trackId: run.trackId,
+    eventId: run.eventId,
+    tireSetId: run.tireSetId,
+    tireRunNumber: run.tireRunNumber,
+    setupSnapshot: run.setupSnapshot,
+    event: run.event
+      ? {
+          ...run.event,
+          startDate: run.event.startDate.toISOString(),
+          endDate: run.event.endDate.toISOString(),
+        }
+      : null,
+    track: run.track,
+    tireSet: run.tireSet,
+    notes: run.notes,
+    driverNotes: run.driverNotes,
+    handlingProblems: run.handlingProblems,
+    suggestedChanges: run.suggestedChanges,
+    lapTimes: run.lapTimes,
+    lapSession: run.lapSession,
+  };
+}
+
+export async function getDashboardNewRunPrefill(
+  userId: string,
+  raw: Record<string, string | string[] | undefined>
+): Promise<DashboardNewRunPrefill | null> {
+  const from = typeof raw.fromDashboard === "string" ? raw.fromDashboard : undefined;
+  const eventId = typeof raw.eventId === "string" ? raw.eventId : undefined;
+  if (!from || !eventId) return null;
+
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, userId },
+    select: { id: true, trackId: true },
+  });
+  if (!event) return null;
+
+  if (from === "first") {
+    return { mode: "first", eventId: event.id, trackId: event.trackId };
+  }
+
+  if (from === "continue") {
+    const run = await prisma.run.findFirst({
+      where: { userId, eventId: event.id },
+      orderBy: { createdAt: "desc" },
+      include: runPrefillInclude,
+    });
+    if (!run) {
+      return { mode: "first", eventId: event.id, trackId: event.trackId };
+    }
+    return { mode: "continue", run: serializeRunForPrefill(run) };
+  }
+
+  return null;
+}
+
+export type DashboardHomeModel = {
+  activeEvent: null | {
+    id: string;
+    name: string;
+    trackLabel: string | null;
+    runCount: number;
+    latest: null | {
+      bestLap: number | null;
+      avgTop5: number | null;
+      notesPreview: string | null;
+    };
+  };
+  hasRunToday: boolean;
+  perfBestLap: number | null;
+  perfAvgTop5: number | null;
+  recentRun: null | {
+    id: string;
+    createdAt: string;
+    carName: string;
+    trackName: string | null;
+    sessionLabel: string;
+    bestLap: number | null;
+    avgTop5: number | null;
+  };
+};
+
+const recentRunSelect = {
+  id: true,
+  createdAt: true,
+  lapTimes: true,
+  sessionType: true,
+  meetingSessionType: true,
+  meetingSessionCode: true,
+  sessionLabel: true,
+  car: { select: { id: true, name: true } },
+  track: { select: { id: true, name: true } },
+  event: { select: { id: true, name: true } },
+} as const;
+
+export async function loadDashboardHomeModel(userId: string): Promise<DashboardHomeModel> {
+  const { start: todayStart, end: todayEnd } = localTodayBounds();
+
+  const [events, hasRunToday, recentRun, runsForPerf] = await Promise.all([
+    prisma.event.findMany({
+      where: { userId },
+      orderBy: { startDate: "desc" },
+      take: 80,
+      include: { track: { select: { id: true, name: true, location: true } } },
+    }),
+    prisma.run.findFirst({
+      where: { userId, createdAt: { gte: todayStart, lt: todayEnd } },
+      select: { id: true },
+    }),
+    prisma.run.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: recentRunSelect,
+    }),
+    prisma.run.findMany({
+      where: { userId },
+      select: { lapTimes: true },
+      take: 400,
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  const activeCandidates = events.filter(eventIsActiveOnLocalToday);
+  const activeEvent =
+    activeCandidates.length === 0
+      ? null
+      : activeCandidates.reduce((a, b) =>
+          new Date(a.startDate).getTime() >= new Date(b.startDate).getTime() ? a : b
+        );
+
+  let activeBlock: DashboardHomeModel["activeEvent"] = null;
+  if (activeEvent) {
+    const [runCount, latestRun] = await Promise.all([
+      prisma.run.count({ where: { userId, eventId: activeEvent.id } }),
+      prisma.run.findFirst({
+        where: { userId, eventId: activeEvent.id },
+        orderBy: { createdAt: "desc" },
+        select: {
+          lapTimes: true,
+          notes: true,
+          driverNotes: true,
+          handlingProblems: true,
+        },
+      }),
+    ]);
+
+    const track = activeEvent.track;
+    const trackLabel = track
+      ? `${track.name}${track.location ? ` (${track.location})` : ""}`
+      : null;
+
+    let latest: {
+      bestLap: number | null;
+      avgTop5: number | null;
+      notesPreview: string | null;
+    } | null = null;
+    if (latestRun) {
+      const laps = normalizeLapTimes(latestRun.lapTimes);
+      const m = computeLapMetrics(laps);
+      const fullNotes = displayRunNotes(latestRun);
+      const notesPreview =
+        fullNotes.length > 100 ? `${fullNotes.slice(0, 97).trimEnd()}…` : fullNotes || null;
+      latest = {
+        bestLap: m.bestLap,
+        avgTop5: m.averageTop5,
+        notesPreview,
+      };
+    }
+
+    activeBlock = {
+      id: activeEvent.id,
+      name: activeEvent.name,
+      trackLabel,
+      runCount,
+      latest,
+    };
+  }
+
+  let perfBestLap: number | null = null;
+  let perfAvgTop5: number | null = null;
+  for (const r of runsForPerf) {
+    const laps = normalizeLapTimes(r.lapTimes);
+    const m = computeLapMetrics(laps);
+    if (m.bestLap != null) {
+      if (perfBestLap == null || m.bestLap < perfBestLap) {
+        perfBestLap = m.bestLap;
+        perfAvgTop5 = m.averageTop5;
+      }
+    }
+  }
+
+  let recent: DashboardHomeModel["recentRun"] = null;
+  if (recentRun) {
+    const laps = normalizeLapTimes(recentRun.lapTimes);
+    const m = computeLapMetrics(laps);
+    recent = {
+      id: recentRun.id,
+      createdAt: recentRun.createdAt.toISOString(),
+      carName: recentRun.car?.name ?? "—",
+      trackName: recentRun.track?.name ?? null,
+      sessionLabel: formatRunSessionDisplay(recentRun),
+      bestLap: m.bestLap,
+      avgTop5: m.averageTop5,
+    };
+  }
+
+  return {
+    activeEvent: activeBlock,
+    hasRunToday: Boolean(hasRunToday),
+    perfBestLap,
+    perfAvgTop5,
+    recentRun: recent,
+  };
+}

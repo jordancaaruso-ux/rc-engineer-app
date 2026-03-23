@@ -1,9 +1,10 @@
-import type { LapUrlParser } from "./types";
+import type { LapUrlParseContext, LapUrlParser } from "./types";
 import { stubUrlParser } from "./stubParser";
 import { httpTimingParser } from "./httpTimingParser";
+import { liveRcParser } from "./liveRcParser";
 
 /** Order: specific parsers first; stub last. */
-const parsers: LapUrlParser[] = [httpTimingParser, stubUrlParser];
+const parsers: LapUrlParser[] = [liveRcParser, httpTimingParser, stubUrlParser];
 
 export function selectUrlParser(url: string): LapUrlParser {
   const u = url.trim();
@@ -13,7 +14,7 @@ export function selectUrlParser(url: string): LapUrlParser {
   return stubUrlParser;
 }
 
-export async function parseTimingUrl(url: string) {
+export async function parseTimingUrl(url: string, context?: LapUrlParseContext) {
   const parser = selectUrlParser(url);
-  return parser.parse(url);
+  return parser.parse(url, context);
 }

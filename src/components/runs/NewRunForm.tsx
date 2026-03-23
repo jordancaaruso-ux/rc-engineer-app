@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
@@ -10,10 +11,10 @@ import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { formatEventDate, formatEventRelativeLabel } from "@/lib/formatDate";
-import { formatRunSessionDisplay, type MeetingSessionType } from "@/lib/runSession";
+import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
-import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
+import { formatRunListScanLine, formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { displayRunNotes } from "@/lib/runNotes";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
@@ -24,6 +25,7 @@ import {
   defaultLapIngestValue,
   type LapIngestFormValue,
 } from "@/components/runs/LapTimesIngestPanel";
+import type { LapImportLapRow } from "@/lib/lapUrlParsers/types";
 
 type CarOption = { id: string; name: string; setupSheetTemplate?: string | null };
 type TrackOption = { id: string; name: string; location?: string | null };
@@ -42,12 +44,15 @@ type EventOption = {
 type LastRun = {
   id: string;
   createdAt: string;
+  sessionLabel?: string | null;
   sessionType?: "TESTING" | "PRACTICE" | "RACE_MEETING";
   meetingSessionType?: string | null;
   meetingSessionCode?: string | null;
   carId?: string;
   car?: { id: string; name: string } | null;
+  carNameSnapshot?: string | null;
   trackId: string | null;
+  trackNameSnapshot?: string | null;
   eventId: string | null;
   tireSetId: string | null;
   tireRunNumber: number;
@@ -62,6 +67,25 @@ type LastRun = {
   lapTimes?: unknown;
   lapSession?: unknown;
 };
+
+function copyPreviewRunToPickerRun(r: LastRun): RunPickerRun {
+  return {
+    id: r.id,
+    createdAt: r.createdAt,
+    sessionLabel: r.sessionLabel ?? null,
+    sessionType: r.sessionType ?? "TESTING",
+    meetingSessionType: r.meetingSessionType,
+    meetingSessionCode: r.meetingSessionCode,
+    eventId: r.eventId,
+    event: r.event ? { name: r.event.name } : null,
+    car: r.car ? { name: r.car.name } : null,
+    carNameSnapshot: r.carNameSnapshot ?? null,
+    track: r.track ? { name: r.track.name } : null,
+    trackNameSnapshot: r.trackNameSnapshot ?? null,
+    lapTimes: r.lapTimes ?? [],
+    setupSnapshot: r.setupSnapshot,
+  };
+}
 
 const FETCH_TIMEOUT_MS = 12000;
 
@@ -97,11 +121,30 @@ function lapIngestFromRunLike(r: { lapTimes?: unknown; lapSession?: unknown }): 
       const kind = src.kind;
       const sk: LapSourceKind =
         kind === "screenshot" || kind === "url" || kind === "csv" || kind === "manual" ? kind : "manual";
+      let urlLapRows: LapImportLapRow[] | null = null;
+      const entries = o.entries;
+      if (Array.isArray(entries) && entries[0] && typeof entries[0] === "object") {
+        const e0 = entries[0] as Record<string, unknown>;
+        const perLap = e0.perLap;
+        if (Array.isArray(perLap) && perLap.length === laps.length) {
+          urlLapRows = laps.map((time, i) => {
+            const meta = perLap[i] as Record<string, unknown> | null | undefined;
+            return {
+              time,
+              isOutlierWarning: Boolean(meta?.isOutlierWarning),
+              warningReason: typeof meta?.warningReason === "string" ? meta.warningReason : null,
+              isFlagged: Boolean(meta?.isFlagged),
+              flagReason: typeof meta?.flagReason === "string" ? meta.flagReason : null,
+            };
+          });
+        }
+      }
       return {
         manualText,
         sourceKind: sk,
         sourceDetail: typeof src.detail === "string" ? src.detail : null,
         parserId: typeof src.parserId === "string" ? src.parserId : null,
+        urlLapRows,
       };
     }
   }
@@ -110,6 +153,7 @@ function lapIngestFromRunLike(r: { lapTimes?: unknown; lapSession?: unknown }): 
     sourceKind: "manual",
     sourceDetail: null,
     parserId: null,
+    urlLapRows: null,
   };
 }
 
@@ -128,12 +172,14 @@ export function NewRunForm(props: {
   tracks: TrackOption[];
   favouriteTrackIds?: string[];
   favouriteTracks?: TrackOption[];
+  dashboardPrefill?: DashboardNewRunPrefill | null;
 }) {
   const router = useRouter();
   const cars = props.cars;
   const tracks = props.tracks;
   const favouriteTrackIds = props.favouriteTrackIds ?? [];
   const favouriteTracks = props.favouriteTracks ?? [];
+  const dashboardPrefill = props.dashboardPrefill ?? null;
 
   const [sessionType, setSessionType] = useState<"TESTING" | "RACE_MEETING">("TESTING");
   const [meetingSessionType, setMeetingSessionType] = useState<MeetingSessionType>("PRACTICE");
@@ -201,6 +247,55 @@ export function NewRunForm(props: {
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
+
+  const dashboardPrefillAppliedRef = useRef(false);
+
+  useEffect(() => {
+    const p = dashboardPrefill;
+    if (!p || dashboardPrefillAppliedRef.current) return;
+    dashboardPrefillAppliedRef.current = true;
+
+    if (p.mode === "first") {
+      setSessionType("RACE_MEETING");
+      setEventId(p.eventId);
+      if (p.trackId) setTrackId(p.trackId);
+      return;
+    }
+
+    const r = p.run;
+    const nextCarId = (r.carId || r.car?.id || "").toString();
+    if (nextCarId && cars.some((c) => c.id === nextCarId)) {
+      setCarId(nextCarId);
+    }
+
+    setTrackId(r.trackId ?? "");
+
+    if (r.sessionType === "RACE_MEETING" || r.sessionType === "PRACTICE") {
+      setSessionType("RACE_MEETING");
+      const sub = r.meetingSessionType as MeetingSessionType | undefined;
+      if (sub === "SEEDING" || sub === "QUALIFYING" || sub === "RACE" || sub === "OTHER") {
+        setMeetingSessionType(sub);
+      } else {
+        setMeetingSessionType("PRACTICE");
+      }
+      setMeetingSessionCustom(sub === "OTHER" ? (r.meetingSessionCode?.trim() ?? "") : "");
+    } else {
+      setSessionType("TESTING");
+      setMeetingSessionCustom("");
+    }
+
+    setEventId(r.eventId ?? "");
+    setTireSetId(r.tireSetId ?? "");
+    setRunsCompleted(r.tireRunNumber ?? 0);
+
+    const nextSetup = normalizeSetupData(r.setupSnapshot?.data);
+    setSetupData(nextSetup);
+    setActiveSetupData(nextSetup);
+    setNotes("");
+    setSuggestedChanges("");
+    setLapIngest(defaultLapIngestValue());
+    setReplicateLast(false);
+  }, [dashboardPrefill, cars]);
 
   const selectedCar = useMemo(() => cars.find((c) => c.id === carId) ?? null, [cars, carId]);
   const setupTemplate = useMemo(() => {
@@ -721,6 +816,17 @@ export function NewRunForm(props: {
             sourceKind: lapIngest.sourceKind,
             sourceDetail: lapIngest.sourceDetail,
             parserId: lapIngest.parserId,
+            perLap:
+              lapIngest.urlLapRows &&
+              lapIngest.urlLapRows.length > 0 &&
+              lapIngest.urlLapRows.length === lapTimes.length
+                ? lapIngest.urlLapRows.map((r) => ({
+                    isOutlierWarning: r.isOutlierWarning,
+                    warningReason: r.warningReason ?? null,
+                    isFlagged: Boolean(r.isFlagged),
+                    flagReason: r.flagReason ?? null,
+                  }))
+                : undefined,
           },
           notes: notes.trim() || null,
           suggestedChanges: suggestedChanges.trim() || null,
@@ -813,22 +919,12 @@ export function NewRunForm(props: {
         {copyStatus ? <div className="mt-1 text-[11px] text-muted-foreground">{copyStatus}</div> : null}
         <div className="mt-2 text-[11px] text-muted-foreground">
           {copyPreviewRun ? (
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              <span className="text-foreground/90">
-                {copyPreviewRun.car?.name ?? copyPreviewRun.carNameSnapshot ?? "Deleted car"}
-              </span>
-              <span>·</span>
-              <span className="text-foreground/90">
-                {copyPreviewRun.track?.name ?? copyPreviewRun.trackNameSnapshot ?? "—"}
-              </span>
-              <span>·</span>
-              <span className="text-foreground/90">
-                {formatRunSessionDisplay(copyPreviewRun)}
-              </span>
+            <div className="text-foreground/90 break-words">
+              {formatRunListScanLine(copyPreviewRunToPickerRun(copyPreviewRun))}
               {copyPreviewRun.tireSet ? (
                 <>
-                  <span>·</span>
-                  <span className="text-foreground/90">
+                  <span className="text-muted-foreground"> · </span>
+                  <span>
                     {copyPreviewRun.tireSet.label}
                     {copyPreviewRun.tireSet.setNumber != null ? ` #${copyPreviewRun.tireSet.setNumber}` : ""}
                   </span>

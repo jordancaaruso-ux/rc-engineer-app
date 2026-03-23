@@ -3,8 +3,13 @@ import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { NewRunForm } from "@/components/runs/NewRunForm";
 import { hasDatabaseUrl } from "@/lib/env";
+import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 
-export default async function NewRunPage() {
+export default async function NewRunPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -26,6 +31,8 @@ export default async function NewRunPage() {
   }
 
   const user = await getOrCreateLocalUser();
+  const sp = await searchParams;
+  const dashboardPrefill = await getDashboardNewRunPrefill(user.id, sp);
 
   const [cars, allTracks, favouriteTrackIds] = await Promise.all([
     prisma.car.findMany({
@@ -60,6 +67,7 @@ export default async function NewRunPage() {
           tracks={tracks}
           favouriteTrackIds={favouriteTrackIds}
           favouriteTracks={favouriteTracks}
+          dashboardPrefill={dashboardPrefill}
         />
       </section>
     </>

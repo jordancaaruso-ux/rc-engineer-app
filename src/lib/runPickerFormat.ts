@@ -1,6 +1,6 @@
 import { bestLap, formatLap } from "@/lib/runLaps";
 import { formatRunSessionDisplay } from "@/lib/runSession";
-import { RUN_DATETIME_LOCALE } from "@/lib/formatDate";
+import { formatRunPickerScanDate } from "@/lib/formatDate";
 
 /** Run shape needed for picker line (API + server components). */
 export type RunPickerRun = {
@@ -10,6 +10,8 @@ export type RunPickerRun = {
   sessionType: string;
   meetingSessionType?: string | null;
   meetingSessionCode?: string | null;
+  eventId?: string | null;
+  event?: { name: string } | null;
   car?: { name: string } | null;
   carNameSnapshot?: string | null;
   track?: { name: string } | null;
@@ -33,17 +35,6 @@ export function formatRunPickerSessionSegment(run: {
 }
 
 const MS_PER_DAY = 86400000;
-const DATE_FALLBACK: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-};
-
-const PICKER_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-};
 
 /** Local calendar start-of-day for the given instant (user's timezone). */
 function startOfLocalDay(d: Date): Date {
@@ -68,36 +59,61 @@ export function formatRunCreatedRelativeWhen(createdAt: Date | string): string {
   const run = new Date(createdAt);
   if (Number.isNaN(run.getTime())) return "—";
   const diffDays = runCreatedLocalDaysAgo(createdAt);
-  if (diffDays < 0) return run.toLocaleDateString(RUN_DATETIME_LOCALE, DATE_FALLBACK);
+  if (diffDays < 0) return formatRunPickerScanDate(createdAt);
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
   if (diffDays >= 2 && diffDays <= 5) return `${diffDays} days ago`;
-  return run.toLocaleDateString(RUN_DATETIME_LOCALE, DATE_FALLBACK);
+  return formatRunPickerScanDate(createdAt);
+}
+
+/** Run type segment: meeting session vs testing label (leading context is handled separately). */
+function formatRunPickerRunTypeSegment(run: RunPickerRun): string {
+  if (run.sessionType === "TESTING") {
+    return run.sessionLabel?.trim() || "Run";
+  }
+  if (run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE") {
+    const s = formatRunSessionDisplay(run);
+    return s === "—" ? "Session" : s;
+  }
+  return run.sessionLabel?.trim() || "Run";
+}
+
+function formatRunListScanLead(run: RunPickerRun): string {
+  const eventName = run.event?.name?.trim();
+  if (eventName) return eventName;
+  if (run.eventId) return "Event";
+  const d = formatRunPickerScanDate(run.createdAt);
+  return d === "—" ? "Testing —" : `Testing ${d}`;
 }
 
 /**
- * Compact one-line summary with absolute date+time (e.g. Analyze choose-run).
+ * Context-first line for pickers and copy-last-run preview:
+ * event name, else `Testing <date>`, then run type, track, car.
+ */
+export function formatRunListScanLine(run: RunPickerRun): string {
+  const lead = formatRunListScanLead(run);
+  const runType = formatRunPickerRunTypeSegment(run);
+  const track = run.track?.name ?? run.trackNameSnapshot ?? "—";
+  const car = run.car?.name ?? run.carNameSnapshot ?? "—";
+  return `${lead} — ${runType} — ${track} — ${car}`;
+}
+
+function appendBestLap(base: string, lapTimes: unknown): string {
+  const lap = bestLap(lapTimes);
+  if (lap == null) return base;
+  return `${base} — ${formatLap(lap)}`;
+}
+
+/**
+ * One-line summary for run pickers (compare, setup modal, history).
  */
 export function formatRunPickerLine(run: RunPickerRun): string {
-  const d = new Date(run.createdAt);
-  const datePart = d.toLocaleDateString(RUN_DATETIME_LOCALE, { day: "numeric", month: "short" });
-  let timePart = new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, PICKER_TIME_OPTIONS).format(d);
-  timePart = timePart.replace(/\s?(am|pm)/i, (m) => m.trim().toLowerCase());
-  const session = formatRunPickerSessionSegment(run);
-  const car = run.car?.name ?? run.carNameSnapshot ?? "—";
-  const track = run.track?.name ?? run.trackNameSnapshot ?? "—";
-  const lap = formatLap(bestLap(run.lapTimes));
-  return `${datePart} ${timePart} · ${session} · ${car} · ${track} · ${lap}`;
+  return appendBestLap(formatRunListScanLine(run), run.lapTimes);
 }
 
 /**
- * Same as formatRunPickerLine but leading segment is relative for recent runs (Log your run → Load setup).
+ * Load-setup control + New Run picker (same scan order as {@link formatRunPickerLine}; name kept for call sites).
  */
 export function formatRunPickerLineRelativeWhen(run: RunPickerRun): string {
-  const when = formatRunCreatedRelativeWhen(run.createdAt);
-  const session = formatRunPickerSessionSegment(run);
-  const car = run.car?.name ?? run.carNameSnapshot ?? "—";
-  const track = run.track?.name ?? run.trackNameSnapshot ?? "—";
-  const lap = formatLap(bestLap(run.lapTimes));
-  return `${when} · ${session} · ${car} · ${track} · ${lap}`;
+  return formatRunPickerLine(run);
 }

@@ -22,6 +22,7 @@ export type SetupSheetModalRun = {
   sessionType: string;
   meetingSessionType?: string | null;
   meetingSessionCode?: string | null;
+  eventId?: string | null;
   carNameSnapshot?: string | null;
   trackNameSnapshot?: string | null;
   tireRunNumber: number;

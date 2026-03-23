@@ -30,6 +30,12 @@ export async function POST(request: Request) {
         sourceKind?: string;
         sourceDetail?: string | null;
         parserId?: string | null;
+        perLap?: Array<{
+          isOutlierWarning?: boolean;
+          warningReason?: string | null;
+          isFlagged?: boolean;
+          flagReason?: string | null;
+        } | null> | null;
       };
       notes?: string | null;
       driverNotes?: string | null;
@@ -67,6 +73,7 @@ export async function POST(request: Request) {
         eventId: body.eventId ?? null,
         sessionLabel: body.sessionLabel?.trim() || null,
       },
+      perLap: body.lapIngestMeta?.perLap ?? null,
     });
 
     const setupSnapshot = await prisma.setupSnapshot.create({

@@ -28,6 +28,13 @@ const RUN_WEEKDAY_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   day: "numeric",
 };
 
+/** Compact calendar date for run list labels (matches run picker / scan lines). */
+const RUN_PICKER_SCAN_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+};
+
 /**
  * Compact date+time for run history rows and detail (SSR-safe: fixed locale + options).
  */
@@ -44,6 +51,12 @@ export function formatRunCreatedAtDateWeekday(d: string | Date): string {
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return "";
   return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, RUN_WEEKDAY_DATE_OPTIONS).format(dt);
+}
+
+export function formatRunPickerScanDate(d: string | Date): string {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, RUN_PICKER_SCAN_DATE_OPTIONS).format(dt);
 }
 
 export function formatEventDate(d: string | Date): string {

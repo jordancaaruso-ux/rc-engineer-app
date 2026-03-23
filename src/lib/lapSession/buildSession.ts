@@ -8,9 +8,19 @@ export function buildLapSessionV1(params: {
   sourceDetail?: string | null;
   parserId?: string | null;
   context?: LapSessionContext;
+  perLap?: Array<{
+    isOutlierWarning?: boolean;
+    warningReason?: string | null;
+    isFlagged?: boolean;
+    flagReason?: string | null;
+  } | null> | null;
 }): LapSessionV1 {
   const laps = params.laps.filter((n) => typeof n === "number" && Number.isFinite(n));
   const metrics = computeLapMetrics(laps);
+  let perLap = params.perLap;
+  if (perLap && perLap.length !== laps.length) {
+    perLap = null;
+  }
   return {
     version: LAP_SESSION_VERSION,
     source: {
@@ -23,6 +33,7 @@ export function buildLapSessionV1(params: {
         role: "primary",
         laps: [...laps],
         metrics,
+        perLap: perLap ?? undefined,
       },
     ],
     metrics,

@@ -3,11 +3,22 @@
  * Parsers are registered by id; the registry picks one by canHandle(url).
  */
 
+/** One lap from URL import (e.g. LiveRC) with optional warnings / user flags. */
+export interface LapImportLapRow {
+  time: number;
+  isOutlierWarning?: boolean;
+  warningReason?: string | null;
+  isFlagged?: boolean;
+  flagReason?: string | null;
+}
+
 export interface LapUrlParseResult {
   /** Stable id, e.g. "stub", "livetime-future". */
   parserId: string;
   /** Candidate laps for the selected driver row (MVP: often empty until parsers exist). */
   laps: number[];
+  /** When present (e.g. LiveRC race result), prefer for UI: warnings and per-lap flags. */
+  lapRows?: LapImportLapRow[];
   /** Optional multi-row preview for confirmation UI (teammates / field later). */
   candidates?: Array<{
     id: string;
@@ -20,10 +31,17 @@ export interface LapUrlParseResult {
     className?: string | null;
   };
   message?: string | null;
+  /** Machine-readable failure (e.g. driver_not_found). */
+  errorCode?: string;
 }
+
+export type LapUrlParseContext = {
+  /** Required for LiveRC race result imports. */
+  driverName?: string;
+};
 
 export interface LapUrlParser {
   readonly id: string;
   canHandle(url: string): boolean;
-  parse(url: string): Promise<LapUrlParseResult>;
+  parse(url: string, context?: LapUrlParseContext): Promise<LapUrlParseResult>;
 }

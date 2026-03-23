@@ -1,4 +1,4 @@
-import type { LapUrlParser, LapUrlParseResult } from "./types";
+import type { LapUrlParseContext, LapUrlParser, LapUrlParseResult } from "./types";
 import { fetchUrlText } from "./fetchText";
 import { parseJsonDocumentToResult } from "./extractFromJson";
 import { parseHtmlDocumentToResult } from "./extractFromHtml";
@@ -20,7 +20,7 @@ export const httpTimingParser: LapUrlParser = {
     }
   },
 
-  async parse(url: string): Promise<LapUrlParseResult> {
+  async parse(url: string, _context?: LapUrlParseContext): Promise<LapUrlParseResult> {
     const trimmed = url.trim();
     const fetched = await fetchUrlText(trimmed);
     if (!fetched.ok) {

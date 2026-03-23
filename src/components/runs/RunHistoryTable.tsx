@@ -6,6 +6,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { bestLap, avgTop5, formatLap, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { displayRunNotes } from "@/lib/runNotes";
+import { formatLapSourceSummary } from "@/lib/lapSession/display";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
@@ -32,6 +33,7 @@ type Run = {
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   event?: { name: string; track?: { name: string } | null } | null;
   setupSnapshot?: { id: string; data: unknown } | null;
+  lapSession?: unknown;
 };
 
 function setupRows(data: unknown): { label: string; value: string }[] {
@@ -184,7 +186,7 @@ function RunDetail({
           <h3 className="text-xs font-mono text-muted-foreground uppercase tracking-wide">Lap times</h3>
           <DetailRow
             label="Lap source"
-            value={formatLapSourceSummary(run.lapSession) || "Manual"}
+            value={formatLapSourceSummary(run.lapSession) ?? "—"}
           />
           <DetailRow label="Best lap" value={formatLap(bestLap(run.lapTimes))} />
           <DetailRow label="Average (top 5)" value={formatLap(avgTop5(run.lapTimes))} />

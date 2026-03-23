@@ -9,8 +9,9 @@ export async function POST(request: Request) {
   }
   await getOrCreateLocalUser();
 
-  const body = (await request.json().catch(() => null)) as { url?: string } | null;
+  const body = (await request.json().catch(() => null)) as { url?: string; driverName?: string } | null;
   const url = body?.url?.trim() ?? "";
+  const driverName = typeof body?.driverName === "string" ? body.driverName.trim() : "";
   if (!url) {
     return NextResponse.json({ error: "url is required" }, { status: 400 });
   }
@@ -24,14 +25,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
   }
 
-  const parsed = await parseTimingUrl(url);
+  const parsed = await parseTimingUrl(url, { driverName: driverName || undefined });
 
   return NextResponse.json({
     parserId: parsed.parserId,
     laps: parsed.laps,
+    lapRows: parsed.lapRows ?? null,
     candidates: parsed.candidates ?? [],
     sessionHint: parsed.sessionHint ?? null,
     message: parsed.message ?? null,
+    errorCode: parsed.errorCode ?? null,
     url,
   });
 }

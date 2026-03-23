@@ -19,6 +19,8 @@ export type CompareRunShape = {
   meetingSessionType?: string | null;
   meetingSessionCode?: string | null;
   sessionLabel?: string | null;
+  eventId?: string | null;
+  event?: { name: string } | null;
   car?: { id: string; name: string } | null;
   carNameSnapshot?: string | null;
   track?: { id: string; name: string } | null;

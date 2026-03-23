@@ -1,4 +1,4 @@
-import type { LapUrlParser, LapUrlParseResult } from "./types";
+import type { LapUrlParseContext, LapUrlParser, LapUrlParseResult } from "./types";
 
 /** Placeholder until real site adapters are added. */
 export const stubUrlParser: LapUrlParser = {
@@ -6,7 +6,7 @@ export const stubUrlParser: LapUrlParser = {
   canHandle() {
     return true;
   },
-  async parse(url: string): Promise<LapUrlParseResult> {
+  async parse(url: string, _context?: LapUrlParseContext): Promise<LapUrlParseResult> {
     return {
       parserId: this.id,
       laps: [],

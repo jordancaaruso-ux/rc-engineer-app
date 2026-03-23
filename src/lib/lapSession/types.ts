@@ -29,6 +29,13 @@ export interface LapEntry {
   laps: number[];
   /** Optional denormalized; can be recomputed from laps. */
   metrics?: LapMetrics;
+  /** Same length as laps — import warnings and user flags (URL import). */
+  perLap?: Array<{
+    isOutlierWarning?: boolean;
+    warningReason?: string | null;
+    isFlagged?: boolean;
+    flagReason?: string | null;
+  } | null> | null;
 }
 
 export interface LapSessionContext {

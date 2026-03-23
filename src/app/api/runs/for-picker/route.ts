@@ -20,12 +20,14 @@ export async function GET() {
       sessionType: true,
       meetingSessionType: true,
       meetingSessionCode: true,
+      eventId: true,
       carNameSnapshot: true,
       trackNameSnapshot: true,
       lapTimes: true,
       setupSnapshot: { select: { data: true } },
       car: { select: { name: true } },
       track: { select: { name: true } },
+      event: { select: { name: true } },
     },
   });
   return NextResponse.json({ runs });
