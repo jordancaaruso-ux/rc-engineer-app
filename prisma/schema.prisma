@@ -70,6 +70,7 @@ model Car {
 
   runs      Run[]
   snapshots SetupSnapshot[]
+  setupParameterAggregations SetupParameterAggregation[]
 }
 
 model Track {
@@ -180,6 +181,44 @@ enum SetupDocumentImportOutcome {
   COMPLETED_WITH_WARNINGS
   PARTIAL_DIAGNOSTIC
   FAILED
+}
+
+/** MVP: only car × parameter; scopeKey duplicates carId for forward-compatible snapshots. */
+enum SetupAggregationScopeType {
+  CAR_PARAMETER
+}
+
+enum SetupAggregationValueType {
+  NUMERIC
+  CATEGORICAL
+  BOOLEAN
+  MULTI_SELECT
+}
+
+/**
+ * Materialized stats from normalized SetupSnapshot.data (via SetupDocument.createdSetup).
+ * No document ids, filenames, or user ids — scoped by carId (user-owned car).
+ */
+model SetupParameterAggregation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scopeType SetupAggregationScopeType @default(CAR_PARAMETER)
+  scopeKey  String
+  carId     String
+  car       Car     @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  parameterKey String
+  valueType    SetupAggregationValueType
+
+  sampleCount Int
+
+  numericStatsJson     Json?
+  categoricalStatsJson Json?
+
+  @@unique([scopeType, carId, parameterKey])
+  @@index([carId])
 }
 
 /** User review for dataset / aggregation eligibility (bulk import workflow). */

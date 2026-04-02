@@ -89,6 +89,12 @@ export default async function SetupPage(): Promise<ReactNode> {
             >
               Bulk setup import
             </Link>
+            <Link
+              href="/setup/aggregations-debug"
+              className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-medium hover:bg-muted transition"
+            >
+              Aggregation stats (debug)
+            </Link>
           </div>
         </div>
 
