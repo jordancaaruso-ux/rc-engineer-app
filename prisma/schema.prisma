@@ -13,12 +13,14 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
+  email     String?  @unique
   name      String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   cars            Car[]
   runs            Run[]
+  tracks          Track[]
   tireSets        TireSet[]
   snapshots       SetupSnapshot[]
   events          Event[]
@@ -76,6 +78,9 @@ model Track {
   location  String?
   layout    String?
   createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
 
   runs            Run[]
   events          Event[]

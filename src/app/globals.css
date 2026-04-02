@@ -38,10 +38,10 @@ body {
   @apply relative flex min-h-screen overflow-hidden bg-transparent text-foreground;
 }
 
-.app-shell > * {
-  position: relative;
-  z-index: 1;
-}
+/* NOTE: Avoid creating sibling stacking contexts here.
+   Mobile nav uses fixed overlays from the sidebar; if <main> and the sidebar
+   are both forced into equal z-index stacking contexts, DOM order can cause
+   <main> to sit above the sidebar and intercept clicks. */
 
 .sidebar {
   /* NOTE: do not set display here; responsive visibility is controlled in JSX */

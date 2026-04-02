@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
+import { getOrCreateLocalUser } from "@/lib/currentUser";
 
 export async function GET(
   _request: Request,
@@ -14,9 +15,10 @@ export async function GET(
   }
 
   const { trackId } = await context.params;
+  const user = await getOrCreateLocalUser();
 
   const track = await prisma.track.findFirst({
-    where: { id: trackId },
+    where: { id: trackId, userId: user.id },
     select: { id: true, name: true, location: true, createdAt: true },
   });
 
@@ -25,7 +27,7 @@ export async function GET(
   }
 
   const runCount = await prisma.run.count({
-    where: { trackId },
+    where: { trackId, userId: user.id },
   });
 
   return NextResponse.json({ track, runCount });

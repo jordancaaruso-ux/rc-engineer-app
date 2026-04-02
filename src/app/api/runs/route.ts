@@ -162,7 +162,7 @@ export async function POST(request: Request) {
 
     const track = body.trackId
       ? await prisma.track.findFirst({
-          where: { id: body.trackId },
+          where: { id: body.trackId, userId: user.id },
           select: { name: true },
         })
       : null;

@@ -7,14 +7,10 @@ import { requireDatabaseUrl } from "@/lib/env";
  */
 export async function getOrCreateLocalUser() {
   requireDatabaseUrl();
-  const existing = await prisma.user.findFirst();
+  const email = "local@rc.engineer";
+  const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return existing;
 
-  return prisma.user.create({
-    data: {
-      email: "local@rc.engineer",
-      name: "Local User"
-    }
-  });
+  return prisma.user.create({ data: { email, name: "Local User" } });
 }
 

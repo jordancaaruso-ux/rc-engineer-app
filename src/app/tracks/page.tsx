@@ -30,6 +30,7 @@ export default async function TracksPage(): Promise<ReactNode> {
   const user = await getOrCreateLocalUser();
   const [tracks, favouriteTrackIds] = await Promise.all([
     prisma.track.findMany({
+      where: { userId: user.id },
       orderBy: { name: "asc" },
       select: { id: true, name: true, location: true },
     }),

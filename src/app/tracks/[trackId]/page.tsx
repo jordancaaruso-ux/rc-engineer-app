@@ -29,14 +29,11 @@ export default async function TrackDetailPage(props: {
   }
 
   const { trackId } = await props.params;
-
-  const [user, track] = await Promise.all([
-    getOrCreateLocalUser(),
-    prisma.track.findFirst({
-      where: { id: trackId },
-      select: { id: true, name: true, location: true, createdAt: true },
-    }),
-  ]);
+  const user = await getOrCreateLocalUser();
+  const track = await prisma.track.findFirst({
+    where: { id: trackId, userId: user.id },
+    select: { id: true, name: true, location: true, createdAt: true },
+  });
 
   if (!track) {
     return (
@@ -58,7 +55,7 @@ export default async function TrackDetailPage(props: {
   }
 
   const [runCount, isFavourite] = await Promise.all([
-    prisma.run.count({ where: { trackId } }),
+    prisma.run.count({ where: { trackId, userId: user.id } }),
     isTrackFavourite(user.id, trackId),
   ]);
 

@@ -22,23 +22,25 @@ export async function GET(request: Request) {
     const favouriteTrackIds =
       favouritesOnly || favouritesFirst ? await getFavouriteTrackIdsForUser(user.id) : [];
 
-    const where = q
-      ? {
-          OR: [
-            { name: { contains: q } },
-            { location: { contains: q } },
-          ],
-        }
-      : {};
+    const whereBase = {
+      userId: user.id,
+      ...(q
+        ? {
+            OR: [
+              { name: { contains: q } },
+              { location: { contains: q } },
+            ],
+          }
+        : {}),
+    };
 
     const tracks = await prisma.track.findMany({
-      where: favouritesOnly && favouriteTrackIds.length > 0
-        ? Object.keys(where).length > 0
-          ? { id: { in: favouriteTrackIds }, ...where }
-          : { id: { in: favouriteTrackIds } }
-        : favouritesOnly
-          ? { id: { in: [] } }
-          : where,
+      where:
+        favouritesOnly && favouriteTrackIds.length > 0
+          ? { ...whereBase, id: { in: favouriteTrackIds } }
+          : favouritesOnly
+            ? { ...whereBase, id: { in: [] } }
+            : whereBase,
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, location: true },
     });
@@ -89,15 +91,16 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    const user = await getOrCreateLocalUser();
     const track = await prisma.track.create({
       data: {
+        userId: user.id,
         name,
         location: body.location?.trim() || null,
       },
       select: { id: true, name: true, location: true },
     });
     if (body.addToFavourites) {
-      const user = await getOrCreateLocalUser();
       await addTrackToFavourites(user.id, track.id);
     }
     revalidatePath("/tracks");

@@ -34,6 +34,7 @@ export default async function EventsPage(): Promise<ReactNode> {
       },
     }),
     prisma.track.findMany({
+      where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, location: true },
     }),

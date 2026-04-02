@@ -22,11 +22,11 @@ export async function POST(
     );
   }
   const { trackId } = await context.params;
-  const track = await prisma.track.findFirst({ where: { id: trackId }, select: { id: true } });
+  const user = await getOrCreateLocalUser();
+  const track = await prisma.track.findFirst({ where: { id: trackId, userId: user.id }, select: { id: true } });
   if (!track) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
-  const user = await getOrCreateLocalUser();
   const result = await toggleTrackFavourite(user.id, trackId);
   if ("error" in result) {
     if (process.env.NODE_ENV === "development") console.error("[favourite POST]", result.error);
