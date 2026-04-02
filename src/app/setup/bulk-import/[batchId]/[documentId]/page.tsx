@@ -46,8 +46,8 @@ export default async function BulkImportDocumentPage({
         updatedAt: true,
       },
     }),
+    // Calibrations are global/shared; list all for selection (document remains user-scoped above).
     prisma.setupSheetCalibration.findMany({
-      where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 60,
       select: { id: true, name: true, sourceType: true, calibrationDataJson: true },
