@@ -15,9 +15,46 @@ import {
   snapshotValueIsEffectivelyEmpty,
 } from "@/lib/runSetup";
 import { computeNumericStats } from "@/lib/setupAggregations/numericStats";
+import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 
 /** At least this many non-empty parameter keys required on the snapshot to count toward aggregation. */
 const MIN_DISTINCT_KEYS_FOR_ELIGIBILITY = 2;
+
+function snapshotDataHasKeys(raw: unknown): boolean {
+  return raw != null && typeof raw === "object" && !Array.isArray(raw) && Object.keys(raw).length > 0;
+}
+
+/**
+ * Prefer committed SetupSnapshot.data; otherwise normalized parsed PDF output (bulk import never calls create-setup).
+ */
+function resolveNormalizedAggregationData(
+  parsedDataJson: unknown,
+  createdSetup: { data: unknown } | null
+): Record<string, SetupSnapshotValue> | null {
+  if (createdSetup && snapshotDataHasKeys(createdSetup.data)) {
+    return normalizeSetupSnapshotForStorage(createdSetup.data) as Record<string, SetupSnapshotValue>;
+  }
+  if (snapshotDataHasKeys(parsedDataJson)) {
+    return normalizeSetupSnapshotForStorage(
+      normalizeParsedSetupData(parsedDataJson)
+    ) as Record<string, SetupSnapshotValue>;
+  }
+  return null;
+}
+
+/** Car for bucketing: explicit snapshot.carId, else the user's only car (safe when unambiguous). */
+function resolveAggregationCarId(
+  snapshotCarId: string | null | undefined,
+  userCarIds: string[]
+): { carId: string | null; ambiguous: boolean; wrongOwner: boolean } {
+  if (snapshotCarId) {
+    if (userCarIds.includes(snapshotCarId)) return { carId: snapshotCarId, ambiguous: false, wrongOwner: false };
+    return { carId: null, ambiguous: false, wrongOwner: true };
+  }
+  if (userCarIds.length === 1) return { carId: userCarIds[0]!, ambiguous: false, wrongOwner: false };
+  if (userCarIds.length === 0) return { carId: null, ambiguous: false, wrongOwner: false };
+  return { carId: null, ambiguous: true, wrongOwner: false };
+}
 
 function extractObservation(
   key: string,
@@ -134,11 +171,27 @@ function buildCategoricalJson(freq: Map<string, number>, sampleCount: number) {
   };
 }
 
+export type RebuildSetupAggregationsExclusionCounts = {
+  /** All non-example setup documents for this user (examination set). */
+  totalUserDocuments: number;
+  excludedNotEligible: number;
+  excludedParseStatus: number;
+  excludedPlaceholder: number;
+  excludedNoPayload: number;
+  excludedNoCar: number;
+  excludedAmbiguousCar: number;
+  excludedSnapshotCarWrongOwner: number;
+  excludedSparseData: number;
+  eligibleDocuments: number;
+};
+
 export type RebuildSetupAggregationsResult = {
   deletedRows: number;
   createdRows: number;
+  /** @deprecated prefer exclusionCounts.eligibleDocuments + documentsIncluded */
   documentsConsidered: number;
   documentsIncluded: number;
+  exclusionCounts: RebuildSetupAggregationsExclusionCounts;
 };
 
 /**
@@ -153,9 +206,6 @@ export async function rebuildSetupAggregationsForUserCars(
     select: { id: true },
   });
   const carIds = cars.map((c) => c.id);
-  if (carIds.length === 0) {
-    return { deletedRows: 0, createdRows: 0, documentsConsidered: 0, documentsIncluded: 0 };
-  }
 
   const exampleRows = await prisma.setupSheetCalibration.findMany({
     where: { exampleDocumentId: { not: null } },
@@ -167,46 +217,95 @@ export async function rebuildSetupAggregationsForUserCars(
       .filter((id): id is string => typeof id === "string" && id.length > 0)
   );
 
-  const documents = await prisma.setupDocument.findMany({
-    where: {
-      eligibleForAggregationDataset: true,
-      parseStatus: { in: ["PARSED", "PARTIAL"] },
-      createdSetupId: { not: null },
-      id: { notIn: [...exampleDocIds] },
-      createdSetup: {
-        carId: { in: carIds },
-        car: { userId },
+  const exclusionCounts: RebuildSetupAggregationsExclusionCounts = {
+    totalUserDocuments: 0,
+    excludedNotEligible: 0,
+    excludedParseStatus: 0,
+    excludedPlaceholder: 0,
+    excludedNoPayload: 0,
+    excludedNoCar: 0,
+    excludedAmbiguousCar: 0,
+    excludedSnapshotCarWrongOwner: 0,
+    excludedSparseData: 0,
+    eligibleDocuments: 0,
+  };
+
+  const [excludedPlaceholderCount, candidates] = await Promise.all([
+    exampleDocIds.size === 0
+      ? Promise.resolve(0)
+      : prisma.setupDocument.count({
+          where: { userId, id: { in: [...exampleDocIds] } },
+        }),
+    prisma.setupDocument.findMany({
+      where: {
+        userId,
+        id: { notIn: [...exampleDocIds] },
       },
-    },
-    select: {
-      id: true,
-      createdSetup: {
-        select: {
-          carId: true,
-          data: true,
+      select: {
+        eligibleForAggregationDataset: true,
+        parseStatus: true,
+        parsedDataJson: true,
+        createdSetup: {
+          select: {
+            carId: true,
+            data: true,
+          },
         },
       },
-    },
-  });
+    }),
+  ]);
+
+  exclusionCounts.excludedPlaceholder = excludedPlaceholderCount;
+  exclusionCounts.totalUserDocuments = candidates.length + excludedPlaceholderCount;
 
   const byCar = new Map<string, Map<string, PerKeyState>>();
 
   let documentsIncluded = 0;
-  for (const doc of documents) {
-    const snap = doc.createdSetup;
-    if (!snap?.carId) continue;
-    const raw = snap.data;
-    const data = normalizeSetupSnapshotForStorage(
-      raw && typeof raw === "object" ? raw : {}
-    ) as Record<string, SetupSnapshotValue>;
+  for (const doc of candidates) {
+    if (!doc.eligibleForAggregationDataset) {
+      exclusionCounts.excludedNotEligible += 1;
+      continue;
+    }
+    if (doc.parseStatus !== "PARSED" && doc.parseStatus !== "PARTIAL") {
+      exclusionCounts.excludedParseStatus += 1;
+      continue;
+    }
 
-    if (countNonEmptyKeys(data) < MIN_DISTINCT_KEYS_FOR_ELIGIBILITY) continue;
+    const data = resolveNormalizedAggregationData(doc.parsedDataJson, doc.createdSetup);
+    if (!data) {
+      exclusionCounts.excludedNoPayload += 1;
+      continue;
+    }
+
+    const { carId: resolvedCarId, ambiguous, wrongOwner } = resolveAggregationCarId(
+      doc.createdSetup?.carId ?? null,
+      carIds
+    );
+    if (wrongOwner) {
+      exclusionCounts.excludedSnapshotCarWrongOwner += 1;
+      continue;
+    }
+    if (ambiguous) {
+      exclusionCounts.excludedAmbiguousCar += 1;
+      continue;
+    }
+    if (!resolvedCarId) {
+      exclusionCounts.excludedNoCar += 1;
+      continue;
+    }
+
+    if (countNonEmptyKeys(data) < MIN_DISTINCT_KEYS_FOR_ELIGIBILITY) {
+      exclusionCounts.excludedSparseData += 1;
+      continue;
+    }
+
+    exclusionCounts.eligibleDocuments += 1;
     documentsIncluded += 1;
 
-    let keyMap = byCar.get(snap.carId);
+    let keyMap = byCar.get(resolvedCarId);
     if (!keyMap) {
       keyMap = new Map();
-      byCar.set(snap.carId, keyMap);
+      byCar.set(resolvedCarId, keyMap);
     }
 
     for (const [key, val] of Object.entries(data)) {
@@ -283,12 +382,15 @@ export async function rebuildSetupAggregationsForUserCars(
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const del = await tx.setupParameterAggregation.deleteMany({
-      where: {
-        scopeType: SetupAggregationScopeType.CAR_PARAMETER,
-        carId: { in: carIds },
-      },
-    });
+    const del =
+      carIds.length > 0
+        ? await tx.setupParameterAggregation.deleteMany({
+            where: {
+              scopeType: SetupAggregationScopeType.CAR_PARAMETER,
+              carId: { in: carIds },
+            },
+          })
+        : { count: 0 };
     if (rows.length > 0) {
       await tx.setupParameterAggregation.createMany({ data: rows });
     }
@@ -298,7 +400,8 @@ export async function rebuildSetupAggregationsForUserCars(
   return {
     deletedRows: result.deleted,
     createdRows: result.created,
-    documentsConsidered: documents.length,
+    documentsConsidered: exclusionCounts.eligibleDocuments,
     documentsIncluded,
+    exclusionCounts,
   };
 }

@@ -58,11 +58,31 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
         createdRows?: number;
         documentsConsidered?: number;
         documentsIncluded?: number;
+        exclusionCounts?: {
+          totalUserDocuments?: number;
+          excludedNotEligible?: number;
+          excludedParseStatus?: number;
+          excludedPlaceholder?: number;
+          excludedNoPayload?: number;
+          excludedNoCar?: number;
+          excludedAmbiguousCar?: number;
+          excludedSnapshotCarWrongOwner?: number;
+          excludedSparseData?: number;
+          eligibleDocuments?: number;
+        };
         error?: string;
       };
       if (!res.ok) throw new Error(data.error || res.statusText);
+      const x = data.exclusionCounts;
+      const detail =
+        x != null
+          ? ` · examined ${x.totalUserDocuments ?? "—"} docs · eligible ${x.eligibleDocuments ?? data.documentsIncluded ?? 0}` +
+            ` · excl: not-eligible ${x.excludedNotEligible ?? 0}, parse ${x.excludedParseStatus ?? 0}, placeholder ${x.excludedPlaceholder ?? 0}` +
+            `, no-payload ${x.excludedNoPayload ?? 0}, no-car ${x.excludedNoCar ?? 0}, multi-car ${x.excludedAmbiguousCar ?? 0}` +
+            `, car-mismatch ${x.excludedSnapshotCarWrongOwner ?? 0}, sparse ${x.excludedSparseData ?? 0}`
+          : "";
       setMessage(
-        `Rebuild OK: ${data.createdRows ?? 0} rows (from ${data.documentsIncluded ?? 0}/${data.documentsConsidered ?? 0} eligible docs); deleted ${data.deletedRows ?? 0} prior rows.`
+        `Rebuild OK: ${data.createdRows ?? 0} aggregation rows (${data.documentsIncluded ?? 0} docs included); deleted ${data.deletedRows ?? 0} prior rows.${detail}`
       );
       await load();
     } catch (e) {
@@ -81,8 +101,9 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
     <div className="space-y-6">
       <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
         Internal verification only. Stats use normalized{" "}
-        <code className="text-xs">SetupSnapshot.data</code> from documents marked eligible for aggregation,
-        with a car assigned. No filenames or document IDs are returned here.
+        <code className="text-xs">SetupSnapshot.data</code> when present, otherwise{" "}
+        <code className="text-xs">parsedDataJson</code> (bulk import). Car comes from the snapshot or, if you
+        have exactly one car, that car. No filenames or document IDs are returned here.
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
