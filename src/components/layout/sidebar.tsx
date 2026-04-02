@@ -88,7 +88,7 @@ export function Sidebar() {
           type="button"
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
           onClick={() => setMobileOpen((v) => !v)}
-          className="fixed left-3 top-3 z-50 inline-flex items-center justify-center rounded-lg border border-border bg-secondary/90 p-2 text-foreground backdrop-blur-md shadow-glow-sm hover:bg-secondary/100 transition"
+          className="fixed left-3 top-3 z-[60] pointer-events-auto inline-flex items-center justify-center rounded-lg border border-border bg-secondary/90 p-2 text-foreground backdrop-blur-md shadow-glow-sm hover:bg-secondary/100 transition"
         >
           <span className="sr-only">{mobileOpen ? "Close menu" : "Open menu"}</span>
           <svg
