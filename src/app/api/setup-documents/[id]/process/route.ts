@@ -44,7 +44,7 @@ export async function POST(_: Request, ctx: Ctx) {
     );
   }
   const calibrationExists = await prisma.setupSheetCalibration.findFirst({
-    where: { id: doc.calibrationProfileId, userId: user.id },
+    where: { id: doc.calibrationProfileId },
     select: { id: true },
   });
   if (!calibrationExists) {

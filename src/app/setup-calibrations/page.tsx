@@ -18,9 +18,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
       </>
     );
   }
-  const user = await getOrCreateLocalUser();
   const calibrations = await prisma.setupSheetCalibration.findMany({
-    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     select: { id: true, name: true, sourceType: true, calibrationDataJson: true, createdAt: true },
   });

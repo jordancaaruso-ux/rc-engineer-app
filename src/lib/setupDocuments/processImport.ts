@@ -329,7 +329,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     // Calibration parse for PDFs (more accurate).
     if (sourceType === "PDF" && effectiveCalibration.calibrationId) {
       const calRow = await prisma.setupSheetCalibration.findFirst({
-        where: { id: effectiveCalibration.calibrationId, userId: doc.userId },
+        where: { id: effectiveCalibration.calibrationId },
         select: { calibrationDataJson: true, name: true },
       });
       if (!calRow) throw new Error(`Calibration not found: ${effectiveCalibration.calibrationId}`);

@@ -68,7 +68,7 @@ async function resolvePdfSourceForRun(
   if (!effective.calibrationId) return null;
 
   const cal = await prisma.setupSheetCalibration.findFirst({
-    where: { id: effective.calibrationId, userId },
+    where: { id: effective.calibrationId },
     select: { id: true, calibrationDataJson: true, name: true },
   });
   if (!cal?.calibrationDataJson) return null;

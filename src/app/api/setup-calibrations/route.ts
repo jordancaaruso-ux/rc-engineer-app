@@ -7,9 +7,7 @@ export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
   const calibrations = await prisma.setupSheetCalibration.findMany({
-    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

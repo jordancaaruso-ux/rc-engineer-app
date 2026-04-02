@@ -46,7 +46,7 @@ export async function POST(_: Request, ctx: Ctx) {
   let normalized = normalizeParsedSetupData(parsed.parsedData);
   if (sourceType === "PDF" && effective.calibrationId) {
     const calRow = await prisma.setupSheetCalibration.findFirst({
-      where: { id: effective.calibrationId, userId: user.id },
+      where: { id: effective.calibrationId },
       select: { calibrationDataJson: true, name: true },
     });
     if (!calRow) {

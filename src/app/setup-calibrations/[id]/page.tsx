@@ -23,9 +23,8 @@ export default async function SetupCalibrationDetailPage({
     );
   }
   const { id } = await params;
-  const user = await getOrCreateLocalUser();
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: { id, userId: user.id },
+    where: { id },
     select: {
       id: true,
       name: true,
