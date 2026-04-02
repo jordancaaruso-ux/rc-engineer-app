@@ -85,6 +85,15 @@ export async function POST(request: Request, ctx: Ctx) {
       select: { id: true },
     });
     createdIds.push(doc.id);
+    console.log(
+      JSON.stringify({
+        tag: "bulk-import-upload",
+        batchId: batch.id,
+        documentId: doc.id,
+        bytes: file.size,
+        filename: file.name || "upload.pdf",
+      })
+    );
   }
 
   return NextResponse.json({ documentIds: createdIds, count: createdIds.length }, { status: 201 });

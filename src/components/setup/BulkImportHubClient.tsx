@@ -85,18 +85,32 @@ export function BulkImportHubClient({ initialBatches }: { initialBatches: BatchR
         setErr("Invalid response");
         return;
       }
-      const fd = new FormData();
-      for (const q of queued) fd.append("files", q.file);
-      const up = await fetch(`/api/setup-import-batches/${data.id}/upload`, {
-        method: "POST",
-        body: fd,
-      });
-      const upData = (await up.json().catch(() => ({}))) as { error?: string };
-      if (!up.ok) {
-        setErr(upData.error ?? "Upload failed");
-        return;
+      // One PDF per request: Vercel/serverless request bodies are capped (~4.5MB). A single
+      // FormData with many PDFs often exceeds the limit; batch POST succeeds then upload fails.
+      for (let i = 0; i < queued.length; i++) {
+        const fd = new FormData();
+        fd.append("files", queued[i].file);
+        const up = await fetch(`/api/setup-import-batches/${data.id}/upload`, {
+          method: "POST",
+          body: fd,
+        });
+        const upData = (await up.json().catch(() => ({}))) as { error?: string; count?: number };
+        if (!up.ok) {
+          setErr(
+            upData.error ??
+              `Upload failed for “${queued[i].file.name}” (${i + 1} of ${queued.length}). Try smaller files or fewer at once.`
+          );
+          return;
+        }
+        if (typeof upData.count === "number" && upData.count < 1) {
+          setErr(`Upload returned no documents for “${queued[i].file.name}”.`);
+          return;
+        }
       }
       router.push(`/setup/bulk-import/${data.id}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Network error during upload";
+      setErr(msg);
     } finally {
       setBusy(false);
     }

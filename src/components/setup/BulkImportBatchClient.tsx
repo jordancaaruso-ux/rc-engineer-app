@@ -65,19 +65,32 @@ export function BulkImportBatchClient({ batchId }: { batchId: string }) {
     setActionErr(null);
     setUploading(true);
     try {
-      const fd = new FormData();
-      for (let i = 0; i < files.length; i++) fd.append("files", files[i]);
-      const res = await fetch(`/api/setup-import-batches/${batchId}/upload`, {
-        method: "POST",
-        body: fd,
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setActionErr(data.error ?? "Upload failed");
-        return;
+      const list = Array.from(files);
+      for (let i = 0; i < list.length; i++) {
+        const fd = new FormData();
+        fd.append("files", list[i]);
+        const res = await fetch(`/api/setup-import-batches/${batchId}/upload`, {
+          method: "POST",
+          body: fd,
+        });
+        const data = (await res.json().catch(() => ({}))) as { error?: string; count?: number };
+        if (!res.ok) {
+          setActionErr(
+            data.error ??
+              `Upload failed for “${list[i].name}” (${i + 1} of ${list.length}). Files may be too large for one request (host limit ~4.5MB).`
+          );
+          return;
+        }
+        if (typeof data.count === "number" && data.count < 1) {
+          setActionErr(`Upload returned no documents for “${list[i].name}”.`);
+          return;
+        }
       }
       await load();
       router.refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Network error during upload";
+      setActionErr(msg);
     } finally {
       setUploading(false);
     }
