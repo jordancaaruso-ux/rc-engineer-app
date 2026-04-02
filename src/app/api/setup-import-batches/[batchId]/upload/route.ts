@@ -11,6 +11,12 @@ import { SETUP_DOCUMENT_MAX_BYTES } from "@/lib/setupDocuments/types";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 
 const PDF_MIME = "application/pdf";
+function looksLikePdf(file: File): boolean {
+  const t = (file.type || "").toLowerCase();
+  if (t === PDF_MIME) return true;
+  const name = (file.name || "").toLowerCase();
+  return name.endsWith(".pdf");
+}
 
 type Ctx = { params: Promise<{ batchId: string }> };
 
@@ -44,9 +50,12 @@ export async function POST(request: Request, ctx: Ctx) {
     if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
       return NextResponse.json({ error: `File too large (max 12 MB): ${file.name}` }, { status: 400 });
     }
-    const mimeType = (file.type || "").toLowerCase();
-    if (mimeType !== PDF_MIME) {
-      return NextResponse.json({ error: `Bulk import accepts PDF only: ${file.name}` }, { status: 400 });
+    if (!looksLikePdf(file)) {
+      const rawType = (file.type || "").trim() || "unknown";
+      return NextResponse.json(
+        { error: `Bulk import accepts PDF only: ${file.name} (type=${rawType})` },
+        { status: 400 }
+      );
     }
     let storagePath: string;
     try {
@@ -57,7 +66,7 @@ export async function POST(request: Request, ctx: Ctx) {
       }
       throw e;
     }
-    const sourceType = sourceTypeFromMime(mimeType);
+    const sourceType = sourceTypeFromMime(PDF_MIME);
     const doc = await prisma.setupDocument.create({
       data: {
         userId: user.id,
