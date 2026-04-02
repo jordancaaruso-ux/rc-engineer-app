@@ -21,8 +21,9 @@ export async function GET(_request: Request, ctx: Ctx) {
   let bytes: Buffer;
   try {
     bytes = await readBytesFromStorageRef(doc.storagePath);
-  } catch {
-    return NextResponse.json({ error: "Stored file not found" }, { status: 404 });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Stored file not found";
+    return NextResponse.json({ error: message }, { status: 404 });
   }
 
   const contentType = doc.mimeType?.trim() || "application/octet-stream";

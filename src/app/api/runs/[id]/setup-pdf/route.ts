@@ -31,8 +31,9 @@ export async function GET(request: Request, ctx: Ctx) {
   let bytes: Buffer;
   try {
     bytes = await readBytesFromStorageRef(ensured.relativePath);
-  } catch {
-    return NextResponse.json({ error: "Rendered PDF not found in storage" }, { status: 404 });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Rendered PDF not found in storage";
+    return NextResponse.json({ error: message }, { status: 404 });
   }
 
   const filename = `setup-run-${id}.pdf`;

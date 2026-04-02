@@ -10,9 +10,34 @@ import { put } from "@vercel/blob";
  * Local disk fallback (development only — no `BLOB_READ_WRITE_TOKEN`).
  * Intentionally outside `public/` so Next/Vercel output file tracing does not bundle
  * uploaded PDFs into serverless functions (see `public/uploads` in repo).
- * DB values stay `/uploads/...`; resolve with `absolutePathForStoragePath`.
+ * DB values stay `/uploads/...`; resolve via `readLocalUploadBytes` (`.local-uploads` first, then legacy `public/`).
  */
 const LOCAL_UPLOAD_ROOT = path.join(process.cwd(), ".local-uploads");
+
+/** Thrown when Vercel is running without Blob — local paths are not durable across invocations. */
+export class StorageConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageConfigurationError";
+  }
+}
+
+function isVercelDeployment(): boolean {
+  return process.env.VERCEL === "1";
+}
+
+/** On Vercel, never persist to local disk — it breaks on the next lambda instance. */
+function assertDurableStorageForWrites(): void {
+  if (isVercelDeployment() && !useBlobStorage()) {
+    throw new StorageConfigurationError(
+      "BLOB_READ_WRITE_TOKEN is required on Vercel. Add it under Project → Settings → Environment Variables (Production / Preview). Local disk storage is not supported in serverless."
+    );
+  }
+}
+
+function isEnoent(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT";
+}
 
 /** When set, setup PDFs and cached run-rendered PDFs use Vercel Blob; otherwise `.local-uploads` (local dev). */
 export function useBlobStorage(): boolean {
@@ -28,6 +53,7 @@ export function sourceTypeFromMime(mimeType: string): "PDF" | "IMAGE" {
 }
 
 export async function storeSetupDocumentFile(file: File): Promise<{ storagePath: string }> {
+  assertDurableStorageForWrites();
   const ext = path.extname(file.name || "").toLowerCase();
   const safeExt = ext && ext.length <= 8 ? ext : "";
   const filename = `${new Date().toISOString().slice(0, 10)}-${randomUUID()}${safeExt}`;
@@ -54,6 +80,7 @@ export async function storeSetupDocumentFile(file: File): Promise<{ storagePath:
 
 /** Persist lazily rendered run setup PDF; returns DB value for `Run.renderedSetupPdfPath` (URL or `/uploads/...`). */
 export async function storeRunRenderedSetupPdf(runId: string, pdfBytes: Buffer): Promise<string> {
+  assertDurableStorageForWrites();
   const key = `run-setup-pdfs/${runId}.pdf`;
   if (useBlobStorage()) {
     const blob = await put(key, pdfBytes, {
@@ -83,16 +110,47 @@ export function absolutePathForStoragePath(storagePath: string): string {
   return path.join(LOCAL_UPLOAD_ROOT, cleaned.slice("uploads/".length));
 }
 
+/**
+ * Read bytes for a DB local ref (`/uploads/...`). Prefer `.local-uploads`, then legacy `public/` (local dev only).
+ * Does not hit Blob — use `readBytesFromStorageRef` for full resolution.
+ */
+async function readLocalUploadBytes(storagePath: string): Promise<Buffer> {
+  if (isRemoteStorageRef(storagePath)) {
+    throw new Error("readLocalUploadBytes expected a local /uploads/ path");
+  }
+  const cleaned = storagePath.startsWith("/") ? storagePath.slice(1) : storagePath;
+  if (!cleaned.startsWith("uploads/")) {
+    throw new Error(`Unsupported local storagePath (expected /uploads/...): ${storagePath}`);
+  }
+  const relativeFromUploads = cleaned.slice("uploads/".length);
+  const primary = path.join(LOCAL_UPLOAD_ROOT, relativeFromUploads);
+  try {
+    return await readFile(primary);
+  } catch (e) {
+    if (!isEnoent(e)) throw e;
+  }
+  try {
+    const legacyPublic = path.join(process.cwd(), "public", cleaned);
+    return await readFile(legacyPublic);
+  } catch (e2) {
+    if (!isEnoent(e2)) throw e2;
+    const hint = isVercelDeployment()
+      ? " On Vercel, re-upload the setup sheet with BLOB_READ_WRITE_TOKEN configured so the file is stored on Blob (legacy /uploads/... rows are not available after serverless deploy)."
+      : " For local dev, place the file under .local-uploads/ or public/uploads/ matching the /uploads/... path, or set BLOB_READ_WRITE_TOKEN.";
+    throw new Error(`Stored file not found for local path ${storagePath}.${hint}`);
+  }
+}
+
 export async function readBytesFromStorageRef(ref: string): Promise<Buffer> {
   const trimmed = ref.trim();
   if (isRemoteStorageRef(trimmed)) {
-    const res = await fetch(trimmed);
+    const res = await fetch(trimmed, { cache: "no-store" });
     if (!res.ok) {
       throw new Error(`Remote storage fetch failed: ${res.status}`);
     }
     return Buffer.from(await res.arrayBuffer());
   }
-  return readFile(absolutePathForStoragePath(trimmed));
+  return readLocalUploadBytes(trimmed);
 }
 
 export async function storageRefIsReadable(ref: string): Promise<boolean> {

@@ -25,8 +25,9 @@ export async function GET(_request: Request, ctx: Ctx) {
   let buffer: Buffer;
   try {
     buffer = await readBytesFromStorageRef(doc.storagePath);
-  } catch {
-    return NextResponse.json({ error: "Stored file not found" }, { status: 404 });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Stored file not found";
+    return NextResponse.json({ error: message }, { status: 404 });
   }
 
   const extracted = await extractPdfFormFields(buffer);

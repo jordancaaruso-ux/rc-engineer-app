@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
-import { sourceTypeFromMime, storeSetupDocumentFile } from "@/lib/setupDocuments/storage";
+import {
+  sourceTypeFromMime,
+  StorageConfigurationError,
+  storeSetupDocumentFile,
+} from "@/lib/setupDocuments/storage";
 import { SETUP_DOCUMENT_MAX_BYTES } from "@/lib/setupDocuments/types";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 
@@ -44,7 +48,15 @@ export async function POST(request: Request, ctx: Ctx) {
     if (mimeType !== PDF_MIME) {
       return NextResponse.json({ error: `Bulk import accepts PDF only: ${file.name}` }, { status: 400 });
     }
-    const { storagePath } = await storeSetupDocumentFile(file);
+    let storagePath: string;
+    try {
+      ({ storagePath } = await storeSetupDocumentFile(file));
+    } catch (e) {
+      if (e instanceof StorageConfigurationError) {
+        return NextResponse.json({ error: e.message }, { status: 503 });
+      }
+      throw e;
+    }
     const sourceType = sourceTypeFromMime(mimeType);
     const doc = await prisma.setupDocument.create({
       data: {
