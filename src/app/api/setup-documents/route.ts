@@ -38,15 +38,20 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const dbg = process.env.DEBUG_SETUP_UPLOAD_TIMING === "1";
+  const t0 = dbg ? performance.now() : 0;
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const user = await getOrCreateLocalUser();
+  if (dbg) console.log(`[setup-upload-timing] after getOrCreateLocalUser ${(performance.now() - t0).toFixed(1)}ms`);
   const ct = request.headers.get("content-type") ?? "";
   if (!ct.includes("multipart/form-data")) {
     return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 });
   }
+  const tForm = dbg ? performance.now() : 0;
   const form = await request.formData().catch(() => null);
+  if (dbg) console.log(`[setup-upload-timing] after formData ${(performance.now() - tForm).toFixed(1)}ms`);
   if (!form) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   const file = form.get("file");
   if (!file || !(file instanceof File)) {
@@ -61,6 +66,7 @@ export async function POST(request: Request) {
   }
 
   let storagePath: string;
+  const tStore = dbg ? performance.now() : 0;
   try {
     ({ storagePath } = await storeSetupDocumentFile(file));
   } catch (e) {
@@ -69,9 +75,11 @@ export async function POST(request: Request) {
     }
     throw e;
   }
+  if (dbg) console.log(`[setup-upload-timing] after storeSetupDocumentFile ${(performance.now() - tStore).toFixed(1)}ms`);
   const sourceType = sourceTypeFromMime(mimeType);
 
   // Create the document immediately so the UI can poll status/stages even if parsing stalls.
+  const tDb = dbg ? performance.now() : 0;
   const created = await prisma.setupDocument.create({
     data: {
       userId: user.id,
@@ -86,7 +94,9 @@ export async function POST(request: Request) {
     },
     select: { id: true },
   });
+  if (dbg) console.log(`[setup-upload-timing] after prisma.create ${(performance.now() - tDb).toFixed(1)}ms`);
   console.log(`[setup-documents/upload] doc=${created.id} stored ${file.name} (${mimeType})`);
+  if (dbg) console.log(`[setup-upload-timing] POST total ${(performance.now() - t0).toFixed(1)}ms`);
 
   return NextResponse.json({ id: created.id }, { status: 201 });
 }

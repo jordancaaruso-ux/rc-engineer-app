@@ -81,24 +81,40 @@ export async function storeSetupDocumentFile(file: File): Promise<{ storagePath:
   const ext = path.extname(file.name || "").toLowerCase();
   const safeExt = ext && ext.length <= 8 ? ext : "";
   const filename = `${new Date().toISOString().slice(0, 10)}-${randomUUID()}${safeExt}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
   const contentType = file.type?.trim() || "application/octet-stream";
 
   if (useBlobStorage()) {
-    const blob = await put(`setup-documents/${filename}`, bytes, {
+    // Pass `File` through to `put` so we do not materialize a second full copy via `arrayBuffer()`
+    // before streaming to the Blob API (reduces memory and often wall time vs buffer-then-put).
+    const t0 = performance.now();
+    const blob = await put(`setup-documents/${filename}`, file, {
       access: "private",
       contentType,
       addRandomSuffix: false,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
+    if (process.env.DEBUG_SETUP_UPLOAD_TIMING === "1") {
+      console.log(
+        `[setup-upload-timing] blob put ${(performance.now() - t0).toFixed(1)}ms bytes=${file.size} pathname=setup-documents/${filename}`
+      );
+    }
     return { storagePath: blob.url };
   }
 
+  const tBuf = performance.now();
+  const bytes = Buffer.from(await file.arrayBuffer());
+  if (process.env.DEBUG_SETUP_UPLOAD_TIMING === "1") {
+    console.log(`[setup-upload-timing] local arrayBuffer ${(performance.now() - tBuf).toFixed(1)}ms bytes=${bytes.length}`);
+  }
   const dir = path.join(LOCAL_UPLOAD_ROOT, "setup-documents");
   await mkdir(dir, { recursive: true });
   const absolutePath = path.join(dir, filename);
   const relativePath = `/uploads/setup-documents/${filename}`;
+  const tWr = performance.now();
   await writeFile(absolutePath, bytes);
+  if (process.env.DEBUG_SETUP_UPLOAD_TIMING === "1") {
+    console.log(`[setup-upload-timing] local writeFile ${(performance.now() - tWr).toFixed(1)}ms`);
+  }
   return { storagePath: relativePath };
 }
 
