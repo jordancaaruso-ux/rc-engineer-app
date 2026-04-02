@@ -9,6 +9,8 @@ import { compareRunTimestamp } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 type RunInGroup = Awaited<ReturnType<typeof fetchRuns>>[number];
 
 function dateKey(d: Date): string {

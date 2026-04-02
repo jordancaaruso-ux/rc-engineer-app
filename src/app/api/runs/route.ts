@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
@@ -265,6 +266,8 @@ export async function POST(request: Request) {
       runId: run.id,
       suggestedChanges: body.suggestedChanges?.trim() || null,
     });
+
+    revalidatePath("/runs/history");
 
     return NextResponse.json({ run }, { status: 201 });
   } catch (err) {
