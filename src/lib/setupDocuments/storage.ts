@@ -4,7 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { put } from "@vercel/blob";
+import { get, put } from "@vercel/blob";
 
 /**
  * Local disk fallback (development only — no `BLOB_READ_WRITE_TOKEN`).
@@ -48,6 +48,30 @@ export function isRemoteStorageRef(ref: string): boolean {
   return /^https?:\/\//i.test(ref.trim());
 }
 
+function isLikelyVercelBlobHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
+async function readableStreamToBuffer(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
+  const reader = stream.getReader();
+  const chunks: Buffer[] = [];
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value?.byteLength) chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks);
+}
+
 export function sourceTypeFromMime(mimeType: string): "PDF" | "IMAGE" {
   return mimeType === "application/pdf" ? "PDF" : "IMAGE";
 }
@@ -62,7 +86,7 @@ export async function storeSetupDocumentFile(file: File): Promise<{ storagePath:
 
   if (useBlobStorage()) {
     const blob = await put(`setup-documents/${filename}`, bytes, {
-      access: "public",
+      access: "private",
       contentType,
       addRandomSuffix: false,
       token: process.env.BLOB_READ_WRITE_TOKEN,
@@ -84,7 +108,7 @@ export async function storeRunRenderedSetupPdf(runId: string, pdfBytes: Buffer):
   const key = `run-setup-pdfs/${runId}.pdf`;
   if (useBlobStorage()) {
     const blob = await put(key, pdfBytes, {
-      access: "public",
+      access: "private",
       contentType: "application/pdf",
       addRandomSuffix: false,
       allowOverwrite: true,
@@ -144,6 +168,17 @@ async function readLocalUploadBytes(storagePath: string): Promise<Buffer> {
 export async function readBytesFromStorageRef(ref: string): Promise<Buffer> {
   const trimmed = ref.trim();
   if (isRemoteStorageRef(trimmed)) {
+    const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+    if (token && isLikelyVercelBlobHttpUrl(trimmed)) {
+      const result = await get(trimmed, {
+        access: "private",
+        token,
+        useCache: false,
+      });
+      if (result?.statusCode === 200 && result.stream) {
+        return readableStreamToBuffer(result.stream);
+      }
+    }
     const res = await fetch(trimmed, { cache: "no-store" });
     if (!res.ok) {
       throw new Error(`Remote storage fetch failed: ${res.status}`);
