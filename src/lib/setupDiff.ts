@@ -1,6 +1,7 @@
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { buildCatalogFromTemplate, buildFieldMetaMap } from "@/lib/setupFieldCatalog";
+import { isMultiSelectFieldKey, multiSelectSetEquals } from "@/lib/setup/multiSelect";
 
 /** All keys from both snapshots, with labels where known */
 export function buildSetupDiffRows(
@@ -52,7 +53,11 @@ export function buildSetupDiffRows(
     const p = previous?.[key];
     const curStr = formatSetupVal(c);
     const prevStr = previous == null ? null : formatSetupVal(p);
-    const changed = previous != null && curStr !== prevStr;
+    const changed = previous != null
+      ? isMultiSelectFieldKey(key)
+        ? !multiSelectSetEquals(key, c, p)
+        : curStr !== prevStr
+      : false;
     rows.push({
       key,
       label: meta2?.label ?? meta?.label ?? key.replace(/_/g, " "),
@@ -67,6 +72,7 @@ export function buildSetupDiffRows(
 
 function formatSetupVal(v: unknown): string {
   if (v == null || v === "") return "—";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
   return String(v);
 }
 

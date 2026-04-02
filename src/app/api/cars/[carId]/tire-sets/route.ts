@@ -16,8 +16,16 @@ export async function GET(
   const user = await getOrCreateLocalUser();
   const { carId } = await context.params;
 
+  const car = await prisma.car.findFirst({
+    where: { id: carId, userId: user.id },
+    select: { id: true },
+  });
+  if (!car) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const tireSets = await prisma.tireSet.findMany({
-    where: { userId: user.id, carId },
+    where: { userId: user.id },
     orderBy: [{ label: "asc" }, { setNumber: "asc" }, { createdAt: "desc" }],
     select: { id: true, label: true, setNumber: true, initialRunCount: true }
   });

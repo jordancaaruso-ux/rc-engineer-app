@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { EventList } from "@/components/events/EventList";
 
-export default async function EventsPage() {
+export default async function EventsPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -14,7 +15,7 @@ export default async function EventsPage() {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             Set DATABASE_URL in .env to manage events.
           </div>
         </section>

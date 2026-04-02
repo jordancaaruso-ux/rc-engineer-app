@@ -3,6 +3,8 @@
  * Same keys as DB snapshot; add car-specific templates later via templateId.
  */
 
+import type { StructuredSection } from "@/lib/a800rrSetupDisplayConfig";
+
 export type SetupSheetFieldDef = {
   key: string;
   label: string;
@@ -25,6 +27,8 @@ export type SetupSheetTemplate = {
   id: string;
   label: string;
   groups: SetupSheetGroupDef[];
+  /** When set (e.g. A800RR v2), SetupSheetView renders structured sections instead of legacy groups. */
+  structuredSections?: StructuredSection[];
 };
 
 /** Generic touring-car style sheet; swap templateId for car-specific later. */
@@ -68,7 +72,8 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
       column: "full",
       fields: [
         { key: "diff", label: "Diff / slipper" },
-        { key: "diff_height", label: "Diff height" },
+        { key: "diff_height_front", label: "Diff height (Front)" },
+        { key: "diff_height_rear", label: "Diff height (Rear)" },
       ],
     },
     {

@@ -1,6 +1,7 @@
+import type { ActionItemSourceType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
-import { computeLapMetrics, normalizeLapTimes } from "@/lib/runLaps";
+import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 
@@ -142,7 +143,16 @@ export async function getDashboardNewRunPrefill(
   return null;
 }
 
+export type DashboardActionItemRow = {
+  id: string;
+  text: string;
+  sourceType: "RUN" | "MANUAL";
+  createdAt: string;
+  sourceRunId: string | null;
+};
+
 export type DashboardHomeModel = {
+  thingsToTry: DashboardActionItemRow[];
   activeEvent: null | {
     id: string;
     name: string;
@@ -172,6 +182,7 @@ const recentRunSelect = {
   id: true,
   createdAt: true,
   lapTimes: true,
+  lapSession: true,
   sessionType: true,
   meetingSessionType: true,
   meetingSessionCode: true,
@@ -202,11 +213,35 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     }),
     prisma.run.findMany({
       where: { userId },
-      select: { lapTimes: true },
+      select: { lapTimes: true, lapSession: true },
       take: 400,
       orderBy: { createdAt: "desc" },
     }),
   ]);
+
+  let actionItems: Array<{
+    id: string;
+    createdAt: Date;
+    text: string;
+    sourceType: ActionItemSourceType;
+    sourceRunId: string | null;
+  }> = [];
+  try {
+    actionItems = await prisma.actionItem.findMany({
+      where: { userId, isArchived: false },
+      orderBy: { createdAt: "desc" },
+      take: 120,
+      select: {
+        id: true,
+        text: true,
+        sourceType: true,
+        createdAt: true,
+        sourceRunId: true,
+      },
+    });
+  } catch {
+    actionItems = [];
+  }
 
   const activeCandidates = events.filter(eventIsActiveOnLocalToday);
   const activeEvent =
@@ -224,10 +259,11 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
         where: { userId, eventId: activeEvent.id },
         orderBy: { createdAt: "desc" },
         select: {
-          lapTimes: true,
-          notes: true,
-          driverNotes: true,
-          handlingProblems: true,
+    lapTimes: true,
+    lapSession: true,
+    notes: true,
+    driverNotes: true,
+    handlingProblems: true,
         },
       }),
     ]);
@@ -243,8 +279,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       notesPreview: string | null;
     } | null = null;
     if (latestRun) {
-      const laps = normalizeLapTimes(latestRun.lapTimes);
-      const m = computeLapMetrics(laps);
+      const m = computeIncludedLapMetricsFromRun(latestRun);
       const fullNotes = displayRunNotes(latestRun);
       const notesPreview =
         fullNotes.length > 100 ? `${fullNotes.slice(0, 97).trimEnd()}…` : fullNotes || null;
@@ -267,8 +302,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
   let perfBestLap: number | null = null;
   let perfAvgTop5: number | null = null;
   for (const r of runsForPerf) {
-    const laps = normalizeLapTimes(r.lapTimes);
-    const m = computeLapMetrics(laps);
+    const m = computeIncludedLapMetricsFromRun(r);
     if (m.bestLap != null) {
       if (perfBestLap == null || m.bestLap < perfBestLap) {
         perfBestLap = m.bestLap;
@@ -279,8 +313,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
 
   let recent: DashboardHomeModel["recentRun"] = null;
   if (recentRun) {
-    const laps = normalizeLapTimes(recentRun.lapTimes);
-    const m = computeLapMetrics(laps);
+    const m = computeIncludedLapMetricsFromRun(recentRun);
     recent = {
       id: recentRun.id,
       createdAt: recentRun.createdAt.toISOString(),
@@ -293,6 +326,13 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
   }
 
   return {
+    thingsToTry: actionItems.map((i) => ({
+      id: i.id,
+      text: i.text,
+      sourceType: i.sourceType,
+      createdAt: i.createdAt.toISOString(),
+      sourceRunId: i.sourceRunId,
+    })),
     activeEvent: activeBlock,
     hasRunToday: Boolean(hasRunToday),
     perfBestLap,

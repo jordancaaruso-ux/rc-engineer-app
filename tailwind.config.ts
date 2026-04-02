@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: ["class"],
+  darkMode: "class",
   content: [
     "./src/app/**/*.{ts,tsx}",
     "./src/components/**/*.{ts,tsx}",
@@ -10,27 +10,34 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "hsl(222.2 84% 4.9%)",
-        foreground: "hsl(210 40% 98%)",
+        background: "#0B0F0E",
+        foreground: "#E8F0ED",
+        card: {
+          DEFAULT: "#131917",
+          foreground: "#E8F0ED"
+        },
         primary: {
-          DEFAULT: "hsl(222.2 47.4% 11.2%)",
-          foreground: "hsl(210 40% 98%)"
+          DEFAULT: "#C92A2A",
+          foreground: "#F8F9FA"
         },
         secondary: {
-          DEFAULT: "hsl(217.2 32.6% 17.5%)",
-          foreground: "hsl(210 40% 98%)"
-        },
-        accent: {
-          DEFAULT: "hsl(142.1 70.6% 45.3%)",
-          foreground: "hsl(144.9 80.4% 10%)"
+          DEFAULT: "#121716",
+          foreground: "#E8F0ED"
         },
         muted: {
-          DEFAULT: "hsl(217.2 32.6% 17.5%)",
-          foreground: "hsl(215 20.2% 65.1%)"
+          DEFAULT: "#121716",
+          foreground: "#A7B3AF"
         },
-        border: "hsl(217.2 32.6% 17.5%)",
-        input: "hsl(217.2 32.6% 17.5%)",
-        ring: "hsl(212.7 26.8% 83.9%)"
+        accent: {
+          DEFAULT: "#2563EB",
+          foreground: "#F8F9FA"
+        },
+        destructive: "#7A1E1E",
+        border: "#1F2624",
+        input: "#161C1A",
+        ring: "#C92A2A",
+        /** Extra-muted labels (spec) */
+        faint: "#6B7572"
       },
       borderRadius: {
         lg: "0.5rem",
@@ -38,8 +45,12 @@ const config: Config = {
         sm: "0.25rem"
       },
       fontFamily: {
-        sans: ["system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "SFMono-Regular", "Menlo", "monospace"]
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
+      },
+      boxShadow: {
+        glow: "0 0 24px -4px rgba(201, 42, 42, 0.28)",
+        "glow-sm": "0 0 16px -6px rgba(201, 42, 42, 0.22)"
       }
     }
   },

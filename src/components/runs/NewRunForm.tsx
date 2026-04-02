@@ -16,16 +16,13 @@ import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupC
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunListScanLine, formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
-import { displayRunNotes } from "@/lib/runNotes";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
-import type { LapSourceKind } from "@/lib/lapSession/types";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import {
   LapTimesIngestPanel,
   defaultLapIngestValue,
   type LapIngestFormValue,
 } from "@/components/runs/LapTimesIngestPanel";
-import type { LapImportLapRow } from "@/lib/lapUrlParsers/types";
 
 type CarOption = { id: string; name: string; setupSheetTemplate?: string | null };
 type TrackOption = { id: string; name: string; location?: string | null };
@@ -68,6 +65,16 @@ type LastRun = {
   lapSession?: unknown;
 };
 
+type DownloadedSetupOption = {
+  id: string;
+  originalFilename: string;
+  createdAt: string;
+  setupData: unknown;
+  baselineSetupSnapshotId?: string | null;
+  /** Car this snapshot belongs to (null = legacy / unknown). */
+  carId?: string | null;
+};
+
 function copyPreviewRunToPickerRun(r: LastRun): RunPickerRun {
   return {
     id: r.id,
@@ -108,53 +115,6 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
     }
     throw new Error("Network error");
   }
-}
-
-function lapIngestFromRunLike(r: { lapTimes?: unknown; lapSession?: unknown }): LapIngestFormValue {
-  const laps = normalizeLapTimes(r.lapTimes);
-  const manualText = laps.map((n) => n.toFixed(3)).join("\n");
-  const raw = r.lapSession;
-  if (raw && typeof raw === "object") {
-    const o = raw as Record<string, unknown>;
-    if (o.version === 1 && o.source && typeof o.source === "object") {
-      const src = o.source as Record<string, unknown>;
-      const kind = src.kind;
-      const sk: LapSourceKind =
-        kind === "screenshot" || kind === "url" || kind === "csv" || kind === "manual" ? kind : "manual";
-      let urlLapRows: LapImportLapRow[] | null = null;
-      const entries = o.entries;
-      if (Array.isArray(entries) && entries[0] && typeof entries[0] === "object") {
-        const e0 = entries[0] as Record<string, unknown>;
-        const perLap = e0.perLap;
-        if (Array.isArray(perLap) && perLap.length === laps.length) {
-          urlLapRows = laps.map((time, i) => {
-            const meta = perLap[i] as Record<string, unknown> | null | undefined;
-            return {
-              time,
-              isOutlierWarning: Boolean(meta?.isOutlierWarning),
-              warningReason: typeof meta?.warningReason === "string" ? meta.warningReason : null,
-              isFlagged: Boolean(meta?.isFlagged),
-              flagReason: typeof meta?.flagReason === "string" ? meta.flagReason : null,
-            };
-          });
-        }
-      }
-      return {
-        manualText,
-        sourceKind: sk,
-        sourceDetail: typeof src.detail === "string" ? src.detail : null,
-        parserId: typeof src.parserId === "string" ? src.parserId : null,
-        urlLapRows,
-      };
-    }
-  }
-  return {
-    manualText,
-    sourceKind: "manual",
-    sourceDetail: null,
-    parserId: null,
-    urlLapRows: null,
-  };
 }
 
 /** Ensure Things to try behaves like a bullet list (first line starts with `• `). */
@@ -220,6 +180,8 @@ export function NewRunForm(props: {
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   const [setupData, setSetupData] = useState<SetupSnapshotData>({});
+  /** Baseline SetupSnapshot id for server merge + audit (null = scratch / no prior snapshot). */
+  const [setupBaselineSnapshotId, setSetupBaselineSnapshotId] = useState<string | null>(null);
   const [lapIngest, setLapIngest] = useState<LapIngestFormValue>(() => defaultLapIngestValue());
   const [notes, setNotes] = useState("");
   const [suggestedChanges, setSuggestedChanges] = useState("");
@@ -244,6 +206,10 @@ export function NewRunForm(props: {
   const [copyTireWarning, setCopyTireWarning] = useState<string | null>(null);
   const [pickerRuns, setPickerRuns] = useState<RunPickerRun[]>([]);
   const [loadSetupSelection, setLoadSetupSelection] = useState("");
+  const [loadOtherSetupSelection, setLoadOtherSetupSelection] = useState("");
+  const [setupSource, setSetupSource] = useState<"previous_runs" | "other">("previous_runs");
+  const [otherSetupSource, setOtherSetupSource] = useState<"downloaded_setups">("downloaded_setups");
+  const [downloadedSetups, setDownloadedSetups] = useState<DownloadedSetupOption[]>([]);
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
@@ -290,7 +256,8 @@ export function NewRunForm(props: {
 
     const nextSetup = normalizeSetupData(r.setupSnapshot?.data);
     setSetupData(nextSetup);
-    setActiveSetupData(nextSetup);
+    setActiveSetupData(nextSetup, nextCarId || carId || null);
+    setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
     setNotes("");
     setSuggestedChanges("");
     setLapIngest(defaultLapIngestValue());
@@ -310,6 +277,13 @@ export function NewRunForm(props: {
   const loadSetupControlLabel = loadedSetupRun
     ? formatRunPickerLineRelativeWhen(loadedSetupRun)
     : "Load from past run";
+  const selectedDownloadedSetup = useMemo(
+    () => (loadOtherSetupSelection ? downloadedSetups.find((d) => d.id === loadOtherSetupSelection) ?? null : null),
+    [loadOtherSetupSelection, downloadedSetups]
+  );
+  const loadOtherSetupLabel = selectedDownloadedSetup
+    ? `${selectedDownloadedSetup.originalFilename} · ${new Date(selectedDownloadedSetup.createdAt).toLocaleDateString()}`
+    : "Load from downloaded setup";
 
   const needsEvent = sessionType === "RACE_MEETING";
 
@@ -338,25 +312,50 @@ export function NewRunForm(props: {
     setTracksList(tracks);
   }, [tracks]);
 
+  /** Past-run + downloaded setup lists scoped to the selected car. */
   useEffect(() => {
+    if (!carId) {
+      setPickerRuns([]);
+      setDownloadedSetups([]);
+      return;
+    }
     let alive = true;
-    jsonFetch<{ runs: RunPickerRun[] }>("/api/runs/for-picker")
-      .then(({ runs }) => {
+    Promise.all([
+      jsonFetch<{ runs: RunPickerRun[] }>(`/api/runs/for-picker?carId=${encodeURIComponent(carId)}`),
+      jsonFetch<{ downloadedSetups: DownloadedSetupOption[] }>(
+        `/api/setup/options?carId=${encodeURIComponent(carId)}`
+      ),
+    ])
+      .then(([runsRes, dlRes]) => {
         if (!alive) return;
-        setPickerRuns(Array.isArray(runs) ? runs : []);
+        setPickerRuns(Array.isArray(runsRes.runs) ? runsRes.runs : []);
+        setDownloadedSetups(Array.isArray(dlRes.downloadedSetups) ? dlRes.downloadedSetups : []);
       })
       .catch(() => {
         if (!alive) return;
         setPickerRuns([]);
+        setDownloadedSetups([]);
       });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [carId]);
+
+  function handleSetupSourceChange(next: "previous_runs" | "other") {
+    setSetupSource(next);
+    if (next === "previous_runs") {
+      const r = pickerRuns.find((x) => x.id === loadSetupSelection);
+      setSetupBaselineSnapshotId(r?.setupSnapshot?.id ?? null);
+    } else {
+      const d = downloadedSetups.find((x) => x.id === loadOtherSetupSelection);
+      setSetupBaselineSnapshotId(d?.baselineSetupSnapshotId ?? null);
+    }
+  }
 
   function applyPastSetupOnly(runId: string) {
     if (!runId) {
       setLoadSetupSelection("");
+      setSetupBaselineSnapshotId(null);
       return;
     }
     const picked = pickerRuns.find((r) => r.id === runId);
@@ -364,15 +363,31 @@ export function NewRunForm(props: {
     setLoadSetupSelection(runId);
     const next = normalizeSetupData(picked.setupSnapshot?.data);
     setSetupData(next);
-    setActiveSetupData(next);
+    setActiveSetupData(next, carId || null);
+    setSetupBaselineSnapshotId(picked.setupSnapshot?.id ?? null);
+  }
+
+  function applyDownloadedSetupOnly(docId: string) {
+    if (!docId) {
+      setLoadOtherSetupSelection("");
+      setSetupBaselineSnapshotId(null);
+      return;
+    }
+    const picked = downloadedSetups.find((d) => d.id === docId);
+    if (!picked) return;
+    setLoadOtherSetupSelection(docId);
+    const next = normalizeSetupData(picked.setupData);
+    setSetupData(next);
+    setActiveSetupData(next, picked.carId ?? carId ?? null);
+    setSetupBaselineSnapshotId(picked.baselineSetupSnapshotId ?? null);
   }
 
   useEffect(() => {
     const t = window.setTimeout(() => {
-      setActiveSetupData(setupData);
+      setActiveSetupData(setupData, carId || null);
     }, 400);
     return () => window.clearTimeout(t);
-  }, [setupData]);
+  }, [setupData, carId]);
 
   useLayoutEffect(() => {
     const el = thingsTryRef.current;
@@ -471,7 +486,8 @@ export function NewRunForm(props: {
           setRunsCompleted(validTireId ? (lastRun.tireRunNumber ?? 0) : 0);
           const nextSetup = normalizeSetupData(lastRun.setupSnapshot?.data);
           setSetupData(nextSetup);
-          setActiveSetupData(nextSetup);
+          setActiveSetupData(nextSetup, carId || null);
+          setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
         } else {
           // Keep current form state unless user explicitly copies last run.
         }
@@ -508,8 +524,9 @@ export function NewRunForm(props: {
     setRunsCompleted(prevTireId ? (lastRun.tireRunNumber ?? 0) : 0);
     const nextSetup = normalizeSetupData(lastRun.setupSnapshot?.data);
     setSetupData(nextSetup);
-    setActiveSetupData(nextSetup);
-  }, [replicateLast, lastRun]);
+    setActiveSetupData(nextSetup, carId || null);
+    setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
+  }, [replicateLast, lastRun, carId]);
 
   useEffect(() => {
     if (!needsEvent) return;
@@ -562,7 +579,7 @@ export function NewRunForm(props: {
     }
     const selected = events.find((e) => e.id === eventId) ?? null;
     const evTrackId = selected?.trackId ?? "";
-    if (!evTrackId) {
+    if (!evTrackId || !selected) {
       setEventTrackSwitchPrompt(null);
       return;
     }
@@ -587,6 +604,7 @@ export function NewRunForm(props: {
   function applyCopyFromPreview() {
     const r = copyPreviewRun;
     if (!r) return;
+    const prevCarId = carId;
     const nextCarId = (r.carId || r.car?.id || "").toString();
     if (nextCarId && cars.some((c) => c.id === nextCarId)) {
       setCarId(nextCarId);
@@ -631,18 +649,19 @@ export function NewRunForm(props: {
       setMeetingSessionCustom("");
     }
     setEventId(r.eventId ?? "");
+    if (nextCarId && nextCarId !== prevCarId) {
+      setLoadSetupSelection("");
+      setLoadOtherSetupSelection("");
+      setSetupBaselineSnapshotId(null);
+    }
     const copied = normalizeSetupData(r.setupSnapshot?.data);
     setSetupData(copied);
-    setActiveSetupData(copied);
-    setNotes(
-      displayRunNotes({
-        notes: r.notes,
-        driverNotes: r.driverNotes,
-        handlingProblems: r.handlingProblems,
-      })
-    );
-    setSuggestedChanges(normalizeThingsToTryFromStorage(r.suggestedChanges?.trim() ?? ""));
-    setLapIngest(lapIngestFromRunLike(r));
+    setActiveSetupData(copied, nextCarId || prevCarId || null);
+    setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
+    // Session-specific text and laps are not copied — only structured fields + setup above.
+    setNotes("");
+    setSuggestedChanges("");
+    setLapIngest(defaultLapIngestValue());
     setLoadSetupSelection(r.id);
     setReplicateLast(true);
   }
@@ -787,6 +806,75 @@ export function NewRunForm(props: {
     }
   }
 
+  function buildImportedLapSetsFromIngest(current: LapIngestFormValue): Array<{
+    sourceUrl: string | null;
+    driverId: string | null;
+    driverName: string;
+    normalizedName: string;
+    isPrimaryUser: boolean;
+    laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
+  }> {
+    if (current.sourceKind !== "url") return [];
+    const sessionDrivers = current.sessionDrivers ?? [];
+    if (sessionDrivers.length === 0) return [];
+
+    const sourceUrl = current.sourceDetail ?? null;
+    const selected = new Set(current.selectedDriverIds ?? []);
+    const selectedOrdered = sessionDrivers.filter((d) => selected.has(d.driverId));
+    const primary = selectedOrdered[0] ?? null;
+
+    function structuredLapsForDriver(d: (typeof sessionDrivers)[number]) {
+      const rows = current.driverLapRowsByDriverId?.[d.driverId];
+      if (rows && rows.length > 0) {
+        return rows.map((r) => ({
+          lapNumber: r.lapNumber,
+          lapTimeSeconds: r.lapTimeSeconds,
+          isIncluded: r.isIncluded,
+        }));
+      }
+      return d.laps.map((t, i) => ({
+        lapNumber: i + 1,
+        lapTimeSeconds: t,
+        isIncluded: true,
+      }));
+    }
+
+    const out: Array<{
+      sourceUrl: string | null;
+      driverId: string | null;
+      driverName: string;
+      normalizedName: string;
+      isPrimaryUser: boolean;
+      laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
+    }> = [];
+
+    if (primary && primary.laps.length > 0) {
+      out.push({
+        sourceUrl,
+        driverId: primary.driverId,
+        driverName: primary.driverName,
+        normalizedName: primary.normalizedName,
+        isPrimaryUser: true,
+        laps: structuredLapsForDriver(primary),
+      });
+    }
+
+    for (const d of selectedOrdered) {
+      if (primary && d.driverId === primary.driverId) continue;
+      if (d.laps.length === 0) continue;
+      out.push({
+        sourceUrl,
+        driverId: d.driverId,
+        driverName: d.driverName,
+        normalizedName: d.normalizedName,
+        isPrimaryUser: false,
+        laps: structuredLapsForDriver(d),
+      });
+    }
+
+    return out;
+  }
+
   async function saveRun(e?: React.MouseEvent) {
     e?.preventDefault();
     setInlineError(null);
@@ -797,7 +885,28 @@ export function NewRunForm(props: {
     }
     setSaving(true);
     try {
-      const lapTimes = parseLapTimes(lapIngest.manualText);
+      let lapTimes: number[];
+      if (lapIngest.sourceKind === "url") {
+        const sessionDrivers = lapIngest.sessionDrivers ?? [];
+        const selectedIds = lapIngest.selectedDriverIds ?? [];
+        const selectedSet = new Set(selectedIds);
+        const selectedOrdered = sessionDrivers.filter((d) => selectedSet.has(d.driverId));
+        const primary = selectedOrdered[0] ?? null;
+
+        if (!primary) {
+          setInlineError("Select at least one imported driver.");
+          setSaving(false);
+          return;
+        }
+        const primaryRows = lapIngest.driverLapRowsByDriverId?.[primary.driverId];
+        lapTimes =
+          primaryRows && primaryRows.length > 0
+            ? primaryRows.map((r) => r.lapTimeSeconds)
+            : primary.laps;
+      } else {
+        lapTimes = parseLapTimes(lapIngest.manualText);
+      }
+      const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
       const { run } = await jsonFetch<{ run: { id: string; createdAt: string } }>("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -811,26 +920,51 @@ export function NewRunForm(props: {
           tireSetId: tireSetId || null,
           tireRunNumber: Math.max(1, runsCompleted + 1),
           setupData,
+          setupBaselineSnapshotId,
+          sourceSetupDocumentId:
+            setupSource === "other" && loadOtherSetupSelection ? loadOtherSetupSelection : null,
           lapTimes,
           lapIngestMeta: {
             sourceKind: lapIngest.sourceKind,
             sourceDetail: lapIngest.sourceDetail,
             parserId: lapIngest.parserId,
-            perLap:
-              lapIngest.urlLapRows &&
-              lapIngest.urlLapRows.length > 0 &&
-              lapIngest.urlLapRows.length === lapTimes.length
-                ? lapIngest.urlLapRows.map((r) => ({
-                    isOutlierWarning: r.isOutlierWarning,
-                    warningReason: r.warningReason ?? null,
-                    isFlagged: Boolean(r.isFlagged),
-                    flagReason: r.flagReason ?? null,
-                  }))
-                : undefined,
+            perLap: (() => {
+              if (lapIngest.sourceKind === "url") {
+                const sessionDrivers = lapIngest.sessionDrivers ?? [];
+                const selectedIds = lapIngest.selectedDriverIds ?? [];
+                const selectedOrdered = sessionDrivers.filter((d) => selectedIds.includes(d.driverId));
+                const primary = selectedOrdered[0] ?? null;
+                const primaryRows = primary ? lapIngest.driverLapRowsByDriverId?.[primary.driverId] : null;
+                if (primaryRows && primaryRows.length === lapTimes.length) {
+                  return primaryRows.map((row, i) => ({
+                    isOutlierWarning: lapIngest.urlLapRows?.[i]?.isOutlierWarning,
+                    warningReason: lapIngest.urlLapRows?.[i]?.warningReason ?? null,
+                    isFlagged: Boolean(lapIngest.urlLapRows?.[i]?.isFlagged),
+                    flagReason: lapIngest.urlLapRows?.[i]?.flagReason ?? null,
+                    isIncluded: row.isIncluded,
+                  }));
+                }
+              }
+              if (
+                lapIngest.urlLapRows &&
+                lapIngest.urlLapRows.length > 0 &&
+                lapIngest.urlLapRows.length === lapTimes.length
+              ) {
+                return lapIngest.urlLapRows.map((r) => ({
+                  isOutlierWarning: r.isOutlierWarning,
+                  warningReason: r.warningReason ?? null,
+                  isFlagged: Boolean(r.isFlagged),
+                  flagReason: r.flagReason ?? null,
+                  isIncluded: true,
+                }));
+              }
+              return undefined;
+            })(),
           },
           notes: notes.trim() || null,
           suggestedChanges: suggestedChanges.trim() || null,
-          sessionLabel: null
+          sessionLabel: null,
+          importedLapSets,
         })
       });
 
@@ -892,19 +1026,19 @@ export function NewRunForm(props: {
       noValidate
     >
       {cars.length === 0 ? (
-        <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
           You need at least one car to log a run. Go to <a href="/cars" className="text-accent underline">Car Manager</a> to create one.
         </div>
       ) : null}
 
       {/* Copy last run shortcut (optional) */}
-      <div className="rounded-lg border border-border bg-secondary/10 px-4 py-3">
+      <div className="rounded-lg border border-border bg-muted/50 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs font-mono text-muted-foreground">Shortcut</div>
+          <div className="ui-title text-sm text-muted-foreground">Shortcut</div>
           <button
             type="button"
             className={cn(
-              "rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-xs font-semibold hover:bg-secondary/40 transition",
+              "rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted transition",
               !copyPreviewRun && "opacity-60 pointer-events-none"
             )}
             onClick={() => {
@@ -938,8 +1072,8 @@ export function NewRunForm(props: {
       </div>
 
       {/* 2. Session type: Testing or Race Meeting only */}
-      <div className="rounded-lg border border-border bg-secondary/20 p-4">
-        <div className="text-xs font-mono text-muted-foreground mb-2">Session type</div>
+      <div className="rounded-lg border border-border bg-muted/70 p-4">
+        <div className="ui-title text-sm text-muted-foreground mb-2">Session type</div>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
@@ -970,12 +1104,12 @@ export function NewRunForm(props: {
       </div>
 
       {needsEvent ? (
-        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+        <div className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-xs font-mono text-muted-foreground">Event / Race meeting</div>
+            <div className="ui-title text-sm text-muted-foreground">Event / Race meeting</div>
             <button
               type="button"
-              className="rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-xs hover:bg-secondary/40 transition"
+              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted transition"
               onClick={() => {
                 setShowNewEventPanel((v) => !v);
                 setStatus(null);
@@ -987,7 +1121,7 @@ export function NewRunForm(props: {
           </div>
 
           <select
-            className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
             value={eventId}
             onChange={(e) => {
               setEventId(e.target.value);
@@ -1055,7 +1189,7 @@ export function NewRunForm(props: {
               </button>
               <button
                 type="button"
-                className="rounded border border-border bg-secondary/40 px-2 py-1 hover:bg-secondary/60"
+                className="rounded border border-border bg-card px-2 py-1 hover:bg-muted"
                 onClick={() => setEventTrackSwitchPrompt(null)}
               >
                 Keep
@@ -1070,11 +1204,11 @@ export function NewRunForm(props: {
           )}
 
           {showNewEventPanel && (
-            <div className="rounded-md border border-border bg-secondary/15 p-3 space-y-2">
-              <div className="rounded-md border border-border bg-secondary/10 p-2">
-                <div className="text-[11px] font-mono text-muted-foreground mb-1">Track (required)</div>
+            <div className="rounded-md border border-border bg-muted/60 p-3 space-y-2">
+              <div className="rounded-md border border-border bg-muted/50 p-2">
+                <div className="ui-title text-sm text-muted-foreground mb-1">Track (required)</div>
                 <select
-                  className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   value={newEventTrackId}
                   onChange={(e) => {
                     setNewEventTrackId(e.target.value);
@@ -1092,7 +1226,7 @@ export function NewRunForm(props: {
                 </select>
               </div>
               <input
-                className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 placeholder="Event name (e.g. TITC 2026)"
                 value={newEventName}
                 onChange={(e) => setNewEventName(e.target.value)}
@@ -1100,7 +1234,7 @@ export function NewRunForm(props: {
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="date"
-                  className="rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                  className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   value={newEventStartDate}
                   onChange={(e) => {
                     setNewEventStartDate(e.target.value);
@@ -1110,7 +1244,7 @@ export function NewRunForm(props: {
                 />
                 <input
                   type="date"
-                  className="rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                  className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   value={newEventEndDate}
                   onChange={(e) => {
                     setNewEventEndDate(e.target.value);
@@ -1133,7 +1267,7 @@ export function NewRunForm(props: {
                   isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate)
                 }
                 className={cn(
-                  "rounded-md bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition",
+                  "rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
                   (creatingEvent ||
                     !newEventName.trim() ||
                     !newEventTrackId ||
@@ -1147,13 +1281,13 @@ export function NewRunForm(props: {
             </div>
           )}
 
-          <div className="rounded-lg border border-border bg-secondary/15 p-3 space-y-3">
-            <div className="text-xs font-mono text-muted-foreground">Session</div>
+          <div className="rounded-lg border border-border bg-muted/60 p-3 space-y-3">
+            <div className="ui-title text-sm text-muted-foreground">Session</div>
             <div className="flex flex-wrap gap-3 items-end">
               <div className="space-y-1">
                 <label className="block text-[11px] text-muted-foreground">Type</label>
                 <select
-                  className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+                  className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   value={meetingSessionType}
                   onChange={(e) => {
                     setMeetingSessionType(e.target.value as MeetingSessionType);
@@ -1173,7 +1307,7 @@ export function NewRunForm(props: {
                   <label className="block text-[11px] text-muted-foreground">Custom session type</label>
                   <input
                     type="text"
-                    className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none min-w-[140px]"
+                    className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none min-w-[140px]"
                     placeholder="e.g. Warm-up"
                     value={meetingSessionCustom}
                     onChange={(e) => setMeetingSessionCustom(e.target.value)}
@@ -1186,8 +1320,8 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-border bg-secondary/10 p-4 space-y-3">
-        <div className="text-xs font-mono text-muted-foreground">Run details</div>
+      <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+        <div className="ui-title text-sm text-muted-foreground">Run details</div>
         <div
           className="flex flex-wrap border-b border-border gap-x-0.5"
           role="tablist"
@@ -1240,13 +1374,22 @@ export function NewRunForm(props: {
         {runDetailsTab === "car" ? (
           <div className="space-y-3 pt-1">
             <div className="space-y-1 text-sm">
-              <div className="text-xs font-mono text-muted-foreground">Car</div>
+              <div className="ui-title text-sm text-muted-foreground">Car</div>
               <select
-                className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={carId}
                 onChange={(e) => {
-                  setCarId(e.target.value);
+                  const next = e.target.value;
+                  const prev = carId;
+                  setCarId(next);
                   setCopyCarWarning(null);
+                  if (next && prev && next !== prev) {
+                    setLoadSetupSelection("");
+                    setLoadOtherSetupSelection("");
+                    setSetupBaselineSnapshotId(null);
+                    setSetupData({});
+                    setActiveSetupData({}, next);
+                  }
                 }}
                 aria-label="Car"
               >
@@ -1270,10 +1413,10 @@ export function NewRunForm(props: {
           <div className="space-y-4 pt-1">
             <div className="space-y-1 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-mono text-muted-foreground">Track</div>
+                <div className="ui-title text-sm text-muted-foreground">Track</div>
                 <button
                   type="button"
-                  className="rounded-md border border-border bg-secondary/30 px-2 py-1 text-[11px] hover:bg-secondary/40 transition"
+                  className="rounded-md border border-border bg-card px-2 py-1 text-[11px] hover:bg-muted transition"
                   onClick={() => {
                     setShowAddTrack((v) => !v);
                     setStatus(null);
@@ -1311,15 +1454,15 @@ export function NewRunForm(props: {
             )}
 
             {showAddTrack && (
-              <div className="rounded-md border border-border bg-secondary/15 p-3 space-y-2">
+              <div className="rounded-md border border-border bg-muted/60 p-3 space-y-2">
                 <input
-                  className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   placeholder="Track name"
                   value={newTrackName}
                   onChange={(e) => setNewTrackName(e.target.value)}
                 />
                 <input
-                  className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   placeholder="Location (optional)"
                   value={newTrackLocation}
                   onChange={(e) => setNewTrackLocation(e.target.value)}
@@ -1328,7 +1471,7 @@ export function NewRunForm(props: {
                   type="button"
                   disabled={addingTrack || !newTrackName.trim()}
                   className={cn(
-                    "rounded-md bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition",
+                    "rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
                     (addingTrack || !newTrackName.trim()) && "opacity-60 pointer-events-none"
                   )}
                   onClick={(e) => createTrack(e)}
@@ -1345,12 +1488,12 @@ export function NewRunForm(props: {
             <div className="space-y-2 text-sm">
               <div className="flex items-end justify-between gap-3">
                 <div>
-                  <div className="text-xs font-mono text-muted-foreground">Tire set</div>
+                  <div className="ui-title text-sm text-muted-foreground">Tire set</div>
                   <div className="text-[11px] text-muted-foreground">Optional.</div>
                 </div>
                 <button
                   type="button"
-                  className="rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-xs hover:bg-secondary/40 transition"
+                  className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted transition"
                   onClick={() => {
                     setShowNewTireSetPanel((v) => !v);
                     setInlineError(null);
@@ -1360,7 +1503,7 @@ export function NewRunForm(props: {
                 </button>
               </div>
               <select
-                className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={tireSetId}
                 onChange={(e) => {
                   setTireSetId(e.target.value);
@@ -1382,10 +1525,10 @@ export function NewRunForm(props: {
             </div>
 
             {showNewTireSetPanel && (
-              <div className="rounded-md border border-border bg-secondary/15 p-3 space-y-3">
+              <div className="rounded-md border border-border bg-muted/60 p-3 space-y-3">
                 <div className="grid gap-2 md:grid-cols-2">
                   <input
-                    className="rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                    className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                     placeholder="Label (brand + compound, e.g. Sweep 32)"
                     value={newTireLabel}
                     onChange={(e) => setNewTireLabel(e.target.value)}
@@ -1394,7 +1537,7 @@ export function NewRunForm(props: {
                   <input
                     type="number"
                     min={1}
-                    className="rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                    className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                     placeholder="Set number"
                     value={newTireSetNumber}
                     onChange={(e) => setNewTireSetNumber(Number(e.target.value) || 1)}
@@ -1410,11 +1553,11 @@ export function NewRunForm(props: {
                   </div>
                 </div>
                 <div className="space-y-1 text-sm">
-                  <div className="text-xs font-mono text-muted-foreground">How many runs have these tires done?</div>
+                  <div className="ui-title text-sm text-muted-foreground">How many runs have these tires done?</div>
                   <input
                     type="number"
                     min={0}
-                    className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                     inputMode="numeric"
                     value={newTireInitialRunCount}
                     onChange={(e) =>
@@ -1434,7 +1577,7 @@ export function NewRunForm(props: {
                 <button
                   type="button"
                   className={cn(
-                    "rounded-md bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition",
+                    "rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
                     (!newTireLabel.trim() || creatingTireSet) && "opacity-60 pointer-events-none"
                   )}
                   onClick={(e) => createTireSet(e)}
@@ -1447,11 +1590,11 @@ export function NewRunForm(props: {
 
             {!showNewTireSetPanel && tireSetId ? (
               <div className="space-y-1 text-sm">
-                <div className="text-xs font-mono text-muted-foreground">How many runs have these tires done?</div>
+                <div className="ui-title text-sm text-muted-foreground">How many runs have these tires done?</div>
                 <input
                   type="number"
                   min={0}
-                  className="w-full max-w-md rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+                  className="w-full max-w-md rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   inputMode="numeric"
                   value={runsCompleted}
                   onChange={(e) => setRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
@@ -1470,7 +1613,7 @@ export function NewRunForm(props: {
       <LapTimesIngestPanel value={lapIngest} onChange={setLapIngest} />
 
       <div className="space-y-2 text-sm">
-        <div className="text-xs font-mono text-muted-foreground">Notes</div>
+        <div className="ui-title text-sm text-muted-foreground">Notes</div>
         <div className="flex border-b border-border" role="tablist" aria-label="Notes and things to try">
           <button
             type="button"
@@ -1503,7 +1646,7 @@ export function NewRunForm(props: {
         </div>
         {notesSubTab === "notes" ? (
           <textarea
-            className="h-32 w-full resize-none rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
             placeholder="Session notes, handling, track conditions…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -1512,7 +1655,7 @@ export function NewRunForm(props: {
         ) : (
           <textarea
             ref={thingsTryRef}
-            className="h-32 w-full resize-none rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
             placeholder="First character becomes a bullet line. Enter: new • line. Shift+Enter: line break inside an item."
             value={suggestedChanges}
             onChange={handleThingsToTryChange}
@@ -1522,31 +1665,82 @@ export function NewRunForm(props: {
         )}
       </div>
 
-      <div className="rounded-lg border border-border bg-secondary/10 p-4 space-y-4">
-        <div className="text-xs font-mono text-muted-foreground">Setup</div>
+      <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-4">
+        <div className="ui-title text-sm text-muted-foreground">Setup</div>
         {!setupSectionExpanded ? (
           <div className="space-y-3">
             <p className="text-sm text-foreground">Log / edit your setup?</p>
             <div className="flex flex-col gap-3 max-w-2xl">
-              <RunPickerSelect
-                label={loadSetupControlLabel}
-                runs={pickerRuns}
-                value={loadSetupSelection}
-                onChange={applyPastSetupOnly}
-                placeholder="Choose a run…"
-                disabled={pickerRuns.length === 0}
-                formatLine={formatRunPickerLineRelativeWhen}
-              />
+              <div className="space-y-1 text-sm">
+                <div className="text-sm font-medium text-muted-foreground">Setup source</div>
+                <select
+                  className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                  value={setupSource}
+                  onChange={(e) =>
+                    handleSetupSourceChange(e.target.value as "previous_runs" | "other")
+                  }
+                >
+                  <option value="previous_runs">Setups from previous runs</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              {setupSource === "previous_runs" ? (
+                <RunPickerSelect
+                  label={loadSetupControlLabel}
+                  runs={pickerRuns}
+                  value={loadSetupSelection}
+                  onChange={applyPastSetupOnly}
+                  placeholder="Choose a run…"
+                  disabled={pickerRuns.length === 0}
+                  formatLine={formatRunPickerLineRelativeWhen}
+                />
+              ) : (
+                <div className="space-y-2">
+                  <div className="space-y-1 text-sm">
+                    <div className="text-sm font-medium text-muted-foreground">Other source</div>
+                    <select
+                      className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                      value={otherSetupSource}
+                      onChange={(e) => setOtherSetupSource(e.target.value as "downloaded_setups")}
+                    >
+                      <option value="downloaded_setups">Downloaded setups</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
+                      {loadOtherSetupLabel}
+                    </div>
+                    <select
+                      className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none font-mono"
+                      value={loadOtherSetupSelection}
+                      onChange={(e) => applyDownloadedSetupOnly(e.target.value)}
+                      disabled={downloadedSetups.length === 0}
+                    >
+                      <option value="">Choose a downloaded setup…</option>
+                      {downloadedSetups.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {`${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => setSetupSectionExpanded(true)}
-                className="self-start rounded-md border border-border bg-secondary/20 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary/40 hover:text-foreground transition"
+                className="self-start rounded-md border border-border bg-muted/70 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition"
               >
                 Edit setup
               </button>
             </div>
-            {pickerRuns.length === 0 ? (
+            {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">No past runs yet, or list failed to load.</p>
+            ) : null}
+            {setupSource === "other" && downloadedSetups.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                No downloaded setups with created setup data yet. Use Setup → Downloaded setups to review and create one.
+              </p>
             ) : null}
           </div>
         ) : (
@@ -1558,25 +1752,76 @@ export function NewRunForm(props: {
               <button
                 type="button"
                 onClick={() => setSetupSectionExpanded(false)}
-                className="rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground transition"
+                className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground transition"
               >
                 Collapse
               </button>
             </div>
-            <div className="max-w-2xl">
-              <RunPickerSelect
-                label={loadSetupControlLabel}
-                runs={pickerRuns}
-                value={loadSetupSelection}
-                onChange={applyPastSetupOnly}
-                placeholder="Choose a run…"
-                disabled={pickerRuns.length === 0}
-                formatLine={formatRunPickerLineRelativeWhen}
-              />
+            <div className="max-w-2xl space-y-2">
+              <div className="space-y-1 text-sm">
+                <div className="text-sm font-medium text-muted-foreground">Setup source</div>
+                <select
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                  value={setupSource}
+                  onChange={(e) =>
+                    handleSetupSourceChange(e.target.value as "previous_runs" | "other")
+                  }
+                >
+                  <option value="previous_runs">Setups from previous runs</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              {setupSource === "previous_runs" ? (
+                <RunPickerSelect
+                  label={loadSetupControlLabel}
+                  runs={pickerRuns}
+                  value={loadSetupSelection}
+                  onChange={applyPastSetupOnly}
+                  placeholder="Choose a run…"
+                  disabled={pickerRuns.length === 0}
+                  formatLine={formatRunPickerLineRelativeWhen}
+                />
+              ) : (
+                <div className="space-y-2">
+                  <div className="space-y-1 text-sm">
+                    <div className="text-sm font-medium text-muted-foreground">Other source</div>
+                    <select
+                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                      value={otherSetupSource}
+                      onChange={(e) => setOtherSetupSource(e.target.value as "downloaded_setups")}
+                    >
+                      <option value="downloaded_setups">Downloaded setups</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
+                      {loadOtherSetupLabel}
+                    </div>
+                    <select
+                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none font-mono"
+                      value={loadOtherSetupSelection}
+                      onChange={(e) => applyDownloadedSetupOnly(e.target.value)}
+                      disabled={downloadedSetups.length === 0}
+                    >
+                      <option value="">Choose a downloaded setup…</option>
+                      {downloadedSetups.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {`${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
             <SetupSheetView value={setupData} onChange={setSetupData} template={setupTemplate} />
-            {pickerRuns.length === 0 ? (
+            {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">No past runs yet, or list failed to load.</p>
+            ) : null}
+            {setupSource === "other" && downloadedSetups.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                No downloaded setups with created setup data yet. Use Setup → Downloaded setups to review and create one.
+              </p>
             ) : null}
           </>
         )}
@@ -1602,7 +1847,7 @@ export function NewRunForm(props: {
         <button
           type="button"
           className={cn(
-            "inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition",
+            "inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
             (!canSave || saving) && "opacity-70 pointer-events-none"
           )}
           onClick={(e) => saveRun(e)}

@@ -12,6 +12,15 @@ export interface LapImportLapRow {
   flagReason?: string | null;
 }
 
+export interface LapUrlSessionDriver {
+  id: string;
+  driverId: string;
+  driverName: string;
+  normalizedName: string;
+  laps: number[];
+  lapCount?: number;
+}
+
 export interface LapUrlParseResult {
   /** Stable id, e.g. "stub", "livetime-future". */
   parserId: string;
@@ -26,6 +35,8 @@ export interface LapUrlParseResult {
     laps: number[];
     roleHint?: "primary" | "teammate" | "competitor" | "unknown";
   }>;
+  /** Optional full session participants (e.g. LiveRC race result). */
+  sessionDrivers?: LapUrlSessionDriver[];
   sessionHint?: {
     name?: string | null;
     className?: string | null;
@@ -36,7 +47,7 @@ export interface LapUrlParseResult {
 }
 
 export type LapUrlParseContext = {
-  /** Required for LiveRC race result imports. */
+  /** Optional explicit driver override (e.g. user typed a name). */
   driverName?: string;
 };
 

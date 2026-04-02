@@ -1,15 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
-import { bestLap, avgTop5, formatLap, normalizeLapTimes } from "@/lib/runLaps";
+import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { displayRunNotes } from "@/lib/runNotes";
-import { formatLapSourceSummary } from "@/lib/lapSession/display";
+import { formatLapSourceSummary, tryReadLapSourceUrl } from "@/lib/lapSession/display";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
+import {
+  getAverageTopN,
+  getBestLap,
+  getIncludedLapDashboardMetrics,
+  primaryLapRowsFromRun,
+} from "@/lib/lapAnalysis";
+import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
+import { toCompareRunShape } from "@/lib/runCompareShape";
 
 type Run = {
   id: string;
@@ -34,7 +43,61 @@ type Run = {
   event?: { name: string; track?: { name: string } | null } | null;
   setupSnapshot?: { id: string; data: unknown } | null;
   lapSession?: unknown;
+  importedLapSets?: Array<{
+    id: string;
+    driverId?: string | null;
+    driverName: string;
+    displayName?: string | null;
+    normalizedName: string;
+    isPrimaryUser: boolean;
+    laps: Array<{
+      lapNumber: number;
+      lapTimeSeconds: number;
+      isIncluded?: boolean;
+    }>;
+  }>;
 };
+
+function formatLapSourceLinkText(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = u.pathname + u.search;
+    const pathShort = path.length > 26 ? `${path.slice(0, 24)}…` : path;
+    return `${u.hostname}${pathShort || "/"}`;
+  } catch {
+    return url.length > 42 ? `${url.slice(0, 39)}…` : url;
+  }
+}
+
+function CompactField({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-[5.5rem] max-w-[220px] shrink-0">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-xs text-foreground break-words">{children ?? value ?? "—"}</div>
+    </div>
+  );
+}
+
+function LapStatChip({ label, value, title }: { label: string; value: string; title?: string }) {
+  return (
+    <div className="rounded border border-border bg-muted/80 px-2 py-1 min-w-[4.5rem]" title={title}>
+      <div className="text-[9px] font-medium text-muted-foreground leading-none mb-0.5">{label}</div>
+      <div className="text-[11px] font-mono tabular-nums text-foreground leading-tight">{value}</div>
+    </div>
+  );
+}
+
+/** Primary action buttons (analyse setup / lap times) — identical styling */
+const analyseActionButtonClass =
+  "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition";
 
 function setupRows(data: unknown): { label: string; value: string }[] {
   const obj = normalizeSetupData(data);
@@ -59,10 +122,13 @@ export function RunHistoryTable({
   runs,
   allRunsDescending,
   runListSource = "my_runs",
+  userDisplayName,
 }: {
   runs: Run[];
   allRunsDescending: CompareRunShape[];
   runListSource?: RunCompareListSource;
+  /** User / driver name for primary lap column ("Me" if unset). */
+  userDisplayName?: string | null;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -92,7 +158,7 @@ export function RunHistoryTable({
                   toggleRow(run.id);
                 }
               }}
-              className="border-b border-border/50 hover:bg-secondary/10 cursor-pointer select-none"
+              className="border-b border-border/80 hover:bg-muted/50 cursor-pointer select-none"
               aria-expanded={isExpanded}
             >
               <td className="px-4 py-2">
@@ -101,17 +167,22 @@ export function RunHistoryTable({
               <td className="px-4 py-2">{carDisplay}</td>
               <td className="px-4 py-2">{trackDisplay}</td>
               <td className="px-4 py-2">{tiresDisplay}</td>
-              <td className="px-4 py-2">{formatLap(bestLap(run.lapTimes))}</td>
-              <td className="px-4 py-2">{formatLap(avgTop5(run.lapTimes))}</td>
+              <td className="px-4 py-2">
+                {formatLap(getBestLap(primaryLapRowsFromRun(run)))}
+              </td>
+              <td className="px-4 py-2">
+                {formatLap(getAverageTopN(primaryLapRowsFromRun(run), 5))}
+              </td>
               <td className="px-4 py-2">{formatRunSessionDisplay(run)}</td>
             </tr>
             {isExpanded && (
-              <tr className="border-b border-border/50 bg-secondary/5">
+              <tr className="border-b border-border/80 bg-muted/40">
                 <td colSpan={7} className="px-4 py-4">
                   <RunDetail
                     run={run}
                     pickerRuns={allRunsDescending}
                     runListSource={runListSource}
+                    userDisplayName={userDisplayName}
                   />
                 </td>
               </tr>
@@ -127,12 +198,20 @@ function RunDetail({
   run,
   pickerRuns,
   runListSource,
+  userDisplayName,
 }: {
   run: Run;
   pickerRuns: CompareRunShape[];
   runListSource: RunCompareListSource;
+  userDisplayName?: string | null;
 }) {
   const [setupOpen, setSetupOpen] = React.useState(false);
+  const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
+  /** Compare / load-setup pickers only offer runs for this vehicle. */
+  const pickerRunsSameCar = useMemo(() => {
+    if (!run.carId) return pickerRuns;
+    return pickerRuns.filter((r) => r.car?.id === run.carId);
+  }, [pickerRuns, run.carId]);
   const carDisplay = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
   const trackDisplay = run.track?.name ?? run.trackNameSnapshot ?? "—";
   const laps = normalizeLapTimes(run.lapTimes);
@@ -151,65 +230,163 @@ function RunDetail({
           : "—"
       : "—";
   const setupList = setupRows(run.setupSnapshot?.data);
+  const ownRows = primaryLapRowsFromRun(run);
+  const lapDash = getIncludedLapDashboardMetrics(ownRows);
+  const sourceUrl = tryReadLapSourceUrl(run.lapSession);
+  const sourceSummary = formatLapSourceSummary(run.lapSession);
+  const uploadedLapSetCount = run.importedLapSets?.length ?? 0;
+  const uploadedLapSetsLine =
+    uploadedLapSetCount === 0
+      ? "No additional driver lap sets uploaded"
+      : uploadedLapSetCount === 1
+        ? "1 driver lap set uploaded"
+        : `${uploadedLapSetCount} driver lap sets uploaded`;
 
   return (
-    <div className="rounded-lg border border-border bg-secondary/10 p-4 space-y-5 text-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="text-xs font-mono text-muted-foreground">Run review</div>
-        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            onClick={() => setSetupOpen(true)}
-            className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition"
-          >
-            View setup
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-3">
-          <h3 className="text-xs font-mono text-muted-foreground uppercase tracking-wide">Run context</h3>
-          <DetailRow label="Date / time" value={formatRunCreatedAtDateTime(run.createdAt)} />
-          <DetailRow label="Session type" value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"} />
-          <DetailRow label="Meeting session type" value={meetingType} />
-          <DetailRow label="Label" value={run.sessionLabel?.trim() || "—"} />
-          <DetailRow label="Car" value={carDisplay} />
-          <DetailRow label="Track" value={trackDisplay} />
-          <DetailRow
-            label="Tire set"
-            value={run.tireSet ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}` : "—"}
-          />
+    <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-5 text-sm">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
+        <div className="min-w-0 space-y-3 xl:max-w-[min(100%,28rem)]">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Run details</h3>
+          <div className="flex flex-wrap gap-x-5 gap-y-3">
+            <CompactField label="Date / time" value={formatRunCreatedAtDateTime(run.createdAt)} />
+            <CompactField
+              label="Session type"
+              value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}
+            />
+            <CompactField label="Meeting session" value={meetingType} />
+            <CompactField label="Label" value={run.sessionLabel?.trim() || "—"} />
+            <CompactField label="Car" value={carDisplay} />
+            <CompactField label="Track" value={trackDisplay} />
+            <CompactField
+              label="Tire set"
+              value={
+                run.tireSet
+                  ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
+                  : "—"
+              }
+            />
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <h3 className="text-xs font-mono text-muted-foreground uppercase tracking-wide">Lap times</h3>
-          <DetailRow
-            label="Lap source"
-            value={formatLapSourceSummary(run.lapSession) ?? "—"}
-          />
-          <DetailRow label="Best lap" value={formatLap(bestLap(run.lapTimes))} />
-          <DetailRow label="Average (top 5)" value={formatLap(avgTop5(run.lapTimes))} />
-          {laps.length > 0 ? (
-            <div>
-              <span className="text-[11px] font-mono text-muted-foreground">All laps ({laps.length})</span>
-              <ul className="mt-1 font-mono text-xs grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 max-h-40 overflow-y-auto rounded-md border border-border bg-secondary/20 p-2">
-                {laps.map((t, i) => (
+        <div className="min-w-0 flex-1 space-y-2 border-t border-border pt-4 xl:border-t-0 xl:border-l xl:border-border xl:pt-0 xl:pl-6">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lap times</h3>
+
+          <div className="space-y-1">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Included-lap metrics
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
+              <LapStatChip
+                label="Stint"
+                title="Sum of included lap times"
+                value={
+                  lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"
+                }
+              />
+              <LapStatChip label="Best lap" value={formatLap(lapDash.bestLap)} />
+              <LapStatChip label="Avg top 5" value={formatLap(lapDash.avgTop5)} />
+              <LapStatChip label="Avg top 10" value={formatLap(lapDash.avgTop10)} />
+              <LapStatChip label="Median" value={formatLap(lapDash.median)} />
+              <LapStatChip
+                label="Consistency"
+                title="100 − CV; higher = more consistent laps"
+                value={
+                  lapDash.consistencyScore != null ? `${lapDash.consistencyScore.toFixed(1)}%` : "—"
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              All laps ({laps.length})
+            </div>
+            {laps.length > 0 ? (
+              <ul className="font-mono text-[11px] grid grid-cols-[auto_1fr_auto] gap-x-2 gap-y-0.5 max-h-32 overflow-y-auto rounded border border-border bg-muted/60 px-2 py-1.5">
+                {(ownRows.length === laps.length ? ownRows : laps.map((t, i) => ({
+                  lapNumber: i + 1,
+                  lapTimeSeconds: t,
+                  isIncluded: true,
+                }))).map((r, i) => (
                   <React.Fragment key={i}>
-                    <span className="text-muted-foreground">{i + 1}.</span>
-                    <span>{t.toFixed(3)}s</span>
+                    <span
+                      className={cn(
+                        "text-muted-foreground",
+                        !r.isIncluded && "opacity-50 line-through"
+                      )}
+                    >
+                      {r.lapNumber}.
+                    </span>
+                    <span className={cn(!r.isIncluded && "opacity-50 line-through")}>
+                      {r.lapTimeSeconds.toFixed(3)}s
+                    </span>
+                    {!r.isIncluded ? (
+                      <span className="text-[9px] uppercase text-muted-foreground">Excluded</span>
+                    ) : (
+                      <span />
+                    )}
                   </React.Fragment>
                 ))}
               </ul>
+            ) : (
+              <div className="text-xs text-muted-foreground">—</div>
+            )}
+          </div>
+
+          <div className="space-y-1 pt-1 border-t border-border/60 border-dashed">
+            <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground/80">Lap source</div>
+            <div className="text-[11px] space-y-1 text-muted-foreground">
+              <div className="text-muted-foreground/90">{sourceSummary ?? "—"}</div>
+              {sourceUrl ? (
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block max-w-full text-accent/90 underline underline-offset-2 break-all text-[11px]"
+                  title={sourceUrl}
+                >
+                  {formatLapSourceLinkText(sourceUrl)}
+                </a>
+              ) : null}
             </div>
-          ) : (
-            <DetailRow label="All laps" value="—" />
-          )}
+          </div>
         </div>
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-xs font-mono text-muted-foreground uppercase tracking-wide">Notes</h3>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="space-y-0.5 min-w-0">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lap analysis</h3>
+            <p className="text-[11px] text-muted-foreground">{uploadedLapSetsLine}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowLapAnalysis((v) => !v)}
+            className={cn("shrink-0", analyseActionButtonClass)}
+          >
+            Analyse lap times
+          </button>
+        </div>
+        {showLapAnalysis ? (
+          <div className="rounded-md border border-border bg-muted/60 p-3">
+            <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Column comparison
+            </div>
+            <LapComparisonColumnGrid
+              myDisplayName={userDisplayName}
+              run={run}
+              currentRunId={run.id}
+              otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
+              compareAnchorRun={toCompareRunShape(run)}
+              pickerRunsForModal={pickerRunsSameCar}
+              runListSource={runListSource}
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
         <DetailRow
           label="Notes"
           value={displayRunNotes(run) || "—"}
@@ -225,10 +402,15 @@ function RunDetail({
       </div>
 
       <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button type="button" onClick={() => setSetupOpen(true)} className={analyseActionButtonClass}>
+            Analyse setup
+          </button>
+        </div>
         {setupList.length === 0 ? (
           <p className="text-muted-foreground text-xs">No setup parameters recorded for this run.</p>
         ) : (
-          <div className="rounded-md border border-border bg-secondary/20 divide-y divide-border max-h-48 overflow-y-auto">
+          <div className="rounded-md border border-border bg-muted/70 divide-y divide-border max-h-48 overflow-y-auto">
             {setupList.map((row) => (
               <div key={row.label} className="px-3 py-2 flex flex-wrap justify-between gap-2 text-xs">
                 <span className="text-muted-foreground">{row.label}</span>
@@ -243,7 +425,7 @@ function RunDetail({
         open={setupOpen}
         onClose={() => setSetupOpen(false)}
         run={run as SetupSheetModalRun}
-        pickerRuns={pickerRuns as SetupSheetModalRun[]}
+        pickerRuns={pickerRunsSameCar as SetupSheetModalRun[]}
         runListSource={runListSource}
       />
     </div>
@@ -264,7 +446,7 @@ function DetailRow({
   const show = emptyAsDash && !value.trim() ? "—" : value;
   return (
     <div>
-      <span className="text-[11px] font-mono text-muted-foreground">{label}</span>
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
       <div className={multiline ? "mt-0.5 whitespace-pre-wrap text-foreground" : "mt-0.5 text-foreground"}>{show}</div>
     </div>
   );

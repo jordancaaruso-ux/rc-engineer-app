@@ -9,10 +9,10 @@ const navItems = [
   { href: "/engineer", label: "Engineer Chat" },
   { href: "/runs/new", label: "Log your run" },
   { href: "/runs/history", label: "Analysis" },
+  { href: "/setup", label: "Setup" },
   { href: "/events", label: "Events" },
   { href: "/cars", label: "Cars" },
   { href: "/tracks", label: "Tracks" },
-  { href: "/setup", label: "Setup" },
 ];
 
 export function Sidebar() {
@@ -22,7 +22,7 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="flex items-center justify-between">
         <div className="sidebar-logo">
-          <span className="text-accent">RC</span> Engineer
+          <span className="text-primary">RC</span> Engineer
         </div>
       </div>
 
@@ -42,7 +42,7 @@ export function Sidebar() {
             >
               <span>{item.label}</span>
               {active && (
-                <span className="h-1 w-6 rounded-full bg-accent group-hover:w-10 transition-all" />
+                <span className="h-1 w-6 rounded-full bg-primary group-hover:w-10 transition-all" />
               )}
             </Link>
           );

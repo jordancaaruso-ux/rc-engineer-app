@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { readSetupField } from "@/lib/a800rrSetupRead";
 import { coerceSetupValue, type SetupSnapshotData } from "@/lib/runSetup";
 import {
   getDefaultSetupSheetTemplate,
   type SetupSheetFieldDef,
   type SetupSheetTemplate,
 } from "@/lib/setupSheetTemplate";
+import { SetupSheetStructured } from "@/components/runs/SetupSheetStructured";
 
 export type SetupSheetViewProps = {
   value: SetupSnapshotData;
@@ -24,9 +26,7 @@ export type SetupSheetViewProps = {
 };
 
 function fieldValue(v: SetupSnapshotData, key: string): string {
-  const x = v[key];
-  if (x == null || x === "") return "";
-  return String(x);
+  return readSetupField(v, key);
 }
 
 function getBoolFromSetupString(v: string): boolean {
@@ -66,11 +66,11 @@ function SheetCell({
   return (
     <div
       className={cn(
-        "flex items-stretch border-b border-border/60 last:border-b-0 min-h-[2.25rem]",
+        "flex items-stretch border-b border-border last:border-b-0 min-h-[2.25rem]",
         changed && "bg-amber-500/15 dark:bg-amber-500/10 border-l-2 border-l-amber-500/60"
       )}
     >
-      <div className="w-[38%] shrink-0 px-2 py-1.5 text-[10px] font-mono text-muted-foreground uppercase tracking-wide border-r border-border/40 flex items-center">
+      <div className="w-[38%] shrink-0 px-2 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wide border-r border-border/80 flex items-center">
         {field.label}
         {field.unit ? <span className="text-[9px] normal-case ml-0.5 opacity-70">({field.unit})</span> : null}
       </div>
@@ -80,7 +80,7 @@ function SheetCell({
             <button
               type="button"
               className={cn(
-                "rounded-md border border-border bg-secondary/20 px-2 py-1 text-[11px] font-mono hover:bg-secondary/35 transition",
+                "rounded-md border border-border bg-muted/70 px-2 py-1 text-[11px] font-mono hover:bg-muted/70 transition",
                 getBoolFromSetupString(value) && "border-accent/60 bg-accent/10"
               )}
               aria-pressed={getBoolFromSetupString(value)}
@@ -91,13 +91,13 @@ function SheetCell({
             >
               {getBoolFromSetupString(value) ? "On" : "Off"}
             </button>
-            <span className="text-[10px] text-muted-foreground font-mono">toggle</span>
+            <span className="text-[10px] font-medium text-muted-foreground">toggle</span>
           </div>
         ) : multiline ? (
           <textarea
             className={cn(
               "w-full min-h-[2.5rem] resize-y bg-transparent px-2 py-1 text-xs font-mono outline-none rounded",
-              focused && "ring-1 ring-accent/50 bg-secondary/30"
+              focused && "ring-1 ring-accent/50 bg-card"
             )}
             placeholder="—"
             rows={2}
@@ -117,7 +117,7 @@ function SheetCell({
           <input
             className={cn(
               "w-full bg-transparent px-2 py-1 text-sm font-mono outline-none rounded",
-              focused && "ring-1 ring-accent/50 bg-secondary/30"
+              focused && "ring-1 ring-accent/50 bg-card"
             )}
             inputMode="decimal"
             placeholder="—"
@@ -161,11 +161,11 @@ function GroupBlock({
   return (
     <div
       className={cn(
-        "rounded-md border-2 border-border bg-secondary/15 overflow-hidden flex flex-col",
+        "rounded-md border-2 border-border bg-muted/60 overflow-hidden flex flex-col",
         className
       )}
     >
-      <div className="px-2 py-1.5 bg-secondary/40 border-b border-border text-center text-[11px] font-semibold tracking-wide uppercase font-mono">
+      <div className="px-2 py-1.5 bg-card border-b border-border text-center text-[11px] font-medium tracking-wide uppercase">
         {title}
       </div>
       <div className="flex-1 divide-y divide-border/30">{children}</div>
@@ -206,6 +206,8 @@ export function SetupSheetView({
     [template.groups]
   );
 
+  const pairedRowCount = Math.max(leftGroups.length, rightGroups.length);
+
   const isChanged = (key: string) => {
     if (highlightChangedKeys?.has(key)) return true;
     if (!baseline) return false;
@@ -217,47 +219,75 @@ export function SetupSheetView({
   return (
     <div
       className={cn(
-        "rounded-lg border-2 border-border bg-gradient-to-b from-secondary/25 to-secondary/10 p-3 shadow-sm",
+        "rounded-lg border border-border bg-card p-3 shadow-sm",
         className
       )}
       data-setup-sheet-template={template.id}
     >
       <div className="text-center border-b-2 border-border pb-2 mb-3">
-        <div className="text-[10px] font-mono text-muted-foreground tracking-widest">SETUP SHEET</div>
-        <div className="text-xs font-semibold mt-0.5">{template.label}</div>
+        <div className="text-[10px] font-medium text-muted-foreground tracking-widest">SETUP SHEET</div>
+        <div className="text-xs font-medium mt-0.5">{template.label}</div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-        {leftGroups.map((g) => (
-          <GroupBlock key={g.id} title={g.title}>
-            {g.fields.map((f) => (
-              <SheetCell
-                key={f.key}
-                field={f}
-                value={fieldValue(value, f.key)}
-                baseline={baseline ? fieldValue(baseline, f.key) : ""}
-                changed={isChanged(f.key)}
-                onCommit={commit}
-                readOnly={readOnly}
-              />
-            ))}
-          </GroupBlock>
-        ))}
-        {rightGroups.map((g) => (
-          <GroupBlock key={g.id} title={g.title}>
-            {g.fields.map((f) => (
-              <SheetCell
-                key={f.key}
-                field={f}
-                value={fieldValue(value, f.key)}
-                baseline={baseline ? fieldValue(baseline, f.key) : ""}
-                changed={isChanged(f.key)}
-                onCommit={commit}
-                readOnly={readOnly}
-              />
-            ))}
-          </GroupBlock>
-        ))}
+      {template.structuredSections?.length ? (
+        <SetupSheetStructured
+          sections={template.structuredSections}
+          value={value}
+          onChange={onChange}
+          readOnly={readOnly}
+          baselineValue={baseline}
+          highlightChangedKeys={highlightChangedKeys ?? null}
+        />
+      ) : null}
+
+      {!template.structuredSections?.length ? (
+        <>
+      <div className="mb-3 space-y-3">
+        {Array.from({ length: pairedRowCount }, (_, rowIndex) => {
+          const left = leftGroups[rowIndex];
+          const right = rightGroups[rowIndex];
+          return (
+            <div
+              key={`pair-${rowIndex}`}
+              className="grid grid-cols-1 md:grid-cols-2 md:items-stretch gap-3"
+            >
+              {left ? (
+                <GroupBlock title={left.title}>
+                  {left.fields.map((f) => (
+                    <SheetCell
+                      key={f.key}
+                      field={f}
+                      value={fieldValue(value, f.key)}
+                      baseline={baseline ? fieldValue(baseline, f.key) : ""}
+                      changed={isChanged(f.key)}
+                      onCommit={commit}
+                      readOnly={readOnly}
+                    />
+                  ))}
+                </GroupBlock>
+              ) : (
+                <div className="hidden md:block" aria-hidden />
+              )}
+              {right ? (
+                <GroupBlock title={right.title}>
+                  {right.fields.map((f) => (
+                    <SheetCell
+                      key={f.key}
+                      field={f}
+                      value={fieldValue(value, f.key)}
+                      baseline={baseline ? fieldValue(baseline, f.key) : ""}
+                      changed={isChanged(f.key)}
+                      onCommit={commit}
+                      readOnly={readOnly}
+                    />
+                  ))}
+                </GroupBlock>
+              ) : (
+                <div className="hidden md:block" aria-hidden />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {fullGroups.map((g) => (
@@ -275,9 +305,11 @@ export function SetupSheetView({
           ))}
         </GroupBlock>
       ))}
+        </>
+      ) : null}
 
       {!readOnly && (
-        <p className="text-[10px] text-muted-foreground mt-3 text-center font-mono">
+        <p className="text-[10px] text-muted-foreground mt-3 text-center">
           Structured setup snapshot · stable keys for compare/diff
         </p>
       )}

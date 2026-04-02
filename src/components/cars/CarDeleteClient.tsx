@@ -37,8 +37,8 @@ export function CarDeleteClient(props: { carId: string; carName: string; runCoun
   }
 
   return (
-    <div className="rounded-lg border border-border bg-secondary/10 p-4 space-y-2">
-      <div className="text-xs font-mono text-muted-foreground">Delete</div>
+    <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+      <div className="ui-title text-sm text-muted-foreground">Delete</div>
 
       <div className="text-sm text-muted-foreground space-y-1">
         <div>
@@ -52,18 +52,18 @@ export function CarDeleteClient(props: { carId: string; carName: string; runCoun
       {!confirmOpen ? (
         <button
           type="button"
-          className="rounded-md bg-destructive px-4 py-2 text-xs font-semibold text-destructive-foreground hover:brightness-110 transition"
+          className="rounded-md bg-destructive px-4 py-2 text-xs font-medium text-destructive-foreground hover:brightness-110 transition"
           onClick={() => { setConfirmOpen(true); setConfirmText(""); setMessage(null); }}
         >
           Delete car…
         </button>
       ) : (
-        <div className="rounded-md border border-border bg-secondary/15 p-3 space-y-2">
+        <div className="rounded-md border border-border bg-muted/60 p-3 space-y-2">
           <div className="text-xs text-muted-foreground">
             Type <span className="font-mono">DELETE</span> to confirm.
           </div>
           <input
-            className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm outline-none"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder="DELETE"
@@ -73,7 +73,7 @@ export function CarDeleteClient(props: { carId: string; carName: string; runCoun
             <button
               type="button"
               className={cn(
-                "rounded-md bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:brightness-110 transition",
+                "rounded-md bg-destructive px-3 py-2 text-xs font-medium text-destructive-foreground hover:brightness-110 transition",
                 (!canConfirm || busy) && "opacity-60 pointer-events-none"
               )}
               disabled={!canConfirm || busy}
@@ -83,7 +83,7 @@ export function CarDeleteClient(props: { carId: string; carName: string; runCoun
             </button>
             <button
               type="button"
-              className="rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs hover:bg-secondary/40 transition"
+              className="rounded-md border border-border bg-card px-3 py-2 text-xs hover:bg-muted transition"
               onClick={() => { setConfirmOpen(false); setMessage(null); }}
               disabled={busy}
             >

@@ -42,11 +42,11 @@ export function CarSetupSheetTemplateEdit({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-secondary/10 p-4 text-sm">
-      <div className="text-xs font-mono text-muted-foreground mb-2">Setup sheet template</div>
+    <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
+      <div className="text-sm font-medium text-muted-foreground mb-2">Setup sheet template</div>
       <div className="flex flex-wrap items-center gap-2">
         <select
-          className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+          className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
           value={value}
           onChange={(e) => setValue(e.target.value)}
         >
@@ -60,7 +60,7 @@ export function CarSetupSheetTemplateEdit({
             disabled={saving}
             onClick={handleSave}
             className={cn(
-              "rounded-md bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition",
+              "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
               saving && "opacity-70 pointer-events-none"
             )}
           >

@@ -3,61 +3,116 @@
 
 :root {
   color-scheme: dark;
+  --background: #0b0f0e;
+  --foreground: #e8f0ed;
+  --surface: #131917;
+  --secondary-bg: #121716;
+  --muted-fg: #a7b3af;
+  --faint: #6b7572;
+  --border: #1f2624;
+  --accent: #2563eb;
+  --primary: #c92a2a;
+}
+
+html {
+  height: 100%;
 }
 
 body {
-  @apply bg-background text-foreground antialiased;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100%;
+  /* Corner glows: red top-left, blue bottom-right; dark base keeps center readable */
+  background:
+    radial-gradient(circle 85vw at 0% 0%, rgba(201, 42, 42, 0.4), transparent 55%),
+    radial-gradient(circle 85vw at 100% 100%, rgba(37, 99, 235, 0.38), transparent 55%),
+    #0b0f0e;
+  @apply text-foreground antialiased font-normal;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+/* Shell sits on body’s corner gradient; cards stay solid via theme tokens */
 .app-shell {
-  @apply flex min-h-screen bg-background text-foreground;
+  @apply relative flex min-h-screen overflow-hidden bg-transparent text-foreground;
+}
+
+.app-shell > * {
+  position: relative;
+  z-index: 1;
 }
 
 .sidebar {
-  @apply w-64 border-r border-border bg-gradient-to-b from-black to-slate-900 px-4 py-6 flex flex-col gap-6;
+  @apply flex w-64 flex-col gap-5 border-r border-border bg-secondary/80 px-4 py-5 backdrop-blur-md;
 }
 
 .sidebar-logo {
-  @apply text-lg font-mono tracking-tight uppercase;
+  @apply text-base font-medium tracking-tight uppercase text-foreground;
 }
 
 .sidebar-nav {
-  @apply flex flex-col gap-1 text-sm;
+  @apply flex flex-col gap-0.5 text-sm;
 }
 
 .sidebar-nav a {
-  @apply flex items-center justify-between rounded-md px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors;
+  @apply flex items-center justify-between rounded-lg border border-transparent px-3 py-1.5 text-muted-foreground transition-colors hover:border-accent/25 hover:bg-card/60 hover:text-foreground;
 }
 
 .sidebar-nav a[data-active="true"] {
-  @apply bg-primary text-primary-foreground;
+  @apply border-border bg-card text-foreground shadow-glow-sm;
 }
 
 .sidebar-footer {
-  @apply mt-auto text-[11px] text-muted-foreground font-mono;
+  @apply mt-auto text-[11px] text-muted-foreground;
 }
 
 .page {
-  @apply flex-1 flex flex-col;
+  @apply flex flex-1 flex-col;
 }
 
 .page-header {
-  @apply border-b border-border px-6 py-4 flex items-center justify-between;
+  @apply flex items-center justify-between border-b border-border px-5 py-3;
 }
 
 .page-title {
-  @apply text-lg font-semibold tracking-tight;
+  @apply text-base tracking-tight text-foreground;
+}
+
+/* Central heading/title standard: bold + italic + uppercase. */
+:where(h1, h2, h3, h4, h5, h6, .page-title, .sidebar-logo, .ui-title) {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  text-transform: uppercase;
+}
+
+/* Shared strong interactive typography (nav tabs + all buttons). */
+:where(.ui-strong, .sidebar-nav a, button) {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  text-transform: uppercase;
 }
 
 .page-subtitle {
-  @apply text-xs text-muted-foreground;
+  @apply text-xs font-normal tracking-[-0.004em] text-muted-foreground;
 }
 
 .page-body {
-  @apply flex-1 px-6 py-4;
+  @apply flex-1 px-5 py-3;
 }
 
-/* Setup sheet modal: when printing, show only the sheet content */
+input[type="text"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="email"]:focus-visible,
+input[type="url"]:focus-visible,
+input[type="search"]:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  @apply outline-none ring-2 ring-primary/35 ring-offset-0 ring-offset-background border-primary/45;
+}
+
 @media print {
   [data-setup-sheet-modal] .setup-sheet-modal-overlay {
     background: transparent;
@@ -73,4 +128,3 @@ body {
     display: none;
   }
 }
-

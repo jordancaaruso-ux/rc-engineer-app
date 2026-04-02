@@ -35,6 +35,30 @@ const RUN_PICKER_SCAN_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   year: "numeric",
 };
 
+const APP_TIMESTAMP_OPTIONS_UTC: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "UTC",
+};
+
+/**
+ * Deterministic, hydration-safe timestamp string.
+ * Always UTC, always `en-GB`, always 24h, always includes seconds.
+ *
+ * Example: `27/03/2026, 09:27:43`
+ */
+export function formatAppTimestampUtc(d: string | Date | null | undefined): string {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  return new Intl.DateTimeFormat(LOCALE, APP_TIMESTAMP_OPTIONS_UTC).format(dt);
+}
+
 /**
  * Compact date+time for run history rows and detail (SSR-safe: fixed locale + options).
  */

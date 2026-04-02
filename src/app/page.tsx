@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { loadDashboardHomeModel } from "@/lib/dashboardServer";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 
-export default async function DashboardPage() {
+export default async function DashboardPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -14,7 +15,7 @@ export default async function DashboardPage() {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             Set <span className="font-mono">DATABASE_URL</span> in <span className="font-mono">.env</span>{" "}
             to load your dashboard.
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   ACTIVE_SETUP_CHANGED_EVENT,
@@ -62,13 +63,22 @@ export function SetupPageClient() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/setup-documents"
+            className="rounded-md border border-border bg-card px-3 py-2 text-xs hover:bg-muted transition"
+          >
+            Upload setup sheet
+          </Link>
           <button
             type="button"
             className={cn(
-              "rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs hover:bg-secondary/40 transition",
+              "rounded-md border border-border bg-card px-3 py-2 text-xs hover:bg-muted transition",
               empty && "opacity-60"
             )}
-            onClick={() => setSetupData({})}
+            onClick={() => {
+              setSetupData({});
+              setActiveSetupData({}, null);
+            }}
             title="Clear current setup"
           >
             Clear

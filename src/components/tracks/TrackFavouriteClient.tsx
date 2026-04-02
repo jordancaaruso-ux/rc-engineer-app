@@ -41,8 +41,8 @@ export function TrackFavouriteClient(props: {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-secondary/10 p-4 space-y-2">
-      <div className="text-xs font-mono text-muted-foreground">Favourites</div>
+    <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+      <div className="ui-title text-sm text-muted-foreground">Favourites</div>
       <p className="text-sm text-muted-foreground">
         Tracks are shared reference data. Adding or removing from favourites only changes your quick-access list; it does not affect run history.
       </p>
@@ -50,7 +50,7 @@ export function TrackFavouriteClient(props: {
         <button
           type="button"
           className={cn(
-            "rounded-md border border-border bg-secondary/30 px-4 py-2 text-xs hover:bg-secondary/40 transition",
+            "rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition",
             busy && "opacity-60 pointer-events-none"
           )}
           onClick={toggleFavourite}
@@ -62,7 +62,7 @@ export function TrackFavouriteClient(props: {
         <button
           type="button"
           className={cn(
-            "rounded-md bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition",
+            "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
             busy && "opacity-60 pointer-events-none"
           )}
           onClick={toggleFavourite}

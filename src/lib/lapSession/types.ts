@@ -35,6 +35,8 @@ export interface LapEntry {
     warningReason?: string | null;
     isFlagged?: boolean;
     flagReason?: string | null;
+    /** When false, lap is excluded from metrics (still stored). Default true. */
+    isIncluded?: boolean;
   } | null> | null;
 }
 

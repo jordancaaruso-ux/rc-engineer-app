@@ -23,7 +23,7 @@ export function SetupEditor({ value, onChange, compact, embed }: Props) {
     <div className="space-y-3">
       {!embed ? (
         <div className="flex items-center justify-between">
-          <div className="text-xs font-mono text-muted-foreground">Setup</div>
+          <div className="ui-title text-sm text-muted-foreground">Setup</div>
           <div className="text-[11px] text-muted-foreground">
             Minimal fields (stored as snapshot)
           </div>
@@ -39,10 +39,10 @@ export function SetupEditor({ value, onChange, compact, embed }: Props) {
         {fields.map((f) => (
           <label
             key={f.key}
-            className="rounded-md border border-border bg-secondary/20 px-3 py-2"
+            className="rounded-md border border-border bg-muted/70 px-3 py-2"
           >
             <div className="flex items-center justify-between gap-2">
-              <div className="text-[11px] font-mono text-muted-foreground">
+              <div className="ui-title text-sm text-muted-foreground">
                 {f.label}
               </div>
               {f.unit ? (

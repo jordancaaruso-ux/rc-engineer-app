@@ -69,6 +69,8 @@ export function SetupSheetModal({
     return () => window.removeEventListener(ACTIVE_SETUP_CHANGED_EVENT, bump);
   }, []);
 
+  // PDF viewer intentionally removed from Analyse run (Setup is app-native / parsed-first).
+
   const activeSetup = useMemo(() => {
     void activeTick;
     return getActiveSetupData();
@@ -126,13 +128,13 @@ export function SetupSheetModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="setup-sheet-modal-close sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-background/95">
-          <div className="text-xs font-mono text-muted-foreground truncate min-w-0">
+          <div className="ui-title text-sm text-muted-foreground truncate min-w-0">
             {run ? formatRunPickerLine(run) : "Setup"}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-secondary/50 transition shrink-0"
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted/90 transition shrink-0"
           >
             Close
           </button>
@@ -144,7 +146,7 @@ export function SetupSheetModal({
           ) : (
             <>
               <div className="space-y-2">
-                <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
+                <span className="ui-title text-xs text-muted-foreground uppercase tracking-wide">
                   Compare to
                 </span>
                 <div className="flex flex-wrap gap-2 items-center">
@@ -155,7 +157,7 @@ export function SetupSheetModal({
                       "rounded-md border px-3 py-1.5 text-xs font-medium transition",
                       mode === "current_setup"
                         ? "border-accent bg-accent/15 text-foreground"
-                        : "border-border bg-secondary/30 hover:bg-secondary/50"
+                        : "border-border bg-card hover:bg-muted/90"
                     )}
                   >
                     Current setup
@@ -167,10 +169,10 @@ export function SetupSheetModal({
                     className={cn(
                       "rounded-md border px-3 py-1.5 text-xs font-medium transition",
                       otherRuns.length === 0
-                        ? "border-border/50 text-muted-foreground/50 cursor-not-allowed"
+                        ? "border-border/80 text-muted-foreground/50 cursor-not-allowed"
                         : mode === "choose_run"
                           ? "border-accent bg-accent/15 text-foreground"
-                          : "border-border bg-secondary/30 hover:bg-secondary/50"
+                          : "border-border bg-card hover:bg-muted/90"
                     )}
                   >
                     Choose run

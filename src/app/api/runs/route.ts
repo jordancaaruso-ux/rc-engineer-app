@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { buildLapSessionV1 } from "@/lib/lapSession/buildSession";
 import type { LapSourceKind } from "@/lib/lapSession/types";
+import { syncActionItemsFromRun } from "@/lib/actionItems";
+import {
+  computeSetupDeltaForAudit,
+  resolveSetupSnapshot,
+} from "@/lib/setup/resolveSetupSnapshot";
+import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
+import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -24,6 +32,13 @@ export async function POST(request: Request) {
       tireSetId?: string | null;
       tireRunNumber?: number;
       setupData?: unknown;
+      /** When set, server merges setupData onto this snapshot (full or sparse) and stores audit delta. */
+      setupBaselineSnapshotId?: string | null;
+      /** If true, only setupDelta keys are merged onto baseline (sparse “changed fields” mode). */
+      setupDeltaOnly?: boolean;
+      setupDelta?: Record<string, unknown> | null;
+      /** Setup document id when setup was loaded from a downloaded PDF (PDF render lineage). */
+      sourceSetupDocumentId?: string | null;
       lapTimes?: number[];
       /** Optional; server builds canonical lapSession from lapTimes + this meta. */
       lapIngestMeta?: {
@@ -35,6 +50,7 @@ export async function POST(request: Request) {
           warningReason?: string | null;
           isFlagged?: boolean;
           flagReason?: string | null;
+          isIncluded?: boolean;
         } | null> | null;
       };
       notes?: string | null;
@@ -42,6 +58,14 @@ export async function POST(request: Request) {
       handlingProblems?: string | null;
       suggestedChanges?: string | null;
       sessionLabel?: string | null;
+      importedLapSets?: Array<{
+        sourceUrl?: string | null;
+        driverId?: string | null;
+        driverName?: string;
+        normalizedName?: string;
+        isPrimaryUser?: boolean;
+        laps?: number[] | Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
+      }>;
     };
 
     const carId = body.carId;
@@ -76,11 +100,56 @@ export async function POST(request: Request) {
       perLap: body.lapIngestMeta?.perLap ?? null,
     });
 
+    const baselineId =
+      typeof body.setupBaselineSnapshotId === "string" && body.setupBaselineSnapshotId.trim()
+        ? body.setupBaselineSnapshotId.trim()
+        : null;
+
+    let resolvedData: SetupSnapshotData;
+    let setupDeltaJson: object | null = null;
+
+    if (baselineId) {
+      const baselineRow = await prisma.setupSnapshot.findFirst({
+        where: { id: baselineId, userId: user.id },
+        select: { data: true },
+      });
+      if (!baselineRow) {
+        return NextResponse.json({ error: "Baseline setup snapshot not found" }, { status: 400 });
+      }
+      const baseNorm = normalizeSetupSnapshotForStorage(baselineRow.data);
+      const useDeltaOnly = Boolean(body.setupDeltaOnly);
+      const deltaPayload = useDeltaOnly
+        ? (body.setupDelta && typeof body.setupDelta === "object" && !Array.isArray(body.setupDelta)
+            ? body.setupDelta
+            : {})
+        : ((body.setupData ?? {}) as Record<string, unknown>);
+      resolvedData = resolveSetupSnapshot(baseNorm, deltaPayload);
+      const audit = computeSetupDeltaForAudit(baseNorm, resolvedData);
+      setupDeltaJson = Object.keys(audit).length > 0 ? audit : null;
+    } else {
+      resolvedData = normalizeSetupSnapshotForStorage(body.setupData ?? {});
+    }
+
+    const pdfLinks = await resolveSourcePdfLinksForNewRun(
+      user.id,
+      baselineId,
+      typeof body.sourceSetupDocumentId === "string" && body.sourceSetupDocumentId.trim()
+        ? body.sourceSetupDocumentId.trim()
+        : null
+    );
+
+    // Each run always gets a new SetupSnapshot row with full resolved `data`.
+    // Historical runs without baseSetupSnapshotId still have complete `data`; screw strings are normalized on read via normalizeSetupData.
     const setupSnapshot = await prisma.setupSnapshot.create({
       data: {
         userId: user.id,
         carId,
-        data: (body.setupData ?? {}) as object,
+        data: resolvedData as object,
+        baseSetupSnapshotId: baselineId,
+        setupDeltaJson:
+          setupDeltaJson === null || Object.keys(setupDeltaJson).length === 0
+            ? undefined
+            : (setupDeltaJson as object),
       },
       select: { id: true },
     });
@@ -127,8 +196,10 @@ export async function POST(request: Request) {
         tireSetId: body.tireSetId ?? null,
         tireRunNumber,
         setupSnapshotId: setupSnapshot.id,
+        sourceSetupDocumentId: pdfLinks.sourceSetupDocumentId,
+        sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,
         lapTimes,
-        lapSession,
+        lapSession: lapSession as unknown as Prisma.InputJsonValue,
         notes: body.notes?.trim() || null,
         driverNotes: null,
         handlingProblems: null,
@@ -136,6 +207,63 @@ export async function POST(request: Request) {
         sessionLabel: body.sessionLabel?.trim() || null,
       },
       select: { id: true, createdAt: true },
+    });
+
+    const importedLapSets = Array.isArray(body.importedLapSets) ? body.importedLapSets : [];
+    for (const set of importedLapSets) {
+      const driverName = typeof set.driverName === "string" ? set.driverName.trim() : "";
+      if (!driverName) continue;
+      const rawLaps = Array.isArray(set.laps) ? set.laps : [];
+      const lapsForSet: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }> = [];
+      if (rawLaps.length > 0 && typeof rawLaps[0] === "number") {
+        const nums = rawLaps.filter((n): n is number => typeof n === "number" && Number.isFinite(n));
+        for (let i = 0; i < nums.length; i++) {
+          lapsForSet.push({ lapNumber: i + 1, lapTimeSeconds: nums[i], isIncluded: true });
+        }
+      } else {
+        for (const row of rawLaps) {
+          if (!row || typeof row !== "object") continue;
+          const r = row as Record<string, unknown>;
+          const lapNumber = typeof r.lapNumber === "number" && Number.isFinite(r.lapNumber) ? Math.floor(r.lapNumber) : 0;
+          const lapTimeSeconds =
+            typeof r.lapTimeSeconds === "number" && Number.isFinite(r.lapTimeSeconds) ? r.lapTimeSeconds : NaN;
+          if (!Number.isFinite(lapTimeSeconds)) continue;
+          lapsForSet.push({
+            lapNumber,
+            lapTimeSeconds,
+            isIncluded: r.isIncluded !== false,
+          });
+        }
+      }
+      if (lapsForSet.length === 0) continue;
+      const normalizedName = typeof set.normalizedName === "string" && set.normalizedName.trim()
+        ? set.normalizedName.trim().toLowerCase()
+        : driverName.toLowerCase();
+      const createdSet = await prisma.runImportedLapSet.create({
+        data: {
+          runId: run.id,
+          sourceUrl: typeof set.sourceUrl === "string" && set.sourceUrl.trim() ? set.sourceUrl.trim() : null,
+          driverId: typeof set.driverId === "string" && set.driverId.trim() ? set.driverId.trim() : null,
+          driverName,
+          normalizedName,
+          isPrimaryUser: Boolean(set.isPrimaryUser),
+        },
+        select: { id: true },
+      });
+      await prisma.runImportedLap.createMany({
+        data: lapsForSet.map((row) => ({
+          lapSetId: createdSet.id,
+          lapNumber: row.lapNumber,
+          lapTimeSeconds: row.lapTimeSeconds,
+          isIncluded: row.isIncluded,
+        })),
+      });
+    }
+
+    await syncActionItemsFromRun({
+      userId: user.id,
+      runId: run.id,
+      suggestedChanges: body.suggestedChanges?.trim() || null,
     });
 
     return NextResponse.json({ run }, { status: 201 });

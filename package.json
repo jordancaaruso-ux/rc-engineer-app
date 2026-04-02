@@ -3,23 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "prisma": "prisma",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "db:migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0",
+    "@prisma/client": "^6.19.2",
+    "@vercel/blob": "^2.3.2",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.453.0",
     "next": "latest",
     "next-themes": "^0.3.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^1.1.1",
+    "pdf2json": "^4.0.2",
+    "pdfjs-dist": "^5.5.207",
     "react": "latest",
     "react-dom": "latest",
+    "react-pdf": "^10.4.1",
     "server-only": "^0.0.1",
     "tailwind-merge": "^2.2.1"
   },

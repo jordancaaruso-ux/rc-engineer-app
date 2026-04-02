@@ -24,10 +24,10 @@ export function RunPickerSelect({
   return (
     <div className="space-y-1 text-sm">
       {label ? (
-        <div className="text-xs font-mono text-muted-foreground break-words min-w-0 leading-snug">{label}</div>
+        <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">{label}</div>
       ) : null}
       <select
-        className="w-full max-w-2xl rounded-md border border-border bg-secondary/40 px-3 py-2 text-xs outline-none font-mono"
+        className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none font-mono"
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}

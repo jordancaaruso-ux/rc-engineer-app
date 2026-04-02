@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
-import { toggleTrackFavourite } from "@/lib/track-favourites";
+import { removeTrackFavourite, toggleTrackFavourite } from "@/lib/track-favourites";
 
 function revalidateFavouritePaths(trackId: string) {
   revalidatePath("/tracks");

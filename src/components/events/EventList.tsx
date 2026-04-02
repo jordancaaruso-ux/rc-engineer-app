@@ -61,11 +61,11 @@ function EventSection({
   return (
     <section className="space-y-2">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <h2 className="ui-title text-sm tracking-tight text-foreground">{title}</h2>
         {subtitle ? <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p> : null}
       </div>
       {events.length === 0 ? (
-        <div className="rounded-lg border border-border bg-secondary/15 p-4 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-border bg-muted/60 p-4 text-sm text-muted-foreground">
           {emptyMessage}
         </div>
       ) : (
@@ -171,13 +171,13 @@ export function EventList({
 
   return (
     <div className="space-y-8">
-      <form onSubmit={handleAdd} className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
-        <div className="text-xs font-mono text-muted-foreground">New event</div>
+      <form onSubmit={handleAdd} className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
+        <div className="ui-title text-sm text-muted-foreground">New event</div>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
             <input
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. BRCA Nationals R3"
@@ -187,7 +187,7 @@ export function EventList({
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Track *</label>
             <select
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={trackId}
               onChange={(e) => setTrackId(e.target.value)}
               aria-label="Track"
@@ -208,7 +208,7 @@ export function EventList({
             <label className="block text-[11px] text-muted-foreground mb-1">Start date</label>
             <input
               type="date"
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               aria-label="Start date"
@@ -218,7 +218,7 @@ export function EventList({
             <label className="block text-[11px] text-muted-foreground mb-1">End date</label>
             <input
               type="date"
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               aria-label="End date"
@@ -233,7 +233,7 @@ export function EventList({
         <div>
           <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
           <input
-            className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Optional notes"
@@ -244,7 +244,7 @@ export function EventList({
             type="submit"
             disabled={adding || !trackId.trim() || dateRangeInvalid}
             className={cn(
-              "rounded-md bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition",
+              "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
               (adding || !trackId.trim() || dateRangeInvalid) && "opacity-70 pointer-events-none"
             )}
           >

@@ -4,8 +4,9 @@
  * No modal URL guessing — embed is the source of truth.
  */
 
-import { load, type CheerioAPI, type Element } from "cheerio";
-import type { LapImportLapRow, LapUrlParseResult } from "./types";
+import { load, type CheerioAPI } from "cheerio";
+import type { Element } from "domhandler";
+import type { LapImportLapRow, LapUrlParseResult, LapUrlSessionDriver } from "./types";
 import { fetchUrlText } from "./fetchText";
 
 const PARSER_ID = "liverc_race_result_v1";
@@ -230,53 +231,126 @@ function findRacerLapsObjectStartIndex(script: string, driverId: string): number
   return null;
 }
 
-function pushLapFromParts(laps: number[], lapNum: number, rawTime: string): void {
-  if (lapNum === 0) return;
+function pushLapFromParts(
+  laps: number[],
+  lapNum: number,
+  rawTime: string,
+  onZero: () => void
+): void {
+  if (lapNum === 0) {
+    onZero();
+    return;
+  }
   const raw = rawTime.replace(",", ".");
   const t = Number.parseFloat(raw);
   if (!Number.isFinite(t)) return;
   laps.push(t);
 }
 
+/** LiveRC uses single-quoted keys and spaces around `:` (not JSON). */
+const LAPS_ARRAY_START_RE = /(?:'laps'|"laps"|laps)\s*:\s*\[/;
+const LAP_NUM_PROP_RE = /(?:'lapNum'|"lapNum"|lapNum)\s*:\s*['"]?(\d+)['"]?/;
+const TIME_PROP_RE = /(?:'time'|"time"|time)\s*:\s*['"]?([\d.,]+)['"]?/;
+
+export type RacerLapsEmbedExtractStats = {
+  lapsKeyDetected: boolean;
+  lapsArrayInnerLength: number;
+  lapObjectChunksFound: number;
+  lapEntriesParsed: number;
+  lapNumZeroDropped: number;
+  firstFiveTimes: number[];
+};
+
 /**
- * Parse `laps: [...]` from one `racerLaps[id] = { ... }` object slice (no eval).
- * Handles repeated-assignment style objects; falls back to ordered regex on the array body.
+ * Parse laps array from one `racerLaps[id] = { ... }` object slice (no eval).
+ * Supports `'laps' : [`, `laps: [`, and quoted `lapNum` / `time` keys.
  */
-export function extractLapTimesFromRacerLapsObjectText(objText: string): number[] {
-  const lapsKey = /laps\s*:\s*\[/.exec(objText);
-  if (!lapsKey) return [];
+export function extractLapTimesFromRacerLapsObjectText(
+  objText: string
+): { laps: number[]; stats: RacerLapsEmbedExtractStats } {
+  let lapNumZeroDropped = 0;
+  const onZero = () => {
+    lapNumZeroDropped += 1;
+  };
+
+  const lapsKey = LAPS_ARRAY_START_RE.exec(objText);
+  const lapsKeyDetected = lapsKey != null;
+  if (!lapsKey) {
+    return {
+      laps: [],
+      stats: {
+        lapsKeyDetected: false,
+        lapsArrayInnerLength: 0,
+        lapObjectChunksFound: 0,
+        lapEntriesParsed: 0,
+        lapNumZeroDropped: 0,
+        firstFiveTimes: [],
+      },
+    };
+  }
 
   const bracketOpen = lapsKey.index + lapsKey[0].length - 1;
   const bracketClose = findClosingDelimiter(objText, bracketOpen, "[", "]");
-  if (bracketClose == null) return [];
+  if (bracketClose == null) {
+    return {
+      laps: [],
+      stats: {
+        lapsKeyDetected: true,
+        lapsArrayInnerLength: 0,
+        lapObjectChunksFound: 0,
+        lapEntriesParsed: 0,
+        lapNumZeroDropped: 0,
+        firstFiveTimes: [],
+      },
+    };
+  }
 
   const inner = objText.slice(bracketOpen + 1, bracketClose);
   const laps: number[] = [];
 
   const objectChunks = inner.match(/\{[^{}]*\}/g) ?? [];
   for (const chunk of objectChunks) {
-    const lapNumM = chunk.match(/lapNum\s*:\s*['"]?(\d+)['"]?/);
-    const timeM = chunk.match(/time\s*:\s*['"]?([\d.,]+)['"]?/);
+    const lapNumM = chunk.match(LAP_NUM_PROP_RE);
+    const timeM = chunk.match(TIME_PROP_RE);
     if (!lapNumM || !timeM) continue;
-    pushLapFromParts(laps, Number.parseInt(lapNumM[1]!, 10), timeM[1]!);
+    pushLapFromParts(laps, Number.parseInt(lapNumM[1]!, 10), timeM[1]!, onZero);
   }
 
-  if (laps.length > 0) return laps;
-
-  // Fallback: property order / minified objects where brace-chunk split failed
-  const forward = /lapNum\s*:\s*['"]?(\d+)['"]?\s*,\s*time\s*:\s*['"]?([\d.,]+)['"]?/g;
-  let m: RegExpExecArray | null;
-  while ((m = forward.exec(inner)) !== null) {
-    pushLapFromParts(laps, Number.parseInt(m[1]!, 10), m[2]!);
-  }
-  if (laps.length > 0) return laps;
-
-  const reversed = /time\s*:\s*['"]?([\d.,]+)['"]?\s*,\s*lapNum\s*:\s*['"]?(\d+)['"]?/g;
-  while ((m = reversed.exec(inner)) !== null) {
-    pushLapFromParts(laps, Number.parseInt(m[2]!, 10), m[1]!);
+  if (laps.length === 0) {
+    const forward = new RegExp(
+      `${LAP_NUM_PROP_RE.source}\\s*,\\s*${TIME_PROP_RE.source}`,
+      "g"
+    );
+    let fm: RegExpExecArray | null;
+    while ((fm = forward.exec(inner)) !== null) {
+      pushLapFromParts(laps, Number.parseInt(fm[1]!, 10), fm[2]!, onZero);
+    }
   }
 
-  return laps;
+  if (laps.length === 0) {
+    const reversed = new RegExp(
+      `${TIME_PROP_RE.source}\\s*,\\s*${LAP_NUM_PROP_RE.source}`,
+      "g"
+    );
+    let rm: RegExpExecArray | null;
+    while ((rm = reversed.exec(inner)) !== null) {
+      pushLapFromParts(laps, Number.parseInt(rm[2]!, 10), rm[1]!, onZero);
+    }
+  }
+
+  const firstFiveTimes = laps.slice(0, 5);
+  const lapEntriesParsed = laps.length + lapNumZeroDropped;
+  return {
+    laps,
+    stats: {
+      lapsKeyDetected,
+      lapsArrayInnerLength: inner.length,
+      lapObjectChunksFound: objectChunks.length,
+      lapEntriesParsed,
+      lapNumZeroDropped,
+      firstFiveTimes,
+    },
+  };
 }
 
 /**
@@ -294,6 +368,7 @@ export function pageHtmlContainsRacerLaps(html: string): boolean {
 export function tryExtractLapsFromRacerLapsEmbed(html: string, driverId: string): {
   laps: number[];
   keys: string[];
+  stats: RacerLapsEmbedExtractStats;
 } | null {
   const script = concatenatePageScriptSources(html);
   if (!/\bracerLaps\b/.test(script)) {
@@ -329,21 +404,21 @@ export function tryExtractLapsFromRacerLapsEmbed(html: string, driverId: string)
   }
 
   const objText = script.slice(objStart, objEnd + 1);
-  const laps = extractLapTimesFromRacerLapsObjectText(objText);
+  const { laps, stats } = extractLapTimesFromRacerLapsObjectText(objText);
   if (laps.length === 0) {
-    const lapsIdx = objText.search(/laps\s*:\s*\[/);
     console.info(LOG_PREFIX, "embed_fail", {
       reason: "no_laps_extracted",
       driverId,
       keys,
       objTextLength: objText.length,
-      hasLapsKey: lapsIdx >= 0,
+      hasLapsKey: stats.lapsKeyDetected,
       objTextHead: objText.slice(0, 400),
+      extractStats: stats,
     });
     return null;
   }
 
-  return { laps, keys };
+  return { laps, keys, stats };
 }
 
 /** ~500 chars around `racerLaps[driverId]` for logs (no eval). */
@@ -438,7 +513,11 @@ export function extractLapTimesFromLiveRcModal($: CheerioAPI): { laps: number[];
   const tryTable = (root: unknown): { laps: number[]; strategy: string } | null => {
     const scope = $(root as never);
     const tables = scope.find("table").toArray();
-    const tableEls = tables.length ? tables : (root as { name?: string })?.name === "table" ? [root] : [];
+    const tableEls: Element[] = tables.length
+      ? tables
+      : (root as { name?: string })?.name === "table" && root && typeof root === "object"
+        ? [root as Element]
+        : [];
 
     for (const table of tableEls) {
       const $t = $(table);
@@ -533,9 +612,28 @@ export async function loadLiveRcLapModalHtml(url: string): Promise<{ ok: true; t
   return { ok: true, text: fetched.text };
 }
 
-export async function importLiveRcRaceResult(pageUrl: string, driverName: string): Promise<LapUrlParseResult> {
+function toSessionDriver(row: ParsedLiveRcResultRow, laps: number[]): LapUrlSessionDriver {
+  return {
+    id: `driver-${row.driverId}`,
+    driverId: row.driverId,
+    driverName: row.driverName,
+    normalizedName: row.normalizedDriverName,
+    laps,
+    lapCount: laps.length,
+  };
+}
+
+function buildCandidateRows(sessionDrivers: LapUrlSessionDriver[]): NonNullable<LapUrlParseResult["candidates"]> {
+  return sessionDrivers.map((d) => ({
+    id: d.id,
+    label: `${d.driverName} · ${d.lapCount ?? d.laps.length} laps`,
+    laps: d.laps,
+    roleHint: "competitor",
+  }));
+}
+
+export async function importLiveRcRaceResult(pageUrl: string, _contextName?: string): Promise<LapUrlParseResult> {
   const trimmedUrl = pageUrl.trim();
-  const name = driverName.trim();
 
   if (!isLiveRcRaceResultUrl(trimmedUrl)) {
     return {
@@ -544,16 +642,6 @@ export async function importLiveRcRaceResult(pageUrl: string, driverName: string
       candidates: [],
       message: "Unsupported LiveRC URL format",
       errorCode: "unsupported_url",
-    };
-  }
-
-  if (!name) {
-    return {
-      parserId: PARSER_ID,
-      laps: [],
-      candidates: [],
-      message: "Enter the driver name as shown on the results.",
-      errorCode: "driver_name_required",
     };
   }
 
@@ -570,99 +658,62 @@ export async function importLiveRcRaceResult(pageUrl: string, driverName: string
   const rows = parseLiveRcRaceResultTableRows(mainFetch.text);
   console.info(LOG_PREFIX, "rows_parsed", { count: rows.length, names: rows.map((r) => r.driverName) });
 
-  const matched = matchDriverRow(rows, name);
-  if (!matched) {
-    console.info(LOG_PREFIX, "match_failed", { wanted: name });
+  const sessionDrivers: LapUrlSessionDriver[] = [];
+  for (const row of rows) {
+    const embed = tryExtractLapsFromRacerLapsEmbed(mainFetch.text, row.driverId);
+    const laps = embed?.laps ?? [];
+    sessionDrivers.push(toSessionDriver(row, laps));
+  }
+
+  const driversWithLaps = sessionDrivers.filter((d) => d.laps.length > 0);
+  if (driversWithLaps.length === 0) {
     return {
       parserId: PARSER_ID,
       laps: [],
       candidates: [],
-      message: "User's name not found",
-      errorCode: "driver_not_found",
-    };
-  }
-
-  console.info(LOG_PREFIX, "matched_row", {
-    driverName: matched.driverName,
-    driverId: matched.driverId,
-  });
-
-  const $page = load(mainFetch.text);
-  const lapsLink = $page("a.driver_laps").filter((_, el) => $page(el).attr("data-driver-id") === matched.driverId);
-  const resultRow = lapsLink.first().closest("tr").get(0) ?? null;
-  const displayedFastest = resultRow ? extractDisplayedFastestLapFromResultRow($page, resultRow) : null;
-
-  let rawLaps: number[] = [];
-  let extractStrategy = "none";
-  let usedUrl: string | null = null;
-
-  const embed = tryExtractLapsFromRacerLapsEmbed(mainFetch.text, matched.driverId);
-  if (embed && embed.laps.length > 0) {
-    rawLaps = embed.laps;
-    extractStrategy = "racer_laps_embed";
-    usedUrl = "embed:racerLaps";
-
-    const fastestExtracted = Math.min(...rawLaps);
-    console.info(LOG_PREFIX, "racer_laps_embed_ok", {
-      matchedName: matched.driverName,
-      driverId: matched.driverId,
-      racerLapsKeys: embed.keys,
-      lapCount: rawLaps.length,
-      firstFive: rawLaps.slice(0, 5),
-      displayedFastest,
-      fastestExtracted,
-    });
-
-    if (displayedFastest != null) {
-      const diff = Math.abs(fastestExtracted - displayedFastest);
-      if (diff > 0.06) {
-        console.warn(LOG_PREFIX, "fastest_lap_mismatch", {
-          fastestExtracted,
-          displayedFastest,
-          diff,
-        });
-      }
-    }
-  }
-
-  if (rawLaps.length === 0) {
-    console.info(LOG_PREFIX, "import_abort", {
-      driverId: matched.driverId,
-      hadRacerLapsScript: pageHtmlContainsRacerLaps(mainFetch.text),
-    });
-    return {
-      parserId: PARSER_ID,
-      laps: [],
-      candidates: [],
-      message: "Could not parse embedded racerLaps for this driver. Check server logs for embed_fail details.",
+      sessionDrivers,
+      message: "Could not parse embedded racerLaps for this session.",
       errorCode: "racer_laps_embed_failed",
       sessionHint: { name: null, className: "racer_laps_embed_failed" },
     };
   }
 
-  console.info(LOG_PREFIX, "laps_extracted", {
-    strategy: extractStrategy,
-    firstFive: rawLaps.slice(0, 5),
-    total: rawLaps.length,
-    resolvedDriverId: matched.driverId,
-  });
-
-  const lapRows = markMedianOutlierWarnings(rawLaps, 0.3);
+  const first = driversWithLaps[0]!;
+  const lapRows = markMedianOutlierWarnings(first.laps, 0.3);
   const laps = lapRows.map((r) => r.time);
+
+  const $page = load(mainFetch.text);
+  const lapsLink = $page("a.driver_laps").filter((_, el) => $page(el).attr("data-driver-id") === first.driverId);
+  const resultRow = lapsLink.first().closest("tr").get(0) ?? null;
+  const displayedFastest = resultRow
+    ? extractDisplayedFastestLapFromResultRow($page, resultRow as Element)
+    : null;
+  const fastestExtracted = Math.min(...first.laps);
+  if (displayedFastest != null) {
+    const diff = Math.abs(fastestExtracted - displayedFastest);
+    if (diff > 0.06) {
+      console.warn(LOG_PREFIX, "fastest_lap_mismatch", {
+        fastestExtracted,
+        displayedFastest,
+        diff,
+        driverId: first.driverId,
+      });
+    }
+  }
+
+  console.info(LOG_PREFIX, "session_loaded", {
+    drivers: driversWithLaps.length,
+    firstDriver: first.driverName,
+    firstDriverLapCount: first.laps.length,
+  });
 
   return {
     parserId: PARSER_ID,
     laps,
     lapRows,
-    candidates: [
-      {
-        id: "liverc_race_driver",
-        label: `${matched.driverName} (LiveRC race result)`,
-        laps,
-        roleHint: "primary",
-      },
-    ],
-    message: `Imported ${laps.length} laps for ${matched.driverName}.`,
-    sessionHint: { name: null, className: `${extractStrategy}|${usedUrl}` },
+    candidates: buildCandidateRows(driversWithLaps),
+    sessionDrivers: driversWithLaps,
+    message: `Imported session with ${driversWithLaps.length} drivers. Select one or more drivers below.`,
+    sessionHint: { name: null, className: "racer_laps_session_loaded" },
   };
 }

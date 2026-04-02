@@ -8,6 +8,7 @@ import { formatRunPickerLine } from "@/lib/runPickerFormat";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import {
   getActiveSetupData,
+  getActiveSetupCarId,
   ACTIVE_SETUP_CHANGED_EVENT,
 } from "@/lib/activeSetupContext";
 import { displayRunNotes } from "@/lib/runNotes";
@@ -21,11 +22,13 @@ export type CompareRunShape = {
   sessionLabel?: string | null;
   eventId?: string | null;
   event?: { name: string } | null;
-  car?: { id: string; name: string } | null;
+  car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
   carNameSnapshot?: string | null;
   track?: { id: string; name: string } | null;
   trackNameSnapshot?: string | null;
   lapTimes: unknown;
+  /** For per-lap inclusion when comparing primary laps. */
+  lapSession?: unknown;
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;
@@ -61,6 +64,11 @@ export function RunComparePanel({
     return getActiveSetupData();
   }, [activeTick]);
 
+  const activeSetupCarId = useMemo(() => {
+    void activeTick;
+    return getActiveSetupCarId();
+  }, [activeTick]);
+
   const hasActiveSetup = useMemo(() => {
     const a = activeSetup;
     if (!a) return false;
@@ -71,9 +79,18 @@ export function RunComparePanel({
   }, [activeSetup]);
 
   const otherRuns = useMemo(
-    () => pickerRuns.filter((r) => r.id !== baseRun.id),
-    [pickerRuns, baseRun.id]
+    () =>
+      pickerRuns.filter((r) => {
+        if (r.id === baseRun.id) return false;
+        if (baseRun.car?.id) return r.car?.id === baseRun.car.id;
+        return true;
+      }),
+    [pickerRuns, baseRun.id, baseRun.car?.id]
   );
+
+  const currentSetupCarMismatch =
+    mode === "current_setup" &&
+    Boolean(baseRun.car?.id && activeSetupCarId && activeSetupCarId !== baseRun.car.id);
 
   const baselineRun = useMemo(() => {
     if (mode !== "choose_run" || !otherRunId) return null;
@@ -138,18 +155,18 @@ export function RunComparePanel({
 
   return (
     <div
-      className="mt-4 rounded-lg border border-border bg-secondary/15 p-4 space-y-4 text-sm"
+      className="mt-4 rounded-lg border border-border bg-muted/60 p-4 space-y-4 text-sm"
       onClick={(e) => e.stopPropagation()}
     >
       <div>
-        <h3 className="text-xs font-mono text-muted-foreground uppercase tracking-wide">
+        <h3 className="ui-title text-xs text-muted-foreground uppercase tracking-wide">
           Compare setup
         </h3>
         <p className="text-xs text-muted-foreground mt-1">{sourceNote}</p>
       </div>
 
       <div className="space-y-2">
-        <span className="text-[11px] font-mono text-muted-foreground">Compare to</span>
+        <span className="ui-title text-sm text-muted-foreground">Compare to</span>
         <div className="flex flex-wrap gap-2">
           <ModeChip
             active={mode === "current_setup"}
@@ -183,17 +200,24 @@ export function RunComparePanel({
         </p>
       )}
 
+      {mode === "current_setup" && hasActiveSetup && currentSetupCarMismatch && (
+        <p className="text-xs text-amber-600/90 dark:text-amber-400/90">
+          Current setup belongs to a different car than this run. Load setup from a past run for{" "}
+          <strong>{baseRun.car?.name ?? "this vehicle"}</strong> on Log your run to compare like-for-like.
+        </p>
+      )}
+
       {mode === "choose_run" && !otherRunId ? (
         <p className="text-xs text-muted-foreground">Select a run from the list.</p>
       ) : mode === "choose_run" && !baselineRun ? null : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 text-xs">
-            <div className="rounded-md border border-border bg-secondary/20 p-3 space-y-1">
-              <div className="font-mono text-muted-foreground">This run (history)</div>
+            <div className="rounded-md border border-border bg-muted/70 p-3 space-y-1">
+              <div className="ui-title text-sm text-muted-foreground">This run (history)</div>
               <div className="font-mono text-[11px] break-words">{formatRunPickerLine(baseRun)}</div>
             </div>
-            <div className="rounded-md border border-border bg-secondary/20 p-3 space-y-1">
-              <div className="font-mono text-muted-foreground">{rightLabel}</div>
+            <div className="rounded-md border border-border bg-muted/70 p-3 space-y-1">
+              <div className="ui-title text-sm text-muted-foreground">{rightLabel}</div>
               {mode === "current_setup" ? (
                 <p className="text-muted-foreground text-[11px]">
                   Values from Log your run (last saved locally).
@@ -229,7 +253,7 @@ export function RunComparePanel({
 
           <div className="grid gap-3 sm:grid-cols-2 text-xs">
             <div>
-              <span className="font-mono text-muted-foreground">Tires · this run</span>
+              <span className="ui-title text-sm text-muted-foreground">Tires · this run</span>
               <p className="mt-1">
                 {baseRun.tireSet
                   ? `${baseRun.tireSet.label} · Set ${baseRun.tireSet.setNumber ?? "—"} · Run ${baseRun.tireRunNumber}`
@@ -237,14 +261,14 @@ export function RunComparePanel({
               </p>
             </div>
             <div>
-              <span className="font-mono text-muted-foreground">Tires · {rightLabel.toLowerCase()}</span>
+              <span className="ui-title text-sm text-muted-foreground">Tires · {rightLabel.toLowerCase()}</span>
               <p className="mt-1">{tiresRight}</p>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-xs font-mono text-muted-foreground uppercase tracking-wide">
+              <h4 className="ui-title text-xs text-muted-foreground uppercase tracking-wide">
                 Setup values
               </h4>
               <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
@@ -265,7 +289,7 @@ export function RunComparePanel({
             <div className="overflow-x-auto rounded-md border border-border">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-secondary/20 text-left text-xs font-mono text-muted-foreground">
+                  <tr className="border-b border-border bg-muted/70 text-left text-xs font-medium text-muted-foreground">
                     <th className="px-3 py-2">Parameter</th>
                     <th className="px-3 py-2">This run</th>
                     <th className="px-3 py-2">{rightLabel}</th>
@@ -288,8 +312,8 @@ export function RunComparePanel({
                         key={r.key}
                         className={
                           r.changed
-                            ? "border-b border-border/50 bg-yellow-500/10 dark:bg-yellow-500/5"
-                            : "border-b border-border/50"
+                            ? "border-b border-border/80 bg-yellow-500/10 dark:bg-yellow-500/5"
+                            : "border-b border-border/80"
                         }
                       >
                         <td className="px-3 py-2">
@@ -333,10 +357,10 @@ function ModeChip({
       onClick={onClick}
       className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
         disabled
-          ? "border-border/50 text-muted-foreground/50 cursor-not-allowed"
+          ? "border-border/80 text-muted-foreground/50 cursor-not-allowed"
           : active
             ? "border-accent bg-accent/15 text-foreground"
-            : "border-border bg-secondary/30 hover:bg-secondary/50"
+            : "border-border bg-card hover:bg-muted/90"
       }`}
     >
       {label}
@@ -356,8 +380,8 @@ function LapBlock({
   rightLabel: string;
 }) {
   return (
-    <div className="rounded-md border border-border bg-secondary/10 px-3 py-2 text-xs">
-      <div className="font-mono text-muted-foreground">{title}</div>
+    <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs">
+      <div className="ui-title text-sm text-muted-foreground">{title}</div>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
         <span>
           This run: <span className="font-mono text-foreground">{left}</span>
@@ -373,8 +397,8 @@ function LapBlock({
 function NoteBlock({ title, text }: { title: string; text?: string | null }) {
   const v = text?.trim() || "—";
   return (
-    <div className="rounded-md border border-border bg-secondary/10 px-3 py-2 text-xs">
-      <div className="font-mono text-muted-foreground">{title}</div>
+    <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs">
+      <div className="ui-title text-sm text-muted-foreground">{title}</div>
       <p className="mt-1 whitespace-pre-wrap text-foreground">{v}</p>
     </div>
   );

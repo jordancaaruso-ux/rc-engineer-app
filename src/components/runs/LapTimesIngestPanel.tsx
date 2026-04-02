@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { parseManualLapText } from "@/lib/lapSession/parseManual";
 import type { LapSourceKind } from "@/lib/lapSession/types";
-import type { LapImportLapRow } from "@/lib/lapUrlParsers/types";
+import type { LapImportLapRow, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
 import { computeLapMetrics, formatLap } from "@/lib/runLaps";
+import type { LapRow } from "@/lib/lapAnalysis";
+import { getAverageTopN, getBestLap } from "@/lib/lapAnalysis";
 
 export type LapIngestFormValue = {
   manualText: string;
@@ -14,11 +16,14 @@ export type LapIngestFormValue = {
   parserId: string | null;
   /** Structured laps + warnings from URL import (e.g. LiveRC). */
   urlLapRows?: LapImportLapRow[] | null;
+  /** Optional race-result session data for primary + competitor selection. */
+  sessionDrivers?: LapUrlSessionDriver[] | null;
+  selectedDriverIds?: string[] | null;
+  /** URL import: per-driver lap rows (inclusion); keyed by driverId. */
+  driverLapRowsByDriverId?: Record<string, LapRow[]> | null;
 };
 
 type IngestTab = "manual" | "photo" | "url" | "csv";
-
-type UrlCandidateRow = { id: string; label: string; laps: number[] };
 
 const DEFAULT_VALUE: LapIngestFormValue = {
   manualText: "",
@@ -26,7 +31,22 @@ const DEFAULT_VALUE: LapIngestFormValue = {
   sourceDetail: null,
   parserId: null,
   urlLapRows: null,
+  sessionDrivers: null,
+  selectedDriverIds: null,
+  driverLapRowsByDriverId: null,
 };
+
+function initDriverLapRows(drivers: LapUrlSessionDriver[]): Record<string, LapRow[]> {
+  const out: Record<string, LapRow[]> = {};
+  for (const d of drivers) {
+    out[d.driverId] = d.laps.map((t, i) => ({
+      lapNumber: i + 1,
+      lapTimeSeconds: t,
+      isIncluded: true,
+    }));
+  }
+  return out;
+}
 
 export function LapTimesIngestPanel({
   value,
@@ -41,13 +61,26 @@ export function LapTimesIngestPanel({
   const [photoConfidence, setPhotoConfidence] = useState<string | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
   const [urlInput, setUrlInput] = useState("");
-  const [urlDriverName, setUrlDriverName] = useState("");
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
-  const [urlCandidates, setUrlCandidates] = useState<UrlCandidateRow[]>([]);
-  const [urlSelectedId, setUrlSelectedId] = useState<string>("");
+  const [activePreviewDriverId, setActivePreviewDriverId] = useState<string | null>(null);
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
   const metrics = useMemo(() => computeLapMetrics(parsedLaps), [parsedLaps]);
+
+  const urlPrimaryPreviewMetrics = useMemo(() => {
+    if (value.sourceKind !== "url" || !value.sessionDrivers?.length) return null;
+    const ids = value.selectedDriverIds ?? [];
+    const primaryId = ids[0] ?? value.sessionDrivers[0]?.driverId ?? null;
+    if (!primaryId) return null;
+    const rows = value.driverLapRowsByDriverId?.[primaryId];
+    if (!rows?.length) return null;
+    const included = rows.filter((r) => r.isIncluded && r.lapNumber !== 0);
+    return {
+      lapCount: included.length,
+      bestLap: getBestLap(rows),
+      averageTop5: getAverageTopN(rows, 5),
+    };
+  }, [value.sourceKind, value.sessionDrivers, value.selectedDriverIds, value.driverLapRowsByDriverId]);
 
   function selectTab(id: IngestTab) {
     setTab(id);
@@ -58,6 +91,9 @@ export function LapTimesIngestPanel({
         sourceDetail: null,
         parserId: null,
         urlLapRows: null,
+        sessionDrivers: null,
+        selectedDriverIds: null,
+        driverLapRowsByDriverId: null,
       });
     }
   }
@@ -91,6 +127,7 @@ export function LapTimesIngestPanel({
         sourceDetail: filename || null,
         parserId: (data as { extractorId?: string })?.extractorId ?? "openai_gpt4o_mini_vision_v1",
         urlLapRows: null,
+        driverLapRowsByDriverId: null,
       });
       setPhotoNote(note);
       setPhotoConfidence(conf);
@@ -109,13 +146,11 @@ export function LapTimesIngestPanel({
     }
     setUrlBusy(true);
     setUrlMessage(null);
-    setUrlCandidates([]);
-    setUrlSelectedId("");
     try {
       const res = await fetch("/api/laps/parse-url-preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, driverName: urlDriverName.trim() || undefined }),
+        body: JSON.stringify({ url }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -124,33 +159,13 @@ export function LapTimesIngestPanel({
       }
       const parserId = (data as { parserId?: string })?.parserId ?? "http_timing_v1";
       const message = (data as { message?: string | null })?.message ?? null;
-      const rawCandidates = (data as { candidates?: UrlCandidateRow[] })?.candidates ?? [];
+      const sessionDriversRaw = (data as { sessionDrivers?: LapUrlSessionDriver[] }).sessionDrivers ?? [];
+      const sessionDrivers = Array.isArray(sessionDriversRaw)
+        ? sessionDriversRaw.filter((d) => d && typeof d.driverId === "string" && Array.isArray(d.laps))
+        : [];
       const topLaps = (data as { laps?: number[] })?.laps ?? [];
-      const lapRowsRaw = (data as { lapRows?: LapImportLapRow[] | null })?.lapRows ?? null;
-      const lapRows: LapImportLapRow[] | null =
-        Array.isArray(lapRowsRaw) && lapRowsRaw.length > 0
-          ? lapRowsRaw.map((r) => ({
-              time: r.time,
-              isOutlierWarning: r.isOutlierWarning,
-              warningReason: r.warningReason ?? null,
-              isFlagged: Boolean(r.isFlagged),
-              flagReason: r.flagReason ?? null,
-            }))
-          : null;
 
-      let list: UrlCandidateRow[] = rawCandidates.filter(
-        (c) => c && typeof c.id === "string" && Array.isArray(c.laps)
-      );
-      if (list.length === 0 && topLaps.length > 0) {
-        list = [{ id: "default", label: "Imported laps", laps: topLaps }];
-      }
-
-      setUrlCandidates(list);
-      const firstId = list[0]?.id ?? "";
-      setUrlSelectedId(firstId);
-      const chosen = list.find((c) => c.id === firstId) ?? list[0];
-      const laps = chosen?.laps ?? topLaps;
-      const textFromLaps = laps.length ? laps.map((n) => n.toFixed(3)).join("\n") : value.manualText;
+      const textFromLaps = topLaps.length > 0 ? topLaps.map((n) => n.toFixed(3)).join("\n") : value.manualText;
 
       onChange({
         ...value,
@@ -158,8 +173,12 @@ export function LapTimesIngestPanel({
         sourceKind: "url",
         sourceDetail: url,
         parserId,
-        urlLapRows: lapRows,
+        urlLapRows: null,
+        sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : null,
+        selectedDriverIds: [],
+        driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : null,
       });
+      setActivePreviewDriverId(sessionDrivers[0]?.driverId ?? null);
       setUrlMessage(message);
     } catch {
       setUrlMessage("Request failed.");
@@ -168,36 +187,62 @@ export function LapTimesIngestPanel({
     }
   }
 
-  function applyUrlCandidate(id: string) {
-    setUrlSelectedId(id);
-    const row = urlCandidates.find((c) => c.id === id);
-    if (!row) return;
+  function toggleDriverSelection(driverId: string) {
+    const drivers = value.sessionDrivers ?? [];
+    if (drivers.length === 0) return;
+    const current = new Set(value.selectedDriverIds ?? []);
+    if (current.has(driverId)) current.delete(driverId);
+    else current.add(driverId);
+
+    const selectedOrderedIds = drivers.map((d) => d.driverId).filter((id) => current.has(id));
+
     onChange({
       ...value,
-      manualText: row.laps.map((n) => n.toFixed(3)).join("\n"),
-      sourceKind: "url",
-      sourceDetail: urlInput.trim() || value.sourceDetail,
-      parserId: value.parserId,
+      selectedDriverIds: selectedOrderedIds,
       urlLapRows: null,
     });
   }
 
-  function toggleUrlLapFlag(index: number) {
-    const rows = value.urlLapRows;
-    if (!rows?.length) return;
-    const next = rows.map((r, i) =>
-      i === index ? { ...r, isFlagged: !r.isFlagged } : r
-    );
+  function statsForDriver(d: LapUrlSessionDriver): { bestLap: number | null; avgTop10: number | null } {
+    const rows =
+      value.driverLapRowsByDriverId?.[d.driverId] ??
+      d.laps.map((t, i) => ({
+        lapNumber: i + 1,
+        lapTimeSeconds: t,
+        isIncluded: true,
+      }));
+    return {
+      bestLap: getBestLap(rows),
+      avgTop10: getAverageTopN(rows, 10),
+    };
+  }
+
+  function toggleLapInclusion(driverId: string, lapIndex: number) {
+    const prev = value.driverLapRowsByDriverId?.[driverId];
+    if (!prev?.[lapIndex]) return;
+    const nextRows = [...prev];
+    nextRows[lapIndex] = { ...nextRows[lapIndex], isIncluded: !nextRows[lapIndex].isIncluded };
     onChange({
       ...value,
-      urlLapRows: next,
-      manualText: next.map((r) => r.time.toFixed(3)).join("\n"),
+      driverLapRowsByDriverId: {
+        ...(value.driverLapRowsByDriverId ?? {}),
+        [driverId]: nextRows,
+      },
+      urlLapRows: null,
     });
   }
 
+  function lapTextFromRows(driverId: string, fallbackLaps: number[]): string {
+    const rows = value.driverLapRowsByDriverId?.[driverId];
+    if (rows && rows.length > 0) {
+      return rows.map((r) => r.lapTimeSeconds.toFixed(3)).join("\n");
+    }
+    return fallbackLaps.map((n) => n.toFixed(3)).join("\n");
+  }
+
   return (
-    <div className="rounded-lg border border-border bg-secondary/10 p-4 space-y-3">
-      <div className="text-xs font-mono text-muted-foreground">Lap times</div>
+    <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+      <div className="ui-title text-sm text-muted-foreground">Lap times</div>
       <div
         className="flex flex-wrap border-b border-border gap-x-0.5"
         role="tablist"
@@ -251,7 +296,7 @@ export function LapTimesIngestPanel({
             type="file"
             accept="image/*"
             disabled={photoBusy}
-            className="block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-secondary/40 file:px-2 file:py-1"
+            className="block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-card file:px-2 file:py-1"
             onChange={(e) => onPhotoSelected(e.target.files?.[0] ?? null)}
           />
           {photoBusy ? <p className="text-[11px] text-muted-foreground">Processing…</p> : null}
@@ -267,64 +312,152 @@ export function LapTimesIngestPanel({
       {tab === "url" ? (
         <div className="space-y-2 text-sm">
           <p className="text-[11px] text-muted-foreground">
-            Paste an <span className="text-foreground/90">https</span> link.{" "}
-            <span className="text-foreground/90">LiveRC race results</span> (
-            <code className="text-foreground/80">…/results/?p=view_race_result&id=…</code>) need your{" "}
-            <span className="text-foreground/90">driver name</span> as on the sheet. Other URLs use JSON/heuristics as
-            before.
+            Paste an <span className="text-foreground/90">https</span> link and import. Then select one or more drivers.
           </p>
-          <div className="flex flex-col gap-2 max-w-lg">
-            <label className="text-[11px] font-mono text-muted-foreground" htmlFor="url-driver-name">
-              Driver name (LiveRC race result)
-            </label>
-            <input
-              id="url-driver-name"
-              type="text"
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
-              placeholder="e.g. Jordan Caruso"
-              value={urlDriverName}
-              onChange={(e) => setUrlDriverName(e.target.value)}
-              autoComplete="off"
-            />
-          </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
+              id="url-import-input"
               type="url"
-              className="flex-1 rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
-              placeholder="https://…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void fetchUrlPreview();
+                }
+              }}
+              className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              placeholder="Upload URL"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              aria-label="Timing page URL"
+              aria-label="Upload URL"
             />
             <button
               type="button"
               disabled={urlBusy}
               className={cn(
-                "rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs font-medium hover:bg-secondary/50 transition shrink-0",
+                "rounded-md border border-border bg-card px-4 py-2 text-xs font-medium hover:bg-muted/90 transition shrink-0 min-w-[88px]",
                 urlBusy && "opacity-60 pointer-events-none"
               )}
               onClick={() => void fetchUrlPreview()}
             >
-              {urlBusy ? "Fetching…" : "Fetch preview"}
+              {urlBusy ? "Importing…" : "Import"}
             </button>
           </div>
-          {urlCandidates.length > 1 ? (
-            <div className="space-y-1">
-              <label className="text-[11px] font-mono text-muted-foreground" htmlFor="url-candidate">
-                Driver / lap list
-              </label>
-              <select
-                id="url-candidate"
-                className="w-full max-w-md rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
-                value={urlSelectedId}
-                onChange={(e) => applyUrlCandidate(e.target.value)}
-              >
-                {urlCandidates.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label} ({c.laps.length} laps)
-                  </option>
-                ))}
-              </select>
+          {value.sessionDrivers && value.sessionDrivers.length > 0 ? (
+            <div className="space-y-2 rounded-lg border border-border bg-muted/70 p-2">
+              <div className="ui-title text-sm text-muted-foreground">Imported drivers</div>
+
+              <div className="space-y-2">
+                {value.sessionDrivers.map((d) => {
+                  const selected = Boolean(value.selectedDriverIds?.includes(d.driverId));
+                  const activeId = activePreviewDriverId ?? value.sessionDrivers?.[0]?.driverId ?? null;
+                  const isPreview = activeId === d.driverId;
+                  const stats = statsForDriver(d);
+                  return (
+                    <div
+                      key={d.driverId}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        setActivePreviewDriverId(d.driverId);
+                        onChange({
+                          ...value,
+                          manualText: lapTextFromRows(d.driverId, d.laps),
+                          urlLapRows: null,
+                        });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setActivePreviewDriverId(d.driverId);
+                          onChange({
+                            ...value,
+                            manualText: lapTextFromRows(d.driverId, d.laps),
+                            urlLapRows: null,
+                          });
+                        }
+                      }}
+                      className={cn(
+                        "flex items-start justify-between gap-3 rounded-md border bg-muted/80 p-2 cursor-pointer transition",
+                        isPreview ? "border-accent/70 bg-accent/10" : "border-border hover:bg-muted/70"
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium truncate">{d.driverName}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">
+                          <span className="font-medium text-muted-foreground">Best:</span> {stats.bestLap != null ? `${stats.bestLap.toFixed(3)}s` : "—"}{" "}
+                          • <span className="font-medium text-muted-foreground">Avg Top 10:</span>{" "}
+                          {stats.avgTop10 != null ? `${stats.avgTop10.toFixed(3)}s` : "—"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={cn(
+                          "shrink-0 rounded-md px-3 py-1.5 text-[11px] font-medium border transition",
+                          selected
+                            ? "border-accent bg-accent/20 text-foreground"
+                            : "border-border bg-card text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleDriverSelection(d.driverId);
+                        }}
+                      >
+                        {selected ? "Selected" : "Select"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-1 rounded-md border border-border bg-muted/60 p-2">
+                <div className="ui-title text-sm text-muted-foreground">Lap preview</div>
+                {(() => {
+                  const activeId = activePreviewDriverId ?? value.sessionDrivers?.[0]?.driverId ?? null;
+                  const active = activeId ? value.sessionDrivers.find((x) => x.driverId === activeId) ?? null : null;
+                  if (!active) return <div className="text-[11px] text-muted-foreground">—</div>;
+                  const rows =
+                    value.driverLapRowsByDriverId?.[active.driverId] ??
+                    active.laps.map((t, i) => ({
+                      lapNumber: i + 1,
+                      lapTimeSeconds: t,
+                      isIncluded: true,
+                    }));
+                  return (
+                    <ul className="font-mono text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-muted/80 p-2 space-y-1">
+                      {rows.map((row, i) => (
+                        <li
+                          key={`${active.driverId}-${row.lapNumber}-${i}`}
+                          className={cn(
+                            "flex flex-wrap items-center gap-2 rounded px-1 py-0.5",
+                            row.isIncluded ? "opacity-100" : "opacity-50 line-through"
+                          )}
+                        >
+                          <span className="text-muted-foreground w-8 shrink-0">{row.lapNumber}.</span>
+                          <span className="min-w-[4.5rem]">{row.lapTimeSeconds.toFixed(3)}s</span>
+                          {!row.isIncluded ? (
+                            <span className="text-[10px] uppercase text-muted-foreground">Excluded</span>
+                          ) : null}
+                          <button
+                            type="button"
+                            className={cn(
+                              "ml-auto shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium transition",
+                              row.isIncluded
+                                ? "border-border bg-card hover:bg-muted"
+                                : "border-border bg-muted/70 hover:bg-muted/70"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleLapInclusion(active.driverId, i);
+                            }}
+                          >
+                            {row.isIncluded ? "Included" : "Excluded"}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
+              </div>
             </div>
           ) : null}
           {urlMessage ? (
@@ -340,57 +473,6 @@ export function LapTimesIngestPanel({
               {urlMessage}
             </p>
           ) : null}
-          {value.urlLapRows && value.urlLapRows.length > 0 ? (
-            <div className="rounded-md border border-border/80 bg-secondary/20 overflow-x-auto">
-              <table className="w-full text-[11px] border-collapse">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground font-mono">
-                    <th className="py-1.5 px-2">#</th>
-                    <th className="py-1.5 px-2">Time</th>
-                    <th className="py-1.5 px-2">Note</th>
-                    <th className="py-1.5 px-2">Flag</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {value.urlLapRows.map((row, i) => (
-                    <tr
-                      key={i}
-                      className={cn(
-                        "border-b border-border/50",
-                        row.isFlagged && "bg-amber-950/30 dark:bg-amber-950/40"
-                      )}
-                    >
-                      <td className="py-1 px-2 font-mono text-muted-foreground">{i + 1}</td>
-                      <td className="py-1 px-2 font-mono tabular-nums">{formatLap(row.time)}</td>
-                      <td className="py-1 px-2">
-                        {row.isOutlierWarning ? (
-                          <span className="text-amber-600 dark:text-amber-400" title={row.warningReason ?? ""}>
-                            Median outlier
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="py-1 px-2">
-                        <button
-                          type="button"
-                          className={cn(
-                            "rounded border px-2 py-0.5 text-[10px] font-medium transition",
-                            row.isFlagged
-                              ? "border-amber-500 bg-amber-500/20 text-amber-800 dark:text-amber-200"
-                              : "border-border bg-secondary/30 hover:bg-secondary/50"
-                          )}
-                          onClick={() => toggleUrlLapFlag(i)}
-                        >
-                          {row.isFlagged ? "Flagged" : "Flag"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -398,13 +480,14 @@ export function LapTimesIngestPanel({
         <p className="text-[11px] text-muted-foreground">CSV import will use the same confirmation step as manual entry.</p>
       ) : null}
 
+      {tab !== "url" ? (
       <div className="space-y-1">
-        <label className="text-xs font-mono text-muted-foreground" htmlFor="lap-times-edit">
+        <label className="text-sm font-medium text-muted-foreground" htmlFor="lap-times-edit">
           Laps (edit before save)
         </label>
         <textarea
           id="lap-times-edit"
-          className="h-32 w-full resize-none rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none font-mono"
+          className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none font-mono"
           placeholder={"12.341 12.298 12.410\nor comma / line separated"}
           value={value.manualText}
           onChange={(e) => {
@@ -415,24 +498,34 @@ export function LapTimesIngestPanel({
               sourceKind: tab === "manual" ? "manual" : value.sourceKind,
               sourceDetail: tab === "manual" ? null : value.sourceDetail,
               parserId: tab === "manual" ? null : value.parserId,
-              urlLapRows: tab === "url" ? null : value.urlLapRows,
+              urlLapRows: value.urlLapRows,
             });
           }}
           aria-label="Lap times"
         />
       </div>
+      ) : null}
 
-      <div className="rounded-md border border-border/60 bg-secondary/15 px-3 py-2 text-[11px] space-y-1">
-        <div className="font-mono text-muted-foreground">Preview</div>
+      <div className="rounded-md border border-border bg-muted/60 px-3 py-2 text-[11px] space-y-1">
+        <div className="ui-title text-sm text-muted-foreground">Preview</div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-foreground">
           <span>
-            Count: <span className="font-mono">{metrics.lapCount}</span>
+            Count:{" "}
+            <span className="font-mono">
+              {urlPrimaryPreviewMetrics ? urlPrimaryPreviewMetrics.lapCount : metrics.lapCount}
+            </span>
           </span>
           <span>
-            Best: <span className="font-mono">{formatLap(metrics.bestLap)}</span>
+            Best:{" "}
+            <span className="font-mono">
+              {formatLap(urlPrimaryPreviewMetrics ? urlPrimaryPreviewMetrics.bestLap : metrics.bestLap)}
+            </span>
           </span>
           <span>
-            Avg top 5: <span className="font-mono">{formatLap(metrics.averageTop5)}</span>
+            Avg top 5:{" "}
+            <span className="font-mono">
+              {formatLap(urlPrimaryPreviewMetrics ? urlPrimaryPreviewMetrics.averageTop5 : metrics.averageTop5)}
+            </span>
           </span>
         </div>
         <span className="text-muted-foreground">
@@ -444,6 +537,17 @@ export function LapTimesIngestPanel({
             </>
           ) : null}
         </span>
+        {value.selectedDriverIds && value.selectedDriverIds.length > 0 && value.sessionDrivers ? (
+          <span className="text-muted-foreground">
+            Selected drivers:{" "}
+            <span className="text-foreground/90">
+              {value.sessionDrivers
+                .filter((d) => value.selectedDriverIds?.includes(d.driverId))
+                .map((d) => d.driverName)
+                .join(", ")}
+            </span>
+          </span>
+        ) : null}
       </div>
     </div>
   );

@@ -5,6 +5,24 @@ const SOURCE_KIND_LABEL: Record<string, string> = {
   csv: "CSV import",
 };
 
+/** Returns `source.detail` when it is an http(s) URL (lap session v1). */
+export function tryReadLapSourceUrl(lapSession: unknown): string | null {
+  try {
+    if (!lapSession || typeof lapSession !== "object") return null;
+    const o = lapSession as Record<string, unknown>;
+    if (o.version !== 1) return null;
+    const src = o.source;
+    if (!src || typeof src !== "object") return null;
+    const s = src as Record<string, unknown>;
+    if (s.kind !== "url") return null;
+    const detail = typeof s.detail === "string" ? s.detail.trim() : "";
+    if (!detail || !/^https?:\/\//i.test(detail)) return null;
+    return detail;
+  } catch {
+    return null;
+  }
+}
+
 /** Human-readable lap ingestion source for Analysis / tables. Never throws. */
 export function formatLapSourceSummary(lapSession: unknown): string | null {
   try {

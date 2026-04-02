@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
@@ -9,7 +10,7 @@ export default async function NewRunPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -20,7 +21,7 @@ export default async function NewRunPage({
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-3xl rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          <div className="max-w-3xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             Set <span className="font-mono">DATABASE_URL</span> in a{" "}
             <span className="font-mono">.env</span> file (Postgres) to enable
             saving runs.

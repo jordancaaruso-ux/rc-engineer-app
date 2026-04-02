@@ -63,13 +63,13 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleAdd} className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
-        <div className="text-xs font-mono text-muted-foreground">Add car</div>
+      <form onSubmit={handleAdd} className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
+        <div className="ui-title text-sm text-muted-foreground">Add car</div>
         <div className="grid gap-3 md:grid-cols-3">
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
             <input
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. TC6.2"
@@ -79,7 +79,7 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Chassis / model (optional)</label>
             <input
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={chassis}
               onChange={(e) => setChassis(e.target.value)}
               placeholder="e.g. Xray T4"
@@ -88,7 +88,7 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
             <input
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional"
@@ -97,7 +97,7 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Setup sheet template</label>
             <select
-              className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={setupSheetTemplate}
               onChange={(e) => setSetupSheetTemplate(e.target.value)}
             >
@@ -112,7 +112,7 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
             type="submit"
             disabled={adding}
             className={cn(
-              "rounded-md bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition",
+              "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
               adding && "opacity-70 pointer-events-none"
             )}
           >
@@ -127,9 +127,9 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
       </form>
 
       <div>
-        <div className="text-xs font-mono text-muted-foreground mb-2">Your cars</div>
+        <div className="ui-title text-sm text-muted-foreground mb-2">Your cars</div>
         {cars.length === 0 ? (
-          <div className="rounded-lg border border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-muted/70 p-4 text-sm text-muted-foreground">
             No cars yet. Add one above to log runs.
           </div>
         ) : (

@@ -1,10 +1,11 @@
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { TrackList } from "@/components/tracks/TrackList";
 
-export default async function TracksPage() {
+export default async function TracksPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -15,7 +16,7 @@ export default async function TracksPage() {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             Set DATABASE_URL in .env to manage tracks.
           </div>
         </section>

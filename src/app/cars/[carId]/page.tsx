@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -6,9 +7,9 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { CarDeleteClient } from "@/components/cars/CarDeleteClient";
 import { CarSetupSheetTemplateEdit } from "@/components/cars/CarSetupSheetTemplateEdit";
 
-export default async function CarDetailPage(
-  props: { params: Promise<{ carId: string }> }
-) {
+export default async function CarDetailPage(props: {
+  params: Promise<{ carId: string }>;
+}): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -19,7 +20,7 @@ export default async function CarDetailPage(
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             Set DATABASE_URL in .env to view cars.
           </div>
         </section>
@@ -45,7 +46,7 @@ export default async function CarDetailPage(
           </div>
           <Link
             href="/cars"
-            className="rounded-md border border-border bg-secondary/30 px-4 py-2 text-xs hover:bg-secondary/40 transition"
+            className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
           >
             Back
           </Link>
@@ -67,22 +68,22 @@ export default async function CarDetailPage(
         </div>
         <Link
           href="/cars"
-          className="rounded-md border border-border bg-secondary/30 px-4 py-2 text-xs hover:bg-secondary/40 transition"
+          className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
         >
           Back
         </Link>
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
-          <div className="rounded-lg border border-border bg-secondary/10 p-4 text-sm">
+          <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
             <div className="grid gap-2">
-              <div><span className="text-xs font-mono text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(car.createdAt)}</span></div>
-              <div><span className="text-xs font-mono text-muted-foreground">Runs</span> <span className="ml-2">{runCount}</span></div>
+              <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(car.createdAt)}</span></div>
+              <div><span className="text-sm font-medium text-muted-foreground">Runs</span> <span className="ml-2">{runCount}</span></div>
               {car.chassis ? (
-                <div><span className="text-xs font-mono text-muted-foreground">Chassis</span> <span className="ml-2">{car.chassis}</span></div>
+                <div><span className="text-sm font-medium text-muted-foreground">Chassis</span> <span className="ml-2">{car.chassis}</span></div>
               ) : null}
               {car.notes ? (
-                <div><span className="text-xs font-mono text-muted-foreground">Notes</span> <span className="ml-2">{car.notes}</span></div>
+                <div><span className="text-sm font-medium text-muted-foreground">Notes</span> <span className="ml-2">{car.notes}</span></div>
               ) : null}
             </div>
           </div>

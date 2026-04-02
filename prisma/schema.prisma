@@ -1,9 +1,13 @@
+// Migration history reset for Postgres deployment.
+// SQLite migrations removed. Fresh baseline will be generated after
+// provider switch in next step.
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -19,6 +23,36 @@ model User {
   snapshots       SetupSnapshot[]
   events          Event[]
   favouriteTracks FavouriteTrack[]
+  appSettings     AppSetting[]
+  actionItems     ActionItem[]
+  setupDocuments  SetupDocument[]
+  setupCalibrations SetupSheetCalibration[]
+  setupImportBatches SetupImportBatch[]
+}
+
+enum ActionItemSourceType {
+  RUN
+  MANUAL
+}
+
+model ActionItem {
+  id          String               @id @default(cuid())
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  text        String
+  normKey     String
+  sourceType  ActionItemSourceType
+  sourceRunId String?
+  isCompleted Boolean              @default(false)
+  isArchived  Boolean              @default(false)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  sourceRun Run? @relation(fields: [sourceRunId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isArchived, createdAt])
+  @@index([userId, normKey, isArchived])
 }
 
 model Car {
@@ -104,7 +138,145 @@ model SetupSnapshot {
   // Flexible JSON blob with setup parameters (geometry, shocks, diff, etc.)
   data Json
 
+  /** Optional baseline snapshot this row was merged from (audit only; data is always full resolved). */
+  baseSetupSnapshotId String?
+  baseSetupSnapshot   SetupSnapshot?  @relation("SetupSnapshotBaseline", fields: [baseSetupSnapshotId], references: [id], onDelete: SetNull)
+  derivedSnapshots    SetupSnapshot[] @relation("SetupSnapshotBaseline")
+
+  /** Keys that differed from baseSetupSnapshot after merge (audit). */
+  setupDeltaJson Json?
+
   runs Run[]
+  sourceDocuments SetupDocument[] @relation("CreatedSetup")
+}
+
+enum SetupDocumentSourceType {
+  PDF
+  IMAGE
+}
+
+enum SetupDocumentParseStatus {
+  PENDING
+  PARSED
+  PARTIAL
+  FAILED
+}
+
+enum SetupDocumentImportStatus {
+  PENDING
+  PROCESSING
+  FAILED
+  COMPLETED
+  COMPLETED_WITH_WARNINGS
+}
+
+enum SetupDocumentImportOutcome {
+  COMPLETED_TRUSTED
+  COMPLETED_WITH_WARNINGS
+  PARTIAL_DIAGNOSTIC
+  FAILED
+}
+
+/** User review for dataset / aggregation eligibility (bulk import workflow). */
+enum SetupImportDatasetReviewStatus {
+  UNSET
+  NOT_CONFIRMED
+  CONFIRMED_ACCURATE
+}
+
+/**
+ * Bulk setup PDF import: label + files first; calibration and parse are per SetupDocument.
+ */
+model SetupImportBatch {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String?
+  /** Optional batch default for future UX; not required for create/parse (per-document calibration is canonical). */
+  calibrationProfileId String?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  calibrationProfile SetupSheetCalibration? @relation(fields: [calibrationProfileId], references: [id], onDelete: SetNull)
+  documents          SetupDocument[]
+
+  @@index([userId, createdAt])
+}
+
+model SetupDocument {
+  id               String                   @id @default(cuid())
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  originalFilename String
+  storagePath      String
+  mimeType         String
+  sourceType       SetupDocumentSourceType
+  parserType       String?
+  parseStatus      SetupDocumentParseStatus @default(PENDING)
+  importStatus     SetupDocumentImportStatus @default(PENDING)
+  importOutcome    SetupDocumentImportOutcome?
+  currentStage       String?
+  lastCompletedStage String?
+  stageStartedAt      DateTime?
+  stageFinishedAt     DateTime?
+  importDebugLogJson  Json?
+  importDiagnosticJson Json?
+  importErrorMessage String?
+  parseStartedAt     DateTime?
+  parseFinishedAt    DateTime?
+  calibrationResolvedProfileId String?
+  calibrationResolvedSource    String?
+  calibrationResolvedDebug     String?
+  calibrationUsedIsForcedDefault Boolean?
+  extractedText    String?
+  parsedDataJson   Json?
+  /** User corrected structured fields after parse (niche fixes; automated re-parse clears this). */
+  parsedSetupManuallyEdited Boolean @default(false)
+  /** Sticky calibration used for parse + render (forced default when missing). */
+  calibrationProfileId String?
+  calibrationProfile   SetupSheetCalibration? @relation("SetupDocumentCalibration", fields: [calibrationProfileId], references: [id], onDelete: SetNull)
+  /** Calibration id actually used to produce current parsedDataJson (stale detection). */
+  parsedCalibrationProfileId String?
+  parsedAt DateTime?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  setupImportBatchId String?
+  setupImportBatch   SetupImportBatch? @relation(fields: [setupImportBatchId], references: [id], onDelete: Cascade)
+  importDatasetReviewStatus    SetupImportDatasetReviewStatus @default(UNSET)
+  /** True only when user confirmed accurate and parse succeeded (PARSED/PARTIAL). */
+  eligibleForAggregationDataset Boolean @default(false)
+
+  createdSetup   SetupSnapshot? @relation("CreatedSetup", fields: [createdSetupId], references: [id], onDelete: SetNull)
+  createdSetupId String?
+  exampleForCalibrations SetupSheetCalibration[] @relation("CalibrationExampleDocument")
+  runsUsingAsPdfSource Run[] @relation("RunSetupPdfSource")
+
+  @@index([userId, createdAt])
+  @@index([userId, parseStatus])
+  @@index([setupImportBatchId])
+}
+
+model SetupSheetCalibration {
+  id String @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name String
+  sourceType String
+  calibrationDataJson Json
+  exampleDocumentId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  exampleDocument SetupDocument? @relation("CalibrationExampleDocument", fields: [exampleDocumentId], references: [id], onDelete: SetNull)
+  runsUsingCalibration Run[] @relation("RunSetupPdfCalibration")
+  documentsUsingCalibration SetupDocument[] @relation("SetupDocumentCalibration")
+  setupImportBatches        SetupImportBatch[]
+
+  @@index([userId, createdAt])
 }
 
 enum SessionType {
@@ -144,6 +316,18 @@ model Run {
   setupSnapshot   SetupSnapshot @relation(fields: [setupSnapshotId], references: [id])
   setupSnapshotId String
 
+  /** Base uploaded PDF used to render this run’s setup sheet (derived PDF is separate). */
+  sourceSetupDocumentId String?
+  sourceSetupDocument   SetupDocument? @relation("RunSetupPdfSource", fields: [sourceSetupDocumentId], references: [id], onDelete: SetNull)
+  /** Calibration / mapping profile used with the base PDF. */
+  sourceSetupCalibrationId String?
+  sourceSetupCalibration   SetupSheetCalibration? @relation("RunSetupPdfCalibration", fields: [sourceSetupCalibrationId], references: [id], onDelete: SetNull)
+  /** Relative path under public/ for rendered run setup PDF (same bytes as in-app view). */
+  renderedSetupPdfPath      String?
+  renderedSetupPdfGeneratedAt DateTime?
+  /** Increment when render pipeline changes; triggers re-render when mismatched. */
+  setupPdfRenderVersion     Int      @default(1)
+
   // Store raw lap times as JSON array (SQLite-compatible; was Float[] for PostgreSQL).
   // Primary (self) laps — kept in sync with lapSession.entries[primary] when lapSession is set.
   lapTimes Json @default("[]")
@@ -156,5 +340,50 @@ model Run {
   handlingProblems String?
   suggestedChanges String?
   appliedChanges   String?
+
+  importedLapSets RunImportedLapSet[]
+  actionItems     ActionItem[]
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  key       String
+  value     String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@unique([userId, key])
+}
+
+model RunImportedLapSet {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  sourceUrl      String?
+  driverId       String?
+  driverName     String
+  displayName    String?
+  surname        String?
+  normalizedName String
+  isPrimaryUser  Boolean  @default(false)
+
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  laps RunImportedLap[]
+}
+
+model RunImportedLap {
+  id             String   @id @default(cuid())
+  lapNumber      Int
+  lapTimeSeconds Float
+  isIncluded     Boolean  @default(true)
+
+  lapSet   RunImportedLapSet @relation(fields: [lapSetId], references: [id], onDelete: Cascade)
+  lapSetId String
+
+  @@index([lapSetId, lapNumber])
 }
 

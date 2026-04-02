@@ -12,13 +12,15 @@ export type RunPickerRun = {
   meetingSessionCode?: string | null;
   eventId?: string | null;
   event?: { name: string } | null;
+  /** Present when API returns car-scoped runs. */
+  carId?: string | null;
   car?: { name: string } | null;
   carNameSnapshot?: string | null;
   track?: { name: string } | null;
   trackNameSnapshot?: string | null;
-  lapTimes: unknown;
+  lapTimes?: unknown;
   /** Present when run comes from for-picker / last APIs (load setup). */
-  setupSnapshot?: { data: unknown } | null;
+  setupSnapshot?: { id: string; data: unknown } | null;
 };
 
 /** Session segment: label if set, else meeting/testing fallback. */

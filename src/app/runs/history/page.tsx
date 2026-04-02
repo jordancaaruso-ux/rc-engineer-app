@@ -1,9 +1,12 @@
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { getMyNameSetting } from "@/lib/appSettings";
 import { formatGroupDate } from "@/lib/formatDate";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { compareRunTimestamp } from "@/lib/runCompareCatalog";
+import { toCompareRunShape } from "@/lib/runCompareShape";
 import Link from "next/link";
 
 type RunInGroup = Awaited<ReturnType<typeof fetchRuns>>[number];
@@ -23,6 +26,11 @@ async function fetchRuns(userId: string) {
       tireSet: { select: { id: true, label: true, setNumber: true } },
       event: { include: { track: { select: { name: true } } } },
       setupSnapshot: { select: { id: true, data: true } },
+      importedLapSets: {
+        include: {
+          laps: { orderBy: { lapNumber: "asc" } },
+        },
+      },
     },
   });
 }
@@ -119,7 +127,7 @@ function buildGroups(runs: RunInGroup[]): Group[] {
   return groups;
 }
 
-export default async function RunHistoryPage() {
+export default async function RunHistoryPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -130,7 +138,7 @@ export default async function RunHistoryPage() {
           </div>
         </header>
         <section className="page-body">
-          <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             Set DATABASE_URL in .env to view run history.
           </div>
         </section>
@@ -140,6 +148,7 @@ export default async function RunHistoryPage() {
 
   const user = await getOrCreateLocalUser();
   await backfillRunNameSnapshots(user.id);
+  const userDisplayName = await getMyNameSetting(user.id);
   const runs = await fetchRuns(user.id);
   const groups = buildGroups(runs);
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
@@ -155,14 +164,14 @@ export default async function RunHistoryPage() {
         </div>
         <Link
           href="/runs/new"
-          className="rounded-md bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground hover:brightness-110 transition"
+          className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition"
         >
           Log your run
         </Link>
       </header>
       <section className="page-body space-y-3">
         {groups.length === 0 ? (
-          <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             No runs yet. <Link href="/runs/new" className="text-accent underline">Create your first run</Link>.
           </div>
         ) : (
@@ -170,11 +179,11 @@ export default async function RunHistoryPage() {
             {groups.map((group) => (
               <details
                 key={group.id}
-                className="rounded-lg border border-border bg-secondary/10 overflow-hidden group/details"
+                className="rounded-lg border border-border bg-muted/50 overflow-hidden group/details"
                 open={false}
               >
                 <summary className="list-none cursor-pointer">
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-secondary/20 transition">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                       <span className="font-medium text-sm">{group.title}</span>
                       <span className="text-xs text-muted-foreground">{group.type}</span>
@@ -183,16 +192,16 @@ export default async function RunHistoryPage() {
                       )}
                       <span className="text-xs text-muted-foreground">{group.dateLabel}</span>
                     </div>
-                    <span className="text-xs font-mono text-muted-foreground">
+                    <span className="text-sm font-medium text-muted-foreground tabular-nums">
                       {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
                     </span>
                   </div>
                 </summary>
-                <div className="border-t border-border bg-secondary/5">
+                <div className="border-t border-border bg-muted/40">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-border bg-secondary/20 text-left text-xs font-mono text-muted-foreground">
+                        <tr className="border-b border-border bg-muted/70 text-left text-xs font-medium text-muted-foreground">
                           <th className="px-4 py-2">Date</th>
                           <th className="px-4 py-2">Car</th>
                           <th className="px-4 py-2">Track</th>
@@ -203,7 +212,11 @@ export default async function RunHistoryPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        <RunHistoryTable runs={group.runs} allRunsDescending={allRunsDescending} />
+                        <RunHistoryTable
+                          runs={group.runs}
+                          allRunsDescending={allRunsDescending.map(toCompareRunShape)}
+                          userDisplayName={userDisplayName}
+                        />
                       </tbody>
                     </table>
                   </div>

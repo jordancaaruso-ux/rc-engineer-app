@@ -1,6 +1,7 @@
 import { LAP_SESSION_VERSION, type LapSessionV1, type LapSourceKind } from "./types";
 import { computeLapMetrics } from "./metrics";
 import type { LapSessionContext } from "./types";
+import { getIncludedLaps, lapRowsFromTimesAndFlags } from "@/lib/lapAnalysis";
 
 export function buildLapSessionV1(params: {
   laps: number[];
@@ -13,14 +14,17 @@ export function buildLapSessionV1(params: {
     warningReason?: string | null;
     isFlagged?: boolean;
     flagReason?: string | null;
+    isIncluded?: boolean;
   } | null> | null;
 }): LapSessionV1 {
   const laps = params.laps.filter((n) => typeof n === "number" && Number.isFinite(n));
-  const metrics = computeLapMetrics(laps);
   let perLap = params.perLap;
   if (perLap && perLap.length !== laps.length) {
     perLap = null;
   }
+  const rows = lapRowsFromTimesAndFlags(laps, perLap);
+  const includedTimes = getIncludedLaps(rows).map((r) => r.lapTimeSeconds);
+  const metrics = computeLapMetrics(includedTimes);
   return {
     version: LAP_SESSION_VERSION,
     source: {

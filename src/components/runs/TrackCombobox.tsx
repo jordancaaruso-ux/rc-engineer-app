@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { Fragment, useRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type TrackOption = { id: string; name: string; location?: string | null };
@@ -140,7 +140,7 @@ export function TrackCombobox({
     <div ref={containerRef} className="relative">
       <input
         type="text"
-        className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm outline-none"
+        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
         placeholder={placeholder}
         value={isOpen ? query : displayValue}
         onChange={(e) => {
@@ -169,7 +169,7 @@ export function TrackCombobox({
           ) : (
             <>
               {!query.trim() && ordered.favourites.length > 0 ? (
-                <li className="px-3 py-1.5 text-[11px] font-mono text-muted-foreground border-b border-border">
+                <li className="px-3 py-1.5 text-sm font-medium text-muted-foreground border-b border-border">
                   Favourites
                 </li>
               ) : null}
@@ -181,11 +181,11 @@ export function TrackCombobox({
                   i === ordered.favourites.length;
 
                 return (
-                  <React.Fragment key={t.id}>
+                  <Fragment key={t.id}>
                     {isDividerPoint ? (
                       <li
                         key={`all-tracks-divider-${t.id}`}
-                        className="px-3 py-1.5 text-[11px] font-mono text-muted-foreground border-y border-border"
+                        className="px-3 py-1.5 text-sm font-medium text-muted-foreground border-y border-border"
                       >
                         All tracks
                       </li>
@@ -195,7 +195,7 @@ export function TrackCombobox({
                       aria-selected={value === t.id}
                       className={cn(
                         "px-3 py-2 cursor-pointer flex items-center justify-between gap-2",
-                        i === highlightIndex ? "bg-accent/20 text-foreground" : "text-foreground hover:bg-secondary/60"
+                        i === highlightIndex ? "bg-accent/20 text-foreground" : "text-foreground hover:bg-muted"
                       )}
                       onMouseEnter={() => setHighlightIndex(i)}
                       onClick={() => select(t.id)}
@@ -206,7 +206,7 @@ export function TrackCombobox({
                       </span>
                       {favSet.has(t.id) && <span className="text-yellow-500 shrink-0" aria-label="Favourite">★</span>}
                     </li>
-                  </React.Fragment>
+                  </Fragment>
                 );
               })}
             </>
