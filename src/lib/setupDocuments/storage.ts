@@ -6,9 +6,15 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { put } from "@vercel/blob";
 
-export const SETUP_DOC_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "setup-documents");
+/**
+ * Local disk fallback (development only — no `BLOB_READ_WRITE_TOKEN`).
+ * Intentionally outside `public/` so Next/Vercel output file tracing does not bundle
+ * uploaded PDFs into serverless functions (see `public/uploads` in repo).
+ * DB values stay `/uploads/...`; resolve with `absolutePathForStoragePath`.
+ */
+const LOCAL_UPLOAD_ROOT = path.join(process.cwd(), ".local-uploads");
 
-/** When set, setup PDFs and cached run-rendered PDFs use Vercel Blob; otherwise `public/uploads` (local dev). */
+/** When set, setup PDFs and cached run-rendered PDFs use Vercel Blob; otherwise `.local-uploads` (local dev). */
 export function useBlobStorage(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
 }
@@ -38,8 +44,9 @@ export async function storeSetupDocumentFile(file: File): Promise<{ storagePath:
     return { storagePath: blob.url };
   }
 
-  await mkdir(SETUP_DOC_UPLOAD_DIR, { recursive: true });
-  const absolutePath = path.join(SETUP_DOC_UPLOAD_DIR, filename);
+  const dir = path.join(LOCAL_UPLOAD_ROOT, "setup-documents");
+  await mkdir(dir, { recursive: true });
+  const absolutePath = path.join(dir, filename);
   const relativePath = `/uploads/setup-documents/${filename}`;
   await writeFile(absolutePath, bytes);
   return { storagePath: relativePath };
@@ -59,9 +66,9 @@ export async function storeRunRenderedSetupPdf(runId: string, pdfBytes: Buffer):
     return blob.url;
   }
   const rel = `/uploads/run-setup-pdfs/${runId}.pdf`;
-  const dir = path.join(process.cwd(), "public", "uploads", "run-setup-pdfs");
+  const dir = path.join(LOCAL_UPLOAD_ROOT, "run-setup-pdfs");
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(process.cwd(), "public", rel.replace(/^\/+/, "")), pdfBytes);
+  await writeFile(path.join(dir, `${runId}.pdf`), pdfBytes);
   return rel;
 }
 
@@ -70,7 +77,10 @@ export function absolutePathForStoragePath(storagePath: string): string {
     throw new Error("absolutePathForStoragePath does not support remote URLs");
   }
   const cleaned = storagePath.startsWith("/") ? storagePath.slice(1) : storagePath;
-  return path.join(process.cwd(), "public", cleaned);
+  if (!cleaned.startsWith("uploads/")) {
+    throw new Error(`Unsupported local storagePath (expected /uploads/...): ${storagePath}`);
+  }
+  return path.join(LOCAL_UPLOAD_ROOT, cleaned.slice("uploads/".length));
 }
 
 export async function readBytesFromStorageRef(ref: string): Promise<Buffer> {

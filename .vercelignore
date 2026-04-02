@@ -1,0 +1,2 @@
+# Do not upload local PDF caches to Vercel (production uses Blob).
+public/uploads
