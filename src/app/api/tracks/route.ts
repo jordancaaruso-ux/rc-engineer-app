@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
@@ -99,6 +100,8 @@ export async function POST(request: Request) {
       const user = await getOrCreateLocalUser();
       await addTrackToFavourites(user.id, track.id);
     }
+    revalidatePath("/tracks");
+    revalidatePath("/runs/new");
     return NextResponse.json({ track }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create track";

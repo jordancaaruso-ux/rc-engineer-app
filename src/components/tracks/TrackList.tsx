@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,9 @@ export function TrackList({
   const favSet = new Set(favouriteTrackIds);
   const router = useRouter();
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
+  useEffect(() => {
+    setTracks(initialTracks);
+  }, [initialTracks]);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [adding, setAdding] = useState(false);

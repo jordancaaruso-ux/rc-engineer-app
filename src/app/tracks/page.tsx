@@ -5,6 +5,9 @@ import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { TrackList } from "@/components/tracks/TrackList";
 
+/** Favourites + global track list — always read fresh (avoids stale tab vs /runs/new). */
+export const dynamic = "force-dynamic";
+
 export default async function TracksPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (

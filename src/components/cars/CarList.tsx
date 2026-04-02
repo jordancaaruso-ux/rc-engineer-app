@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,9 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 export function CarList({ initialCars }: { initialCars: Car[] }) {
   const router = useRouter();
   const [cars, setCars] = useState<Car[]>(initialCars);
+  useEffect(() => {
+    setCars(initialCars);
+  }, [initialCars]);
   const [name, setName] = useState("");
   const [chassis, setChassis] = useState("");
   const [notes, setNotes] = useState("");

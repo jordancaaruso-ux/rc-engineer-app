@@ -4,6 +4,9 @@ import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { CarList } from "@/components/cars/CarList";
 
+/** User-specific list — always read fresh (avoids stale tab vs /runs/new). */
+export const dynamic = "force-dynamic";
+
 export default async function CarManagerPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
