@@ -66,8 +66,11 @@ export async function POST(_: Request, ctx: Ctx) {
     );
   }
 
+  const dbg = process.env.DEBUG_SETUP_PROCESS_TIMING === "1";
+  const t0 = dbg ? performance.now() : 0;
   try {
     await processSetupDocumentImport({ docId: doc.id, userId: user.id });
+    if (dbg) console.log(`[setup-process-timing] POST /process handler total ${(performance.now() - t0).toFixed(1)}ms doc=${doc.id}`);
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

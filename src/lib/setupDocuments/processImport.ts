@@ -7,6 +7,7 @@ import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { extractPdfRawDataFromFile, mapExtractedPdfWithCalibration } from "@/lib/setupCalibrations/pdfExtractPipeline";
 import { SetupDocumentImportStages, type SetupDocumentImportStage } from "@/lib/setupDocuments/importStages";
+import type { SetupDocumentParsedResult } from "@/lib/setupDocuments/types";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { computeA800rrDerived } from "@/lib/setupCalculations/a800rrDerived";
 import { computeDetailedDerivedFieldStatuses } from "@/lib/setup/derivedFields";
@@ -135,7 +136,10 @@ async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise
   }
 }
 
+const procDbg = () => process.env.DEBUG_SETUP_PROCESS_TIMING === "1";
+
 export async function processSetupDocumentImport(input: { docId: string; userId: string }) {
+  const tAll = procDbg() ? performance.now() : 0;
   const doc = await prisma.setupDocument.findFirst({
     where: { id: input.docId, userId: input.userId },
     select: {
@@ -149,6 +153,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     },
   });
   if (!doc) throw new Error("Setup document not found");
+  if (procDbg()) console.log(`[setup-process-timing] doc=${doc.id} after initial findFirst`);
 
   let stage: SetupDocumentImportStage = SetupDocumentImportStages.UPLOAD_RECEIVED;
   await prisma.setupDocument.update({
@@ -165,11 +170,15 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     await startStage({ docId: doc.id, stage: SetupDocumentImportStages.UPLOAD_RECEIVED, status: "PROCESSING" });
     await finishStage({ docId: doc.id, stage: SetupDocumentImportStages.UPLOAD_RECEIVED, status: "PROCESSING" });
 
+    const tLoad = procDbg() ? performance.now() : 0;
     const file = await loadSetupDocumentFileFromStorage({
       storagePath: doc.storagePath,
       originalFilename: doc.originalFilename,
       mimeType: doc.mimeType,
     });
+    if (procDbg()) {
+      console.log(`[setup-process-timing] doc=${doc.id} loadSetupDocumentFileFromStorage ${(performance.now() - tLoad).toFixed(1)}ms bytes=${file.size}`);
+    }
     const sourceType = doc.sourceType ?? sourceTypeFromMime(doc.mimeType);
     stage = SetupDocumentImportStages.PDF_LOADED;
     await startStage({
@@ -180,11 +189,15 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     });
     await finishStage({ docId: doc.id, stage, status: "PROCESSING" });
 
+    const tCal = procDbg() ? performance.now() : 0;
     const effectiveCalibration = await getEffectiveCalibrationProfileId({
       userId: doc.userId,
       storedCalibrationId: doc.calibrationProfileId,
       context: `setupDocumentImport:${doc.id}:${doc.originalFilename}`,
     });
+    if (procDbg()) {
+      console.log(`[setup-process-timing] doc=${doc.id} getEffectiveCalibrationProfileId ${(performance.now() - tCal).toFixed(1)}ms`);
+    }
     if (!effectiveCalibration.calibrationId) {
       await prisma.setupDocument.update({
         where: { id: doc.id },
@@ -233,32 +246,59 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     });
     await finishStage({ docId: doc.id, stage, status: "PROCESSING" });
 
-    // Basic parse (OCR/text extraction + heuristics)
-    const basic = await withTimeout(
-      parseSetupDocumentFile({
-        file,
-        sourceType,
-        debug: {
-          docId: doc.id,
-          filename: doc.originalFilename,
-          onStage: async (s, e) => {
-            if (e === "start") await startStage({ docId: doc.id, stage: `parser:${s}`, status: "PROCESSING" });
-            else await finishStage({ docId: doc.id, stage: `parser:${s}`, status: "PROCESSING" });
+    // Basic parse (OCR/text extraction + heuristics). For PDF + calibration, skip: extractPdfRawDataFromFile already
+    // runs pdf-lib + pdf2json as needed — parseSetupDocumentFile would duplicate a full pdf2json text pass (~10–40s).
+    const skipBasicPdfForCalibration = sourceType === "PDF" && Boolean(effectiveCalibration.calibrationId);
+    const tBasic = procDbg() ? performance.now() : 0;
+    let basic: SetupDocumentParsedResult;
+    if (skipBasicPdfForCalibration) {
+      basic = {
+        parserType: "awesomatix_v1",
+        parseStatus: "PARTIAL",
+        extractedText: null,
+        parsedData: {},
+        note: "Basic text parse skipped when calibration runs; see calibration pipeline for extraction.",
+        mappedFieldKeys: [],
+        mappedFieldCount: 0,
+      };
+      if (procDbg()) {
+        console.log(`[setup-process-timing] doc=${doc.id} parseSetupDocumentFile SKIPPED (PDF+calibration) 0ms`);
+      }
+    } else {
+      basic = await withTimeout(
+        parseSetupDocumentFile({
+          file,
+          sourceType,
+          debug: {
+            docId: doc.id,
+            filename: doc.originalFilename,
+            onStage: async (s, e) => {
+              if (e === "start") await startStage({ docId: doc.id, stage: `parser:${s}`, status: "PROCESSING" });
+              else await finishStage({ docId: doc.id, stage: `parser:${s}`, status: "PROCESSING" });
+            },
+            onInfo: async (s, data) => {
+              await appendDebugLog(doc.id, { at: nowIso(), stage: `parser:${s}`, event: "info", data: capObject(data ?? {}) });
+            },
           },
-          onInfo: async (s, data) => {
-            await appendDebugLog(doc.id, { at: nowIso(), stage: `parser:${s}`, event: "info", data: capObject(data ?? {}) });
-          },
-        },
-      }),
-      25000,
-      "parseSetupDocumentFile"
-    );
+        }),
+        25000,
+        "parseSetupDocumentFile"
+      );
+      if (procDbg()) {
+        console.log(`[setup-process-timing] doc=${doc.id} parseSetupDocumentFile ${(performance.now() - tBasic).toFixed(1)}ms`);
+      }
+    }
     stage = SetupDocumentImportStages.RAW_FORM_FIELDS_EXTRACTED;
     await startStage({
       docId: doc.id,
       stage,
       status: "PROCESSING",
-      extra: { parserType: basic.parserType, parseStatus: basic.parseStatus, mappedFieldCount: basic.mappedFieldCount },
+      extra: {
+        parserType: basic.parserType,
+        parseStatus: basic.parseStatus,
+        mappedFieldCount: basic.mappedFieldCount,
+        ...(skipBasicPdfForCalibration ? { skippedBasicPdfParse: true } : {}),
+      },
     });
     await finishStage({ docId: doc.id, stage, status: "PROCESSING" });
 
@@ -271,6 +311,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     await finishStage({ docId: doc.id, stage: SetupDocumentImportStages.NORMALIZATION_COMPLETED, status: "PROCESSING" });
 
     // Persist non-destructive base parse so the document is inspectable even if calibration mapping fails.
+    const tBaseDb = procDbg() ? performance.now() : 0;
     await prisma.setupDocument.update({
       where: { id: doc.id },
       data: {
@@ -281,6 +322,9 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
         parsedSetupManuallyEdited: false,
       },
     });
+    if (procDbg()) {
+      console.log(`[setup-process-timing] doc=${doc.id} prisma base parse persist ${(performance.now() - tBaseDb).toFixed(1)}ms`);
+    }
 
     // Calibration parse for PDFs (more accurate).
     if (sourceType === "PDF" && effectiveCalibration.calibrationId) {
@@ -291,6 +335,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       if (!calRow) throw new Error(`Calibration not found: ${effectiveCalibration.calibrationId}`);
 
       // Extract once, then map calibrations against the extracted dataset (no PDF re-read during mapping).
+      const tExtract = procDbg() ? performance.now() : 0;
       const raw = await withTimeout(
         extractPdfRawDataFromFile({
           file,
@@ -308,6 +353,11 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
         30000,
         "extractPdfRawDataFromFile"
       );
+      if (procDbg()) {
+        console.log(
+          `[setup-process-timing] doc=${doc.id} extractPdfRawDataFromFile ${(performance.now() - tExtract).toFixed(1)}ms mode=${raw.extractionMode} pages=${raw.pageCount} tokens=${raw.tokenCount}`
+        );
+      }
 
       await prisma.setupDocument.update({
         where: { id: doc.id },
@@ -333,6 +383,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       stage = SetupDocumentImportStages.FIELD_MAPPING_STARTED;
       await startStage({ docId: doc.id, stage: SetupDocumentImportStages.FIELD_MAPPING_STARTED, status: "PROCESSING" });
 
+      const tMap = procDbg() ? performance.now() : 0;
       const mapped = await withTimeout(
         mapExtractedPdfWithCalibration({
           extracted: raw,
@@ -351,6 +402,11 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
         25000,
         "mapExtractedPdfWithCalibration"
       );
+      if (procDbg()) {
+        console.log(
+          `[setup-process-timing] doc=${doc.id} mapExtractedPdfWithCalibration ${(performance.now() - tMap).toFixed(1)}ms importedKeys=${mapped.importedKeys.length}`
+        );
+      }
 
       normalizedParsedData = normalizeParsedSetupData(mapped.parsedData);
       const pipelineWarnings = mapped.diagnostic?.pipelineWarnings ?? [];
@@ -361,9 +417,13 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
         || pipelineWarnings.length > 0
         || raw.textExtractionFailure != null;
 
+      const calibrationParseStatus =
+        mapped.importedKeys.length >= 10 ? "PARSED" : mapped.importedKeys.length > 0 ? "PARTIAL" : "FAILED";
+
       await prisma.setupDocument.update({
         where: { id: doc.id },
         data: {
+          parseStatus: calibrationParseStatus,
           importDiagnosticJson: {
             kind: "pdf_import_diagnostic_v1",
             filename: doc.originalFilename,
@@ -418,14 +478,17 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     }
 
     stage = SetupDocumentImportStages.DERIVED_FIELDS_STARTED;
+    const tDer = procDbg() ? performance.now() : 0;
     await startStage({ docId: doc.id, stage: SetupDocumentImportStages.DERIVED_FIELDS_STARTED, status: "PROCESSING" });
     normalizedParsedData = applyDerivedFieldsToSnapshot(normalizedParsedData);
+    if (procDbg()) console.log(`[setup-process-timing] doc=${doc.id} derived snapshot ${(performance.now() - tDer).toFixed(1)}ms`);
     stage = SetupDocumentImportStages.DERIVED_FIELDS_COMPLETED;
     await finishStage({ docId: doc.id, stage: SetupDocumentImportStages.DERIVED_FIELDS_STARTED, status: "PROCESSING" });
     await startStage({ docId: doc.id, stage: SetupDocumentImportStages.DERIVED_FIELDS_COMPLETED, status: "PROCESSING" });
     await finishStage({ docId: doc.id, stage: SetupDocumentImportStages.DERIVED_FIELDS_COMPLETED, status: "PROCESSING" });
 
     stage = SetupDocumentImportStages.DATABASE_SAVE_STARTED;
+    const tFinalDb = procDbg() ? performance.now() : 0;
     await startStage({ docId: doc.id, stage: SetupDocumentImportStages.DATABASE_SAVE_STARTED, status: "PROCESSING" });
     const { diagnostics: derivedDiagnostics } = computeA800rrDerived(normalizedParsedData);
     const derivedStatuses = computeDetailedDerivedFieldStatuses(normalizedParsedData, derivedDiagnostics);
@@ -464,6 +527,9 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
         } as object,
       },
     });
+    if (procDbg()) {
+      console.log(`[setup-process-timing] doc=${doc.id} prisma final parsedData+diagnostic ${(performance.now() - tFinalDb).toFixed(1)}ms`);
+    }
     stage = SetupDocumentImportStages.DATABASE_SAVE_COMPLETED;
     await finishStage({ docId: doc.id, stage: SetupDocumentImportStages.DATABASE_SAVE_STARTED, status: "PROCESSING" });
     await startStage({ docId: doc.id, stage: SetupDocumentImportStages.DATABASE_SAVE_COMPLETED, status: "PROCESSING" });
@@ -488,6 +554,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       },
     });
     console.log(`[setup-import] doc=${doc.id} completed`);
+    if (procDbg()) console.log(`[setup-process-timing] doc=${doc.id} TOTAL ${(performance.now() - tAll).toFixed(1)}ms`);
   } catch (e) {
     await failImport({
       docId: doc.id,
