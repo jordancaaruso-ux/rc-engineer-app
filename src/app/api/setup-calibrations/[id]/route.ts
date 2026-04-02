@@ -43,15 +43,19 @@ export async function PATCH(request: Request, ctx: Ctx) {
     select: { id: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const updated = await prisma.setupSheetCalibration.update({
-    where: { id },
+  const updated = await prisma.setupSheetCalibration.updateMany({
+    where: { id, userId: user.id },
     data: {
       name: body.name?.trim() || undefined,
       sourceType: body.sourceType?.trim() || undefined,
       calibrationDataJson: (body.calibrationDataJson ?? {}) as object,
     },
+  });
+  if (updated.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const calibration = await prisma.setupSheetCalibration.findFirst({
+    where: { id, userId: user.id },
     select: { id: true, updatedAt: true },
   });
-  return NextResponse.json({ calibration: updated });
+  return NextResponse.json({ calibration });
 }
 

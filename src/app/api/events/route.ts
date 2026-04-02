@@ -77,6 +77,13 @@ export async function POST(request: Request) {
     if (!trackId) {
       return NextResponse.json({ error: "trackId is required" }, { status: 400 });
     }
+    const track = await prisma.track.findFirst({
+      where: { id: trackId, userId: user.id },
+      select: { id: true },
+    });
+    if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 400 });
+    }
 
     const startDate = body.startDate ? new Date(body.startDate) : new Date();
     const endDate = body.endDate ? new Date(body.endDate) : new Date(startDate);

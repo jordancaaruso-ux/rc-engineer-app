@@ -45,8 +45,8 @@ export async function POST(request: Request, ctx: Ctx) {
   });
 
   if (!result.ok) {
-    await prisma.setupDocument.update({
-      where: { id: doc.id },
+    await prisma.setupDocument.updateMany({
+      where: { id: doc.id, userId: user.id },
       data: {
         parseStatus: "FAILED",
         importStatus: "FAILED",
@@ -60,8 +60,8 @@ export async function POST(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: result.error }, { status });
   }
 
-  await prisma.setupDocument.update({
-    where: { id: doc.id },
+  await prisma.setupDocument.updateMany({
+    where: { id: doc.id, userId: user.id },
     data: {
       importErrorMessage: null,
       importDatasetReviewStatus: "UNSET",

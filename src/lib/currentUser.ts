@@ -14,3 +14,14 @@ export async function getOrCreateLocalUser() {
   return prisma.user.create({ data: { email, name: "Local User" } });
 }
 
+/** Current-user bridge for routes/pages. Replace with real auth later. */
+export async function requireCurrentUser() {
+  return getOrCreateLocalUser();
+}
+
+/** Convenience helper when only the id is needed. */
+export async function requireCurrentUserId(): Promise<string> {
+  const u = await requireCurrentUser();
+  return u.id;
+}
+

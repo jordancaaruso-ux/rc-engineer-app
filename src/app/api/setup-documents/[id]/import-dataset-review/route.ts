@@ -51,18 +51,17 @@ export async function PATCH(request: Request, ctx: Ctx) {
     body.importDatasetReviewStatus === "CONFIRMED_ACCURATE"
     && (doc.parseStatus === "PARSED" || doc.parseStatus === "PARTIAL");
 
-  const updated = await prisma.setupDocument.update({
-    where: { id: doc.id },
+  const updated = await prisma.setupDocument.updateMany({
+    where: { id: doc.id, userId: user.id },
     data: {
       importDatasetReviewStatus: body.importDatasetReviewStatus,
       eligibleForAggregationDataset: eligible,
     },
-    select: {
-      id: true,
-      importDatasetReviewStatus: true,
-      eligibleForAggregationDataset: true,
-    },
   });
-
-  return NextResponse.json(updated);
+  if (updated.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const next = await prisma.setupDocument.findFirst({
+    where: { id: doc.id, userId: user.id },
+    select: { id: true, importDatasetReviewStatus: true, eligibleForAggregationDataset: true },
+  });
+  return NextResponse.json(next);
 }

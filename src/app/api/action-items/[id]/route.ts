@@ -25,10 +25,13 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.actionItem.update({
-    where: { id },
+  const updated = await prisma.actionItem.updateMany({
+    where: { id, userId: user.id },
     data: { isArchived: true },
   });
+  if (updated.count === 0) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   return NextResponse.json({ ok: true });
 }

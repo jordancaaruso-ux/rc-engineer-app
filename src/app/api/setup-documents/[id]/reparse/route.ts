@@ -69,8 +69,8 @@ export async function POST(_: Request, ctx: Ctx) {
   const { diagnostics: derivedDiagnostics } = computeA800rrDerived(normalized);
   const derivedStatuses = computeDetailedDerivedFieldStatuses(normalized, derivedDiagnostics);
 
-  const updated = await prisma.setupDocument.update({
-    where: { id: doc.id },
+  const updated = await prisma.setupDocument.updateMany({
+    where: { id: doc.id, userId: user.id },
     data: {
       parserType: parsed.parserType,
       parseStatus: parsed.parseStatus,
@@ -95,11 +95,15 @@ export async function POST(_: Request, ctx: Ctx) {
       parsedAt: new Date(),
       parsedSetupManuallyEdited: false,
     },
+  });
+  if (updated.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const row = await prisma.setupDocument.findFirst({
+    where: { id: doc.id, userId: user.id },
     select: { id: true, parseStatus: true, updatedAt: true },
   });
 
   return NextResponse.json({
-    document: updated,
+    document: row,
     mappedFieldCount: parsed.mappedFieldCount,
     mappedFieldKeys: parsed.mappedFieldKeys,
     extractedTextLength: (parsed.extractedText ?? "").length,

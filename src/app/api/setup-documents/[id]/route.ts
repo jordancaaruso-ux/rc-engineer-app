@@ -110,9 +110,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
     data.calibrationResolvedDebug = null;
     data.calibrationUsedIsForcedDefault = false;
   }
-  const next = await prisma.setupDocument.update({
-    where: { id },
+  const updated = await prisma.setupDocument.updateMany({
+    where: { id, userId: user.id },
     data,
+  });
+  if (updated.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const next = await prisma.setupDocument.findFirst({
+    where: { id, userId: user.id },
     select: {
       id: true,
       parseStatus: true,

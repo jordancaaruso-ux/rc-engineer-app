@@ -27,8 +27,8 @@ export async function POST(_: Request, ctx: Ctx) {
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!doc.calibrationProfileId) {
-    await prisma.setupDocument.update({
-      where: { id: doc.id },
+    await prisma.setupDocument.updateMany({
+      where: { id: doc.id, userId: user.id },
       data: {
         importStatus: "PENDING",
         currentStage: SetupDocumentImportStages.AWAITING_CALIBRATION,
@@ -48,8 +48,8 @@ export async function POST(_: Request, ctx: Ctx) {
     select: { id: true },
   });
   if (!calibrationExists) {
-    await prisma.setupDocument.update({
-      where: { id: doc.id },
+    await prisma.setupDocument.updateMany({
+      where: { id: doc.id, userId: user.id },
       data: {
         calibrationProfileId: null,
         importStatus: "PENDING",

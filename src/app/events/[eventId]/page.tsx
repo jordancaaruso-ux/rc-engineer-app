@@ -56,7 +56,7 @@ export default async function EventDetailPage(props: {
   }
 
   const runCount = await prisma.run.count({
-    where: { eventId: event.id },
+    where: { eventId: event.id, userId: user.id },
   });
 
   return (

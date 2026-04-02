@@ -159,6 +159,9 @@ export async function POST(request: Request) {
       where: { id: carId, userId: user.id },
       select: { name: true },
     });
+    if (!car) {
+      return NextResponse.json({ error: "Car not found" }, { status: 400 });
+    }
 
     const track = body.trackId
       ? await prisma.track.findFirst({
@@ -166,6 +169,29 @@ export async function POST(request: Request) {
           select: { name: true },
         })
       : null;
+    if (body.trackId && !track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 400 });
+    }
+
+    const event = body.eventId
+      ? await prisma.event.findFirst({
+          where: { id: body.eventId, userId: user.id },
+          select: { id: true },
+        })
+      : null;
+    if (body.eventId && !event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 400 });
+    }
+
+    const tireSet = body.tireSetId
+      ? await prisma.tireSet.findFirst({
+          where: { id: body.tireSetId, userId: user.id },
+          select: { id: true },
+        })
+      : null;
+    if (body.tireSetId && !tireSet) {
+      return NextResponse.json({ error: "Tire set not found" }, { status: 400 });
+    }
 
     const sessionType =
       body.sessionType === "PRACTICE" || body.sessionType === "RACE_MEETING"
@@ -187,7 +213,7 @@ export async function POST(request: Request) {
       data: {
         userId: user.id,
         carId,
-        carNameSnapshot: car?.name ?? null,
+        carNameSnapshot: car.name,
         sessionType,
         meetingSessionType,
         meetingSessionCode,
