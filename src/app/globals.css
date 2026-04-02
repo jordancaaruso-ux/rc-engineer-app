@@ -44,7 +44,8 @@ body {
 }
 
 .sidebar {
-  @apply flex w-64 flex-col gap-5 border-r border-border bg-secondary/80 px-4 py-5 backdrop-blur-md;
+  /* NOTE: do not set display here; responsive visibility is controlled in JSX */
+  @apply w-64 flex-col gap-5 border-r border-border bg-secondary/80 px-4 py-5 backdrop-blur-md;
 }
 
 .sidebar-logo {
