@@ -1739,7 +1739,8 @@ export function NewRunForm(props: {
             ) : null}
             {setupSource === "other" && downloadedSetups.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
-                No downloaded setups with created setup data yet. Use Setup → Downloaded setups to review and create one.
+                No parsed setups available for this car (or parse not run). Parse a PDF under Setup → Downloaded setups
+                or bulk import, or pick a car that matches the setup’s assigned car when one is set.
               </p>
             ) : null}
           </div>
@@ -1820,7 +1821,8 @@ export function NewRunForm(props: {
             ) : null}
             {setupSource === "other" && downloadedSetups.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
-                No downloaded setups with created setup data yet. Use Setup → Downloaded setups to review and create one.
+                No parsed setups available for this car (or parse not run). Parse a PDF under Setup → Downloaded setups
+                or bulk import, or pick a car that matches the setup’s assigned car when one is set.
               </p>
             ) : null}
           </>

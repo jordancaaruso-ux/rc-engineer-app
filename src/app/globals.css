@@ -15,17 +15,30 @@
 }
 
 html {
-  height: 100%;
+  /* min-height allows the document to grow past one viewport so body background covers long pages */
+  min-height: 100%;
 }
 
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
   min-height: 100%;
-  /* Corner glows: red top-left, blue bottom-right; dark base keeps center readable */
-  background:
-    radial-gradient(circle 85vw at 0% 0%, rgba(201, 42, 42, 0.4), transparent 55%),
-    radial-gradient(circle 85vw at 100% 100%, rgba(37, 99, 235, 0.38), transparent 55%),
-    #0b0f0e;
+  /* Corner glows + soft vertical rhythm so mid-page scroll is not a flat cutoff vs #0b0f0e */
+  background-color: #0b0f0e;
+  background-image:
+    radial-gradient(ellipse 120% 90% at 0% 0%, rgba(201, 42, 42, 0.38), transparent 52%),
+    radial-gradient(ellipse 120% 90% at 100% 0%, rgba(37, 99, 235, 0.22), transparent 50%),
+    radial-gradient(ellipse 120% 90% at 0% 100%, rgba(37, 99, 235, 0.22), transparent 50%),
+    radial-gradient(ellipse 120% 90% at 100% 100%, rgba(201, 42, 42, 0.34), transparent 52%),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 420px,
+      rgba(201, 42, 42, 0.035) 420px,
+      rgba(201, 42, 42, 0.035) 840px,
+      rgba(37, 99, 235, 0.04) 840px,
+      rgba(37, 99, 235, 0.04) 1260px
+    );
+  background-attachment: scroll;
   @apply text-foreground antialiased font-normal;
 }
 
@@ -35,7 +48,8 @@ body {
 
 /* Shell sits on body’s corner gradient; cards stay solid via theme tokens */
 .app-shell {
-  @apply relative flex min-h-screen overflow-hidden bg-transparent text-foreground;
+  /* overflow-y visible so document scroll paints body background; clip horizontal bleed only */
+  @apply relative flex min-h-screen overflow-x-hidden overflow-y-visible bg-transparent text-foreground;
 }
 
 /* NOTE: Avoid creating sibling stacking contexts here.

@@ -84,35 +84,28 @@ export function Sidebar() {
 
       {/* Mobile: hamburger + overlay drawer */}
       <div className="md:hidden">
-        <button
-          type="button"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMobileOpen((v) => !v)}
-          className="fixed left-3 top-3 z-[60] pointer-events-auto inline-flex items-center justify-center rounded-lg border border-border bg-secondary/90 p-2 text-foreground backdrop-blur-md shadow-glow-sm hover:bg-secondary/100 transition"
-        >
-          <span className="sr-only">{mobileOpen ? "Close menu" : "Open menu"}</span>
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
+        {!mobileOpen ? (
+          <button
+            type="button"
+            aria-label="Open menu"
+            onClick={() => setMobileOpen(true)}
+            className="fixed left-3 top-3 z-[60] pointer-events-auto inline-flex items-center justify-center rounded-lg border border-border bg-secondary/90 p-2 text-foreground backdrop-blur-md shadow-glow-sm hover:bg-secondary/100 transition"
           >
-            {mobileOpen ? (
-              <>
-                <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </>
-            ) : (
-              <>
-                <path d="M4 7H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M4 12H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M4 17H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </>
-            )}
-          </svg>
-        </button>
+            <span className="sr-only">Open menu</span>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path d="M4 7H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M4 12H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M4 17H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        ) : null}
 
         {mobileOpen && (
           <div className="fixed inset-0 z-40">
