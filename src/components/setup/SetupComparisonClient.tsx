@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { getActiveSetupData } from "@/lib/activeSetupContext";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
@@ -13,12 +14,26 @@ import {
   parseNumericAggregationCompareSlice,
   type NumericAggregationCompareSlice,
 } from "@/lib/setupCompare/numericAggregationCompare";
+import {
+  buildRawNumericStatsJsonMap,
+  collectNumericUnknownDiagnostics,
+  listNumericGradientCompareKeys,
+  summarizeAggregationRowsForCar,
+  tallyPrimaryReasons,
+} from "@/lib/setupCompare/compareNumericDiagnostics";
 
 type SetupAggApiRow = {
   carId: string;
   parameterKey: string;
   valueType: string;
+  sampleCount: number;
   numericStatsJson: unknown;
+};
+
+type AggregationFetchBundle = {
+  parsedMap: Map<string, NumericAggregationCompareSlice>;
+  rawNumericJsonByKey: Map<string, unknown>;
+  summaries: ReturnType<typeof summarizeAggregationRowsForCar>;
 };
 
 function buildNumericAggregationMap(
@@ -61,6 +76,9 @@ function emptySelection(): SelectedSetup {
 }
 
 export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
+  const searchParams = useSearchParams();
+  const compareDebug = searchParams.get("compareDebug") === "1";
+
   const [runs, setRuns] = useState<RunPickerRun[]>([]);
   const [downloaded, setDownloaded] = useState<DownloadedSetupOption[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -145,14 +163,11 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
     return null;
   }, [aKind, aId, bKind, bId, runs]);
 
-  const [numericAggregationByKey, setNumericAggregationByKey] = useState<Map<
-    string,
-    NumericAggregationCompareSlice
-  > | null>(null);
+  const [aggregationBundle, setAggregationBundle] = useState<AggregationFetchBundle | null>(null);
 
   useEffect(() => {
     if (!dbReady || !aggregationCarId) {
-      setNumericAggregationByKey(null);
+      setAggregationBundle(null);
       return;
     }
     let alive = true;
@@ -162,15 +177,21 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
       .then((data: { aggregations?: SetupAggApiRow[] }) => {
         if (!alive) return;
         const rows = Array.isArray(data.aggregations) ? data.aggregations : [];
-        setNumericAggregationByKey(buildNumericAggregationMap(rows, aggregationCarId));
+        setAggregationBundle({
+          parsedMap: buildNumericAggregationMap(rows, aggregationCarId),
+          rawNumericJsonByKey: buildRawNumericStatsJsonMap(rows, aggregationCarId),
+          summaries: summarizeAggregationRowsForCar(rows, aggregationCarId),
+        });
       })
       .catch(() => {
-        if (alive) setNumericAggregationByKey(null);
+        if (alive) setAggregationBundle(null);
       });
     return () => {
       alive = false;
     };
   }, [dbReady, aggregationCarId]);
+
+  const numericAggregationByKey = aggregationBundle?.parsedMap ?? null;
 
   const compareMap = useMemo(() => {
     if (!canCompare || !selectionA.data || !selectionB.data) return null;
@@ -178,6 +199,52 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
       numericAggregationByKey,
     });
   }, [canCompare, selectionA.data, selectionB.data, numericAggregationByKey]);
+
+  const gradientCompareKeys = useMemo(() => [...listNumericGradientCompareKeys()].sort(), []);
+
+  const numericAggregationParameterKeys = useMemo(() => {
+    if (!aggregationBundle) return [];
+    return aggregationBundle.summaries
+      .filter((s) => s.valueType === "NUMERIC")
+      .map((s) => s.parameterKey)
+      .sort();
+  }, [aggregationBundle]);
+
+  const numericUnknownDiagnostics = useMemo(() => {
+    if (
+      !compareDebug ||
+      !compareMap ||
+      !selectionA.data ||
+      !selectionB.data
+    ) {
+      return [];
+    }
+    return collectNumericUnknownDiagnostics({
+      compareMap,
+      dataA: selectionA.data as Record<string, unknown>,
+      dataB: selectionB.data as Record<string, unknown>,
+      numericAggregationByKey,
+      rawNumericStatsJsonByKey: aggregationBundle?.rawNumericJsonByKey ?? null,
+      aggregationSummariesForCar: aggregationBundle?.summaries ?? [],
+      aggregationCarId,
+    });
+  }, [
+    compareDebug,
+    compareMap,
+    selectionA.data,
+    selectionB.data,
+    numericAggregationByKey,
+    aggregationBundle?.rawNumericJsonByKey,
+    aggregationBundle?.summaries,
+    aggregationCarId,
+  ]);
+
+  const diagnosticReasonTally = useMemo(
+    () => [...tallyPrimaryReasons(numericUnknownDiagnostics).entries()].sort((a, b) => b[1] - a[1]),
+    [numericUnknownDiagnostics]
+  );
+
+  const topDiagnosticReason = diagnosticReasonTally[0]?.[0] ?? null;
 
   const severityCounts = useMemo(() => {
     const counts = { same: 0, minor: 0, moderate: 0, major: 0, unknown: 0 };
@@ -277,6 +344,75 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
           <div className="text-[11px] text-muted-foreground">Select both setups to compare.</div>
         )}
       </div>
+
+      {compareDebug && canCompare && selectionA.data && selectionB.data ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-xs space-y-3 font-mono">
+          <div className="text-[11px] font-sans font-medium text-foreground">
+            Temporary diagnostics <span className="text-muted-foreground">(?compareDebug=1)</span>
+          </div>
+          <div className="text-muted-foreground font-sans">
+            IQR compare keys ({gradientCompareKeys.length}):{" "}
+            <span className="text-foreground/90 break-all">{gradientCompareKeys.join(", ")}</span>
+          </div>
+          <div className="text-muted-foreground font-sans">
+            NUMERIC aggregation keys for car{" "}
+            <span className="text-foreground/90">{aggregationCarId ?? "—"}</span> ({numericAggregationParameterKeys.length}
+            ):{" "}
+            <span className="text-foreground/90 break-all">{numericAggregationParameterKeys.join(", ") || "—"}</span>
+          </div>
+          <div className="text-muted-foreground font-sans">
+            Most common unknown reason:{" "}
+            <span className="text-foreground/90">{topDiagnosticReason ?? "—"}</span>
+            {diagnosticReasonTally.length ? (
+              <pre className="mt-2 max-h-40 overflow-auto rounded border border-border bg-card p-2 text-[10px] whitespace-pre-wrap">
+                {diagnosticReasonTally.map(([k, n]) => `${n}\t${k}`).join("\n")}
+              </pre>
+            ) : null}
+          </div>
+          {numericUnknownDiagnostics.length ? (
+            <div className="overflow-x-auto rounded border border-border bg-card">
+              <table className="w-full min-w-[720px] border-collapse text-left text-[10px]">
+                <thead className="border-b border-border bg-muted/50 text-muted-foreground">
+                  <tr>
+                    <th className="p-1.5">uiKey</th>
+                    <th className="p-1.5">matchedAggKey</th>
+                    <th className="p-1.5">rows</th>
+                    <th className="p-1.5">aggType</th>
+                    <th className="p-1.5">rawN</th>
+                    <th className="p-1.5">inMap</th>
+                    <th className="p-1.5">parseOk</th>
+                    <th className="p-1.5">p25</th>
+                    <th className="p-1.5">p75</th>
+                    <th className="p-1.5">iqr</th>
+                    <th className="p-1.5">Δ</th>
+                    <th className="p-1.5">primaryReason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {numericUnknownDiagnostics.map((d) => (
+                    <tr key={d.uiKey} className="border-b border-border/60 align-top">
+                      <td className="p-1.5">{d.uiKey}</td>
+                      <td className="p-1.5">{d.matchedAggregationKey ?? "null"}</td>
+                      <td className="p-1.5">{d.aggregationRowsForExactKey}</td>
+                      <td className="p-1.5">{d.aggregationValueType ?? "—"}</td>
+                      <td className="p-1.5">{d.rawJsonSampleCount ?? "—"}</td>
+                      <td className="p-1.5">{d.inClientCompareMap ? "y" : "n"}</td>
+                      <td className="p-1.5">{d.rawJsonParsesToPercentileSlice ? "y" : "n"}</td>
+                      <td className="p-1.5">{d.p25 ?? "—"}</td>
+                      <td className="p-1.5">{d.p75 ?? "—"}</td>
+                      <td className="p-1.5">{d.iqr ?? "—"}</td>
+                      <td className="p-1.5">{d.deltaAbs ?? "—"}</td>
+                      <td className="p-1.5 whitespace-pre-wrap break-all">{d.primaryReason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-muted-foreground font-sans">No unknown IQR-scored fields in this compare.</div>
+          )}
+        </div>
+      ) : null}
 
       {canCompare && selectionA.data && selectionB.data ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

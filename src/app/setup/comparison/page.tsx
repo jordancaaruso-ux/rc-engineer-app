@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import { hasDatabaseUrl } from "@/lib/env";
 import { SetupComparisonClient } from "@/components/setup/SetupComparisonClient";
 
@@ -14,7 +15,9 @@ export default async function SetupComparisonPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body">
-        <SetupComparisonClient dbReady={dbReady} />
+        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
+          <SetupComparisonClient dbReady={dbReady} />
+        </Suspense>
       </section>
     </>
   );
