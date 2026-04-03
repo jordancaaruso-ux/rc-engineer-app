@@ -1,7 +1,8 @@
 /**
  * Setup comparison gradient scale from car parameter aggregations (robust spread / IQR).
- * Score = |Δ| / (iqr * IQR_THRESHOLD_MULTIPLIER), capped; not std-dev or rarity based.
+ * Score = |Δ| / threshold, capped; threshold = max(iqr * IQR_THRESHOLD_MULTIPLIER, per-key floor).
  */
+import { getIqrGradientMinThreshold } from "@/lib/setupCompare/iqrGradientMinThreshold";
 
 export type NumericAggregationCompareSlice = {
   sampleCount: number;
@@ -14,11 +15,11 @@ export type NumericAggregationCompareSlice = {
   broadRange: number;
 };
 
-/** Multiply IQR to get comparison threshold (tune here only). */
-export const IQR_THRESHOLD_MULTIPLIER = 1.25;
+/** Multiply IQR to get base comparison threshold (before per-key floor). */
+export const IQR_THRESHOLD_MULTIPLIER = 2.0;
 
 /** Max score before normalization to 0–1 gradient intensity. */
-export const IQR_SCORE_CAP = 1.75;
+export const IQR_SCORE_CAP = 2.0;
 
 export const MIN_AGGREGATION_SAMPLE_COUNT_FOR_IQR_COMPARE = 5;
 
@@ -27,14 +28,17 @@ export const MIN_AGGREGATION_SAMPLE_COUNT_FOR_IQR_COMPARE = 5;
  */
 export function gradientIntensityFromIqrDelta(
   deltaAbs: number,
-  agg: NumericAggregationCompareSlice | null | undefined
+  agg: NumericAggregationCompareSlice | null | undefined,
+  parameterKey: string
 ): number | null {
   if (agg == null) return null;
   if (agg.sampleCount < MIN_AGGREGATION_SAMPLE_COUNT_FOR_IQR_COMPARE) return null;
   if (!Number.isFinite(agg.iqr) || agg.iqr <= 0) return null;
   if (!Number.isFinite(deltaAbs) || deltaAbs <= 0) return null;
 
-  const threshold = agg.iqr * IQR_THRESHOLD_MULTIPLIER;
+  const baseThreshold = agg.iqr * IQR_THRESHOLD_MULTIPLIER;
+  const minThreshold = getIqrGradientMinThreshold(parameterKey);
+  const threshold = Math.max(baseThreshold, minThreshold);
   if (!(threshold > 0)) return null;
 
   const score = deltaAbs / threshold;

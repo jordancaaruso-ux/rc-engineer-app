@@ -220,7 +220,7 @@ export function compareSetupField(input: {
       }
       const delta = Math.abs(na - nb);
       const agg = input.numericAggregationByKey?.get(key) ?? null;
-      const gradientIntensity = gradientIntensityFromIqrDelta(delta, agg);
+      const gradientIntensity = gradientIntensityFromIqrDelta(delta, agg, key);
       if (gradientIntensity != null) {
         const severity = severityFromGradientIntensity(gradientIntensity);
         return {
