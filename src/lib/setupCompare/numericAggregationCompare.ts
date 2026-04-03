@@ -51,30 +51,36 @@ export function parseNumericAggregationCompareSlice(json: unknown): NumericAggre
   const read = (k: string): number => {
     const v = o[k];
     if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (v === null || v === undefined) return NaN;
     const n = Number(v);
     return Number.isFinite(n) ? n : NaN;
   };
 
-  const p10 = read("p10");
   const p25 = read("p25");
-  const p50 = read("p50");
   const p75 = read("p75");
+  if (!Number.isFinite(p25) || !Number.isFinite(p75)) return null;
+
+  const p50 = read("p50");
+  const p10 = read("p10");
   const p90 = read("p90");
+  const mid = Number.isFinite(p50) ? p50 : (p25 + p75) / 2;
+  const lo = Number.isFinite(p10) ? p10 : p25;
+  const hi = Number.isFinite(p90) ? p90 : p75;
+
   let iqr = read("iqr");
-  if (![p10, p25, p50, p75, p90].every((x) => Number.isFinite(x))) return null;
-  if (!Number.isFinite(iqr)) {
-    iqr = p75 - p25;
-  }
-  const broadRange = Number.isFinite(read("broadRange")) ? read("broadRange") : p90 - p10;
+  if (!Number.isFinite(iqr)) iqr = p75 - p25;
+
+  let broadRange = read("broadRange");
+  if (!Number.isFinite(broadRange)) broadRange = hi - lo;
 
   return {
     sampleCount: Math.floor(sampleCount),
     iqr,
-    p10,
+    p10: lo,
     p25,
-    p50,
+    p50: mid,
     p75,
-    p90,
+    p90: hi,
     broadRange,
   };
 }

@@ -32,18 +32,19 @@ export function linearPercentile(sortedAsc: number[], p: number): number {
 }
 
 export function computeNumericStats(values: number[]): NumericStats | null {
-  const n = values.length;
+  const finite = values.filter((x) => typeof x === "number" && Number.isFinite(x));
+  const n = finite.length;
   if (n === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = [...finite].sort((a, b) => a - b);
   const min = sorted[0]!;
   const max = sorted[n - 1]!;
-  const sum = values.reduce((acc, x) => acc + x, 0);
+  const sum = finite.reduce((acc, x) => acc + x, 0);
   const mean = sum / n;
   const median =
     n % 2 === 1 ? sorted[(n - 1) / 2]! : (sorted[n / 2 - 1]! + sorted[n / 2]!) / 2;
   let stdDev = 0;
   if (n > 1) {
-    const variance = values.reduce((acc, x) => acc + (x - mean) ** 2, 0) / (n - 1);
+    const variance = finite.reduce((acc, x) => acc + (x - mean) ** 2, 0) / (n - 1);
     stdDev = Math.sqrt(variance);
   }
 

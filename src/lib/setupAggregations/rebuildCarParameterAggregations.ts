@@ -16,6 +16,10 @@ import {
 } from "@/lib/runSetup";
 import { computeNumericStats } from "@/lib/setupAggregations/numericStats";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
+import {
+  getNumericGradientConfig,
+  normalizeNumericForGradientCompare,
+} from "@/lib/setupCompare/numericGradientConfig";
 
 /** At least this many non-empty parameter keys required on the snapshot to count toward aggregation. */
 const MIN_DISTINCT_KEYS_FOR_ELIGIBILITY = 2;
@@ -70,6 +74,13 @@ function extractObservation(
     const tokens = normalizeMultiSelectValue(key, v);
     if (tokens.length === 0) return null;
     return { tag: "multi", tokens };
+  }
+
+  const gradCfg = getNumericGradientConfig(key);
+  if (gradCfg) {
+    const n = normalizeNumericForGradientCompare(key, gradCfg.normalization, v);
+    if (n != null && Number.isFinite(n)) return { tag: "scalar", nOrS: n };
+    return null;
   }
 
   if (typeof v === "number" && Number.isFinite(v)) {
@@ -345,7 +356,7 @@ export async function rebuildSetupAggregationsForUserCars(
       }
 
       const vals = state.values;
-      const allNumeric = vals.every((x) => typeof x === "number");
+      const allNumeric = vals.every((x) => typeof x === "number" && Number.isFinite(x));
       if (allNumeric && vals.length > 0) {
         const stats = computeNumericStats(vals as number[]);
         if (stats) {
