@@ -10,10 +10,11 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { compareSetupSnapshots } from "@/lib/setupCompare/compare";
+import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import {
-  parseNumericAggregationCompareSlice,
-  type NumericAggregationCompareSlice,
-} from "@/lib/setupCompare/numericAggregationCompare";
+  buildNumericAggregationMapForCar,
+  type SetupAggApiRow,
+} from "@/lib/setupCompare/buildNumericAggregationMap";
 import {
   buildRawNumericStatsJsonMap,
   collectNumericUnknownDiagnostics,
@@ -22,32 +23,11 @@ import {
   tallyPrimaryReasons,
 } from "@/lib/setupCompare/compareNumericDiagnostics";
 
-type SetupAggApiRow = {
-  carId: string;
-  parameterKey: string;
-  valueType: string;
-  sampleCount: number;
-  numericStatsJson: unknown;
-};
-
 type AggregationFetchBundle = {
   parsedMap: Map<string, NumericAggregationCompareSlice>;
   rawNumericJsonByKey: Map<string, unknown>;
   summaries: ReturnType<typeof summarizeAggregationRowsForCar>;
 };
-
-function buildNumericAggregationMap(
-  rows: SetupAggApiRow[],
-  carId: string
-): Map<string, NumericAggregationCompareSlice> {
-  const m = new Map<string, NumericAggregationCompareSlice>();
-  for (const r of rows) {
-    if (r.carId !== carId || r.valueType !== "NUMERIC") continue;
-    const slice = parseNumericAggregationCompareSlice(r.numericStatsJson);
-    if (slice) m.set(r.parameterKey, slice);
-  }
-  return m;
-}
 
 type DownloadedSetupOption = {
   id: string;
@@ -198,7 +178,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
         if (!alive) return;
         const rows = Array.isArray(data.aggregations) ? data.aggregations : [];
         setAggregationBundle({
-          parsedMap: buildNumericAggregationMap(rows, aggregationCarId),
+          parsedMap: buildNumericAggregationMapForCar(rows, aggregationCarId),
           rawNumericJsonByKey: buildRawNumericStatsJsonMap(rows, aggregationCarId),
           summaries: summarizeAggregationRowsForCar(rows, aggregationCarId),
         });
