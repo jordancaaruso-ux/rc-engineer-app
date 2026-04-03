@@ -4,6 +4,7 @@ import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
+import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -44,6 +45,7 @@ export async function GET(_: Request, ctx: Ctx) {
       createdAt: true,
       updatedAt: true,
       createdSetupId: true,
+      carId: true,
     },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -60,6 +62,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     parsedDataJson?: unknown;
     parseStatus?: "PENDING" | "PARSED" | "PARTIAL" | "FAILED";
     calibrationProfileId?: string | null;
+    carId?: string | null;
     /** When true with parsedDataJson, marks document as manually corrected (not parser output). */
     manualStructuredEdit?: boolean;
   };
@@ -82,7 +85,17 @@ export async function PATCH(request: Request, ctx: Ctx) {
     calibrationResolvedDebug?: string | null;
     calibrationUsedIsForcedDefault?: boolean | null;
     parsedSetupManuallyEdited?: boolean;
+    carId?: string | null;
   } = {};
+  if (body.carId !== undefined) {
+    if (body.carId === null || body.carId === "") {
+      data.carId = null;
+    } else {
+      const owned = await resolveOwnedCarId(user.id, body.carId);
+      if (!owned.ok) return NextResponse.json({ error: owned.message }, { status: 400 });
+      data.carId = owned.carId;
+    }
+  }
   if (body.parsedDataJson !== undefined) {
     data.parsedDataJson = normalizeParsedSetupData(body.parsedDataJson ?? {}) as object;
     if (body.manualStructuredEdit === true) {
@@ -129,6 +142,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       updatedAt: true,
       parsedSetupManuallyEdited: true,
       parsedDataJson: true,
+      carId: true,
     },
   });
   return NextResponse.json({ document: next });

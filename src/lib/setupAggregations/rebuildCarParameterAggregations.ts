@@ -25,7 +25,8 @@ function snapshotDataHasKeys(raw: unknown): boolean {
 }
 
 /**
- * Prefer committed SetupSnapshot.data; otherwise normalized parsed PDF output (bulk import never calls create-setup).
+ * Prefer committed SetupSnapshot.data; otherwise normalized parsed PDF output.
+ * Car id: createdSetup.carId when present, else SetupDocument.carId from upload.
  */
 function resolveNormalizedAggregationData(
   parsedDataJson: unknown,
@@ -42,7 +43,7 @@ function resolveNormalizedAggregationData(
   return null;
 }
 
-/** Car for bucketing: explicit snapshot.carId, else the user's only car (safe when unambiguous). */
+/** Car for bucketing: explicit id, else the user's only car (safe when unambiguous). */
 function resolveAggregationCarId(
   snapshotCarId: string | null | undefined,
   userCarIds: string[]
@@ -245,6 +246,7 @@ export async function rebuildSetupAggregationsForUserCars(
         eligibleForAggregationDataset: true,
         parseStatus: true,
         parsedDataJson: true,
+        carId: true,
         createdSetup: {
           select: {
             carId: true,
@@ -277,8 +279,9 @@ export async function rebuildSetupAggregationsForUserCars(
       continue;
     }
 
+    const effectiveCarId = doc.createdSetup?.carId ?? doc.carId ?? null;
     const { carId: resolvedCarId, ambiguous, wrongOwner } = resolveAggregationCarId(
-      doc.createdSetup?.carId ?? null,
+      effectiveCarId,
       carIds
     );
     if (wrongOwner) {

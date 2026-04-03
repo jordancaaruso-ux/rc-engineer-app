@@ -68,6 +68,7 @@ type SetupDocumentDetail = {
   createdAt: string;
   updatedAt: string;
   createdSetupId: string | null;
+  carId: string | null;
 };
 
 export function SetupDocumentReviewClient({
@@ -83,7 +84,7 @@ export function SetupDocumentReviewClient({
   const [setupData, setSetupData] = useState<SetupSnapshotData>(() =>
     applyDerivedFieldsToSnapshot(interpretAwesomatixSetupSnapshot(normalizeSetupData(doc.parsedDataJson)))
   );
-  const [carId, setCarId] = useState<string>("");
+  const [savingCarLink, setSavingCarLink] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [reparsing, setReparsing] = useState(false);
   const [creatingSetup, setCreatingSetup] = useState(false);
@@ -304,8 +305,40 @@ export function SetupDocumentReviewClient({
     }
   }
 
+  async function persistCarLink(nextCarId: string) {
+    const value = nextCarId.trim() || null;
+    setSavingCarLink(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/setup-documents/${liveDoc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ carId: value }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        document?: Partial<SetupDocumentDetail>;
+      };
+      if (!res.ok) {
+        setError(data.error || "Failed to save car");
+        return;
+      }
+      if (data.document) {
+        setLiveDoc((cur) => ({ ...cur, ...data.document }));
+      }
+    } catch {
+      setError("Failed to save car");
+    } finally {
+      setSavingCarLink(false);
+    }
+  }
+
   async function createSetup() {
     if (liveDoc.createdSetupId) return;
+    if (!liveDoc.carId) {
+      setError("Select which car this setup belongs to before creating a setup snapshot.");
+      return;
+    }
     setCreatingSetup(true);
     setError(null);
     setStatus(null);
@@ -313,7 +346,7 @@ export function SetupDocumentReviewClient({
       const res = await fetch(`/api/setup-documents/${doc.id}/create-setup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setupData, carId: carId || null }),
+        body: JSON.stringify({ setupData, carId: liveDoc.carId }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; setup?: { id: string } };
       if (!res.ok || !data.setup?.id) {
@@ -870,10 +903,11 @@ export function SetupDocumentReviewClient({
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <select
                   className="rounded-md border border-border bg-muted/60 px-2 py-1.5 text-xs"
-                  value={carId}
-                  onChange={(e) => setCarId(e.target.value)}
+                  value={liveDoc.carId ?? ""}
+                  disabled={savingCarLink}
+                  onChange={(e) => void persistCarLink(e.target.value)}
                 >
-                  <option value="">No car link</option>
+                  <option value="">Select car…</option>
                   {cars.map((car) => (
                     <option key={car.id} value={car.id}>
                       {car.name}
@@ -902,7 +936,9 @@ export function SetupDocumentReviewClient({
                   type="button"
                   className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
                   onClick={createSetup}
-                  disabled={creatingSetup || Boolean(liveDoc.createdSetupId)}
+                  disabled={
+                    creatingSetup || Boolean(liveDoc.createdSetupId) || !liveDoc.carId || savingCarLink
+                  }
                 >
                   {liveDoc.createdSetupId ? "Setup already created" : creatingSetup ? "Creating…" : "Create setup from document"}
                 </button>

@@ -10,7 +10,8 @@
     "lint": "next lint",
     "prisma": "prisma",
     "db:push": "prisma db push",
-    "db:migrate:deploy": "prisma migrate deploy"
+    "db:migrate:deploy": "prisma migrate deploy",
+    "backfill:setup-car": "npx tsx scripts/backfill-setup-documents-car-id.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
@@ -42,6 +43,7 @@
     "postcss": "^8.5.8",
     "prisma": "^6.0.0",
     "tailwindcss": "latest",
+    "tsx": "^4.19.4",
     "typescript": "latest"
   }
 }

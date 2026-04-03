@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+type CarOption = { id: string; name: string };
+
 type DocRow = {
   id: string;
   originalFilename: string;
@@ -32,13 +34,25 @@ type BatchPayload = {
   documents: DocRow[];
 };
 
-export function BulkImportBatchClient({ batchId }: { batchId: string }) {
+export function BulkImportBatchClient({
+  batchId,
+  cars,
+}: {
+  batchId: string;
+  cars: CarOption[];
+}) {
   const router = useRouter();
   const [batch, setBatch] = useState<BatchPayload | null>(null);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
+  const [uploadCarId, setUploadCarId] = useState("");
+
+  useEffect(() => {
+    if (cars.length !== 1 || uploadCarId) return;
+    setUploadCarId(cars[0].id);
+  }, [cars, uploadCarId]);
 
   const load = useCallback(async () => {
     setLoadErr(null);
@@ -62,6 +76,10 @@ export function BulkImportBatchClient({ batchId }: { batchId: string }) {
 
   async function onUploadFiles(files: FileList | null) {
     if (!files?.length) return;
+    if (!uploadCarId) {
+      setActionErr("Select which car these setup sheets belong to.");
+      return;
+    }
     setActionErr(null);
     setUploading(true);
     try {
@@ -69,6 +87,7 @@ export function BulkImportBatchClient({ batchId }: { batchId: string }) {
       for (let i = 0; i < list.length; i++) {
         const fd = new FormData();
         fd.append("files", list[i]);
+        fd.set("carId", uploadCarId);
         const res = await fetch(`/api/setup-import-batches/${batchId}/upload`, {
           method: "POST",
           body: fd,
@@ -127,13 +146,39 @@ export function BulkImportBatchClient({ batchId }: { batchId: string }) {
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap items-end gap-3">
+        {cars.length === 0 ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            Add a car under{" "}
+            <Link href="/cars" className="underline hover:text-foreground">
+              Cars
+            </Link>{" "}
+            before uploading PDFs.
+          </p>
+        ) : (
+          <label className="text-xs">
+            <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground mb-1">Car for new PDFs</div>
+            <select
+              className="mt-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              value={uploadCarId}
+              onChange={(e) => setUploadCarId(e.target.value)}
+              disabled={uploading}
+            >
+              <option value="">Select car…</option>
+              {cars.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div>
           <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground mb-1">Add PDFs</div>
           <input
             type="file"
             accept="application/pdf"
             multiple
-            disabled={uploading}
+            disabled={uploading || cars.length === 0}
             onChange={(e) => void onUploadFiles(e.target.files)}
             className="text-xs"
           />

@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+
+type CarOption = { id: string; name: string };
 
 type SetupDocListItem = {
   id: string;
@@ -21,6 +23,7 @@ type SetupDocListItem = {
   /** Deterministic server-rendered timestamp label to avoid hydration mismatch. */
   createdAtLabel?: string;
   createdSetupId: string | null;
+  carId: string | null;
 };
 
 function statusClass(status: SetupDocListItem["parseStatus"]): string {
@@ -31,23 +34,36 @@ function statusClass(status: SetupDocListItem["parseStatus"]): string {
 }
 
 export function SetupDocumentLibraryClient({
+  cars,
   initialDocuments,
 }: {
+  cars: CarOption[];
   initialDocuments: SetupDocListItem[];
 }) {
   const router = useRouter();
+  const [uploadCarId, setUploadCarId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (cars.length !== 1 || uploadCarId) return;
+    setUploadCarId(cars[0].id);
+  }, [cars, uploadCarId]);
+
   async function onSelect(file: File | null) {
     if (!file) return;
+    if (!uploadCarId) {
+      setError("Select which car this setup sheet is for.");
+      return;
+    }
     setUploading(true);
     setError(null);
     setStatus(null);
     try {
       const fd = new FormData();
       fd.set("file", file);
+      fd.set("carId", uploadCarId);
       const controller = new AbortController();
       const timeoutId = window.setTimeout(() => controller.abort(), 45000);
       const res = await fetch("/api/setup-documents", { method: "POST", body: fd, signal: controller.signal });
@@ -76,13 +92,39 @@ export function SetupDocumentLibraryClient({
         <p className="mt-1 text-xs text-muted-foreground">
           PDF and images are stored as setup documents. Parsing creates draft values for review.
         </p>
+        {cars.length === 0 ? (
+          <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+            Add a car under{" "}
+            <Link href="/cars" className="underline hover:text-foreground">
+              Cars
+            </Link>{" "}
+            before uploading setup sheets.
+          </p>
+        ) : (
+          <label className="mt-3 block text-xs">
+            <span className="text-muted-foreground">Car for this sheet</span>
+            <select
+              className="mt-1 block w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              value={uploadCarId}
+              onChange={(e) => setUploadCarId(e.target.value)}
+              disabled={uploading}
+            >
+              <option value="">Select car…</option>
+              {cars.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="mt-3 flex items-center gap-3">
           <label className="inline-flex cursor-pointer items-center rounded-md border border-border bg-muted/60 px-3 py-2 text-xs hover:bg-muted">
             <input
               type="file"
               className="hidden"
               accept="application/pdf,image/jpeg,image/png,image/webp"
-              disabled={uploading}
+              disabled={uploading || cars.length === 0}
               onChange={(e) => onSelect(e.currentTarget.files?.[0] ?? null)}
             />
             {uploading ? "Uploading…" : "Upload setup sheet"}

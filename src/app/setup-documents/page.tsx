@@ -30,7 +30,8 @@ export default async function SetupDocumentsPage(): Promise<ReactNode> {
   }
 
   const user = await getOrCreateLocalUser();
-  const documents = await prisma.setupDocument.findMany({
+  const [documents, cars] = await Promise.all([
+    prisma.setupDocument.findMany({
     where: { userId: user.id, setupImportBatchId: null },
     orderBy: { createdAt: "desc" },
     select: {
@@ -47,8 +48,15 @@ export default async function SetupDocumentsPage(): Promise<ReactNode> {
       createdAt: true,
       updatedAt: true,
       createdSetupId: true,
+      carId: true,
     },
-  });
+  }),
+    prisma.car.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true },
+    }),
+  ]);
 
   return (
     <>
@@ -59,6 +67,7 @@ export default async function SetupDocumentsPage(): Promise<ReactNode> {
         </div>
       </header>
       <SetupDocumentLibraryClient
+        cars={cars}
         initialDocuments={documents.map((d) => ({
           ...d,
           createdAt: d.createdAt.toISOString(),

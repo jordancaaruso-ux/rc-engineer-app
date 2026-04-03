@@ -26,7 +26,8 @@ export default async function BulkImportBatchPage({
 
   const { batchId } = await params;
   const user = await getOrCreateLocalUser();
-  const batch = await prisma.setupImportBatch.findFirst({
+  const [batch, cars] = await Promise.all([
+    prisma.setupImportBatch.findFirst({
     where: { id: batchId, userId: user.id },
     select: {
       id: true,
@@ -34,7 +35,13 @@ export default async function BulkImportBatchPage({
       calibrationProfile: { select: { name: true, sourceType: true } },
       _count: { select: { documents: true } },
     },
-  });
+  }),
+    prisma.car.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true },
+    }),
+  ]);
   if (!batch) notFound();
 
   const sub =
@@ -59,7 +66,7 @@ export default async function BulkImportBatchPage({
         </div>
       </header>
       <section className="page-body">
-        <BulkImportBatchClient batchId={batch.id} />
+        <BulkImportBatchClient batchId={batch.id} cars={cars} />
       </section>
     </>
   );

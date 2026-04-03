@@ -58,6 +58,7 @@ export default async function SetupDocumentDetailPage({
         createdAt: true,
         updatedAt: true,
         createdSetupId: true,
+        carId: true,
       },
     }),
     prisma.car.findMany({

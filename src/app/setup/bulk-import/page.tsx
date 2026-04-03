@@ -25,7 +25,8 @@ export default async function BulkImportPage(): Promise<ReactNode> {
   }
 
   const user = await getOrCreateLocalUser();
-  const batches = await prisma.setupImportBatch.findMany({
+  const [batches, cars] = await Promise.all([
+    prisma.setupImportBatch.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     take: 30,
@@ -36,7 +37,13 @@ export default async function BulkImportPage(): Promise<ReactNode> {
       calibrationProfile: { select: { name: true } },
       _count: { select: { documents: true } },
     },
-  });
+  }),
+    prisma.car.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true },
+    }),
+  ]);
 
   const batchRows = batches.map((b) => ({
     ...b,
@@ -58,7 +65,7 @@ export default async function BulkImportPage(): Promise<ReactNode> {
         </Link>
       </header>
       <section className="page-body">
-        <BulkImportHubClient initialBatches={batchRows} />
+        <BulkImportHubClient cars={cars} initialBatches={batchRows} />
       </section>
     </>
   );

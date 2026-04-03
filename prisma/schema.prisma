@@ -71,6 +71,7 @@ model Car {
 
   runs      Run[]
   snapshots SetupSnapshot[]
+  setupDocuments SetupDocument[]
   setupParameterAggregations SetupParameterAggregation[]
 }
 
@@ -305,6 +306,9 @@ model SetupDocument {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
+  car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)
+  carId String?
+
   setupImportBatchId String?
   setupImportBatch   SetupImportBatch? @relation(fields: [setupImportBatchId], references: [id], onDelete: Cascade)
   importDatasetReviewStatus    SetupImportDatasetReviewStatus @default(UNSET)
@@ -319,6 +323,7 @@ model SetupDocument {
   @@index([userId, createdAt])
   @@index([userId, parseStatus])
   @@index([setupImportBatchId])
+  @@index([carId])
 }
 
 model SetupSheetCalibration {

@@ -9,6 +9,7 @@ import {
 } from "@/lib/setupDocuments/storage";
 import { SETUP_DOCUMENT_MAX_BYTES } from "@/lib/setupDocuments/types";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
+import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 
 const PDF_MIME = "application/pdf";
 function looksLikePdf(file: File): boolean {
@@ -38,6 +39,11 @@ export async function POST(request: Request, ctx: Ctx) {
   }
   const form = await request.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
+
+  const carResolved = await resolveOwnedCarId(user.id, form.get("carId"));
+  if (!carResolved.ok) {
+    return NextResponse.json({ error: carResolved.message }, { status: 400 });
+  }
 
   const files = form.getAll("files");
   const fileList = files.filter((f): f is File => f instanceof File);
@@ -70,6 +76,7 @@ export async function POST(request: Request, ctx: Ctx) {
     const doc = await prisma.setupDocument.create({
       data: {
         userId: user.id,
+        carId: carResolved.carId,
         setupImportBatchId: batch.id,
         originalFilename: file.name || "upload.pdf",
         storagePath,

@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+
+type CarOption = { id: string; name: string };
 
 type BatchRow = {
   id: string;
@@ -24,13 +26,25 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function BulkImportHubClient({ initialBatches }: { initialBatches: BatchRow[] }) {
+export function BulkImportHubClient({
+  cars,
+  initialBatches,
+}: {
+  cars: CarOption[];
+  initialBatches: BatchRow[];
+}) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
+  const [batchCarId, setBatchCarId] = useState("");
   const [queued, setQueued] = useState<QueuedPdf[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (cars.length !== 1 || batchCarId) return;
+    setBatchCarId(cars[0].id);
+  }, [cars, batchCarId]);
 
   function onFilesChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const list = e.target.files;
@@ -69,6 +83,10 @@ export function BulkImportHubClient({ initialBatches }: { initialBatches: BatchR
       setErr("Add one or more PDF files.");
       return;
     }
+    if (!batchCarId) {
+      setErr("Select which car these setup sheets belong to.");
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/setup-import-batches", {
@@ -90,6 +108,7 @@ export function BulkImportHubClient({ initialBatches }: { initialBatches: BatchR
       for (let i = 0; i < queued.length; i++) {
         const fd = new FormData();
         fd.append("files", queued[i].file);
+        fd.set("carId", batchCarId);
         const up = await fetch(`/api/setup-import-batches/${data.id}/upload`, {
           method: "POST",
           body: fd,
@@ -137,6 +156,32 @@ export function BulkImportHubClient({ initialBatches }: { initialBatches: BatchR
             required
           />
         </label>
+        {cars.length === 0 ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            Add a car under{" "}
+            <Link href="/cars" className="underline hover:text-foreground">
+              Cars
+            </Link>{" "}
+            before importing setup PDFs.
+          </p>
+        ) : (
+          <label className="block text-xs">
+            <span className="text-muted-foreground">Car for all PDFs in this batch</span>
+            <select
+              className="mt-1 w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              value={batchCarId}
+              onChange={(e) => setBatchCarId(e.target.value)}
+              required
+            >
+              <option value="">Select car…</option>
+              {cars.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -201,7 +246,7 @@ export function BulkImportHubClient({ initialBatches }: { initialBatches: BatchR
         {err ? <div className="text-xs text-destructive">{err}</div> : null}
         <button
           type="submit"
-          disabled={busy || queued.length === 0}
+          disabled={busy || queued.length === 0 || cars.length === 0 || !batchCarId}
           className="rounded-md border border-border bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {busy ? "Creating…" : `Create batch & upload (${queued.length})`}

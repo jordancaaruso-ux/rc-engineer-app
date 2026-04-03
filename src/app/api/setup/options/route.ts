@@ -31,6 +31,7 @@ export async function GET(request: Request) {
       createdAt: true,
       createdSetupId: true,
       parsedDataJson: true,
+      carId: true,
       createdSetup: { select: { data: true, carId: true } },
     },
   });
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
       ? snapData
       : normalizeSetupSnapshotForStorage(normalizeParsedSetupData(d.parsedDataJson));
 
-    const carFromSnap = snap?.carId ?? null;
+    const carFromSnap = snap?.carId ?? d.carId ?? null;
     return [
       {
         id: d.id,

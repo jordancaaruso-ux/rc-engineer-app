@@ -9,6 +9,7 @@ import {
 } from "@/lib/setupDocuments/storage";
 import { SETUP_DOCUMENT_ALLOWED_MIME, SETUP_DOCUMENT_MAX_BYTES } from "@/lib/setupDocuments/types";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
+import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -32,6 +33,7 @@ export async function GET() {
       createdAt: true,
       updatedAt: true,
       createdSetupId: true,
+      carId: true,
     },
   });
   return NextResponse.json({ documents: docs });
@@ -56,6 +58,10 @@ export async function POST(request: Request) {
   const file = form.get("file");
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: "Missing file field" }, { status: 400 });
+  }
+  const carResolved = await resolveOwnedCarId(user.id, form.get("carId"));
+  if (!carResolved.ok) {
+    return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
   if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
@@ -83,6 +89,7 @@ export async function POST(request: Request) {
   const created = await prisma.setupDocument.create({
     data: {
       userId: user.id,
+      carId: carResolved.carId,
       originalFilename: file.name || "upload",
       storagePath,
       mimeType,
