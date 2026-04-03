@@ -10,6 +10,8 @@ export interface LapImportLapRow {
   warningReason?: string | null;
   isFlagged?: boolean;
   flagReason?: string | null;
+  /** LiveRC practice: lap line had trailing * in source HTML (informational only; not used to exclude). */
+  liveRcPracticeStarred?: boolean;
 }
 
 export interface LapUrlSessionDriver {

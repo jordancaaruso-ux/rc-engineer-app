@@ -164,8 +164,14 @@ export function LapTimesIngestPanel({
         ? sessionDriversRaw.filter((d) => d && typeof d.driverId === "string" && Array.isArray(d.laps))
         : [];
       const topLaps = (data as { laps?: number[] })?.laps ?? [];
+      const lapRowsFromApi = (data as { lapRows?: LapImportLapRow[] | null }).lapRows;
 
       const textFromLaps = topLaps.length > 0 ? topLaps.map((n) => n.toFixed(3)).join("\n") : value.manualText;
+
+      const autoSelectIds =
+        sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
+          ? [sessionDrivers[0].driverId]
+          : [];
 
       onChange({
         ...value,
@@ -173,9 +179,12 @@ export function LapTimesIngestPanel({
         sourceKind: "url",
         sourceDetail: url,
         parserId,
-        urlLapRows: null,
+        urlLapRows:
+          Array.isArray(lapRowsFromApi) && lapRowsFromApi.length > 0 && lapRowsFromApi.length === topLaps.length
+            ? lapRowsFromApi
+            : null,
         sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : null,
-        selectedDriverIds: [],
+        selectedDriverIds: autoSelectIds,
         driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : null,
       });
       setActivePreviewDriverId(sessionDrivers[0]?.driverId ?? null);
