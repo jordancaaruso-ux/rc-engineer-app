@@ -7,7 +7,8 @@ function compareSeverityTailwindClass(sev: CompareSeverity): string {
   if (sev === "minor") return "bg-sky-500/[0.04] border-l-[3px] border-l-sky-500/40";
   if (sev === "moderate") return "bg-amber-500/[0.07] border-l-[3px] border-l-amber-500/50";
   if (sev === "major") return "bg-rose-500/[0.06] border-l-[3px] border-l-rose-500/55";
-  return "bg-muted/30 border-l-[3px] border-l-muted-foreground/30";
+  // unknown / low-confidence: bar was too easy to miss on muted cards — add a faint cool wash, still below sky/amber/rose/gradient
+  return "bg-slate-500/[0.08] dark:bg-slate-400/[0.09] border-l-[3px] border-l-muted-foreground/40";
 }
 
 /** Continuous heat: yellow → orange → red; intensity is 0–1 (0 = no highlight). */
@@ -17,7 +18,8 @@ export function gradientIntensityToHighlightStyle(intensity: number): { classNam
   const hue = 55 - t * 55;
   const sat = 90;
   const lightBg = 58 - t * 8;
-  const alphaBg = 0.06 + t * 0.28;
+  // Slightly higher floor so very low scores read as tinted row, not “bar only”
+  const alphaBg = 0.09 + t * 0.25;
   const borderAlpha = 0.35 + t * 0.45;
   return {
     className: "border-l-[3px]",
