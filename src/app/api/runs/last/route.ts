@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     include: {
       track: { select: { id: true, name: true } },
       tireSet: { select: { id: true, label: true, setNumber: true } },
+      battery: { select: { id: true, label: true, packNumber: true } },
       event: { select: { id: true, name: true, trackId: true, startDate: true, endDate: true } },
       setupSnapshot: { select: { id: true, data: true } }
     }

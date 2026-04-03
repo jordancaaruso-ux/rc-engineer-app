@@ -32,6 +32,7 @@ const runPrefillInclude = {
   track: { select: { id: true, name: true } },
   car: { select: { id: true, name: true } },
   tireSet: { select: { id: true, label: true, setNumber: true } },
+  battery: { select: { id: true, label: true, packNumber: true } },
   event: {
     select: {
       id: true,
@@ -59,6 +60,8 @@ function serializeRunForPrefill(
     eventId: string | null;
     tireSetId: string | null;
     tireRunNumber: number;
+    batteryId: string | null;
+    batteryRunNumber: number;
     setupSnapshot: { id: string; data: unknown };
     event: {
       id: string;
@@ -71,6 +74,7 @@ function serializeRunForPrefill(
     } | null;
     track: { id: string; name: string } | null;
     tireSet: { id: string; label: string; setNumber: number | null } | null;
+    battery: { id: string; label: string; packNumber: number | null } | null;
     notes: string | null;
     driverNotes: string | null;
     handlingProblems: string | null;
@@ -91,6 +95,8 @@ function serializeRunForPrefill(
     eventId: run.eventId,
     tireSetId: run.tireSetId,
     tireRunNumber: run.tireRunNumber,
+    batteryId: run.batteryId,
+    batteryRunNumber: run.batteryRunNumber,
     setupSnapshot: run.setupSnapshot,
     event: run.event
       ? {
@@ -101,6 +107,7 @@ function serializeRunForPrefill(
       : null,
     track: run.track,
     tireSet: run.tireSet,
+    battery: run.battery,
     notes: run.notes,
     driverNotes: run.driverNotes,
     handlingProblems: run.handlingProblems,

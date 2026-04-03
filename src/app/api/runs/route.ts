@@ -32,6 +32,8 @@ export async function POST(request: Request) {
       trackId?: string | null;
       tireSetId?: string | null;
       tireRunNumber?: number;
+      batteryId?: string | null;
+      batteryRunNumber?: number;
       setupData?: unknown;
       /** When set, server merges setupData onto this snapshot (full or sparse) and stores audit delta. */
       setupBaselineSnapshotId?: string | null;
@@ -77,6 +79,11 @@ export async function POST(request: Request) {
     const tireRunNumber =
       typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
         ? Math.max(1, Math.floor(body.tireRunNumber))
+        : 1;
+
+    const batteryRunNumber =
+      typeof body.batteryRunNumber === "number" && Number.isFinite(body.batteryRunNumber)
+        ? Math.max(1, Math.floor(body.batteryRunNumber))
         : 1;
 
     const lapTimes = Array.isArray(body.lapTimes)
@@ -193,6 +200,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Tire set not found" }, { status: 400 });
     }
 
+    const battery = body.batteryId
+      ? await prisma.battery.findFirst({
+          where: { id: body.batteryId, userId: user.id },
+          select: { id: true },
+        })
+      : null;
+    if (body.batteryId && !battery) {
+      return NextResponse.json({ error: "Battery not found" }, { status: 400 });
+    }
+
     const sessionType =
       body.sessionType === "PRACTICE" || body.sessionType === "RACE_MEETING"
         ? body.sessionType
@@ -222,6 +239,8 @@ export async function POST(request: Request) {
         trackNameSnapshot: track?.name ?? null,
         tireSetId: body.tireSetId ?? null,
         tireRunNumber,
+        batteryId: body.batteryId ?? null,
+        batteryRunNumber,
         setupSnapshotId: setupSnapshot.id,
         sourceSetupDocumentId: pdfLinks.sourceSetupDocumentId,
         sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,

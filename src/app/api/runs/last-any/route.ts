@@ -20,6 +20,7 @@ export async function GET() {
       car: { select: { id: true, name: true } },
       track: { select: { id: true, name: true } },
       tireSet: { select: { id: true, label: true, setNumber: true } },
+      battery: { select: { id: true, label: true, packNumber: true } },
       event: { select: { id: true, name: true } },
       setupSnapshot: { select: { id: true, data: true } },
     },

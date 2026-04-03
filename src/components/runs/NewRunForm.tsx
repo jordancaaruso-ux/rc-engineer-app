@@ -27,6 +27,7 @@ import {
 type CarOption = { id: string; name: string; setupSheetTemplate?: string | null };
 type TrackOption = { id: string; name: string; location?: string | null };
 type TireSetOption = { id: string; label: string; setNumber?: number; initialRunCount?: number };
+type BatteryPackOption = { id: string; label: string; packNumber?: number; initialRunCount?: number };
 
 type EventOption = {
   id: string;
@@ -57,6 +58,9 @@ type LastRun = {
   event?: EventOption | null;
   track?: { id: string; name: string } | null;
   tireSet?: { id: string; label: string; setNumber?: number | null } | null;
+  batteryId?: string | null;
+  batteryRunNumber?: number;
+  battery?: { id: string; label: string; packNumber?: number | null } | null;
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;
@@ -150,6 +154,9 @@ export function NewRunForm(props: {
   const [tireSets, setTireSets] = useState<TireSetOption[]>([]);
   const [tireSetId, setTireSetId] = useState<string>("");
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
+  const [batteries, setBatteries] = useState<BatteryPackOption[]>([]);
+  const [batteryId, setBatteryId] = useState<string>("");
+  const [batteryRunsCompleted, setBatteryRunsCompleted] = useState<number>(0);
 
   const [events, setEvents] = useState<EventOption[]>([]);
   const [eventId, setEventId] = useState<string>("");
@@ -196,6 +203,12 @@ export function NewRunForm(props: {
   const [newTireSetNumber, setNewTireSetNumber] = useState<number>(1);
   const [newTireInitialRunCount, setNewTireInitialRunCount] = useState<number>(0);
 
+  const [showNewBatteryPanel, setShowNewBatteryPanel] = useState(false);
+  const [creatingBattery, setCreatingBattery] = useState(false);
+  const [newBatteryLabel, setNewBatteryLabel] = useState("");
+  const [newBatteryPackNumber, setNewBatteryPackNumber] = useState<number>(1);
+  const [newBatteryInitialRunCount, setNewBatteryInitialRunCount] = useState<number>(0);
+
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -204,6 +217,7 @@ export function NewRunForm(props: {
   const [copyCarWarning, setCopyCarWarning] = useState<string | null>(null);
   const [copyTrackWarning, setCopyTrackWarning] = useState<string | null>(null);
   const [copyTireWarning, setCopyTireWarning] = useState<string | null>(null);
+  const [copyBatteryWarning, setCopyBatteryWarning] = useState<string | null>(null);
   const [pickerRuns, setPickerRuns] = useState<RunPickerRun[]>([]);
   const [loadSetupSelection, setLoadSetupSelection] = useState("");
   const [loadOtherSetupSelection, setLoadOtherSetupSelection] = useState("");
@@ -253,6 +267,8 @@ export function NewRunForm(props: {
     setEventId(r.eventId ?? "");
     setTireSetId(r.tireSetId ?? "");
     setRunsCompleted(r.tireRunNumber ?? 0);
+    setBatteryId(r.batteryId ?? "");
+    setBatteryRunsCompleted(r.batteryRunNumber ?? 0);
 
     const nextSetup = normalizeSetupData(r.setupSnapshot?.data);
     setSetupData(nextSetup);
@@ -458,12 +474,14 @@ export function NewRunForm(props: {
 
     (async () => {
       try {
-        const [{ tireSets }, { lastRun }] = await Promise.all([
+        const [{ tireSets }, { batteries }, { lastRun }] = await Promise.all([
           jsonFetch<{ tireSets: TireSetOption[] }>(`/api/tire-sets`),
-          jsonFetch<{ lastRun: LastRun | null }>(`/api/runs/last?carId=${carId}`)
+          jsonFetch<{ batteries: BatteryPackOption[] }>(`/api/batteries`),
+          jsonFetch<{ lastRun: LastRun | null }>(`/api/runs/last?carId=${carId}`),
         ]);
         if (!alive) return;
         setTireSets(tireSets);
+        setBatteries(batteries);
         setLastRun(lastRun);
 
         if (replicateLast && lastRun) {
@@ -484,6 +502,10 @@ export function NewRunForm(props: {
           const validTireId = prevTireId && tireSets.some((ts) => ts.id === prevTireId) ? prevTireId : "";
           setTireSetId(validTireId);
           setRunsCompleted(validTireId ? (lastRun.tireRunNumber ?? 0) : 0);
+          const prevBatId = lastRun.batteryId ?? "";
+          const validBatId = prevBatId && batteries.some((b) => b.id === prevBatId) ? prevBatId : "";
+          setBatteryId(validBatId);
+          setBatteryRunsCompleted(validBatId ? (lastRun.batteryRunNumber ?? 0) : 0);
           const nextSetup = normalizeSetupData(lastRun.setupSnapshot?.data);
           setSetupData(nextSetup);
           setActiveSetupData(nextSetup, carId || null);
@@ -522,6 +544,9 @@ export function NewRunForm(props: {
     const prevTireId = lastRun.tireSetId ?? "";
     setTireSetId(prevTireId);
     setRunsCompleted(prevTireId ? (lastRun.tireRunNumber ?? 0) : 0);
+    const prevBatId = lastRun.batteryId ?? "";
+    setBatteryId(prevBatId);
+    setBatteryRunsCompleted(prevBatId ? (lastRun.batteryRunNumber ?? 0) : 0);
     const nextSetup = normalizeSetupData(lastRun.setupSnapshot?.data);
     setSetupData(nextSetup);
     setActiveSetupData(nextSetup, carId || null);
@@ -638,6 +663,19 @@ export function NewRunForm(props: {
       setCopyTireWarning(null);
     }
 
+    const nextBatId = r.batteryId || r.battery?.id || "";
+    if (nextBatId && batteries.some((b) => b.id === nextBatId)) {
+      setBatteryId(nextBatId);
+      setBatteryRunsCompleted(r.batteryRunNumber ?? 0);
+      setCopyBatteryWarning(null);
+    } else if (r.battery?.label) {
+      setCopyBatteryWarning(
+        `Last run used a battery pack that no longer exists: ${r.battery.label}. You can select a current pack.`
+      );
+    } else {
+      setCopyBatteryWarning(null);
+    }
+
     if (r.sessionType === "RACE_MEETING" || r.sessionType === "PRACTICE") {
       setSessionType("RACE_MEETING");
       const sub = r.meetingSessionType as MeetingSessionType | undefined;
@@ -684,6 +722,25 @@ export function NewRunForm(props: {
       alive = false;
     };
   }, [tireSetId]);
+
+  useEffect(() => {
+    if (!batteryId) return;
+    let alive = true;
+    jsonFetch<{ lastBatteryRunNumber: number | null }>(
+      `/api/runs/last-battery-run-number?batteryId=${batteryId}`
+    )
+      .then(({ lastBatteryRunNumber }) => {
+        if (!alive) return;
+        setBatteryRunsCompleted(lastBatteryRunNumber ?? 0);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setBatteryRunsCompleted(0);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [batteryId]);
 
   async function createEvent(e?: React.MouseEvent) {
     e?.preventDefault();
@@ -806,6 +863,66 @@ export function NewRunForm(props: {
     }
   }
 
+  async function createBattery(e?: React.MouseEvent) {
+    e?.preventDefault();
+    const label = newBatteryLabel.trim();
+    if (!label) {
+      setInlineError("Enter a battery label (e.g. LCG 6000mAh).");
+      return;
+    }
+    setInlineError(null);
+    setStatus(null);
+    setCreatingBattery(true);
+
+    const packNumber = newBatteryPackNumber >= 1 ? Math.floor(newBatteryPackNumber) : 1;
+    const initialRunCount = newBatteryInitialRunCount >= 0 ? Math.floor(newBatteryInitialRunCount) : 0;
+
+    const runCreate = async (): Promise<{ battery: BatteryPackOption }> => {
+      const res = await fetch("/api/batteries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label,
+          packNumber,
+          initialRunCount,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = (data as { error?: string })?.error || `Server error (${res.status})`;
+        throw new Error(msg);
+      }
+      const battery = (data as { battery?: BatteryPackOption })?.battery;
+      if (!battery?.id) {
+        throw new Error("Invalid response: battery not returned.");
+      }
+      return { battery };
+    };
+
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timed out (15s). Try again.")), 15000)
+    );
+
+    try {
+      const { battery } = await Promise.race([runCreate(), timeout]);
+      setBatteries((prev) => [battery, ...prev]);
+      setBatteryId(battery.id);
+      setBatteryRunsCompleted(initialRunCount);
+      setNewBatteryLabel("");
+      setNewBatteryPackNumber(1);
+      setNewBatteryInitialRunCount(0);
+      setShowNewBatteryPanel(false);
+      setStatus("Battery pack created — selected.");
+      setInlineError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to create battery";
+      setStatus(msg);
+      setInlineError(msg);
+    } finally {
+      setCreatingBattery(false);
+    }
+  }
+
   function buildImportedLapSetsFromIngest(current: LapIngestFormValue): Array<{
     sourceUrl: string | null;
     driverId: string | null;
@@ -919,6 +1036,8 @@ export function NewRunForm(props: {
           trackId: trackId || null,
           tireSetId: tireSetId || null,
           tireRunNumber: Math.max(1, runsCompleted + 1),
+          batteryId: batteryId || null,
+          batteryRunNumber: Math.max(1, batteryRunsCompleted + 1),
           setupData,
           setupBaselineSnapshotId,
           sourceSetupDocumentId:
@@ -977,6 +1096,7 @@ export function NewRunForm(props: {
       setLastRun(refreshed);
       if (replicateLast && refreshed) {
         setRunsCompleted(refreshed.tireRunNumber ?? 0);
+        setBatteryRunsCompleted(refreshed.batteryRunNumber ?? 0);
       }
 
       setTimeout(() => {
@@ -1064,6 +1184,15 @@ export function NewRunForm(props: {
                   </span>
                 </>
               ) : null}
+              {copyPreviewRun.battery ? (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span>
+                    {copyPreviewRun.battery.label}
+                    {copyPreviewRun.battery.packNumber != null ? ` #${copyPreviewRun.battery.packNumber}` : ""}
+                  </span>
+                </>
+              ) : null}
             </div>
           ) : (
             <span>No previous run found yet.</span>
@@ -1082,6 +1211,7 @@ export function NewRunForm(props: {
               value="TESTING"
               checked={sessionType === "TESTING"}
               onChange={() => setSessionType("TESTING")}
+              className="h-4 w-4 shrink-0 accent-primary"
             />
             <span>Testing</span>
           </label>
@@ -1092,6 +1222,7 @@ export function NewRunForm(props: {
               value="RACE_MEETING"
               checked={sessionType === "RACE_MEETING"}
               onChange={() => setSessionType("RACE_MEETING")}
+              className="h-4 w-4 shrink-0 accent-primary"
             />
             <span>Race Meeting</span>
           </label>
@@ -1367,7 +1498,7 @@ export function NewRunForm(props: {
             )}
             onClick={() => setRunDetailsTab("tires")}
           >
-            Tires
+            Tires & batteries
           </button>
         </div>
 
@@ -1606,6 +1737,118 @@ export function NewRunForm(props: {
                 </div>
               </div>
             ) : null}
+
+            <div className="border-t border-border pt-4 space-y-2 text-sm">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <div className="ui-title text-sm text-muted-foreground">Battery pack</div>
+                  <div className="text-[11px] text-muted-foreground">Optional.</div>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted transition"
+                  onClick={() => {
+                    setShowNewBatteryPanel((v) => !v);
+                    setInlineError(null);
+                  }}
+                >
+                  {showNewBatteryPanel ? "Cancel" : "New battery"}
+                </button>
+              </div>
+              <select
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                value={batteryId}
+                onChange={(e) => {
+                  setBatteryId(e.target.value);
+                  setCopyBatteryWarning(null);
+                }}
+                aria-label="Battery pack"
+              >
+                <option value="">—</option>
+                {batteries.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.label}
+                    {b.packNumber != null ? ` #${b.packNumber}` : ""}
+                  </option>
+                ))}
+              </select>
+              {copyBatteryWarning && (
+                <div className="text-[11px] text-muted-foreground mt-1">{copyBatteryWarning}</div>
+              )}
+            </div>
+
+            {showNewBatteryPanel && (
+              <div className="rounded-md border border-border bg-muted/60 p-3 space-y-3">
+                <div className="grid gap-2 md:grid-cols-2">
+                  <input
+                    className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                    placeholder="Label (e.g. LCG 6000mAh)"
+                    value={newBatteryLabel}
+                    onChange={(e) => setNewBatteryLabel(e.target.value)}
+                    aria-label="Battery label"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                    placeholder="Pack number"
+                    value={newBatteryPackNumber}
+                    onChange={(e) => setNewBatteryPackNumber(Number(e.target.value) || 1)}
+                    aria-label="Pack number"
+                  />
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="ui-title text-sm text-muted-foreground">How many runs has this pack done?</div>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                    inputMode="numeric"
+                    value={newBatteryInitialRunCount}
+                    onChange={(e) =>
+                      setNewBatteryInitialRunCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                    }
+                    aria-label="Runs before this log"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+                    (!newBatteryLabel.trim() || creatingBattery) && "opacity-60 pointer-events-none"
+                  )}
+                  onClick={(e) => createBattery(e)}
+                  disabled={!newBatteryLabel.trim() || creatingBattery}
+                >
+                  {creatingBattery ? "Adding…" : "Add battery pack"}
+                </button>
+              </div>
+            )}
+
+            {!showNewBatteryPanel && batteryId ? (
+              <div className="space-y-1 text-sm">
+                <div className="ui-title text-sm text-muted-foreground">How many runs has this pack done?</div>
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full max-w-md rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                  inputMode="numeric"
+                  value={batteryRunsCompleted}
+                  onChange={(e) =>
+                    setBatteryRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                  }
+                  aria-label="Runs completed on this battery pack"
+                />
+                <div className="text-[11px] text-muted-foreground">
+                  {batteryRunsCompleted === 0
+                    ? "0 runs"
+                    : batteryRunsCompleted === 1
+                      ? "1 run"
+                      : `${batteryRunsCompleted} runs`}{" "}
+                  completed on this pack. This run will be run #{batteryRunsCompleted + 1}.
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -1669,7 +1912,6 @@ export function NewRunForm(props: {
         <div className="ui-title text-sm text-muted-foreground">Setup</div>
         {!setupSectionExpanded ? (
           <div className="space-y-3">
-            <p className="text-sm text-foreground">Log / edit your setup?</p>
             <div className="flex flex-col gap-3 max-w-2xl">
               <div className="space-y-1 text-sm">
                 <div className="text-sm font-medium text-muted-foreground">Setup source</div>

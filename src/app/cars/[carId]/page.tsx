@@ -59,6 +59,66 @@ export default async function CarDetailPage(props: {
     where: { userId: user.id, carId },
   });
 
+  const tireRunRows = await prisma.run.findMany({
+    where: { userId: user.id, carId, tireSetId: { not: null } },
+    select: { tireSetId: true },
+  });
+  const tireIds = [...new Set(tireRunRows.map((r) => r.tireSetId!))];
+  const runsOnCarByTire = new Map<string, number>();
+  for (const r of tireRunRows) {
+    const id = r.tireSetId!;
+    runsOnCarByTire.set(id, (runsOnCarByTire.get(id) ?? 0) + 1);
+  }
+  const tireSetsOnCar =
+    tireIds.length > 0
+      ? await prisma.tireSet.findMany({
+          where: { userId: user.id, id: { in: tireIds } },
+          orderBy: [{ label: "asc" }, { setNumber: "asc" }],
+          select: { id: true, label: true, setNumber: true },
+        })
+      : [];
+  const latestTireRunGlobal = await prisma.run.findMany({
+    where: { userId: user.id, tireSetId: { in: tireIds } },
+    orderBy: { createdAt: "desc" },
+    select: { tireSetId: true, tireRunNumber: true },
+  });
+  const globalTireCount = new Map<string, number>();
+  for (const r of latestTireRunGlobal) {
+    if (r.tireSetId && !globalTireCount.has(r.tireSetId)) {
+      globalTireCount.set(r.tireSetId, r.tireRunNumber);
+    }
+  }
+
+  const batteryRunRows = await prisma.run.findMany({
+    where: { userId: user.id, carId, batteryId: { not: null } },
+    select: { batteryId: true },
+  });
+  const batteryIds = [...new Set(batteryRunRows.map((r) => r.batteryId!))];
+  const runsOnCarByBattery = new Map<string, number>();
+  for (const r of batteryRunRows) {
+    const id = r.batteryId!;
+    runsOnCarByBattery.set(id, (runsOnCarByBattery.get(id) ?? 0) + 1);
+  }
+  const batteriesOnCar =
+    batteryIds.length > 0
+      ? await prisma.battery.findMany({
+          where: { userId: user.id, id: { in: batteryIds } },
+          orderBy: [{ label: "asc" }, { packNumber: "asc" }],
+          select: { id: true, label: true, packNumber: true },
+        })
+      : [];
+  const latestBatteryRunGlobal = await prisma.run.findMany({
+    where: { userId: user.id, batteryId: { in: batteryIds } },
+    orderBy: { createdAt: "desc" },
+    select: { batteryId: true, batteryRunNumber: true },
+  });
+  const globalBatteryCount = new Map<string, number>();
+  for (const r of latestBatteryRunGlobal) {
+    if (r.batteryId && !globalBatteryCount.has(r.batteryId)) {
+      globalBatteryCount.set(r.batteryId, r.batteryRunNumber);
+    }
+  }
+
   return (
     <>
       <header className="page-header">
@@ -89,6 +149,60 @@ export default async function CarDetailPage(props: {
           </div>
 
           <CarSetupSheetTemplateEdit carId={car.id} currentTemplate={car.setupSheetTemplate} />
+
+          <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+            <div className="ui-title text-sm text-muted-foreground">Tires used with this car</div>
+            {tireSetsOnCar.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No tire sets linked on runs for this car yet. Log a run and select a tire set.
+              </p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {tireSetsOnCar.map((ts) => (
+                  <li
+                    key={ts.id}
+                    className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
+                  >
+                    <span className="text-foreground">
+                      {ts.label}
+                      {ts.setNumber != null ? ` · Set #${ts.setNumber}` : ""}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                      {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} on this car · set
+                      total {globalTireCount.get(ts.id) ?? "—"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+            <div className="ui-title text-sm text-muted-foreground">Batteries used with this car</div>
+            {batteriesOnCar.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No batteries linked on runs for this car yet. Log a run and select a battery pack.
+              </p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {batteriesOnCar.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
+                  >
+                    <span className="text-foreground">
+                      {b.label}
+                      {b.packNumber != null ? ` · Pack #${b.packNumber}` : ""}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                      {runsOnCarByBattery.get(b.id) ?? 0} run{runsOnCarByBattery.get(b.id) === 1 ? "" : "s"} on this car ·
+                      pack total {globalBatteryCount.get(b.id) ?? "—"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <CarDeleteClient carId={car.id} carName={car.name} runCount={runCount} />
         </div>
