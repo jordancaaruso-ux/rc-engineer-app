@@ -9,6 +9,30 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { compareSetupSnapshots } from "@/lib/setupCompare/compare";
+import {
+  parseNumericAggregationCompareSlice,
+  type NumericAggregationCompareSlice,
+} from "@/lib/setupCompare/numericAggregationCompare";
+
+type SetupAggApiRow = {
+  carId: string;
+  parameterKey: string;
+  valueType: string;
+  numericStatsJson: unknown;
+};
+
+function buildNumericAggregationMap(
+  rows: SetupAggApiRow[],
+  carId: string
+): Map<string, NumericAggregationCompareSlice> {
+  const m = new Map<string, NumericAggregationCompareSlice>();
+  for (const r of rows) {
+    if (r.carId !== carId || r.valueType !== "NUMERIC") continue;
+    const slice = parseNumericAggregationCompareSlice(r.numericStatsJson);
+    if (slice) m.set(r.parameterKey, slice);
+  }
+  return m;
+}
 
 type DownloadedSetupOption = {
   id: string;
@@ -109,10 +133,51 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   }, [bKind, bId, runs, downloaded]);
 
   const canCompare = Boolean(selectionA.data && selectionB.data);
+
+  const aggregationCarId = useMemo(() => {
+    const runA = aKind === "run" && aId ? runs.find((x) => x.id === aId) : null;
+    const runB = bKind === "run" && bId ? runs.find((x) => x.id === bId) : null;
+    const idA = runA?.carId ?? null;
+    const idB = runB?.carId ?? null;
+    if (idA && idB && idA === idB) return idA;
+    if (idA) return idA;
+    if (idB) return idB;
+    return null;
+  }, [aKind, aId, bKind, bId, runs]);
+
+  const [numericAggregationByKey, setNumericAggregationByKey] = useState<Map<
+    string,
+    NumericAggregationCompareSlice
+  > | null>(null);
+
+  useEffect(() => {
+    if (!dbReady || !aggregationCarId) {
+      setNumericAggregationByKey(null);
+      return;
+    }
+    let alive = true;
+    const q = `?carId=${encodeURIComponent(aggregationCarId)}`;
+    fetch(`/api/setup-aggregations${q}`)
+      .then((res) => res.json())
+      .then((data: { aggregations?: SetupAggApiRow[] }) => {
+        if (!alive) return;
+        const rows = Array.isArray(data.aggregations) ? data.aggregations : [];
+        setNumericAggregationByKey(buildNumericAggregationMap(rows, aggregationCarId));
+      })
+      .catch(() => {
+        if (alive) setNumericAggregationByKey(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [dbReady, aggregationCarId]);
+
   const compareMap = useMemo(() => {
     if (!canCompare || !selectionA.data || !selectionB.data) return null;
-    return compareSetupSnapshots(selectionA.data, selectionB.data);
-  }, [canCompare, selectionA.data, selectionB.data]);
+    return compareSetupSnapshots(selectionA.data, selectionB.data, {
+      numericAggregationByKey,
+    });
+  }, [canCompare, selectionA.data, selectionB.data, numericAggregationByKey]);
 
   const severityCounts = useMemo(() => {
     const counts = { same: 0, minor: 0, moderate: 0, major: 0, unknown: 0 };
@@ -196,8 +261,17 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
         </div>
 
         {compareMap ? (
-          <div className="text-[11px] text-muted-foreground">
-            Same: {severityCounts.same} · Minor: {severityCounts.minor} · Moderate: {severityCounts.moderate} · Major: {severityCounts.major} · Unknown: {severityCounts.unknown}
+          <div className="text-[11px] text-muted-foreground space-y-1">
+            <div>
+              Same: {severityCounts.same} · Minor: {severityCounts.minor} · Moderate: {severityCounts.moderate} · Major:{" "}
+              {severityCounts.major} · Unknown: {severityCounts.unknown}
+            </div>
+            {canCompare && !aggregationCarId && dbReady ? (
+              <div>
+                Numeric diff colours use aggregation IQR when a <span className="text-foreground/80">run</span> (with car)
+                is selected on at least one side; otherwise differences show as low-confidence grey.
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="text-[11px] text-muted-foreground">Select both setups to compare.</div>
@@ -208,11 +282,25 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="text-xs font-medium text-muted-foreground mb-2">Setup A</div>
-            <SetupSheetView value={selectionA.data} onChange={() => {}} readOnly template={A800RR_SETUP_SHEET_V1} baselineValue={selectionB.data} />
+            <SetupSheetView
+              value={selectionA.data}
+              onChange={() => {}}
+              readOnly
+              template={A800RR_SETUP_SHEET_V1}
+              baselineValue={selectionB.data}
+              numericAggregationByKey={numericAggregationByKey}
+            />
           </div>
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="text-xs font-medium text-muted-foreground mb-2">Setup B</div>
-            <SetupSheetView value={selectionB.data} onChange={() => {}} readOnly template={A800RR_SETUP_SHEET_V1} baselineValue={selectionA.data} />
+            <SetupSheetView
+              value={selectionB.data}
+              onChange={() => {}}
+              readOnly
+              template={A800RR_SETUP_SHEET_V1}
+              baselineValue={selectionA.data}
+              numericAggregationByKey={numericAggregationByKey}
+            />
           </div>
         </div>
       ) : null}

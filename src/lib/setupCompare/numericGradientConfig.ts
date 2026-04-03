@@ -1,7 +1,6 @@
 /**
- * V1 per-field numeric comparison scales for setup diff gradients.
- * Tune `strongDifferenceScale`: |Δ| equal to this value (after normalization) yields full intensity (before cap).
- * Optional `aggregationSurface` reserved for future carpet/asphalt-aware thresholds — unused in v1.
+ * Numeric fields eligible for compare gradient + per-field normalization (plain vs geometry_sign) and equality tolerance.
+ * Heat intensity uses car aggregation IQR (`numericAggregationCompare.ts`), not `strongDifferenceScale`.
  */
 
 import { canonicalGeometrySignedValue, isGeometrySignCanonicalKey } from "@/lib/setup/geometrySignNormalize";
@@ -12,22 +11,11 @@ export type NumericGradientNormalization = "plain" | "geometry_sign";
 export type NumericGradientFieldConfig = {
   label: string;
   normalization: NumericGradientNormalization;
-  /** |a−b| at this magnitude maps to full intensity (subject to intensityCap). */
+  /** Legacy field; kept for readability. Scaling is IQR-based from aggregations. */
   strongDifferenceScale: number;
-  intensityCap?: number;
   equalityTolerance?: number;
   aggregationSurface?: "agnostic";
 };
-
-const DEFAULT_CAP = 1;
-
-/** Δ → raw intensity in [0, cap], then divided by cap for UI (0–1). */
-export function gradientIntensityFromDelta(deltaAbs: number, cfg: NumericGradientFieldConfig): number {
-  const cap = cfg.intensityCap ?? DEFAULT_CAP;
-  if (cap <= 0 || !Number.isFinite(deltaAbs)) return 0;
-  const raw = Math.min(deltaAbs / cfg.strongDifferenceScale, cap);
-  return raw / cap;
-}
 
 const NUMERIC_GRADIENT_BY_KEY: Record<string, NumericGradientFieldConfig> = {
   ride_height_front: {

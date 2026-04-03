@@ -28,7 +28,8 @@ import {
 import { AwesomatixScrewStrip } from "@/components/setup-sheet/AwesomatixScrewStrip";
 import { compareSetupField, maxSeverity } from "@/lib/setupCompare/compare";
 import { compareResultToHighlight } from "@/lib/setupCompare/compareHighlight";
-import type { CompareSeverity, FieldCompareResult } from "@/lib/setupCompare/types";
+import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
+import type { FieldCompareResult } from "@/lib/setupCompare/types";
 import {
   DERIVED_FRONT_SPRING_RATE_KEY,
   DERIVED_REAR_SPRING_RATE_KEY,
@@ -65,6 +66,8 @@ type Props = {
   readOnly: boolean;
   baselineValue: SetupSnapshotData | null;
   highlightChangedKeys: Set<string> | null;
+  /** Car aggregation numeric stats: IQR scale for comparison gradient only. */
+  numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
 };
 
 function formatDerivedSpringRateNumber(n: number): string {
@@ -121,27 +124,6 @@ function fieldValue(data: SetupSnapshotData, key: string): string {
   return readSetupField(data, key);
 }
 
-function expandKeysWithCompanion(keys: string[]): string[] {
-  const out: string[] = [];
-  for (const k of keys) {
-    out.push(k);
-    const o = companionOtherTextKeyForSingleSelect(k);
-    if (o) out.push(o);
-  }
-  return out;
-}
-
-function rowKeys(row: StructuredRow): string[] {
-  if (row.type === "single") return expandKeysWithCompanion([row.key]);
-  if (row.type === "pair") return expandKeysWithCompanion([row.leftKey, row.rightKey]);
-  if (row.type === "corner4") return [row.ff, row.fr, row.rf, row.rr];
-  if (row.type === "top_deck_block") {
-    return [...expandKeysWithCompanion(["top_deck_front", "top_deck_rear", "top_deck_single"]), "top_deck_cuts"];
-  }
-  if (row.type === "screw_strip") return [row.key];
-  return [];
-}
-
 function mergeFieldCompareResults(a: FieldCompareResult, b: FieldCompareResult): FieldCompareResult {
   const areEqual = a.areEqual && b.areEqual;
   if (areEqual) {
@@ -173,8 +155,10 @@ function keyFieldCompareResult(
   key: string,
   value: SetupSnapshotData,
   baseline: SetupSnapshotData | null,
-  highlightChangedKeys: Set<string> | null
+  highlightChangedKeys: Set<string> | null,
+  numericAggregationByKey: ReadonlyMap<string, NumericAggregationCompareSlice> | null | undefined
 ): FieldCompareResult {
+  const aggMap = numericAggregationByKey ?? null;
   if (!baseline) {
     return {
       key,
@@ -186,7 +170,7 @@ function keyFieldCompareResult(
     };
   }
   if (highlightChangedKeys?.has(key)) {
-    const base = compareSetupField({ key, a: value[key], b: baseline[key] });
+    const base = compareSetupField({ key, a: value[key], b: baseline[key], numericAggregationByKey: aggMap });
     return {
       ...base,
       areEqual: false,
@@ -195,30 +179,11 @@ function keyFieldCompareResult(
       gradientIntensity: 1,
     };
   }
-  const main = compareSetupField({ key, a: value[key], b: baseline[key] });
+  const main = compareSetupField({ key, a: value[key], b: baseline[key], numericAggregationByKey: aggMap });
   const co = companionOtherTextKeyForSingleSelect(key);
   if (!co) return main;
-  const other = compareSetupField({ key: co, a: value[co], b: baseline[co] });
+  const other = compareSetupField({ key: co, a: value[co], b: baseline[co], numericAggregationByKey: aggMap });
   return mergeFieldCompareResults(main, other);
-}
-
-function keySeverity(
-  key: string,
-  value: SetupSnapshotData,
-  baseline: SetupSnapshotData | null,
-  highlightChangedKeys: Set<string> | null
-): CompareSeverity {
-  return keyFieldCompareResult(key, value, baseline, highlightChangedKeys).severity;
-}
-
-function rowSeverity(
-  row: StructuredRow,
-  value: SetupSnapshotData,
-  baseline: SetupSnapshotData | null,
-  highlightChangedKeys: Set<string> | null
-): CompareSeverity {
-  const keys = rowKeys(row);
-  return maxSeverity(keys.map((k) => keySeverity(k, value, baseline, highlightChangedKeys)));
 }
 
 /** Safe string for inline labels — never pass raw snapshot objects into JSX text. */
@@ -1019,6 +984,7 @@ function PairSideCell({
   onCommit,
   fieldKind,
   highlightChangedKeys,
+  numericAggregationByKey,
 }: {
   fieldKey: string;
   side: "Front" | "Rear";
@@ -1029,10 +995,11 @@ function PairSideCell({
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   fieldKind?: "text" | "bool" | "multi";
   highlightChangedKeys: Set<string> | null;
+  numericAggregationByKey: ReadonlyMap<string, NumericAggregationCompareSlice> | null | undefined;
 }) {
   const v = fieldValue(value, fieldKey);
   const b = baseline ? fieldValue(baseline, fieldKey) : "";
-  const cmp = keyFieldCompareResult(fieldKey, value, baseline, highlightChangedKeys);
+  const cmp = keyFieldCompareResult(fieldKey, value, baseline, highlightChangedKeys, numericAggregationByKey);
   const hl = compareResultToHighlight(cmp);
   const c = !cmp.areEqual;
   const fk = fieldKind ?? "text";
@@ -1206,9 +1173,10 @@ function PairRow({
   readOnly,
   onCommit,
   highlightChangedKeys,
+  numericAggregationByKey,
 }: {
   row: Extract<StructuredRow, { type: "pair" }>;
-} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys"> & {
+} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey"> & {
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
@@ -1234,6 +1202,7 @@ function PairRow({
           onCommit={onCommit}
           fieldKind={row.fieldKind}
           highlightChangedKeys={highlightChangedKeys}
+          numericAggregationByKey={numericAggregationByKey}
         />
         <PairSideCell
           fieldKey={row.rightKey}
@@ -1245,6 +1214,7 @@ function PairRow({
           onCommit={onCommit}
           fieldKind={row.fieldKind}
           highlightChangedKeys={highlightChangedKeys}
+          numericAggregationByKey={numericAggregationByKey}
         />
       </div>
     </div>
@@ -1259,9 +1229,10 @@ function Corner4Row({
   readOnly,
   onCommit,
   highlightChangedKeys,
+  numericAggregationByKey,
 }: {
   row: Extract<StructuredRow, { type: "corner4" }>;
-} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys"> & {
+} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey"> & {
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
@@ -1286,7 +1257,7 @@ function Corner4Row({
         {corners.map(({ k, lab }) => {
           const v = fieldValue(value, k);
           const b = baseline ? fieldValue(baseline, k) : "";
-          const cornerCmp = keyFieldCompareResult(k, value, baseline, highlightChangedKeys);
+          const cornerCmp = keyFieldCompareResult(k, value, baseline, highlightChangedKeys, numericAggregationByKey);
           const cornerHl = compareResultToHighlight(cornerCmp);
           const c = !cornerCmp.areEqual;
           return (
@@ -1459,7 +1430,8 @@ function TopDeckBlock({
   onCommit,
   onScrewChange,
   highlightChangedKeys,
-}: Pick<Props, "value" | "readOnly" | "highlightChangedKeys"> & {
+  numericAggregationByKey,
+}: Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey"> & {
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
@@ -1467,7 +1439,13 @@ function TopDeckBlock({
 }) {
   const modeCurrent = topDeckRenderMode(value);
   const modeBaseline = baseline ? topDeckRenderMode(baseline) : "unknown";
-  const topDeckSingleCmp = keyFieldCompareResult("top_deck_single", value, baseline, highlightChangedKeys);
+  const topDeckSingleCmp = keyFieldCompareResult(
+    "top_deck_single",
+    value,
+    baseline,
+    highlightChangedKeys,
+    numericAggregationByKey
+  );
 
   return (
     <div className={cn("space-y-0 border-b border-border/80 last:border-b-0")}>
@@ -1484,6 +1462,7 @@ function TopDeckBlock({
         readOnly={readOnly}
         onCommit={onCommit}
         highlightChangedKeys={highlightChangedKeys}
+        numericAggregationByKey={numericAggregationByKey}
       />
       <ScrewStripRow
         row={{ type: "screw_strip", key: "top_deck_cuts", label: "Top deck cuts" }}
@@ -1532,6 +1511,7 @@ export function SetupSheetStructured({
   readOnly,
   baselineValue,
   highlightChangedKeys,
+  numericAggregationByKey = null,
 }: Props) {
   const baseline = baselineValue ?? null;
   const hasBaseline = baseline != null;
@@ -1566,7 +1546,7 @@ export function SetupSheetStructured({
 
   const renderRow = (row: StructuredRow) => {
     if (row.type === "single") {
-      const cmp = keyFieldCompareResult(row.key, value, baseline, highlightChangedKeys);
+      const cmp = keyFieldCompareResult(row.key, value, baseline, highlightChangedKeys, numericAggregationByKey);
       const rowHl = compareResultToHighlight(cmp);
       return (
         <EditableSingle
@@ -1597,6 +1577,7 @@ export function SetupSheetStructured({
           readOnly={readOnly}
           onCommit={commit}
           highlightChangedKeys={highlightChangedKeys}
+          numericAggregationByKey={numericAggregationByKey}
         />
       );
     }
@@ -1611,6 +1592,7 @@ export function SetupSheetStructured({
           readOnly={readOnly}
           onCommit={commit}
           highlightChangedKeys={highlightChangedKeys}
+          numericAggregationByKey={numericAggregationByKey}
         />
       );
     }
@@ -1625,6 +1607,7 @@ export function SetupSheetStructured({
           onCommit={commit}
           onScrewChange={commitScrews}
           highlightChangedKeys={highlightChangedKeys}
+          numericAggregationByKey={numericAggregationByKey}
         />
       );
     }

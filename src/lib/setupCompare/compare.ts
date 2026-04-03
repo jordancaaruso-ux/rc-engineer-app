@@ -16,10 +16,11 @@ import type { FieldCompareResult, FieldKind, FieldMeta, CompareSeverity } from "
 import { normalizeMultiSelectValue } from "@/lib/setup/multiSelect";
 import {
   getNumericGradientConfig,
-  gradientIntensityFromDelta,
   normalizeNumericForGradientCompare,
   numericGradientEqual,
 } from "@/lib/setupCompare/numericGradientConfig";
+import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
+import { gradientIntensityFromIqrDelta } from "@/lib/setupCompare/numericAggregationCompare";
 
 const SCREW_KEYS = new Set(["motor_mount_screws", "top_deck_screws", "top_deck_cuts"]);
 
@@ -120,6 +121,8 @@ export function compareSetupField(input: {
   a: unknown;
   b: unknown;
   meta?: FieldMeta;
+  /** Car numeric aggregations: scale only (IQR), not rarity. */
+  numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
 }): FieldCompareResult {
   const key = input.key;
   const meta = input.meta ?? DEFAULT_META.get(key) ?? { key, label: key, kind: "text" as const };
@@ -216,16 +219,27 @@ export function compareSetupField(input: {
         };
       }
       const delta = Math.abs(na - nb);
-      const gradientIntensity = gradientIntensityFromDelta(delta, gradCfg);
-      const severity = severityFromGradientIntensity(gradientIntensity);
+      const agg = input.numericAggregationByKey?.get(key) ?? null;
+      const gradientIntensity = gradientIntensityFromIqrDelta(delta, agg);
+      if (gradientIntensity != null) {
+        const severity = severityFromGradientIntensity(gradientIntensity);
+        return {
+          key,
+          areEqual: false,
+          severity,
+          severityReason: `Δ=${delta} (IQR-scaled)`,
+          normalizedA: String(na),
+          normalizedB: String(nb),
+          gradientIntensity,
+        };
+      }
       return {
         key,
         areEqual: false,
-        severity,
-        severityReason: `Δ=${delta} (intensity ${gradientIntensity.toFixed(3)})`,
+        severity: "unknown",
+        severityReason: "different (no robust aggregation scale)",
         normalizedA: String(na),
         normalizedB: String(nb),
-        gradientIntensity,
       };
     }
     const sa = formatNormalized(input.a);
@@ -288,15 +302,20 @@ export function compareSetupField(input: {
   };
 }
 
-export function compareSetupSnapshots(a: SetupSnapshotData, b: SetupSnapshotData): Map<string, FieldCompareResult> {
+export function compareSetupSnapshots(
+  a: SetupSnapshotData,
+  b: SetupSnapshotData,
+  options?: { numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null }
+): Map<string, FieldCompareResult> {
   const keys = new Set(
     [...Object.keys(a), ...Object.keys(b)].filter(
       (k) => !k.startsWith("imported_displayed_spring_rate_") && k !== "imported_displayed_final_drive_ratio"
     )
   );
   const out = new Map<string, FieldCompareResult>();
+  const numericAggregationByKey = options?.numericAggregationByKey ?? null;
   for (const k of keys) {
-    out.set(k, compareSetupField({ key: k, a: a[k], b: b[k] }));
+    out.set(k, compareSetupField({ key: k, a: a[k], b: b[k], numericAggregationByKey }));
   }
   return out;
 }

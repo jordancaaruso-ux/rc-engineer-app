@@ -10,6 +10,7 @@ import {
   type SetupSheetTemplate,
 } from "@/lib/setupSheetTemplate";
 import { SetupSheetStructured } from "@/components/runs/SetupSheetStructured";
+import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 
 export type SetupSheetViewProps = {
   value: SetupSnapshotData;
@@ -23,6 +24,8 @@ export type SetupSheetViewProps = {
   className?: string;
   /** Override default generic template (future: car-specific). */
   template?: SetupSheetTemplate;
+  /** Optional car aggregation stats for IQR-scaled compare gradient. */
+  numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
 };
 
 function fieldValue(v: SetupSnapshotData, key: string): string {
@@ -181,6 +184,7 @@ export function SetupSheetView({
   baselineValue,
   className,
   template: templateProp,
+  numericAggregationByKey = null,
 }: SetupSheetViewProps) {
   const template = templateProp ?? getDefaultSetupSheetTemplate();
   const baseline = baselineValue ?? null;
@@ -237,6 +241,7 @@ export function SetupSheetView({
           readOnly={readOnly}
           baselineValue={baseline}
           highlightChangedKeys={highlightChangedKeys ?? null}
+          numericAggregationByKey={numericAggregationByKey}
         />
       ) : null}
 
