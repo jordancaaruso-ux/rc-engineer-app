@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
-import { getActiveSetupData } from "@/lib/activeSetupContext";
+import { getActiveSetupCarId, getActiveSetupData } from "@/lib/activeSetupContext";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
@@ -54,6 +54,8 @@ type DownloadedSetupOption = {
   originalFilename: string;
   createdAt: string;
   setupData: unknown;
+  /** From `createdSetup.carId` when the document was applied to a car. */
+  carId?: string | null;
 };
 
 type SetupSourceKind = "none" | "current_setup" | "run" | "downloaded_setup";
@@ -73,6 +75,26 @@ async function jsonFetch<T>(input: string): Promise<T> {
 
 function emptySelection(): SelectedSetup {
   return { kind: "none", label: "—", data: null };
+}
+
+/** Car for aggregation lookup: same scoping as rebuild (car-only), from whichever compare source provides it. */
+function carIdFromCompareSource(
+  kind: SetupSourceKind,
+  sourceId: string,
+  runs: RunPickerRun[],
+  downloaded: DownloadedSetupOption[]
+): string | null {
+  if (kind === "current_setup") {
+    return getActiveSetupCarId();
+  }
+  if (kind === "run" && sourceId) {
+    return runs.find((x) => x.id === sourceId)?.carId ?? null;
+  }
+  if (kind === "downloaded_setup" && sourceId) {
+    const c = downloaded.find((x) => x.id === sourceId)?.carId;
+    return typeof c === "string" && c.trim() ? c.trim() : null;
+  }
+  return null;
 }
 
 export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
@@ -153,15 +175,13 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   const canCompare = Boolean(selectionA.data && selectionB.data);
 
   const aggregationCarId = useMemo(() => {
-    const runA = aKind === "run" && aId ? runs.find((x) => x.id === aId) : null;
-    const runB = bKind === "run" && bId ? runs.find((x) => x.id === bId) : null;
-    const idA = runA?.carId ?? null;
-    const idB = runB?.carId ?? null;
+    const idA = carIdFromCompareSource(aKind, aId, runs, downloaded);
+    const idB = carIdFromCompareSource(bKind, bId, runs, downloaded);
     if (idA && idB && idA === idB) return idA;
     if (idA) return idA;
     if (idB) return idB;
     return null;
-  }, [aKind, aId, bKind, bId, runs]);
+  }, [aKind, aId, bKind, bId, runs, downloaded]);
 
   const [aggregationBundle, setAggregationBundle] = useState<AggregationFetchBundle | null>(null);
 
@@ -335,8 +355,9 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             </div>
             {canCompare && !aggregationCarId && dbReady ? (
               <div>
-                Numeric diff colours use aggregation IQR when a <span className="text-foreground/80">run</span> (with car)
-                is selected on at least one side; otherwise differences show as low-confidence grey.
+                Numeric diff colours use aggregation IQR when a <span className="text-foreground/80">car</span> can be resolved
+                from a run, current setup, or downloaded setup document on at least one side; otherwise differences show as
+                low-confidence grey.
               </div>
             ) : null}
           </div>
