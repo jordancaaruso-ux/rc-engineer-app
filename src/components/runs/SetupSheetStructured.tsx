@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import {
   coerceSetupValue,
@@ -27,7 +27,8 @@ import {
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { AwesomatixScrewStrip } from "@/components/setup-sheet/AwesomatixScrewStrip";
 import { compareSetupField, maxSeverity } from "@/lib/setupCompare/compare";
-import type { CompareSeverity } from "@/lib/setupCompare/types";
+import { compareResultToHighlight } from "@/lib/setupCompare/compareHighlight";
+import type { CompareSeverity, FieldCompareResult } from "@/lib/setupCompare/types";
 import {
   DERIVED_FRONT_SPRING_RATE_KEY,
   DERIVED_REAR_SPRING_RATE_KEY,
@@ -141,26 +142,64 @@ function rowKeys(row: StructuredRow): string[] {
   return [];
 }
 
-function isRowChanged(
-  row: StructuredRow,
+function mergeFieldCompareResults(a: FieldCompareResult, b: FieldCompareResult): FieldCompareResult {
+  const areEqual = a.areEqual && b.areEqual;
+  if (areEqual) {
+    return {
+      key: a.key,
+      areEqual: true,
+      severity: "same",
+      severityReason: `${a.severityReason} · ${b.severityReason}`,
+      normalizedA: a.normalizedA,
+      normalizedB: a.normalizedB,
+    };
+  }
+  const severity = maxSeverity([a.severity, b.severity]);
+  const ga = a.gradientIntensity ?? 0;
+  const gb = b.gradientIntensity ?? 0;
+  const g = Math.max(ga, gb);
+  return {
+    key: a.key,
+    areEqual: false,
+    severity,
+    severityReason: `${a.severityReason} · ${b.severityReason}`,
+    normalizedA: a.normalizedA,
+    normalizedB: a.normalizedB,
+    gradientIntensity: g > 0 ? g : undefined,
+  };
+}
+
+function keyFieldCompareResult(
+  key: string,
   value: SetupSnapshotData,
   baseline: SetupSnapshotData | null,
   highlightChangedKeys: Set<string> | null
-): boolean {
-  const keys = rowKeys(row);
-  for (const k of keys) {
-    if (highlightChangedKeys?.has(k)) return true;
-    if (baseline && compareSetupField({ key: k, a: value[k], b: baseline[k] }).severity !== "same") return true;
+): FieldCompareResult {
+  if (!baseline) {
+    return {
+      key,
+      areEqual: true,
+      severity: "same",
+      severityReason: "no baseline",
+      normalizedA: "—",
+      normalizedB: "—",
+    };
   }
-  return false;
-}
-
-function severityClass(sev: CompareSeverity): string {
-  if (sev === "same") return "";
-  if (sev === "minor") return "bg-sky-500/[0.04] border-l-[3px] border-l-sky-500/40";
-  if (sev === "moderate") return "bg-amber-500/[0.07] border-l-[3px] border-l-amber-500/50";
-  if (sev === "major") return "bg-rose-500/[0.06] border-l-[3px] border-l-rose-500/55";
-  return "bg-muted/30 border-l-[3px] border-l-muted-foreground/30";
+  if (highlightChangedKeys?.has(key)) {
+    const base = compareSetupField({ key, a: value[key], b: baseline[key] });
+    return {
+      ...base,
+      areEqual: false,
+      severity: "major",
+      severityReason: "forced highlight",
+      gradientIntensity: 1,
+    };
+  }
+  const main = compareSetupField({ key, a: value[key], b: baseline[key] });
+  const co = companionOtherTextKeyForSingleSelect(key);
+  if (!co) return main;
+  const other = compareSetupField({ key: co, a: value[co], b: baseline[co] });
+  return mergeFieldCompareResults(main, other);
 }
 
 function keySeverity(
@@ -169,23 +208,7 @@ function keySeverity(
   baseline: SetupSnapshotData | null,
   highlightChangedKeys: Set<string> | null
 ): CompareSeverity {
-  if (!baseline) return "same";
-  if (highlightChangedKeys?.has(key)) return "major";
-  const sev = compareSetupField({ key, a: value[key], b: baseline[key] }).severity;
-  const co = companionOtherTextKeyForSingleSelect(key);
-  if (!co) return sev;
-  return maxSeverity([sev, compareSeverityForKey(co, value, baseline, highlightChangedKeys)]);
-}
-
-function compareSeverityForKey(
-  key: string,
-  value: SetupSnapshotData,
-  baseline: SetupSnapshotData | null,
-  highlightChangedKeys: Set<string> | null
-): CompareSeverity {
-  if (!baseline) return "same";
-  if (highlightChangedKeys?.has(key)) return "major";
-  return compareSetupField({ key, a: value[key], b: baseline[key] }).severity;
+  return keyFieldCompareResult(key, value, baseline, highlightChangedKeys).severity;
 }
 
 function rowSeverity(
@@ -682,7 +705,7 @@ function EditableSingle({
   baseline,
   hasBaseline,
   changed,
-  severity,
+  rowHighlight,
   readOnly,
   onCommit,
 }: {
@@ -695,7 +718,7 @@ function EditableSingle({
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   changed: boolean;
-  severity?: CompareSeverity;
+  rowHighlight: { className: string; style?: CSSProperties };
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
 }) {
@@ -726,8 +749,9 @@ function EditableSingle({
       <div
         className={cn(
           "flex min-h-[2.25rem] items-stretch border-b border-border/80 last:border-b-0",
-          changed && severityClass(severity ?? "moderate")
+          changed && rowHighlight.className
         )}
+        style={changed && rowHighlight.style ? rowHighlight.style : undefined}
       >
         <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
           {label}
@@ -797,8 +821,9 @@ function EditableSingle({
     <div
       className={cn(
         "flex min-h-[2.25rem] items-stretch border-b border-border/80 last:border-b-0",
-        changed && severityClass(severity ?? "moderate")
+        changed && rowHighlight.className
       )}
+      style={changed && rowHighlight.style ? rowHighlight.style : undefined}
     >
       <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
         {label}
@@ -1007,8 +1032,9 @@ function PairSideCell({
 }) {
   const v = fieldValue(value, fieldKey);
   const b = baseline ? fieldValue(baseline, fieldKey) : "";
-  const sev = keySeverity(fieldKey, value, baseline, highlightChangedKeys);
-  const c = sev !== "same";
+  const cmp = keyFieldCompareResult(fieldKey, value, baseline, highlightChangedKeys);
+  const hl = compareResultToHighlight(cmp);
+  const c = !cmp.areEqual;
   const fk = fieldKind ?? "text";
   const [local, setLocal] = useState(v);
   const [focused, setFocused] = useState(false);
@@ -1030,8 +1056,9 @@ function PairSideCell({
       <div
         className={cn(
           "flex min-h-[2.25rem] flex-1 flex-col border-l border-border/60 px-2 py-1 first:border-l-0 md:border-border/60",
-          c && severityClass(sev)
+          c && hl.className
         )}
+        style={c && hl.style ? hl.style : undefined}
       >
         <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{side}</div>
         <div className="mt-0.5 flex min-w-0 flex-col gap-1">
@@ -1090,8 +1117,9 @@ function PairSideCell({
     <div
       className={cn(
         "flex min-h-[2.25rem] flex-1 flex-col border-l border-border/60 px-2 py-1 first:border-l-0 md:border-border/60",
-        c && severityClass(sev)
+        c && hl.className
       )}
+      style={c && hl.style ? hl.style : undefined}
     >
       <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{side}</div>
       {options ? (
@@ -1258,9 +1286,15 @@ function Corner4Row({
         {corners.map(({ k, lab }) => {
           const v = fieldValue(value, k);
           const b = baseline ? fieldValue(baseline, k) : "";
-          const c = keySeverity(k, value, baseline, highlightChangedKeys) !== "same";
+          const cornerCmp = keyFieldCompareResult(k, value, baseline, highlightChangedKeys);
+          const cornerHl = compareResultToHighlight(cornerCmp);
+          const c = !cornerCmp.areEqual;
           return (
-            <div key={k} className={cn("p-1.5", c && "bg-amber-500/[0.08]")}>
+            <div
+              key={k}
+              className={cn("p-1.5", c && cornerHl.className)}
+              style={c && cornerHl.style ? cornerHl.style : undefined}
+            >
               <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{lab}</div>
               {readOnly ? (
                 <InlineValueCompare
@@ -1433,6 +1467,7 @@ function TopDeckBlock({
 }) {
   const modeCurrent = topDeckRenderMode(value);
   const modeBaseline = baseline ? topDeckRenderMode(baseline) : "unknown";
+  const topDeckSingleCmp = keyFieldCompareResult("top_deck_single", value, baseline, highlightChangedKeys);
 
   return (
     <div className={cn("space-y-0 border-b border-border/80 last:border-b-0")}>
@@ -1465,12 +1500,10 @@ function TopDeckBlock({
         value={value}
         baseline={baseline}
         hasBaseline={!!hasBaseline}
-        changed={
-          keySeverity("top_deck_single", value, baseline, highlightChangedKeys) !== "same"
-        }
+        changed={!topDeckSingleCmp.areEqual}
+        rowHighlight={compareResultToHighlight(topDeckSingleCmp)}
         readOnly={readOnly}
         onCommit={onCommit}
-        severity={keySeverity("top_deck_single", value, baseline, highlightChangedKeys)}
       />
       {hasBaseline && modeCurrent !== modeBaseline && modeCurrent !== "unknown" && modeBaseline !== "unknown" ? (
         <p className="px-2 py-1 text-[10px] text-muted-foreground">
@@ -1532,9 +1565,9 @@ export function SetupSheetStructured({
   );
 
   const renderRow = (row: StructuredRow) => {
-    const changed = isRowChanged(row, value, baseline, highlightChangedKeys);
     if (row.type === "single") {
-      const sev = rowSeverity(row, value, baseline, highlightChangedKeys);
+      const cmp = keyFieldCompareResult(row.key, value, baseline, highlightChangedKeys);
+      const rowHl = compareResultToHighlight(cmp);
       return (
         <EditableSingle
           key={row.key}
@@ -1546,10 +1579,10 @@ export function SetupSheetStructured({
           value={value}
           baseline={baseline}
           hasBaseline={hasBaseline}
-          changed={sev !== "same"}
+          changed={!cmp.areEqual}
+          rowHighlight={rowHl}
           readOnly={readOnly}
           onCommit={commit}
-          severity={sev}
         />
       );
     }

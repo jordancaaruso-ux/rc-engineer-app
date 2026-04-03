@@ -7,6 +7,8 @@ export type FieldCompareResult = {
   severityReason: string;
   normalizedA: string;
   normalizedB: string;
+  /** 0–1 heat for configured numeric fields; omitted when equal or non-gradient fallback. */
+  gradientIntensity?: number;
 };
 
 export type FieldKind = "number" | "categorical" | "boolean" | "multiSelect" | "text";

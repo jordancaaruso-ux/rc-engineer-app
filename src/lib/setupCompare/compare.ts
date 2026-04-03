@@ -14,6 +14,12 @@ import { getBoolFromSetupString } from "@/lib/a800rrSetupRead";
 import { getCalibrationFieldKind } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import type { FieldCompareResult, FieldKind, FieldMeta, CompareSeverity } from "@/lib/setupCompare/types";
 import { normalizeMultiSelectValue } from "@/lib/setup/multiSelect";
+import {
+  getNumericGradientConfig,
+  gradientIntensityFromDelta,
+  normalizeNumericForGradientCompare,
+  numericGradientEqual,
+} from "@/lib/setupCompare/numericGradientConfig";
 
 const SCREW_KEYS = new Set(["motor_mount_screws", "top_deck_screws", "top_deck_cuts"]);
 
@@ -64,6 +70,14 @@ function inferKind(key: string, a: unknown, b: unknown): FieldKind {
   if (an != null && bn != null) return "number";
   // categorical: treat case-insensitive if short tokens
   return "categorical";
+}
+
+/** Map 0–1 intensity to summary severity (cell color is continuous via gradientIntensity). */
+function severityFromGradientIntensity(intensity01: number): CompareSeverity {
+  if (intensity01 <= 0) return "same";
+  if (intensity01 < 0.26) return "minor";
+  if (intensity01 < 0.58) return "moderate";
+  return "major";
 }
 
 function severityForNumeric(deltaAbs: number, baseAbs: number, thresholds?: { minor?: number; moderate?: number }): {
@@ -171,6 +185,59 @@ export function compareSetupField(input: {
       severityReason: same ? "same" : "toggle differs",
       normalizedA: aOn ? "Yes" : "No",
       normalizedB: bOn ? "Yes" : "No",
+    };
+  }
+
+  const gradCfg = getNumericGradientConfig(key);
+  if (gradCfg) {
+    const nilA = isNil(input.a);
+    const nilB = isNil(input.b);
+    if (nilA && nilB) {
+      return {
+        key,
+        areEqual: true,
+        severity: "same",
+        severityReason: "both blank",
+        normalizedA: "—",
+        normalizedB: "—",
+      };
+    }
+    const na = normalizeNumericForGradientCompare(key, gradCfg.normalization, input.a);
+    const nb = normalizeNumericForGradientCompare(key, gradCfg.normalization, input.b);
+    if (na != null && nb != null) {
+      if (numericGradientEqual(na, nb, gradCfg)) {
+        return {
+          key,
+          areEqual: true,
+          severity: "same",
+          severityReason: "equal within tolerance",
+          normalizedA: String(na),
+          normalizedB: String(nb),
+        };
+      }
+      const delta = Math.abs(na - nb);
+      const gradientIntensity = gradientIntensityFromDelta(delta, gradCfg);
+      const severity = severityFromGradientIntensity(gradientIntensity);
+      return {
+        key,
+        areEqual: false,
+        severity,
+        severityReason: `Δ=${delta} (intensity ${gradientIntensity.toFixed(3)})`,
+        normalizedA: String(na),
+        normalizedB: String(nb),
+        gradientIntensity,
+      };
+    }
+    const sa = formatNormalized(input.a);
+    const sb = formatNormalized(input.b);
+    const same = sa === sb;
+    return {
+      key,
+      areEqual: same,
+      severity: same ? "same" : "unknown",
+      severityReason: same ? "equal" : "missing or unparsable numeric",
+      normalizedA: sa,
+      normalizedB: sb,
     };
   }
 
