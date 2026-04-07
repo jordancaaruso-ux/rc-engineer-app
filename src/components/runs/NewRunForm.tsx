@@ -10,7 +10,7 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
-import { formatEventDate, formatEventRelativeLabel } from "@/lib/formatDate";
+import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
@@ -298,7 +298,7 @@ export function NewRunForm(props: {
     [loadOtherSetupSelection, downloadedSetups]
   );
   const loadOtherSetupLabel = selectedDownloadedSetup
-    ? `${selectedDownloadedSetup.originalFilename} · ${new Date(selectedDownloadedSetup.createdAt).toLocaleDateString()}`
+    ? `${selectedDownloadedSetup.originalFilename} · ${formatRunCreatedAtDateTime(selectedDownloadedSetup.createdAt)}`
     : "Load from downloaded setup";
 
   const needsEvent = sessionType === "RACE_MEETING";
@@ -1961,7 +1961,7 @@ export function NewRunForm(props: {
                       <option value="">Choose a downloaded setup…</option>
                       {downloadedSetups.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {`${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`}
+                          {`${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`}
                         </option>
                       ))}
                     </select>
@@ -2049,7 +2049,7 @@ export function NewRunForm(props: {
                       <option value="">Choose a downloaded setup…</option>
                       {downloadedSetups.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {`${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`}
+                          {`${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`}
                         </option>
                       ))}
                     </select>
@@ -2057,7 +2057,12 @@ export function NewRunForm(props: {
                 </div>
               )}
             </div>
-            <SetupSheetView value={setupData} onChange={setSetupData} template={setupTemplate} />
+            <SetupSheetView
+              value={setupData}
+              onChange={setSetupData}
+              template={setupTemplate}
+              enableFieldSearch
+            />
             {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">No past runs yet, or list failed to load.</p>
             ) : null}

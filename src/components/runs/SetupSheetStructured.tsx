@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 import { cn } from "@/lib/utils";
 import {
   coerceSetupValue,
@@ -68,7 +76,119 @@ type Props = {
   highlightChangedKeys: Set<string> | null;
   /** Car aggregation numeric stats: IQR scale for comparison gradient only. */
   numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
+  /** Search + jump to field rows (edit flows). */
+  enableFieldSearch?: boolean;
 };
+
+/** Keys and labels for “find field” (mirrors row rendering, including top deck block). */
+function collectFieldSearchEntries(sections: StructuredSection[]): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  for (const sec of sections) {
+    for (const row of sec.rows) {
+      if (row.type === "single") {
+        out.push({ key: row.key, label: row.label });
+      } else if (row.type === "pair") {
+        out.push({ key: row.leftKey, label: `${row.label} · Front` });
+        out.push({ key: row.rightKey, label: `${row.label} · Rear` });
+      } else if (row.type === "corner4") {
+        const corners: { k: string; lab: string }[] = [
+          { k: row.ff, lab: "FF" },
+          { k: row.fr, lab: "FR" },
+          { k: row.rf, lab: "RF" },
+          { k: row.rr, lab: "RR" },
+        ];
+        for (const { k, lab } of corners) {
+          out.push({ key: k, label: `${row.label} · ${lab}` });
+        }
+      } else if (row.type === "top_deck_block") {
+        out.push({ key: "top_deck_front", label: "Top deck · Front" });
+        out.push({ key: "top_deck_rear", label: "Top deck · Rear" });
+        out.push({ key: "top_deck_cuts", label: "Top deck cuts" });
+        out.push({ key: "top_deck_single", label: "Top deck · Single" });
+      } else if (row.type === "screw_strip") {
+        out.push({ key: row.key, label: row.label });
+      }
+    }
+  }
+  return out;
+}
+
+function SetupFieldJumpSearch({
+  entries,
+  rootRef,
+}: {
+  entries: readonly { key: string; label: string }[];
+  rootRef: RefObject<HTMLDivElement | null>;
+}) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return [];
+    return entries.filter(
+      (e) => e.label.toLowerCase().includes(s) || e.key.toLowerCase().includes(s)
+    );
+  }, [entries, q]);
+
+  const jumpTo = (key: string) => {
+    const root = rootRef.current;
+    if (!root || typeof CSS === "undefined" || typeof CSS.escape !== "function") return;
+    const el = root.querySelector(`[data-setup-field-key="${CSS.escape(key)}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("ring-2", "ring-accent/70", "rounded-sm");
+    window.setTimeout(() => {
+      el.classList.remove("ring-2", "ring-accent/70", "rounded-sm");
+    }, 1400);
+    setOpen(false);
+    setQ("");
+  };
+
+  return (
+    <div className="relative mb-3">
+      <label htmlFor="setup-field-search" className="sr-only">
+        Find setup field
+      </label>
+      <input
+        id="setup-field-search"
+        type="search"
+        autoComplete="off"
+        placeholder="Find field…"
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 180)}
+        className="w-full max-w-md rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-accent/50"
+      />
+      {open && filtered.length > 0 ? (
+        <ul
+          className="absolute z-20 mt-1 max-h-48 w-full max-w-md overflow-auto rounded-md border border-border bg-card py-1 text-xs shadow-md"
+          role="listbox"
+        >
+          {filtered.slice(0, 50).map((e) => (
+            <li key={e.key} role="option">
+              <button
+                type="button"
+                className="flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left hover:bg-muted/80"
+                onMouseDown={(ev) => {
+                  ev.preventDefault();
+                  jumpTo(e.key);
+                }}
+              >
+                <span className="font-medium text-foreground">{e.label}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{e.key}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 function formatDerivedSpringRateNumber(n: number): string {
   return n.toFixed(3);
@@ -712,6 +832,7 @@ function EditableSingle({
   if (effectiveReadOnly || fieldKind === "bool") {
     return (
       <div
+        data-setup-field-key={fieldKey}
         className={cn(
           "flex min-h-[2.25rem] items-stretch border-b border-border/80 last:border-b-0",
           changed && rowHighlight.className
@@ -784,6 +905,7 @@ function EditableSingle({
 
   return (
     <div
+      data-setup-field-key={fieldKey}
       className={cn(
         "flex min-h-[2.25rem] items-stretch border-b border-border/80 last:border-b-0",
         changed && rowHighlight.className
@@ -1021,6 +1143,7 @@ function PairSideCell({
   if (readOnly || fk === "bool") {
     return (
       <div
+        data-setup-field-key={fieldKey}
         className={cn(
           "flex min-h-[2.25rem] flex-1 flex-col border-l border-border/60 px-2 py-1 first:border-l-0 md:border-border/60",
           c && hl.className
@@ -1082,6 +1205,7 @@ function PairSideCell({
 
   return (
     <div
+      data-setup-field-key={fieldKey}
       className={cn(
         "flex min-h-[2.25rem] flex-1 flex-col border-l border-border/60 px-2 py-1 first:border-l-0 md:border-border/60",
         c && hl.className
@@ -1263,6 +1387,7 @@ function Corner4Row({
           return (
             <div
               key={k}
+              data-setup-field-key={k}
               className={cn("p-1.5", c && cornerHl.className)}
               style={c && cornerHl.style ? cornerHl.style : undefined}
             >
@@ -1401,6 +1526,7 @@ function ScrewStripRow({
 
   return (
     <div
+      data-setup-field-key={row.key}
       className={cn(
         "flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch"
       )}
@@ -1512,9 +1638,12 @@ export function SetupSheetStructured({
   baselineValue,
   highlightChangedKeys,
   numericAggregationByKey = null,
+  enableFieldSearch = false,
 }: Props) {
   const baseline = baselineValue ?? null;
   const hasBaseline = baseline != null;
+  const sheetRootRef = useRef<HTMLDivElement>(null);
+  const fieldSearchEntries = useMemo(() => collectFieldSearchEntries(sections), [sections]);
 
   const commit = useCallback(
     (key: string, raw: SetupSnapshotValue) => {
@@ -1629,7 +1758,10 @@ export function SetupSheetStructured({
   };
 
   return (
-    <div className="space-y-3">
+    <div ref={sheetRootRef} className="space-y-3">
+      {enableFieldSearch && !readOnly ? (
+        <SetupFieldJumpSearch entries={fieldSearchEntries} rootRef={sheetRootRef} />
+      ) : null}
       {sections.map((sec) => (
         <SectionCard key={sec.id} title={sec.title}>
           {sec.rows.map((row) => renderRow(row))}
