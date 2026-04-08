@@ -8,7 +8,7 @@ import { load } from "cheerio";
 import type { LapImportLapRow, LapUrlParseResult, LapUrlSessionDriver } from "./types";
 import { fetchUrlText } from "./fetchText";
 import {
-  extractLiveRcPracticeSessionWhenRaw,
+  extractLiveRcPracticeSessionWhenFromHtml,
   parseLiveRcSessionDisplayTimeToUtcIso,
 } from "./livercSessionTime";
 
@@ -154,8 +154,7 @@ export function parseLiveRcPracticeSession(html: string, url: string): LapUrlPar
   }
 
   const { driverName, className } = extractSessionMeta(html);
-  const titleText = normalizeWhitespace(load(html)("title").text());
-  const whenRaw = extractLiveRcPracticeSessionWhenRaw(titleText);
+  const whenRaw = extractLiveRcPracticeSessionWhenFromHtml(html);
   const sessionCompletedAtIso = whenRaw ? parseLiveRcSessionDisplayTimeToUtcIso(whenRaw) : null;
   const laps = lines.map((l) => l.lapTimeSeconds);
   const lapRows = toLapImportRows(lines);
