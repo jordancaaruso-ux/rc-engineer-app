@@ -9,6 +9,7 @@ const navItems = [
   { href: "/", label: "Dashboard" },
   { href: "/engineer", label: "Engineer Chat" },
   { href: "/runs/new", label: "Log your run" },
+  { href: "/laps/import", label: "Lap-time import" },
   { href: "/runs/history", label: "Analysis" },
   { href: "/setup", label: "Setup" },
   { href: "/events", label: "Events" },

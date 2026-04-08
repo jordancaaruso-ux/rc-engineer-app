@@ -13,6 +13,7 @@ import {
 } from "@/lib/setup/resolveSetupSnapshot";
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
+import { linkImportedSessionToRun } from "@/lib/lapImport/service";
 
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -69,6 +70,8 @@ export async function POST(request: Request) {
         isPrimaryUser?: boolean;
         laps?: number[] | Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
       }>;
+      /** Optional: link persisted ImportedLapTimeSession from URL import to this run. */
+      importedLapTimeSessionId?: string | null;
     };
 
     const carId = body.carId;
@@ -312,9 +315,22 @@ export async function POST(request: Request) {
       suggestedChanges: body.suggestedChanges?.trim() || null,
     });
 
+    const lapImportId =
+      typeof body.importedLapTimeSessionId === "string" && body.importedLapTimeSessionId.trim()
+        ? body.importedLapTimeSessionId.trim()
+        : null;
+    if (lapImportId) {
+      await linkImportedSessionToRun({
+        userId: user.id,
+        importedLapTimeSessionId: lapImportId,
+        runId: run.id,
+      });
+    }
+
     revalidatePath("/runs/history");
     revalidatePath("/");
     revalidatePath("/engineer");
+    revalidatePath("/laps/import");
 
     return NextResponse.json({ run }, { status: 201 });
   } catch (err) {

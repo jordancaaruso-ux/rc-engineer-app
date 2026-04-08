@@ -21,6 +21,8 @@ export type LapIngestFormValue = {
   selectedDriverIds?: string[] | null;
   /** URL import: per-driver lap rows (inclusion); keyed by driverId. */
   driverLapRowsByDriverId?: Record<string, LapRow[]> | null;
+  /** Persisted ImportedLapTimeSession id after shared import (linked to run on save). */
+  importedLapTimeSessionId?: string | null;
 };
 
 type IngestTab = "manual" | "photo" | "url" | "csv";
@@ -34,6 +36,7 @@ const DEFAULT_VALUE: LapIngestFormValue = {
   sessionDrivers: null,
   selectedDriverIds: null,
   driverLapRowsByDriverId: null,
+  importedLapTimeSessionId: null,
 };
 
 function initDriverLapRows(drivers: LapUrlSessionDriver[]): Record<string, LapRow[]> {
@@ -94,6 +97,7 @@ export function LapTimesIngestPanel({
         sessionDrivers: null,
         selectedDriverIds: null,
         driverLapRowsByDriverId: null,
+        importedLapTimeSessionId: null,
       });
     }
   }
@@ -128,6 +132,7 @@ export function LapTimesIngestPanel({
         parserId: (data as { extractorId?: string })?.extractorId ?? "openai_gpt4o_mini_vision_v1",
         urlLapRows: null,
         driverLapRowsByDriverId: null,
+        importedLapTimeSessionId: null,
       });
       setPhotoNote(note);
       setPhotoConfidence(conf);
@@ -147,24 +152,50 @@ export function LapTimesIngestPanel({
     setUrlBusy(true);
     setUrlMessage(null);
     try {
-      const res = await fetch("/api/laps/parse-url-preview", {
+      const res = await fetch("/api/lap-time-sessions/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ urls: [url] }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setUrlMessage((data as { error?: string })?.error || "Request failed.");
+        onChange({ ...value, importedLapTimeSessionId: null });
         return;
       }
-      const parserId = (data as { parserId?: string })?.parserId ?? "http_timing_v1";
-      const message = (data as { message?: string | null })?.message ?? null;
-      const sessionDriversRaw = (data as { sessionDrivers?: LapUrlSessionDriver[] }).sessionDrivers ?? [];
+      const results = (data as { results?: unknown }).results;
+      const first =
+        Array.isArray(results) && results.length > 0
+          ? (results[0] as { success?: boolean; error?: string })
+          : null;
+      if (!first || first.success === false) {
+        const err =
+          first && typeof first === "object" && "error" in first && typeof first.error === "string"
+            ? first.error
+            : "Could not import this URL.";
+        setUrlMessage(err);
+        onChange({ ...value, importedLapTimeSessionId: null });
+        return;
+      }
+
+      const row = first as {
+        success: true;
+        importedSessionId: string;
+        parserId: string;
+        message?: string | null;
+        laps?: number[];
+        lapRows?: LapImportLapRow[] | null;
+        sessionDrivers?: LapUrlSessionDriver[];
+      };
+
+      const parserId = row.parserId ?? "http_timing_v1";
+      const message = row.message ?? null;
+      const sessionDriversRaw = row.sessionDrivers ?? [];
       const sessionDrivers = Array.isArray(sessionDriversRaw)
         ? sessionDriversRaw.filter((d) => d && typeof d.driverId === "string" && Array.isArray(d.laps))
         : [];
-      const topLaps = (data as { laps?: number[] })?.laps ?? [];
-      const lapRowsFromApi = (data as { lapRows?: LapImportLapRow[] | null }).lapRows;
+      const topLaps = row.laps ?? [];
+      const lapRowsFromApi = row.lapRows;
 
       const textFromLaps = topLaps.length > 0 ? topLaps.map((n) => n.toFixed(3)).join("\n") : value.manualText;
 
@@ -186,11 +217,13 @@ export function LapTimesIngestPanel({
         sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : null,
         selectedDriverIds: autoSelectIds,
         driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : null,
+        importedLapTimeSessionId: row.importedSessionId,
       });
       setActivePreviewDriverId(sessionDrivers[0]?.driverId ?? null);
       setUrlMessage(message);
     } catch {
       setUrlMessage("Request failed.");
+      onChange({ ...value, importedLapTimeSessionId: null });
     } finally {
       setUrlBusy(false);
     }

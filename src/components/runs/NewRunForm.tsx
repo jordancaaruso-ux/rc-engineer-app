@@ -1164,6 +1164,10 @@ export function NewRunForm(props: {
           suggestedChanges: suggestedChanges.trim() || null,
           sessionLabel: null,
           importedLapSets,
+          importedLapTimeSessionId:
+            lapIngest.sourceKind === "url" && lapIngest.importedLapTimeSessionId
+              ? lapIngest.importedLapTimeSessionId
+              : null,
         })
       });
 

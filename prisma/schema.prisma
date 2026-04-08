@@ -31,6 +31,7 @@ model User {
   setupDocuments  SetupDocument[]
   setupCalibrations SetupSheetCalibration[]
   setupImportBatches SetupImportBatch[]
+  importedLapTimeSessions ImportedLapTimeSession[]
 }
 
 enum ActionItemSourceType {
@@ -116,6 +117,7 @@ model Event {
   trackId String?
 
   runs Run[]
+  importedLapTimeSessions ImportedLapTimeSession[]
   // Future: timetable/scheduled sessions (timetableSessions?), reminders, "most likely session" suggestions
 }
 
@@ -415,6 +417,39 @@ model Run {
 
   importedLapSets RunImportedLapSet[]
   actionItems     ActionItem[]
+
+  /** Lap-time imports linked to this run (optional; see ImportedLapTimeSession). */
+  importedLapTimeSessions ImportedLapTimeSession[]
+}
+
+/**
+ * Parsed lap-time session from a timing URL (e.g. LiveRC), reusable outside a single run.
+ * Optional links to Run / Event for continuity; ingestion uses parseTimingUrl (shared parser registry).
+ */
+model ImportedLapTimeSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  sourceUrl  String
+  parserId   String
+  /** e.g. liverc, timing_url */
+  sourceType String   @default("timing_url")
+
+  /** Snapshot of LapUrlParseResult fields for rehydration (laps, sessionDrivers, sessionHint, …). */
+  parsedPayload Json
+
+  linkedRun   Run?    @relation(fields: [linkedRunId], references: [id], onDelete: SetNull)
+  linkedRunId String?
+
+  linkedEvent   Event?  @relation(fields: [linkedEventId], references: [id], onDelete: SetNull)
+  linkedEventId String?
+
+  @@index([userId, createdAt])
+  @@index([userId, sourceUrl])
 }
 
 model AppSetting {
