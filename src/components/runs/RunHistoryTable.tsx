@@ -247,7 +247,7 @@ function RunDetail({
   const [setupOpen, setSetupOpen] = React.useState(false);
   const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
   const [libraryLapSessions, setLibraryLapSessions] = useState<
-    Array<{ id: string; selectLabel: string; laps: LapRow[] }>
+    Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }>
   >([]);
 
   useEffect(() => {
@@ -259,7 +259,7 @@ function RunDetail({
           sessions?: Array<{ id: string; createdAt: string; sessionCompletedAt?: string | null; parsedPayload: unknown }>;
         } | null) => {
         if (!alive || !data?.sessions) return;
-        const mapped: Array<{ id: string; selectLabel: string; laps: LapRow[] }> = [];
+        const mapped: Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }> = [];
         for (const s of data.sessions) {
           const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
           if (!parsed) continue;
@@ -272,6 +272,7 @@ function RunDetail({
             id: s.id,
             selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso),
             laps: parsed.rows,
+            sortTimeIso: whenIso,
           });
         }
         setLibraryLapSessions(mapped);

@@ -19,12 +19,18 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { formatCompareRunMetaLine } from "@/lib/runCompareMeta";
-import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
+import { formatRunPickerScanDate } from "@/lib/formatDate";
+import {
+  formatDriverSessionLabel,
+  formatDriverSessionLabelWithContext,
+  resolveImportedSessionLabelTimeIso,
+} from "@/lib/lapImport/labels";
 
 type ImportedSet = {
   id: string;
   createdAt?: Date | string;
   sessionCompletedAt?: Date | string | null;
+  isPrimaryUser?: boolean;
   driverName: string;
   displayName?: string | null;
   laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
@@ -33,9 +39,45 @@ type ImportedSet = {
 type SeriesMeta = {
   metaLine: string | null;
   setupRun: CompareRunShape | null;
-  /** Target dropdown + checkbox label */
+  /** Target dropdown + compare list label */
   selectLabel: string;
+  /** Ordering: true session / run instant as ISO (for sorting compare options). */
+  sortIso: string;
 };
+
+const MS_PER_DAY = 86400000;
+
+function startOfLocalDay(d: Date): number {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+}
+
+/** Calendar-day distance from local today: 0 = today, 1 = yesterday, … */
+function dayBucketFromSortIso(sortIso: string): number {
+  const t = new Date(sortIso);
+  if (Number.isNaN(t.getTime())) return 9999;
+  const today = startOfLocalDay(new Date());
+  const day = startOfLocalDay(t);
+  return Math.round((today - day) / MS_PER_DAY);
+}
+
+function groupHeadingForSortIso(sortIso: string): string {
+  const t = new Date(sortIso);
+  if (Number.isNaN(t.getTime())) return "Other";
+  const b = dayBucketFromSortIso(sortIso);
+  if (b === 0) return "Today";
+  if (b === 1) return "Yesterday";
+  return formatRunPickerScanDate(t);
+}
+
+/** Today first, then newer calendar days before older; within a day, newest instant first. */
+function compareOptionSort(a: { sortIso: string }, b: { sortIso: string }): number {
+  const ba = dayBucketFromSortIso(a.sortIso);
+  const bb = dayBucketFromSortIso(b.sortIso);
+  if (ba !== bb) return ba - bb;
+  return new Date(b.sortIso).getTime() - new Date(a.sortIso).getTime();
+}
 
 function lapAt(series: ComparisonSeries, lapNumber: number): LapRow | undefined {
   return series.laps.find((l) => l.lapNumber === lapNumber);
@@ -159,7 +201,7 @@ export function LapComparisonColumnGrid({
   pickerRunsForModal?: CompareRunShape[];
   runListSource?: RunCompareListSource;
   /** User-owned imported lap-time library (any session from /laps/import or Log your run). */
-  librarySessions?: Array<{ id: string; selectLabel: string; laps: LapRow[] }>;
+  librarySessions?: Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }>;
 }) {
   const primaryRunLabel = myDisplayName?.trim() || "Me";
 
@@ -176,9 +218,8 @@ export function LapComparisonColumnGrid({
   }, [otherRuns, currentRunId, primaryLaps]);
 
   const [targetId, setTargetId] = useState("run:primary");
-  /** Import / driver columns only; history is controlled via multiselect. */
-  const [importComparisonIds, setImportComparisonIds] = useState<string[]>([]);
-  const [selectedHistoryRunIds, setSelectedHistoryRunIds] = useState<string[]>([]);
+  /** Columns to show vs target: imports, library, and previous runs (ids from seriesList). */
+  const [selectedComparisonIds, setSelectedComparisonIds] = useState<string[]>([]);
   const [setupModalRun, setSetupModalRun] = useState<CompareRunShape | null>(null);
 
   const { seriesList, metaById } = useMemo(() => {
@@ -190,14 +231,31 @@ export function LapComparisonColumnGrid({
       "run",
       primaryLaps
     );
-    const meWhen =
+    const anchorCreatedIso =
       typeof compareAnchorRun.createdAt === "string"
         ? compareAnchorRun.createdAt
         : compareAnchorRun.createdAt.toISOString();
+    const primaryImport =
+      run.importedLapSets?.find((x) => x.isPrimaryUser) ?? run.importedLapSets?.[0];
+    const primaryFallback =
+      primaryImport && primaryImport.createdAt != null
+        ? typeof primaryImport.createdAt === "string"
+          ? primaryImport.createdAt
+          : primaryImport.createdAt.toISOString()
+        : anchorCreatedIso;
+    const meSortIso = primaryImport
+      ? resolveImportedSessionLabelTimeIso(
+          primaryImport.sessionCompletedAt ?? null,
+          null,
+          primaryFallback
+        )
+      : anchorCreatedIso;
+
     metaById.set(primarySeries.id, {
       metaLine: formatCompareRunMetaLine(compareAnchorRun),
       setupRun: compareAnchorRun,
-      selectLabel: formatDriverSessionLabel(primaryRunLabel, meWhen),
+      selectLabel: formatDriverSessionLabel(primaryRunLabel, meSortIso),
+      sortIso: meSortIso,
     });
 
     const rawImported: ComparisonSeries[] = [];
@@ -211,20 +269,18 @@ export function LapComparisonColumnGrid({
           ? s.createdAt
           : s.createdAt != null
             ? s.createdAt.toISOString()
-            : meWhen;
+            : anchorCreatedIso;
       const whenIso = resolveImportedSessionLabelTimeIso(s.sessionCompletedAt ?? null, null, fallbackWhen);
       metaById.set(ser.id, {
         metaLine: null,
         setupRun: null,
         selectLabel: formatDriverSessionLabel(label, whenIso),
+        sortIso: whenIso,
       });
     }
 
     const rawHistory: ComparisonSeries[] = [];
-    for (const r of otherRuns) {
-      if (!selectedHistoryRunIds.includes(r.id)) continue;
-      if (r.id === currentRunId) continue;
-      if (normalizeLapTimes(r.lapTimes).length === 0) continue;
+    for (const r of historyPickOptions) {
       const ser = buildComparisonSeries(
         `history:${r.id}`,
         primaryRunLabel,
@@ -234,12 +290,13 @@ export function LapComparisonColumnGrid({
       rawHistory.push(ser);
       const metaLine = formatCompareRunMetaLine(r);
       const carName = r.car?.name?.trim() || r.carNameSnapshot?.trim() || primaryRunLabel;
-      const when =
-        typeof r.createdAt === "string" ? r.createdAt : r.createdAt.toISOString();
+      const whenIso = typeof r.createdAt === "string" ? r.createdAt : r.createdAt.toISOString();
+      const trackCtx = r.track?.name?.trim() || r.trackNameSnapshot?.trim() || null;
       metaById.set(ser.id, {
         metaLine,
         setupRun: r,
-        selectLabel: formatDriverSessionLabel(carName, when),
+        selectLabel: formatDriverSessionLabelWithContext(carName, whenIso, trackCtx ?? undefined),
+        sortIso: whenIso,
       });
     }
 
@@ -257,6 +314,7 @@ export function LapComparisonColumnGrid({
         metaLine: "Imported lap-time library",
         setupRun: null,
         selectLabel: lib.selectLabel,
+        sortIso: lib.sortTimeIso,
       });
     }
 
@@ -267,49 +325,23 @@ export function LapComparisonColumnGrid({
     ]);
     const list = [primarySeries, ...dedupedOthers];
     return { seriesList: list, metaById };
-  }, [
-    run,
-    primaryRunLabel,
-    otherRuns,
-    currentRunId,
-    compareAnchorRun,
-    primaryLaps,
-    selectedHistoryRunIds,
-    librarySessions,
-  ]);
+  }, [run, primaryRunLabel, historyPickOptions, compareAnchorRun, primaryLaps, librarySessions]);
 
   useEffect(() => {
-    setSelectedHistoryRunIds([]);
+    setSelectedComparisonIds([]);
   }, [currentRunId]);
 
   useEffect(() => {
-    const allowed = new Set(historyPickOptions.map((r) => r.id));
-    setSelectedHistoryRunIds((prev) => prev.filter((id) => allowed.has(id)));
-  }, [historyPickOptions]);
-
-  const importedSeriesIds = useMemo(
-    () => seriesList.filter((s) => s.sourceType === "imported").map((s) => s.id),
-    [seriesList]
-  );
-
-  useEffect(() => {
     const valid = new Set(seriesList.map((s) => s.id));
-    setImportComparisonIds((prev) => {
-      const filtered = prev.filter(
-        (id) => valid.has(id) && id !== targetId && importedSeriesIds.includes(id)
-      );
+    const defaultNonHistory = seriesList
+      .filter((s) => s.id !== "run:primary" && !s.id.startsWith("history:"))
+      .map((s) => s.id);
+    setSelectedComparisonIds((prev) => {
+      const filtered = prev.filter((id) => valid.has(id) && id !== targetId);
       if (filtered.length > 0) return filtered;
-      return importedSeriesIds.filter((id) => id !== targetId);
+      return defaultNonHistory.filter((id) => id !== targetId);
     });
-  }, [seriesList, targetId, importedSeriesIds]);
-
-  const comparisonIds = useMemo(() => {
-    const valid = new Set(seriesList.map((s) => s.id));
-    const hist = selectedHistoryRunIds
-      .map((id) => `history:${id}`)
-      .filter((id) => valid.has(id) && id !== targetId);
-    return [...importComparisonIds, ...hist];
-  }, [importComparisonIds, selectedHistoryRunIds, seriesList, targetId]);
+  }, [seriesList, targetId]);
 
   useEffect(() => {
     const ids = seriesList.map((s) => s.id);
@@ -319,19 +351,66 @@ export function LapComparisonColumnGrid({
   }, [seriesList, targetId]);
 
   const targetSeries = seriesList.find((s) => s.id === targetId) ?? seriesList[0];
-  const comparisonSeries = seriesList.filter((s) => comparisonIds.includes(s.id));
+  const comparisonSeries = useMemo(() => {
+    return selectedComparisonIds
+      .map((id) => seriesList.find((s) => s.id === id))
+      .filter((s): s is ComparisonSeries => Boolean(s));
+  }, [selectedComparisonIds, seriesList]);
 
   const lapNumbers = useMemo(() => {
     const cols = targetSeries ? [targetSeries, ...comparisonSeries] : comparisonSeries;
     return alignLapsByNumber(cols);
   }, [targetSeries, comparisonSeries]);
 
+  const sortedSeriesForTarget = useMemo(() => {
+    const primary = seriesList.find((s) => s.id === "run:primary");
+    const rest = seriesList.filter((s) => s.id !== "run:primary");
+    const restSorted = [...rest].sort((a, b) => {
+      const ma = metaById.get(a.id)?.sortIso ?? "";
+      const mb = metaById.get(b.id)?.sortIso ?? "";
+      return compareOptionSort({ sortIso: ma }, { sortIso: mb });
+    });
+    return primary ? [primary, ...restSorted] : restSorted;
+  }, [seriesList, metaById]);
+
+  const compareOptionGroups = useMemo(() => {
+    const rows = seriesList
+      .filter((s) => s.id !== targetId)
+      .map((s) => {
+        const m = metaById.get(s.id);
+        return {
+          id: s.id,
+          sortIso: m?.sortIso ?? "",
+          label: m?.selectLabel ?? s.label,
+        };
+      })
+      .sort(compareOptionSort);
+    const groups: { heading: string; items: typeof rows }[] = [];
+    for (const row of rows) {
+      const h = groupHeadingForSortIso(row.sortIso);
+      const last = groups[groups.length - 1];
+      if (last && last.heading === h) last.items.push(row);
+      else groups.push({ heading: h, items: [row] });
+    }
+    return groups;
+  }, [seriesList, targetId, metaById]);
+
+  const compareOptionCount = useMemo(
+    () => compareOptionGroups.reduce((n, g) => n + g.items.length, 0),
+    [compareOptionGroups]
+  );
+
   function metaFor(s: ComparisonSeries): SeriesMeta {
+    const fallbackIso =
+      typeof compareAnchorRun.createdAt === "string"
+        ? compareAnchorRun.createdAt
+        : compareAnchorRun.createdAt.toISOString();
     return (
       metaById.get(s.id) ?? {
         metaLine: null,
         setupRun: null,
         selectLabel: s.label,
+        sortIso: fallbackIso,
       }
     );
   }
@@ -359,73 +438,50 @@ export function LapComparisonColumnGrid({
         <div className="space-y-1">
           <label className="text-sm font-medium text-muted-foreground">Target</label>
           <select
-            className="rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none max-w-[min(100%,280px)]"
+            className="rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none max-w-[min(100%,min(360px,100vw))]"
             value={targetId}
             onChange={(e) => setTargetId(e.target.value)}
             aria-label="Target series"
           >
-            {seriesList.map((s) => (
+            {sortedSeriesForTarget.map((s) => (
               <option key={s.id} value={s.id}>
                 {metaFor(s).selectLabel}
               </option>
             ))}
           </select>
         </div>
-        <div className="space-y-1 min-w-[200px]">
-          <span className="text-sm font-medium text-muted-foreground block">Compare (this run + library)</span>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            {seriesList
-              .filter((s) => s.id !== targetId && s.sourceType === "imported")
-              .map((s) => {
-                const m = metaFor(s);
-                return (
-                  <label key={s.id} className="flex items-center gap-1.5 text-xs cursor-pointer max-w-[200px]">
-                    <input
-                      type="checkbox"
-                      checked={importComparisonIds.includes(s.id)}
-                      onChange={(e) => {
-                        setImportComparisonIds((prev) =>
-                          e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id)
-                        );
-                      }}
-                    />
-                    <span className="truncate" title={m.selectLabel}>
-                      {m.selectLabel}
-                    </span>
-                  </label>
-                );
-              })}
-            {importedSeriesIds.filter((id) => id !== targetId).length === 0 ? (
-              <span className="text-[11px] text-muted-foreground">No extra imported/lap-library columns.</span>
-            ) : null}
-          </div>
-        </div>
-        <div className="space-y-1 min-w-[200px] max-w-[min(100%,320px)]">
-          <label className="text-sm font-medium text-muted-foreground block" htmlFor="lap-compare-history">
-            Compare to your previous runs?
+        <div className="space-y-1 min-w-[200px] max-w-[min(100%,420px)] flex-1">
+          <label className="text-sm font-medium text-muted-foreground block" htmlFor="lap-compare-unified">
+            Compare against
           </label>
-          {historyPickOptions.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">No other runs with different lap data.</p>
+          {compareOptionCount === 0 ? (
+            <p className="text-[11px] text-muted-foreground">No other lap series to compare.</p>
           ) : (
             <select
-              id="lap-compare-history"
+              id="lap-compare-unified"
               multiple
-              size={Math.min(6, Math.max(3, historyPickOptions.length))}
+              size={Math.min(12, Math.max(4, compareOptionCount))}
               className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-              value={selectedHistoryRunIds}
+              value={selectedComparisonIds.filter((id) => id !== targetId)}
               onChange={(e) => {
-                setSelectedHistoryRunIds(Array.from(e.target.selectedOptions, (o) => o.value));
+                setSelectedComparisonIds(Array.from(e.target.selectedOptions, (o) => o.value));
               }}
-              aria-label="Select previous runs to compare"
+              aria-label="Select series to compare against the target"
             >
-              {historyPickOptions.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {formatCompareRunMetaLine(r)}
-                </option>
+              {compareOptionGroups.map((g) => (
+                <optgroup key={g.heading} label={g.heading}>
+                  {g.items.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           )}
-          <p className="text-[10px] text-muted-foreground">Hold Ctrl (Windows) or ⌘ (Mac) to select several.</p>
+          <p className="text-[10px] text-muted-foreground">
+            Imports, library sessions, and your other runs. Hold Ctrl (Windows) or ⌘ (Mac) to select several.
+          </p>
         </div>
       </div>
 

@@ -29,3 +29,15 @@ export function formatDriverSessionLabel(driverName: string, sessionTimeIso: str
   const when = formatRunCreatedAtDateTime(sessionTimeIso);
   return `${t} · ${when}`;
 }
+
+/** Optional short context (e.g. track) after the primary driver · time label. */
+export function formatDriverSessionLabelWithContext(
+  driverName: string,
+  sessionTimeIso: string,
+  context?: string | null
+): string {
+  const base = formatDriverSessionLabel(driverName, sessionTimeIso);
+  const c = context?.trim();
+  if (!c) return base;
+  return `${base} · ${c}`;
+}
