@@ -179,6 +179,7 @@ export type DashboardHomeModel = {
     createdAt: string;
     carName: string;
     trackName: string | null;
+    eventName: string | null;
     sessionLabel: string;
     bestLap: number | null;
     avgTop5: number | null;
@@ -326,6 +327,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       createdAt: recentRun.createdAt.toISOString(),
       carName: recentRun.car?.name ?? "—",
       trackName: recentRun.track?.name ?? null,
+      eventName: recentRun.event?.name ?? null,
       sessionLabel: formatRunSessionDisplay(recentRun),
       bestLap: m.bestLap,
       avgTop5: m.averageTop5,

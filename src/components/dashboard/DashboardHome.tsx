@@ -1,8 +1,7 @@
 import Link from "next/link";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
-import { ThingsToTrySection } from "@/components/dashboard/ThingsToTrySection";
+import { DashboardWorkflowContext } from "@/components/dashboard/DashboardWorkflowContext";
 
 function btnPrimary(className = "") {
   return `inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
@@ -114,7 +113,7 @@ export function DashboardHome({ model }: { model: DashboardHomeModel }) {
           )}
         </div>
 
-        <ThingsToTrySection initialItems={thingsToTry} />
+        <DashboardWorkflowContext recentRun={recentRun} thingsToTry={thingsToTry} />
 
         <div className="flex flex-wrap gap-1.5">
           <Link href="/engineer" className={btnGhost()}>
@@ -128,53 +127,18 @@ export function DashboardHome({ model }: { model: DashboardHomeModel }) {
           </Link>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm shadow-black/25">
-          <div className="grid grid-cols-1 divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0">
-            <div className="p-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Last run</div>
-              {recentRun ? (
-                <div className="mt-2 space-y-2 text-[11px]">
-                  <div className="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 sm:grid-cols-[4.5rem_1fr]">
-                    <span className="text-muted-foreground">Car</span>
-                    <span className="min-w-0 font-medium text-foreground">{recentRun.carName}</span>
-                    <span className="text-muted-foreground">Track</span>
-                    <span className="min-w-0 text-muted-foreground">
-                      {recentRun.trackName ?? "—"} · {recentRun.sessionLabel}
-                    </span>
-                    <span className="text-muted-foreground">When</span>
-                    <span className="text-[10px] tabular-nums text-muted-foreground">
-                      {formatRunCreatedAtDateTime(recentRun.createdAt)}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-border pt-2">
-                    <span className="tabular-nums">
-                      <span className="mr-1.5 text-[10px] font-medium text-muted-foreground">Best</span>
-                      <span className="font-mono">{formatLap(recentRun.bestLap)}</span>
-                    </span>
-                    <span className="tabular-nums">
-                      <span className="mr-1.5 text-[10px] font-medium text-muted-foreground">Avg 5</span>
-                      <span className="font-mono">{formatLap(recentRun.avgTop5)}</span>
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-2 text-[11px] text-muted-foreground">No runs yet.</p>
-              )}
+        <div className="overflow-hidden rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Session PB (logged laps)
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+            <div>
+              <div className="text-[10px] font-medium text-muted-foreground">Best lap</div>
+              <div className="font-mono text-sm tabular-nums text-foreground">{formatLap(perfBestLap)}</div>
             </div>
-            <div className="p-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Session PB (logged laps)
-              </div>
-              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
-                <div>
-                  <div className="text-[10px] font-medium text-muted-foreground">Best lap</div>
-                  <div className="font-mono text-sm tabular-nums text-foreground">{formatLap(perfBestLap)}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-medium text-muted-foreground">Avg top 5</div>
-                  <div className="font-mono text-sm tabular-nums text-foreground">{formatLap(perfAvgTop5)}</div>
-                </div>
-              </div>
+            <div>
+              <div className="text-[10px] font-medium text-muted-foreground">Avg top 5</div>
+              <div className="font-mono text-sm tabular-nums text-foreground">{formatLap(perfAvgTop5)}</div>
             </div>
           </div>
         </div>

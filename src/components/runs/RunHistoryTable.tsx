@@ -20,6 +20,7 @@ import {
 } from "@/lib/lapAnalysis";
 import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
 import { toCompareRunShape } from "@/lib/runCompareShape";
+import { AnalysisActiveThingsToTry } from "@/components/runs/AnalysisActiveThingsToTry";
 
 type Run = {
   id: string;
@@ -432,6 +433,8 @@ function RunDetail({
           </div>
         ) : null}
       </div>
+
+      <AnalysisActiveThingsToTry />
 
       <div className="space-y-2">
         <DetailRow

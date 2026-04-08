@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-
-export const dynamic = "force-dynamic";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { loadEngineerWorkflowContext } from "@/lib/workflowContext";
+
+export const dynamic = "force-dynamic";
 
 export default async function EngineerChatPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -39,11 +39,11 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
             Workflow context
           </div>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            Same data the app uses for decisions: your latest saved run and active &quot;things to try&quot; (also on the{" "}
+            Continuity only — your latest saved run and active &quot;things to try&quot; (same as the{" "}
             <Link href="/" className="text-accent underline">
               dashboard
             </Link>
-            ).
+            ). This is not automated judgment; the engineer stays conservative until you drive the conversation.
           </p>
           <div className="rounded-md border border-border bg-card/80 p-2.5 space-y-1.5">
             <div className="font-medium text-foreground text-[11px]">Latest run</div>
