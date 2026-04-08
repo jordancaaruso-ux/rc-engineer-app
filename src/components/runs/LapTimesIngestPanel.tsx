@@ -8,7 +8,7 @@ import type { LapImportLapRow, LapUrlSessionDriver } from "@/lib/lapUrlParsers/t
 import { computeLapMetrics, formatLap } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { getAverageTopN, getBestLap } from "@/lib/lapAnalysis";
-import { formatDriverSessionLabel } from "@/lib/lapImport/labels";
+import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 
 export type UrlImportBlock = {
@@ -16,8 +16,10 @@ export type UrlImportBlock = {
   importedSessionId: string;
   sourceUrl: string;
   parserId: string;
-  /** ISO time for labels (import stored time). */
+  /** ISO time for labels when true session time is unknown (import row createdAt). */
   recordedAt: string;
+  /** UTC ISO from timing page when parsed. */
+  sessionCompletedAtIso: string | null;
   sessionDrivers: LapUrlSessionDriver[];
   selectedDriverIds: string[];
   driverLapRowsByDriverId: Record<string, LapRow[]>;
@@ -56,6 +58,10 @@ function initDriverLapRows(drivers: LapUrlSessionDriver[]): Record<string, LapRo
     }));
   }
   return out;
+}
+
+function blockLabelTimeIso(block: UrlImportBlock): string {
+  return resolveImportedSessionLabelTimeIso(null, block.sessionCompletedAtIso ?? null, block.recordedAt);
 }
 
 function primaryLapTextFromFirstBlock(blocks: UrlImportBlock[]): string {
@@ -201,6 +207,7 @@ export function LapTimesIngestPanel({
         success: true;
         importedSessionId: string;
         recordedAt: string;
+        sessionCompletedAtIso?: string | null;
         parserId: string;
         message?: string | null;
         laps?: number[];
@@ -223,12 +230,17 @@ export function LapTimesIngestPanel({
           : [];
 
       const recordedAt = row.recordedAt ?? new Date().toISOString();
+      const sessionCompletedAtIso =
+        typeof row.sessionCompletedAtIso === "string" && row.sessionCompletedAtIso.trim()
+          ? row.sessionCompletedAtIso.trim()
+          : null;
       const newBlock: UrlImportBlock = {
         blockId: crypto.randomUUID(),
         importedSessionId: row.importedSessionId,
         sourceUrl: url,
         parserId,
         recordedAt,
+        sessionCompletedAtIso,
         sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : [],
         selectedDriverIds: autoSelectIds,
         driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : {},
@@ -371,7 +383,7 @@ export function LapTimesIngestPanel({
       const sel = b.selectedDriverIds ?? [];
       for (const id of sel) {
         const d = b.sessionDrivers.find((x) => x.driverId === id);
-        if (d) parts.push(formatDriverSessionLabel(d.driverName, b.recordedAt));
+        if (d) parts.push(formatDriverSessionLabel(d.driverName, blockLabelTimeIso(b)));
       }
     }
     return parts;
@@ -487,7 +499,7 @@ export function LapTimesIngestPanel({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Import {blockIndex + 1} · {formatRunCreatedAtDateTime(block.recordedAt)}
+                    Import {blockIndex + 1} · {formatRunCreatedAtDateTime(blockLabelTimeIso(block))}
                   </div>
                   <div className="text-[11px] text-muted-foreground break-all">{block.sourceUrl}</div>
                 </div>
@@ -508,7 +520,7 @@ export function LapTimesIngestPanel({
                       const key = `${block.blockId}:${d.driverId}`;
                       const isPreview = activePreviewKey === key;
                       const stats = statsForDriver(block, d);
-                      const primaryLabel = formatDriverSessionLabel(d.driverName, block.recordedAt);
+                      const primaryLabel = formatDriverSessionLabel(d.driverName, blockLabelTimeIso(block));
                       return (
                         <div
                           key={d.driverId}

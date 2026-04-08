@@ -34,6 +34,7 @@ export function serializeParsePayload(parsed: LapUrlParseResult): Record<string,
     candidates: parsed.candidates ?? [],
     sessionDrivers: parsed.sessionDrivers ?? [],
     sessionHint: parsed.sessionHint ?? null,
+    sessionCompletedAtIso: parsed.sessionCompletedAtIso ?? null,
     message: parsed.message ?? null,
     errorCode: parsed.errorCode ?? null,
   };
@@ -51,6 +52,8 @@ export type ImportOneUrlSuccess = {
   importedSessionId: string;
   /** When this import row was stored (use for session labels until parsed session time exists). */
   recordedAt: string;
+  /** UTC ISO from timing page when parsed; null if unavailable. */
+  sessionCompletedAtIso: string | null;
   parserId: string;
   laps: number[];
   lapRows: LapUrlParseResult["lapRows"];
@@ -93,6 +96,12 @@ export async function importOneTimingUrl(userId: string, url: string): Promise<I
     };
   }
 
+  const rawIso = parsed.sessionCompletedAtIso?.trim();
+  let sessionCompletedAt: Date | null = null;
+  if (rawIso) {
+    const d = new Date(rawIso);
+    if (!Number.isNaN(d.getTime())) sessionCompletedAt = d;
+  }
   const row = await prisma.importedLapTimeSession.create({
     data: {
       userId,
@@ -100,6 +109,7 @@ export async function importOneTimingUrl(userId: string, url: string): Promise<I
       parserId: parsed.parserId,
       sourceType: inferSourceType(normalized),
       parsedPayload: serializeParsePayload(parsed) as Prisma.InputJsonValue,
+      sessionCompletedAt,
     },
     select: { id: true, createdAt: true },
   });
@@ -109,6 +119,7 @@ export async function importOneTimingUrl(userId: string, url: string): Promise<I
     success: true,
     importedSessionId: row.id,
     recordedAt: row.createdAt.toISOString(),
+    sessionCompletedAtIso: sessionCompletedAt ? sessionCompletedAt.toISOString() : null,
     parserId: parsed.parserId,
     laps: parsed.laps,
     lapRows: parsed.lapRows,

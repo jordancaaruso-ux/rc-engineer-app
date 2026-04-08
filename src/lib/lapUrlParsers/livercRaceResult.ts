@@ -8,6 +8,10 @@ import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import type { LapImportLapRow, LapUrlParseResult, LapUrlSessionDriver } from "./types";
 import { fetchUrlText } from "./fetchText";
+import {
+  extractLiveRcRaceSessionWhenRaw,
+  parseLiveRcSessionDisplayTimeToUtcIso,
+} from "./livercSessionTime";
 
 const PARSER_ID = "liverc_race_result_v1";
 const LOG_PREFIX = "[liveRc-race-result]";
@@ -701,16 +705,21 @@ export async function importLiveRcRaceResult(pageUrl: string, _contextName?: str
     }
   }
 
+  const whenRaw = extractLiveRcRaceSessionWhenRaw(mainFetch.text);
+  const sessionCompletedAtIso = whenRaw ? parseLiveRcSessionDisplayTimeToUtcIso(whenRaw) : null;
+
   console.info(LOG_PREFIX, "session_loaded", {
     drivers: driversWithLaps.length,
     firstDriver: first.driverName,
     firstDriverLapCount: first.laps.length,
+    sessionCompletedAtIso,
   });
 
   return {
     parserId: PARSER_ID,
     laps,
     lapRows,
+    sessionCompletedAtIso,
     candidates: buildCandidateRows(driversWithLaps),
     sessionDrivers: driversWithLaps,
     message: `Imported session with ${driversWithLaps.length} drivers. Select one or more drivers below.`,

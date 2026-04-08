@@ -68,6 +68,8 @@ export async function POST(request: Request) {
         driverName?: string;
         normalizedName?: string;
         isPrimaryUser?: boolean;
+        /** UTC ISO instant from timing page when known. */
+        sessionCompletedAt?: string | null;
         laps?: number[] | Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
       }>;
       /** Optional: link persisted ImportedLapTimeSession rows from URL import(s) to this run. */
@@ -288,6 +290,11 @@ export async function POST(request: Request) {
       const normalizedName = typeof set.normalizedName === "string" && set.normalizedName.trim()
         ? set.normalizedName.trim().toLowerCase()
         : driverName.toLowerCase();
+      let sessionCompletedAt: Date | null = null;
+      if (typeof set.sessionCompletedAt === "string" && set.sessionCompletedAt.trim()) {
+        const d = new Date(set.sessionCompletedAt.trim());
+        if (!Number.isNaN(d.getTime())) sessionCompletedAt = d;
+      }
       const createdSet = await prisma.runImportedLapSet.create({
         data: {
           runId: run.id,
@@ -296,6 +303,7 @@ export async function POST(request: Request) {
           driverName,
           normalizedName,
           isPrimaryUser: Boolean(set.isPrimaryUser),
+          sessionCompletedAt,
         },
         select: { id: true },
       });

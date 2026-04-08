@@ -22,6 +22,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       id: row.id,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+      sessionCompletedAt: row.sessionCompletedAt ? row.sessionCompletedAt.toISOString() : null,
       sourceUrl: row.sourceUrl,
       parserId: row.parserId,
       sourceType: row.sourceType,

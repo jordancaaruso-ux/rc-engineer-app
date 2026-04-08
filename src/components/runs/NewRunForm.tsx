@@ -1009,6 +1009,7 @@ export function NewRunForm(props: {
     driverName: string;
     normalizedName: string;
     isPrimaryUser: boolean;
+    sessionCompletedAt: string | null;
     laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
   }> {
     if (current.sourceKind !== "url") return [];
@@ -1021,6 +1022,7 @@ export function NewRunForm(props: {
       driverName: string;
       normalizedName: string;
       isPrimaryUser: boolean;
+      sessionCompletedAt: string | null;
       laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
     }> = [];
 
@@ -1029,6 +1031,10 @@ export function NewRunForm(props: {
       const sessionDrivers = block.sessionDrivers ?? [];
       if (sessionDrivers.length === 0) continue;
       const sourceUrl = block.sourceUrl ?? null;
+      const sessionCompletedAt =
+        typeof block.sessionCompletedAtIso === "string" && block.sessionCompletedAtIso.trim()
+          ? block.sessionCompletedAtIso.trim()
+          : null;
       const selected = new Set(block.selectedDriverIds ?? []);
       const selectedOrdered = sessionDrivers.filter((d) => selected.has(d.driverId));
       const primary = selectedOrdered[0] ?? null;
@@ -1056,6 +1062,7 @@ export function NewRunForm(props: {
           driverName: primary.driverName,
           normalizedName: primary.normalizedName,
           isPrimaryUser: bi === 0,
+          sessionCompletedAt,
           laps: structuredLapsForDriver(primary),
         });
       }
@@ -1069,6 +1076,7 @@ export function NewRunForm(props: {
           driverName: d.driverName,
           normalizedName: d.normalizedName,
           isPrimaryUser: false,
+          sessionCompletedAt,
           laps: structuredLapsForDriver(d),
         });
       }

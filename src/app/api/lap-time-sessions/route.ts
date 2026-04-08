@@ -16,6 +16,7 @@ export async function GET() {
     select: {
       id: true,
       createdAt: true,
+      sessionCompletedAt: true,
       sourceUrl: true,
       parserId: true,
       sourceType: true,
@@ -29,6 +30,7 @@ export async function GET() {
     sessions: rows.map((r) => ({
       ...r,
       createdAt: r.createdAt.toISOString(),
+      sessionCompletedAt: r.sessionCompletedAt ? r.sessionCompletedAt.toISOString() : null,
     })),
   });
 }

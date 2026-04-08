@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { formatDriverSessionLabel } from "@/lib/lapImport/labels";
+import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
 
 type SessionRow = {
   id: string;
   createdAt: string;
+  sessionCompletedAt?: string | null;
   sourceUrl: string;
   parserId: string;
   sourceType: string;
@@ -193,7 +194,12 @@ export function LapImportWorkspace() {
                   {(() => {
                     const p = primaryLapRowsFromImportedPayload(s.parsedPayload);
                     const name = p?.driverName ?? "Session";
-                    return formatDriverSessionLabel(name, s.createdAt);
+                    const whenIso = resolveImportedSessionLabelTimeIso(
+                      s.sessionCompletedAt ?? null,
+                      sessionCompletedAtIsoFromImportedPayload(s.parsedPayload),
+                      s.createdAt
+                    );
+                    return formatDriverSessionLabel(name, whenIso);
                   })()}
                 </span>
                 <span className="break-all text-[11px] text-muted-foreground">{s.sourceUrl}</span>

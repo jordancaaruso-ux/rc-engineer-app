@@ -442,6 +442,12 @@ model ImportedLapTimeSession {
   /** Snapshot of LapUrlParseResult fields for rehydration (laps, sessionDrivers, sessionHint, …). */
   parsedPayload Json
 
+  /**
+   * When the timing provider exposes session/run wall time (e.g. LiveRC HTML), stored as UTC.
+   * Distinct from createdAt (when this row was imported). Null for legacy rows or unparseable pages.
+   */
+  sessionCompletedAt DateTime?
+
   linkedRun   Run?    @relation(fields: [linkedRunId], references: [id], onDelete: SetNull)
   linkedRunId String?
 
@@ -468,6 +474,8 @@ model AppSetting {
 model RunImportedLapSet {
   id             String   @id @default(cuid())
   createdAt      DateTime @default(now())
+  /** Denormalized from ImportedLapTimeSession at save time; null for legacy URL-import rows. */
+  sessionCompletedAt DateTime?
   sourceUrl      String?
   driverId       String?
   driverName     String

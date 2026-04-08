@@ -35,3 +35,12 @@ export function primaryLapRowsFromImportedPayload(parsed: unknown): { driverName
   }
   return null;
 }
+
+/** UTC ISO string if present on stored parse snapshot (legacy rows may omit). */
+export function sessionCompletedAtIsoFromImportedPayload(parsed: unknown): string | null {
+  if (!parsed || typeof parsed !== "object") return null;
+  const v = (parsed as Record<string, unknown>).sessionCompletedAtIso;
+  if (typeof v !== "string" || !v.trim()) return null;
+  const d = new Date(v.trim());
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}

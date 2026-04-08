@@ -7,6 +7,10 @@
 import { load } from "cheerio";
 import type { LapImportLapRow, LapUrlParseResult, LapUrlSessionDriver } from "./types";
 import { fetchUrlText } from "./fetchText";
+import {
+  extractLiveRcPracticeSessionWhenRaw,
+  parseLiveRcSessionDisplayTimeToUtcIso,
+} from "./livercSessionTime";
 
 export const LIVERC_PRACTICE_PARSER_ID = "liverc_practice_session_v1";
 
@@ -150,6 +154,9 @@ export function parseLiveRcPracticeSession(html: string, url: string): LapUrlPar
   }
 
   const { driverName, className } = extractSessionMeta(html);
+  const titleText = normalizeWhitespace(load(html)("title").text());
+  const whenRaw = extractLiveRcPracticeSessionWhenRaw(titleText);
+  const sessionCompletedAtIso = whenRaw ? parseLiveRcSessionDisplayTimeToUtcIso(whenRaw) : null;
   const laps = lines.map((l) => l.lapTimeSeconds);
   const lapRows = toLapImportRows(lines);
   const normalizedName = normalizeNameKey(driverName);
@@ -169,12 +176,14 @@ export function parseLiveRcPracticeSession(html: string, url: string): LapUrlPar
     driverName,
     className,
     starredCount: lines.filter((l) => l.liveRcPracticeStarred).length,
+    sessionCompletedAtIso,
   });
 
   return {
     parserId: LIVERC_PRACTICE_PARSER_ID,
     laps,
     lapRows,
+    sessionCompletedAtIso,
     candidates: [
       {
         id: "liverc_practice_primary",

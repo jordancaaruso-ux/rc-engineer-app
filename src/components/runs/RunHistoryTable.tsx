@@ -21,8 +21,8 @@ import {
 import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { AnalysisActiveThingsToTry } from "@/components/runs/AnalysisActiveThingsToTry";
-import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { formatDriverSessionLabel } from "@/lib/lapImport/labels";
+import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
 import type { LapRow } from "@/lib/lapAnalysis";
 
 type Run = {
@@ -50,6 +50,8 @@ type Run = {
   lapSession?: unknown;
   importedLapSets?: Array<{
     id: string;
+    createdAt: Date | string;
+    sessionCompletedAt?: Date | string | null;
     driverId?: string | null;
     driverName: string;
     displayName?: string | null;
@@ -252,20 +254,29 @@ function RunDetail({
     let alive = true;
     fetch("/api/lap-time-sessions", { cache: "no-store" })
       .then((r) => r.json().catch(() => null))
-      .then((data: { sessions?: Array<{ id: string; createdAt: string; parsedPayload: unknown }> } | null) => {
+      .then(
+        (data: {
+          sessions?: Array<{ id: string; createdAt: string; sessionCompletedAt?: string | null; parsedPayload: unknown }>;
+        } | null) => {
         if (!alive || !data?.sessions) return;
         const mapped: Array<{ id: string; selectLabel: string; laps: LapRow[] }> = [];
         for (const s of data.sessions) {
           const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
           if (!parsed) continue;
+          const whenIso = resolveImportedSessionLabelTimeIso(
+            s.sessionCompletedAt ?? null,
+            sessionCompletedAtIsoFromImportedPayload(s.parsedPayload),
+            s.createdAt
+          );
           mapped.push({
             id: s.id,
-            selectLabel: formatDriverSessionLabel(parsed.driverName, s.createdAt),
+            selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso),
             laps: parsed.rows,
           });
         }
         setLibraryLapSessions(mapped);
-      })
+      }
+      )
       .catch(() => {
         if (alive) setLibraryLapSessions([]);
       });

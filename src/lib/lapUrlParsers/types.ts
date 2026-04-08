@@ -43,6 +43,11 @@ export interface LapUrlParseResult {
     name?: string | null;
     className?: string | null;
   };
+  /**
+   * UTC ISO instant when the timing provider exposes session/run time on track
+   * (e.g. LiveRC page title/body). Not the same as when the user imported the URL.
+   */
+  sessionCompletedAtIso?: string | null;
   message?: string | null;
   /** Machine-readable failure (e.g. driver_not_found). */
   errorCode?: string;

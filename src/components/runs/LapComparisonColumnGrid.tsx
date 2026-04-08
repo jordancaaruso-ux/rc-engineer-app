@@ -19,10 +19,12 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { formatCompareRunMetaLine } from "@/lib/runCompareMeta";
-import { formatDriverSessionLabel } from "@/lib/lapImport/labels";
+import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
 
 type ImportedSet = {
   id: string;
+  createdAt?: Date | string;
+  sessionCompletedAt?: Date | string | null;
   driverName: string;
   displayName?: string | null;
   laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
@@ -204,10 +206,17 @@ export function LapComparisonColumnGrid({
       const label = (s.displayName?.trim() || s.driverName).trim() || "Imported";
       const ser = buildComparisonSeries(`imported:${s.id}`, label, "imported", importedSetToLapRows(s.laps));
       rawImported.push(ser);
+      const fallbackWhen =
+        typeof s.createdAt === "string"
+          ? s.createdAt
+          : s.createdAt != null
+            ? s.createdAt.toISOString()
+            : meWhen;
+      const whenIso = resolveImportedSessionLabelTimeIso(s.sessionCompletedAt ?? null, null, fallbackWhen);
       metaById.set(ser.id, {
         metaLine: null,
         setupRun: null,
-        selectLabel: formatDriverSessionLabel(label, meWhen),
+        selectLabel: formatDriverSessionLabel(label, whenIso),
       });
     }
 

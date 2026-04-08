@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     candidates: parsed.candidates ?? [],
     sessionDrivers: parsed.sessionDrivers ?? [],
     sessionHint: parsed.sessionHint ?? null,
+    sessionCompletedAtIso: parsed.sessionCompletedAtIso ?? null,
     message: parsed.message ?? null,
     errorCode: parsed.errorCode ?? null,
     url: v.normalized,
