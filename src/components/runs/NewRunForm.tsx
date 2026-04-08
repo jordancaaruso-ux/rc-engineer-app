@@ -5,6 +5,7 @@ import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
+import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
@@ -131,6 +132,10 @@ function normalizeThingsToTryFromStorage(raw: string): string {
   return "• " + first.replace(/^\s*•\s?/, "") + rest;
 }
 
+function setupSnapshotWithDerived(raw: unknown): SetupSnapshotData {
+  return applyDerivedFieldsToSnapshot(normalizeSetupData(raw));
+}
+
 export function NewRunForm(props: {
   cars: CarOption[];
   tracks: TrackOption[];
@@ -226,6 +231,13 @@ export function NewRunForm(props: {
   const [downloadedSetups, setDownloadedSetups] = useState<DownloadedSetupOption[]>([]);
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
 
+  const tireSetIdRef = useRef(tireSetId);
+  tireSetIdRef.current = tireSetId;
+  const batteryIdRef = useRef(batteryId);
+  batteryIdRef.current = batteryId;
+  const tireRunUserTouchedRef = useRef(false);
+  const batteryRunUserTouchedRef = useRef(false);
+
   const canSave = useMemo(() => Boolean(carId), [carId]);
 
   const dashboardPrefillAppliedRef = useRef(false);
@@ -270,12 +282,11 @@ export function NewRunForm(props: {
     setBatteryId(r.batteryId ?? "");
     setBatteryRunsCompleted(r.batteryRunNumber ?? 0);
 
-    const nextSetup = normalizeSetupData(r.setupSnapshot?.data);
+    const nextSetup = setupSnapshotWithDerived(r.setupSnapshot?.data);
     setSetupData(nextSetup);
     setActiveSetupData(nextSetup, nextCarId || carId || null);
     setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
     setNotes("");
-    setSuggestedChanges("");
     setLapIngest(defaultLapIngestValue());
     setReplicateLast(false);
   }, [dashboardPrefill, cars]);
@@ -322,6 +333,23 @@ export function NewRunForm(props: {
 
   useEffect(() => {
     migrateLegacyLoadedSetup();
+  }, []);
+
+  /** Same list as dashboard: ActionItem rows → textarea (order matches GET /api/action-items). */
+  useEffect(() => {
+    let alive = true;
+    jsonFetch<{ items: Array<{ id: string; text: string }> }>("/api/action-items")
+      .then(({ items }) => {
+        if (!alive) return;
+        const lines = (items ?? []).map((i) => `• ${i.text.trim()}`).filter((l) => l.length > 2);
+        setSuggestedChanges(lines.length ? normalizeThingsToTryFromStorage(lines.join("\n")) : "");
+      })
+      .catch(() => {
+        if (!alive) return;
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -377,7 +405,7 @@ export function NewRunForm(props: {
     const picked = pickerRuns.find((r) => r.id === runId);
     if (!picked) return;
     setLoadSetupSelection(runId);
-    const next = normalizeSetupData(picked.setupSnapshot?.data);
+    const next = setupSnapshotWithDerived(picked.setupSnapshot?.data);
     setSetupData(next);
     setActiveSetupData(next, carId || null);
     setSetupBaselineSnapshotId(picked.setupSnapshot?.id ?? null);
@@ -392,7 +420,7 @@ export function NewRunForm(props: {
     const picked = downloadedSetups.find((d) => d.id === docId);
     if (!picked) return;
     setLoadOtherSetupSelection(docId);
-    const next = normalizeSetupData(picked.setupData);
+    const next = setupSnapshotWithDerived(picked.setupData);
     setSetupData(next);
     setActiveSetupData(next, picked.carId ?? carId ?? null);
     setSetupBaselineSnapshotId(picked.baselineSetupSnapshotId ?? null);
@@ -506,7 +534,7 @@ export function NewRunForm(props: {
           const validBatId = prevBatId && batteries.some((b) => b.id === prevBatId) ? prevBatId : "";
           setBatteryId(validBatId);
           setBatteryRunsCompleted(validBatId ? (lastRun.batteryRunNumber ?? 0) : 0);
-          const nextSetup = normalizeSetupData(lastRun.setupSnapshot?.data);
+          const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot?.data);
           setSetupData(nextSetup);
           setActiveSetupData(nextSetup, carId || null);
           setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
@@ -547,7 +575,7 @@ export function NewRunForm(props: {
     const prevBatId = lastRun.batteryId ?? "";
     setBatteryId(prevBatId);
     setBatteryRunsCompleted(prevBatId ? (lastRun.batteryRunNumber ?? 0) : 0);
-    const nextSetup = normalizeSetupData(lastRun.setupSnapshot?.data);
+    const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot?.data);
     setSetupData(nextSetup);
     setActiveSetupData(nextSetup, carId || null);
     setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
@@ -692,30 +720,36 @@ export function NewRunForm(props: {
       setLoadOtherSetupSelection("");
       setSetupBaselineSnapshotId(null);
     }
-    const copied = normalizeSetupData(r.setupSnapshot?.data);
+    const copied = setupSnapshotWithDerived(r.setupSnapshot?.data);
     setSetupData(copied);
     setActiveSetupData(copied, nextCarId || prevCarId || null);
     setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
     // Session-specific text and laps are not copied — only structured fields + setup above.
     setNotes("");
-    setSuggestedChanges("");
     setLapIngest(defaultLapIngestValue());
     setLoadSetupSelection(r.id);
     setReplicateLast(true);
   }
 
   useEffect(() => {
+    tireRunUserTouchedRef.current = false;
+  }, [tireSetId]);
+
+  useEffect(() => {
     if (!tireSetId) return;
+    const id = tireSetId;
     let alive = true;
     jsonFetch<{ lastTireRunNumber: number | null }>(
-      `/api/runs/last-tire-run-number?tireSetId=${tireSetId}`
+      `/api/runs/last-tire-run-number?tireSetId=${encodeURIComponent(id)}`
     )
       .then(({ lastTireRunNumber }) => {
-        if (!alive) return;
+        if (!alive || tireSetIdRef.current !== id) return;
+        if (tireRunUserTouchedRef.current) return;
         setRunsCompleted(lastTireRunNumber ?? 0);
       })
       .catch(() => {
-        if (!alive) return;
+        if (!alive || tireSetIdRef.current !== id) return;
+        if (tireRunUserTouchedRef.current) return;
         setRunsCompleted(0);
       });
     return () => {
@@ -724,17 +758,24 @@ export function NewRunForm(props: {
   }, [tireSetId]);
 
   useEffect(() => {
+    batteryRunUserTouchedRef.current = false;
+  }, [batteryId]);
+
+  useEffect(() => {
     if (!batteryId) return;
+    const id = batteryId;
     let alive = true;
     jsonFetch<{ lastBatteryRunNumber: number | null }>(
-      `/api/runs/last-battery-run-number?batteryId=${batteryId}`
+      `/api/runs/last-battery-run-number?batteryId=${encodeURIComponent(id)}`
     )
       .then(({ lastBatteryRunNumber }) => {
-        if (!alive) return;
+        if (!alive || batteryIdRef.current !== id) return;
+        if (batteryRunUserTouchedRef.current) return;
         setBatteryRunsCompleted(lastBatteryRunNumber ?? 0);
       })
       .catch(() => {
-        if (!alive) return;
+        if (!alive || batteryIdRef.current !== id) return;
+        if (batteryRunUserTouchedRef.current) return;
         setBatteryRunsCompleted(0);
       });
     return () => {
@@ -847,6 +888,7 @@ export function NewRunForm(props: {
       const { tireSet } = await Promise.race([runCreate(), timeout]);
       setTireSets((prev) => [tireSet, ...prev]);
       setTireSetId(tireSet.id);
+      tireRunUserTouchedRef.current = true;
       setRunsCompleted(initialRunCount);
       setNewTireLabel("");
       setNewTireSetNumber(1);
@@ -907,6 +949,7 @@ export function NewRunForm(props: {
       const { battery } = await Promise.race([runCreate(), timeout]);
       setBatteries((prev) => [battery, ...prev]);
       setBatteryId(battery.id);
+      batteryRunUserTouchedRef.current = true;
       setBatteryRunsCompleted(initialRunCount);
       setNewBatteryLabel("");
       setNewBatteryPackNumber(1);
@@ -1038,7 +1081,7 @@ export function NewRunForm(props: {
           tireRunNumber: Math.max(1, runsCompleted + 1),
           batteryId: batteryId || null,
           batteryRunNumber: Math.max(1, batteryRunsCompleted + 1),
-          setupData,
+          setupData: applyDerivedFieldsToSnapshot(setupData),
           setupBaselineSnapshotId,
           sourceSetupDocumentId:
             setupSource === "other" && loadOtherSetupSelection ? loadOtherSetupSelection : null,
@@ -1684,7 +1727,7 @@ export function NewRunForm(props: {
                   </div>
                 </div>
                 <div className="space-y-1 text-sm">
-                  <div className="ui-title text-sm text-muted-foreground">How many runs have these tires done?</div>
+                  <div className="ui-title text-sm text-muted-foreground">Prior runs on this set (before first log)</div>
                   <input
                     type="number"
                     min={0}
@@ -1694,15 +1737,15 @@ export function NewRunForm(props: {
                     onChange={(e) =>
                       setNewTireInitialRunCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))
                     }
-                    aria-label="How many runs have these tires done"
+                    aria-label="Prior runs on this tire set before first log"
                   />
                   <div className="text-[11px] text-muted-foreground">
+                    First log on this set will be <span className="font-medium text-foreground">tire run #{newTireInitialRunCount + 1}</span>
                     {newTireInitialRunCount === 0
-                      ? "0 runs on this set before this log."
+                      ? " (no prior runs)."
                       : newTireInitialRunCount === 1
-                        ? "1 run on this set before this log."
-                        : `${newTireInitialRunCount} runs on this set before this log.`}{" "}
-                    Your next save will be run #{newTireInitialRunCount + 1}.
+                        ? " (1 prior run)."
+                        : ` (${newTireInitialRunCount} prior runs).`}
                   </div>
                 </div>
                 <button
@@ -1721,19 +1764,27 @@ export function NewRunForm(props: {
 
             {!showNewTireSetPanel && tireSetId ? (
               <div className="space-y-1 text-sm">
-                <div className="ui-title text-sm text-muted-foreground">How many runs have these tires done?</div>
+                <div className="ui-title text-sm text-muted-foreground">Prior runs on this set (before this log)</div>
                 <input
                   type="number"
                   min={0}
                   className="w-full max-w-md rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   inputMode="numeric"
                   value={runsCompleted}
-                  onChange={(e) => setRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                  aria-label="Runs completed on this tire set"
+                  onChange={(e) => {
+                    tireRunUserTouchedRef.current = true;
+                    setRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)));
+                  }}
+                  aria-label="Prior runs on this tire set before this log"
                 />
                 <div className="text-[11px] text-muted-foreground">
-                  {runsCompleted === 0 ? "0 runs" : runsCompleted === 1 ? "1 run" : `${runsCompleted} runs`}{" "}
-                  completed on this set. This run will be run #{runsCompleted + 1}.
+                  This log saves as{" "}
+                  <span className="font-medium text-foreground">tire run #{runsCompleted + 1}</span>
+                  {runsCompleted === 0
+                    ? " (first run on this set)."
+                    : runsCompleted === 1
+                      ? " (after 1 prior run on this set)."
+                      : ` (after ${runsCompleted} prior runs on this set).`}
                 </div>
               </div>
             ) : null}
@@ -1798,7 +1849,7 @@ export function NewRunForm(props: {
                   />
                 </div>
                 <div className="space-y-1 text-sm">
-                  <div className="ui-title text-sm text-muted-foreground">How many runs has this pack done?</div>
+                  <div className="ui-title text-sm text-muted-foreground">Prior runs on this pack (before first log)</div>
                   <input
                     type="number"
                     min={0}
@@ -1808,8 +1859,12 @@ export function NewRunForm(props: {
                     onChange={(e) =>
                       setNewBatteryInitialRunCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))
                     }
-                    aria-label="Runs before this log"
+                    aria-label="Prior runs on this battery pack before first log"
                   />
+                  <div className="text-[11px] text-muted-foreground">
+                    First log on this pack will be{" "}
+                    <span className="font-medium text-foreground">battery run #{newBatteryInitialRunCount + 1}</span>.
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -1827,25 +1882,27 @@ export function NewRunForm(props: {
 
             {!showNewBatteryPanel && batteryId ? (
               <div className="space-y-1 text-sm">
-                <div className="ui-title text-sm text-muted-foreground">How many runs has this pack done?</div>
+                <div className="ui-title text-sm text-muted-foreground">Prior runs on this pack (before this log)</div>
                 <input
                   type="number"
                   min={0}
                   className="w-full max-w-md rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   inputMode="numeric"
                   value={batteryRunsCompleted}
-                  onChange={(e) =>
-                    setBatteryRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                  }
-                  aria-label="Runs completed on this battery pack"
+                  onChange={(e) => {
+                    batteryRunUserTouchedRef.current = true;
+                    setBatteryRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)));
+                  }}
+                  aria-label="Prior runs on this battery pack before this log"
                 />
                 <div className="text-[11px] text-muted-foreground">
+                  This log saves as{" "}
+                  <span className="font-medium text-foreground">battery run #{batteryRunsCompleted + 1}</span>
                   {batteryRunsCompleted === 0
-                    ? "0 runs"
+                    ? " (first run on this pack)."
                     : batteryRunsCompleted === 1
-                      ? "1 run"
-                      : `${batteryRunsCompleted} runs`}{" "}
-                  completed on this pack. This run will be run #{batteryRunsCompleted + 1}.
+                      ? " (after 1 prior run on this pack)."
+                      : ` (after ${batteryRunsCompleted} prior runs on this pack).`}
                 </div>
               </div>
             ) : null}
@@ -2059,7 +2116,7 @@ export function NewRunForm(props: {
             </div>
             <SetupSheetView
               value={setupData}
-              onChange={setSetupData}
+              onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
               template={setupTemplate}
               enableFieldSearch
             />

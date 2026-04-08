@@ -22,7 +22,23 @@ export async function syncActionItemsFromRun(params: {
   suggestedChanges: string | null | undefined;
 }): Promise<void> {
   const lines = parseThingsToTryLines(params.suggestedChanges ?? null);
-  if (lines.length === 0) return;
+  const wantedKeys = lines.map((t) => normalizeActionItemKey(t)).filter(Boolean);
+
+  if (wantedKeys.length === 0) {
+    await prisma.actionItem.updateMany({
+      where: { userId: params.userId, isArchived: false },
+      data: { isArchived: true },
+    });
+  } else {
+    await prisma.actionItem.updateMany({
+      where: {
+        userId: params.userId,
+        isArchived: false,
+        NOT: { normKey: { in: wantedKeys } },
+      },
+      data: { isArchived: true },
+    });
+  }
 
   for (const text of lines) {
     const normKey = normalizeActionItemKey(text);

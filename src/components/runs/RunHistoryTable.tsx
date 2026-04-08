@@ -6,6 +6,7 @@ import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
+import { compareSetupField } from "@/lib/setupCompare/compare";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatLapSourceSummary, tryReadLapSourceUrl } from "@/lib/lapSession/display";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
@@ -99,6 +100,11 @@ function LapStatChip({ label, value, title }: { label: string; value: string; ti
 const analyseActionButtonClass =
   "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition";
 
+function setupFieldLabel(key: string): string {
+  const f = DEFAULT_SETUP_FIELDS.find((d) => d.key === key);
+  return f ? f.label + (f.unit ? ` (${f.unit})` : "") : key.replace(/_/g, " ");
+}
+
 function setupRows(data: unknown): { label: string; value: string }[] {
   const obj = normalizeSetupData(data);
   const seen = new Set<string>();
@@ -114,6 +120,33 @@ function setupRows(data: unknown): { label: string; value: string }[] {
     const v = obj[key];
     if (v == null || String(v).trim() === "") continue;
     rows.push({ label: key.replace(/_/g, " "), value: String(v) });
+  }
+  return rows;
+}
+
+/** Inline analysis preview: only fields that differ from the previous run on the same car (compare semantics). */
+function setupChangedRowsSincePrevious(current: unknown, previous: unknown): {
+  label: string;
+  value: string;
+  previousValue: string;
+}[] {
+  const cur = normalizeSetupData(current);
+  const prev = normalizeSetupData(previous);
+  const keys = new Set([...Object.keys(cur), ...Object.keys(prev)]);
+  const rows: { label: string; value: string; previousValue: string }[] = [];
+  for (const key of [...keys].sort()) {
+    const cmp = compareSetupField({
+      key,
+      a: cur[key],
+      b: prev[key],
+      numericAggregationByKey: null,
+    });
+    if (cmp.areEqual) continue;
+    rows.push({
+      label: setupFieldLabel(key),
+      value: cmp.normalizedA,
+      previousValue: cmp.normalizedB,
+    });
   }
   return rows;
 }
@@ -229,7 +262,21 @@ function RunDetail({
             }[run.meetingSessionType] ?? run.meetingSessionType
           : "—"
       : "—";
-  const setupList = setupRows(run.setupSnapshot?.data);
+  const previousRunOnCar = useMemo(() => {
+    if (!run.carId) return null;
+    const idx = pickerRunsSameCar.findIndex((r) => r.id === run.id);
+    if (idx < 0 || idx >= pickerRunsSameCar.length - 1) return null;
+    return pickerRunsSameCar[idx + 1] ?? null;
+  }, [pickerRunsSameCar, run.id, run.carId]);
+
+  const setupPreview = useMemo(() => {
+    const prevData = previousRunOnCar?.setupSnapshot?.data;
+    if (!run.carId || !prevData) {
+      return { mode: "no_baseline" as const, rows: [] as ReturnType<typeof setupRows> };
+    }
+    const changed = setupChangedRowsSincePrevious(run.setupSnapshot?.data, prevData);
+    return { mode: "diff" as const, rows: changed };
+  }, [run.setupSnapshot?.data, previousRunOnCar]);
   const ownRows = primaryLapRowsFromRun(run);
   const lapDash = getIncludedLapDashboardMetrics(ownRows);
   const sourceUrl = tryReadLapSourceUrl(run.lapSession);
@@ -407,14 +454,28 @@ function RunDetail({
             Analyse setup
           </button>
         </div>
-        {setupList.length === 0 ? (
-          <p className="text-muted-foreground text-xs">No setup parameters recorded for this run.</p>
+        <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Setup vs previous run</div>
+        {setupPreview.mode === "no_baseline" ? (
+          <p className="text-muted-foreground text-xs">
+            No earlier run on this car to diff against. Open <span className="font-medium text-foreground">Analyse setup</span> for the
+            full sheet.
+          </p>
+        ) : setupPreview.rows.length === 0 ? (
+          <p className="text-muted-foreground text-xs">No setup changes since your previous run on this car.</p>
         ) : (
           <div className="rounded-md border border-border bg-muted/70 divide-y divide-border max-h-48 overflow-y-auto">
-            {setupList.map((row) => (
-              <div key={row.label} className="px-3 py-2 flex flex-wrap justify-between gap-2 text-xs">
-                <span className="text-muted-foreground">{row.label}</span>
-                <span className="font-mono">{row.value}</span>
+            {setupPreview.rows.map((row) => (
+              <div
+                key={`${row.label}:${row.value}:${row.previousValue}`}
+                className="px-3 py-2 flex flex-col gap-0.5 text-xs sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"
+              >
+                <span className="text-muted-foreground shrink-0">{row.label}</span>
+                <div className="min-w-0 text-right sm:text-left">
+                  <span className="font-mono text-foreground">{row.value}</span>
+                  <span className="block text-[10px] text-muted-foreground sm:inline sm:ml-2">
+                    was {row.previousValue}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
