@@ -13,7 +13,7 @@ import {
 } from "@/lib/setup/resolveSetupSnapshot";
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
-import { linkImportedSessionToRun } from "@/lib/lapImport/service";
+import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -70,8 +70,8 @@ export async function POST(request: Request) {
         isPrimaryUser?: boolean;
         laps?: number[] | Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
       }>;
-      /** Optional: link persisted ImportedLapTimeSession from URL import to this run. */
-      importedLapTimeSessionId?: string | null;
+      /** Optional: link persisted ImportedLapTimeSession rows from URL import(s) to this run. */
+      importedLapTimeSessionIds?: string[];
     };
 
     const carId = body.carId;
@@ -315,14 +315,13 @@ export async function POST(request: Request) {
       suggestedChanges: body.suggestedChanges?.trim() || null,
     });
 
-    const lapImportId =
-      typeof body.importedLapTimeSessionId === "string" && body.importedLapTimeSessionId.trim()
-        ? body.importedLapTimeSessionId.trim()
-        : null;
-    if (lapImportId) {
-      await linkImportedSessionToRun({
+    const lapImportIds = Array.isArray(body.importedLapTimeSessionIds)
+      ? body.importedLapTimeSessionIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+      : [];
+    if (lapImportIds.length > 0) {
+      await linkImportedSessionsToRun({
         userId: user.id,
-        importedLapTimeSessionId: lapImportId,
+        importedLapTimeSessionIds: lapImportIds,
         runId: run.id,
       });
     }

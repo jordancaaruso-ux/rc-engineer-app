@@ -49,6 +49,8 @@ export type ImportOneUrlSuccess = {
   url: string;
   success: true;
   importedSessionId: string;
+  /** When this import row was stored (use for session labels until parsed session time exists). */
+  recordedAt: string;
   parserId: string;
   laps: number[];
   lapRows: LapUrlParseResult["lapRows"];
@@ -99,13 +101,14 @@ export async function importOneTimingUrl(userId: string, url: string): Promise<I
       sourceType: inferSourceType(normalized),
       parsedPayload: serializeParsePayload(parsed) as Prisma.InputJsonValue,
     },
-    select: { id: true },
+    select: { id: true, createdAt: true },
   });
 
   return {
     url: normalized,
     success: true,
     importedSessionId: row.id,
+    recordedAt: row.createdAt.toISOString(),
     parserId: parsed.parserId,
     laps: parsed.laps,
     lapRows: parsed.lapRows,
@@ -133,4 +136,19 @@ export async function linkImportedSessionToRun(params: {
     data: { linkedRunId: params.runId },
   });
   return true;
+}
+
+export async function linkImportedSessionsToRun(params: {
+  userId: string;
+  importedLapTimeSessionIds: string[];
+  runId: string;
+}): Promise<void> {
+  const ids = [...new Set(params.importedLapTimeSessionIds.map((id) => id.trim()).filter(Boolean))];
+  for (const id of ids) {
+    await linkImportedSessionToRun({
+      userId: params.userId,
+      importedLapTimeSessionId: id,
+      runId: params.runId,
+    });
+  }
 }

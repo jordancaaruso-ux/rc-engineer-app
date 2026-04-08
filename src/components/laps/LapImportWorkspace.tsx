@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { formatDriverSessionLabel } from "@/lib/lapImport/labels";
 
 type SessionRow = {
   id: string;
@@ -12,6 +14,7 @@ type SessionRow = {
   sourceType: string;
   linkedRunId: string | null;
   linkedEventId: string | null;
+  parsedPayload?: unknown;
 };
 
 type ImportResultRow =
@@ -186,10 +189,14 @@ export function LapImportWorkspace() {
                 onClick={() => void expandSession(s.id)}
                 className="flex w-full flex-col gap-0.5 px-2.5 py-2 text-left text-[11px] hover:bg-muted/60"
               >
-                <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
-                  {new Date(s.createdAt).toLocaleString()}
+                <span className="text-xs font-medium text-foreground">
+                  {(() => {
+                    const p = primaryLapRowsFromImportedPayload(s.parsedPayload);
+                    const name = p?.driverName ?? "Session";
+                    return formatDriverSessionLabel(name, s.createdAt);
+                  })()}
                 </span>
-                <span className="break-all text-foreground">{s.sourceUrl}</span>
+                <span className="break-all text-[11px] text-muted-foreground">{s.sourceUrl}</span>
                 <span className="text-[10px] text-muted-foreground">
                   {s.parserId} · {s.sourceType}
                   {s.linkedRunId ? ` · linked run` : ""}

@@ -21,6 +21,7 @@ export async function GET() {
       sourceType: true,
       linkedRunId: true,
       linkedEventId: true,
+      parsedPayload: true,
     },
   });
 

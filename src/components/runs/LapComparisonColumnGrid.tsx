@@ -19,6 +19,7 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { formatCompareRunMetaLine } from "@/lib/runCompareMeta";
+import { formatDriverSessionLabel } from "@/lib/lapImport/labels";
 
 type ImportedSet = {
   id: string;
@@ -138,6 +139,7 @@ export function LapComparisonColumnGrid({
   compareAnchorRun,
   pickerRunsForModal = [],
   runListSource = "my_runs",
+  librarySessions = [],
 }: {
   myDisplayName?: string | null;
   run: {
@@ -154,6 +156,8 @@ export function LapComparisonColumnGrid({
   /** All runs for setup modal picker (e.g. full history list). */
   pickerRunsForModal?: CompareRunShape[];
   runListSource?: RunCompareListSource;
+  /** User-owned imported lap-time library (any session from /laps/import or Log your run). */
+  librarySessions?: Array<{ id: string; selectLabel: string; laps: LapRow[] }>;
 }) {
   const primaryRunLabel = myDisplayName?.trim() || "Me";
 
@@ -184,10 +188,14 @@ export function LapComparisonColumnGrid({
       "run",
       primaryLaps
     );
+    const meWhen =
+      typeof compareAnchorRun.createdAt === "string"
+        ? compareAnchorRun.createdAt
+        : compareAnchorRun.createdAt.toISOString();
     metaById.set(primarySeries.id, {
       metaLine: formatCompareRunMetaLine(compareAnchorRun),
       setupRun: compareAnchorRun,
-      selectLabel: "Me — this run",
+      selectLabel: formatDriverSessionLabel(primaryRunLabel, meWhen),
     });
 
     const rawImported: ComparisonSeries[] = [];
@@ -199,7 +207,7 @@ export function LapComparisonColumnGrid({
       metaById.set(ser.id, {
         metaLine: null,
         setupRun: null,
-        selectLabel: label,
+        selectLabel: formatDriverSessionLabel(label, meWhen),
       });
     }
 
@@ -216,14 +224,38 @@ export function LapComparisonColumnGrid({
       );
       rawHistory.push(ser);
       const metaLine = formatCompareRunMetaLine(r);
+      const carName = r.car?.name?.trim() || r.carNameSnapshot?.trim() || primaryRunLabel;
+      const when =
+        typeof r.createdAt === "string" ? r.createdAt : r.createdAt.toISOString();
       metaById.set(ser.id, {
         metaLine,
         setupRun: r,
-        selectLabel: `Me — ${metaLine}`,
+        selectLabel: formatDriverSessionLabel(carName, when),
       });
     }
 
-    const dedupedOthers = filterDuplicateImportedSeries(primarySeries, [...rawImported, ...rawHistory]);
+    const rawLibrary: ComparisonSeries[] = [];
+    for (const lib of librarySessions) {
+      if (!lib.laps?.length) continue;
+      const ser = buildComparisonSeries(
+        `library:${lib.id}`,
+        lib.selectLabel,
+        "imported",
+        lib.laps
+      );
+      rawLibrary.push(ser);
+      metaById.set(ser.id, {
+        metaLine: "Imported lap-time library",
+        setupRun: null,
+        selectLabel: lib.selectLabel,
+      });
+    }
+
+    const dedupedOthers = filterDuplicateImportedSeries(primarySeries, [
+      ...rawImported,
+      ...rawLibrary,
+      ...rawHistory,
+    ]);
     const list = [primarySeries, ...dedupedOthers];
     return { seriesList: list, metaById };
   }, [
@@ -234,6 +266,7 @@ export function LapComparisonColumnGrid({
     compareAnchorRun,
     primaryLaps,
     selectedHistoryRunIds,
+    librarySessions,
   ]);
 
   useEffect(() => {
@@ -330,7 +363,7 @@ export function LapComparisonColumnGrid({
           </select>
         </div>
         <div className="space-y-1 min-w-[200px]">
-          <span className="text-sm font-medium text-muted-foreground block">Compare (imported drivers)</span>
+          <span className="text-sm font-medium text-muted-foreground block">Compare (this run + library)</span>
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             {seriesList
               .filter((s) => s.id !== targetId && s.sourceType === "imported")
@@ -354,7 +387,7 @@ export function LapComparisonColumnGrid({
                 );
               })}
             {importedSeriesIds.filter((id) => id !== targetId).length === 0 ? (
-              <span className="text-[11px] text-muted-foreground">No imported lap sets on this run.</span>
+              <span className="text-[11px] text-muted-foreground">No extra imported/lap-library columns.</span>
             ) : null}
           </div>
         </div>

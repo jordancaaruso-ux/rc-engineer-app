@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
@@ -21,6 +21,9 @@ import {
 import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { AnalysisActiveThingsToTry } from "@/components/runs/AnalysisActiveThingsToTry";
+import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { formatDriverSessionLabel } from "@/lib/lapImport/labels";
+import type { LapRow } from "@/lib/lapAnalysis";
 
 type Run = {
   id: string;
@@ -241,6 +244,36 @@ function RunDetail({
 }) {
   const [setupOpen, setSetupOpen] = React.useState(false);
   const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
+  const [libraryLapSessions, setLibraryLapSessions] = useState<
+    Array<{ id: string; selectLabel: string; laps: LapRow[] }>
+  >([]);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/lap-time-sessions", { cache: "no-store" })
+      .then((r) => r.json().catch(() => null))
+      .then((data: { sessions?: Array<{ id: string; createdAt: string; parsedPayload: unknown }> } | null) => {
+        if (!alive || !data?.sessions) return;
+        const mapped: Array<{ id: string; selectLabel: string; laps: LapRow[] }> = [];
+        for (const s of data.sessions) {
+          const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
+          if (!parsed) continue;
+          mapped.push({
+            id: s.id,
+            selectLabel: formatDriverSessionLabel(parsed.driverName, s.createdAt),
+            laps: parsed.rows,
+          });
+        }
+        setLibraryLapSessions(mapped);
+      })
+      .catch(() => {
+        if (alive) setLibraryLapSessions([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   /** Compare / load-setup pickers only offer runs for this vehicle. */
   const pickerRunsSameCar = useMemo(() => {
     if (!run.carId) return pickerRuns;
@@ -429,6 +462,7 @@ function RunDetail({
               compareAnchorRun={toCompareRunShape(run)}
               pickerRunsForModal={pickerRunsSameCar}
               runListSource={runListSource}
+              librarySessions={libraryLapSessions}
             />
           </div>
         ) : null}

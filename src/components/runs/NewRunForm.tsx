@@ -1012,29 +1012,8 @@ export function NewRunForm(props: {
     laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
   }> {
     if (current.sourceKind !== "url") return [];
-    const sessionDrivers = current.sessionDrivers ?? [];
-    if (sessionDrivers.length === 0) return [];
-
-    const sourceUrl = current.sourceDetail ?? null;
-    const selected = new Set(current.selectedDriverIds ?? []);
-    const selectedOrdered = sessionDrivers.filter((d) => selected.has(d.driverId));
-    const primary = selectedOrdered[0] ?? null;
-
-    function structuredLapsForDriver(d: (typeof sessionDrivers)[number]) {
-      const rows = current.driverLapRowsByDriverId?.[d.driverId];
-      if (rows && rows.length > 0) {
-        return rows.map((r) => ({
-          lapNumber: r.lapNumber,
-          lapTimeSeconds: r.lapTimeSeconds,
-          isIncluded: r.isIncluded,
-        }));
-      }
-      return d.laps.map((t, i) => ({
-        lapNumber: i + 1,
-        lapTimeSeconds: t,
-        isIncluded: true,
-      }));
-    }
+    const blocks = current.urlImportBlocks ?? [];
+    if (blocks.length === 0) return [];
 
     const out: Array<{
       sourceUrl: string | null;
@@ -1045,28 +1024,54 @@ export function NewRunForm(props: {
       laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
     }> = [];
 
-    if (primary && primary.laps.length > 0) {
-      out.push({
-        sourceUrl,
-        driverId: primary.driverId,
-        driverName: primary.driverName,
-        normalizedName: primary.normalizedName,
-        isPrimaryUser: true,
-        laps: structuredLapsForDriver(primary),
-      });
-    }
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const block = blocks[bi]!;
+      const sessionDrivers = block.sessionDrivers ?? [];
+      if (sessionDrivers.length === 0) continue;
+      const sourceUrl = block.sourceUrl ?? null;
+      const selected = new Set(block.selectedDriverIds ?? []);
+      const selectedOrdered = sessionDrivers.filter((d) => selected.has(d.driverId));
+      const primary = selectedOrdered[0] ?? null;
 
-    for (const d of selectedOrdered) {
-      if (primary && d.driverId === primary.driverId) continue;
-      if (d.laps.length === 0) continue;
-      out.push({
-        sourceUrl,
-        driverId: d.driverId,
-        driverName: d.driverName,
-        normalizedName: d.normalizedName,
-        isPrimaryUser: false,
-        laps: structuredLapsForDriver(d),
-      });
+      function structuredLapsForDriver(d: (typeof sessionDrivers)[number]) {
+        const rows = block.driverLapRowsByDriverId?.[d.driverId];
+        if (rows && rows.length > 0) {
+          return rows.map((r) => ({
+            lapNumber: r.lapNumber,
+            lapTimeSeconds: r.lapTimeSeconds,
+            isIncluded: r.isIncluded,
+          }));
+        }
+        return d.laps.map((t, i) => ({
+          lapNumber: i + 1,
+          lapTimeSeconds: t,
+          isIncluded: true,
+        }));
+      }
+
+      if (primary && primary.laps.length > 0) {
+        out.push({
+          sourceUrl,
+          driverId: primary.driverId,
+          driverName: primary.driverName,
+          normalizedName: primary.normalizedName,
+          isPrimaryUser: bi === 0,
+          laps: structuredLapsForDriver(primary),
+        });
+      }
+
+      for (const d of selectedOrdered) {
+        if (primary && d.driverId === primary.driverId) continue;
+        if (d.laps.length === 0) continue;
+        out.push({
+          sourceUrl,
+          driverId: d.driverId,
+          driverName: d.driverName,
+          normalizedName: d.normalizedName,
+          isPrimaryUser: false,
+          laps: structuredLapsForDriver(d),
+        });
+      }
     }
 
     return out;
@@ -1084,18 +1089,20 @@ export function NewRunForm(props: {
     try {
       let lapTimes: number[];
       if (lapIngest.sourceKind === "url") {
-        const sessionDrivers = lapIngest.sessionDrivers ?? [];
-        const selectedIds = lapIngest.selectedDriverIds ?? [];
+        const blocks = lapIngest.urlImportBlocks ?? [];
+        const firstBlock = blocks[0];
+        const sessionDrivers = firstBlock?.sessionDrivers ?? [];
+        const selectedIds = firstBlock?.selectedDriverIds ?? [];
         const selectedSet = new Set(selectedIds);
         const selectedOrdered = sessionDrivers.filter((d) => selectedSet.has(d.driverId));
         const primary = selectedOrdered[0] ?? null;
 
         if (!primary) {
-          setInlineError("Select at least one imported driver.");
+          setInlineError("Select at least one driver in your first imported session.");
           setSaving(false);
           return;
         }
-        const primaryRows = lapIngest.driverLapRowsByDriverId?.[primary.driverId];
+        const primaryRows = firstBlock?.driverLapRowsByDriverId?.[primary.driverId];
         lapTimes =
           primaryRows && primaryRows.length > 0
             ? primaryRows.map((r) => r.lapTimeSeconds)
@@ -1129,11 +1136,12 @@ export function NewRunForm(props: {
             parserId: lapIngest.parserId,
             perLap: (() => {
               if (lapIngest.sourceKind === "url") {
-                const sessionDrivers = lapIngest.sessionDrivers ?? [];
-                const selectedIds = lapIngest.selectedDriverIds ?? [];
+                const firstBlock = lapIngest.urlImportBlocks?.[0];
+                const sessionDrivers = firstBlock?.sessionDrivers ?? [];
+                const selectedIds = firstBlock?.selectedDriverIds ?? [];
                 const selectedOrdered = sessionDrivers.filter((d) => selectedIds.includes(d.driverId));
                 const primary = selectedOrdered[0] ?? null;
-                const primaryRows = primary ? lapIngest.driverLapRowsByDriverId?.[primary.driverId] : null;
+                const primaryRows = primary ? firstBlock?.driverLapRowsByDriverId?.[primary.driverId] : null;
                 if (primaryRows && primaryRows.length === lapTimes.length) {
                   return primaryRows.map((row, i) => ({
                     isOutlierWarning: lapIngest.urlLapRows?.[i]?.isOutlierWarning,
@@ -1164,10 +1172,10 @@ export function NewRunForm(props: {
           suggestedChanges: suggestedChanges.trim() || null,
           sessionLabel: null,
           importedLapSets,
-          importedLapTimeSessionId:
-            lapIngest.sourceKind === "url" && lapIngest.importedLapTimeSessionId
-              ? lapIngest.importedLapTimeSessionId
-              : null,
+          importedLapTimeSessionIds:
+            lapIngest.sourceKind === "url"
+              ? lapIngest.urlImportBlocks.map((b) => b.importedSessionId)
+              : [],
         })
       });
 
