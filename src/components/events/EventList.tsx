@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatEventDate } from "@/lib/formatDate";
@@ -19,7 +19,7 @@ type EventItem = {
 };
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, init);
+  const res = await fetch(input, { ...init, cache: "no-store" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error((data as { error?: string })?.error || `Request failed (${res.status})`);
@@ -107,7 +107,9 @@ export function EventList({
   tracks: TrackOption[];
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [events, setEvents] = useState<EventItem[]>(initialEvents);
+  const [trackOptions, setTrackOptions] = useState<TrackOption[]>(tracks);
   const [name, setName] = useState("");
   const [trackId, setTrackId] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -117,6 +119,35 @@ export function EventList({
   const [message, setMessage] = useState<string | null>(null);
 
   const { upcoming, past } = useMemo(() => splitEvents(events), [events]);
+
+  /** Same dataset as Log your run: user-scoped GET /api/tracks, refetched whenever user lands on Events (and on tab focus). */
+  useEffect(() => {
+    if (pathname !== "/events") return;
+    let alive = true;
+    jsonFetch<{ tracks: TrackOption[] }>("/api/tracks")
+      .then(({ tracks: list }) => {
+        if (!alive || !Array.isArray(list)) return;
+        setTrackOptions(list);
+      })
+      .catch(() => {
+        if (!alive) return;
+      });
+    return () => {
+      alive = false;
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname !== "/events") return;
+    function onVisibility() {
+      if (document.visibilityState !== "visible") return;
+      void jsonFetch<{ tracks: TrackOption[] }>("/api/tracks").then(({ tracks: list }) => {
+        if (Array.isArray(list)) setTrackOptions(list);
+      });
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [pathname]);
 
   const dateRangeInvalid = useMemo(
     () => isEndDateBeforeStartDateYmd(startDate, endDate),
@@ -194,7 +225,7 @@ export function EventList({
               required
             >
               <option value="">— Select track —</option>
-              {tracks.map((t) => (
+              {trackOptions.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                   {t.location ? ` (${t.location})` : ""}

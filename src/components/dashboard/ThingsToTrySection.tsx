@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
 
 export function ThingsToTrySection({ initialItems }: { initialItems: DashboardActionItemRow[] }) {
@@ -8,6 +8,30 @@ export function ThingsToTrySection({ initialItems }: { initialItems: DashboardAc
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/action-items")
+      .then((res) => res.json().catch(() => null))
+      .then((data: { items?: DashboardActionItemRow[] } | null) => {
+        if (!alive || !data?.items) return;
+        setItems(
+          data.items.map((i) => ({
+            id: i.id,
+            text: i.text,
+            sourceType: i.sourceType,
+            createdAt: typeof i.createdAt === "string" ? i.createdAt : String(i.createdAt),
+            sourceRunId: i.sourceRunId ?? null,
+          }))
+        );
+      })
+      .catch(() => {
+        if (!alive) return;
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   async function archive(id: string) {
     setError(null);

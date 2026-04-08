@@ -105,6 +105,7 @@ export async function POST(request: Request) {
     }
     revalidatePath("/tracks");
     revalidatePath("/runs/new");
+    revalidatePath("/events");
     return NextResponse.json({ track }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create track";

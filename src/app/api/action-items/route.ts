@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -66,6 +67,10 @@ export async function POST(request: Request) {
       sourceRunId: true,
     },
   });
+
+  revalidatePath("/");
+  revalidatePath("/runs/new");
+  revalidatePath("/engineer");
 
   return NextResponse.json({
     item: {

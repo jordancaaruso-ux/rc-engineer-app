@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -32,6 +33,10 @@ export async function PATCH(
   if (updated.count === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  revalidatePath("/");
+  revalidatePath("/runs/new");
+  revalidatePath("/engineer");
 
   return NextResponse.json({ ok: true });
 }

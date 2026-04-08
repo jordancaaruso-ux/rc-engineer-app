@@ -201,6 +201,8 @@ export function NewRunForm(props: {
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("car");
   const thingsTryRef = useRef<HTMLTextAreaElement>(null);
   const thingsTryCursorRef = useRef<number | null>(null);
+  /** True after user edits “Things to try”; avoids syncing (or wiping) on initial API hydrate. */
+  const thingsToTryDirtyRef = useRef(false);
 
   const [showNewTireSetPanel, setShowNewTireSetPanel] = useState(false);
   const [creatingTireSet, setCreatingTireSet] = useState(false);
@@ -352,9 +354,42 @@ export function NewRunForm(props: {
     };
   }, []);
 
+  /** Authoritative list for run + event track pickers (matches /events and DB; avoids stale RSC-only props). */
+  const tracksFingerprint = useMemo(() => tracks.map((t) => t.id).sort().join(","), [tracks]);
   useEffect(() => {
-    setTracksList(tracks);
-  }, [tracks]);
+    let alive = true;
+    jsonFetch<{ tracks: TrackOption[] }>("/api/tracks")
+      .then(({ tracks: list }) => {
+        if (!alive || !Array.isArray(list)) return;
+        setTracksList(list);
+      })
+      .catch(() => {
+        if (!alive) return;
+      });
+    return () => {
+      alive = false;
+    };
+  }, [tracksFingerprint]);
+
+  /** Persist bullets to ActionItem rows while typing (dashboard uses same table). */
+  useEffect(() => {
+    if (!thingsToTryDirtyRef.current) return;
+    const t = window.setTimeout(() => {
+      if (!thingsToTryDirtyRef.current) return;
+      void fetch("/api/action-items/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestedChanges }),
+      })
+        .then((res) => {
+          if (res.ok) thingsToTryDirtyRef.current = false;
+        })
+        .catch(() => {
+          /* keep dirty for retry on next edit */
+        });
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [suggestedChanges]);
 
   /** Past-run + downloaded setup lists scoped to the selected car. */
   useEffect(() => {
@@ -450,6 +485,7 @@ export function NewRunForm(props: {
   function handleThingsToTryKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey) return;
     if (e.nativeEvent.isComposing) return;
+    thingsToTryDirtyRef.current = true;
     e.preventDefault();
     const el = e.currentTarget;
     const start = el.selectionStart;
@@ -468,6 +504,7 @@ export function NewRunForm(props: {
   }
 
   function handleThingsToTryChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    thingsToTryDirtyRef.current = true;
     const raw = e.target.value;
     if (raw === "") {
       setSuggestedChanges("");

@@ -313,6 +313,8 @@ export async function POST(request: Request) {
     });
 
     revalidatePath("/runs/history");
+    revalidatePath("/");
+    revalidatePath("/engineer");
 
     return NextResponse.json({ run }, { status: 201 });
   } catch (err) {
