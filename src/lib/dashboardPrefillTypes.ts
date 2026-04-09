@@ -35,4 +35,14 @@ export type DashboardSerializedRun = {
 
 export type DashboardNewRunPrefill =
   | { mode: "first"; eventId: string; trackId: string | null }
-  | { mode: "continue"; run: DashboardSerializedRun };
+  | { mode: "continue"; run: DashboardSerializedRun }
+  | {
+      mode: "imported_lap_session";
+      importedLapTimeSession: {
+        id: string;
+        sourceUrl: string;
+        parserId: string;
+        sessionCompletedAtIso: string | null;
+        parsedPayload: unknown;
+      };
+    };

@@ -121,6 +121,32 @@ export async function getDashboardNewRunPrefill(
   userId: string,
   raw: Record<string, string | string[] | undefined>
 ): Promise<DashboardNewRunPrefill | null> {
+  const importedLapTimeSessionId =
+    typeof raw.importedLapTimeSessionId === "string" ? raw.importedLapTimeSessionId.trim() : "";
+  if (importedLapTimeSessionId) {
+    const sess = await prisma.importedLapTimeSession.findFirst({
+      where: { id: importedLapTimeSessionId, userId },
+      select: {
+        id: true,
+        sourceUrl: true,
+        parserId: true,
+        sessionCompletedAt: true,
+        parsedPayload: true,
+      },
+    });
+    if (!sess) return null;
+    return {
+      mode: "imported_lap_session",
+      importedLapTimeSession: {
+        id: sess.id,
+        sourceUrl: sess.sourceUrl,
+        parserId: sess.parserId,
+        sessionCompletedAtIso: sess.sessionCompletedAt ? sess.sessionCompletedAt.toISOString() : null,
+        parsedPayload: sess.parsedPayload,
+      },
+    };
+  }
+
   const from = typeof raw.fromDashboard === "string" ? raw.fromDashboard : undefined;
   const eventId = typeof raw.eventId === "string" ? raw.eventId : undefined;
   if (!from || !eventId) return null;

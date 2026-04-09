@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { DashboardWorkflowContext } from "@/components/dashboard/DashboardWorkflowContext";
+import { WatchedLapSourcesCard } from "@/components/dashboard/WatchedLapSourcesCard";
 
 function btnPrimary(className = "") {
   return `inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
@@ -114,6 +115,8 @@ export function DashboardHome({ model }: { model: DashboardHomeModel }) {
         </div>
 
         <DashboardWorkflowContext recentRun={recentRun} thingsToTry={thingsToTry} />
+
+        <WatchedLapSourcesCard />
 
         <div className="flex flex-wrap gap-1.5">
           <Link href="/engineer" className={btnGhost()}>

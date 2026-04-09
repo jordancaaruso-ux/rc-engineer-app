@@ -78,13 +78,17 @@ export type ImportOneUrlResult = ImportOneUrlSuccess | ImportOneUrlFailure;
 /**
  * Parse URL via shared registry, persist snapshot for the user. Single source of truth for stored imports.
  */
-export async function importOneTimingUrl(userId: string, url: string): Promise<ImportOneUrlResult> {
+export async function importOneTimingUrl(
+  userId: string,
+  url: string,
+  context?: { driverName?: string }
+): Promise<ImportOneUrlResult> {
   const v = validateTimingHttpUrl(url);
   if (!v.ok) {
     return { url: url.trim(), success: false, error: v.error };
   }
   const normalized = v.normalized;
-  const parsed = await parseTimingUrl(normalized);
+  const parsed = await parseTimingUrl(normalized, context?.driverName ? { driverName: context.driverName } : undefined);
   if (!isImportableParse(parsed)) {
     return {
       url: normalized,

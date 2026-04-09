@@ -19,6 +19,8 @@ import { formatRunListScanLine, formatRunPickerLineRelativeWhen } from "@/lib/ru
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { normalizeLapTimes } from "@/lib/runLaps";
+import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
 import {
   LapTimesIngestPanel,
   defaultLapIngestValue,
@@ -254,11 +256,60 @@ export function NewRunForm(props: {
 
   const dashboardPrefillAppliedRef = useRef(false);
   const editPrefillAppliedRef = useRef(false);
+  const importPrefillTouchedRef = useRef(false);
 
   useEffect(() => {
     const p = dashboardPrefill;
     if (!p || dashboardPrefillAppliedRef.current) return;
     dashboardPrefillAppliedRef.current = true;
+
+    if (p.mode === "imported_lap_session") {
+      const sess = p.importedLapTimeSession;
+      const parsed = primaryLapRowsFromImportedPayload(sess.parsedPayload);
+      if (parsed) {
+        const laps = parsed.rows.map((r) => r.lapTimeSeconds);
+        const whenIso = resolveImportedSessionLabelTimeIso(
+          sess.sessionCompletedAtIso ?? null,
+          sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload),
+          new Date().toISOString()
+        );
+        setLapIngest({
+          ...defaultLapIngestValue(),
+          manualText: laps.map((n) => n.toFixed(3)).join("\n"),
+          sourceKind: "url",
+          sourceDetail: sess.sourceUrl,
+          parserId: sess.parserId,
+          urlLapRows: null,
+          urlImportBlocks: [
+            {
+              blockId: crypto.randomUUID(),
+              importedSessionId: sess.id,
+              sourceUrl: sess.sourceUrl,
+              parserId: sess.parserId,
+              recordedAt: new Date().toISOString(),
+              sessionCompletedAtIso: whenIso,
+              sessionDrivers: [
+                {
+                  id: "prefill",
+                  driverId: "prefill",
+                  driverName: parsed.driverName,
+                  normalizedName: parsed.driverName.toLowerCase(),
+                  laps,
+                  lapCount: laps.length,
+                },
+              ],
+              selectedDriverIds: ["prefill"],
+              driverLapRowsByDriverId: {
+                prefill: parsed.rows,
+              },
+              urlLapRows: null,
+            },
+          ],
+        });
+        setSetupSectionExpanded(true);
+      }
+      return;
+    }
 
     if (p.mode === "first") {
       setSessionType("RACE_MEETING");
@@ -303,6 +354,29 @@ export function NewRunForm(props: {
     setLapIngest(defaultLapIngestValue());
     setReplicateLast(false);
   }, [dashboardPrefill, cars]);
+
+  /** For imported lap prefills: suggest tire/battery from last run on this car once a car is selected (unless user overrides). */
+  useEffect(() => {
+    const p = dashboardPrefill;
+    if (!p || p.mode !== "imported_lap_session") return;
+    if (!carId) return;
+    if (importPrefillTouchedRef.current) return;
+    // only set when user has not manually picked tires/battery yet
+    if (tireSetIdRef.current || batteryIdRef.current) return;
+    let alive = true;
+    jsonFetch<{ lastRun: LastRun | null }>(`/api/runs/last?carId=${encodeURIComponent(carId)}`)
+      .then(({ lastRun }) => {
+        if (!alive || !lastRun) return;
+        if (importPrefillTouchedRef.current) return;
+        if (lastRun.tireSetId) setTireSetId(lastRun.tireSetId);
+        if (lastRun.batteryId) setBatteryId(lastRun.batteryId);
+      })
+      .catch(() => {})
+      .finally(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [dashboardPrefill, carId]);
 
   useEffect(() => {
     const r = editRun;
@@ -1874,6 +1948,7 @@ export function NewRunForm(props: {
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={tireSetId}
                 onChange={(e) => {
+                  importPrefillTouchedRef.current = true;
                   setTireSetId(e.target.value);
                   setCopyTireWarning(null);
                 }}
@@ -2004,6 +2079,7 @@ export function NewRunForm(props: {
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={batteryId}
                 onChange={(e) => {
+                  importPrefillTouchedRef.current = true;
                   setBatteryId(e.target.value);
                   setCopyBatteryWarning(null);
                 }}

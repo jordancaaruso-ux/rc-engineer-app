@@ -32,6 +32,7 @@ model User {
   setupCalibrations SetupSheetCalibration[]
   setupImportBatches SetupImportBatch[]
   importedLapTimeSessions ImportedLapTimeSession[]
+  watchedLapSources WatchedLapSource[]
 }
 
 enum ActionItemSourceType {
@@ -455,6 +456,30 @@ model ImportedLapTimeSession {
   linkedEventId String?
 
   @@index([userId, createdAt])
+  @@index([userId, sourceUrl])
+}
+
+model WatchedLapSource {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /** Timing/result URL to check (practice view_session or race view_race_result). */
+  sourceUrl String
+  /** Optional: LiveRC race result requires a driver name to pick lap series. */
+  driverName String?
+  /** Optional: choose a car for prefill suggestions when logging. */
+  carId String?
+
+  /** Last time we checked this source (audit only). */
+  lastCheckedAt DateTime?
+  /** Last observed session completion time (UTC) to detect new sessions. */
+  lastSeenSessionCompletedAt DateTime?
+
+  @@index([userId, updatedAt])
   @@index([userId, sourceUrl])
 }
 
