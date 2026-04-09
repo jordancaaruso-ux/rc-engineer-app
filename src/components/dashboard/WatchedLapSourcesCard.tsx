@@ -72,12 +72,17 @@ export function WatchedLapSourcesCard() {
       const res = await fetch("/api/lap-watch/sources", { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setLoadErr((data as { error?: string })?.error ?? "Could not load watched sources.");
+        const apiErr =
+          (data as { error?: string; code?: string; detail?: string })?.error ??
+          `Failed to load watched sources (HTTP ${res.status}).`;
+        const detail = (data as { detail?: string })?.detail;
+        setLoadErr(detail ? `${apiErr} (${detail})` : apiErr);
         return;
       }
       setSources(Array.isArray((data as { sources?: unknown }).sources) ? ((data as { sources: SourceRow[] }).sources as SourceRow[]) : []);
-    } catch {
-      setLoadErr("Could not load watched sources.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Request failed";
+      setLoadErr(`Failed to load watched sources (${msg}).`);
     }
   }
 
