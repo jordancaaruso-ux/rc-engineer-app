@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
+import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
@@ -142,6 +142,8 @@ export function NewRunForm(props: {
   favouriteTrackIds?: string[];
   favouriteTracks?: TrackOption[];
   dashboardPrefill?: DashboardNewRunPrefill | null;
+  /** When set, the form edits an existing run (owner-only enforced by server update route). */
+  editRun?: LastRun | null;
 }) {
   const router = useRouter();
   const cars = props.cars;
@@ -197,6 +199,12 @@ export function NewRunForm(props: {
   const [lapIngest, setLapIngest] = useState<LapIngestFormValue>(() => defaultLapIngestValue());
   const [notes, setNotes] = useState("");
   const [suggestedChanges, setSuggestedChanges] = useState("");
+  const [setupChangesText, setSetupChangesText] = useState("");
+  const [setupChangesBusy, setSetupChangesBusy] = useState(false);
+  const [setupChangesError, setSetupChangesError] = useState<string | null>(null);
+  const [setupChangesProposal, setSetupChangesProposal] = useState<
+    Array<{ fieldKey: string; fieldLabel: string; fromValue: string; toValue: string; confidence: "low" | "medium" | "high"; note?: string | null }>
+  >([]);
   const [notesSubTab, setNotesSubTab] = useState<"notes" | "things">("notes");
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("car");
   const thingsTryRef = useRef<HTMLTextAreaElement>(null);
@@ -241,8 +249,11 @@ export function NewRunForm(props: {
   const batteryRunUserTouchedRef = useRef(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
+  const editRun = props.editRun ?? null;
+  const isEditing = Boolean(editRun?.id);
 
   const dashboardPrefillAppliedRef = useRef(false);
+  const editPrefillAppliedRef = useRef(false);
 
   useEffect(() => {
     const p = dashboardPrefill;
@@ -292,6 +303,61 @@ export function NewRunForm(props: {
     setLapIngest(defaultLapIngestValue());
     setReplicateLast(false);
   }, [dashboardPrefill, cars]);
+
+  useEffect(() => {
+    const r = editRun;
+    if (!r || editPrefillAppliedRef.current) return;
+    editPrefillAppliedRef.current = true;
+
+    const nextCarId = (r.carId || r.car?.id || "").toString();
+    if (nextCarId && cars.some((c) => c.id === nextCarId)) {
+      setCarId(nextCarId);
+    }
+    setTrackId(r.trackId ?? "");
+
+    if (r.sessionType === "RACE_MEETING" || r.sessionType === "PRACTICE") {
+      setSessionType("RACE_MEETING");
+      const sub = r.meetingSessionType as MeetingSessionType | undefined;
+      if (sub === "SEEDING" || sub === "QUALIFYING" || sub === "RACE" || sub === "OTHER") {
+        setMeetingSessionType(sub);
+      } else {
+        setMeetingSessionType("PRACTICE");
+      }
+      setMeetingSessionCustom(sub === "OTHER" ? (r.meetingSessionCode?.trim() ?? "") : "");
+    } else {
+      setSessionType("TESTING");
+      setMeetingSessionCustom("");
+    }
+
+    setEventId(r.eventId ?? "");
+    setTireSetId(r.tireSetId ?? "");
+    setRunsCompleted(r.tireRunNumber ?? 0);
+    setBatteryId(r.batteryId ?? "");
+    setBatteryRunsCompleted(r.batteryRunNumber ?? 0);
+
+    const nextSetup = setupSnapshotWithDerived(r.setupSnapshot?.data);
+    setSetupData(nextSetup);
+    setActiveSetupData(nextSetup, nextCarId || carId || null);
+    setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
+
+    setNotes((r.notes ?? "").trim());
+    setSuggestedChanges((r.suggestedChanges ?? "").trim());
+
+    const existingLaps = normalizeLapTimes(r.lapTimes ?? []);
+    const existingText = existingLaps.length ? existingLaps.map((n) => n.toFixed(3)).join("\n") : "";
+    setLapIngest({
+      ...defaultLapIngestValue(),
+      manualText: existingText,
+      sourceKind: existingText ? "manual" : "manual",
+      sourceDetail: r.lapSession ? "Existing laps loaded (edit)" : null,
+      parserId: null,
+      urlLapRows: null,
+      urlImportBlocks: [],
+    });
+
+    setReplicateLast(false);
+    setSetupSectionExpanded(true);
+  }, [editRun, cars]);
 
   const selectedCar = useMemo(() => cars.find((c) => c.id === carId) ?? null, [cars, carId]);
   const setupTemplate = useMemo(() => {
@@ -343,6 +409,7 @@ export function NewRunForm(props: {
     jsonFetch<{ items: Array<{ id: string; text: string }> }>("/api/action-items")
       .then(({ items }) => {
         if (!alive) return;
+        if (isEditing && suggestedChanges.trim().length > 0) return;
         const lines = (items ?? []).map((i) => `• ${i.text.trim()}`).filter((l) => l.length > 2);
         setSuggestedChanges(lines.length ? normalizeThingsToTryFromStorage(lines.join("\n")) : "");
       })
@@ -1085,6 +1152,73 @@ export function NewRunForm(props: {
     return out;
   }
 
+  async function interpretSetupChanges() {
+    const text = setupChangesText.trim();
+    if (!text) {
+      setSetupChangesError("Type your setup changes first.");
+      return;
+    }
+    if (!carId) {
+      setSetupChangesError("Select a car first.");
+      return;
+    }
+    setSetupChangesBusy(true);
+    setSetupChangesError(null);
+    try {
+      const res = await fetch("/api/setup/interpret-changes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          carId,
+          setupData,
+          changesText: text,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSetupChangesError((data as { error?: string })?.error ?? "Could not interpret setup changes.");
+        setSetupChangesProposal([]);
+        return;
+      }
+      const edits = Array.isArray((data as { edits?: unknown }).edits) ? ((data as { edits: unknown[] }).edits as unknown[]) : [];
+      const mapped: Array<{ fieldKey: string; fieldLabel: string; fromValue: string; toValue: string; confidence: "low" | "medium" | "high"; note?: string | null }> =
+        edits
+          .map((e) => (e && typeof e === "object" ? (e as Record<string, unknown>) : null))
+          .filter(Boolean)
+          .map((e) => ({
+            fieldKey: typeof e!.fieldKey === "string" ? e!.fieldKey : "",
+            fieldLabel: typeof e!.fieldLabel === "string" ? e!.fieldLabel : "",
+            fromValue: typeof e!.fromValue === "string" ? e!.fromValue : "",
+            toValue: typeof e!.toValue === "string" ? e!.toValue : "",
+            confidence: (e!.confidence === "high" || e!.confidence === "medium" || e!.confidence === "low"
+              ? (e!.confidence as "low" | "medium" | "high")
+              : "low"),
+            note: typeof e!.note === "string" ? e!.note : null,
+          }))
+          .filter((x) => x.fieldKey && x.toValue);
+      setSetupChangesProposal(mapped);
+      if (mapped.length === 0) {
+        setSetupChangesError("No safe changes could be proposed from that text. Try being more specific (field + direction + amount).");
+      }
+    } catch (e) {
+      setSetupChangesError(e instanceof Error ? e.message : "Could not interpret setup changes.");
+      setSetupChangesProposal([]);
+    } finally {
+      setSetupChangesBusy(false);
+    }
+  }
+
+  function applySetupChangesProposal() {
+    if (setupChangesProposal.length === 0) return;
+    const next: SetupSnapshotData = { ...setupData };
+    for (const p of setupChangesProposal) {
+      next[p.fieldKey] = coerceSetupValue(p.toValue);
+    }
+    setSetupData(applyDerivedFieldsToSnapshot(next));
+    setSetupChangesProposal([]);
+    setSetupChangesError(null);
+  }
+
   async function saveRun(e?: React.MouseEvent) {
     e?.preventDefault();
     setInlineError(null);
@@ -1120,9 +1254,10 @@ export function NewRunForm(props: {
       }
       const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
       const { run } = await jsonFetch<{ run: { id: string; createdAt: string } }>("/api/runs", {
-        method: "POST",
+        method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          runId: isEditing ? editRun?.id : undefined,
           carId,
           sessionType: sessionType === "RACE_MEETING" ? "RACE_MEETING" : "TESTING",
           meetingSessionType: needsEvent ? meetingSessionType : null,
@@ -1188,7 +1323,7 @@ export function NewRunForm(props: {
       });
 
       setSaveSuccess(true);
-      setStatus("Run saved. Redirecting to Analysis…");
+      setStatus(isEditing ? "Changes saved." : "Run saved. Redirecting to Analysis…");
 
       const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
         `/api/runs/last?carId=${carId}`
@@ -1199,9 +1334,11 @@ export function NewRunForm(props: {
         setBatteryRunsCompleted(refreshed.batteryRunNumber ?? 0);
       }
 
-      setTimeout(() => {
-        router.push("/runs/history");
-      }, 1000);
+      if (!isEditing) {
+        setTimeout(() => {
+          router.push("/runs/history");
+        }, 1000);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save run";
       setStatus(msg);
@@ -2113,6 +2250,81 @@ export function NewRunForm(props: {
               >
                 Collapse
               </button>
+            </div>
+            <div className="max-w-2xl rounded-md border border-border bg-muted/40 p-3 space-y-2">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Setup changes (free text)
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Type natural language changes. The engineer will propose structured edits, and nothing is applied until you confirm.
+              </p>
+              <textarea
+                className="h-20 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                placeholder={'Examples:\n“+0.5 rear camber, softer rear spring”\n“remove 0.5 upper inner shim rear”'}
+                value={setupChangesText}
+                onChange={(e) => setSetupChangesText(e.target.value)}
+                aria-label="Setup changes free text"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void interpretSetupChanges()}
+                  disabled={setupChangesBusy}
+                  className={cn(
+                    "rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105",
+                    setupChangesBusy && "opacity-60 pointer-events-none"
+                  )}
+                >
+                  {setupChangesBusy ? "Interpreting…" : "Interpret changes"}
+                </button>
+                {setupChangesProposal.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => applySetupChangesProposal()}
+                    className="rounded-md border border-border bg-card px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition"
+                  >
+                    Apply changes
+                  </button>
+                ) : null}
+                {setupChangesProposal.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetupChangesProposal([]);
+                      setSetupChangesError(null);
+                    }}
+                    className="rounded-md border border-border bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted/60 transition"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
+              {setupChangesError ? (
+                <div className="text-[11px] text-destructive">{setupChangesError}</div>
+              ) : null}
+              {setupChangesProposal.length > 0 ? (
+                <div className="rounded-md border border-border bg-card/70 p-2 space-y-1">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Proposed edits (review)
+                  </div>
+                  <ul className="space-y-1 text-[11px]">
+                    {setupChangesProposal.map((p) => (
+                      <li key={`${p.fieldKey}-${p.toValue}`} className="flex flex-col gap-0.5">
+                        <div className="text-foreground">
+                          <span className="font-medium">{p.fieldLabel || p.fieldKey}</span>{" "}
+                          <span className="text-muted-foreground">
+                            ({p.confidence})
+                          </span>
+                        </div>
+                        <div className="font-mono text-muted-foreground">
+                          {p.fromValue || "—"} → <span className="text-foreground">{p.toValue}</span>
+                        </div>
+                        {p.note ? <div className="text-muted-foreground">{p.note}</div> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
             <div className="max-w-2xl space-y-2">
               <div className="space-y-1 text-sm">

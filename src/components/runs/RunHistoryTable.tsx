@@ -24,6 +24,7 @@ import { AnalysisActiveThingsToTry } from "@/components/runs/AnalysisActiveThing
 import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
 import type { LapRow } from "@/lib/lapAnalysis";
+import Link from "next/link";
 
 type Run = {
   id: string;
@@ -453,6 +454,13 @@ function RunDetail({
             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lap analysis</h3>
             <p className="text-[11px] text-muted-foreground">{uploadedLapSetsLine}</p>
           </div>
+          <Link
+            href={`/runs/${encodeURIComponent(run.id)}/edit`}
+            className={cn(analyseActionButtonClass, "no-underline")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            Edit run
+          </Link>
           <button
             type="button"
             onClick={() => setShowLapAnalysis((v) => !v)}
