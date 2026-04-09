@@ -360,13 +360,22 @@ export function NewRunForm(props: {
     const tireLabel = tire ? `${tire.label}${tire.setNumber != null ? ` #${tire.setNumber}` : ""}` : "";
     const batLabel = bat ? `${bat.label}${bat.packNumber != null ? ` #${bat.packNumber}` : ""}` : "";
     setSetupData((prev) =>
-      applyDerivedFieldsToSnapshot({
-        ...prev,
-        tires: tireLabel || undefined,
-        battery: batLabel || undefined,
-      })
+      prev.tires === (tireLabel || undefined) && prev.battery === (batLabel || undefined)
+        ? prev
+        : applyDerivedFieldsToSnapshot({
+            ...prev,
+            tires: tireLabel || undefined,
+            battery: batLabel || undefined,
+          })
     );
   }
+
+  // Deterministic sync: snapshot tires/battery always mirror the run context selections,
+  // including on initial load and when option lists arrive async.
+  useEffect(() => {
+    applyTireBatteryToSetupSnapshot(tireSetId, batteryId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tireSetId, batteryId, tireSets, batteries]);
 
   useEffect(() => {
     const r = editRun;
