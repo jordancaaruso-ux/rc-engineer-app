@@ -190,7 +190,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   const tireSet = body.tireSetId
     ? await prisma.tireSet.findFirst({
         where: { id: body.tireSetId, userId: params.userId },
-        select: { id: true },
+        select: { id: true, label: true, setNumber: true },
       })
     : null;
   if (body.tireSetId && !tireSet) {
@@ -200,12 +200,21 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   const battery = body.batteryId
     ? await prisma.battery.findFirst({
         where: { id: body.batteryId, userId: params.userId },
-        select: { id: true },
+        select: { id: true, label: true, packNumber: true },
       })
     : null;
   if (body.batteryId && !battery) {
     return NextResponse.json({ error: "Battery not found" }, { status: 400 });
   }
+
+  // Ensure the persisted setup snapshot reflects the actual tire/battery selected on the run.
+  const tireLabel = tireSet ? `${tireSet.label}${tireSet.setNumber != null ? ` #${tireSet.setNumber}` : ""}` : "";
+  const batteryLabel = battery ? `${battery.label}${battery.packNumber != null ? ` #${battery.packNumber}` : ""}` : "";
+  resolvedData = {
+    ...resolvedData,
+    tires: tireLabel || undefined,
+    battery: batteryLabel || undefined,
+  };
 
   const sessionType =
     body.sessionType === "PRACTICE" || body.sessionType === "RACE_MEETING"

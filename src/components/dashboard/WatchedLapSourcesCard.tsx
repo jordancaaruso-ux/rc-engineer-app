@@ -22,6 +22,8 @@ type CheckResult =
       carId: string | null;
       status: "new_imported";
       importedSessionId: string;
+      importedFromUrl: string;
+      sessionId: string;
       sessionCompletedAtIso: string | null;
       parserId: string;
       message: string | null;
@@ -32,8 +34,6 @@ type CheckResult =
       driverName: string | null;
       carId: string | null;
       status: "no_change";
-      sessionCompletedAtIso: string | null;
-      parserId: string;
       message: string | null;
     }
   | {
@@ -211,7 +211,7 @@ export function WatchedLapSourcesCard() {
         <div className="space-y-1">
           <input
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs outline-none"
-            placeholder="LiveRC timing URL (practice view_session or race view_race_result)"
+            placeholder="LiveRC URL (practice session_list d=YYYY-MM-DD, or results /results/)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />

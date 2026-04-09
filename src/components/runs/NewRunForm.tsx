@@ -256,7 +256,6 @@ export function NewRunForm(props: {
 
   const dashboardPrefillAppliedRef = useRef(false);
   const editPrefillAppliedRef = useRef(false);
-  const importPrefillTouchedRef = useRef(false);
 
   useEffect(() => {
     const p = dashboardPrefill;
@@ -355,28 +354,19 @@ export function NewRunForm(props: {
     setReplicateLast(false);
   }, [dashboardPrefill, cars]);
 
-  /** For imported lap prefills: suggest tire/battery from last run on this car once a car is selected (unless user overrides). */
-  useEffect(() => {
-    const p = dashboardPrefill;
-    if (!p || p.mode !== "imported_lap_session") return;
-    if (!carId) return;
-    if (importPrefillTouchedRef.current) return;
-    // only set when user has not manually picked tires/battery yet
-    if (tireSetIdRef.current || batteryIdRef.current) return;
-    let alive = true;
-    jsonFetch<{ lastRun: LastRun | null }>(`/api/runs/last?carId=${encodeURIComponent(carId)}`)
-      .then(({ lastRun }) => {
-        if (!alive || !lastRun) return;
-        if (importPrefillTouchedRef.current) return;
-        if (lastRun.tireSetId) setTireSetId(lastRun.tireSetId);
-        if (lastRun.batteryId) setBatteryId(lastRun.batteryId);
+  function applyTireBatteryToSetupSnapshot(nextTireSetId: string, nextBatteryId: string) {
+    const tire = nextTireSetId ? tireSets.find((t) => t.id === nextTireSetId) ?? null : null;
+    const bat = nextBatteryId ? batteries.find((b) => b.id === nextBatteryId) ?? null : null;
+    const tireLabel = tire ? `${tire.label}${tire.setNumber != null ? ` #${tire.setNumber}` : ""}` : "";
+    const batLabel = bat ? `${bat.label}${bat.packNumber != null ? ` #${bat.packNumber}` : ""}` : "";
+    setSetupData((prev) =>
+      applyDerivedFieldsToSnapshot({
+        ...prev,
+        tires: tireLabel || undefined,
+        battery: batLabel || undefined,
       })
-      .catch(() => {})
-      .finally(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [dashboardPrefill, carId]);
+    );
+  }
 
   useEffect(() => {
     const r = editRun;
@@ -1948,8 +1938,9 @@ export function NewRunForm(props: {
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={tireSetId}
                 onChange={(e) => {
-                  importPrefillTouchedRef.current = true;
-                  setTireSetId(e.target.value);
+                  const nextId = e.target.value;
+                  setTireSetId(nextId);
+                  applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
                   setCopyTireWarning(null);
                 }}
                 aria-label="Tire set"
@@ -2079,8 +2070,9 @@ export function NewRunForm(props: {
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={batteryId}
                 onChange={(e) => {
-                  importPrefillTouchedRef.current = true;
-                  setBatteryId(e.target.value);
+                  const nextId = e.target.value;
+                  setBatteryId(nextId);
+                  applyTireBatteryToSetupSnapshot(tireSetIdRef.current, nextId);
                   setCopyBatteryWarning(null);
                 }}
                 aria-label="Battery pack"
