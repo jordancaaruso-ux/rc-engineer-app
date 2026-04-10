@@ -60,7 +60,7 @@ function readSessionIdFromUrl(urlStr: string): string | null {
   }
 }
 
-function looksLikePracticeListUrl(urlStr: string): boolean {
+export function isLiveRcPracticeListUrl(urlStr: string): boolean {
   try {
     const u = new URL(urlStr.trim());
     if (!/\.liverc\.com$/i.test(u.hostname)) return false;
@@ -73,12 +73,16 @@ function looksLikePracticeListUrl(urlStr: string): boolean {
   }
 }
 
-function looksLikeResultsIndexUrl(urlStr: string): boolean {
+/**
+ * LiveRC pages where race result session links (`p=view_race_result`) can be discovered.
+ * Includes bare track results hubs and event hubs such as `p=view_event&id=…` (path still `/results/`).
+ */
+export function isLiveRcResultsDiscoveryUrl(urlStr: string): boolean {
   try {
     const u = new URL(urlStr.trim());
     if (!/\.liverc\.com$/i.test(u.hostname)) return false;
     const path = u.pathname.toLowerCase().replace(/\/+$/, "");
-    return path.endsWith("/results") && !u.searchParams.get("id");
+    return path.endsWith("/results");
   } catch {
     return false;
   }
@@ -112,7 +116,7 @@ export type ExtractedRaceSession = {
  * - **sessionTime**: best-effort date/time substring from the row's visible text
  */
 export function extractPracticeSessions(html: string, pageUrl: string): ExtractedPracticeSession[] {
-  if (!looksLikePracticeListUrl(pageUrl)) return [];
+  if (!isLiveRcPracticeListUrl(pageUrl)) return [];
   const $ = load(html);
   const out: ExtractedPracticeSession[] = [];
 
@@ -175,8 +179,7 @@ export function filterPracticeSessionsByTargetDriver(
 }
 
 /**
- * LiveRC results index page:
- * `.../results/` (no `id=` in query)
+ * Parse race result session links from a LiveRC results area HTML (track index or event hub).
  *
  * Deterministic mapping:
  * - **sessionUrl**: any `<a href>` containing `p=view_race_result&id=...`
@@ -185,11 +188,11 @@ export function filterPracticeSessionsByTargetDriver(
  * - **sessionTime**: best-effort date/time substring from the row text
  *
  * Notes:
- * - Driver names are not reliably per-session on the index page; the detailed result page has drivers.
+ * - Driver names are not reliably per-session on the list page; the detailed result page has drivers.
  *   We return `driverName: null` and the watcher can pass the watched-source driver name into the importer.
  */
 export function extractRaceSessions(html: string, pageUrl: string): ExtractedRaceSession[] {
-  if (!looksLikeResultsIndexUrl(pageUrl)) return [];
+  if (!isLiveRcResultsDiscoveryUrl(pageUrl)) return [];
   const $ = load(html);
   const out: ExtractedRaceSession[] = [];
 

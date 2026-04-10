@@ -4,7 +4,12 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
 import { fetchUrlText } from "@/lib/lapUrlParsers/fetchText";
-import { extractPracticeSessions, extractRaceSessions } from "@/lib/lapWatch/livercSessionIndexParsers";
+import {
+  extractPracticeSessions,
+  extractRaceSessions,
+  isLiveRcPracticeListUrl,
+  isLiveRcResultsDiscoveryUrl,
+} from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
@@ -57,30 +62,6 @@ export type WatchCheckResultRow =
       error: string;
       parserId: string | null;
     };
-
-function isLiveRcPracticeListUrl(urlStr: string): boolean {
-  try {
-    const u = new URL(urlStr.trim());
-    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
-    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
-    if (!path.endsWith("/practice")) return false;
-    const p = (u.searchParams.get("p") ?? "").toLowerCase();
-    return p === "session_list";
-  } catch {
-    return false;
-  }
-}
-
-function isLiveRcResultsIndexUrl(urlStr: string): boolean {
-  try {
-    const u = new URL(urlStr.trim());
-    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
-    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
-    return path.endsWith("/results") && !u.searchParams.get("id");
-  } catch {
-    return false;
-  }
-}
 
 function maxDate(a: Date | null | undefined, b: Date | null | undefined): Date | null {
   if (!a && !b) return null;
@@ -154,7 +135,7 @@ export async function checkWatchedLapSources(params: {
       const targetDriverTrim = effectiveDriver?.trim() ?? "";
       const targetNorm = targetDriverTrim ? normalizeLiveRcDriverNameForMatch(targetDriverTrim) : "";
       const isPracticeListPage = isLiveRcPracticeListUrl(pageUrl);
-      const isResultsIndexPage = isLiveRcResultsIndexUrl(pageUrl);
+      const isResultsIndexPage = isLiveRcResultsDiscoveryUrl(pageUrl);
       const targetMode = (typeof s.targetMode === "string" ? s.targetMode : "none") as "driver" | "class" | "none";
       const targetClassTrim = typeof s.targetClass === "string" ? s.targetClass.trim() : "";
       const targetClassNorm = targetClassTrim ? normalizeLiveRcDriverNameForMatch(targetClassTrim) : "";
@@ -179,7 +160,7 @@ export async function checkWatchedLapSources(params: {
         })),
       });
 
-      const raceList = isLiveRcResultsIndexUrl(pageUrl) ? extractRaceSessions(fetched.text, pageUrl) : [];
+      const raceList = isLiveRcResultsDiscoveryUrl(pageUrl) ? extractRaceSessions(fetched.text, pageUrl) : [];
       const raceListFiltered =
         targetMode === "class" && targetClassNorm
           ? raceList.filter((r) => normalizeLiveRcDriverNameForMatch(r.raceClass ?? "") === targetClassNorm)

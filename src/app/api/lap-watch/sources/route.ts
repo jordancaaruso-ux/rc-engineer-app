@@ -3,32 +3,12 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { validateTimingHttpUrl } from "@/lib/lapImport/service";
+import {
+  isLiveRcPracticeListUrl,
+  isLiveRcResultsDiscoveryUrl,
+} from "@/lib/lapWatch/livercSessionIndexParsers";
 
 export const dynamic = "force-dynamic";
-
-function isLiveRcPracticeListUrl(urlStr: string): boolean {
-  try {
-    const u = new URL(urlStr.trim());
-    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
-    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
-    if (!path.endsWith("/practice")) return false;
-    const p = (u.searchParams.get("p") ?? "").toLowerCase();
-    return p === "session_list";
-  } catch {
-    return false;
-  }
-}
-
-function isLiveRcResultsIndexUrl(urlStr: string): boolean {
-  try {
-    const u = new URL(urlStr.trim());
-    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
-    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
-    return path.endsWith("/results") && !u.searchParams.get("id");
-  } catch {
-    return false;
-  }
-}
 
 function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -116,7 +96,7 @@ export async function POST(request: Request) {
 
   const targetMode = isLiveRcPracticeListUrl(v.normalized)
     ? "driver"
-    : isLiveRcResultsIndexUrl(v.normalized)
+    : isLiveRcResultsDiscoveryUrl(v.normalized)
       ? "class"
       : "none";
 

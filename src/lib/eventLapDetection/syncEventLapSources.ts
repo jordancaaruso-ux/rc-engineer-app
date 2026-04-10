@@ -4,7 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
 import { fetchUrlText } from "@/lib/lapUrlParsers/fetchText";
-import { extractPracticeSessions, extractRaceSessions } from "@/lib/lapWatch/livercSessionIndexParsers";
+import {
+  extractPracticeSessions,
+  extractRaceSessions,
+  isLiveRcPracticeListUrl,
+  isLiveRcResultsDiscoveryUrl,
+} from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
@@ -21,28 +26,62 @@ function maxDate(a: Date | null | undefined, b: Date | null | undefined): Date |
   return a.getTime() >= b.getTime() ? a : b;
 }
 
-function isLiveRcPracticeListUrl(urlStr: string): boolean {
-  try {
-    const u = new URL(urlStr.trim());
-    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
-    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
-    if (!path.endsWith("/practice")) return false;
-    const p = (u.searchParams.get("p") ?? "").toLowerCase();
-    return p === "session_list";
-  } catch {
-    return false;
-  }
+const EVENT_LAP_DETECTION_CANDIDATE_TAKE = 24;
+
+export type EventLapDetectionScopeResult = {
+  scopedEventIds: string[];
+  strategy: "active_today" | "fallback_most_recent";
+  activeTodayCount: number;
+};
+
+/**
+ * Same scoping as sync and dashboard prompts: active-on-local-today events, else the single most recent by endDate.
+ */
+export async function getEventLapDetectionScope(userId: string): Promise<EventLapDetectionScopeResult> {
+  const candidates = await prisma.event.findMany({
+    where: { userId },
+    orderBy: { endDate: "desc" },
+    take: EVENT_LAP_DETECTION_CANDIDATE_TAKE,
+    select: { id: true, startDate: true, endDate: true },
+  });
+  const active = candidates.filter(eventIsActiveOnLocalToday);
+  const scoped = active.length > 0 ? active : candidates.slice(0, 1);
+  return {
+    scopedEventIds: scoped.map((e) => e.id),
+    strategy: active.length > 0 ? "active_today" : "fallback_most_recent",
+    activeTodayCount: active.length,
+  };
 }
 
-function isLiveRcResultsIndexUrl(urlStr: string): boolean {
-  try {
-    const u = new URL(urlStr.trim());
-    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
-    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
-    return path.endsWith("/results") && !u.searchParams.get("id");
-  } catch {
-    return false;
+/** Human-readable reason this event id is or is not included in sync/prompt scope. */
+export function describeEventLapDetectionScopeForEvent(
+  eventId: string,
+  scope: EventLapDetectionScopeResult
+): { eventInSyncScope: boolean; scopeReason: string } {
+  const inScope = scope.scopedEventIds.includes(eventId);
+  if (!inScope) {
+    return {
+      eventInSyncScope: false,
+      scopeReason:
+        scope.strategy === "active_today"
+          ? "Another set of events is active today; this event is not among them, so sync and dashboard prompts skip it."
+          : "No event is active on today’s local calendar; only the single most recent event (by end date) is synced. This event is not that one.",
+    };
   }
+  if (scope.strategy === "active_today") {
+    return {
+      eventInSyncScope: true,
+      scopeReason:
+        scope.activeTodayCount > 1
+          ? "Event is within its calendar range for today; sync runs for all such events."
+          : "Event is within its calendar range for today.",
+    };
+  }
+  return {
+    eventInSyncScope: true,
+    scopeReason:
+      "No event is active on today’s local calendar; this is the most recent event by end date, so it is the only one synced.",
+  };
 }
 
 /**
@@ -53,10 +92,12 @@ export async function syncRecentEventLapSources(userId: string): Promise<void> {
   const liveName = (await getLiveRcDriverNameSetting(userId).catch(() => null))?.trim() ?? "";
   const liveNorm = liveName ? normalizeLiveRcDriverNameForMatch(liveName) : "";
 
-  const candidates = await prisma.event.findMany({
-    where: { userId },
+  const scope = await getEventLapDetectionScope(userId);
+  if (scope.scopedEventIds.length === 0) return;
+
+  const scoped = await prisma.event.findMany({
+    where: { userId, id: { in: scope.scopedEventIds } },
     orderBy: { endDate: "desc" },
-    take: 24,
     select: {
       id: true,
       startDate: true,
@@ -68,9 +109,6 @@ export async function syncRecentEventLapSources(userId: string): Promise<void> {
       resultsLastSeenSessionCompletedAt: true,
     },
   });
-
-  const active = candidates.filter(eventIsActiveOnLocalToday);
-  const scoped = active.length > 0 ? active : candidates.slice(0, 1);
 
   for (const ev of scoped) {
     if (ev.practiceSourceUrl?.trim() && liveNorm) {
@@ -169,7 +207,7 @@ async function syncResultsForEvent(
   liveName: string
 ): Promise<void> {
   const pageUrl = ev.resultsSourceUrl!.trim();
-  if (!isLiveRcResultsIndexUrl(pageUrl)) return;
+  if (!isLiveRcResultsDiscoveryUrl(pageUrl)) return;
 
   const classNorm = normalizeLiveRcDriverNameForMatch(ev.raceClass!.trim());
 
@@ -247,18 +285,15 @@ function runIsIncomplete(run: { lapTimes: unknown; notes: string | null }): bool
 export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRunPrompt[]> {
   const liveRcDriverName = (await getLiveRcDriverNameSetting(userId).catch(() => null))?.trim() ?? null;
 
-  const candidates = await prisma.event.findMany({
-    where: { userId },
-    orderBy: { endDate: "desc" },
-    take: 24,
-    select: { id: true, name: true, startDate: true, endDate: true },
-  });
-  const active = candidates.filter(eventIsActiveOnLocalToday);
-  const scoped = active.length > 0 ? active : candidates.slice(0, 1);
-  const scopedIds = scoped.map((e) => e.id);
-  const eventNameById = new Map(scoped.map((e) => [e.id, e.name] as const));
+  const scope = await getEventLapDetectionScope(userId);
+  if (scope.scopedEventIds.length === 0) return [];
 
-  if (scopedIds.length === 0) return [];
+  const scopedIds = scope.scopedEventIds;
+  const scopedEvents = await prisma.event.findMany({
+    where: { userId, id: { in: scopedIds } },
+    select: { id: true, name: true },
+  });
+  const eventNameById = new Map(scopedEvents.map((e) => [e.id, e.name] as const));
 
   const sessions = await prisma.importedLapTimeSession.findMany({
     where: {
