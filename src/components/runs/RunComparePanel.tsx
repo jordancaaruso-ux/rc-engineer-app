@@ -35,6 +35,8 @@ export type CompareRunShape = {
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   tireRunNumber: number;
   setupSnapshot?: { id: string; data: unknown } | null;
+  /** On-track session instant when known (import / timing). */
+  sessionCompletedAt?: Date | string | null;
 };
 
 type CompareMode = "current_setup" | "choose_run";

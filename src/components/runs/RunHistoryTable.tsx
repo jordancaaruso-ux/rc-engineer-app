@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { compareSetupField } from "@/lib/setupCompare/compare";
@@ -25,10 +26,12 @@ import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import type { LapRow } from "@/lib/lapAnalysis";
 import Link from "next/link";
+import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 
 type Run = {
   id: string;
   createdAt: Date | string;
+  sessionCompletedAt?: Date | string | null;
   carId: string | null;
   eventId: string | null;
   sessionType: string;
@@ -202,7 +205,7 @@ export function RunHistoryTable({
               aria-expanded={isExpanded}
             >
               <td className="px-4 py-2">
-                {formatRunCreatedAtDateTime(run.createdAt)}
+                {formatRunCreatedAtDateTime(resolveRunDisplayInstant(run))}
               </td>
               <td className="px-4 py-2">{carDisplay}</td>
               <td className="px-4 py-2">{trackDisplay}</td>
@@ -336,13 +339,40 @@ function RunDetail({
         ? "1 driver lap set uploaded"
         : `${uploadedLapSetCount} driver lap sets uploaded`;
 
+  const engineerThisRunHref = `/engineer?runId=${encodeURIComponent(run.id)}`;
+  const engineerVsPreviousHref =
+    previousRunOnCar &&
+    `/engineer?runId=${encodeURIComponent(run.id)}&compareRunId=${encodeURIComponent(previousRunOnCar.id)}`;
+
   return (
     <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-5 text-sm">
+      <EngineerRunSummaryPanel runId={run.id} defaultExpanded={false} />
+
+      <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+        <Link
+          href={engineerThisRunHref}
+          className="inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition"
+        >
+          Ask Engineer (this run)
+        </Link>
+        {engineerVsPreviousHref ? (
+          <Link
+            href={engineerVsPreviousHref}
+            className="inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition"
+          >
+            Ask Engineer vs previous same car
+          </Link>
+        ) : null}
+      </div>
+
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
         <div className="min-w-0 space-y-3 xl:max-w-[min(100%,28rem)]">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Run details</h3>
           <div className="flex flex-wrap gap-x-5 gap-y-3">
-            <CompactField label="Date / time" value={formatRunCreatedAtDateTime(run.createdAt)} />
+            <CompactField
+              label="Date / time"
+              value={formatRunCreatedAtDateTime(resolveRunDisplayInstant(run))}
+            />
             <CompactField
               label="Session type"
               value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}

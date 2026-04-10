@@ -437,6 +437,21 @@ model Run {
   /** Primary imported lap-time session when this run was created from detection / URL import. */
   importedLapTimeSessionId String?                 @unique
   detectedImportedLapSession ImportedLapTimeSession? @relation("RunDetectedImport", fields: [importedLapTimeSessionId], references: [id], onDelete: SetNull)
+
+  /**
+   * When the on-track session actually occurred (from timing import / LiveRC), if known.
+   * Distinct from createdAt (when this row was saved in the app).
+   */
+  sessionCompletedAt DateTime?
+  /** User finished the logging workflow (Run completed), or saved from event-detected import. */
+  loggingComplete  Boolean  @default(false)
+
+  /** Cached deterministic Engineer Summary JSON (invalidated on run update). */
+  engineerSummaryJson         Json?
+  engineerSummaryRefRunId     String?
+  engineerSummaryComputedAt   DateTime?
+  /** Optional structured Deep Dive answers (versioned object). */
+  engineerDeepDiveJson        Json?
 }
 
 /**

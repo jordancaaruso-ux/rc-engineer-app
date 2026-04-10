@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     select: {
       id: true,
       createdAt: true,
+      sessionCompletedAt: true,
       sessionLabel: true,
       sessionType: true,
       meetingSessionType: true,

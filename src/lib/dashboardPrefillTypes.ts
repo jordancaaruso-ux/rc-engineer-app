@@ -51,4 +51,6 @@ export type DashboardNewRunPrefill =
         linkedEventId: string | null;
         liveRcDriverName: string | null;
       };
+      /** True when session came from event lap watch / detection — any save counts as logging complete. */
+      fromEventDetection: boolean;
     };

@@ -17,6 +17,15 @@ function dateKey(d: Date): string {
   return new Date(d).toISOString().slice(0, 10);
 }
 
+function runSessionSortInstant(run: RunInGroup): Date {
+  const s = run.sessionCompletedAt;
+  if (s) {
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date(run.createdAt);
+}
+
 async function fetchRuns(userId: string) {
   return prisma.run.findMany({
     where: { userId },
@@ -88,7 +97,7 @@ type Group = {
 function buildGroups(runs: RunInGroup[]): Group[] {
   const byKey = new Map<string, RunInGroup[]>();
   for (const run of runs) {
-    const key = run.eventId ? `event-${run.eventId}` : `day-${dateKey(run.createdAt)}`;
+    const key = run.eventId ? `event-${run.eventId}` : `day-${dateKey(runSessionSortInstant(run))}`;
     const list = byKey.get(key) ?? [];
     list.push(run);
     byKey.set(key, list);
@@ -99,31 +108,33 @@ function buildGroups(runs: RunInGroup[]): Group[] {
     const isEvent = !!run.eventId && run.event;
     const title = isEvent && run.event
       ? run.event.name
-      : `Test day – ${formatGroupDate(run.createdAt)}`;
+      : `Test day – ${formatGroupDate(runSessionSortInstant(run))}`;
     const type: Group["type"] = isEvent ? "Race Meeting" : "Testing";
     const trackName = isEvent && run.event
       ? (run.event.track?.name ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
       : (run.track?.name ?? run.trackNameSnapshot ?? "—");
     const dateLabel = isEvent && run.event
       ? (() => {
-          const start = run.event.startDate ? new Date(run.event.startDate) : new Date(run.createdAt);
-          const end = run.event.endDate ? new Date(run.event.endDate) : new Date(run.createdAt);
+          const start = run.event.startDate ? new Date(run.event.startDate) : runSessionSortInstant(run);
+          const end = run.event.endDate ? new Date(run.event.endDate) : runSessionSortInstant(run);
           if (dateKey(start) === dateKey(end)) return formatGroupDate(start);
           return `${formatGroupDate(start)} – ${formatGroupDate(end)}`;
         })()
-      : formatGroupDate(run.createdAt);
+      : formatGroupDate(runSessionSortInstant(run));
     groups.push({
       id: key,
       title,
       type,
       trackName,
       dateLabel,
-      runs: groupRuns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+      runs: groupRuns.sort(
+        (a, b) => runSessionSortInstant(b).getTime() - runSessionSortInstant(a).getTime()
+      ),
     });
   }
   groups.sort((a, b) => {
-    const aMax = Math.max(...a.runs.map((r) => new Date(r.createdAt).getTime()));
-    const bMax = Math.max(...b.runs.map((r) => new Date(r.createdAt).getTime()));
+    const aMax = Math.max(...a.runs.map((r) => runSessionSortInstant(r).getTime()));
+    const bMax = Math.max(...b.runs.map((r) => runSessionSortInstant(r).getTime()));
     return bMax - aMax;
   });
   return groups;

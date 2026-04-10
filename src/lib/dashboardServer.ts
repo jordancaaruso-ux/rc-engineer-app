@@ -150,6 +150,7 @@ export async function getDashboardNewRunPrefill(
         linkedEventId: sess.linkedEventId,
         liveRcDriverName,
       },
+      fromEventDetection: eventDetectionSource === "practice" || eventDetectionSource === "race",
     };
   }
 
@@ -210,6 +211,7 @@ export type DashboardHomeModel = {
   recentRun: null | {
     id: string;
     createdAt: string;
+    sessionCompletedAt: string | null;
     carName: string;
     trackName: string | null;
     eventName: string | null;
@@ -222,6 +224,7 @@ export type DashboardHomeModel = {
 const recentRunSelect = {
   id: true,
   createdAt: true,
+  sessionCompletedAt: true,
   lapTimes: true,
   lapSession: true,
   sessionType: true,
@@ -361,6 +364,9 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     recent = {
       id: recentRun.id,
       createdAt: recentRun.createdAt.toISOString(),
+      sessionCompletedAt: recentRun.sessionCompletedAt
+        ? recentRun.sessionCompletedAt.toISOString()
+        : null,
       carName: recentRun.car?.name ?? "—",
       trackName: recentRun.track?.name ?? null,
       eventName: recentRun.event?.name ?? null,

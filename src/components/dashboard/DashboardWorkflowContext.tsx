@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { DashboardActionItemRow, DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { ThingsToTrySection } from "@/components/dashboard/ThingsToTrySection";
 
 function btnGhost(className = "") {
@@ -29,7 +30,12 @@ export function DashboardWorkflowContext({
             <div className="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 sm:grid-cols-[4.5rem_1fr]">
               <span className="text-muted-foreground">When</span>
               <span className="text-[10px] tabular-nums text-muted-foreground">
-                {formatRunCreatedAtDateTime(recentRun.createdAt)}
+                {formatRunCreatedAtDateTime(
+                  resolveRunDisplayInstant({
+                    createdAt: recentRun.createdAt,
+                    sessionCompletedAt: recentRun.sessionCompletedAt,
+                  })
+                )}
               </span>
               <span className="text-muted-foreground">Car</span>
               <span className="min-w-0 font-medium text-foreground">{recentRun.carName}</span>

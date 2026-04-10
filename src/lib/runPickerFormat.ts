@@ -21,7 +21,13 @@ export type RunPickerRun = {
   lapTimes?: unknown;
   /** Present when run comes from for-picker / last APIs (load setup). */
   setupSnapshot?: { id: string; data: unknown } | null;
+  /** On-track session time when known (import). */
+  sessionCompletedAt?: Date | string | null;
 };
+
+function pickRunInstant(run: RunPickerRun): Date | string {
+  return run.sessionCompletedAt ?? run.createdAt;
+}
 
 /** Session segment: label if set, else meeting/testing fallback. */
 export function formatRunPickerSessionSegment(run: {
@@ -84,7 +90,7 @@ function formatRunListScanLead(run: RunPickerRun): string {
   const eventName = run.event?.name?.trim();
   if (eventName) return eventName;
   if (run.eventId) return "Event";
-  const d = formatRunPickerScanDate(run.createdAt);
+  const d = formatRunPickerScanDate(pickRunInstant(run));
   return d === "—" ? "Testing —" : `Testing ${d}`;
 }
 
@@ -111,6 +117,11 @@ function appendBestLap(base: string, lapTimes: unknown): string {
  */
 export function formatRunPickerLine(run: RunPickerRun): string {
   return appendBestLap(formatRunListScanLine(run), run.lapTimes);
+}
+
+/** Compact “when” segment using session time when set. */
+export function formatRunPickerWhenSegment(run: RunPickerRun): string {
+  return formatRunCreatedRelativeWhen(pickRunInstant(run));
 }
 
 /**

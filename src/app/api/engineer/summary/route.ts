@@ -1,22 +1,26 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
-import { hasOpenAiApiKey } from "@/lib/openaiServerEnv";
-import { buildEngineerContextPacketV1 } from "@/lib/engineerPhase5/contextPacket";
-import { generateEngineerSummaryV1 } from "@/lib/engineerPhase5/openaiEngineer";
+import { getOrComputeEngineerSummaryForLatestRun } from "@/lib/engineerPhase5/loadLatestEngineerSummary";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Latest run's deterministic Engineer Summary (no OpenAI).
+ * Prefer `/api/runs/[id]/engineer-summary` when the run id is known.
+ */
 export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  if (!hasOpenAiApiKey()) {
-    return NextResponse.json({ error: "OPENAI_API_KEY is not set" }, { status: 500 });
-  }
   const user = await getOrCreateLocalUser();
-  const packet = await buildEngineerContextPacketV1(user.id);
-  const summary = await generateEngineerSummaryV1(packet);
-  return NextResponse.json({ packet, summary });
+  const result = await getOrComputeEngineerSummaryForLatestRun(user.id);
+  if (!result) {
+    return NextResponse.json({ summary: null, cached: false, runId: null });
+  }
+  return NextResponse.json({
+    summary: result.summary,
+    cached: result.cached,
+    runId: result.summary.currentRunId,
+  });
 }
-

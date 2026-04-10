@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -13,7 +14,7 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
       <>
         <header className="page-header">
           <div>
-            <h1 className="page-title">Engineer Chat</h1>
+            <h1 className="page-title">Engineer</h1>
             <p className="page-subtitle">Database not configured.</p>
           </div>
         </header>
@@ -75,7 +76,15 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
           </div>
         </div>
 
-        <EngineerSummaryAndChat />
+        <Suspense
+          fallback={
+            <div className="rounded-lg border border-border bg-muted/50 p-3 text-[11px] text-muted-foreground">
+              Loading engineer…
+            </div>
+          }
+        >
+          <EngineerSummaryAndChat />
+        </Suspense>
       </section>
     </>
   );

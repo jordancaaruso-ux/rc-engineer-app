@@ -19,12 +19,12 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { formatCompareRunMetaLine } from "@/lib/runCompareMeta";
-import { formatRunPickerScanDate } from "@/lib/formatDate";
 import {
   formatDriverSessionLabel,
   formatDriverSessionLabelWithContext,
   resolveImportedSessionDisplayTimeIso,
 } from "@/lib/lapImport/labels";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 
 type ImportedSet = {
   id: string;
@@ -62,13 +62,15 @@ function dayBucketFromSortIso(sortIso: string): number {
   return Math.round((today - day) / MS_PER_DAY);
 }
 
-function groupHeadingForSortIso(sortIso: string): string {
-  const t = new Date(sortIso);
-  if (Number.isNaN(t.getTime())) return "Other";
-  const b = dayBucketFromSortIso(sortIso);
-  if (b === 0) return "Today";
-  if (b === 1) return "Yesterday";
-  return formatRunPickerScanDate(t);
+function sameLocalCalendarDay(isoA: string, isoB: string): boolean {
+  const a = new Date(isoA);
+  const b = new Date(isoB);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
 /** Today first, then newer calendar days before older; within a day, newest instant first. */
@@ -190,6 +192,7 @@ export function LapComparisonColumnGrid({
     lapTimes: unknown;
     lapSession?: unknown;
     importedLapSets?: ImportedSet[];
+    eventId?: string | null;
   };
   /** Current expanded run id — excluded from “other” prior runs. */
   currentRunId: string;
@@ -221,6 +224,8 @@ export function LapComparisonColumnGrid({
   /** Columns to show vs target: imports, library, and previous runs (ids from seriesList). */
   const [selectedComparisonIds, setSelectedComparisonIds] = useState<string[]>([]);
   const [setupModalRun, setSetupModalRun] = useState<CompareRunShape | null>(null);
+  const [compareScope, setCompareScope] = useState<"all" | "same_day" | "same_event">("same_day");
+  const [compareDriverKey, setCompareDriverKey] = useState<string>("__me__");
 
   const { seriesList, metaById } = useMemo(() => {
     const metaById = new Map<string, SeriesMeta>();
@@ -231,10 +236,7 @@ export function LapComparisonColumnGrid({
       "run",
       primaryLaps
     );
-    const anchorCreatedIso =
-      typeof compareAnchorRun.createdAt === "string"
-        ? compareAnchorRun.createdAt
-        : compareAnchorRun.createdAt.toISOString();
+    const anchorSessionIso = resolveRunDisplayInstant(compareAnchorRun).toISOString();
     const primaryImport =
       run.importedLapSets?.find((x) => x.isPrimaryUser) ?? run.importedLapSets?.[0];
     const primaryFallback =
@@ -242,14 +244,14 @@ export function LapComparisonColumnGrid({
         ? typeof primaryImport.createdAt === "string"
           ? primaryImport.createdAt
           : primaryImport.createdAt.toISOString()
-        : anchorCreatedIso;
+        : anchorSessionIso;
     const meSortIso = primaryImport
       ? resolveImportedSessionDisplayTimeIso({
           sessionCompletedAt: primaryImport.sessionCompletedAt ?? null,
           parsedPayload: undefined,
           createdAt: primaryFallback,
         })
-      : anchorCreatedIso;
+      : anchorSessionIso;
 
     metaById.set(primarySeries.id, {
       metaLine: formatCompareRunMetaLine(compareAnchorRun),
@@ -269,7 +271,7 @@ export function LapComparisonColumnGrid({
           ? s.createdAt
           : s.createdAt != null
             ? s.createdAt.toISOString()
-            : anchorCreatedIso;
+            : anchorSessionIso;
       const whenIso = resolveImportedSessionDisplayTimeIso({
         sessionCompletedAt: s.sessionCompletedAt ?? null,
         parsedPayload: undefined,
@@ -294,7 +296,7 @@ export function LapComparisonColumnGrid({
       rawHistory.push(ser);
       const metaLine = formatCompareRunMetaLine(r);
       const carName = r.car?.name?.trim() || r.carNameSnapshot?.trim() || primaryRunLabel;
-      const whenIso = typeof r.createdAt === "string" ? r.createdAt : r.createdAt.toISOString();
+      const whenIso = resolveRunDisplayInstant(r).toISOString();
       const trackCtx = r.track?.name?.trim() || r.trackNameSnapshot?.trim() || null;
       metaById.set(ser.id, {
         metaLine,
@@ -331,21 +333,129 @@ export function LapComparisonColumnGrid({
     return { seriesList: list, metaById };
   }, [run, primaryRunLabel, historyPickOptions, compareAnchorRun, primaryLaps, librarySessions]);
 
+  const anchorInstantIso = useMemo(
+    () => resolveRunDisplayInstant(compareAnchorRun).toISOString(),
+    [compareAnchorRun]
+  );
+
+  const scopeFilteredRows = useMemo(() => {
+    const ev = compareAnchorRun.eventId;
+    return seriesList
+      .filter((s) => s.id !== targetId)
+      .map((s) => {
+        const m = metaById.get(s.id);
+        const sortIso = m?.sortIso ?? "";
+        return { series: s, sortIso, label: m?.selectLabel ?? s.label };
+      })
+      .filter(({ series, sortIso }) => {
+        if (compareScope === "all") return true;
+        if (compareScope === "same_day") {
+          return sameLocalCalendarDay(sortIso, anchorInstantIso);
+        }
+        if (!ev) {
+          if (series.id.startsWith("library:")) return false;
+          return true;
+        }
+        if (series.id === "run:primary") return run.eventId === ev;
+        if (series.id.startsWith("history:")) {
+          const rid = series.id.slice(8);
+          return otherRuns.find((o) => o.id === rid)?.eventId === ev;
+        }
+        if (series.id.startsWith("imported:")) return run.eventId === ev;
+        if (series.id.startsWith("library:")) return false;
+        return false;
+      });
+  }, [
+    seriesList,
+    targetId,
+    metaById,
+    compareScope,
+    anchorInstantIso,
+    compareAnchorRun.eventId,
+    run.eventId,
+    otherRuns,
+  ]);
+
+  const compareDriverChoices = useMemo(() => {
+    const opts: { key: string; label: string }[] = [{ key: "__all__", label: "All drivers" }];
+    const hasMe = scopeFilteredRows.some(
+      (r) => r.series.id === "run:primary" || r.series.id.startsWith("history:")
+    );
+    if (hasMe) opts.push({ key: "__me__", label: `${primaryRunLabel} (my runs)` });
+    const seenImported = new Set<string>();
+    const seenLib = new Set<string>();
+    for (const r of scopeFilteredRows) {
+      if (r.series.id.startsWith("imported:")) {
+        const setId = r.series.id.slice(9);
+        const set = run.importedLapSets?.find((x) => x.id === setId);
+        const label = (set?.displayName?.trim() || set?.driverName || "").trim();
+        if (!label) continue;
+        const k = `drv:${label}`;
+        if (seenImported.has(k)) continue;
+        seenImported.add(k);
+        opts.push({ key: k, label });
+      } else if (r.series.id.startsWith("library:")) {
+        const libId = r.series.id.slice(8);
+        const lib = librarySessions.find((l) => l.id === libId);
+        const lead = lib?.selectLabel.split(" · ")[0]?.trim() || lib?.selectLabel || "";
+        if (!lead) continue;
+        const k = `lib:${lead}`;
+        if (seenLib.has(k)) continue;
+        seenLib.add(k);
+        opts.push({ key: k, label: `${lead} (library)` });
+      }
+    }
+    return opts;
+  }, [scopeFilteredRows, primaryRunLabel, run.importedLapSets, librarySessions]);
+
+  useEffect(() => {
+    const keys = new Set(compareDriverChoices.map((c) => c.key));
+    if (keys.has(compareDriverKey)) return;
+    const next =
+      compareDriverChoices.find((c) => c.key === "__me__") ?? compareDriverChoices[0];
+    if (next) setCompareDriverKey(next.key);
+  }, [compareDriverChoices, compareDriverKey]);
+
+  const compareOptionRows = useMemo(() => {
+    return scopeFilteredRows
+      .filter(({ series }) => {
+        if (compareDriverKey === "__all__") return true;
+        if (compareDriverKey === "__me__") {
+          return series.id === "run:primary" || series.id.startsWith("history:");
+        }
+        if (compareDriverKey.startsWith("drv:")) {
+          const name = compareDriverKey.slice(4);
+          if (!series.id.startsWith("imported:")) return false;
+          const setId = series.id.slice(9);
+          const set = run.importedLapSets?.find((x) => x.id === setId);
+          const label = (set?.displayName?.trim() || set?.driverName || "").trim();
+          return label === name;
+        }
+        if (compareDriverKey.startsWith("lib:")) {
+          const lead = compareDriverKey.slice(4);
+          if (!series.id.startsWith("library:")) return false;
+          const libId = series.id.slice(8);
+          const lib = librarySessions.find((l) => l.id === libId);
+          return lib?.selectLabel.startsWith(lead) ?? false;
+        }
+        return true;
+      })
+      .map(({ series, sortIso, label }) => ({ id: series.id, sortIso, label }))
+      .sort((a, b) => new Date(a.sortIso).getTime() - new Date(b.sortIso).getTime());
+  }, [scopeFilteredRows, compareDriverKey, run.importedLapSets, librarySessions]);
+
   useEffect(() => {
     setSelectedComparisonIds([]);
   }, [currentRunId]);
 
   useEffect(() => {
-    const valid = new Set(seriesList.map((s) => s.id));
-    const defaultNonHistory = seriesList
-      .filter((s) => s.id !== "run:primary" && !s.id.startsWith("history:"))
-      .map((s) => s.id);
+    const valid = new Set(compareOptionRows.map((r) => r.id));
     setSelectedComparisonIds((prev) => {
       const filtered = prev.filter((id) => valid.has(id) && id !== targetId);
       if (filtered.length > 0) return filtered;
-      return defaultNonHistory.filter((id) => id !== targetId);
+      return compareOptionRows.map((r) => r.id);
     });
-  }, [seriesList, targetId]);
+  }, [compareOptionRows, targetId]);
 
   useEffect(() => {
     const ids = seriesList.map((s) => s.id);
@@ -377,38 +487,10 @@ export function LapComparisonColumnGrid({
     return primary ? [primary, ...restSorted] : restSorted;
   }, [seriesList, metaById]);
 
-  const compareOptionGroups = useMemo(() => {
-    const rows = seriesList
-      .filter((s) => s.id !== targetId)
-      .map((s) => {
-        const m = metaById.get(s.id);
-        return {
-          id: s.id,
-          sortIso: m?.sortIso ?? "",
-          label: m?.selectLabel ?? s.label,
-        };
-      })
-      .sort(compareOptionSort);
-    const groups: { heading: string; items: typeof rows }[] = [];
-    for (const row of rows) {
-      const h = groupHeadingForSortIso(row.sortIso);
-      const last = groups[groups.length - 1];
-      if (last && last.heading === h) last.items.push(row);
-      else groups.push({ heading: h, items: [row] });
-    }
-    return groups;
-  }, [seriesList, targetId, metaById]);
-
-  const compareOptionCount = useMemo(
-    () => compareOptionGroups.reduce((n, g) => n + g.items.length, 0),
-    [compareOptionGroups]
-  );
+  const compareOptionCount = compareOptionRows.length;
 
   function metaFor(s: ComparisonSeries): SeriesMeta {
-    const fallbackIso =
-      typeof compareAnchorRun.createdAt === "string"
-        ? compareAnchorRun.createdAt
-        : compareAnchorRun.createdAt.toISOString();
+    const fallbackIso = resolveRunDisplayInstant(compareAnchorRun).toISOString();
     return (
       metaById.get(s.id) ?? {
         metaLine: null,
@@ -454,37 +536,74 @@ export function LapComparisonColumnGrid({
             ))}
           </select>
         </div>
-        <div className="space-y-1 min-w-[200px] max-w-[min(100%,420px)] flex-1">
-          <label className="text-sm font-medium text-muted-foreground block" htmlFor="lap-compare-unified">
-            Compare against
-          </label>
+        <div className="space-y-2 min-w-[200px] max-w-[min(100%,480px)] flex-1">
+          <div className="text-sm font-medium text-muted-foreground">Compare against</div>
+          <div className="flex flex-wrap gap-3">
+            <div className="space-y-0.5">
+              <label className="text-[10px] text-muted-foreground" htmlFor="lap-compare-scope">
+                Scope
+              </label>
+              <select
+                id="lap-compare-scope"
+                className="rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none max-w-[200px]"
+                value={compareScope}
+                onChange={(e) => setCompareScope(e.target.value as typeof compareScope)}
+              >
+                <option value="same_day">Same calendar day</option>
+                <option value="same_event">Same event</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+            <div className="space-y-0.5 min-w-[140px] flex-1">
+              <label className="text-[10px] text-muted-foreground" htmlFor="lap-compare-driver">
+                Driver
+              </label>
+              <select
+                id="lap-compare-driver"
+                className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
+                value={compareDriverKey}
+                onChange={(e) => setCompareDriverKey(e.target.value)}
+              >
+                {compareDriverChoices.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           {compareOptionCount === 0 ? (
-            <p className="text-[11px] text-muted-foreground">No other lap series to compare.</p>
+            <p className="text-[11px] text-muted-foreground">No lap series match this scope and driver.</p>
           ) : (
-            <select
-              id="lap-compare-unified"
-              multiple
-              size={Math.min(12, Math.max(4, compareOptionCount))}
-              className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-              value={selectedComparisonIds.filter((id) => id !== targetId)}
-              onChange={(e) => {
-                setSelectedComparisonIds(Array.from(e.target.selectedOptions, (o) => o.value));
-              }}
-              aria-label="Select series to compare against the target"
+            <div
+              className="max-h-[min(220px,40vh)] overflow-y-auto rounded-md border border-border bg-card px-2 py-1.5"
+              role="group"
+              aria-label="Series to compare against the target"
             >
-              {compareOptionGroups.map((g) => (
-                <optgroup key={g.heading} label={g.heading}>
-                  {g.items.map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {row.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              <ul className="space-y-1.5">
+                {compareOptionRows.map((row) => (
+                  <li key={row.id}>
+                    <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 shrink-0"
+                        checked={selectedComparisonIds.includes(row.id)}
+                        onChange={(e) => {
+                          setSelectedComparisonIds((prev) => {
+                            if (e.target.checked) return [...prev, row.id];
+                            return prev.filter((id) => id !== row.id);
+                          });
+                        }}
+                      />
+                      <span className="min-w-0 text-foreground">{row.label}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <p className="text-[10px] text-muted-foreground">
-            Imports, library sessions, and your other runs. Hold Ctrl (Windows) or ⌘ (Mac) to select several.
+            Choose scope and driver, then tick runs to compare. Order is chronological (earliest first).
           </p>
         </div>
       </div>

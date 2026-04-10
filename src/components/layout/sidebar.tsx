@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard" },
-  { href: "/engineer", label: "Engineer Chat" },
+  { href: "/engineer", label: "Engineer" },
   { href: "/runs/new", label: "Log your run" },
   { href: "/laps/import", label: "Lap-time import" },
   { href: "/runs/history", label: "Analysis" },

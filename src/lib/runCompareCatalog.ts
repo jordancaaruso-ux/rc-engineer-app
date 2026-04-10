@@ -1,11 +1,16 @@
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
+
 /**
  * Run lists used for comparison. Today: my_runs only.
  * Later: team_runs, shared_setups, etc. can extend the catalog shape.
  */
 export type RunCompareListSource = "my_runs" | "team_runs";
 
-export function compareRunTimestamp(a: { createdAt: Date | string }, b: { createdAt: Date | string }) {
-  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+export function compareRunTimestamp(
+  a: { createdAt: Date | string; sessionCompletedAt?: Date | string | null },
+  b: { createdAt: Date | string; sessionCompletedAt?: Date | string | null }
+) {
+  return resolveRunDisplayInstant(b).getTime() - resolveRunDisplayInstant(a).getTime();
 }
 
 /** Next older run in a newest-first list. */

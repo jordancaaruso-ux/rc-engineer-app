@@ -17,6 +17,7 @@ import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupC
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunListScanLine, formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
+import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
@@ -1356,7 +1357,7 @@ export function NewRunForm(props: {
     setSetupChangesError(null);
   }
 
-  async function saveRun(e?: React.MouseEvent) {
+  async function saveRun(e?: React.MouseEvent, intent: "draft" | "completed" = "completed") {
     e?.preventDefault();
     setInlineError(null);
     setStatus(null);
@@ -1394,6 +1395,11 @@ export function NewRunForm(props: {
         method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          loggingIntent: intent,
+          fromEventDetection:
+            !isEditing &&
+            dashboardPrefill?.mode === "imported_lap_session" &&
+            dashboardPrefill.fromEventDetection === true,
           runId: isEditing ? editRun?.id : undefined,
           carId,
           sessionType: sessionType === "RACE_MEETING" ? "RACE_MEETING" : "TESTING",
@@ -1460,7 +1466,7 @@ export function NewRunForm(props: {
       });
 
       setSaveSuccess(true);
-      setStatus(isEditing ? "Changes saved." : "Run saved. Redirecting to Analysis…");
+      setStatus(isEditing ? "Changes saved." : "Run saved. Opening run review…");
 
       const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
         `/api/runs/last?carId=${carId}`
@@ -1473,8 +1479,8 @@ export function NewRunForm(props: {
 
       if (!isEditing) {
         setTimeout(() => {
-          router.push("/runs/history");
-        }, 1000);
+          router.push(`/runs/${run.id}/edit`);
+        }, 800);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save run";
@@ -1522,6 +1528,12 @@ export function NewRunForm(props: {
       {cars.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
           You need at least one car to log a run. Go to <a href="/cars" className="text-accent underline">Car Manager</a> to create one.
+        </div>
+      ) : null}
+
+      {isEditing && editRun?.id ? (
+        <div className="space-y-2">
+          <EngineerRunSummaryPanel runId={editRun.id} />
         </div>
       ) : null}
 
@@ -2562,18 +2574,33 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <button
           type="button"
           className={cn(
-            "inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+            "inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted/60",
             (!canSave || saving) && "opacity-70 pointer-events-none"
           )}
-          onClick={(e) => saveRun(e)}
+          onClick={(e) => saveRun(e, "draft")}
           disabled={!canSave || saving}
           aria-busy={saving}
         >
           {saving ? "Saving…" : saveSuccess ? "Saved" : "Save run"}
+        </button>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+            (!canSave || saving) && "opacity-70 pointer-events-none"
+          )}
+          onClick={(e) => saveRun(e, "completed")}
+          disabled={!canSave || saving}
+          aria-busy={saving}
+        >
+          {saving ? "Saving…" : saveSuccess ? "Saved" : "Run completed"}
+          <span className="text-sm leading-none" aria-hidden>
+            🏁
+          </span>
         </button>
       </div>
     </form>

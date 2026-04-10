@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { Prisma as PrismaTypes } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -14,6 +15,7 @@ import {
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
+import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
 
 type RunUpsertBody = {
   runId?: string;
@@ -66,6 +68,13 @@ type RunUpsertBody = {
   }>;
   /** Optional: link persisted ImportedLapTimeSession rows from URL import(s) to this run. */
   importedLapTimeSessionIds?: string[];
+  /**
+   * `draft` = save progress without marking logging complete (unless `fromEventDetection`).
+   * Omitted = treat as completed (backward compatible).
+   */
+  loggingIntent?: "draft" | "completed";
+  /** True when opening Log your run from dashboard detected-session prefill (practice/race watch). */
+  fromEventDetection?: boolean;
 };
 
 async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; mode: "create" | "update" }) {
@@ -74,6 +83,10 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   if (!carId) {
     return NextResponse.json({ error: "carId is required" }, { status: 400 });
   }
+
+  const sessionCompletedAtResolved = await resolveRunSessionCompletedAtFromUpsertBody(params.userId, body);
+  const loggingComplete =
+    body.fromEventDetection === true || body.loggingIntent !== "draft";
 
   const tireRunNumber =
     typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
@@ -254,13 +267,15 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         sourceSetupDocumentId: pdfLinks.sourceSetupDocumentId,
         sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,
         lapTimes,
-        lapSession: lapSession as unknown as Prisma.InputJsonValue,
+        lapSession: lapSession as unknown as PrismaTypes.InputJsonValue,
         notes: body.notes?.trim() || null,
         driverNotes: null,
         handlingProblems: null,
         suggestedChanges: body.suggestedChanges?.trim() || null,
         sessionLabel: body.sessionLabel?.trim() || null,
-      },
+        sessionCompletedAt: sessionCompletedAtResolved,
+        loggingComplete,
+      } as PrismaTypes.RunUncheckedCreateInput,
       select: { id: true, createdAt: true },
     });
   } else {
@@ -294,11 +309,16 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         sourceSetupDocumentId: pdfLinks.sourceSetupDocumentId,
         sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,
         lapTimes,
-        lapSession: lapSession as unknown as Prisma.InputJsonValue,
+        lapSession: lapSession as unknown as PrismaTypes.InputJsonValue,
         notes: body.notes?.trim() || null,
         suggestedChanges: body.suggestedChanges?.trim() || null,
         sessionLabel: body.sessionLabel?.trim() || null,
-      },
+        engineerSummaryJson: Prisma.JsonNull,
+        engineerSummaryRefRunId: null,
+        engineerSummaryComputedAt: null,
+        sessionCompletedAt: sessionCompletedAtResolved,
+        loggingComplete,
+      } as PrismaTypes.RunUncheckedUpdateInput,
       select: { id: true, createdAt: true },
     });
 
