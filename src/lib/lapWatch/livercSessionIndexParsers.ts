@@ -165,6 +165,9 @@ export function extractPracticeSessions(html: string, pageUrl: string): Extracte
 /**
  * When `targetName` is set, keep only rows whose extracted driver name matches exactly (normalized).
  * When `targetName` is empty/null, return all sessions (caller may still apply time-based limits).
+ *
+ * Lap-watch does **not** use this for gating imports: it imports all list rows and matches on canonical
+ * `displayDriverName` after parse, so list-row heuristics cannot hide real sessions.
  */
 export function filterPracticeSessionsByTargetDriver(
   sessions: ExtractedPracticeSession[],
