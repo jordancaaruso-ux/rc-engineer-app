@@ -4,11 +4,8 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
 import { fetchUrlText } from "@/lib/lapUrlParsers/fetchText";
-import {
-  extractPracticeSessions,
-  extractRaceSessions,
-  normalizeLiveRcDriverNameForMatch,
-} from "@/lib/lapWatch/livercSessionIndexParsers";
+import { extractPracticeSessions, extractRaceSessions } from "@/lib/lapWatch/livercSessionIndexParsers";
+import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 

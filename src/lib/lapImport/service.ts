@@ -169,4 +169,10 @@ export async function linkImportedSessionsToRun(params: {
       runId: params.runId,
     });
   }
+  if (ids.length > 0) {
+    await prisma.run.update({
+      where: { id: params.runId, userId: params.userId },
+      data: { importedLapTimeSessionId: ids[0]! },
+    });
+  }
 }

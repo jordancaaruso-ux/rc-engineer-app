@@ -4,22 +4,16 @@ import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashb
 import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { eventIsActiveOnLocalToday, startOfLocalDay } from "@/lib/eventActive";
+import { loadDetectedRunPrompts, syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
+import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
+import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
+export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 
-function startOfLocalDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-/** Event calendar range includes today (local midnight boundaries). */
-export function eventIsActiveOnLocalToday(ev: { startDate: Date; endDate: Date }): boolean {
-  const today = startOfLocalDay(new Date());
-  const start = startOfLocalDay(ev.startDate);
-  const end = startOfLocalDay(ev.endDate);
-  return start.getTime() <= today.getTime() && today.getTime() <= end.getTime();
-}
+/** @deprecated import from `@/lib/eventActive` */
+export { eventIsActiveOnLocalToday } from "@/lib/eventActive";
 
 function localTodayBounds(): { start: Date; end: Date } {
   const start = startOfLocalDay(new Date());
@@ -124,18 +118,25 @@ export async function getDashboardNewRunPrefill(
   const importedLapTimeSessionId =
     typeof raw.importedLapTimeSessionId === "string" ? raw.importedLapTimeSessionId.trim() : "";
   if (importedLapTimeSessionId) {
-    const sess = await prisma.importedLapTimeSession.findFirst({
-      where: { id: importedLapTimeSessionId, userId },
-      select: {
-        id: true,
-        sourceUrl: true,
-        parserId: true,
-        sessionCompletedAt: true,
-        parsedPayload: true,
-        createdAt: true,
-      },
-    });
+    const [sess, liveRcDriverName] = await Promise.all([
+      prisma.importedLapTimeSession.findFirst({
+        where: { id: importedLapTimeSessionId, userId },
+        select: {
+          id: true,
+          sourceUrl: true,
+          parserId: true,
+          sessionCompletedAt: true,
+          parsedPayload: true,
+          createdAt: true,
+          eventDetectionSource: true,
+          linkedEventId: true,
+        },
+      }),
+      getLiveRcDriverNameSetting(userId),
+    ]);
     if (!sess) return null;
+    const src = sess.eventDetectionSource;
+    const eventDetectionSource = src === "practice" || src === "race" ? src : null;
     return {
       mode: "imported_lap_session",
       importedLapTimeSession: {
@@ -145,6 +146,9 @@ export async function getDashboardNewRunPrefill(
         sessionCompletedAtIso: sess.sessionCompletedAt ? sess.sessionCompletedAt.toISOString() : null,
         parsedPayload: sess.parsedPayload,
         createdAt: sess.createdAt.toISOString(),
+        eventDetectionSource,
+        linkedEventId: sess.linkedEventId,
+        liveRcDriverName,
       },
     };
   }
@@ -187,6 +191,7 @@ export type DashboardActionItemRow = {
 };
 
 export type DashboardHomeModel = {
+  detectedRunPrompts: DetectedRunPrompt[];
   thingsToTry: DashboardActionItemRow[];
   activeEvent: null | {
     id: string;
@@ -230,6 +235,9 @@ const recentRunSelect = {
 
 export async function loadDashboardHomeModel(userId: string): Promise<DashboardHomeModel> {
   const { start: todayStart, end: todayEnd } = localTodayBounds();
+
+  await syncRecentEventLapSources(userId).catch(() => {});
+  const detectedRunPrompts = await loadDetectedRunPrompts(userId);
 
   const [events, hasRunToday, recentRun, runsForPerf] = await Promise.all([
     prisma.event.findMany({
@@ -363,6 +371,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
   }
 
   return {
+    detectedRunPrompts,
     thingsToTry: actionItems.map((i) => ({
       id: i.id,
       text: i.text,

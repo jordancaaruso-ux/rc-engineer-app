@@ -34,6 +34,8 @@ export default async function NewRunPage({
   const user = await getOrCreateLocalUser();
   const sp = await searchParams;
   const dashboardPrefill = await getDashboardNewRunPrefill(user.id, sp);
+  const initialEventId =
+    typeof sp.eventId === "string" && sp.eventId.trim().length > 0 ? sp.eventId.trim() : null;
 
   const [cars, allTracks, favouriteTrackIds] = await Promise.all([
     prisma.car.findMany({
@@ -70,6 +72,7 @@ export default async function NewRunPage({
           favouriteTrackIds={favouriteTrackIds}
           favouriteTracks={favouriteTracks}
           dashboardPrefill={dashboardPrefill}
+          initialEventId={initialEventId}
         />
       </section>
     </>

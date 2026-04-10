@@ -19,7 +19,9 @@ import { formatRunListScanLine, formatRunPickerLineRelativeWhen } from "@/lib/ru
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { normalizeLapTimes } from "@/lib/runLaps";
+import type { LapRow } from "@/lib/lapAnalysis";
 import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import {
   LapTimesIngestPanel,
@@ -144,6 +146,8 @@ export function NewRunForm(props: {
   favouriteTrackIds?: string[];
   favouriteTracks?: TrackOption[];
   dashboardPrefill?: DashboardNewRunPrefill | null;
+  /** Optional event to attach (e.g. from dashboard detection deep link). */
+  initialEventId?: string | null;
   /** When set, the form edits an existing run (owner-only enforced by server update route). */
   editRun?: LastRun | null;
 }) {
@@ -153,6 +157,7 @@ export function NewRunForm(props: {
   const favouriteTrackIds = props.favouriteTrackIds ?? [];
   const favouriteTracks = props.favouriteTracks ?? [];
   const dashboardPrefill = props.dashboardPrefill ?? null;
+  const initialEventId = props.initialEventId?.trim() || null;
 
   const [sessionType, setSessionType] = useState<"TESTING" | "RACE_MEETING">("TESTING");
   const [meetingSessionType, setMeetingSessionType] = useState<MeetingSessionType>("PRACTICE");
@@ -258,15 +263,74 @@ export function NewRunForm(props: {
   const editPrefillAppliedRef = useRef(false);
 
   useEffect(() => {
+    if (initialEventId) setEventId(initialEventId);
+  }, [initialEventId]);
+
+  useEffect(() => {
     const p = dashboardPrefill;
     if (!p || dashboardPrefillAppliedRef.current) return;
     dashboardPrefillAppliedRef.current = true;
 
     if (p.mode === "imported_lap_session") {
       const sess = p.importedLapTimeSession;
-      const parsed = primaryLapRowsFromImportedPayload(sess.parsedPayload);
-      if (parsed) {
+      const ingestMode =
+        sess.eventDetectionSource === "practice"
+          ? "practice_user_only"
+          : sess.eventDetectionSource === "race"
+            ? "race_full_field"
+            : "race_full_field";
+      const plan = buildImportedIngestPlanFromPayload(sess.parsedPayload, {
+        mode: ingestMode,
+        liveRcDriverName: sess.liveRcDriverName,
+      });
+      const parsed = plan
+        ? null
+        : primaryLapRowsFromImportedPayload(sess.parsedPayload);
+      if (plan) {
+        const driverLapRowsByDriverId: Record<string, LapRow[]> = {};
+        for (const d of plan.sessionDrivers) {
+          driverLapRowsByDriverId[d.driverId] = d.laps.map((t, i) => ({
+            lapNumber: i + 1,
+            lapTimeSeconds: t,
+            isIncluded: true,
+          }));
+        }
+        const primaryLaps = plan.primaryRows.map((r) => r.lapTimeSeconds);
+        if (sess.linkedEventId) setEventId(sess.linkedEventId);
+        if (sess.eventDetectionSource === "race") {
+          setSessionType("RACE_MEETING");
+          setMeetingSessionType("RACE");
+        } else if (sess.eventDetectionSource === "practice") {
+          setSessionType("RACE_MEETING");
+          setMeetingSessionType("PRACTICE");
+        }
+        setLapIngest({
+          ...defaultLapIngestValue(),
+          manualText: primaryLaps.map((n) => n.toFixed(3)).join("\n"),
+          sourceKind: "url",
+          sourceDetail: sess.sourceUrl,
+          parserId: sess.parserId,
+          urlLapRows: null,
+          urlImportBlocks: [
+            {
+              blockId: crypto.randomUUID(),
+              importedSessionId: sess.id,
+              sourceUrl: sess.sourceUrl,
+              parserId: sess.parserId,
+              recordedAt: sess.createdAt,
+              sessionCompletedAtDbIso: sess.sessionCompletedAtIso,
+              sessionCompletedAtIso: sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload),
+              sessionDrivers: plan.sessionDrivers,
+              selectedDriverIds: plan.selectedDriverIds,
+              driverLapRowsByDriverId,
+              urlLapRows: null,
+            },
+          ],
+        });
+        setSetupSectionExpanded(true);
+      } else if (parsed) {
         const laps = parsed.rows.map((r) => r.lapTimeSeconds);
+        if (sess.linkedEventId) setEventId(sess.linkedEventId);
         setLapIngest({
           ...defaultLapIngestValue(),
           manualText: laps.map((n) => n.toFixed(3)).join("\n"),

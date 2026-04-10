@@ -47,5 +47,8 @@ export type DashboardNewRunPrefill =
         parsedPayload: unknown;
         /** Import row `createdAt` — last-resort instant for labels when completion time is missing. */
         createdAt: string;
+        eventDetectionSource: "practice" | "race" | null;
+        linkedEventId: string | null;
+        liveRcDriverName: string | null;
       };
     };

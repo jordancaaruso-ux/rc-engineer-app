@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { DashboardWorkflowContext } from "@/components/dashboard/DashboardWorkflowContext";
-import { WatchedLapSourcesCard } from "@/components/dashboard/WatchedLapSourcesCard";
+import { DetectedRunPromptsBanner } from "@/components/dashboard/DetectedRunPromptsBanner";
 
 function btnPrimary(className = "") {
   return `inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
@@ -13,7 +13,7 @@ function btnGhost(className = "") {
 }
 
 export function DashboardHome({ model }: { model: DashboardHomeModel }) {
-  const { activeEvent, hasRunToday, perfBestLap, perfAvgTop5, recentRun, thingsToTry } = model;
+  const { activeEvent, hasRunToday, perfBestLap, perfAvgTop5, recentRun, thingsToTry, detectedRunPrompts } = model;
 
   const standaloneHref = "/runs/new";
   const standaloneLabel = hasRunToday ? "Log another run today" : "Log today's run";
@@ -40,6 +40,8 @@ export function DashboardHome({ model }: { model: DashboardHomeModel }) {
       </header>
 
       <section className="page-body flex max-w-3xl flex-col gap-3">
+        <DetectedRunPromptsBanner prompts={detectedRunPrompts} />
+
         <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current context</div>
 
@@ -115,8 +117,6 @@ export function DashboardHome({ model }: { model: DashboardHomeModel }) {
         </div>
 
         <DashboardWorkflowContext recentRun={recentRun} thingsToTry={thingsToTry} />
-
-        <WatchedLapSourcesCard />
 
         <div className="flex flex-wrap gap-1.5">
           <Link href="/engineer" className={btnGhost()}>

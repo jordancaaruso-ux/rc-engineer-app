@@ -117,6 +117,18 @@ model Event {
   track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
   trackId String?
 
+  /** LiveRC practice session list URL for this event (optional). */
+  practiceSourceUrl String?
+  /** LiveRC results index URL for this event (optional). */
+  resultsSourceUrl  String?
+  /** Race class to watch on results index (e.g. \"17.5 Stock\"). */
+  raceClass         String?
+
+  /** Watermark for practice auto-import (canonical session completion instant). */
+  practiceLastSeenSessionCompletedAt DateTime?
+  /** Watermark for results auto-import. */
+  resultsLastSeenSessionCompletedAt    DateTime?
+
   runs Run[]
   importedLapTimeSessions ImportedLapTimeSession[]
   // Future: timetable/scheduled sessions (timetableSessions?), reminders, "most likely session" suggestions
@@ -420,7 +432,11 @@ model Run {
   actionItems     ActionItem[]
 
   /** Lap-time imports linked to this run (optional; see ImportedLapTimeSession). */
-  importedLapTimeSessions ImportedLapTimeSession[]
+  linkedImportedLapSessions ImportedLapTimeSession[] @relation("ImportedLapSessionLinkedRun")
+
+  /** Primary imported lap-time session when this run was created from detection / URL import. */
+  importedLapTimeSessionId String?                 @unique
+  detectedImportedLapSession ImportedLapTimeSession? @relation("RunDetectedImport", fields: [importedLapTimeSessionId], references: [id], onDelete: SetNull)
 }
 
 /**
@@ -449,14 +465,22 @@ model ImportedLapTimeSession {
    */
   sessionCompletedAt DateTime?
 
-  linkedRun   Run?    @relation(fields: [linkedRunId], references: [id], onDelete: SetNull)
+  linkedRun   Run?    @relation("ImportedLapSessionLinkedRun", fields: [linkedRunId], references: [id], onDelete: SetNull)
   linkedRunId String?
 
   linkedEvent   Event?  @relation(fields: [linkedEventId], references: [id], onDelete: SetNull)
   linkedEventId String?
 
+  /** When populated by event lap detection: practice vs race scope. */
+  eventDetectionSource String?
+  /** Race class label when `eventDetectionSource` is race. */
+  eventRaceClass       String?
+
+  detectedPrimaryForRun Run? @relation("RunDetectedImport")
+
   @@index([userId, createdAt])
   @@index([userId, sourceUrl])
+  @@index([linkedEventId])
 }
 
 model WatchedLapSource {

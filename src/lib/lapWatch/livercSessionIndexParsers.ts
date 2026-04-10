@@ -3,18 +3,12 @@ import "server-only";
 import { load } from "cheerio";
 import type { CheerioAPI } from "cheerio";
 import { parseLiveRcSessionDisplayTimeToUtcIso } from "@/lib/lapUrlParsers/livercSessionTime";
+import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+
+export { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 
 function normalizeWhitespace(s: string): string {
   return s.replace(/\s+/g, " ").trim();
-}
-
-/** Deterministic comparison for session-list driver filtering (no fuzzy matching). */
-export function normalizeLiveRcDriverNameForMatch(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[.,;:]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function looksLikePersonNameCell(text: string): boolean {
