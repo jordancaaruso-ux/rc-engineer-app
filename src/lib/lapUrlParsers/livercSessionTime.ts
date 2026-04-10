@@ -109,6 +109,14 @@ export function parseLiveRcSessionDisplayTimeToUtcIso(raw: string): string | nul
   let s = normalizeWhitespace(raw).replace(/[\u2013\u2014\u2212]/g, "-");
   if (!s) return null;
 
+  // LiveRC lists use "Jan 25, 2026 at 3:22pm"; Node Date.parse needs "Jan 25, 2026 3:22 PM" (space + uppercase AM/PM).
+  s = s.replace(/\s+at\s+/i, " ");
+  s = s.replace(/\b(\d{1,2}:\d{2})(?::(\d{2}))?\s*([ap]m)\b/gi, (_, h, sec, ap) => {
+    const mid = sec != null ? `:${sec}` : "";
+    const suf = String(ap).toLowerCase() === "am" ? "AM" : "PM";
+    return `${h}${mid} ${suf}`;
+  });
+
   const tryParse = (v: string): string | null => {
     const ms = Date.parse(v);
     if (!Number.isNaN(ms)) return new Date(ms).toISOString();
@@ -118,7 +126,6 @@ export function parseLiveRcSessionDisplayTimeToUtcIso(raw: string): string | nul
   let out = tryParse(s);
   if (out) return out;
 
-  // "Wednesday, 8 April 2025 at 2:30 PM" vs spacing issues
   out = tryParse(s.replace(/\s+at\s+/i, " "));
   if (out) return out;
 

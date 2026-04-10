@@ -60,6 +60,66 @@ function readSessionIdFromUrl(urlStr: string): string | null {
   }
 }
 
+const RE_WEEKDAY_DATE =
+  /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}(?:\s+at\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)?/i;
+const RE_SLASH_DATE = /\b\d{1,2}\/\d{1,2}\/\d{4}(?:\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)?/i;
+/** e.g. Jan 25, 2026 at 3:22pm (LiveRC race result list "Time Completed" column) */
+const RE_MONTH_NAME_DATE =
+  /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}(?:\s+at\s+\d{1,2}:\d{2}\s*(?:[ap]m))?/i;
+/** e.g. 2026-01-25 17:34:51 before duplicate am/pm noise on practice lists */
+const RE_ISO_LOCAL_DATETIME = /\b\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?/;
+
+/**
+ * Best-effort datetime substring from LiveRC practice session list or race results list row text.
+ */
+/**
+ * LiveRC result list links often look like:
+ * `Race 14: ISTC 13.5T (ISTC 13.5T A3-Main)` — class lives in the anchor, not a `Class:` table cell.
+ */
+export function extractRaceClassFromLiveRcResultListLink(linkText: string): string | null {
+  const t = normalizeWhitespace(linkText);
+  if (!t) return null;
+  const raceMain = t.match(/\bRace\s+\d+\s*:\s*(.+?)(?:\s*\(|$)/i);
+  if (raceMain?.[1]) {
+    const s = normalizeWhitespace(raceMain[1]);
+    return s.length >= 2 ? s : null;
+  }
+  const qual = t.match(/\bQualifier\s+[^:]+:\s*(.+?)(?:\s*\(|$)/i);
+  if (qual?.[1]) {
+    const s = normalizeWhitespace(qual[1]);
+    return s.length >= 2 ? s : null;
+  }
+  return null;
+}
+
+/** Row matches configured event/watch class: exact normalized match, or configured class appears in row/link text. */
+export function raceListRowMatchesEventClass(
+  r: Pick<ExtractedRaceSession, "raceClass" | "listLinkText">,
+  configuredNorm: string
+): boolean {
+  if (!configuredNorm) return false;
+  const col = normalizeLiveRcDriverNameForMatch(r.raceClass ?? "");
+  if (col && col === configuredNorm) return true;
+  const hay = normalizeLiveRcDriverNameForMatch(`${r.raceClass ?? ""} ${r.listLinkText ?? ""}`);
+  if (hay && hay === configuredNorm) return true;
+  if (configuredNorm.length >= 5 && hay.includes(configuredNorm)) return true;
+  return false;
+}
+
+export function extractLiveRcRowTimeCandidate(rowText: string): string | null {
+  const t = normalizeWhitespace(rowText);
+  if (!t) return null;
+  const m1 = t.match(RE_WEEKDAY_DATE);
+  if (m1?.[0]) return normalizeWhitespace(m1[0]);
+  const m2 = t.match(RE_SLASH_DATE);
+  if (m2?.[0]) return normalizeWhitespace(m2[0]);
+  const m3 = t.match(RE_MONTH_NAME_DATE);
+  if (m3?.[0]) return normalizeWhitespace(m3[0]);
+  const m4 = t.match(RE_ISO_LOCAL_DATETIME);
+  if (m4?.[0]) return normalizeWhitespace(m4[0]);
+  return null;
+}
+
 export function isLiveRcPracticeListUrl(urlStr: string): boolean {
   try {
     const u = new URL(urlStr.trim());
@@ -90,6 +150,8 @@ export function isLiveRcResultsDiscoveryUrl(urlStr: string): boolean {
 
 export type ExtractedPracticeSession = {
   driverName: string;
+  /** Visible `<a>` text on the practice list (usually the driver name). */
+  listLinkText: string | null;
   sessionTime: string | null;
   sessionCompletedAtIso: string | null;
   sessionId: string;
@@ -98,6 +160,8 @@ export type ExtractedPracticeSession = {
 
 export type ExtractedRaceSession = {
   driverName: string | null;
+  /** Visible `<a>` text on the results list (e.g. "Race 15: ISTC Modified (A3-Main)"). */
+  listLinkText: string | null;
   raceClass: string | null;
   sessionTime: string | null;
   sessionCompletedAtIso: string | null;
@@ -134,19 +198,21 @@ export function extractPracticeSessions(html: string, pageUrl: string): Extracte
 
     const driverName = tr.length ? guessDriverNameFromPracticeRow($, tr.get(0), linkText) : linkText || "Practice session";
 
-    // Heuristic extraction for a display time token inside the row.
-    // We keep this conservative: if no match, store null and watcher will rely on forceImport mode.
-    const timeCandidate =
-      rowText.match(
-        /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}(?:\s+at\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)?/i
-      )?.[0] ??
-      rowText.match(/\b\d{1,2}\/\d{1,2}\/\d{4}(?:\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)?/i)?.[0] ??
-      null;
+    const timeCandidate = extractLiveRcRowTimeCandidate(rowText);
 
     const sessionTime = timeCandidate ? normalizeWhitespace(timeCandidate) : null;
     const sessionCompletedAtIso = sessionTime ? parseLiveRcSessionDisplayTimeToUtcIso(sessionTime) : null;
 
-    out.push({ driverName, sessionTime, sessionCompletedAtIso, sessionId, sessionUrl });
+    const listLinkText = linkText.trim() ? linkText : null;
+
+    out.push({
+      driverName,
+      listLinkText,
+      sessionTime,
+      sessionCompletedAtIso,
+      sessionId,
+      sessionUrl,
+    });
   }
 
   // Deduplicate by sessionId (same list can contain duplicate links in header/footer).
@@ -205,23 +271,30 @@ export function extractRaceSessions(html: string, pageUrl: string): ExtractedRac
     if (!sessionId) continue;
 
     const tr = $(a).closest("tr");
+    const linkText = normalizeWhitespace($(a).text());
     const rowText = normalizeWhitespace(tr.length ? tr.text() : $(a).parent().text());
 
-    const timeCandidate =
-      rowText.match(
-        /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}(?:\s+at\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)?/i
-      )?.[0] ??
-      rowText.match(/\b\d{1,2}\/\d{1,2}\/\d{4}(?:\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)?/i)?.[0] ??
-      null;
+    const timeCandidate = extractLiveRcRowTimeCandidate(rowText);
     const sessionTime = timeCandidate ? normalizeWhitespace(timeCandidate) : null;
     const sessionCompletedAtIso = sessionTime ? parseLiveRcSessionDisplayTimeToUtcIso(sessionTime) : null;
 
-    // "Class" column text is inconsistent; try a conservative capture.
+    // Prefer `Class:` cell; else parse class from list link text (LiveRC event hub rows).
     const raceClass =
       rowText.match(/\bClass\b\s*[:\-]\s*([A-Za-z0-9 _./+-]{2,40})/i)?.[1]?.trim() ??
+      extractRaceClassFromLiveRcResultListLink(linkText) ??
       null;
 
-    out.push({ driverName: null, raceClass, sessionTime, sessionCompletedAtIso, sessionId, sessionUrl });
+    const listLinkText = linkText.trim() ? linkText : null;
+
+    out.push({
+      driverName: null,
+      listLinkText,
+      raceClass,
+      sessionTime,
+      sessionCompletedAtIso,
+      sessionId,
+      sessionUrl,
+    });
   }
 
   const seen = new Set<string>();

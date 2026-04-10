@@ -9,6 +9,7 @@ import {
   extractRaceSessions,
   isLiveRcPracticeListUrl,
   isLiveRcResultsDiscoveryUrl,
+  raceListRowMatchesEventClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
@@ -163,7 +164,7 @@ export async function checkWatchedLapSources(params: {
       const raceList = isLiveRcResultsDiscoveryUrl(pageUrl) ? extractRaceSessions(fetched.text, pageUrl) : [];
       const raceListFiltered =
         targetMode === "class" && targetClassNorm
-          ? raceList.filter((r) => normalizeLiveRcDriverNameForMatch(r.raceClass ?? "") === targetClassNorm)
+          ? raceList.filter((r) => raceListRowMatchesEventClass(r, targetClassNorm))
           : raceList;
       if (isResultsIndexPage && targetMode === "class" && !targetClassNorm) {
         await prisma.watchedLapSource.update({ where: { id: s.id }, data: { lastCheckedAt: now } });

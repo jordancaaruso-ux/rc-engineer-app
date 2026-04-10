@@ -475,6 +475,11 @@ model ImportedLapTimeSession {
   eventDetectionSource String?
   /** Race class label when `eventDetectionSource` is race. */
   eventRaceClass       String?
+  /**
+   * Human label from the LiveRC list row when detected (e.g. race result link text:
+   * "Race 15: ISTC Modified (ISTC Modified A3-Main)"). Null for legacy imports.
+   */
+  eventDetectionSessionLabel String?
 
   detectedPrimaryForRun Run? @relation("RunDetectedImport")
 

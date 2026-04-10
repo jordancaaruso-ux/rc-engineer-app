@@ -8,6 +8,7 @@ import {
   extractRaceSessions,
   isLiveRcPracticeListUrl,
   isLiveRcResultsDiscoveryUrl,
+  raceListRowMatchesEventClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import {
@@ -195,7 +196,7 @@ export async function buildEventLapDetectionDebug(
 
         const decorated = raw.map((r) => {
           const rowNorm = r.raceClass ? normalizeLiveRcDriverNameForMatch(r.raceClass) : null;
-          const classMatchesEvent = Boolean(classNorm && rowNorm && rowNorm === classNorm);
+          const classMatchesEvent = Boolean(classNorm && raceListRowMatchesEventClass(r, classNorm));
           const iso = r.sessionCompletedAtIso?.trim() ? r.sessionCompletedAtIso.trim() : null;
           const dt = iso ? new Date(iso) : null;
           const whenOk = dt != null && !Number.isNaN(dt.getTime());

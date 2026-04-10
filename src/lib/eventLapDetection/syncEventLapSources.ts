@@ -9,6 +9,7 @@ import {
   extractRaceSessions,
   isLiveRcPracticeListUrl,
   isLiveRcResultsDiscoveryUrl,
+  raceListRowMatchesEventClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
@@ -179,12 +180,18 @@ async function syncPracticeForEvent(
       maxSeen = maxDate(maxSeen, when);
     }
 
+    const practiceLabel =
+      t.listLinkText?.trim() ||
+      t.driverName?.trim() ||
+      null;
+
     await prisma.importedLapTimeSession.update({
       where: { id: imported.importedSessionId },
       data: {
         linkedEventId: ev.id,
         eventDetectionSource: "practice",
         eventRaceClass: null,
+        eventDetectionSessionLabel: practiceLabel,
       },
     });
   }
@@ -214,8 +221,8 @@ async function syncResultsForEvent(
   const fetched = await fetchUrlText(pageUrl);
   if (!fetched.ok) return;
 
-  const raceList = extractRaceSessions(fetched.text, pageUrl).filter(
-    (r) => normalizeLiveRcDriverNameForMatch(r.raceClass ?? "") === classNorm
+  const raceList = extractRaceSessions(fetched.text, pageUrl).filter((r) =>
+    raceListRowMatchesEventClass(r, classNorm)
   );
 
   const lastSeen = ev.resultsLastSeenSessionCompletedAt;
@@ -263,6 +270,7 @@ async function syncResultsForEvent(
         linkedEventId: ev.id,
         eventDetectionSource: "race",
         eventRaceClass: ev.raceClass!.trim(),
+        eventDetectionSessionLabel: t.listLinkText?.trim() || null,
       },
     });
   }
@@ -309,6 +317,7 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
       createdAt: true,
       eventDetectionSource: true,
       eventRaceClass: true,
+      eventDetectionSessionLabel: true,
       linkedRunId: true,
     },
   });
@@ -366,6 +375,7 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
       importedLapTimeSessionId: s.id,
       sourceType,
       sessionCompletedAtIso,
+      sessionListLabel: s.eventDetectionSessionLabel?.trim() || null,
       displayDriverName,
       className: sourceType === "race" ? s.eventRaceClass?.trim() ?? null : null,
       lapCount,

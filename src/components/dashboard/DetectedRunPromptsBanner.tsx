@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
+import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { formatLap } from "@/lib/runLaps";
 
 function btnPrimary(className = "") {
@@ -18,6 +19,12 @@ function promptHref(p: DetectedRunPrompt): string {
   return `/runs/new?${q.toString()}`;
 }
 
+function formatPromptSessionWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return formatAppTimestampUtc(iso);
+}
+
 export function DetectedRunPromptsBanner({ prompts }: { prompts: DetectedRunPrompt[] }) {
   if (prompts.length === 0) return null;
 
@@ -32,41 +39,51 @@ export function DetectedRunPromptsBanner({ prompts }: { prompts: DetectedRunProm
             p.promptKind === "finish" ? "Finish logging this run" : "Log this run";
           const timeLabel = formatLap(p.bestLapSeconds);
           const lapsLabel = p.lapCount != null ? `${p.lapCount} lap${p.lapCount === 1 ? "" : "s"}` : "—";
+          const whenUtc = formatPromptSessionWhen(p.sessionCompletedAtIso);
+          const kindLabel = p.sourceType === "practice" ? "Practice" : "Race / qualifying";
+          const sessionTitle =
+            p.sessionListLabel?.trim() ||
+            (p.sourceType === "race" ? (p.className?.trim() || "Race session") : p.displayDriverName);
 
           return (
             <li
               key={`${p.importedLapTimeSessionId}-${p.promptKind}`}
-              className="flex flex-col gap-2 rounded-md border border-border bg-card/80 p-2.5 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 rounded-md border border-border bg-card/80 p-2.5 sm:flex-row sm:items-start sm:justify-between"
             >
-              <div className="min-w-0 text-[11px] leading-snug">
-                <div className="font-medium text-foreground">{title}</div>
-                <div className="mt-0.5 text-muted-foreground">
-                  <span className="text-foreground/90">{p.eventName}</span>
+              <div className="min-w-0 flex-1 text-[11px] leading-snug">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground">
+                    {kindLabel}
+                  </span>
+                  <span className="font-medium text-foreground">{title}</span>
+                </div>
+                <div className="mt-1 text-foreground/90">{p.eventName}</div>
+                <div className="mt-0.5 font-medium text-foreground break-words">{sessionTitle}</div>
+                <div className="mt-1 space-y-0.5 text-muted-foreground">
+                  <div>
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">
+                      Session time (UTC)
+                    </span>
+                    <span className="ml-1.5 font-mono tabular-nums text-foreground/90">{whenUtc}</span>
+                  </div>
                   {p.sourceType === "practice" ? (
-                    <>
-                      {" · "}
-                      <span>{p.displayDriverName}</span>
-                      {" · "}
-                      <span className="font-mono tabular-nums">{timeLabel}</span>
-                      {" · "}
-                      <span>{lapsLabel}</span>
-                    </>
+                    <div>Driver (your laps): {p.displayDriverName}</div>
                   ) : (
-                    <>
-                      {" · "}
-                      <span>{p.className ?? "Race"}</span>
-                      {" · "}
-                      <span className="font-mono tabular-nums">{timeLabel}</span>
-                      {" · "}
-                      <span>{lapsLabel}</span>
-                    </>
+                    <div>
+                      Class filter: {p.className ?? "—"} · Your row: {p.displayDriverName}
+                    </div>
                   )}
+                  <div>
+                    Best lap {timeLabel} · {lapsLabel}
+                  </div>
                 </div>
                 {p.sourceType === "race" ? (
-                  <div className="mt-0.5 text-[10px] italic text-muted-foreground">Full field loaded; your row preselected</div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    Full field loaded in Log your run; your driver is preselected.
+                  </div>
                 ) : null}
               </div>
-              <Link href={promptHref(p)} className={`${btnPrimary()} shrink-0 self-start sm:self-auto`}>
+              <Link href={promptHref(p)} className={`${btnPrimary()} shrink-0 self-start sm:mt-0.5`}>
                 {title}
               </Link>
             </li>
