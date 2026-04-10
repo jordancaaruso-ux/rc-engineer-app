@@ -6,6 +6,30 @@ import { validateTimingHttpUrl } from "@/lib/lapImport/service";
 
 export const dynamic = "force-dynamic";
 
+function isLiveRcPracticeListUrl(urlStr: string): boolean {
+  try {
+    const u = new URL(urlStr.trim());
+    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
+    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
+    if (!path.endsWith("/practice")) return false;
+    const p = (u.searchParams.get("p") ?? "").toLowerCase();
+    return p === "session_list";
+  } catch {
+    return false;
+  }
+}
+
+function isLiveRcResultsIndexUrl(urlStr: string): boolean {
+  try {
+    const u = new URL(urlStr.trim());
+    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
+    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
+    return path.endsWith("/results") && !u.searchParams.get("id");
+  } catch {
+    return false;
+  }
+}
+
 function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
   try {
@@ -32,6 +56,9 @@ export async function GET() {
       select: {
         id: true,
         sourceUrl: true,
+        targetMode: true,
+        targetClass: true,
+        targetDriverOverride: true,
         driverName: true,
         carId: true,
         lastCheckedAt: true,
@@ -77,21 +104,34 @@ export async function POST(request: Request) {
   }
   const user = await getOrCreateLocalUser();
   const body = (await request.json().catch(() => null)) as
-    | { sourceUrl?: unknown; driverName?: unknown; carId?: unknown }
+    | { sourceUrl?: unknown; targetClass?: unknown; carId?: unknown }
     | null;
 
   const sourceUrl = typeof body?.sourceUrl === "string" ? body.sourceUrl.trim() : "";
   const v = validateTimingHttpUrl(sourceUrl);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
-  const driverName = typeof body?.driverName === "string" && body.driverName.trim() ? body.driverName.trim() : null;
+  const targetClass = typeof body?.targetClass === "string" && body.targetClass.trim() ? body.targetClass.trim() : null;
   const carId = typeof body?.carId === "string" && body.carId.trim() ? body.carId.trim() : null;
+
+  const targetMode = isLiveRcPracticeListUrl(v.normalized)
+    ? "driver"
+    : isLiveRcResultsIndexUrl(v.normalized)
+      ? "class"
+      : "none";
+
+  if (targetMode === "class" && !targetClass) {
+    return NextResponse.json({ error: "Race class is required for results sources." }, { status: 400 });
+  }
 
   const row = await prisma.watchedLapSource.create({
     data: {
       userId: user.id,
       sourceUrl: v.normalized,
-      driverName,
+      targetMode,
+      targetClass: targetMode === "class" ? targetClass : null,
+      targetDriverOverride: null,
+      driverName: null,
       carId,
     },
     select: { id: true },

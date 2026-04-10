@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 
 export const APP_SETTING_KEYS = {
   myName: "myName",
+  liveRcDriverName: "liveRcDriverName",
 } as const;
 
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[keyof typeof APP_SETTING_KEYS];
@@ -61,4 +62,12 @@ export async function getMyNameSetting(userId: string): Promise<string | null> {
 
 export async function setMyNameSetting(userId: string, value: string | null): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.myName, value);
+}
+
+export async function getLiveRcDriverNameSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.liveRcDriverName);
+}
+
+export async function setLiveRcDriverNameSetting(userId: string, value: string | null): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.liveRcDriverName, value);
 }

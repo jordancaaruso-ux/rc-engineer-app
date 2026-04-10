@@ -10,6 +10,7 @@ import {
   normalizeLiveRcDriverNameForMatch,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
+import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 
 export type WatchCheckResultRow =
   | {
@@ -103,6 +104,10 @@ export async function checkWatchedLapSources(params: {
   const runId = randomUUID();
   logWatch(runId, "run_start", { forceImport: params.forceImport === true });
 
+  const userLiveRcDriverName = (await getLiveRcDriverNameSetting(params.userId).catch(() => null)) ?? null;
+  const userLiveRcDriverNorm = userLiveRcDriverName ? normalizeLiveRcDriverNameForMatch(userLiveRcDriverName) : "";
+  logWatch(runId, "user_identity", { liveRcDriverName: userLiveRcDriverName, normalized: userLiveRcDriverNorm || null });
+
   const sources = await prisma.watchedLapSource.findMany({
     where: { userId: params.userId },
     orderBy: { updatedAt: "desc" },
@@ -110,7 +115,10 @@ export async function checkWatchedLapSources(params: {
     select: {
       id: true,
       sourceUrl: true,
-      driverName: true,
+      targetMode: true,
+      targetClass: true,
+      targetDriverOverride: true,
+      driverName: true, // legacy
       carId: true,
       lastSeenSessionCompletedAt: true,
     },
@@ -139,9 +147,27 @@ export async function checkWatchedLapSources(params: {
       const now = new Date();
 
       const practiceListRaw = isLiveRcPracticeListUrl(pageUrl) ? extractPracticeSessions(fetched.text, pageUrl) : [];
-      const targetDriverTrim = s.driverName?.trim() ?? "";
+      const legacyDriverTrim = s.driverName?.trim() ?? "";
+      const effectiveDriver =
+        (typeof s.targetDriverOverride === "string" && s.targetDriverOverride.trim()
+          ? s.targetDriverOverride.trim()
+          : null) ??
+        (s.targetMode === "driver" ? (userLiveRcDriverName?.trim() || null) : null) ??
+        (legacyDriverTrim || null);
+      const targetDriverTrim = effectiveDriver?.trim() ?? "";
       const targetNorm = targetDriverTrim ? normalizeLiveRcDriverNameForMatch(targetDriverTrim) : "";
       const isPracticeListPage = isLiveRcPracticeListUrl(pageUrl);
+      const isResultsIndexPage = isLiveRcResultsIndexUrl(pageUrl);
+      const targetMode = (typeof s.targetMode === "string" ? s.targetMode : "none") as "driver" | "class" | "none";
+      const targetClassTrim = typeof s.targetClass === "string" ? s.targetClass.trim() : "";
+      const targetClassNorm = targetClassTrim ? normalizeLiveRcDriverNameForMatch(targetClassTrim) : "";
+
+      logWatch(runId, "source_targeting", {
+        sourceId: s.id,
+        targetMode,
+        targetClass: targetClassTrim || null,
+        effectiveDriverName: targetDriverTrim || null,
+      });
 
       // --- 1) After parsing session-list page ---
       logWatch(runId, "practice_list_parsed", {
@@ -157,6 +183,24 @@ export async function checkWatchedLapSources(params: {
       });
 
       const raceList = isLiveRcResultsIndexUrl(pageUrl) ? extractRaceSessions(fetched.text, pageUrl) : [];
+      const raceListFiltered =
+        targetMode === "class" && targetClassNorm
+          ? raceList.filter((r) => normalizeLiveRcDriverNameForMatch(r.raceClass ?? "") === targetClassNorm)
+          : raceList;
+      if (isResultsIndexPage && targetMode === "class" && !targetClassNorm) {
+        await prisma.watchedLapSource.update({ where: { id: s.id }, data: { lastCheckedAt: now } });
+        out.push({
+          sourceId: s.id,
+          sourceUrl: s.sourceUrl,
+          driverName: s.driverName ?? null,
+          carId: s.carId ?? null,
+          status: "error",
+          error: "Results sources require a target class.",
+          parserId: null,
+        });
+        logWatch(runId, "final_decision", { sourceId: s.id, branch: "error", reason: "missing_target_class" });
+        continue;
+      }
 
       if (practiceListRaw.length === 0 && raceList.length === 0) {
         await prisma.watchedLapSource.update({ where: { id: s.id }, data: { lastCheckedAt: now } });
@@ -189,9 +233,9 @@ export async function checkWatchedLapSources(params: {
           sessionId: x.sessionId,
           sessionUrl: x.sessionUrl,
         })),
-        ...raceList.map((x) => ({
+        ...raceListFiltered.map((x) => ({
           kind: "race" as const,
-          driverName: s.driverName ?? null,
+          driverName: null,
           sessionCompletedAtIso: x.sessionCompletedAtIso,
           sessionId: x.sessionId,
           sessionUrl: x.sessionUrl,
@@ -273,7 +317,13 @@ export async function checkWatchedLapSources(params: {
       const canonicalSamples: Array<{ driverName: string; sessionCompletedAtIso: string | null; sourceUrl: string }> = [];
 
       for (const t of cappedTargets) {
-        const imported = await importOneTimingUrl(params.userId, t.sessionUrl, t.driverName ? { driverName: t.driverName } : undefined);
+        const contextDriverName =
+          t.kind === "practice"
+            ? undefined
+            : targetMode === "class" && userLiveRcDriverName
+              ? { driverName: userLiveRcDriverName }
+              : undefined;
+        const imported = await importOneTimingUrl(params.userId, t.sessionUrl, contextDriverName);
         if (imported.success !== true) {
           out.push({
             sourceId: s.id,
@@ -324,8 +374,8 @@ export async function checkWatchedLapSources(params: {
           listRowDriverHint: t.kind === "practice" ? t.driverName : null,
         });
 
-        // Target-driver mode (practice list): match canonical imported session driver, not list-row heuristics.
-        if (isPracticeListPage && targetNorm && t.kind === "practice") {
+        // Practice + driver targeting: match canonical imported session driver, not list-row heuristics.
+        if (targetMode === "driver" && isPracticeListPage && targetNorm && t.kind === "practice") {
           const canonNorm = normalizeLiveRcDriverNameForMatch(canonicalDriver);
           if (canonNorm !== targetNorm) {
             logWatch(runId, "driver_match_skip", {
@@ -395,6 +445,7 @@ export async function checkWatchedLapSources(params: {
 
       // Practice + target driver: imports succeeded but none matched canonical driver — not "no rows on list".
       if (
+        targetMode === "driver" &&
         isPracticeListPage &&
         targetNorm &&
         importTargets.length > 0 &&

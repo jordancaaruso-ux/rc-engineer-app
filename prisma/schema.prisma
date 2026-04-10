@@ -469,7 +469,22 @@ model WatchedLapSource {
 
   /** Timing/result URL to check (practice view_session or race view_race_result). */
   sourceUrl String
-  /** Optional: LiveRC race result requires a driver name to pick lap series. */
+  /**
+   * Targeting semantics:
+   * - `driver`: personal practice sessions (match canonical parsed driver name)
+   * - `class`: race results index scoped by class; user row resolved via stored LiveRC driver name
+   * - `none`: generic watch (no targeting)
+   */
+  targetMode String @default("none")
+  /** Optional: target class for results index sources (e.g. \"17.5 Stock\"). */
+  targetClass String?
+  /** Optional override for practice driver matching (otherwise uses user setting `liveRcDriverName`). */
+  targetDriverOverride String?
+
+  /**
+   * Legacy: older sources stored a per-source driver name.
+   * Kept for backward compatibility; new sources should use targetMode + targetDriverOverride.
+   */
   driverName String?
   /** Optional: choose a car for prefill suggestions when logging. */
   carId String?

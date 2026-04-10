@@ -8,7 +8,9 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 type SourceRow = {
   id: string;
   sourceUrl: string;
-  driverName: string | null;
+  targetMode?: "driver" | "class" | "none";
+  targetClass?: string | null;
+  driverName: string | null; // legacy
   carId: string | null;
   lastCheckedAt: string | null;
   lastSeenSessionCompletedAt: string | null;
@@ -74,10 +76,30 @@ export function WatchedLapSourcesCard() {
   const [results, setResults] = useState<CheckResult[]>([]);
   const [resultNote, setResultNote] = useState<string | null>(null);
 
+  const [liveRcDriverName, setLiveRcDriverName] = useState("");
+  const [liveRcDriverBusy, setLiveRcDriverBusy] = useState(false);
+
   const [url, setUrl] = useState("");
-  const [driverName, setDriverName] = useState("");
+  const [raceClass, setRaceClass] = useState("");
   const [carId, setCarId] = useState("");
   const [addErr, setAddErr] = useState<string | null>(null);
+
+  function inferUrlKind(u: string): "practice_list" | "results_index" | "other" {
+    try {
+      const x = new URL(u.trim());
+      const hostOk = /\.liverc\.com$/i.test(x.hostname);
+      const path = x.pathname.toLowerCase().replace(/\/+$/, "");
+      if (hostOk && path.endsWith("/practice") && (x.searchParams.get("p") ?? "").toLowerCase() === "session_list") {
+        return "practice_list";
+      }
+      if (hostOk && path.endsWith("/results") && !x.searchParams.get("id")) {
+        return "results_index";
+      }
+      return "other";
+    } catch {
+      return "other";
+    }
+  }
 
   async function loadSources() {
     setLoadErr(null);
@@ -103,6 +125,37 @@ export function WatchedLapSourcesCard() {
     void loadSources();
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/settings/live-rc-driver", { cache: "no-store" })
+      .then((r) => r.json().catch(() => ({})))
+      .then((data: { liveRcDriverName?: string | null }) => {
+        if (!alive) return;
+        setLiveRcDriverName(typeof data.liveRcDriverName === "string" ? data.liveRcDriverName : "");
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function saveLiveRcDriverName() {
+    setLiveRcDriverBusy(true);
+    try {
+      const res = await fetch("/api/settings/live-rc-driver", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ liveRcDriverName: liveRcDriverName.trim() || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setLiveRcDriverName(typeof (data as { liveRcDriverName?: string | null }).liveRcDriverName === "string" ? (data as { liveRcDriverName: string }).liveRcDriverName : "");
+      }
+    } finally {
+      setLiveRcDriverBusy(false);
+    }
+  }
+
   async function addSource() {
     const sourceUrl = url.trim();
     if (!sourceUrl) {
@@ -110,13 +163,22 @@ export function WatchedLapSourcesCard() {
       return;
     }
     setAddErr(null);
+    const kind = inferUrlKind(sourceUrl);
+    if (kind === "practice_list" && !liveRcDriverName.trim()) {
+      setAddErr("Set your LiveRC driver name first (used for practice sources).");
+      return;
+    }
+    if (kind === "results_index" && !raceClass.trim()) {
+      setAddErr("Enter your race class for results sources.");
+      return;
+    }
     try {
       const res = await fetch("/api/lap-watch/sources", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourceUrl,
-          driverName: driverName.trim() || null,
+          targetClass: kind === "results_index" ? raceClass.trim() : null,
           carId: carId.trim() || null,
         }),
       });
@@ -126,7 +188,7 @@ export function WatchedLapSourcesCard() {
         return;
       }
       setUrl("");
-      setDriverName("");
+      setRaceClass("");
       setCarId("");
       await loadSources();
     } catch {
@@ -248,6 +310,21 @@ export function WatchedLapSourcesCard() {
       ) : null}
 
       <div className="rounded-md border border-border bg-muted/40 p-2 space-y-2">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">LiveRC identity</div>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+          <input
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs outline-none"
+            placeholder="Your LiveRC driver name (e.g. Jordan Caruso)"
+            value={liveRcDriverName}
+            onChange={(e) => setLiveRcDriverName(e.target.value)}
+          />
+          <button type="button" className={btnPrimary()} disabled={liveRcDriverBusy} onClick={() => void saveLiveRcDriverName()}>
+            {liveRcDriverBusy ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-md border border-border bg-muted/40 p-2 space-y-2">
         <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Add source</div>
         <div className="space-y-1">
           <input
@@ -257,12 +334,25 @@ export function WatchedLapSourcesCard() {
             onChange={(e) => setUrl(e.target.value)}
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs outline-none"
-              placeholder="Driver name (race result only)"
-              value={driverName}
-              onChange={(e) => setDriverName(e.target.value)}
-            />
+            {inferUrlKind(url) === "results_index" ? (
+              <input
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs outline-none"
+                placeholder="Race class (results pages)"
+                value={raceClass}
+                onChange={(e) => setRaceClass(e.target.value)}
+              />
+            ) : (
+              <div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                {inferUrlKind(url) === "practice_list" ? (
+                  <>
+                    Using LiveRC driver:{" "}
+                    <span className="text-foreground/90 font-medium">{liveRcDriverName.trim() || "—"}</span>
+                  </>
+                ) : (
+                  <>Targeting: none</>
+                )}
+              </div>
+            )}
             <input
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs outline-none"
               placeholder="Car id (optional)"
@@ -290,7 +380,9 @@ export function WatchedLapSourcesCard() {
                   <div className="min-w-0">
                     <div className="text-[11px] font-medium text-foreground break-all">{s.sourceUrl}</div>
                     <div className="text-[10px] text-muted-foreground">
-                      {s.driverName ? `Driver: ${s.driverName} · ` : ""}
+                      {s.targetMode === "class" && s.targetClass ? `Class: ${s.targetClass} · ` : ""}
+                      {s.targetMode === "driver" ? `Practice (uses LiveRC identity) · ` : ""}
+                      {s.driverName ? `Legacy driver: ${s.driverName} · ` : ""}
                       Last seen:{" "}
                       {s.lastSeenSessionCompletedAt ? formatRunCreatedAtDateTime(s.lastSeenSessionCompletedAt) : "—"} · Last checked:{" "}
                       {s.lastCheckedAt ? formatRunCreatedAtDateTime(s.lastCheckedAt) : "—"}
