@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { hasDatabaseUrl } from "@/lib/env";
 import { LapImportWorkspace } from "@/components/laps/LapImportWorkspace";
@@ -39,7 +40,9 @@ export default function LapTimeImportPage(): ReactNode {
         </div>
       </header>
       <section className="page-body">
-        <LapImportWorkspace />
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+          <LapImportWorkspace />
+        </Suspense>
       </section>
     </>
   );

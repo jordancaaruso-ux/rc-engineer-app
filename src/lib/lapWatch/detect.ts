@@ -9,20 +9,28 @@ import {
   filterPracticeSessionsByTargetDriver,
   normalizeLiveRcDriverNameForMatch,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
+import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
 
 export type WatchCheckResultRow =
   | {
       sourceId: string;
       sourceUrl: string;
+      /** Watched-source target driver (optional); not the canonical display name. */
       driverName: string | null;
       carId: string | null;
       status: "new_imported";
       importedSessionId: string;
+      /** Canonical timing URL from ImportedLapTimeSession.sourceUrl after import. */
       importedFromUrl: string;
       sessionId: string;
+      /** Display time (ISO) — from DB + payload, same as lap import library. */
       sessionCompletedAtIso: string | null;
       parserId: string;
       message: string | null;
+      /** Canonical driver label from imported session parsed payload. */
+      displayDriverName: string;
+      lapCount: number | null;
+      bestLapSeconds: number | null;
     }
   | {
       sourceId: string;
@@ -247,7 +255,9 @@ export async function checkWatchedLapSources(params: {
           continue;
         }
 
-        const importedWhen = imported.sessionCompletedAtIso ? new Date(imported.sessionCompletedAtIso) : null;
+        const enriched = await enrichImportedSessionForWatch(params.userId, imported.importedSessionId);
+        const displayIso = enriched?.sessionCompletedAtIso ?? imported.sessionCompletedAtIso ?? t.sessionCompletedAtIso ?? null;
+        const importedWhen = displayIso ? new Date(displayIso) : null;
         if (importedWhen && !Number.isNaN(importedWhen.getTime())) {
           maxSeen = maxDate(maxSeen, importedWhen);
         }
@@ -255,15 +265,22 @@ export async function checkWatchedLapSources(params: {
         out.push({
           sourceId: s.id,
           sourceUrl: s.sourceUrl,
-          driverName: t.driverName ?? s.driverName ?? null,
+          driverName: s.driverName ?? null,
           carId: s.carId ?? null,
           status: "new_imported",
           importedSessionId: imported.importedSessionId,
-          importedFromUrl: t.sessionUrl,
+          importedFromUrl: enriched?.timingSourceUrl ?? t.sessionUrl,
           sessionId: t.sessionId,
-          sessionCompletedAtIso: imported.sessionCompletedAtIso ?? t.sessionCompletedAtIso ?? null,
+          sessionCompletedAtIso: displayIso,
           parserId: imported.parserId,
           message: imported.message ?? null,
+          displayDriverName: enriched?.displayDriverName ?? t.driverName ?? s.driverName ?? "Session",
+          lapCount: enriched?.lapCount ?? (Array.isArray(imported.laps) ? imported.laps.length : null),
+          bestLapSeconds:
+            enriched?.bestLapSeconds ??
+            (Array.isArray(imported.laps) && imported.laps.length > 0
+              ? Math.min(...imported.laps.filter((n): n is number => typeof n === "number" && Number.isFinite(n)))
+              : null),
         });
       }
 

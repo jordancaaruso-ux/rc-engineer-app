@@ -27,6 +27,9 @@ type CheckResult =
       sessionCompletedAtIso: string | null;
       parserId: string;
       message: string | null;
+      displayDriverName: string;
+      lapCount: number | null;
+      bestLapSeconds: number | null;
     }
   | {
       sourceId: string;
@@ -204,18 +207,30 @@ export function WatchedLapSourcesCard() {
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">New sessions</div>
           <ul className="space-y-1 text-[11px]">
             {importedRows.map((r) => (
-              <li key={`${r.sourceId}-${(r as any).importedSessionId}`} className="flex flex-wrap items-center gap-2">
-                <span className="text-foreground font-medium">
-                  {r.driverName || "Session"} ·{" "}
+              <li key={r.importedSessionId} className="flex flex-wrap items-center gap-2">
+                <span className="text-foreground font-medium min-w-0">
+                  {r.displayDriverName} ·{" "}
                   {r.sessionCompletedAtIso ? formatRunCreatedAtDateTime(r.sessionCompletedAtIso) : "—"}
+                  {r.lapCount != null ? (
+                    <span className="text-muted-foreground font-normal"> · {r.lapCount} laps</span>
+                  ) : null}
+                  {r.bestLapSeconds != null ? (
+                    <span className="text-muted-foreground font-normal font-mono">
+                      {" "}
+                      · best {r.bestLapSeconds.toFixed(3)}s
+                    </span>
+                  ) : null}
                 </span>
                 <Link
-                  href={`/runs/new?importedLapTimeSessionId=${encodeURIComponent((r as any).importedSessionId)}`}
+                  href={`/runs/new?importedLapTimeSessionId=${encodeURIComponent(r.importedSessionId)}`}
                   className={cn(btnPrimary("px-2 py-1 text-[10px]"), "no-underline")}
                 >
                   Log this run
                 </Link>
-                <Link href="/laps/import" className={cn(btnGhost("px-2 py-1 text-[10px]"), "no-underline")}>
+                <Link
+                  href={`/laps/import?sessionId=${encodeURIComponent(r.importedSessionId)}`}
+                  className={cn(btnGhost("px-2 py-1 text-[10px]"), "no-underline")}
+                >
                   View laps
                 </Link>
               </li>

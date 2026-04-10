@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
@@ -23,6 +24,10 @@ type ImportResultRow =
   | { url: string; success: false; error: string };
 
 export function LapImportWorkspace() {
+  const searchParams = useSearchParams();
+  const sessionIdFromQuery = searchParams.get("sessionId");
+  const deepLinkedRef = useRef<string | null>(null);
+
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -51,6 +56,46 @@ export function LapImportWorkspace() {
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  const loadSessionDetail = useCallback(async (id: string) => {
+    setExpandedId(id);
+    setDetailJson(null);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/lap-time-sessions/${encodeURIComponent(id)}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setDetailJson(JSON.stringify({ error: (data as { error?: string })?.error ?? "Not found" }, null, 2));
+        return;
+      }
+      setDetailJson(JSON.stringify((data as { session?: unknown }).session ?? data, null, 2));
+    } catch {
+      setDetailJson(JSON.stringify({ error: "Request failed" }, null, 2));
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  const expandSession = useCallback(
+    async (id: string) => {
+      if (expandedId === id) {
+        setExpandedId(null);
+        setDetailJson(null);
+        return;
+      }
+      await loadSessionDetail(id);
+    },
+    [expandedId, loadSessionDetail]
+  );
+
+  /** Open the session detail when linked from dashboard (?sessionId=). */
+  useEffect(() => {
+    if (!sessionIdFromQuery) return;
+    if (deepLinkedRef.current === sessionIdFromQuery) return;
+    if (!sessions.some((s) => s.id === sessionIdFromQuery)) return;
+    deepLinkedRef.current = sessionIdFromQuery;
+    void loadSessionDetail(sessionIdFromQuery);
+  }, [sessionIdFromQuery, sessions, loadSessionDetail]);
 
   async function onImport() {
     const urls = text
@@ -102,30 +147,6 @@ export function LapImportWorkspace() {
       setHint("Import request failed.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function expandSession(id: string) {
-    if (expandedId === id) {
-      setExpandedId(null);
-      setDetailJson(null);
-      return;
-    }
-    setExpandedId(id);
-    setDetailJson(null);
-    setDetailLoading(true);
-    try {
-      const res = await fetch(`/api/lap-time-sessions/${encodeURIComponent(id)}`);
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        setDetailJson(JSON.stringify({ error: (data as { error?: string })?.error ?? "Not found" }, null, 2));
-        return;
-      }
-      setDetailJson(JSON.stringify((data as { session?: unknown }).session ?? data, null, 2));
-    } catch {
-      setDetailJson(JSON.stringify({ error: "Request failed" }, null, 2));
-    } finally {
-      setDetailLoading(false);
     }
   }
 
