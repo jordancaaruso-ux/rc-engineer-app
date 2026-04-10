@@ -132,6 +132,7 @@ export async function getDashboardNewRunPrefill(
         parserId: true,
         sessionCompletedAt: true,
         parsedPayload: true,
+        createdAt: true,
       },
     });
     if (!sess) return null;
@@ -143,6 +144,7 @@ export async function getDashboardNewRunPrefill(
         parserId: sess.parserId,
         sessionCompletedAtIso: sess.sessionCompletedAt ? sess.sessionCompletedAt.toISOString() : null,
         parsedPayload: sess.parsedPayload,
+        createdAt: sess.createdAt.toISOString(),
       },
     };
   }

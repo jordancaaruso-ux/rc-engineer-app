@@ -1,8 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
+import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 
 export type EnrichedImportedForWatch = {
   importedSessionId: string;
@@ -10,7 +10,7 @@ export type EnrichedImportedForWatch = {
   timingSourceUrl: string;
   /** Driver label from parsed payload (same logic as Lap import library list). */
   displayDriverName: string;
-  /** ISO instant for labels (DB session time → payload → createdAt). */
+  /** ISO instant for labels (payload → DB session time → import createdAt). */
   sessionCompletedAtIso: string;
   lapCount: number | null;
   bestLapSeconds: number | null;
@@ -41,11 +41,11 @@ export async function enrichImportedSessionForWatch(
   const lapTimes = (primary?.rows ?? []).map((l) => l.lapTimeSeconds).filter((n): n is number => Number.isFinite(n));
   const bestLapSeconds = lapTimes.length > 0 ? Math.min(...lapTimes) : null;
 
-  const sessionCompletedAtIso = resolveImportedSessionLabelTimeIso(
-    row.sessionCompletedAt,
-    sessionCompletedAtIsoFromImportedPayload(parsed),
-    row.createdAt.toISOString()
-  );
+  const sessionCompletedAtIso = resolveImportedSessionDisplayTimeIso({
+    sessionCompletedAt: row.sessionCompletedAt,
+    parsedPayload: parsed,
+    createdAt: row.createdAt,
+  });
 
   return {
     importedSessionId: row.id,

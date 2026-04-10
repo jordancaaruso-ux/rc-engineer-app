@@ -1,28 +1,53 @@
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 
 /**
- * Prefer true session/run instant from the timing provider; otherwise fallback (e.g. import row createdAt).
+ * Canonical instant for imported lap sessions: timing payload ISO → DB `sessionCompletedAt` → import row `createdAt`.
+ * Use this for labels, sorting, and grouping so display time never silently tracks upload/import time when real session time exists.
+ */
+export function resolveImportedSessionDisplayTimeIso(input: {
+  sessionCompletedAt?: Date | string | null;
+  parsedPayload?: unknown;
+  createdAt: Date | string;
+}): string {
+  const fromPayload = sessionCompletedAtIsoFromImportedPayload(input.parsedPayload)?.trim();
+  if (fromPayload) {
+    const d = new Date(fromPayload);
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  if (input.sessionCompletedAt != null) {
+    const d =
+      typeof input.sessionCompletedAt === "string"
+        ? new Date(input.sessionCompletedAt.trim())
+        : input.sessionCompletedAt;
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  return typeof input.createdAt === "string" ? input.createdAt : input.createdAt.toISOString();
+}
+
+/**
+ * Legacy three-arg helper: builds a minimal payload object from an explicit ISO string when present.
+ * Prefer {@link resolveImportedSessionDisplayTimeIso} with full `parsedPayload` when available.
  */
 export function resolveImportedSessionLabelTimeIso(
   sessionCompletedAt: Date | string | null | undefined,
   sessionCompletedAtIsoFromPayload: string | null | undefined,
   fallbackIso: string
 ): string {
-  if (sessionCompletedAt != null) {
-    const s = typeof sessionCompletedAt === "string" ? sessionCompletedAt : sessionCompletedAt.toISOString();
-    if (s.trim()) return s;
-  }
-  const p = sessionCompletedAtIsoFromPayload?.trim();
-  if (p) {
-    const d = new Date(p);
-    if (!Number.isNaN(d.getTime())) return d.toISOString();
-  }
-  return fallbackIso;
+  const syntheticPayload =
+    sessionCompletedAtIsoFromPayload != null && sessionCompletedAtIsoFromPayload.trim()
+      ? { sessionCompletedAtIso: sessionCompletedAtIsoFromPayload.trim() }
+      : undefined;
+  return resolveImportedSessionDisplayTimeIso({
+    sessionCompletedAt,
+    parsedPayload: syntheticPayload,
+    createdAt: fallbackIso,
+  });
 }
 
 /**
  * Standard primary label for a driver/run choice: driver name + session time.
- * Pass `sessionTimeIso` from {@link resolveImportedSessionLabelTimeIso} for imports.
+ * Pass `sessionTimeIso` from {@link resolveImportedSessionDisplayTimeIso} for imports.
  */
 export function formatDriverSessionLabel(driverName: string, sessionTimeIso: string): string {
   const t = driverName.trim() || "Driver";

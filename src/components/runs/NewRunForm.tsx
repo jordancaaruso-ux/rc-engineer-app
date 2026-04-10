@@ -20,7 +20,7 @@ import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
+import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import {
   LapTimesIngestPanel,
   defaultLapIngestValue,
@@ -267,11 +267,6 @@ export function NewRunForm(props: {
       const parsed = primaryLapRowsFromImportedPayload(sess.parsedPayload);
       if (parsed) {
         const laps = parsed.rows.map((r) => r.lapTimeSeconds);
-        const whenIso = resolveImportedSessionLabelTimeIso(
-          sess.sessionCompletedAtIso ?? null,
-          sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload),
-          new Date().toISOString()
-        );
         setLapIngest({
           ...defaultLapIngestValue(),
           manualText: laps.map((n) => n.toFixed(3)).join("\n"),
@@ -285,8 +280,9 @@ export function NewRunForm(props: {
               importedSessionId: sess.id,
               sourceUrl: sess.sourceUrl,
               parserId: sess.parserId,
-              recordedAt: new Date().toISOString(),
-              sessionCompletedAtIso: whenIso,
+              recordedAt: sess.createdAt,
+              sessionCompletedAtDbIso: sess.sessionCompletedAtIso,
+              sessionCompletedAtIso: sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload),
               sessionDrivers: [
                 {
                   id: "prefill",
@@ -1171,10 +1167,14 @@ export function NewRunForm(props: {
       const sessionDrivers = block.sessionDrivers ?? [];
       if (sessionDrivers.length === 0) continue;
       const sourceUrl = block.sourceUrl ?? null;
-      const sessionCompletedAt =
-        typeof block.sessionCompletedAtIso === "string" && block.sessionCompletedAtIso.trim()
-          ? block.sessionCompletedAtIso.trim()
-          : null;
+      const sessionCompletedAt = resolveImportedSessionDisplayTimeIso({
+        sessionCompletedAt: block.sessionCompletedAtDbIso ?? null,
+        parsedPayload:
+          block.sessionCompletedAtIso != null && block.sessionCompletedAtIso.trim()
+            ? { sessionCompletedAtIso: block.sessionCompletedAtIso.trim() }
+            : undefined,
+        createdAt: block.recordedAt,
+      });
       const selected = new Set(block.selectedDriverIds ?? []);
       const selectedOrdered = sessionDrivers.filter((d) => selected.has(d.driverId));
       const primary = selectedOrdered[0] ?? null;

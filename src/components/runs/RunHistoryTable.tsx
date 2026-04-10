@@ -21,8 +21,8 @@ import {
 import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { AnalysisActiveThingsToTry } from "@/components/runs/AnalysisActiveThingsToTry";
-import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
+import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import type { LapRow } from "@/lib/lapAnalysis";
 import Link from "next/link";
 
@@ -264,11 +264,11 @@ function RunDetail({
         for (const s of data.sessions) {
           const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
           if (!parsed) continue;
-          const whenIso = resolveImportedSessionLabelTimeIso(
-            s.sessionCompletedAt ?? null,
-            sessionCompletedAtIsoFromImportedPayload(s.parsedPayload),
-            s.createdAt
-          );
+          const whenIso = resolveImportedSessionDisplayTimeIso({
+            sessionCompletedAt: s.sessionCompletedAt ?? null,
+            parsedPayload: s.parsedPayload,
+            createdAt: s.createdAt,
+          });
           mapped.push({
             id: s.id,
             selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso),

@@ -50,10 +50,12 @@ export type ImportOneUrlSuccess = {
   url: string;
   success: true;
   importedSessionId: string;
-  /** When this import row was stored (use for session labels until parsed session time exists). */
+  /** When this import row was stored (fallback only when session completion time is unknown). */
   recordedAt: string;
   /** UTC ISO from timing page when parsed; null if unavailable. */
   sessionCompletedAtIso: string | null;
+  /** DB `ImportedLapTimeSession.sessionCompletedAt` after persist (same instant as above when parser supplied a time). */
+  sessionCompletedAtDbIso: string | null;
   parserId: string;
   laps: number[];
   lapRows: LapUrlParseResult["lapRows"];
@@ -115,7 +117,7 @@ export async function importOneTimingUrl(
       parsedPayload: serializeParsePayload(parsed) as Prisma.InputJsonValue,
       sessionCompletedAt,
     },
-    select: { id: true, createdAt: true },
+    select: { id: true, createdAt: true, sessionCompletedAt: true },
   });
 
   return {
@@ -124,6 +126,7 @@ export async function importOneTimingUrl(
     importedSessionId: row.id,
     recordedAt: row.createdAt.toISOString(),
     sessionCompletedAtIso: sessionCompletedAt ? sessionCompletedAt.toISOString() : null,
+    sessionCompletedAtDbIso: row.sessionCompletedAt ? row.sessionCompletedAt.toISOString() : null,
     parserId: parsed.parserId,
     laps: parsed.laps,
     lapRows: parsed.lapRows,

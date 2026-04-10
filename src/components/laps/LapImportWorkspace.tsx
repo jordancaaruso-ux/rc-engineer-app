@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
+import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 
 type SessionRow = {
   id: string;
@@ -215,11 +215,11 @@ export function LapImportWorkspace() {
                   {(() => {
                     const p = primaryLapRowsFromImportedPayload(s.parsedPayload);
                     const name = p?.driverName ?? "Session";
-                    const whenIso = resolveImportedSessionLabelTimeIso(
-                      s.sessionCompletedAt ?? null,
-                      sessionCompletedAtIsoFromImportedPayload(s.parsedPayload),
-                      s.createdAt
-                    );
+                    const whenIso = resolveImportedSessionDisplayTimeIso({
+                      sessionCompletedAt: s.sessionCompletedAt ?? null,
+                      parsedPayload: s.parsedPayload,
+                      createdAt: s.createdAt,
+                    });
                     return formatDriverSessionLabel(name, whenIso);
                   })()}
                 </span>

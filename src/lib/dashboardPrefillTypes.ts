@@ -42,7 +42,10 @@ export type DashboardNewRunPrefill =
         id: string;
         sourceUrl: string;
         parserId: string;
+        /** DB `sessionCompletedAt` as ISO (canonical session instant when set). */
         sessionCompletedAtIso: string | null;
         parsedPayload: unknown;
+        /** Import row `createdAt` — last-resort instant for labels when completion time is missing. */
+        createdAt: string;
       };
     };

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
+import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -11,7 +12,6 @@ export async function GET() {
 
   const rows = await prisma.importedLapTimeSession.findMany({
     where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
     take: 200,
     select: {
       id: true,
@@ -26,11 +26,25 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({
-    sessions: rows.map((r) => ({
+  const sessions = rows
+    .map((r) => ({
       ...r,
       createdAt: r.createdAt.toISOString(),
       sessionCompletedAt: r.sessionCompletedAt ? r.sessionCompletedAt.toISOString() : null,
-    })),
-  });
+    }))
+    .sort((a, b) => {
+      const ta = resolveImportedSessionDisplayTimeIso({
+        sessionCompletedAt: a.sessionCompletedAt,
+        parsedPayload: a.parsedPayload,
+        createdAt: a.createdAt,
+      });
+      const tb = resolveImportedSessionDisplayTimeIso({
+        sessionCompletedAt: b.sessionCompletedAt,
+        parsedPayload: b.parsedPayload,
+        createdAt: b.createdAt,
+      });
+      return new Date(tb).getTime() - new Date(ta).getTime();
+    });
+
+  return NextResponse.json({ sessions });
 }

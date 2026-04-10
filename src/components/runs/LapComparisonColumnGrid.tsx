@@ -23,7 +23,7 @@ import { formatRunPickerScanDate } from "@/lib/formatDate";
 import {
   formatDriverSessionLabel,
   formatDriverSessionLabelWithContext,
-  resolveImportedSessionLabelTimeIso,
+  resolveImportedSessionDisplayTimeIso,
 } from "@/lib/lapImport/labels";
 
 type ImportedSet = {
@@ -244,11 +244,11 @@ export function LapComparisonColumnGrid({
           : primaryImport.createdAt.toISOString()
         : anchorCreatedIso;
     const meSortIso = primaryImport
-      ? resolveImportedSessionLabelTimeIso(
-          primaryImport.sessionCompletedAt ?? null,
-          null,
-          primaryFallback
-        )
+      ? resolveImportedSessionDisplayTimeIso({
+          sessionCompletedAt: primaryImport.sessionCompletedAt ?? null,
+          parsedPayload: undefined,
+          createdAt: primaryFallback,
+        })
       : anchorCreatedIso;
 
     metaById.set(primarySeries.id, {
@@ -270,7 +270,11 @@ export function LapComparisonColumnGrid({
           : s.createdAt != null
             ? s.createdAt.toISOString()
             : anchorCreatedIso;
-      const whenIso = resolveImportedSessionLabelTimeIso(s.sessionCompletedAt ?? null, null, fallbackWhen);
+      const whenIso = resolveImportedSessionDisplayTimeIso({
+        sessionCompletedAt: s.sessionCompletedAt ?? null,
+        parsedPayload: undefined,
+        createdAt: fallbackWhen,
+      });
       metaById.set(ser.id, {
         metaLine: null,
         setupRun: null,

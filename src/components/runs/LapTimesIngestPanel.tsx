@@ -8,7 +8,7 @@ import type { LapImportLapRow, LapUrlSessionDriver } from "@/lib/lapUrlParsers/t
 import { computeLapMetrics, formatLap } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { getAverageTopN, getBestLap } from "@/lib/lapAnalysis";
-import { formatDriverSessionLabel, resolveImportedSessionLabelTimeIso } from "@/lib/lapImport/labels";
+import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 
 export type UrlImportBlock = {
@@ -18,6 +18,8 @@ export type UrlImportBlock = {
   parserId: string;
   /** ISO time for labels when true session time is unknown (import row createdAt). */
   recordedAt: string;
+  /** DB `sessionCompletedAt` after persist (canonical when parser did not echo ISO in `sessionCompletedAtIso`). */
+  sessionCompletedAtDbIso?: string | null;
   /** UTC ISO from timing page when parsed. */
   sessionCompletedAtIso: string | null;
   sessionDrivers: LapUrlSessionDriver[];
@@ -61,7 +63,14 @@ function initDriverLapRows(drivers: LapUrlSessionDriver[]): Record<string, LapRo
 }
 
 function blockLabelTimeIso(block: UrlImportBlock): string {
-  return resolveImportedSessionLabelTimeIso(null, block.sessionCompletedAtIso ?? null, block.recordedAt);
+  return resolveImportedSessionDisplayTimeIso({
+    sessionCompletedAt: block.sessionCompletedAtDbIso ?? null,
+    parsedPayload:
+      block.sessionCompletedAtIso != null && block.sessionCompletedAtIso.trim()
+        ? { sessionCompletedAtIso: block.sessionCompletedAtIso.trim() }
+        : undefined,
+    createdAt: block.recordedAt,
+  });
 }
 
 function primaryLapTextFromFirstBlock(blocks: UrlImportBlock[]): string {
@@ -208,6 +217,7 @@ export function LapTimesIngestPanel({
         importedSessionId: string;
         recordedAt: string;
         sessionCompletedAtIso?: string | null;
+        sessionCompletedAtDbIso?: string | null;
         parserId: string;
         message?: string | null;
         laps?: number[];
@@ -234,12 +244,17 @@ export function LapTimesIngestPanel({
         typeof row.sessionCompletedAtIso === "string" && row.sessionCompletedAtIso.trim()
           ? row.sessionCompletedAtIso.trim()
           : null;
+      const sessionCompletedAtDbIso =
+        typeof row.sessionCompletedAtDbIso === "string" && row.sessionCompletedAtDbIso.trim()
+          ? row.sessionCompletedAtDbIso.trim()
+          : null;
       const newBlock: UrlImportBlock = {
         blockId: crypto.randomUUID(),
         importedSessionId: row.importedSessionId,
         sourceUrl: url,
         parserId,
         recordedAt,
+        sessionCompletedAtDbIso,
         sessionCompletedAtIso,
         sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : [],
         selectedDriverIds: autoSelectIds,
