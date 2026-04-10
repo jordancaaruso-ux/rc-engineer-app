@@ -1,10 +1,49 @@
 import "server-only";
 
 import { load } from "cheerio";
+import type { CheerioAPI } from "cheerio";
 import { parseLiveRcSessionDisplayTimeToUtcIso } from "@/lib/lapUrlParsers/livercSessionTime";
 
 function normalizeWhitespace(s: string): string {
   return s.replace(/\s+/g, " ").trim();
+}
+
+/** Deterministic comparison for session-list driver filtering (no fuzzy matching). */
+export function normalizeLiveRcDriverNameForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[.,;:]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksLikePersonNameCell(text: string): boolean {
+  const t = normalizeWhitespace(text);
+  if (t.length < 3) return false;
+  // Skip times, dates, pure numbers
+  if (/^\d+\s*:\s*\d+/.test(t)) return false;
+  if (/^\d{1,2}\/\d{1,2}/.test(t)) return false;
+  if (/^\d+(?:\.\d+)?$/.test(t)) return false;
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return false;
+  return /^[A-Za-z]/.test(parts[0]!);
+}
+
+/**
+ * Practice session list rows often put the session link on "View" or a time — not on the driver name.
+ * Prefer a name-like table cell over raw link text when extracting the driver for this row.
+ */
+function guessDriverNameFromPracticeRow($: CheerioAPI, tr: unknown, linkText: string): string {
+  const row = $(tr as never);
+  const cells = row
+    .find("td")
+    .toArray()
+    .map((td) => normalizeWhitespace($(td).text()))
+    .filter((t) => t.length > 0);
+  const fromCell = cells.find(looksLikePersonNameCell);
+  if (fromCell) return fromCell;
+  if (looksLikePersonNameCell(linkText)) return linkText;
+  return linkText || cells[0] || "Practice session";
 }
 
 function absoluteUrl(baseUrl: string, href: string): string | null {
@@ -95,12 +134,7 @@ export function extractPracticeSessions(html: string, pageUrl: string): Extracte
     const linkText = normalizeWhitespace($(a).text());
     const rowText = normalizeWhitespace(tr.length ? tr.text() : $(a).parent().text());
 
-    const driverName =
-      linkText ||
-      normalizeWhitespace(
-        (tr.find("td").toArray().map((td) => normalizeWhitespace($(td).text())).find((t) => t.length > 0) ?? "") as string
-      ) ||
-      "Practice session";
+    const driverName = tr.length ? guessDriverNameFromPracticeRow($, tr.get(0), linkText) : linkText || "Practice session";
 
     // Heuristic extraction for a display time token inside the row.
     // We keep this conservative: if no match, store null and watcher will rely on forceImport mode.
@@ -126,6 +160,21 @@ export function extractPracticeSessions(html: string, pageUrl: string): Extracte
     deduped.push(s);
   }
   return deduped;
+}
+
+/**
+ * When `targetName` is set, keep only rows whose extracted driver name matches exactly (normalized).
+ * When `targetName` is empty/null, return all sessions (caller may still apply time-based limits).
+ */
+export function filterPracticeSessionsByTargetDriver(
+  sessions: ExtractedPracticeSession[],
+  targetName: string | null | undefined
+): ExtractedPracticeSession[] {
+  const raw = typeof targetName === "string" ? targetName.trim() : "";
+  if (!raw) return sessions;
+  const want = normalizeLiveRcDriverNameForMatch(raw);
+  if (!want) return sessions;
+  return sessions.filter((s) => normalizeLiveRcDriverNameForMatch(s.driverName) === want);
 }
 
 /**

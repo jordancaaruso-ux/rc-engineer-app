@@ -41,6 +41,16 @@ type CheckResult =
       sourceUrl: string;
       driverName: string | null;
       carId: string | null;
+      status: "no_driver_match";
+      message: string;
+      parsedCandidateCount: number;
+      candidateDriverNamesSample: string[];
+    }
+  | {
+      sourceId: string;
+      sourceUrl: string;
+      driverName: string | null;
+      carId: string | null;
       status: "error";
       error: string;
       parserId: string | null;
@@ -148,12 +158,15 @@ export function WatchedLapSourcesCard() {
       setResults(r);
       const imported = r.filter((x) => x.status === "new_imported").length;
       const errs = r.filter((x) => x.status === "error").length;
+      const noDriver = r.filter((x) => x.status === "no_driver_match");
+      const parts: string[] = [];
+      if (noDriver.length > 0) parts.push(noDriver.map((x) => x.message).join(" "));
+      if (imported > 0) parts.push(`Imported ${imported} new session${imported === 1 ? "" : "s"}`);
+      if (errs > 0) parts.push(`${errs} error${errs === 1 ? "" : "s"}`);
       setResultNote(
-        imported === 0 && errs === 0
-          ? "No new sessions detected."
-          : imported > 0
-            ? `Imported ${imported} new session${imported === 1 ? "" : "s"}${errs ? ` · ${errs} error` : ""}.`
-            : `${errs} error${errs === 1 ? "" : "s"} while checking.`
+        parts.length > 0
+          ? parts.join(" · ")
+          : "No new sessions detected."
       );
       await loadSources();
     } catch {

@@ -3,7 +3,12 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
 import { fetchUrlText } from "@/lib/lapUrlParsers/fetchText";
-import { extractPracticeSessions, extractRaceSessions } from "@/lib/lapWatch/livercSessionIndexParsers";
+import {
+  extractPracticeSessions,
+  extractRaceSessions,
+  filterPracticeSessionsByTargetDriver,
+  normalizeLiveRcDriverNameForMatch,
+} from "@/lib/lapWatch/livercSessionIndexParsers";
 
 export type WatchCheckResultRow =
   | {
@@ -26,6 +31,16 @@ export type WatchCheckResultRow =
       carId: string | null;
       status: "no_change";
       message: string | null;
+    }
+  | {
+      sourceId: string;
+      sourceUrl: string;
+      driverName: string | null;
+      carId: string | null;
+      status: "no_driver_match";
+      message: string;
+      parsedCandidateCount: number;
+      candidateDriverNamesSample: string[];
     }
   | {
       sourceId: string;
@@ -107,7 +122,44 @@ export async function checkWatchedLapSources(params: {
       const lastSeen = s.lastSeenSessionCompletedAt;
       const now = new Date();
 
-      const practiceList = isLiveRcPracticeListUrl(pageUrl) ? extractPracticeSessions(fetched.text, pageUrl) : [];
+      const practiceListRaw = isLiveRcPracticeListUrl(pageUrl) ? extractPracticeSessions(fetched.text, pageUrl) : [];
+      const targetDriverTrim = s.driverName?.trim() ?? "";
+      const practiceList =
+        targetDriverTrim && isLiveRcPracticeListUrl(pageUrl)
+          ? filterPracticeSessionsByTargetDriver(practiceListRaw, s.driverName)
+          : practiceListRaw;
+
+      if (targetDriverTrim && isLiveRcPracticeListUrl(pageUrl)) {
+        const sample = practiceListRaw.slice(0, 12).map((x) => x.driverName);
+        console.info("[lap-watch] practice session_list filter", {
+          sourceId: s.id,
+          parsedCandidateCount: practiceListRaw.length,
+          candidateDriverNamesSample: sample,
+          normalizedTarget: normalizeLiveRcDriverNameForMatch(targetDriverTrim),
+          matchedAfterFilter: practiceList.length,
+        });
+      }
+
+      if (
+        targetDriverTrim &&
+        isLiveRcPracticeListUrl(pageUrl) &&
+        practiceListRaw.length > 0 &&
+        practiceList.length === 0
+      ) {
+        await prisma.watchedLapSource.update({ where: { id: s.id }, data: { lastCheckedAt: now } });
+        out.push({
+          sourceId: s.id,
+          sourceUrl: s.sourceUrl,
+          driverName: s.driverName ?? null,
+          carId: s.carId ?? null,
+          status: "no_driver_match",
+          message: `No matching practice sessions for driver "${targetDriverTrim}" on this list.`,
+          parsedCandidateCount: practiceListRaw.length,
+          candidateDriverNamesSample: practiceListRaw.slice(0, 20).map((x) => x.driverName),
+        });
+        continue;
+      }
+
       const raceList = isLiveRcResultsIndexUrl(pageUrl) ? extractRaceSessions(fetched.text, pageUrl) : [];
 
       if (practiceList.length === 0 && raceList.length === 0) {
@@ -142,7 +194,7 @@ export async function checkWatchedLapSources(params: {
         })),
       ];
 
-      // Sort oldest → newest; only time-parseable sessions participate in normal new detection.
+      // Sort newest → oldest for matched sessions; time-parseable sessions participate in normal new detection.
       const withTime = discovered
         .map((d) => {
           const iso = d.sessionCompletedAtIso?.trim() ? d.sessionCompletedAtIso.trim() : null;
@@ -153,7 +205,7 @@ export async function checkWatchedLapSources(params: {
         .sort((a, b) => {
           const ta = a.when?.getTime() ?? 0;
           const tb = b.when?.getTime() ?? 0;
-          return ta - tb;
+          return tb - ta;
         });
 
       const importTargets = withTime.filter((d) => {
@@ -176,8 +228,8 @@ export async function checkWatchedLapSources(params: {
         continue;
       }
 
-      // Safety cap: avoid importing hundreds of old sessions by mistake.
-      const cappedTargets = importTargets.slice(-10);
+      // Safety cap: avoid importing hundreds of old sessions by mistake (newest-first).
+      const cappedTargets = importTargets.slice(0, 10);
 
       let maxSeen: Date | null = lastSeen ?? null;
       for (const t of cappedTargets) {
