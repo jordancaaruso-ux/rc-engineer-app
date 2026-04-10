@@ -2,13 +2,19 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 
 /**
- * Canonical instant for imported lap sessions: timing payload ISO → DB `sessionCompletedAt` → import row `createdAt`.
+ * Canonical instant for imported lap sessions: stored payload `sessionCompletedAtIso` → DB `sessionCompletedAt` →
+ * optional discovery hint (e.g. LiveRC index row) → import row `createdAt`.
  * Use this for labels, sorting, and grouping so display time never silently tracks upload/import time when real session time exists.
  */
 export function resolveImportedSessionDisplayTimeIso(input: {
   sessionCompletedAt?: Date | string | null;
   parsedPayload?: unknown;
   createdAt: Date | string;
+  /**
+   * When payload + DB lack a valid instant (e.g. parse gap on detail import), use a time from the watcher/index
+   * discovery row before falling back to import `createdAt`. Must not override payload or DB.
+   */
+  sessionCompletedAtIsoHint?: string | null;
 }): string {
   const fromPayload = sessionCompletedAtIsoFromImportedPayload(input.parsedPayload)?.trim();
   if (fromPayload) {
@@ -21,6 +27,11 @@ export function resolveImportedSessionDisplayTimeIso(input: {
         ? new Date(input.sessionCompletedAt.trim())
         : input.sessionCompletedAt;
     if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  const hint = input.sessionCompletedAtIsoHint?.trim();
+  if (hint) {
+    const hd = new Date(hint);
+    if (!Number.isNaN(hd.getTime())) return hd.toISOString();
   }
   return typeof input.createdAt === "string" ? input.createdAt : input.createdAt.toISOString();
 }

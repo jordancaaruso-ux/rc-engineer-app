@@ -22,7 +22,8 @@ export type EnrichedImportedForWatch = {
  */
 export async function enrichImportedSessionForWatch(
   userId: string,
-  importedSessionId: string
+  importedSessionId: string,
+  options?: { sessionCompletedAtIsoFromDiscovery?: string | null }
 ): Promise<EnrichedImportedForWatch | null> {
   const row = await prisma.importedLapTimeSession.findFirst({
     where: { id: importedSessionId, userId },
@@ -45,6 +46,7 @@ export async function enrichImportedSessionForWatch(
     sessionCompletedAt: row.sessionCompletedAt,
     parsedPayload: parsed,
     createdAt: row.createdAt,
+    sessionCompletedAtIsoHint: options?.sessionCompletedAtIsoFromDiscovery ?? null,
   });
 
   return {

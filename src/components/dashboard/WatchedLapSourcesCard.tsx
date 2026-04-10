@@ -179,7 +179,15 @@ export function WatchedLapSourcesCard() {
     }
   }
 
-  const importedRows = useMemo(() => results.filter((r) => r.status === "new_imported"), [results]);
+  const importedRows = useMemo(() => {
+    const rows = results.filter((r) => r.status === "new_imported");
+    function sortInstant(iso: string | null): number {
+      if (!iso?.trim()) return Number.NEGATIVE_INFINITY;
+      const t = new Date(iso.trim()).getTime();
+      return Number.isNaN(t) ? Number.NEGATIVE_INFINITY : t;
+    }
+    return [...rows].sort((a, b) => sortInstant(b.sessionCompletedAtIso) - sortInstant(a.sessionCompletedAtIso));
+  }, [results]);
 
   return (
     <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25 space-y-2">

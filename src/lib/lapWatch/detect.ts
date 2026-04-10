@@ -9,6 +9,7 @@ import {
   filterPracticeSessionsByTargetDriver,
   normalizeLiveRcDriverNameForMatch,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
+import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
 
 export type WatchCheckResultRow =
@@ -255,8 +256,20 @@ export async function checkWatchedLapSources(params: {
           continue;
         }
 
-        const enriched = await enrichImportedSessionForWatch(params.userId, imported.importedSessionId);
-        const displayIso = enriched?.sessionCompletedAtIso ?? imported.sessionCompletedAtIso ?? t.sessionCompletedAtIso ?? null;
+        const enriched = await enrichImportedSessionForWatch(params.userId, imported.importedSessionId, {
+          sessionCompletedAtIsoFromDiscovery: t.sessionCompletedAtIso,
+        });
+        const displayIso = enriched
+          ? enriched.sessionCompletedAtIso
+          : resolveImportedSessionDisplayTimeIso({
+              sessionCompletedAt: imported.sessionCompletedAtDbIso ?? null,
+              parsedPayload:
+                imported.sessionCompletedAtIso != null && imported.sessionCompletedAtIso.trim()
+                  ? { sessionCompletedAtIso: imported.sessionCompletedAtIso.trim() }
+                  : undefined,
+              createdAt: imported.recordedAt,
+              sessionCompletedAtIsoHint: t.sessionCompletedAtIso,
+            });
         const importedWhen = displayIso ? new Date(displayIso) : null;
         if (importedWhen && !Number.isNaN(importedWhen.getTime())) {
           maxSeen = maxDate(maxSeen, importedWhen);
