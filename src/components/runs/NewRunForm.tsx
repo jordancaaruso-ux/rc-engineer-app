@@ -1927,6 +1927,9 @@ export function NewRunForm(props: {
         {runDetailsTab === "tires" ? (
           <div className="space-y-4 pt-1">
             <div className="space-y-2 text-sm">
+              <p className="text-[11px] text-muted-foreground leading-snug rounded-md border border-border/60 bg-muted/30 px-2 py-1.5">
+                Saved setup snapshot always stores the tire set and battery pack selected here for this run, even if the setup preview below still shows values from a loaded previous setup.
+              </p>
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="ui-title text-sm text-muted-foreground">Tire set</div>
