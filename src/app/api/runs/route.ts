@@ -16,6 +16,7 @@ import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
+import { parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 
 type RunUpsertBody = {
   runId?: string;
@@ -69,13 +70,20 @@ type RunUpsertBody = {
   /** Optional: link persisted ImportedLapTimeSession rows from URL import(s) to this run. */
   importedLapTimeSessionIds?: string[];
   /**
-   * `draft` = save progress without marking logging complete (unless `fromEventDetection`).
-   * Omitted = treat as completed (backward compatible).
+   * `draft` = save progress without marking logging complete.
+   * Omitted or `completed` = treat as logging complete (backward compatible).
    */
   loggingIntent?: "draft" | "completed";
-  /** True when opening Log your run from dashboard detected-session prefill (practice/race watch). */
+  /** True when opening Log your run from dashboard detected-session prefill (metadata only; does not affect completion). */
   fromEventDetection?: boolean;
+  /** Optional structured handling assessment (versioned JSON). */
+  handlingAssessmentJson?: unknown;
 };
+
+function prismaJsonFromHandlingBody(raw: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  const parsed = parseHandlingAssessmentJson(raw);
+  return parsed === null ? Prisma.JsonNull : (parsed as Prisma.InputJsonValue);
+}
 
 async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; mode: "create" | "update" }) {
   const body = params.body;
@@ -85,8 +93,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   }
 
   const sessionCompletedAtResolved = await resolveRunSessionCompletedAtFromUpsertBody(params.userId, body);
-  const loggingComplete =
-    body.fromEventDetection === true || body.loggingIntent !== "draft";
+  const loggingComplete = body.loggingIntent !== "draft";
 
   const tireRunNumber =
     typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
@@ -271,6 +278,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         notes: body.notes?.trim() || null,
         driverNotes: null,
         handlingProblems: null,
+        handlingAssessmentJson: prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null),
         suggestedChanges: body.suggestedChanges?.trim() || null,
         sessionLabel: body.sessionLabel?.trim() || null,
         sessionCompletedAt: sessionCompletedAtResolved,
@@ -290,35 +298,39 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     if (!existing) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
+    const updateData: PrismaTypes.RunUncheckedUpdateInput = {
+      carId,
+      carNameSnapshot: car.name,
+      sessionType,
+      meetingSessionType,
+      meetingSessionCode,
+      eventId: body.eventId ?? null,
+      trackId: body.trackId ?? null,
+      trackNameSnapshot: track?.name ?? null,
+      tireSetId: body.tireSetId ?? null,
+      tireRunNumber,
+      batteryId: body.batteryId ?? null,
+      batteryRunNumber,
+      setupSnapshotId: setupSnapshot.id,
+      sourceSetupDocumentId: pdfLinks.sourceSetupDocumentId,
+      sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,
+      lapTimes,
+      lapSession: lapSession as unknown as PrismaTypes.InputJsonValue,
+      notes: body.notes?.trim() || null,
+      suggestedChanges: body.suggestedChanges?.trim() || null,
+      sessionLabel: body.sessionLabel?.trim() || null,
+      engineerSummaryJson: Prisma.JsonNull,
+      engineerSummaryRefRunId: null,
+      engineerSummaryComputedAt: null,
+      sessionCompletedAt: sessionCompletedAtResolved,
+      loggingComplete,
+    };
+    if ("handlingAssessmentJson" in body) {
+      updateData.handlingAssessmentJson = prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null);
+    }
     run = await prisma.run.update({
       where: { id: existing.id },
-      data: {
-        carId,
-        carNameSnapshot: car.name,
-        sessionType,
-        meetingSessionType,
-        meetingSessionCode,
-        eventId: body.eventId ?? null,
-        trackId: body.trackId ?? null,
-        trackNameSnapshot: track?.name ?? null,
-        tireSetId: body.tireSetId ?? null,
-        tireRunNumber,
-        batteryId: body.batteryId ?? null,
-        batteryRunNumber,
-        setupSnapshotId: setupSnapshot.id,
-        sourceSetupDocumentId: pdfLinks.sourceSetupDocumentId,
-        sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,
-        lapTimes,
-        lapSession: lapSession as unknown as PrismaTypes.InputJsonValue,
-        notes: body.notes?.trim() || null,
-        suggestedChanges: body.suggestedChanges?.trim() || null,
-        sessionLabel: body.sessionLabel?.trim() || null,
-        engineerSummaryJson: Prisma.JsonNull,
-        engineerSummaryRefRunId: null,
-        engineerSummaryComputedAt: null,
-        sessionCompletedAt: sessionCompletedAtResolved,
-        loggingComplete,
-      } as PrismaTypes.RunUncheckedUpdateInput,
+      data: updateData,
       select: { id: true, createdAt: true },
     });
 

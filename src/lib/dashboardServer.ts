@@ -191,8 +191,20 @@ export type DashboardActionItemRow = {
   sourceRunId: string | null;
 };
 
+export type DashboardIncompleteRunRow = {
+  id: string;
+  createdAt: string;
+  sessionCompletedAt: string | null;
+  carName: string;
+  trackName: string | null;
+  eventName: string | null;
+  sessionLabel: string;
+};
+
 export type DashboardHomeModel = {
   detectedRunPrompts: DetectedRunPrompt[];
+  /** Saved runs where the user has not clicked "Run completed" yet. */
+  incompleteRuns: DashboardIncompleteRunRow[];
   thingsToTry: DashboardActionItemRow[];
   activeEvent: null | {
     id: string;
@@ -236,13 +248,85 @@ const recentRunSelect = {
   event: { select: { id: true, name: true } },
 } as const;
 
+const incompleteRunSelect = {
+  id: true,
+  createdAt: true,
+  sessionCompletedAt: true,
+  sessionType: true,
+  meetingSessionType: true,
+  meetingSessionCode: true,
+  sessionLabel: true,
+  car: { select: { name: true } },
+  track: { select: { name: true } },
+  event: { select: { name: true } },
+} as const;
+
+function toDashboardIncompleteRunRow(
+  r: {
+    id: string;
+    createdAt: Date;
+    sessionCompletedAt: Date | null;
+    sessionType: string;
+    meetingSessionType: string | null;
+    meetingSessionCode: string | null;
+    sessionLabel: string | null;
+    car: { name: string } | null;
+    track: { name: string } | null;
+    event: { name: string } | null;
+  }
+): DashboardIncompleteRunRow {
+  return {
+    id: r.id,
+    createdAt: r.createdAt.toISOString(),
+    sessionCompletedAt: r.sessionCompletedAt ? r.sessionCompletedAt.toISOString() : null,
+    carName: r.car?.name ?? "—",
+    trackName: r.track?.name ?? null,
+    eventName: r.event?.name ?? null,
+    sessionLabel: formatRunSessionDisplay({
+      sessionType: r.sessionType,
+      meetingSessionType: r.meetingSessionType,
+      meetingSessionCode: r.meetingSessionCode,
+      sessionLabel: r.sessionLabel,
+    }),
+  };
+}
+
+/**
+ * Incomplete runs for linking a LiveRC import to an existing draft (same event first, then any).
+ */
+export async function loadIncompleteRunsForImportChooser(
+  userId: string,
+  eventId: string | null
+): Promise<DashboardIncompleteRunRow[]> {
+  const baseWhere = {
+    userId,
+    loggingComplete: false as const,
+    incompleteLoggingPromptDismissedAt: null,
+  };
+  let rows = await prisma.run.findMany({
+    where: eventId ? { ...baseWhere, eventId } : baseWhere,
+    orderBy: { createdAt: "desc" },
+    take: 15,
+    select: incompleteRunSelect,
+  });
+  if (rows.length === 0 && eventId) {
+    rows = await prisma.run.findMany({
+      where: baseWhere,
+      orderBy: { createdAt: "desc" },
+      take: 15,
+      select: incompleteRunSelect,
+    });
+  }
+  return rows.map(toDashboardIncompleteRunRow);
+}
+
 export async function loadDashboardHomeModel(userId: string): Promise<DashboardHomeModel> {
   const { start: todayStart, end: todayEnd } = localTodayBounds();
 
   await syncRecentEventLapSources(userId).catch(() => {});
   const detectedRunPrompts = await loadDetectedRunPrompts(userId);
 
-  const [events, hasRunToday, recentRun, runsForPerf] = await Promise.all([
+  const [events, hasRunToday, recentRun, runsForPerf, incompleteRunsRows] = await Promise.all([
     prisma.event.findMany({
       where: { userId },
       orderBy: { startDate: "desc" },
@@ -263,6 +347,12 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       select: { lapTimes: true, lapSession: true },
       take: 400,
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.run.findMany({
+      where: { userId, loggingComplete: false, incompleteLoggingPromptDismissedAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: incompleteRunSelect,
     }),
   ]);
 
@@ -376,8 +466,11 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     };
   }
 
+  const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
+
   return {
     detectedRunPrompts,
+    incompleteRuns,
     thingsToTry: actionItems.map((i) => ({
       id: i.id,
       text: i.text,

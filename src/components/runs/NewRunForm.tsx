@@ -29,6 +29,16 @@ import {
   defaultLapIngestValue,
   type LapIngestFormValue,
 } from "@/components/runs/LapTimesIngestPanel";
+import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
+import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
+import {
+  emptyHandlingAssessmentUiState,
+  isHandlingAssessmentMeaningful,
+  parseHandlingAssessmentJson,
+  persistedFromUiState,
+  uiStateFromParsed,
+  type HandlingAssessmentUiState,
+} from "@/lib/runHandlingAssessment";
 
 type CarOption = { id: string; name: string; setupSheetTemplate?: string | null };
 type TrackOption = { id: string; name: string; location?: string | null };
@@ -71,8 +81,15 @@ type LastRun = {
   driverNotes?: string | null;
   handlingProblems?: string | null;
   suggestedChanges?: string | null;
+  handlingAssessmentJson?: unknown;
   lapTimes?: unknown;
   lapSession?: unknown;
+  importedLapSets?: Array<{
+    driverName: string;
+    displayName: string | null;
+    isPrimaryUser: boolean;
+    laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
+  }>;
 };
 
 type DownloadedSetupOption = {
@@ -214,6 +231,8 @@ export function NewRunForm(props: {
     Array<{ fieldKey: string; fieldLabel: string; fromValue: string; toValue: string; confidence: "low" | "medium" | "high"; note?: string | null }>
   >([]);
   const [notesSubTab, setNotesSubTab] = useState<"notes" | "things">("notes");
+  const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
+  const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("car");
   const thingsTryRef = useRef<HTMLTextAreaElement>(null);
   const thingsTryCursorRef = useRef<number | null>(null);
@@ -266,6 +285,66 @@ export function NewRunForm(props: {
   useEffect(() => {
     if (initialEventId) setEventId(initialEventId);
   }, [initialEventId]);
+
+  // Edit-run load must run before dashboard/import prefill so opening /runs/:id/edit?importedLapTimeSessionId=…
+  // does not reset lap ingest after the import block is applied.
+  useEffect(() => {
+    const r = editRun;
+    if (!r || editPrefillAppliedRef.current) return;
+    editPrefillAppliedRef.current = true;
+
+    const nextCarId = (r.carId || r.car?.id || "").toString();
+    if (nextCarId && cars.some((c) => c.id === nextCarId)) {
+      setCarId(nextCarId);
+    }
+    setTrackId(r.trackId ?? "");
+
+    if (r.sessionType === "RACE_MEETING" || r.sessionType === "PRACTICE") {
+      setSessionType("RACE_MEETING");
+      const sub = r.meetingSessionType as MeetingSessionType | undefined;
+      if (sub === "SEEDING" || sub === "QUALIFYING" || sub === "RACE" || sub === "OTHER") {
+        setMeetingSessionType(sub);
+      } else {
+        setMeetingSessionType("PRACTICE");
+      }
+      setMeetingSessionCustom(sub === "OTHER" ? (r.meetingSessionCode?.trim() ?? "") : "");
+    } else {
+      setSessionType("TESTING");
+      setMeetingSessionCustom("");
+    }
+
+    setEventId(r.eventId ?? "");
+    setTireSetId(r.tireSetId ?? "");
+    setRunsCompleted(r.tireRunNumber ?? 0);
+    setBatteryId(r.batteryId ?? "");
+    setBatteryRunsCompleted(r.batteryRunNumber ?? 0);
+
+    const nextSetup = setupSnapshotWithDerived(r.setupSnapshot?.data);
+    setSetupData(nextSetup);
+    setActiveSetupData(nextSetup, nextCarId || carId || null);
+    setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
+
+    setNotes((r.notes ?? "").trim());
+    setSuggestedChanges((r.suggestedChanges ?? "").trim());
+    const parsedHandling = parseHandlingAssessmentJson(r.handlingAssessmentJson);
+    setHandlingUi(uiStateFromParsed(parsedHandling));
+    setHandlingDetailExpanded(isHandlingAssessmentMeaningful(r.handlingAssessmentJson));
+
+    const existingLaps = normalizeLapTimes(r.lapTimes ?? []);
+    const existingText = existingLaps.length ? existingLaps.map((n) => n.toFixed(3)).join("\n") : "";
+    setLapIngest({
+      ...defaultLapIngestValue(),
+      manualText: existingText,
+      sourceKind: existingText ? "manual" : "manual",
+      sourceDetail: r.lapSession ? "Existing laps loaded (edit)" : null,
+      parserId: null,
+      urlLapRows: null,
+      urlImportBlocks: [],
+    });
+
+    setReplicateLast(false);
+    setSetupSectionExpanded(true);
+  }, [editRun, cars]);
 
   useEffect(() => {
     const p = dashboardPrefill;
@@ -437,61 +516,6 @@ export function NewRunForm(props: {
     applyTireBatteryToSetupSnapshot(tireSetId, batteryId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tireSetId, batteryId, tireSets, batteries]);
-
-  useEffect(() => {
-    const r = editRun;
-    if (!r || editPrefillAppliedRef.current) return;
-    editPrefillAppliedRef.current = true;
-
-    const nextCarId = (r.carId || r.car?.id || "").toString();
-    if (nextCarId && cars.some((c) => c.id === nextCarId)) {
-      setCarId(nextCarId);
-    }
-    setTrackId(r.trackId ?? "");
-
-    if (r.sessionType === "RACE_MEETING" || r.sessionType === "PRACTICE") {
-      setSessionType("RACE_MEETING");
-      const sub = r.meetingSessionType as MeetingSessionType | undefined;
-      if (sub === "SEEDING" || sub === "QUALIFYING" || sub === "RACE" || sub === "OTHER") {
-        setMeetingSessionType(sub);
-      } else {
-        setMeetingSessionType("PRACTICE");
-      }
-      setMeetingSessionCustom(sub === "OTHER" ? (r.meetingSessionCode?.trim() ?? "") : "");
-    } else {
-      setSessionType("TESTING");
-      setMeetingSessionCustom("");
-    }
-
-    setEventId(r.eventId ?? "");
-    setTireSetId(r.tireSetId ?? "");
-    setRunsCompleted(r.tireRunNumber ?? 0);
-    setBatteryId(r.batteryId ?? "");
-    setBatteryRunsCompleted(r.batteryRunNumber ?? 0);
-
-    const nextSetup = setupSnapshotWithDerived(r.setupSnapshot?.data);
-    setSetupData(nextSetup);
-    setActiveSetupData(nextSetup, nextCarId || carId || null);
-    setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
-
-    setNotes((r.notes ?? "").trim());
-    setSuggestedChanges((r.suggestedChanges ?? "").trim());
-
-    const existingLaps = normalizeLapTimes(r.lapTimes ?? []);
-    const existingText = existingLaps.length ? existingLaps.map((n) => n.toFixed(3)).join("\n") : "";
-    setLapIngest({
-      ...defaultLapIngestValue(),
-      manualText: existingText,
-      sourceKind: existingText ? "manual" : "manual",
-      sourceDetail: r.lapSession ? "Existing laps loaded (edit)" : null,
-      parserId: null,
-      urlLapRows: null,
-      urlImportBlocks: [],
-    });
-
-    setReplicateLast(false);
-    setSetupSectionExpanded(true);
-  }, [editRun, cars]);
 
   const selectedCar = useMemo(() => cars.find((c) => c.id === carId) ?? null, [cars, carId]);
   const setupTemplate = useMemo(() => {
@@ -1456,6 +1480,7 @@ export function NewRunForm(props: {
           },
           notes: notes.trim() || null,
           suggestedChanges: suggestedChanges.trim() || null,
+          handlingAssessmentJson: persistedFromUiState(handlingUi),
           sessionLabel: null,
           importedLapSets,
           importedLapTimeSessionIds:
@@ -1534,6 +1559,9 @@ export function NewRunForm(props: {
       {isEditing && editRun?.id ? (
         <div className="space-y-2">
           <EngineerRunSummaryPanel runId={editRun.id} />
+          {editRun.importedLapSets && editRun.importedLapSets.length >= 2 ? (
+            <ImportedFieldSessionCard importedLapSets={editRun.importedLapSets} />
+          ) : null}
         </div>
       ) : null}
 
@@ -2313,6 +2341,22 @@ export function NewRunForm(props: {
             aria-label="Things to try"
           />
         )}
+        <div className="pt-1">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md border border-border/80 bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
+            aria-expanded={handlingDetailExpanded}
+            onClick={() => setHandlingDetailExpanded((v) => !v)}
+          >
+            <span>Handling detail (optional)</span>
+            <span className="text-[10px] opacity-70">{handlingDetailExpanded ? "Hide" : "Show"}</span>
+          </button>
+          {handlingDetailExpanded ? (
+            <div className="mt-2">
+              <HandlingAssessmentFields value={handlingUi} onChange={setHandlingUi} />
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-4">

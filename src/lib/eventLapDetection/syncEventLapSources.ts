@@ -308,6 +308,7 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
       userId,
       linkedEventId: { in: scopedIds },
       eventDetectionSource: { in: ["practice", "race"] },
+      detectionPromptDismissedAt: null,
     },
     select: {
       id: true,
@@ -325,6 +326,14 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
   const out: DetectedRunPrompt[] = [];
 
   for (const s of sessions) {
+    if (s.linkedRunId) {
+      const draftLinked = await prisma.run.findFirst({
+        where: { userId, id: s.linkedRunId },
+        select: { loggingComplete: true },
+      });
+      if (draftLinked && draftLinked.loggingComplete === false) continue;
+    }
+
     const eventId = s.linkedEventId!;
     const eventName = eventNameById.get(eventId) ?? "Event";
     const sourceType = s.eventDetectionSource === "race" ? "race" : "practice";

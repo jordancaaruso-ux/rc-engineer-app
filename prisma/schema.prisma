@@ -33,6 +33,23 @@ model User {
   setupImportBatches SetupImportBatch[]
   importedLapTimeSessions ImportedLapTimeSession[]
   watchedLapSources WatchedLapSource[]
+  teammateLinksOwned TeammateLink[] @relation("TeammateLinksOwned")
+  teammateLinksPeer  TeammateLink[] @relation("TeammateLinksPeer")
+}
+
+/** Viewer (`userId`) may browse peer runs in Engineer when same track (enforced in APIs + context). */
+model TeammateLink {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  userId     String
+  peerUserId String
+
+  user User @relation("TeammateLinksOwned", fields: [userId], references: [id], onDelete: Cascade)
+  peer User @relation("TeammateLinksPeer", fields: [peerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, peerUserId])
+  @@index([userId])
+  @@index([peerUserId])
 }
 
 enum ActionItemSourceType {
@@ -425,6 +442,8 @@ model Run {
   notes            String?  // unified notes (new); legacy fields below for older runs
   driverNotes      String?
   handlingProblems String?
+  /** Optional structured handling tags / balance / prompts (see runHandlingAssessment). */
+  handlingAssessmentJson Json?
   suggestedChanges String?
   appliedChanges   String?
 
@@ -445,6 +464,8 @@ model Run {
   sessionCompletedAt DateTime?
   /** User finished the logging workflow (Run completed), or saved from event-detected import. */
   loggingComplete  Boolean  @default(false)
+  /** Dashboard / import chooser: hide "incomplete logging" reminder without deleting the run. */
+  incompleteLoggingPromptDismissedAt DateTime?
 
   /** Cached deterministic Engineer Summary JSON (invalidated on run update). */
   engineerSummaryJson         Json?
@@ -495,6 +516,9 @@ model ImportedLapTimeSession {
    * "Race 15: ISTC Modified (ISTC Modified A3-Main)"). Null for legacy imports.
    */
   eventDetectionSessionLabel String?
+
+  /** User hid this session from the dashboard "Detected sessions" prompt (does not delete import). */
+  detectionPromptDismissedAt DateTime?
 
   detectedPrimaryForRun Run? @relation("RunDetectedImport")
 

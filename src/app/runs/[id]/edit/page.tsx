@@ -4,13 +4,16 @@ import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { NewRunForm } from "@/components/runs/NewRunForm";
+import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditRunPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
@@ -27,6 +30,8 @@ export default async function EditRunPage({
 
   const user = await getOrCreateLocalUser();
   const { id } = await params;
+  const sp = await searchParams;
+  const dashboardPrefill = await getDashboardNewRunPrefill(user.id, sp);
 
   const run = await prisma.run.findFirst({
     where: { id, userId: user.id },
@@ -66,8 +71,17 @@ export default async function EditRunPage({
       driverNotes: true,
       handlingProblems: true,
       suggestedChanges: true,
+      handlingAssessmentJson: true,
       lapTimes: true,
       lapSession: true,
+      importedLapSets: {
+        select: {
+          driverName: true,
+          displayName: true,
+          isPrimaryUser: true,
+          laps: { orderBy: { lapNumber: "asc" } },
+        },
+      },
     },
   });
 
@@ -115,7 +129,7 @@ export default async function EditRunPage({
           tracks={allTracks}
           favouriteTrackIds={favouriteTrackIds}
           favouriteTracks={favouriteTracks}
-          dashboardPrefill={null}
+          dashboardPrefill={dashboardPrefill}
           editRun={{
             id: run.id,
             createdAt: run.createdAt.toISOString(),
@@ -156,8 +170,19 @@ export default async function EditRunPage({
             driverNotes: run.driverNotes,
             handlingProblems: run.handlingProblems,
             suggestedChanges: run.suggestedChanges,
+            handlingAssessmentJson: run.handlingAssessmentJson,
             lapTimes: run.lapTimes,
             lapSession: run.lapSession,
+            importedLapSets: run.importedLapSets.map((s) => ({
+              driverName: s.driverName,
+              displayName: s.displayName,
+              isPrimaryUser: s.isPrimaryUser,
+              laps: s.laps.map((l) => ({
+                lapNumber: l.lapNumber,
+                lapTimeSeconds: l.lapTimeSeconds,
+                isIncluded: l.isIncluded,
+              })),
+            })),
           }}
         />
       </section>

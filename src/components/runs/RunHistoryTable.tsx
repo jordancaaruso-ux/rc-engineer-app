@@ -32,6 +32,8 @@ type Run = {
   id: string;
   createdAt: Date | string;
   sessionCompletedAt?: Date | string | null;
+  /** False until user marks "Run completed" when saving. */
+  loggingComplete?: boolean;
   carId: string | null;
   eventId: string | null;
   sessionType: string;
@@ -216,7 +218,19 @@ export function RunHistoryTable({
               <td className="px-4 py-2">
                 {formatLap(getAverageTopN(primaryLapRowsFromRun(run), 5))}
               </td>
-              <td className="px-4 py-2">{formatRunSessionDisplay(run)}</td>
+              <td className="px-4 py-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span>{formatRunSessionDisplay(run)}</span>
+                  {run.loggingComplete === false ? (
+                    <span
+                      className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-amber-900 dark:text-amber-100"
+                      title="Logging not marked complete"
+                    >
+                      Not completed
+                    </span>
+                  ) : null}
+                </div>
+              </td>
             </tr>
             {isExpanded && (
               <tr className="border-b border-border/80 bg-muted/40">
