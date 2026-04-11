@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { formatLap } from "@/lib/runLaps";
+import { cn } from "@/lib/utils";
 
 function btnPrimary(className = "") {
   return `inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
@@ -26,13 +29,42 @@ function formatPromptSessionWhen(iso: string): string {
 }
 
 export function DetectedRunPromptsBanner({ prompts }: { prompts: DetectedRunPrompt[] }) {
+  const router = useRouter();
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const [dismissErr, setDismissErr] = useState<string | null>(null);
+
+  async function dismiss(importedLapTimeSessionId: string) {
+    setDismissErr(null);
+    setDismissingId(importedLapTimeSessionId);
+    try {
+      const res = await fetch(
+        `/api/lap-time-sessions/${encodeURIComponent(importedLapTimeSessionId)}/dismiss-detection-prompt`,
+        { method: "POST" }
+      );
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setDismissErr(data.error ?? "Could not dismiss.");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setDismissingId(null);
+    }
+  }
+
   if (prompts.length === 0) return null;
 
   return (
     <div className="rounded-lg border border-accent/40 bg-accent/5 p-3 shadow-sm shadow-black/20">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        Detected sessions
+      <div className="space-y-0.5">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Detected sessions
+        </div>
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          Dismiss hides a session from this list without deleting the imported timing data.
+        </p>
       </div>
+      {dismissErr ? <p className="text-[11px] text-destructive">{dismissErr}</p> : null}
       <ul className="mt-2 space-y-2">
         {prompts.map((p) => {
           const title =
@@ -83,9 +115,22 @@ export function DetectedRunPromptsBanner({ prompts }: { prompts: DetectedRunProm
                   </div>
                 ) : null}
               </div>
-              <Link href={promptHref(p)} className={`${btnPrimary()} shrink-0 self-start sm:mt-0.5`}>
-                {title}
-              </Link>
+              <div className="flex shrink-0 flex-col gap-1.5 self-start sm:mt-0.5 sm:items-end">
+                <Link href={promptHref(p)} className={`${btnPrimary()} w-full sm:w-auto text-center`}>
+                  {title}
+                </Link>
+                <button
+                  type="button"
+                  disabled={dismissingId === p.importedLapTimeSessionId}
+                  onClick={() => void dismiss(p.importedLapTimeSessionId)}
+                  aria-label="Dismiss: hide this session from detected prompts without logging a run"
+                  className={cn(
+                    "text-[11px] font-medium text-muted-foreground underline decoration-border underline-offset-2 hover:text-foreground disabled:opacity-50"
+                  )}
+                >
+                  {dismissingId === p.importedLapTimeSessionId ? "…" : "Dismiss"}
+                </button>
+              </div>
             </li>
           );
         })}

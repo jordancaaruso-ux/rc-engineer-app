@@ -1,0 +1,252 @@
+import "server-only";
+
+import { prisma } from "@/lib/prisma";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
+import { formatRunSessionDisplay } from "@/lib/runSession";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { getIncludedLapDashboardMetrics, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
+import { hasTeammateLink } from "@/lib/teammateRunAccess";
+import { buildFocusedRunPairContext } from "@/lib/engineerPhase5/contextPacket";
+
+export type LinkedTeammateRow = {
+  peerUserId: string;
+  email: string | null;
+  name: string | null;
+  label: string;
+};
+
+export async function listLinkedTeammatesForEngineer(viewingUserId: string): Promise<LinkedTeammateRow[]> {
+  const links = await prisma.teammateLink.findMany({
+    where: { userId: viewingUserId },
+    select: {
+      peerUserId: true,
+      peer: { select: { email: true, name: true } },
+    },
+  });
+  return links.map((l) => {
+    const email = l.peer.email ?? null;
+    const name = l.peer.name ?? null;
+    const label = name?.trim() || email?.trim() || l.peerUserId.slice(0, 8);
+    return { peerUserId: l.peerUserId, email, name, label };
+  });
+}
+
+/** Resolve "bob" / partial email to a single linked peer, or null if ambiguous / none. */
+export async function resolveTeammatePeerUserId(
+  viewingUserId: string,
+  query: string
+): Promise<{ ok: true; peer: LinkedTeammateRow } | { ok: false; error: string; candidates?: LinkedTeammateRow[] }> {
+  const q = query.trim().toLowerCase();
+  if (!q) return { ok: false, error: "Empty teammate query." };
+  const all = await listLinkedTeammatesForEngineer(viewingUserId);
+  if (all.length === 0) return { ok: false, error: "No linked teammates. Add one on the Engineer compare section." };
+
+  const scored = all
+    .map((t) => {
+      const email = (t.email ?? "").toLowerCase();
+      const name = (t.name ?? "").toLowerCase();
+      let score = 0;
+      if (email === q) score = 100;
+      else if (name === q) score = 95;
+      else if (email.includes(q)) score = 80;
+      else if (name.includes(q)) score = 75;
+      else if (q.length >= 2 && (email.startsWith(q) || name.split(/\s+/).some((w) => w.startsWith(q)))) score = 60;
+      return { t, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length === 0) {
+    return { ok: false, error: `No linked teammate matched "${query}".`, candidates: all };
+  }
+  if (scored.length > 1 && scored[0]!.score === scored[1]!.score && scored[0]!.score < 90) {
+    return {
+      ok: false,
+      error: `Multiple teammates could match "${query}". Be more specific (full email or name).`,
+      candidates: scored.slice(0, 5).map((s) => s.t),
+    };
+  }
+  return { ok: true, peer: scored[0]!.t };
+}
+
+export type SearchRunsForEngineerArgs = {
+  owner_scope: "mine" | "teammate";
+  /** When owner_scope is teammate: match linked teammate by name/email fragment. */
+  teammate_query?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  car_id?: string | null;
+  track_id?: string | null;
+  event_id?: string | null;
+  text_contains?: string | null;
+  max_results?: number;
+};
+
+export type SearchRunsForEngineerResultRow = {
+  runId: string;
+  whenLabel: string;
+  sortIso: string;
+  carName: string;
+  trackName: string;
+  eventName: string | null;
+  sessionSummary: string;
+  lapCount: number;
+  bestLapSeconds: number | null;
+  owner: "you" | "teammate";
+  teammateLabel: string | null;
+};
+
+export async function searchRunsForEngineerTool(
+  viewingUserId: string,
+  raw: SearchRunsForEngineerArgs
+): Promise<{ ok: true; runs: SearchRunsForEngineerResultRow[]; truncated: boolean } | { ok: false; error: string }> {
+  const maxResults = Math.min(40, Math.max(1, raw.max_results ?? 25));
+  let runOwnerId = viewingUserId;
+  let teammateLabel: string | null = null;
+
+  if (raw.owner_scope === "teammate") {
+    const tq = raw.teammate_query?.trim();
+    if (!tq) {
+      return { ok: false, error: "owner_scope is teammate but teammate_query is missing. Use list_linked_teammates or pass teammate_query." };
+    }
+    const resolved = await resolveTeammatePeerUserId(viewingUserId, tq);
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    const allowed = await hasTeammateLink(viewingUserId, resolved.peer.peerUserId);
+    if (!allowed) return { ok: false, error: "Not allowed to view that teammate's runs." };
+    runOwnerId = resolved.peer.peerUserId;
+    teammateLabel = resolved.peer.label;
+  }
+
+  const where: NonNullable<Parameters<typeof prisma.run.findMany>[0]>["where"] = {
+    userId: runOwnerId,
+  };
+  if (raw.car_id?.trim()) where.carId = raw.car_id.trim();
+  if (raw.event_id?.trim()) where.eventId = raw.event_id.trim();
+  if (raw.track_id?.trim()) where.trackId = raw.track_id.trim();
+
+  const take = Math.min(300, Math.max(maxResults * 3, 80));
+
+  const runs = await prisma.run.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take,
+    select: {
+      id: true,
+      createdAt: true,
+      sessionCompletedAt: true,
+      carNameSnapshot: true,
+      sessionType: true,
+      meetingSessionType: true,
+      meetingSessionCode: true,
+      sessionLabel: true,
+      lapTimes: true,
+      lapSession: true,
+      car: { select: { name: true } },
+      track: { select: { name: true } },
+      event: { select: { name: true } },
+    },
+  });
+
+  let filtered = runs;
+
+  if (raw.date_from?.trim() || raw.date_to?.trim()) {
+    const from = raw.date_from?.trim() ? new Date(`${raw.date_from.trim()}T00:00:00.000Z`) : null;
+    const to = raw.date_to?.trim() ? new Date(`${raw.date_to.trim()}T23:59:59.999Z`) : null;
+    filtered = runs.filter((r) => {
+      const t = resolveRunDisplayInstant({
+        createdAt: r.createdAt,
+        sessionCompletedAt: r.sessionCompletedAt,
+      }).getTime();
+      const d = new Date(t);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  }
+
+  const q = raw.text_contains?.trim().toLowerCase();
+  if (q) {
+    filtered = filtered.filter((r) => {
+      const hay = [
+        r.car?.name,
+        r.carNameSnapshot,
+        r.track?.name,
+        r.sessionLabel,
+        r.event?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  const truncated = filtered.length > maxResults;
+  const slice = filtered.slice(0, maxResults);
+
+  const rows: SearchRunsForEngineerResultRow[] = slice.map((run) => {
+    const when = resolveRunDisplayInstant({
+      createdAt: run.createdAt,
+      sessionCompletedAt: run.sessionCompletedAt,
+    });
+    const dash = getIncludedLapDashboardMetrics(primaryLapRowsFromRun(run));
+    return {
+      runId: run.id,
+      whenLabel: formatRunCreatedAtDateTime(when),
+      sortIso: when.toISOString(),
+      carName: run.car?.name ?? run.carNameSnapshot ?? "—",
+      trackName: run.track?.name ?? "—",
+      eventName: run.event?.name ?? null,
+      sessionSummary: formatRunSessionDisplay({
+        sessionType: run.sessionType,
+        meetingSessionType: run.meetingSessionType,
+        meetingSessionCode: run.meetingSessionCode,
+        sessionLabel: run.sessionLabel,
+      }),
+      lapCount: dash.lapCount,
+      bestLapSeconds: dash.bestLap,
+      owner: raw.owner_scope === "teammate" ? "teammate" : "you",
+      teammateLabel: raw.owner_scope === "teammate" ? teammateLabel : null,
+    };
+  });
+
+  return { ok: true, runs: rows, truncated };
+}
+
+export async function applyEngineerFocusTool(
+  viewingUserId: string,
+  primaryRunId: string,
+  compareRunId: string | null | undefined
+): Promise<
+  | { ok: true; focusedRunPair: NonNullable<Awaited<ReturnType<typeof buildFocusedRunPairContext>>> }
+  | { ok: false; error: string }
+> {
+  const primary = primaryRunId?.trim();
+  if (!primary) return { ok: false, error: "primary_run_id is required." };
+
+  const ownPrimary = await prisma.run.findFirst({
+    where: { id: primary, userId: viewingUserId },
+    select: { id: true },
+  });
+  if (!ownPrimary) {
+    return {
+      ok: false,
+      error:
+        "Primary run must belong to the current user. Search with owner_scope mine and use that run id, or pick your run first.",
+    };
+  }
+
+  const cid = compareRunId?.trim() || null;
+  const focused = await buildFocusedRunPairContext(viewingUserId, primary, cid);
+  if (!focused) return { ok: false, error: "Could not load focused runs." };
+
+  if (cid && focused.compareRunId == null) {
+    return {
+      ok: false,
+      error:
+        "Compare run not found or not allowed. For teammate runs, primary must share the same track as the teammate compare run and you must be linked.",
+    };
+  }
+
+  return { ok: true, focusedRunPair: focused };
+}

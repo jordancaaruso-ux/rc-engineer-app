@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { EngineerDeepDiveAnswersV1, EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 
 function fmtSec(v: number | null | undefined, notMeaningful?: boolean): string {
   if (notMeaningful) return "—";
@@ -42,13 +43,6 @@ export function EngineerRunSummaryPanel({
   const [summary, setSummary] = useState<EngineerRunSummaryV2 | null>(null);
   const [cached, setCached] = useState(false);
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [deepDive, setDeepDive] = useState<EngineerDeepDiveAnswersV1 | null>(null);
-  const [savingDive, setSavingDive] = useState(false);
-
-  const [dominantIssue, setDominantIssue] = useState("entry");
-  const [severityFeel, setSeverityFeel] = useState<"mild" | "moderate" | "severe">("mild");
-  const [feelVsPrior, setFeelVsPrior] = useState("unsure");
-  const [freeText, setFreeText] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,47 +65,9 @@ export function EngineerRunSummaryPanel({
     }
   }, [runId]);
 
-  const loadDeepDive = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/runs/${encodeURIComponent(runId)}/engineer-deep-dive`, { cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
-      const d = (data as { deepDive?: EngineerDeepDiveAnswersV1 | null }).deepDive;
-      setDeepDive(d && typeof d === "object" && d.version === 1 ? d : null);
-    } catch {
-      setDeepDive(null);
-    }
-  }, [runId]);
-
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    void loadDeepDive();
-  }, [loadDeepDive]);
-
-  async function saveDeepDive() {
-    setSavingDive(true);
-    try {
-      const res = await fetch(`/api/runs/${encodeURIComponent(runId)}/engineer-deep-dive`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dominantIssue,
-          severityFeel,
-          feelVsPrior,
-          freeText: freeText.trim() || undefined,
-          referenceRunId: summary?.referenceRunId ?? null,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data && typeof data === "object" && "deepDive" in data) {
-        setDeepDive((data as { deepDive: EngineerDeepDiveAnswersV1 }).deepDive);
-      }
-    } finally {
-      setSavingDive(false);
-    }
-  }
 
   if (loading && !summary) {
     return (
@@ -124,6 +80,7 @@ export function EngineerRunSummaryPanel({
   if (!summary) return null;
 
   const lo = summary.lapOutcome;
+  const engineerChatHref = `/engineer?runId=${encodeURIComponent(runId)}`;
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -153,6 +110,51 @@ export function EngineerRunSummaryPanel({
           {summary.importedProvenance ? (
             <div className="text-muted-foreground">
               Timing source: <span className="text-foreground/90">{summary.importedProvenance}</span>
+            </div>
+          ) : null}
+
+          {summary.fieldImportSession && summary.fieldImportSession.ranked.length >= 2 ? (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Imported session — field
+              </div>
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Same timing import, multiple drivers. Rank and gap use each driver&apos;s best included lap vs session
+                best. Fade is mean(second half) − mean(first half) of included laps (needs ≥4 laps).
+              </p>
+              <div className="overflow-x-auto rounded-md border border-border bg-muted/40">
+                <table className="w-full text-left text-[10px]">
+                  <thead>
+                    <tr className="border-b border-border text-muted-foreground">
+                      <th className="px-2 py-1.5 font-medium">Driver</th>
+                      <th className="px-2 py-1.5 font-medium">Rank</th>
+                      <th className="px-2 py-1.5 font-medium">Best</th>
+                      <th className="px-2 py-1.5 font-medium">Gap to P1</th>
+                      <th className="px-2 py-1.5 font-medium">Fade</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-mono text-foreground/90">
+                    {summary.fieldImportSession.ranked.map((row, i) => (
+                      <tr key={`${row.label}-${i}`} className={row.isPrimaryUser ? "bg-primary/5" : undefined}>
+                        <td className="px-2 py-1">
+                          {row.label}
+                          {row.isPrimaryUser ? (
+                            <span className="ml-1 text-[9px] text-muted-foreground font-sans">(your row)</span>
+                          ) : null}
+                        </td>
+                        <td className="px-2 py-1 tabular-nums">{row.rank}</td>
+                        <td className="px-2 py-1 tabular-nums">{fmtSec(row.bestLapSeconds)}</td>
+                        <td className="px-2 py-1 tabular-nums">
+                          {row.gapToSessionBestSeconds == null || !Number.isFinite(row.gapToSessionBestSeconds)
+                            ? "—"
+                            : row.gapToSessionBestSeconds.toFixed(3)}
+                        </td>
+                        <td className="px-2 py-1 tabular-nums">{fmtSec(row.fadeSeconds)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : null}
 
@@ -227,84 +229,17 @@ export function EngineerRunSummaryPanel({
             </button>
           </div>
 
-          {summary.deepDiveOffered ? (
-            <div className="border-t border-border pt-3 space-y-2">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Handling deep dive (optional)</div>
-              {deepDive ? (
-                <div className="rounded-md bg-muted/40 p-2 text-muted-foreground space-y-1">
-                  <div>
-                    Saved: {deepDive.dominantIssue} · {deepDive.severityFeel} · {deepDive.feelVsPrior}
-                  </div>
-                  {deepDive.freeText ? <div className="text-foreground/90">{deepDive.freeText}</div> : null}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-muted-foreground">A few quick taps — optional.</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="space-y-0.5">
-                      <span className="text-[10px] text-muted-foreground">Where it shows up</span>
-                      <select
-                        className="w-full rounded border border-border bg-background px-2 py-1 text-[11px]"
-                        value={dominantIssue}
-                        onChange={(e) => setDominantIssue(e.target.value)}
-                      >
-                        <option value="push">Push / understeer</option>
-                        <option value="entry">Entry</option>
-                        <option value="mid">Mid-corner</option>
-                        <option value="exit">Exit</option>
-                        <option value="high_speed">High speed</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </label>
-                    <label className="space-y-0.5">
-                      <span className="text-[10px] text-muted-foreground">How much</span>
-                      <select
-                        className="w-full rounded border border-border bg-background px-2 py-1 text-[11px]"
-                        value={severityFeel}
-                        onChange={(e) => setSeverityFeel(e.target.value as "mild" | "moderate" | "severe")}
-                      >
-                        <option value="mild">Mild</option>
-                        <option value="moderate">Moderate</option>
-                        <option value="severe">Severe</option>
-                      </select>
-                    </label>
-                    <label className="space-y-0.5 sm:col-span-2">
-                      <span className="text-[10px] text-muted-foreground">Feel vs previous run</span>
-                      <select
-                        className="w-full rounded border border-border bg-background px-2 py-1 text-[11px]"
-                        value={feelVsPrior}
-                        onChange={(e) => setFeelVsPrior(e.target.value)}
-                      >
-                        <option value="more_grip">More grip</option>
-                        <option value="less_grip">Less grip</option>
-                        <option value="more_steering">More steering</option>
-                        <option value="less_steering">Less steering</option>
-                        <option value="same">Same</option>
-                        <option value="unsure">Unsure</option>
-                      </select>
-                    </label>
-                    <label className="space-y-0.5 sm:col-span-2">
-                      <span className="text-[10px] text-muted-foreground">Optional detail</span>
-                      <input
-                        className="w-full rounded border border-border bg-background px-2 py-1 text-[11px]"
-                        value={freeText}
-                        onChange={(e) => setFreeText(e.target.value)}
-                        placeholder="One line (optional)"
-                      />
-                    </label>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={savingDive}
-                    onClick={() => void saveDeepDive()}
-                    className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground disabled:opacity-50"
-                  >
-                    {savingDive ? "Saving…" : "Save deep dive"}
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : null}
+          <div className="border-t border-border pt-3 space-y-2">
+            <p className="text-muted-foreground">
+              Want to go deeper? Use the Engineer chat for questions and handling ideas about this run (optional).
+            </p>
+            <Link
+              href={engineerChatHref}
+              className="inline-flex rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground shadow-glow-sm hover:brightness-105"
+            >
+              Chat with Engineer
+            </Link>
+          </div>
         </div>
       ) : null}
     </div>

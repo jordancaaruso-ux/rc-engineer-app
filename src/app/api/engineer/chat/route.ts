@@ -9,7 +9,11 @@ import {
 import { getOrComputeEngineerSummaryForLatestRun } from "@/lib/engineerPhase5/loadLatestEngineerSummary";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
-import { generateEngineerChatReply, type EngineerChatMessage } from "@/lib/engineerPhase5/openaiEngineer";
+import {
+  generateEngineerChatReplyWithTools,
+  type EngineerChatMessage,
+} from "@/lib/engineerPhase5/openaiEngineer";
+import { buildRunCatalogV1 } from "@/lib/engineerPhase5/runCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +30,9 @@ export async function POST(request: Request) {
         messages?: Array<{ role?: unknown; content?: unknown }>;
         runId?: unknown;
         compareRunId?: unknown;
+        patternDigest?: unknown;
+        /** When false, omit account run catalog from context (default: include). */
+        includeRunCatalog?: unknown;
       }
     | null;
   const raw = Array.isArray(body?.messages) ? body!.messages : [];
@@ -60,14 +67,55 @@ export async function POST(request: Request) {
     engineerSummary = summaryResult?.summary ?? null;
   }
 
+  const patternDigest =
+    body?.patternDigest && typeof body.patternDigest === "object" && body.patternDigest !== null
+      ? body.patternDigest
+      : null;
+
+  const includeRunCatalog = body?.includeRunCatalog !== false;
+  const runCatalog = includeRunCatalog ? await buildRunCatalogV1({ userId: user.id }) : null;
+
   const contextJson = {
     defaultDashboardContext: basePacket,
     engineerSummary,
     /** When set with `compareRunId`, deterministic summary is omitted (its reference run may differ). */
     focusedRunPair,
+    /** Optional chronological series + setup deltas (same car) for trend questions. */
+    patternDigest,
+    /** Account-wide run inventory (compact rows); null when client disables to save tokens. */
+    runCatalog,
     thingsToTry: basePacket.thingsToTry,
   };
-  const out = await generateEngineerChatReply({ contextJson, messages });
-  return NextResponse.json({ contextJson, reply: out.reply });
+
+  const baseForMerge = {
+    defaultDashboardContext: basePacket,
+    patternDigest,
+    runCatalog,
+    thingsToTry: basePacket.thingsToTry,
+  };
+
+  const out = await generateEngineerChatReplyWithTools({
+    contextJson,
+    messages,
+    userId: user.id,
+    mergeContextWithFocusedPair: async (focused) => {
+      let summary: EngineerRunSummaryV2 | null = null;
+      if (!focused.compareRunId) {
+        const summaryResult = await getOrComputeEngineerSummaryForRun(user.id, focused.primaryRunId);
+        summary = summaryResult?.summary ?? null;
+      }
+      return {
+        ...baseForMerge,
+        engineerSummary: summary,
+        focusedRunPair: focused,
+      };
+    },
+  });
+
+  return NextResponse.json({
+    contextJson: out.contextJson,
+    reply: out.reply,
+    resolvedFocus: out.resolvedFocus,
+  });
 }
 

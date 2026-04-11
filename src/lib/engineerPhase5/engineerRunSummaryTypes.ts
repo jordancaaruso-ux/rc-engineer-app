@@ -40,6 +40,22 @@ export type EngineerRunSummaryV2 = {
   notesUsed: { verbatimSnippet: string | null; role: "none" | "context_only" };
   /** One-line import provenance when linked session exists */
   importedProvenance: string | null;
+  /**
+   * When this run has ≥2 imported lap sets (same session), rank / gap / fade vs session best.
+   * `fieldFingerprint` invalidates cached JSON when imports change.
+   */
+  fieldImportSession: null | {
+    sessionBestLapSeconds: number | null;
+    ranked: Array<{
+      label: string;
+      isPrimaryUser: boolean;
+      rank: number;
+      bestLapSeconds: number | null;
+      gapToSessionBestSeconds: number | null;
+      fadeSeconds: number | null;
+    }>;
+  };
+  fieldFingerprint: string;
   deepDiveOffered: boolean;
   /** Soft historical context (Phase 4); never strong claims */
   softPriors: string[];

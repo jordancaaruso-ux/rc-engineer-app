@@ -11,8 +11,10 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { listSetupKeysChangedBetweenSnapshots } from "@/lib/setupCompare/listSetupKeysChangedBetweenSnapshots";
 import { buildSetupDiffRows, normalizeSetupData } from "@/lib/setupDiff";
-import { displayRunNotes } from "@/lib/runNotes";
+import { displayRunNotesTextOnly } from "@/lib/runNotes";
+import { formatHandlingAssessmentForEngineer } from "@/lib/runHandlingAssessment";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
+import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
 
 export type EngineerContextPacketV1 = {
   version: 1;
@@ -38,6 +40,7 @@ export type EngineerContextPacketV1 = {
       keysChangedFromPreviousRunCount: number;
     };
     notesPreview: string | null;
+    handlingPreview: string | null;
   };
   previousRun: null | {
     id: string;
@@ -76,6 +79,10 @@ function clampNotePreview(raw: string | null | undefined, max = 220): string | n
   const t = raw?.trim();
   if (!t) return null;
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+function clampHandlingPreview(raw: string | null | undefined): string | null {
+  return clampNotePreview(raw, 800);
 }
 
 function lapSummaryFromRun(run: { lapTimes: unknown; lapSession?: unknown } | null): LapSummary {
@@ -122,6 +129,7 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
       notes: true,
       driverNotes: true,
       handlingProblems: true,
+      handlingAssessmentJson: true,
       carNameSnapshot: true,
       trackNameSnapshot: true,
       car: { select: { name: true } },
@@ -220,7 +228,10 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
         keysChangedFromPreviousRun,
         keysChangedFromPreviousRunCount: keysChangedFromPreviousRun.length,
       },
-      notesPreview: clampNotePreview(latest.notes ?? latest.driverNotes ?? latest.handlingProblems ?? null),
+      notesPreview: clampNotePreview(displayRunNotesTextOnly(latest)),
+      handlingPreview: clampHandlingPreview(
+        formatHandlingAssessmentForEngineer(latest.handlingAssessmentJson)
+      ),
     },
     previousRun: prev
       ? {
@@ -272,6 +283,7 @@ export type EngineerFocusedRunPairContext = {
       consistencyScore: number | null;
     };
     notesPreview: string | null;
+    handlingPreview: string | null;
   };
   compare: null | EngineerFocusedRunPairContext["primary"];
   lapComparison: null | {
@@ -295,6 +307,19 @@ export type EngineerFocusedRunPairContext = {
     bestLapSeconds: number | null;
     avgTop5Seconds: number | null;
   }>;
+  /** When ≥2 imported drivers on the primary run: rank / gap / stint fade vs session best. */
+  fieldImportSession: null | {
+    driverCount: number;
+    sessionBestLapSeconds: number | null;
+    ranked: Array<{
+      label: string;
+      isPrimaryUser: boolean;
+      rank: number;
+      bestLapSeconds: number | null;
+      gapToSessionBestSeconds: number | null;
+      fadeSeconds: number | null;
+    }>;
+  };
 };
 
 function lapDashboardFromRun(run: { lapTimes: unknown; lapSession?: unknown }) {
@@ -323,7 +348,9 @@ const focusedRunSelect = {
   notes: true,
   driverNotes: true,
   handlingProblems: true,
+  handlingAssessmentJson: true,
   carId: true,
+  trackId: true,
   carNameSnapshot: true,
   trackNameSnapshot: true,
   car: { select: { id: true, name: true } },
@@ -334,6 +361,7 @@ const focusedRunSelect = {
     select: {
       driverName: true,
       displayName: true,
+      isPrimaryUser: true,
       laps: { orderBy: { lapNumber: "asc" as const } },
     },
   },
@@ -353,6 +381,7 @@ function runSliceFromRow(
     notes: string | null;
     driverNotes: string | null;
     handlingProblems: string | null;
+    handlingAssessmentJson: unknown;
     carNameSnapshot: string | null;
     trackNameSnapshot: string | null;
     car: { name: string } | null;
@@ -386,12 +415,51 @@ function runSliceFromRow(
       avgTop10Seconds: lap.avgTop10,
       consistencyScore: lap.consistencyScore,
     },
-    notesPreview: clampNotePreview(displayRunNotes(row)),
+    notesPreview: clampNotePreview(displayRunNotesTextOnly(row)),
+    handlingPreview: clampHandlingPreview(
+      formatHandlingAssessmentForEngineer(row.handlingAssessmentJson)
+    ),
   };
+}
+
+async function loadCompareRunForFocusedContext(
+  viewerId: string,
+  primaryRunId: string,
+  primaryTrackId: string | null,
+  compareRunId: string | null | undefined
+) {
+  if (!compareRunId?.trim()) return null;
+  const cid = compareRunId.trim();
+  if (cid === primaryRunId.trim()) return null;
+
+  const own = await prisma.run.findFirst({
+    where: { id: cid, userId: viewerId },
+    select: focusedRunSelect,
+  });
+  if (own) return own;
+
+  const other = await prisma.run.findFirst({
+    where: { id: cid },
+    select: { userId: true, trackId: true },
+  });
+  if (!other) return null;
+
+  const link = await prisma.teammateLink.findFirst({
+    where: { userId: viewerId, peerUserId: other.userId },
+    select: { id: true },
+  });
+  if (!link) return null;
+  if (!primaryTrackId || !other.trackId || primaryTrackId !== other.trackId) return null;
+
+  return prisma.run.findFirst({
+    where: { id: cid },
+    select: focusedRunSelect,
+  });
 }
 
 /**
  * Deterministic context for comparing two user runs (any date). Setup diff only when same `carId`.
+ * Compare run may be the viewer's or a teammate's (requires TeammateLink + same track as primary).
  */
 export async function buildFocusedRunPairContext(
   userId: string,
@@ -404,13 +472,12 @@ export async function buildFocusedRunPairContext(
   });
   if (!primary) return null;
 
-  const compare =
-    compareRunId && compareRunId.trim() && compareRunId.trim() !== primaryRunId.trim()
-      ? await prisma.run.findFirst({
-          where: { id: compareRunId.trim(), userId },
-          select: focusedRunSelect,
-        })
-      : null;
+  const compare = await loadCompareRunForFocusedContext(
+    userId,
+    primary.id,
+    primary.trackId,
+    compareRunId
+  );
 
   const primarySlice = runSliceFromRow(primary);
   const compareSlice = compare ? runSliceFromRow(compare) : null;
@@ -490,6 +557,20 @@ export async function buildFocusedRunPairContext(
     });
   }
 
+  const fieldImportSession =
+    computeFieldImportSessionFromSets(
+      (primary.importedLapSets ?? []).map((s) => ({
+        driverName: s.driverName,
+        displayName: s.displayName,
+        isPrimaryUser: s.isPrimaryUser,
+        laps: s.laps.map((l) => ({
+          lapNumber: l.lapNumber,
+          lapTimeSeconds: l.lapTimeSeconds,
+          isIncluded: l.isIncluded,
+        })),
+      }))
+    ) ?? null;
+
   return {
     primaryRunId: primary.id,
     compareRunId: compareSlice?.id ?? null,
@@ -498,5 +579,6 @@ export async function buildFocusedRunPairContext(
     lapComparison,
     setupComparison,
     importedDriversOnPrimary,
+    fieldImportSession,
   };
 }

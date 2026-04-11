@@ -91,9 +91,17 @@ export function buildImportedIngestPlanFromPayload(
   }
 
   const nums = primary.laps;
+  const selectedDriverIds =
+    opts.mode === "race_full_field" && sessionDrivers.length > 1
+      ? [
+          primary.driverId,
+          ...sessionDrivers.filter((d) => d.driverId !== primary.driverId).map((d) => d.driverId),
+        ]
+      : [primary.driverId];
+
   return {
     sessionDrivers,
-    selectedDriverIds: [primary.driverId],
+    selectedDriverIds,
     primaryDriverName: primary.driverName,
     primaryRows: lapRowsFromNums(nums),
   };

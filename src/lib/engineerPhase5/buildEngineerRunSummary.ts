@@ -8,6 +8,7 @@ import { getEffectiveRunNotes } from "@/lib/engineerPhase5/mergeRunNotes";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { loadNumericAggregationMapForCar } from "@/lib/engineerPhase5/loadNumericAggregationMapForCar";
+import type { FieldImportSession } from "@/lib/lapField/fieldImportSession";
 
 const SNIPPET_MAX = 120;
 
@@ -18,6 +19,7 @@ export type RunShapeForEngineer = {
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;
+  handlingAssessmentJson?: unknown;
   sessionType?: string;
   meetingSessionType?: string | null;
   meetingSessionCode?: string | null;
@@ -60,6 +62,8 @@ export async function buildEngineerRunSummary(params: {
   current: RunShapeForEngineer;
   reference: RunShapeForEngineer | null;
   importedSession: { sourceUrl: string; eventDetectionSessionLabel: string | null } | null;
+  fieldImportSession: FieldImportSession | null;
+  fieldFingerprint: string;
 }): Promise<EngineerRunSummaryV2> {
   const { lapOutcome, lapCountIncluded } = computeLapOutcomesForEngineer(
     params.current,
@@ -103,6 +107,20 @@ export async function buildEngineerRunSummary(params: {
       role: effectiveNotes ? "context_only" : "none",
     },
     importedProvenance: importedProvenanceLine(params.importedSession),
+    fieldImportSession: params.fieldImportSession
+      ? {
+          sessionBestLapSeconds: params.fieldImportSession.sessionBestLapSeconds,
+          ranked: params.fieldImportSession.ranked.map((r) => ({
+            label: r.label,
+            isPrimaryUser: r.isPrimaryUser,
+            rank: r.rank,
+            bestLapSeconds: r.bestLapSeconds,
+            gapToSessionBestSeconds: r.gapToSessionBestSeconds,
+            fadeSeconds: r.fadeSeconds,
+          })),
+        }
+      : null,
+    fieldFingerprint: params.fieldFingerprint,
     deepDiveOffered: false,
     softPriors,
   };

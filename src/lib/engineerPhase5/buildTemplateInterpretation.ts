@@ -20,6 +20,22 @@ function pacePhrase(summary: EngineerRunSummaryV2): string {
   return `Compared to the reference run: ${parts.join("; ")}.`;
 }
 
+function fieldPhrase(summary: EngineerRunSummaryV2): string {
+  const f = summary.fieldImportSession;
+  if (!f || f.ranked.length < 2) return "";
+  const you = f.ranked.find((r) => r.isPrimaryUser) ?? f.ranked[0];
+  if (!you) return "";
+  const gap =
+    you.gapToSessionBestSeconds != null && Number.isFinite(you.gapToSessionBestSeconds)
+      ? `${you.gapToSessionBestSeconds.toFixed(3)}s`
+      : "—";
+  const fade =
+    you.fadeSeconds != null && Number.isFinite(you.fadeSeconds)
+      ? `${you.fadeSeconds >= 0 ? "+" : ""}${you.fadeSeconds.toFixed(3)}s`
+      : "n/a";
+  return `Imported timing field (by best lap): your row ranked ${you.rank} of ${f.ranked.length}; gap to session best ${gap}; stint fade ${fade} (second half vs first half of included laps, when computable).`;
+}
+
 function setupPhrase(summary: EngineerRunSummaryV2): string {
   const n = summary.setupChanges.length;
   if (!summary.referenceRunId) return "";
@@ -31,7 +47,12 @@ function setupPhrase(summary: EngineerRunSummaryV2): string {
 
 function notesPhrase(
   summary: EngineerRunSummaryV2,
-  run: { notes?: string | null; driverNotes?: string | null; handlingProblems?: string | null }
+  run: {
+    notes?: string | null;
+    driverNotes?: string | null;
+    handlingProblems?: string | null;
+    handlingAssessmentJson?: unknown;
+  }
 ): string {
   if (summary.notesUsed.role === "none") return "";
   const full = getEffectiveRunNotes(run);
@@ -44,7 +65,12 @@ function notesPhrase(
 
 function conflictPhrase(
   summary: EngineerRunSummaryV2,
-  run: { notes?: string | null; driverNotes?: string | null; handlingProblems?: string | null }
+  run: {
+    notes?: string | null;
+    driverNotes?: string | null;
+    handlingProblems?: string | null;
+    handlingAssessmentJson?: unknown;
+  }
 ): string {
   const text = getEffectiveRunNotes(run).toLowerCase();
   if (!text.includes("faster") && !text.includes("better") && !text.includes("improved")) return "";
@@ -63,9 +89,13 @@ export function buildTemplateInterpretation(
   summary: EngineerRunSummaryV2,
   run: { notes?: string | null; driverNotes?: string | null; handlingProblems?: string | null }
 ): string {
-  const chunks = [pacePhrase(summary), setupPhrase(summary), notesPhrase(summary, run), conflictPhrase(summary, run)].filter(
-    Boolean
-  );
+  const chunks = [
+    pacePhrase(summary),
+    setupPhrase(summary),
+    fieldPhrase(summary),
+    notesPhrase(summary, run),
+    conflictPhrase(summary, run),
+  ].filter(Boolean);
   const soft = summary.softPriors.length
     ? `Historical context: ${summary.softPriors.join(" ")}`
     : "";

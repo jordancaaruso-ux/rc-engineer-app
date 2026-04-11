@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
-import { displayRunNotes } from "@/lib/runNotes";
+import { displayRunNotesTextOnly } from "@/lib/runNotes";
+import { formatHandlingAssessmentForEngineer } from "@/lib/runHandlingAssessment";
 
 /** Serializable snapshot for engineer / workflow UI (no Prisma types in client props). */
 export type EngineerWorkflowContext = {
@@ -14,6 +15,7 @@ export type EngineerWorkflowContext = {
     trackName: string;
     eventName: string | null;
     notesPreview: string;
+    handlingPreview: string;
   };
   thingsToTry: { id: string; text: string }[];
 };
@@ -39,6 +41,7 @@ export async function loadEngineerWorkflowContext(userId: string): Promise<Engin
         notes: true,
         driverNotes: true,
         handlingProblems: true,
+        handlingAssessmentJson: true,
         car: { select: { name: true } },
         track: { select: { name: true } },
         event: { select: { name: true } },
@@ -57,11 +60,13 @@ export async function loadEngineerWorkflowContext(userId: string): Promise<Engin
 
   const carName = lastRun.car?.name ?? lastRun.carNameSnapshot ?? "—";
   const trackName = lastRun.track?.name ?? lastRun.trackNameSnapshot ?? "—";
-  const notesPreview = displayRunNotes({
-    notes: lastRun.notes,
-    driverNotes: lastRun.driverNotes,
-    handlingProblems: lastRun.handlingProblems,
-  }).trim();
+  const notesRaw = displayRunNotesTextOnly(lastRun).trim();
+  const notesPreview =
+    !notesRaw ? "—" : notesRaw.length > 220 ? `${notesRaw.slice(0, 217)}…` : notesRaw;
+
+  const handlingRaw = formatHandlingAssessmentForEngineer(lastRun.handlingAssessmentJson).trim();
+  const handlingPreview =
+    !handlingRaw ? "" : handlingRaw.length > 400 ? `${handlingRaw.slice(0, 397)}…` : handlingRaw;
 
   return {
     lastRun: {
@@ -77,7 +82,8 @@ export async function loadEngineerWorkflowContext(userId: string): Promise<Engin
       carName,
       trackName,
       eventName: lastRun.event?.name ?? null,
-      notesPreview: notesPreview.length > 220 ? `${notesPreview.slice(0, 217)}…` : notesPreview || "—",
+      notesPreview,
+      handlingPreview,
     },
     thingsToTry,
   };

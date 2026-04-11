@@ -237,7 +237,9 @@ export function LapTimesIngestPanel({
       const autoSelectIds =
         sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
           ? [sessionDrivers[0].driverId]
-          : [];
+          : sessionDrivers.length > 1
+            ? sessionDrivers.map((d) => d.driverId).filter((id): id is string => Boolean(id))
+            : [];
 
       const recordedAt = row.recordedAt ?? new Date().toISOString();
       const sessionCompletedAtIso =

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { buildEngineerRunSummary, type RunShapeForEngineer } from "@/lib/engineerPhase5/buildEngineerRunSummary";
+import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
 
 const runSelect = {
   id: true,
@@ -10,6 +11,7 @@ const runSelect = {
   notes: true,
   driverNotes: true,
   handlingProblems: true,
+  handlingAssessmentJson: true,
   sessionType: true,
   meetingSessionType: true,
   meetingSessionCode: true,
@@ -19,7 +21,39 @@ const runSelect = {
   engineerSummaryJson: true,
   engineerSummaryRefRunId: true,
   setupSnapshot: { select: { data: true } },
+  importedLapSets: {
+    select: {
+      id: true,
+      driverName: true,
+      displayName: true,
+      isPrimaryUser: true,
+      laps: {
+        select: { lapNumber: true, lapTimeSeconds: true, isIncluded: true },
+        orderBy: { lapNumber: "asc" as const },
+      },
+    },
+  },
 } as const;
+
+/** Stable string so cached summary invalidates when imported lap sets or lap rows change. */
+function fieldFingerprint(
+  sets: Array<{
+    id: string;
+    laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
+  }>
+): string {
+  if (sets.length === 0) return "";
+  return [...sets]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((s) => {
+      const lapSig = [...s.laps]
+        .sort((a, b) => a.lapNumber - b.lapNumber)
+        .map((l) => `${l.lapNumber}:${l.lapTimeSeconds}:${l.isIncluded}`)
+        .join(",");
+      return `${s.id}:${lapSig}`;
+    })
+    .join("|");
+}
 
 function toShape(
   r: {
@@ -30,6 +64,7 @@ function toShape(
     notes: string | null;
     driverNotes: string | null;
     handlingProblems: string | null;
+    handlingAssessmentJson: unknown;
     sessionType: string;
     meetingSessionType: string | null;
     meetingSessionCode: string | null;
@@ -46,6 +81,7 @@ function toShape(
     notes: r.notes,
     driverNotes: r.driverNotes,
     handlingProblems: r.handlingProblems,
+    handlingAssessmentJson: r.handlingAssessmentJson,
     sessionType: r.sessionType,
     meetingSessionType: r.meetingSessionType,
     meetingSessionCode: r.meetingSessionCode,
@@ -75,13 +111,17 @@ export async function getOrComputeEngineerSummaryForRun(
     : null;
 
   const refId = reference?.id ?? null;
+  const fp = fieldFingerprint(run.importedLapSets ?? []);
   if (
     !opts?.force &&
     run.engineerSummaryJson &&
     typeof run.engineerSummaryJson === "object" &&
     run.engineerSummaryRefRunId === refId
   ) {
-    return { summary: run.engineerSummaryJson as EngineerRunSummaryV2, cached: true };
+    const cached = run.engineerSummaryJson as EngineerRunSummaryV2;
+    if (cached.fieldFingerprint === fp) {
+      return { summary: cached, cached: true };
+    }
   }
 
   const importedSession = run.importedLapTimeSessionId
@@ -91,10 +131,26 @@ export async function getOrComputeEngineerSummaryForRun(
       })
     : null;
 
+  const fieldImportSession =
+    computeFieldImportSessionFromSets(
+      (run.importedLapSets ?? []).map((s) => ({
+        driverName: s.driverName,
+        displayName: s.displayName,
+        isPrimaryUser: s.isPrimaryUser,
+        laps: s.laps.map((l) => ({
+          lapNumber: l.lapNumber,
+          lapTimeSeconds: l.lapTimeSeconds,
+          isIncluded: l.isIncluded,
+        })),
+      }))
+    ) ?? null;
+
   const summary = await buildEngineerRunSummary({
     current: toShape(run),
     reference: reference ? toShape(reference) : null,
     importedSession: importedSession,
+    fieldImportSession,
+    fieldFingerprint: fp,
   });
 
   await prisma.run.update({

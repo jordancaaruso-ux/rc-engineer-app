@@ -16,6 +16,8 @@ export type RunPickerRun = {
   carId?: string | null;
   car?: { name: string } | null;
   carNameSnapshot?: string | null;
+  /** When API returns it (e.g. runs/search). */
+  trackId?: string | null;
   track?: { name: string } | null;
   trackNameSnapshot?: string | null;
   lapTimes?: unknown;
