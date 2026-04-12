@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -18,8 +19,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "carId is required" }, { status: 400 });
   }
 
+  const scopeCarIds = await carIdsSharingSetupTemplate(user.id, carId);
+
   const lastRun = await prisma.run.findFirst({
-    where: { userId: user.id, carId },
+    where: { userId: user.id, carId: { in: scopeCarIds } },
     orderBy: { createdAt: "desc" },
     include: {
       track: { select: { id: true, name: true } },

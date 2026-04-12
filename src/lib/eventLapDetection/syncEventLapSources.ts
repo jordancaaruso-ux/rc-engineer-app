@@ -312,6 +312,7 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
     },
     select: {
       id: true,
+      sourceUrl: true,
       linkedEventId: true,
       parsedPayload: true,
       sessionCompletedAt: true,
@@ -323,9 +324,23 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
     },
   });
 
+  /** One prompt per timing URL — duplicate import rows would otherwise repeat the same session. */
+  const sessionsDedupedByUrl = new Map<
+    string,
+    (typeof sessions)[number]
+  >();
+  for (const s of sessions) {
+    const key = s.sourceUrl?.trim() || s.id;
+    const prev = sessionsDedupedByUrl.get(key);
+    if (!prev || prev.createdAt.getTime() < s.createdAt.getTime()) {
+      sessionsDedupedByUrl.set(key, s);
+    }
+  }
+  const sessionsUnique = [...sessionsDedupedByUrl.values()];
+
   const out: DetectedRunPrompt[] = [];
 
-  for (const s of sessions) {
+  for (const s of sessionsUnique) {
     if (s.linkedRunId) {
       const draftLinked = await prisma.run.findFirst({
         where: { userId, id: s.linkedRunId },

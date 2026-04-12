@@ -108,17 +108,34 @@ export async function importOneTimingUrl(
     const d = new Date(rawIso);
     if (!Number.isNaN(d.getTime())) sessionCompletedAt = d;
   }
-  const row = await prisma.importedLapTimeSession.create({
-    data: {
-      userId,
-      sourceUrl: normalized,
-      parserId: parsed.parserId,
-      sourceType: inferSourceType(normalized),
-      parsedPayload: serializeParsePayload(parsed) as Prisma.InputJsonValue,
-      sessionCompletedAt,
-    },
+
+  const payload = serializeParsePayload(parsed) as Prisma.InputJsonValue;
+  const existing = await prisma.importedLapTimeSession.findFirst({
+    where: { userId, sourceUrl: normalized },
     select: { id: true, createdAt: true, sessionCompletedAt: true },
   });
+
+  const row = existing
+    ? await prisma.importedLapTimeSession.update({
+        where: { id: existing.id },
+        data: {
+          parserId: parsed.parserId,
+          parsedPayload: payload,
+          sessionCompletedAt,
+        },
+        select: { id: true, createdAt: true, sessionCompletedAt: true },
+      })
+    : await prisma.importedLapTimeSession.create({
+        data: {
+          userId,
+          sourceUrl: normalized,
+          parserId: parsed.parserId,
+          sourceType: inferSourceType(normalized),
+          parsedPayload: payload,
+          sessionCompletedAt,
+        },
+        select: { id: true, createdAt: true, sessionCompletedAt: true },
+      });
 
   return {
     url: normalized,

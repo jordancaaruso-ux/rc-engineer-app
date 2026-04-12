@@ -14,6 +14,7 @@ import {
   type EngineerChatMessage,
 } from "@/lib/engineerPhase5/openaiEngineer";
 import { buildRunCatalogV1 } from "@/lib/engineerPhase5/runCatalog";
+import { resolveRunScopeForEngineerChat } from "@/lib/engineerPhase5/resolveEngineerRunScope";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
         patternDigest?: unknown;
         /** When false, omit account run catalog from context (default: include). */
         includeRunCatalog?: unknown;
+        /** IANA timezone for local-calendar run resolution (e.g. from Intl). */
+        timeZone?: unknown;
       }
     | null;
   const raw = Array.isArray(body?.messages) ? body!.messages : [];
@@ -47,8 +50,20 @@ export async function POST(request: Request) {
 
   const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
   const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
+  const timeZone =
+    typeof body?.timeZone === "string" && body.timeZone.trim().length > 0 ? body.timeZone.trim() : "UTC";
 
   const basePacket = await buildEngineerContextPacketV1(user.id);
+
+  const lastUser = [...messages].reverse().find((m) => m.role === "user");
+  const resolvedRunScope =
+    !runId && lastUser
+      ? await resolveRunScopeForEngineerChat({
+          userId: user.id,
+          lastUserMessage: lastUser.content,
+          timeZone,
+        }).catch(() => null)
+      : null;
 
   let focusedRunPair = null as Awaited<ReturnType<typeof buildFocusedRunPairContext>>;
   if (runId) {
@@ -59,10 +74,14 @@ export async function POST(request: Request) {
   }
 
   let engineerSummary: EngineerRunSummaryV2 | null = null;
-  if (!focusedRunPair) {
+  /** Omit latest-vs-reference summary whenever auto scope is active (including zero matching runs). */
+  const omitPairwiseSummary = Boolean(resolvedRunScope?.preferOverDefaultPair);
+  if (!focusedRunPair && !omitPairwiseSummary) {
     const summaryResult = await getOrComputeEngineerSummaryForLatestRun(user.id);
     engineerSummary = summaryResult?.summary ?? null;
-  } else if (!compareRunId) {
+  } else if (!focusedRunPair && omitPairwiseSummary) {
+    engineerSummary = null;
+  } else if (focusedRunPair && !compareRunId) {
     const summaryResult = await getOrComputeEngineerSummaryForRun(user.id, focusedRunPair.primaryRunId);
     engineerSummary = summaryResult?.summary ?? null;
   }
@@ -78,6 +97,8 @@ export async function POST(request: Request) {
   const contextJson = {
     defaultDashboardContext: basePacket,
     engineerSummary,
+    /** Auto-resolved runs from the latest user message (natural-language time scope). */
+    resolvedRunScope,
     /** When set with `compareRunId`, deterministic summary is omitted (its reference run may differ). */
     focusedRunPair,
     /** Optional chronological series + setup deltas (same car) for trend questions. */
@@ -89,6 +110,7 @@ export async function POST(request: Request) {
 
   const baseForMerge = {
     defaultDashboardContext: basePacket,
+    resolvedRunScope,
     patternDigest,
     runCatalog,
     thingsToTry: basePacket.thingsToTry,

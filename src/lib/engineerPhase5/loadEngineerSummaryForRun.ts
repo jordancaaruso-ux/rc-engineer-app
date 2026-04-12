@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { buildEngineerRunSummary, type RunShapeForEngineer } from "@/lib/engineerPhase5/buildEngineerRunSummary";
 import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
+import { hasTeammateLink } from "@/lib/teammateRunAccess";
 
 const runSelect = {
   id: true,
@@ -163,4 +164,72 @@ export async function getOrComputeEngineerSummaryForRun(
   });
 
   return { summary, cached: false };
+}
+
+const runSelectWithOwner = {
+  ...runSelect,
+  userId: true,
+} as const;
+
+/**
+ * Compare an explicit pair of runs (primary must be the viewer's; compare may be a linked teammate's).
+ * Does not persist to `Run.engineerSummaryJson` (pair selection is ephemeral in the UI).
+ */
+export async function getOrComputeEngineerSummaryForRunPair(
+  viewerUserId: string,
+  primaryRunId: string,
+  compareRunId: string
+): Promise<{ summary: EngineerRunSummaryV2 } | null> {
+  if (primaryRunId === compareRunId) return null;
+
+  const primary = await prisma.run.findFirst({
+    where: { id: primaryRunId, userId: viewerUserId },
+    select: runSelect,
+  });
+  if (!primary) return null;
+
+  const compare = await prisma.run.findFirst({
+    where: { id: compareRunId },
+    select: runSelectWithOwner,
+  });
+  if (!compare) return null;
+
+  if (compare.userId !== viewerUserId) {
+    const ok = await hasTeammateLink(viewerUserId, compare.userId);
+    if (!ok) return null;
+  }
+
+  const { userId: _uid, ...compareForShape } = compare;
+
+  const importedSession = primary.importedLapTimeSessionId
+    ? await prisma.importedLapTimeSession.findFirst({
+        where: { id: primary.importedLapTimeSessionId, userId: viewerUserId },
+        select: { sourceUrl: true, eventDetectionSessionLabel: true },
+      })
+    : null;
+
+  const fp = fieldFingerprint(primary.importedLapSets ?? []);
+  const fieldImportSession =
+    computeFieldImportSessionFromSets(
+      (primary.importedLapSets ?? []).map((s) => ({
+        driverName: s.driverName,
+        displayName: s.displayName,
+        isPrimaryUser: s.isPrimaryUser,
+        laps: s.laps.map((l) => ({
+          lapNumber: l.lapNumber,
+          lapTimeSeconds: l.lapTimeSeconds,
+          isIncluded: l.isIncluded,
+        })),
+      }))
+    ) ?? null;
+
+  const summary = await buildEngineerRunSummary({
+    current: toShape(primary),
+    reference: toShape(compareForShape),
+    importedSession: importedSession,
+    fieldImportSession,
+    fieldFingerprint: fp,
+  });
+
+  return { summary };
 }

@@ -77,6 +77,7 @@ export function EngineerChatPanel({
           ...(compareRunIdFromUrl ? { compareRunId: compareRunIdFromUrl } : {}),
           ...(patternDigest ? { patternDigest } : {}),
           includeRunCatalog,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
       const data = await res.json().catch(() => ({}));

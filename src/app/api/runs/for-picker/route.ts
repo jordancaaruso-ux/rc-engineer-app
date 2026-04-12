@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
 
 /** Past runs for Load setup + Compare pickers (newest first). */
 export async function GET(request: Request) {
@@ -11,9 +12,13 @@ export async function GET(request: Request) {
   const user = await getOrCreateLocalUser();
   const { searchParams } = new URL(request.url);
   const carId = searchParams.get("carId")?.trim() || null;
+  const scopeCarIds = carId ? await carIdsSharingSetupTemplate(user.id, carId) : null;
 
   const runs = await prisma.run.findMany({
-    where: carId ? { userId: user.id, carId } : { userId: user.id },
+    where:
+      carId && scopeCarIds?.length
+        ? { userId: user.id, carId: { in: scopeCarIds } }
+        : { userId: user.id },
     orderBy: { createdAt: "desc" },
     take: 200,
     select: {
@@ -35,5 +40,6 @@ export async function GET(request: Request) {
       event: { select: { name: true } },
     },
   });
+
   return NextResponse.json({ runs });
 }

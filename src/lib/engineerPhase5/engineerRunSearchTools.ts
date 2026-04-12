@@ -7,6 +7,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { getIncludedLapDashboardMetrics, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { hasTeammateLink } from "@/lib/teammateRunAccess";
 import { buildFocusedRunPairContext } from "@/lib/engineerPhase5/contextPacket";
+import { formatLocalCalendarDate } from "@/lib/engineerPhase5/localCalendarInTimeZone";
 
 export type LinkedTeammateRow = {
   peerUserId: string;
@@ -80,6 +81,11 @@ export type SearchRunsForEngineerArgs = {
   event_id?: string | null;
   text_contains?: string | null;
   max_results?: number;
+  /**
+   * When set with date_from/date_to, filter by local calendar day in this IANA zone
+   * (e.g. "today" matches the user's local day, not UTC).
+   */
+  calendar_time_zone?: string | null;
 };
 
 export type SearchRunsForEngineerResultRow = {
@@ -124,7 +130,10 @@ export async function searchRunsForEngineerTool(
   if (raw.event_id?.trim()) where.eventId = raw.event_id.trim();
   if (raw.track_id?.trim()) where.trackId = raw.track_id.trim();
 
-  const take = Math.min(300, Math.max(maxResults * 3, 80));
+  const hasDateFilter = Boolean(raw.date_from?.trim() || raw.date_to?.trim());
+  const take = hasDateFilter
+    ? Math.min(1200, Math.max(maxResults * 4, 200))
+    : Math.min(300, Math.max(maxResults * 3, 80));
 
   const runs = await prisma.run.findMany({
     where,
@@ -150,18 +159,34 @@ export async function searchRunsForEngineerTool(
   let filtered = runs;
 
   if (raw.date_from?.trim() || raw.date_to?.trim()) {
-    const from = raw.date_from?.trim() ? new Date(`${raw.date_from.trim()}T00:00:00.000Z`) : null;
-    const to = raw.date_to?.trim() ? new Date(`${raw.date_to.trim()}T23:59:59.999Z`) : null;
-    filtered = runs.filter((r) => {
-      const t = resolveRunDisplayInstant({
-        createdAt: r.createdAt,
-        sessionCompletedAt: r.sessionCompletedAt,
-      }).getTime();
-      const d = new Date(t);
-      if (from && d < from) return false;
-      if (to && d > to) return false;
-      return true;
-    });
+    const fromStr = raw.date_from?.trim() ?? null;
+    const toStr = raw.date_to?.trim() ?? null;
+    const tz = raw.calendar_time_zone?.trim();
+    if (tz) {
+      filtered = runs.filter((r) => {
+        const inst = resolveRunDisplayInstant({
+          createdAt: r.createdAt,
+          sessionCompletedAt: r.sessionCompletedAt,
+        });
+        const ymd = formatLocalCalendarDate(inst, tz);
+        if (fromStr && ymd < fromStr) return false;
+        if (toStr && ymd > toStr) return false;
+        return true;
+      });
+    } else {
+      const from = fromStr ? new Date(`${fromStr}T00:00:00.000Z`) : null;
+      const to = toStr ? new Date(`${toStr}T23:59:59.999Z`) : null;
+      filtered = runs.filter((r) => {
+        const t = resolveRunDisplayInstant({
+          createdAt: r.createdAt,
+          sessionCompletedAt: r.sessionCompletedAt,
+        }).getTime();
+        const d = new Date(t);
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      });
+    }
   }
 
   const q = raw.text_contains?.trim().toLowerCase();

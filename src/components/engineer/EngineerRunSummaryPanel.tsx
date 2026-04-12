@@ -32,9 +32,12 @@ function flagClass(flag: string): string {
 
 export function EngineerRunSummaryPanel({
   runId,
+  compareRunId,
   defaultExpanded = true,
 }: {
   runId: string;
+  /** When set, summary compares this run to `compareRunId` (teammate allowed if linked). */
+  compareRunId?: string | null;
   /** Collapse details for dense layouts */
   defaultExpanded?: boolean;
 }) {
@@ -48,7 +51,11 @@ export function EngineerRunSummaryPanel({
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/runs/${encodeURIComponent(runId)}/engineer-summary`, { cache: "no-store" });
+      const qs = new URLSearchParams();
+      const c = compareRunId?.trim();
+      if (c) qs.set("compareRunId", c);
+      const url = `/api/runs/${encodeURIComponent(runId)}/engineer-summary${qs.toString() ? `?${qs}` : ""}`;
+      const res = await fetch(url, { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr((data as { error?: string })?.error ?? "Could not load summary.");
@@ -63,7 +70,7 @@ export function EngineerRunSummaryPanel({
     } finally {
       setLoading(false);
     }
-  }, [runId]);
+  }, [runId, compareRunId]);
 
   useEffect(() => {
     void load();
@@ -91,7 +98,7 @@ export function EngineerRunSummaryPanel({
       >
         <div className="ui-title text-[10px] uppercase tracking-wide text-muted-foreground">Engineer summary</div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          {cached ? <span>cached</span> : null}
+          {cached && !compareRunId?.trim() ? <span>cached</span> : null}
           <span>{expanded ? "▼" : "▶"}</span>
         </div>
       </button>

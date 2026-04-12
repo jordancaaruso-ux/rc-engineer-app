@@ -22,6 +22,10 @@ export type EngineerChatMessage = { role: "user" | "assistant"; content: string 
 const CHAT_SYSTEM = `You are an RC touring car race engineer assistant.
 Be conservative and grounded in the provided context JSON.
 
+RESOLVED RUN SCOPE (highest priority for "which runs" questions):
+If "resolvedRunScope" is present, the user's message was interpreted as referring to a specific set of runs (time range and/or text filter). Use "resolvedRunScope.runs" as the authoritative list of runs for that question—each entry has runId, whenLabel, car, track, session summary, lap count, best lap. Do NOT answer as if only two runs existed unless resolvedRunScope.runs has exactly two entries (or the user explicitly asks for latest vs previous). If resolvedRunScope.truncated is true, say more runs may exist than listed. If resolvedRunScope.runs is empty, say no runs matched the interpreted filter and suggest narrowing or checking dates.
+When resolvedRunScope.preferOverDefaultPair is true, treat "defaultDashboardContext" (latest vs previous on the account) as background only—not as the full set of runs the user meant. "engineerSummary" may be omitted in that case; do not imply only those two runs cover the user's question.
+
 If "focusedRunPair" is present, prioritize it for questions about comparing those runs (lap deltas, setup changedRows, importedDriversOnPrimary, fieldImportSession).
 When "fieldImportSession" is non-null, it ranks imported drivers from the same timing session (best lap, gap to session best, stint fade); use it for field / class position questions vs raw lap lists.
 focusedRunPair.primary and focusedRunPair.compare each include notesPreview (session notes only, may be truncated) and handlingPreview (structured handling from the log, including balance, corner phases, and severity when present) — use both.
@@ -71,6 +75,10 @@ const TOOLS = [
           },
           date_from: { type: "string", description: "YYYY-MM-DD inclusive" },
           date_to: { type: "string", description: "YYYY-MM-DD inclusive" },
+          calendar_time_zone: {
+            type: "string",
+            description: "IANA timezone for local calendar day filtering (e.g. Australia/Sydney). Use when date_from/date_to mean the user's local dates.",
+          },
           car_id: { type: "string" },
           track_id: { type: "string" },
           event_id: { type: "string" },
@@ -138,6 +146,10 @@ async function executeSearchOrListTool(
         teammate_query: typeof sr.teammate_query === "string" ? sr.teammate_query : null,
         date_from: typeof sr.date_from === "string" ? sr.date_from : null,
         date_to: typeof sr.date_to === "string" ? sr.date_to : null,
+        calendar_time_zone:
+          typeof sr.calendar_time_zone === "string" && sr.calendar_time_zone.trim()
+            ? sr.calendar_time_zone.trim()
+            : null,
         car_id: typeof sr.car_id === "string" ? sr.car_id : null,
         track_id: typeof sr.track_id === "string" ? sr.track_id : null,
         event_id: typeof sr.event_id === "string" ? sr.event_id : null,
