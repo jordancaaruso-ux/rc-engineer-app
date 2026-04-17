@@ -1,18 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
-import { getActiveSetupCarId, getActiveSetupData } from "@/lib/activeSetupContext";
+import { getActiveSetupData } from "@/lib/activeSetupContext";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
+import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { compareSetupSnapshots } from "@/lib/setupCompare/compare";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import {
-  buildNumericAggregationMapForCar,
+  buildNumericAggregationMapFromCommunity,
+  COMMUNITY_AGGREGATION_PSEUDO_CAR_ID,
   type SetupAggApiRow,
 } from "@/lib/setupCompare/buildNumericAggregationMap";
 import {
@@ -22,6 +24,12 @@ import {
   summarizeAggregationRowsForCar,
   tallyPrimaryReasons,
 } from "@/lib/setupCompare/compareNumericDiagnostics";
+import {
+  ALL_GRIP_BUCKETS,
+  GRIP_BUCKET_ANY,
+  gripBucketLabel,
+  type GripBucket,
+} from "@/lib/setupAggregations/gripBuckets";
 
 type AggregationFetchBundle = {
   parsedMap: Map<string, NumericAggregationCompareSlice>;
@@ -46,6 +54,8 @@ type SelectedSetup = {
   data: SetupSnapshotData | null;
 };
 
+type TrackSurface = "asphalt" | "carpet";
+
 async function jsonFetch<T>(input: string): Promise<T> {
   const res = await fetch(input);
   const data = await res.json().catch(() => ({}));
@@ -57,60 +67,59 @@ function emptySelection(): SelectedSetup {
   return { kind: "none", label: "—", data: null };
 }
 
-/** Car for aggregation lookup: same scoping as rebuild (car-only), from whichever compare source provides it. */
-function carIdFromCompareSource(
-  kind: SetupSourceKind,
-  sourceId: string,
-  runs: RunPickerRun[],
-  downloaded: DownloadedSetupOption[]
-): string | null {
-  if (kind === "current_setup") {
-    return getActiveSetupCarId();
-  }
-  if (kind === "run" && sourceId) {
-    return runs.find((x) => x.id === sourceId)?.carId ?? null;
-  }
-  if (kind === "downloaded_setup" && sourceId) {
-    const c = downloaded.find((x) => x.id === sourceId)?.carId;
-    return typeof c === "string" && c.trim() ? c.trim() : null;
-  }
-  return null;
-}
-
 export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const compareDebug = searchParams.get("compareDebug") === "1";
 
   const [runs, setRuns] = useState<RunPickerRun[]>([]);
   const [downloaded, setDownloaded] = useState<DownloadedSetupOption[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [sourcesReloading, setSourcesReloading] = useState(false);
+  const [sourcesRefreshedAt, setSourcesRefreshedAt] = useState<number | null>(null);
 
   const [aKind, setAKind] = useState<SetupSourceKind>("none");
   const [bKind, setBKind] = useState<SetupSourceKind>("none");
   const [aId, setAId] = useState<string>("");
   const [bId, setBId] = useState<string>("");
 
+  const reloadSources = useCallback(async () => {
+    if (!dbReady) return;
+    setSourcesReloading(true);
+    setErr(null);
+    try {
+      const [r, d] = await Promise.all([
+        jsonFetch<{ runs: RunPickerRun[] }>("/api/runs/for-picker").catch(() => ({ runs: [] })),
+        jsonFetch<{ downloadedSetups: DownloadedSetupOption[] }>("/api/setup/options").catch(() => ({ downloadedSetups: [] })),
+      ]);
+      setRuns(Array.isArray(r.runs) ? r.runs : []);
+      setDownloaded(Array.isArray(d.downloadedSetups) ? d.downloadedSetups : []);
+      setSourcesRefreshedAt(Date.now());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to load setup sources");
+    } finally {
+      setSourcesReloading(false);
+    }
+  }, [dbReady]);
+
+  // Initial load + refetch when the tab regains focus / becomes visible, so freshly downloaded
+  // setups show up without a manual refresh.
   useEffect(() => {
     if (!dbReady) return;
-    let alive = true;
-    setErr(null);
-    Promise.all([
-      jsonFetch<{ runs: RunPickerRun[] }>("/api/runs/for-picker").catch(() => ({ runs: [] })),
-      jsonFetch<{ downloadedSetups: DownloadedSetupOption[] }>("/api/setup/options").catch(() => ({ downloadedSetups: [] })),
-    ])
-      .then(([r, d]) => {
-        if (!alive) return;
-        setRuns(Array.isArray(r.runs) ? r.runs : []);
-        setDownloaded(Array.isArray(d.downloadedSetups) ? d.downloadedSetups : []);
-      })
-      .catch((e) => {
-        if (!alive) return;
-        setErr(e instanceof Error ? e.message : "Failed to load setup sources");
-      });
-    return () => {
-      alive = false;
+    void reloadSources();
+    const onFocus = () => {
+      void reloadSources();
     };
-  }, [dbReady]);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void reloadSources();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [dbReady, reloadSources]);
 
   const selectionA: SelectedSetup = useMemo(() => {
     if (aKind === "current_setup") {
@@ -154,33 +163,80 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
 
   const canCompare = Boolean(selectionA.data && selectionB.data);
 
-  const aggregationCarId = useMemo(() => {
-    const idA = carIdFromCompareSource(aKind, aId, runs, downloaded);
-    const idB = carIdFromCompareSource(bKind, bId, runs, downloaded);
-    if (idA && idB && idA === idB) return idA;
-    if (idA) return idA;
-    if (idB) return idB;
-    return null;
-  }, [aKind, aId, bKind, bId, runs, downloaded]);
+  // Engineer-compare button is only meaningful when both selections are saved runs — the Engineer
+  // backend resolves the pair from runId + compareRunId URL params today. If either side is the
+  // in-memory "Current setup" or a downloaded setup document, we disable it with a tooltip.
+  const engineerCompareState = useMemo<{
+    enabled: boolean;
+    reason: string | null;
+    runIdA: string | null;
+    runIdB: string | null;
+  }>(() => {
+    if (!canCompare) return { enabled: false, reason: "Pick both setups first.", runIdA: null, runIdB: null };
+    if (aKind !== "run" || bKind !== "run") {
+      return {
+        enabled: false,
+        reason: "Both setups need to be saved runs to use Engineer compare.",
+        runIdA: null,
+        runIdB: null,
+      };
+    }
+    const runA = runs.find((r) => r.id === aId) ?? null;
+    const runB = runs.find((r) => r.id === bId) ?? null;
+    if (!runA || !runB) return { enabled: false, reason: "Run not found.", runIdA: null, runIdB: null };
+    if (runA.id === runB.id) {
+      return { enabled: false, reason: "Pick two different runs.", runIdA: null, runIdB: null };
+    }
+    if (runA.carId && runB.carId && runA.carId !== runB.carId) {
+      return {
+        enabled: false,
+        reason: "Runs are on different cars — Engineer setup-compare needs the same car.",
+        runIdA: runA.id,
+        runIdB: runB.id,
+      };
+    }
+    return { enabled: true, reason: null, runIdA: runA.id, runIdB: runB.id };
+  }, [canCompare, aKind, bKind, aId, bId, runs]);
+
+  const openEngineerCompare = useCallback(() => {
+    if (!engineerCompareState.enabled || !engineerCompareState.runIdA || !engineerCompareState.runIdB) {
+      return;
+    }
+    const params = new URLSearchParams();
+    params.set("runId", engineerCompareState.runIdA);
+    params.set("compareRunId", engineerCompareState.runIdB);
+    params.set("engineerPrompt", "compare_setups");
+    router.push(`/engineer?${params.toString()}`);
+  }, [engineerCompareState, router]);
+
+  // Community aggregations are bucketed by (template, surface, grip). We only ship the A800RR
+  // template today, so it's hardcoded here and will become a selector when more ship.
+  const setupSheetTemplate = SETUP_SHEET_TEMPLATE_A800RR;
+  const [trackSurface, setTrackSurface] = useState<TrackSurface>("asphalt");
+  const [gripLevel, setGripLevel] = useState<GripBucket>(GRIP_BUCKET_ANY);
 
   const [aggregationBundle, setAggregationBundle] = useState<AggregationFetchBundle | null>(null);
 
   useEffect(() => {
-    if (!dbReady || !aggregationCarId) {
+    if (!dbReady) {
       setAggregationBundle(null);
       return;
     }
     let alive = true;
-    const q = `?carId=${encodeURIComponent(aggregationCarId)}`;
-    fetch(`/api/setup-aggregations${q}`)
+    const q = new URLSearchParams({
+      setupSheetTemplate,
+      trackSurface,
+      gripLevel,
+    }).toString();
+    fetch(`/api/setup-aggregations/community?${q}`)
       .then((res) => res.json())
       .then((data: { aggregations?: SetupAggApiRow[] }) => {
         if (!alive) return;
         const rows = Array.isArray(data.aggregations) ? data.aggregations : [];
         setAggregationBundle({
-          parsedMap: buildNumericAggregationMapForCar(rows, aggregationCarId),
-          rawNumericJsonByKey: buildRawNumericStatsJsonMap(rows, aggregationCarId),
-          summaries: summarizeAggregationRowsForCar(rows, aggregationCarId),
+          parsedMap: buildNumericAggregationMapFromCommunity(rows),
+          rawNumericJsonByKey: buildRawNumericStatsJsonMap(rows, COMMUNITY_AGGREGATION_PSEUDO_CAR_ID),
+          summaries: summarizeAggregationRowsForCar(rows, COMMUNITY_AGGREGATION_PSEUDO_CAR_ID),
         });
       })
       .catch(() => {
@@ -189,9 +245,17 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
     return () => {
       alive = false;
     };
-  }, [dbReady, aggregationCarId]);
+  }, [dbReady, setupSheetTemplate, trackSurface, gripLevel]);
 
   const numericAggregationByKey = aggregationBundle?.parsedMap ?? null;
+  const communitySampleCount = useMemo(() => {
+    if (!aggregationBundle) return 0;
+    let max = 0;
+    for (const s of aggregationBundle.summaries) {
+      if (s.sampleCount > max) max = s.sampleCount;
+    }
+    return max;
+  }, [aggregationBundle]);
 
   const compareMap = useMemo(() => {
     if (!canCompare || !selectionA.data || !selectionB.data) return null;
@@ -226,7 +290,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
       numericAggregationByKey,
       rawNumericStatsJsonByKey: aggregationBundle?.rawNumericJsonByKey ?? null,
       aggregationSummariesForCar: aggregationBundle?.summaries ?? [],
-      aggregationCarId,
+      aggregationCarId: COMMUNITY_AGGREGATION_PSEUDO_CAR_ID,
     });
   }, [
     compareDebug,
@@ -236,7 +300,6 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
     numericAggregationByKey,
     aggregationBundle?.rawNumericJsonByKey,
     aggregationBundle?.summaries,
-    aggregationCarId,
   ]);
 
   const diagnosticReasonTally = useMemo(
@@ -266,9 +329,36 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="ui-title text-sm text-muted-foreground">Pick two setups</div>
-          <Link href="/setup" className="text-xs text-muted-foreground hover:text-foreground">
-            Back to Setup
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={openEngineerCompare}
+              disabled={!engineerCompareState.enabled}
+              className="rounded-md border border-primary/60 bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:cursor-default disabled:opacity-40"
+              title={
+                engineerCompareState.reason ??
+                "Open the Engineer chat with these two runs and auto-run the compare-setups prompt"
+              }
+            >
+              Use Engineer to compare
+            </button>
+            <button
+              type="button"
+              onClick={() => void reloadSources()}
+              disabled={!dbReady || sourcesReloading}
+              className="rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:cursor-default disabled:opacity-50"
+              title={
+                sourcesRefreshedAt
+                  ? `Last refreshed ${new Date(sourcesRefreshedAt).toLocaleTimeString()}`
+                  : "Reload run and downloaded setup lists"
+              }
+            >
+              {sourcesReloading ? "Refreshing…" : "Refresh sources"}
+            </button>
+            <Link href="/setup" className="text-xs text-muted-foreground hover:text-foreground">
+              Back to Setup
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -327,19 +417,44 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 gap-3 border-t border-border/60 pt-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-muted-foreground">Spread source · surface</div>
+            <select
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs"
+              value={trackSurface}
+              onChange={(e) => setTrackSurface(e.target.value as TrackSurface)}
+            >
+              <option value="asphalt">Asphalt</option>
+              <option value="carpet">Carpet</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-muted-foreground">Spread source · grip</div>
+            <select
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs"
+              value={gripLevel}
+              onChange={(e) => setGripLevel(e.target.value as GripBucket)}
+            >
+              {ALL_GRIP_BUCKETS.map((g) => (
+                <option key={g} value={g}>{gripBucketLabel(g)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {compareMap ? (
           <div className="text-[11px] text-muted-foreground space-y-1">
             <div>
               Same: {severityCounts.same} · Minor: {severityCounts.minor} · Moderate: {severityCounts.moderate} · Major:{" "}
               {severityCounts.major} · Unknown: {severityCounts.unknown}
             </div>
-            {canCompare && !aggregationCarId && dbReady ? (
-              <div>
-                Numeric diff colours use aggregation IQR when a <span className="text-foreground/80">car</span> can be resolved
-                from a run, current setup, or downloaded setup document on at least one side; otherwise differences show as
-                low-confidence grey.
-              </div>
-            ) : null}
+            <div>
+              Spread scale from all eligible setups in the community (template{" "}
+              <span className="text-foreground/80">{setupSheetTemplate}</span> · {trackSurface} · {gripBucketLabel(gripLevel)}
+              {communitySampleCount > 0 ? ` · ~${communitySampleCount} docs in bucket` : " · no docs in bucket yet"}
+              ). Fields without enough community samples fall back to low-confidence grey.
+            </div>
           </div>
         ) : (
           <div className="text-[11px] text-muted-foreground">Select both setups to compare.</div>
@@ -356,9 +471,11 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             <span className="text-foreground/90 break-all">{gradientCompareKeys.join(", ")}</span>
           </div>
           <div className="text-muted-foreground font-sans">
-            NUMERIC aggregation keys for car{" "}
-            <span className="text-foreground/90">{aggregationCarId ?? "—"}</span> ({numericAggregationParameterKeys.length}
-            ):{" "}
+            NUMERIC aggregation keys in community bucket{" "}
+            <span className="text-foreground/90">
+              {setupSheetTemplate} · {trackSurface} · {gripBucketLabel(gripLevel)}
+            </span>{" "}
+            ({numericAggregationParameterKeys.length}):{" "}
             <span className="text-foreground/90 break-all">{numericAggregationParameterKeys.join(", ") || "—"}</span>
           </div>
           <div className="text-muted-foreground font-sans">

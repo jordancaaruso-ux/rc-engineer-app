@@ -6,6 +6,7 @@ import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLine } from "@/lib/runPickerFormat";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
+import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 import { cn } from "@/lib/utils";
 
 type CarOpt = { id: string; name: string };
@@ -26,10 +27,16 @@ function toPickerRuns(raw: unknown[]): RunPickerRun[] {
 export function EngineerCompareAndPattern({
   onDigestLoaded,
   embedded = false,
+  showRunSummaryPanel = false,
+  onQueueEngineerChatPrompt,
 }: {
   onDigestLoaded: (d: PatternDigestV1 | null) => void;
   /** Omit outer card chrome when nested (e.g. collapsible section). */
   embedded?: boolean;
+  /** Show lap/setup summary for URL primary + compare (Engineer page). */
+  showRunSummaryPanel?: boolean;
+  /** Quick prompts from run summary → Ask the Engineer. */
+  onQueueEngineerChatPrompt?: (text: string) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -338,14 +345,21 @@ export function EngineerCompareAndPattern({
         embedded ? "space-y-4" : "rounded-lg border border-border bg-card p-3 space-y-4"
       )}
     >
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {embedded ? "Compare & trend" : "Compare runs"}
-      </div>
-      <p className="text-[11px] text-muted-foreground leading-snug">
-        Pick a primary run, then compare with another run (lap + setup diff when same car). For teammates: add them by
-        email, choose their car — only runs at the same track as your primary run are listed. Selection is stored in the
-        URL.
-      </p>
+      {!embedded ? (
+        <>
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Compare runs</div>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Pick a primary run, then compare with another run (lap + setup diff when same car). For teammates: add them by
+            email, choose their car — only runs at the same track as your primary run are listed. Selection is stored in
+            the URL.
+          </p>
+        </>
+      ) : (
+        <p className="text-[11px] text-muted-foreground leading-snug">
+          Filters scope the lists below. Primary and compare runs update the URL (<span className="font-mono">runId</span>{" "}
+          / <span className="font-mono">compareRunId</span>) for chat and for links from Analysis.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-3 items-end">
         <div className="space-y-1 min-w-[140px]">
@@ -548,6 +562,22 @@ export function EngineerCompareAndPattern({
           </div>
         </div>
       )}
+
+      {showRunSummaryPanel && runIdUrl ? (
+        <div className="border-t border-border pt-4 space-y-2">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Run summary</div>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Lap and setup deltas for the primary run vs comparison (or previous on same car when compare is not set). Use
+            the buttons inside the summary to send a focused question to the Engineer.
+          </p>
+          <EngineerRunSummaryPanel
+            runId={runIdUrl}
+            compareRunId={compareRunIdUrl || null}
+            defaultExpanded
+            onQueueEngineerChatPrompt={onQueueEngineerChatPrompt}
+          />
+        </div>
+      ) : null}
 
       <div className="border-t border-border pt-3 space-y-2">
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pattern digest (one car)</div>

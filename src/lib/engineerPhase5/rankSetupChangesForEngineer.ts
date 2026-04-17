@@ -1,5 +1,6 @@
 import { normalizeSetupData } from "@/lib/runSetup";
 import { listSetupKeysChangedBetweenSnapshots } from "@/lib/setupCompare/listSetupKeysChangedBetweenSnapshots";
+import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 import { compareSetupField } from "@/lib/setupCompare/compare";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
@@ -44,7 +45,9 @@ export function rankSetupChangesForEngineer(
   referenceData: unknown,
   numericAggregationByKey: ReadonlyMap<string, NumericAggregationCompareSlice> | null
 ): EngineerSetupChangeRow[] {
-  const keys = listSetupKeysChangedBetweenSnapshots(currentData, referenceData);
+  const keys = listSetupKeysChangedBetweenSnapshots(currentData, referenceData, {
+    keyFilter: isTuningComparisonKey,
+  });
   const cur = normalizeSetupData(currentData);
   const prev = normalizeSetupData(referenceData);
 

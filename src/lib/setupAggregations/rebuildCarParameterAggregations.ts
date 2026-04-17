@@ -1,51 +1,20 @@
 import type { Prisma } from "@prisma/client";
 import { SetupAggregationScopeType, SetupAggregationValueType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isMultiSelectFieldKey, normalizeMultiSelectValue } from "@/lib/setup/multiSelect";
-import {
-  displayPresetWithOther,
-  isEmptyPresetWithOther,
-  isPresetWithOtherFieldKey,
-  normalizePresetWithOtherFromUnknown,
-} from "@/lib/setup/presetWithOther";
-import { getSingleSelectChipOptions } from "@/lib/setupCalibrations/calibrationFieldCatalog";
+import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
 import type { SetupSnapshotValue } from "@/lib/runSetup";
+import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 import {
-  normalizeSetupSnapshotForStorage,
-  snapshotValueIsEffectivelyEmpty,
-} from "@/lib/runSetup";
-import { computeNumericStats } from "@/lib/setupAggregations/numericStats";
-import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
-import {
-  getNumericGradientConfig,
-  normalizeNumericForGradientCompare,
-} from "@/lib/setupCompare/numericGradientConfig";
-
-/** At least this many non-empty parameter keys required on the snapshot to count toward aggregation. */
-const MIN_DISTINCT_KEYS_FOR_ELIGIBILITY = 2;
-
-function snapshotDataHasKeys(raw: unknown): boolean {
-  return raw != null && typeof raw === "object" && !Array.isArray(raw) && Object.keys(raw).length > 0;
-}
-
-/**
- * Prefer committed SetupSnapshot.data; otherwise normalized parsed PDF output.
- * Car id: createdSetup.carId when present, else SetupDocument.carId from upload.
- */
-function resolveNormalizedAggregationData(
-  parsedDataJson: unknown,
-  createdSetup: { data: unknown } | null
-): Record<string, SetupSnapshotValue> | null {
-  if (createdSetup && snapshotDataHasKeys(createdSetup.data)) {
-    return normalizeSetupSnapshotForStorage(createdSetup.data) as Record<string, SetupSnapshotValue>;
-  }
-  if (snapshotDataHasKeys(parsedDataJson)) {
-    return normalizeSetupSnapshotForStorage(
-      normalizeParsedSetupData(parsedDataJson)
-    ) as Record<string, SetupSnapshotValue>;
-  }
-  return null;
-}
+  MIN_DISTINCT_KEYS_FOR_ELIGIBILITY,
+  aggregationRowsFromPerKeyMap,
+  countNonEmptyKeys,
+  extractObservation,
+  filterTuningKeysOnly,
+  getOrCreateBucket,
+  resolveNormalizedAggregationData,
+  snapshotDataHasKeys,
+  type PerKeyState,
+} from "@/lib/setupAggregations/eligibleDocAggregationCore";
 
 /** Car for bucketing: explicit id, else the user's only car (safe when unambiguous). */
 function resolveAggregationCarId(
@@ -59,128 +28,6 @@ function resolveAggregationCarId(
   if (userCarIds.length === 1) return { carId: userCarIds[0]!, ambiguous: false, wrongOwner: false };
   if (userCarIds.length === 0) return { carId: null, ambiguous: false, wrongOwner: false };
   return { carId: null, ambiguous: true, wrongOwner: false };
-}
-
-function extractObservation(
-  key: string,
-  v: SetupSnapshotValue
-):
-  | { tag: "multi"; tokens: string[] }
-  | { tag: "scalar"; nOrS: number | string }
-  | null {
-  if (snapshotValueIsEffectivelyEmpty(v)) return null;
-
-  if (isMultiSelectFieldKey(key)) {
-    const tokens = normalizeMultiSelectValue(key, v);
-    if (tokens.length === 0) return null;
-    return { tag: "multi", tokens };
-  }
-
-  const gradCfg = getNumericGradientConfig(key);
-  if (gradCfg) {
-    const n = normalizeNumericForGradientCompare(key, gradCfg.normalization, v);
-    if (n != null && Number.isFinite(n)) return { tag: "scalar", nOrS: n };
-    return null;
-  }
-
-  if (typeof v === "number" && Number.isFinite(v)) {
-    return { tag: "scalar", nOrS: v };
-  }
-  if (typeof v === "boolean") {
-    return { tag: "scalar", nOrS: v ? "true" : "false" };
-  }
-  if (typeof v === "string") {
-    const t = v.trim();
-    if (t === "") return null;
-    const n = Number(t);
-    if (Number.isFinite(n)) return { tag: "scalar", nOrS: n };
-    return { tag: "scalar", nOrS: t };
-  }
-  if (typeof v === "object" && v !== null && !Array.isArray(v)) {
-    const opts = isPresetWithOtherFieldKey(key) ? getSingleSelectChipOptions(key) : null;
-    const pov = normalizePresetWithOtherFromUnknown(v, undefined, opts);
-    if (!isEmptyPresetWithOther(pov)) {
-      return { tag: "scalar", nOrS: displayPresetWithOther(pov) };
-    }
-    return null;
-  }
-  if (Array.isArray(v)) {
-    const joined = v
-      .map((x) => String(x).trim())
-      .filter(Boolean)
-      .join(", ");
-    if (!joined) return null;
-    return { tag: "scalar", nOrS: joined };
-  }
-  return { tag: "scalar", nOrS: String(v) };
-}
-
-function countNonEmptyKeys(data: Record<string, SetupSnapshotValue>): number {
-  let n = 0;
-  for (const v of Object.values(data)) {
-    if (!snapshotValueIsEffectivelyEmpty(v)) n += 1;
-  }
-  return n;
-}
-
-type PerKeyState =
-  | {
-      kind: "multi";
-      tokenDocCount: Map<string, number>;
-      documentCount: number;
-    }
-  | {
-      kind: "scalar";
-      values: Array<number | string>;
-    };
-
-function getOrCreateBucket(
-  map: Map<string, PerKeyState>,
-  key: string,
-  obs: { tag: "multi"; tokens: string[] } | { tag: "scalar"; nOrS: number | string }
-): PerKeyState {
-  if (obs.tag === "multi") {
-    let b = map.get(key);
-    if (!b || b.kind !== "multi") {
-      b = { kind: "multi", tokenDocCount: new Map(), documentCount: 0 };
-      map.set(key, b);
-    }
-    const seenInDoc = new Set<string>();
-    for (const t of obs.tokens) {
-      const norm = t.trim();
-      if (!norm) continue;
-      const lk = norm.toLowerCase();
-      if (seenInDoc.has(lk)) continue;
-      seenInDoc.add(lk);
-      b.tokenDocCount.set(lk, (b.tokenDocCount.get(lk) ?? 0) + 1);
-    }
-    b.documentCount += 1;
-    return b;
-  }
-
-  let b = map.get(key);
-  if (!b || b.kind !== "scalar") {
-    b = { kind: "scalar", values: [] };
-    map.set(key, b);
-  }
-  b.values.push(obs.nOrS);
-  return b;
-}
-
-function isBooleanDistribution(freq: Map<string, number>): boolean {
-  const keys = [...freq.keys()].map((k) => k.trim().toLowerCase());
-  if (keys.length === 0) return false;
-  const allowed = new Set(["true", "false"]);
-  return keys.every((k) => allowed.has(k));
-}
-
-function buildCategoricalJson(freq: Map<string, number>, sampleCount: number) {
-  const frequencies = Object.fromEntries([...freq.entries()].sort((a, b) => b[1] - a[1]));
-  return {
-    distinctCount: freq.size,
-    sampleCount,
-    frequencies,
-  };
 }
 
 export type RebuildSetupAggregationsExclusionCounts = {
@@ -200,11 +47,75 @@ export type RebuildSetupAggregationsExclusionCounts = {
 export type RebuildSetupAggregationsResult = {
   deletedRows: number;
   createdRows: number;
+  conditionDeletedRows: number;
+  conditionCreatedRows: number;
   /** @deprecated prefer exclusionCounts.eligibleDocuments + documentsIncluded */
   documentsConsidered: number;
   documentsIncluded: number;
   exclusionCounts: RebuildSetupAggregationsExclusionCounts;
 };
+
+async function buildCarParameterConditionRowsFromRuns(
+  userId: string,
+  carIds: string[]
+): Promise<Prisma.SetupParameterAggregationCreateManyInput[]> {
+  if (carIds.length === 0) return [];
+
+  const runs = await prisma.run.findMany({
+    where: {
+      userId,
+      carId: { in: carIds },
+      track: { isNot: null },
+    },
+    select: {
+      carId: true,
+      setupSnapshot: { select: { data: true } },
+      track: { select: { gripTags: true, layoutTags: true } },
+    },
+  });
+
+  /** carId + condition signature → per-key state */
+  const buckets = new Map<string, Map<string, PerKeyState>>();
+
+  for (const run of runs) {
+    if (!run.carId || !run.track) continue;
+    const raw = run.setupSnapshot?.data;
+    if (!snapshotDataHasKeys(raw)) continue;
+    const normalized = normalizeSetupSnapshotForStorage(raw) as Record<string, SetupSnapshotValue>;
+    const tuningOnly = filterTuningKeysOnly(normalized);
+    if (countNonEmptyKeys(tuningOnly) < MIN_DISTINCT_KEYS_FOR_ELIGIBILITY) continue;
+
+    const conditionSig = encodeTrackConditionSignature(run.track.gripTags, run.track.layoutTags);
+    const bk = `${run.carId}\x1e${conditionSig}`;
+    let keyMap = buckets.get(bk);
+    if (!keyMap) {
+      keyMap = new Map();
+      buckets.set(bk, keyMap);
+    }
+
+    for (const [key, val] of Object.entries(tuningOnly)) {
+      const obs = extractObservation(key, val);
+      if (!obs) continue;
+      getOrCreateBucket(keyMap, key, obs);
+    }
+  }
+
+  const rows: Prisma.SetupParameterAggregationCreateManyInput[] = [];
+  for (const [bk, keyMap] of buckets) {
+    const sep = bk.indexOf("\x1e");
+    const carId = bk.slice(0, sep);
+    const scopeKey = bk.slice(sep + 1);
+    rows.push(
+      ...aggregationRowsFromPerKeyMap(
+        SetupAggregationScopeType.CAR_PARAMETER_CONDITION,
+        scopeKey,
+        carId,
+        keyMap
+      )
+    );
+  }
+  return rows;
+}
 
 /**
  * Rebuilds CAR_PARAMETER aggregations for every car owned by `userId`.
@@ -333,70 +244,20 @@ export async function rebuildSetupAggregationsForUserCars(
 
   for (const [carId, keyMap] of byCar) {
     const scopeKey = carId;
-    for (const [parameterKey, state] of keyMap) {
-      if (state.kind === "multi") {
-        const freq = state.tokenDocCount;
-        rows.push({
-          scopeType: SetupAggregationScopeType.CAR_PARAMETER,
-          scopeKey,
-          carId,
-          parameterKey,
-          valueType: SetupAggregationValueType.MULTI_SELECT,
-          sampleCount: state.documentCount,
-          categoricalStatsJson: {
-            kind: "multi_select_token_document_frequency",
-            sampleCount: state.documentCount,
-            tokenDocumentFrequency: Object.fromEntries(
-              [...freq.entries()].sort((a, b) => b[1] - a[1])
-            ),
-            distinctTokenCount: freq.size,
-          },
-        });
-        continue;
-      }
-
-      const vals = state.values;
-      const allNumeric = vals.every((x) => typeof x === "number" && Number.isFinite(x));
-      if (allNumeric && vals.length > 0) {
-        const stats = computeNumericStats(vals as number[]);
-        if (stats) {
-          rows.push({
-            scopeType: SetupAggregationScopeType.CAR_PARAMETER,
-            scopeKey,
-            carId,
-            parameterKey,
-            valueType: SetupAggregationValueType.NUMERIC,
-            sampleCount: stats.sampleCount,
-            numericStatsJson: stats,
-          });
-        }
-        continue;
-      }
-
-      const freq = new Map<string, number>();
-      for (const x of vals) {
-        const s = typeof x === "number" ? String(x) : String(x).trim();
-        if (s === "") continue;
-        freq.set(s, (freq.get(s) ?? 0) + 1);
-      }
-      const sampleCount = [...freq.values()].reduce((a, b) => a + b, 0);
-      if (sampleCount === 0) continue;
-
-      const bool = isBooleanDistribution(freq);
-      rows.push({
-        scopeType: SetupAggregationScopeType.CAR_PARAMETER,
+    rows.push(
+      ...aggregationRowsFromPerKeyMap(
+        SetupAggregationScopeType.CAR_PARAMETER,
         scopeKey,
         carId,
-        parameterKey,
-        valueType: bool ? SetupAggregationValueType.BOOLEAN : SetupAggregationValueType.CATEGORICAL,
-        sampleCount,
-        categoricalStatsJson: buildCategoricalJson(freq, sampleCount),
-      });
-    }
+        keyMap
+      )
+    );
   }
 
+  const conditionRows = await buildCarParameterConditionRowsFromRuns(userId, carIds);
+
   const result = await prisma.$transaction(async (tx) => {
-    const del =
+    const delCar =
       carIds.length > 0
         ? await tx.setupParameterAggregation.deleteMany({
             where: {
@@ -405,15 +266,34 @@ export async function rebuildSetupAggregationsForUserCars(
             },
           })
         : { count: 0 };
+    const delCond =
+      carIds.length > 0
+        ? await tx.setupParameterAggregation.deleteMany({
+            where: {
+              scopeType: SetupAggregationScopeType.CAR_PARAMETER_CONDITION,
+              carId: { in: carIds },
+            },
+          })
+        : { count: 0 };
     if (rows.length > 0) {
       await tx.setupParameterAggregation.createMany({ data: rows });
     }
-    return { deleted: del.count, created: rows.length };
+    if (conditionRows.length > 0) {
+      await tx.setupParameterAggregation.createMany({ data: conditionRows });
+    }
+    return {
+      deleted: delCar.count,
+      created: rows.length,
+      conditionDeleted: delCond.count,
+      conditionCreated: conditionRows.length,
+    };
   });
 
   return {
     deletedRows: result.deleted,
     createdRows: result.created,
+    conditionDeletedRows: result.conditionDeleted,
+    conditionCreatedRows: result.conditionCreated,
     documentsConsidered: exclusionCounts.eligibleDocuments,
     documentsIncluded,
     exclusionCounts,

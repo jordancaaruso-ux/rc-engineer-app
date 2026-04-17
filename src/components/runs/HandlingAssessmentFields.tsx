@@ -2,205 +2,149 @@
 
 import { cn } from "@/lib/utils";
 import {
-  HANDLING_SEVERITY_LABELS,
   HANDLING_TRAIT_LABELS,
   HANDLING_TRAIT_TAG_IDS,
   type CornerPhase,
+  type FeelVsLastRun,
   type HandlingAssessmentUiState,
-  type HandlingSeverity,
+  type PhaseBalance,
   type HandlingTraitTagId,
 } from "@/lib/runHandlingAssessment";
 import { HandlingCornerAnimation } from "@/components/runs/HandlingCornerAnimation";
 
-const PHASES: { id: CornerPhase; label: string }[] = [
-  { id: "entry", label: "Entry" },
-  { id: "mid", label: "Mid" },
-  { id: "exit", label: "Exit" },
+const PHASE_ROWS: {
+  stateKey: "balanceEntry" | "balanceMid" | "balanceExit";
+  label: string;
+  phase: CornerPhase;
+}[] = [
+  { stateKey: "balanceEntry", label: "Entry", phase: "entry" },
+  { stateKey: "balanceMid", label: "Mid", phase: "mid" },
+  { stateKey: "balanceExit", label: "Exit", phase: "exit" },
 ];
 
-const SEVERITY_OPTIONS = (Object.keys(HANDLING_SEVERITY_LABELS) as HandlingSeverity[]).map((id) => ({
-  id,
-  label: HANDLING_SEVERITY_LABELS[id],
-}));
+const PHASE_BALANCE_LEVELS: PhaseBalance[] = [-3, -2, -1, 0, 1, 2, 3];
 
-function togglePhase(
-  block: { entry?: boolean; mid?: boolean; exit?: boolean } | null,
-  phase: CornerPhase
-): { entry?: boolean; mid?: boolean; exit?: boolean } {
-  if (!block || Object.keys(block).length === 0) {
-    return { [phase]: true };
-  }
-  const next = { ...block };
-  if (next[phase]) {
-    delete next[phase];
-  } else {
-    next[phase] = true;
-  }
-  const keys = Object.keys(next).filter((k) => next[k as CornerPhase] === true);
-  return keys.length ? next : {};
-}
+const FEEL_VS_LAST_RUN_LEVELS: FeelVsLastRun[] = [-3, -2, -1, 0, 1, 2, 3];
 
 function toggleTrait(tags: HandlingTraitTagId[], id: HandlingTraitTagId): HandlingTraitTagId[] {
   if (tags.includes(id)) return tags.filter((t) => t !== id);
   return [...tags, id];
 }
 
+function phaseBalanceChipClass(n: PhaseBalance, current: PhaseBalance | null): string {
+  const on = current === n;
+  if (!on) {
+    return cn(
+      "rounded border px-1.5 py-0.5 text-[11px] font-medium transition min-w-[2rem]",
+      "border-border bg-card text-muted-foreground hover:text-foreground",
+      n < 0 && "hover:border-red-400/50 hover:bg-red-500/5",
+      n === 0 && "hover:bg-muted/80",
+      n > 0 && "hover:border-emerald-500/50 hover:bg-emerald-500/5"
+    );
+  }
+  return cn(
+    "rounded border px-1.5 py-0.5 text-[11px] font-medium min-w-[2rem]",
+    n < 0 && "border-red-500/70 bg-red-500/15 text-foreground",
+    n === 0 && "border-muted-foreground/60 bg-muted text-foreground",
+    n > 0 && "border-emerald-600/70 bg-emerald-500/15 text-foreground"
+  );
+}
+
+function feelVsLastRunButtonClass(n: FeelVsLastRun, current: FeelVsLastRun | null): string {
+  return phaseBalanceChipClass(n, current);
+}
+
 type Props = {
   value: HandlingAssessmentUiState;
   onChange: (next: HandlingAssessmentUiState) => void;
+  feelVsLastRunEligible?: boolean;
 };
 
-export function HandlingAssessmentFields({ value, onChange }: Props) {
-  const setBalance = (
-    key: "understeer" | "oversteer",
-    nextBlock: { entry?: boolean; mid?: boolean; exit?: boolean } | null
-  ) => {
-    onChange({ ...value, [key]: nextBlock });
-  };
-
-  const toggleBalance = (key: "understeer" | "oversteer") => {
-    const cur = value[key];
-    if (cur == null) setBalance(key, {});
-    else setBalance(key, null);
-  };
-
-  const flipPhase = (key: "understeer" | "oversteer", phase: CornerPhase) => {
-    const cur = value[key];
-    setBalance(key, togglePhase(cur ?? {}, phase));
-  };
+export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligible = false }: Props) {
+  function setPhaseBalance(
+    stateKey: "balanceEntry" | "balanceMid" | "balanceExit",
+    n: PhaseBalance
+  ) {
+    const cur = value[stateKey];
+    onChange({
+      ...value,
+      [stateKey]: cur === n ? null : n,
+    });
+  }
 
   return (
     <div className="space-y-4 rounded-md border border-border/80 bg-muted/30 p-3">
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">Balance (pick corner phase)</div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={cn(
-              "rounded-md border px-3 py-1.5 text-xs font-medium transition",
-              value.understeer != null
-                ? "border-accent bg-accent/15 text-foreground"
-                : "border-border bg-card text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => toggleBalance("understeer")}
-          >
-            Understeer
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "rounded-md border px-3 py-1.5 text-xs font-medium transition",
-              value.oversteer != null
-                ? "border-accent bg-accent/15 text-foreground"
-                : "border-border bg-card text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => toggleBalance("oversteer")}
-          >
-            Oversteer
-          </button>
+      {feelVsLastRunEligible ? (
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-muted-foreground">
+            Compared to your last run on this car
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] text-red-600/90 dark:text-red-400/90 mr-0.5">Worse</span>
+            {FEEL_VS_LAST_RUN_LEVELS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                aria-pressed={value.feelVsLastRun === n}
+                className={feelVsLastRunButtonClass(n, value.feelVsLastRun)}
+                onClick={() =>
+                  onChange({
+                    ...value,
+                    feelVsLastRun: value.feelVsLastRun === n ? null : n,
+                  })
+                }
+              >
+                {n > 0 ? `+${n}` : String(n)}
+              </button>
+            ))}
+            <span className="text-[10px] text-emerald-700/90 dark:text-emerald-400/90 ml-0.5">Better</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Tap again to clear. 0 = same as last time on this car.
+          </p>
         </div>
-        {value.understeer != null ? (
-          <div className="flex flex-col gap-3 pl-1 sm:flex-row sm:flex-wrap sm:items-start">
-            <div className="flex flex-col gap-2 min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-muted-foreground">Understeer:</span>
-                {PHASES.map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={cn(
-                      "rounded border px-2 py-0.5 text-[11px] font-medium transition",
-                      value.understeer?.[id]
-                        ? "border-accent bg-accent/15 text-foreground"
-                        : "border-border bg-card text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => flipPhase("understeer", id)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-muted-foreground">Severity:</span>
-                {SEVERITY_OPTIONS.map(({ id, label }) => {
-                  const on = value.understeerSeverity === id;
-                  return (
+      ) : (
+        <p className="text-[10px] text-muted-foreground">
+          Log at least one prior run on this car to rate feel vs last run.
+        </p>
+      )}
+
+      <div className="space-y-3">
+        <div className="text-xs font-medium text-muted-foreground">
+          Corner balance (−3 push → +3 oversteer, per phase)
+        </div>
+        {PHASE_ROWS.map(({ stateKey, label, phase }) => {
+          const rowVal = value[stateKey];
+          return (
+            <div
+              key={stateKey}
+              className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
+            >
+              <div className="flex flex-col gap-2 min-w-0 flex-1">
+                <span className="text-[11px] font-medium text-foreground">{label}</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-[10px] text-red-600/90 dark:text-red-400/90">Push</span>
+                  {PHASE_BALANCE_LEVELS.map((n) => (
                     <button
-                      key={id}
+                      key={n}
                       type="button"
-                      aria-pressed={on}
-                      className={cn(
-                        "rounded border px-2 py-0.5 text-[11px] font-medium transition",
-                        on
-                          ? "border-accent bg-accent/15 text-foreground"
-                          : "border-border bg-card text-muted-foreground hover:text-foreground"
-                      )}
-                      onClick={() => onChange({ ...value, understeerSeverity: id })}
+                      aria-pressed={rowVal === n}
+                      className={phaseBalanceChipClass(n, rowVal)}
+                      onClick={() => setPhaseBalance(stateKey, n)}
                     >
-                      {label}
+                      {n > 0 ? `+${n}` : String(n)}
                     </button>
-                  );
-                })}
+                  ))}
+                  <span className="text-[10px] text-emerald-700/90 dark:text-emerald-400/90">OS</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Tap again to clear this phase.</p>
               </div>
+              {rowVal != null ? (
+                <HandlingCornerAnimation phase={phase} balance={rowVal} />
+              ) : null}
             </div>
-            <HandlingCornerAnimation
-              balance="understeer"
-              phases={value.understeer}
-              severity={value.understeerSeverity}
-            />
-          </div>
-        ) : null}
-        {value.oversteer != null ? (
-          <div className="flex flex-col gap-3 pl-1 sm:flex-row sm:flex-wrap sm:items-start">
-            <div className="flex flex-col gap-2 min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-muted-foreground">Oversteer:</span>
-                {PHASES.map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={cn(
-                      "rounded border px-2 py-0.5 text-[11px] font-medium transition",
-                      value.oversteer?.[id]
-                        ? "border-accent bg-accent/15 text-foreground"
-                        : "border-border bg-card text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => flipPhase("oversteer", id)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-muted-foreground">Severity:</span>
-                {SEVERITY_OPTIONS.map(({ id, label }) => {
-                  const on = value.oversteerSeverity === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      aria-pressed={on}
-                      className={cn(
-                        "rounded border px-2 py-0.5 text-[11px] font-medium transition",
-                        on
-                          ? "border-accent bg-accent/15 text-foreground"
-                          : "border-border bg-card text-muted-foreground hover:text-foreground"
-                      )}
-                      onClick={() => onChange({ ...value, oversteerSeverity: id })}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <HandlingCornerAnimation
-              balance="oversteer"
-              phases={value.oversteer}
-              severity={value.oversteerSeverity}
-            />
-          </div>
-        ) : null}
+          );
+        })}
       </div>
 
       <div className="space-y-2">

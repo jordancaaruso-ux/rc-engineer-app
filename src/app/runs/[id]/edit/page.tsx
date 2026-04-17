@@ -60,6 +60,7 @@ export default async function EditRunPage({
           track: { select: { id: true, name: true, location: true } },
         },
       },
+      raceClass: true,
       tireSetId: true,
       tireSet: { select: { id: true, label: true, setNumber: true, initialRunCount: true } },
       tireRunNumber: true,
@@ -107,7 +108,7 @@ export default async function EditRunPage({
     prisma.track.findMany({
       where: { userId: user.id },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true },
+      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
     }),
     getFavouriteTrackIdsForUser(user.id),
   ]);
@@ -142,6 +143,7 @@ export default async function EditRunPage({
             carNameSnapshot: run.carNameSnapshot ?? null,
             trackId: run.trackId,
             trackNameSnapshot: run.trackNameSnapshot ?? null,
+            raceClass: run.raceClass ?? null,
             eventId: run.eventId,
             tireSetId: run.tireSetId,
             tireRunNumber: run.tireRunNumber,

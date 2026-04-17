@@ -89,12 +89,21 @@ export function EngineerLatestRunSummary() {
   useEffect(() => {
     if (!options?.mine.length || !primaryRunId) return;
     setCompareRunId((prev) => {
-      if (prev && prev !== primaryRunId) {
-        const allowed =
-          options.mine.some((r) => r.runId === prev) ||
-          options.teammates.some((t) => t.runs.some((r) => r.runId === prev));
-        if (allowed) return prev;
+      if (prev === primaryRunId) {
+        return defaultCompareId(primaryRunId, options.mine, options.teammates);
       }
+
+      if (prev === "") {
+        return "";
+      }
+
+      const allowed =
+        options.mine.some((r) => r.runId === prev) ||
+        options.teammates.some((t) => t.runs.some((r) => r.runId === prev));
+      if (allowed) {
+        return prev;
+      }
+
       return defaultCompareId(primaryRunId, options.mine, options.teammates);
     });
   }, [options, primaryRunId]);
@@ -142,11 +151,7 @@ export function EngineerLatestRunSummary() {
               <select
                 className="rounded-md border border-border bg-background px-2 py-1.5 text-[11px] text-foreground"
                 value={primaryRunId}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setPrimaryRunId(v);
-                  setCompareRunId("");
-                }}
+                onChange={(e) => setPrimaryRunId(e.target.value)}
               >
                 {options.mine.map((r) => (
                   <option key={r.runId} value={r.runId}>

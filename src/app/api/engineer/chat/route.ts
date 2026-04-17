@@ -6,6 +6,7 @@ import {
   buildEngineerContextPacketV1,
   buildFocusedRunPairContext,
 } from "@/lib/engineerPhase5/contextPacket";
+import { buildEngineerRichContextV1 } from "@/lib/engineerPhase5/engineerRichContext";
 import { getOrComputeEngineerSummaryForLatestRun } from "@/lib/engineerPhase5/loadLatestEngineerSummary";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
@@ -18,13 +19,31 @@ import { resolveRunScopeForEngineerChat } from "@/lib/engineerPhase5/resolveEngi
 
 export const dynamic = "force-dynamic";
 
+function jsonError(status: number, message: string, debug?: string) {
+  const payload: { error: string; debug?: string } = { error: message };
+  if (debug) payload.debug = debug;
+  return NextResponse.json(payload, { status });
+}
+
+function exceptionToClientPayload(err: unknown): { message: string; debug?: string } {
+  const message =
+    err instanceof Error ? err.message : typeof err === "string" ? err : "Engineer chat failed";
+  const showStack =
+    process.env.NODE_ENV === "development" || process.env.DEBUG_ENGINEER_CHAT === "1";
+  const debug =
+    showStack && err instanceof Error && err.stack ? err.stack.slice(0, 4000) : undefined;
+  return { message: message || "Engineer chat failed", debug };
+}
+
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
-    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+    return jsonError(500, "DATABASE_URL is not set");
   }
   if (!hasOpenAiApiKey()) {
-    return NextResponse.json({ error: "OPENAI_API_KEY is not set" }, { status: 500 });
+    return jsonError(500, "OPENAI_API_KEY is not set");
   }
+
+  try {
   const user = await getOrCreateLocalUser();
   const body = (await request.json().catch(() => null)) as
     | {
@@ -56,6 +75,15 @@ export async function POST(request: Request) {
   const basePacket = await buildEngineerContextPacketV1(user.id);
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
+  const anchorForRichContext = runId || basePacket.latestRun?.id || null;
+  const richEngineerContext =
+    lastUser && typeof lastUser.content === "string"
+      ? await buildEngineerRichContextV1({
+          userId: user.id,
+          anchorRunId: anchorForRichContext,
+          lastUserMessage: lastUser.content,
+        })
+      : null;
   const resolvedRunScope =
     !runId && lastUser
       ? await resolveRunScopeForEngineerChat({
@@ -69,7 +97,7 @@ export async function POST(request: Request) {
   if (runId) {
     focusedRunPair = await buildFocusedRunPairContext(user.id, runId, compareRunId || null);
     if (!focusedRunPair) {
-      return NextResponse.json({ error: "Run not found" }, { status: 404 });
+      return jsonError(404, "Run not found");
     }
   }
 
@@ -97,6 +125,8 @@ export async function POST(request: Request) {
   const contextJson = {
     defaultDashboardContext: basePacket,
     engineerSummary,
+    /** Car, class, tires, track, setup vs template spread, retrieved vehicle-dynamics KB. */
+    richEngineerContext,
     /** Auto-resolved runs from the latest user message (natural-language time scope). */
     resolvedRunScope,
     /** When set with `compareRunId`, deterministic summary is omitted (its reference run may differ). */
@@ -126,10 +156,19 @@ export async function POST(request: Request) {
         const summaryResult = await getOrComputeEngineerSummaryForRun(user.id, focused.primaryRunId);
         summary = summaryResult?.summary ?? null;
       }
+      const rich =
+        lastUser && typeof lastUser.content === "string"
+          ? await buildEngineerRichContextV1({
+              userId: user.id,
+              anchorRunId: focused.primaryRunId,
+              lastUserMessage: lastUser.content,
+            })
+          : null;
       return {
         ...baseForMerge,
         engineerSummary: summary,
         focusedRunPair: focused,
+        richEngineerContext: rich,
       };
     },
   });
@@ -139,5 +178,10 @@ export async function POST(request: Request) {
     reply: out.reply,
     resolvedFocus: out.resolvedFocus,
   });
+  } catch (err) {
+    console.error("[api/engineer/chat]", err);
+    const { message, debug } = exceptionToClientPayload(err);
+    return jsonError(500, message, debug);
+  }
 }
 

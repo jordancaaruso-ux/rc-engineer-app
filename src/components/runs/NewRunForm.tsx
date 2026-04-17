@@ -31,6 +31,7 @@ import {
 } from "@/components/runs/LapTimesIngestPanel";
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
+import { TrackMetaChipGroups } from "@/components/runs/TrackMetaChipGroups";
 import {
   emptyHandlingAssessmentUiState,
   isHandlingAssessmentMeaningful,
@@ -41,7 +42,13 @@ import {
 } from "@/lib/runHandlingAssessment";
 
 type CarOption = { id: string; name: string; setupSheetTemplate?: string | null };
-type TrackOption = { id: string; name: string; location?: string | null };
+type TrackOption = {
+  id: string;
+  name: string;
+  location?: string | null;
+  gripTags?: string[];
+  layoutTags?: string[];
+};
 type TireSetOption = { id: string; label: string; setNumber?: number; initialRunCount?: number };
 type BatteryPackOption = { id: string; label: string; packNumber?: number; initialRunCount?: number };
 
@@ -82,6 +89,8 @@ type LastRun = {
   handlingProblems?: string | null;
   suggestedChanges?: string | null;
   handlingAssessmentJson?: unknown;
+  /** Session race class when not only from event (e.g. practice). */
+  raceClass?: string | null;
   lapTimes?: unknown;
   lapSession?: unknown;
   importedLapSets?: Array<{
@@ -223,6 +232,7 @@ export function NewRunForm(props: {
   const [setupBaselineSnapshotId, setSetupBaselineSnapshotId] = useState<string | null>(null);
   const [lapIngest, setLapIngest] = useState<LapIngestFormValue>(() => defaultLapIngestValue());
   const [notes, setNotes] = useState("");
+  const [raceClass, setRaceClass] = useState("");
   const [suggestedChanges, setSuggestedChanges] = useState("");
   const [setupChangesText, setSetupChangesText] = useState("");
   const [setupChangesBusy, setSetupChangesBusy] = useState(false);
@@ -234,6 +244,8 @@ export function NewRunForm(props: {
   const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
   const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("car");
+  const [trackGripTags, setTrackGripTags] = useState<string[]>([]);
+  const [trackLayoutTags, setTrackLayoutTags] = useState<string[]>([]);
   const thingsTryRef = useRef<HTMLTextAreaElement>(null);
   const thingsTryCursorRef = useRef<number | null>(null);
   /** True after user edits “Things to try”; avoids syncing (or wiping) on initial API hydrate. */
@@ -314,6 +326,7 @@ export function NewRunForm(props: {
     }
 
     setEventId(r.eventId ?? "");
+    setRaceClass((r.raceClass ?? "").trim());
     setTireSetId(r.tireSetId ?? "");
     setRunsCompleted(r.tireRunNumber ?? 0);
     setBatteryId(r.batteryId ?? "");
@@ -527,6 +540,15 @@ export function NewRunForm(props: {
     () => (loadSetupSelection ? pickerRuns.find((r) => r.id === loadSetupSelection) ?? null : null),
     [loadSetupSelection, pickerRuns]
   );
+
+  /** Prior run on this car exists → show “feel vs last run” (−3…+3). */
+  const feelVsLastRunEligible = useMemo(() => {
+    if (!carId) return false;
+    if (isEditing && editRun?.id) {
+      return pickerRuns.some((r) => r.id !== editRun.id);
+    }
+    return pickerRuns.length > 0;
+  }, [carId, isEditing, editRun?.id, pickerRuns]);
   const loadSetupControlLabel = loadedSetupRun
     ? formatRunPickerLineRelativeWhen(loadedSetupRun)
     : "Load from past run";
@@ -595,6 +617,17 @@ export function NewRunForm(props: {
       alive = false;
     };
   }, [tracksFingerprint]);
+
+  useEffect(() => {
+    const t = tracksList.find((x) => x.id === trackId);
+    if (t) {
+      setTrackGripTags(Array.isArray(t.gripTags) ? [...t.gripTags] : []);
+      setTrackLayoutTags(Array.isArray(t.layoutTags) ? [...t.layoutTags] : []);
+    } else {
+      setTrackGripTags([]);
+      setTrackLayoutTags([]);
+    }
+  }, [trackId, tracksList]);
 
   /** Persist bullets to ActionItem rows while typing (dashboard uses same table). */
   useEffect(() => {
@@ -1479,6 +1512,7 @@ export function NewRunForm(props: {
             })(),
           },
           notes: notes.trim() || null,
+          raceClass: raceClass.trim() || null,
           suggestedChanges: suggestedChanges.trim() || null,
           handlingAssessmentJson: persistedFromUiState(handlingUi),
           sessionLabel: null,
@@ -1513,6 +1547,28 @@ export function NewRunForm(props: {
       setInlineError(msg);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function persistTrackPatch(overrides?: { gripTags?: string[]; layoutTags?: string[] }) {
+    if (!trackId) return;
+    const gripTags = overrides?.gripTags ?? trackGripTags;
+    const layoutTags = overrides?.layoutTags ?? trackLayoutTags;
+    try {
+      const res = await fetch(`/api/tracks/${encodeURIComponent(trackId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gripTags,
+          layoutTags,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { track?: TrackOption };
+      if (res.ok && data.track) {
+        setTracksList((prev) => prev.map((x) => (x.id === trackId ? { ...x, ...data.track } : x)));
+      }
+    } catch {
+      /* ignore */
     }
   }
 
@@ -1951,6 +2007,19 @@ export function NewRunForm(props: {
             <p className="text-[11px] text-muted-foreground">
               Drives setup sheet template, tire set list, and last-run defaults for this vehicle.
             </p>
+            <div className="space-y-1 text-sm pt-1">
+              <div className="ui-title text-sm text-muted-foreground">Race class (optional)</div>
+              <input
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                placeholder='e.g. 17.5 Stock — stored on this run'
+                value={raceClass}
+                onChange={(e) => setRaceClass(e.target.value)}
+                aria-label="Race class"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Overrides or supplements the event class for engineer context when set.
+              </p>
+            </div>
           </div>
         ) : null}
 
@@ -1997,6 +2066,29 @@ export function NewRunForm(props: {
             {copyTrackWarning && (
               <div className="text-[11px] text-muted-foreground">{copyTrackWarning}</div>
             )}
+
+            {trackId ? (
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">
+                  Track details (saved on track)
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Tap chips to describe grip and layout; you can select multiple (e.g. medium + high grip).
+                </p>
+                <TrackMetaChipGroups
+                  gripTags={trackGripTags}
+                  layoutTags={trackLayoutTags}
+                  onGripChange={(next) => {
+                    setTrackGripTags(next);
+                    void persistTrackPatch({ gripTags: next });
+                  }}
+                  onLayoutChange={(next) => {
+                    setTrackLayoutTags(next);
+                    void persistTrackPatch({ layoutTags: next });
+                  }}
+                />
+              </div>
+            ) : null}
 
             {showAddTrack && (
               <div className="rounded-md border border-border bg-muted/60 p-3 space-y-2">
@@ -2353,7 +2445,11 @@ export function NewRunForm(props: {
           </button>
           {handlingDetailExpanded ? (
             <div className="mt-2">
-              <HandlingAssessmentFields value={handlingUi} onChange={setHandlingUi} />
+              <HandlingAssessmentFields
+                value={handlingUi}
+                onChange={setHandlingUi}
+                feelVsLastRunEligible={feelVsLastRunEligible}
+              />
             </div>
           ) : null}
         </div>

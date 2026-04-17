@@ -57,6 +57,8 @@ type RunUpsertBody = {
   handlingProblems?: string | null;
   suggestedChanges?: string | null;
   sessionLabel?: string | null;
+  /** Race class for this session (e.g. \"17.5 Stock\"); complements event.raceClass when set. */
+  raceClass?: string | null;
   importedLapSets?: Array<{
     sourceUrl?: string | null;
     driverId?: string | null;
@@ -281,6 +283,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         handlingAssessmentJson: prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null),
         suggestedChanges: body.suggestedChanges?.trim() || null,
         sessionLabel: body.sessionLabel?.trim() || null,
+        raceClass: body.raceClass?.trim() || null,
         sessionCompletedAt: sessionCompletedAtResolved,
         loggingComplete,
       } as PrismaTypes.RunUncheckedCreateInput,
@@ -319,6 +322,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       notes: body.notes?.trim() || null,
       suggestedChanges: body.suggestedChanges?.trim() || null,
       sessionLabel: body.sessionLabel?.trim() || null,
+      raceClass: body.raceClass?.trim() || null,
       engineerSummaryJson: Prisma.JsonNull,
       engineerSummaryRefRunId: null,
       engineerSummaryComputedAt: null,

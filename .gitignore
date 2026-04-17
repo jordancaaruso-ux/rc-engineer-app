@@ -4,6 +4,12 @@ node_modules/
 .env.local
 prisma/dev.db
 
+# Cursor local state / debug
+.cursor/
+
+# TypeScript incremental cache
+*.tsbuildinfo
+
 # Local dev PDFs (Blob in production). Outside `public/` so they are not traced into serverless bundles.
 .local-uploads/
 # Legacy dev path — keep out of repo/deploy; migrate files to `.local-uploads/` if needed (same filenames).

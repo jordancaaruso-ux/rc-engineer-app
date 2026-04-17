@@ -27,7 +27,9 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
       <header className="page-header">
         <div>
           <h1 className="page-title">Engineer</h1>
-          <p className="page-subtitle">Summary of your latest run, then chat — compare runs when you need more context.</p>
+          <p className="page-subtitle">
+            Compare &amp; trend at the top (same run pair as Analysis), then ask the Engineer anything.
+          </p>
         </div>
       </header>
       <section className="page-body flex flex-col h-full space-y-3">

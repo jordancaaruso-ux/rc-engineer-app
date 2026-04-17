@@ -10,11 +10,29 @@ import {
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { listSetupKeysChangedBetweenSnapshots } from "@/lib/setupCompare/listSetupKeysChangedBetweenSnapshots";
+import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 import { buildSetupDiffRows, normalizeSetupData } from "@/lib/setupDiff";
 import { displayRunNotesTextOnly } from "@/lib/runNotes";
 import { formatHandlingAssessmentForEngineer } from "@/lib/runHandlingAssessment";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
+import {
+  buildRcEffectHintsFromChangedRows,
+  type RcEffectHint,
+} from "@/lib/engineerPhase5/rcEffectHintsFromSetupComparison";
+import { buildVehicleDynamicsKbQueryFromChangedKeys } from "@/lib/engineerPhase5/setupCompareKbQuery";
+import {
+  searchVehicleDynamicsKb,
+  type VehicleDynamicsKbSnippet,
+} from "@/lib/engineerPhase5/vehicleDynamicsKb";
+import {
+  SETUP_COMPARE_CORNER_KEY_LEGEND,
+  collapseSetupDiffRowsForEngineer,
+} from "@/lib/engineerPhase5/collapseSetupDiffForEngineer";
+import {
+  buildFrontRearAxleNetNotes,
+  buildLowerArmAntiGeometryNotes,
+} from "@/lib/engineerPhase5/setupCompareAxleNet";
 
 export type EngineerContextPacketV1 = {
   version: 1;
@@ -207,7 +225,9 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
       : null;
 
   const keysChangedFromPreviousRun = prev
-    ? listSetupKeysChangedBetweenSnapshots(latest.setupSnapshot?.data, prev.setupSnapshot?.data)
+    ? listSetupKeysChangedBetweenSnapshots(latest.setupSnapshot?.data, prev.setupSnapshot?.data, {
+        keyFilter: isTuningComparisonKey,
+      })
     : [];
 
   return {
@@ -263,6 +283,13 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
 
 const MAX_SETUP_DIFF_ROWS = 55;
 
+const SETUP_COMPARE_COLUMN_NOTE =
+  "Each changedRow: `primary` = setup value on the focused primary run; `compare` = value on the compare run. " +
+  "Change compare→primary (shim stack mm): primary minus compare — positive means a raised stack on primary vs compare. " +
+  "Do not swap columns or invert this sign. Use `rcEffectHints` for roll-centre direction on upper inner and under lower arm shims. " +
+  SETUP_COMPARE_CORNER_KEY_LEGEND +
+  " When front-left and front-right (or rear-left and rear-right) show the same compare→primary change, the table uses one merged row—do not repeat the same axle twice.";
+
 /** User-selected runs for engineer chat (lap + setup diff + imported drivers on primary). */
 export type EngineerFocusedRunPairContext = {
   primaryRunId: string;
@@ -297,9 +324,26 @@ export type EngineerFocusedRunPairContext = {
     comparable: boolean;
     reasonIfNot: string | null;
     sameCar: boolean;
-    changedRows: Array<{ label: string; primary: string; compare: string }>;
+    /** How to read values (primary = focused run, compare = other run). */
+    columnReadingNote: string | null;
+    changedRows: Array<{ key: string; label: string; primary: string; compare: string }>;
+    /** Deterministic RC sign lines for upper inner + under lower arm (compare → primary). */
+    rcEffectHints: RcEffectHint[];
     changedRowCount: number;
     truncated: boolean;
+    /**
+     * When only one axle’s upper-link keys changed vs compare: reminds the model to interpret
+     * roll-centre balance front vs rear, not that axle in isolation.
+     */
+    rollCentreBalanceNote: string | null;
+    /** Deterministic per-axle RC net from changed shims (compare→primary); prevents summary sign errors. */
+    frontAxleNetNote: string | null;
+    rearAxleNetNote: string | null;
+    /**
+     * Left–right inner lower arm split (FF–FR / RF–RR) for anti-dive / anti-squat vs averaged RC on the axle.
+     */
+    frontLowerArmAntiGeometryNote: string | null;
+    rearLowerArmAntiGeometryNote: string | null;
   };
   importedDriversOnPrimary: Array<{
     label: string;
@@ -320,6 +364,11 @@ export type EngineerFocusedRunPairContext = {
       fadeSeconds: number | null;
     }>;
   };
+  /**
+   * vehicle-dynamics KB sections chosen by keyword overlap with changed setup keys—use for handling
+   * text alongside rcEffectHints (compare→primary direction is authoritative).
+   */
+  setupCompareKbSnippets: VehicleDynamicsKbSnippet[];
 };
 
 function lapDashboardFromRun(run: { lapTimes: unknown; lapSession?: unknown }) {
@@ -333,6 +382,32 @@ function bestLapOutcomeFromDelta(
   if (delta == null || !Number.isFinite(delta)) return "unknown";
   if (Math.abs(delta) < 1e-6) return "flat";
   return delta < 0 ? "primary_faster" : "compare_faster";
+}
+
+/** When only one axle’s upper-link keys are in the diff, steer the model toward balance reasoning. */
+function rollCentreBalanceNoteFromChangedKeys(keys: readonly string[]): string | null {
+  const s = new Set(keys);
+  const frontUpper =
+    s.has("upper_inner_shims_ff") ||
+    s.has("upper_inner_shims_fr") ||
+    s.has("upper_outer_shims_front");
+  const rearUpper =
+    s.has("upper_inner_shims_rf") ||
+    s.has("upper_inner_shims_rr") ||
+    s.has("upper_outer_shims_rear");
+  if (frontUpper && !rearUpper) {
+    return (
+      "This diff includes front upper-link keys (upper inner and/or upper outer) but no rear upper_inner or upper_outer keys—rear upper link is unchanged vs compare. " +
+      "Interpret handling as a shift in roll-centre balance front vs rear (vehicleDynamicsKb: one axle upper link changes, upper link balance, per-end theory), not only isolated front effects."
+    );
+  }
+  if (rearUpper && !frontUpper) {
+    return (
+      "This diff includes rear upper-link keys but no front upper_inner or upper_outer keys—front upper link is unchanged vs compare. " +
+      "Interpret as roll-centre balance rear vs front per vehicleDynamicsKb, not only isolated rear effects."
+    );
+  }
+  return null;
 }
 
 const focusedRunSelect = {
@@ -505,6 +580,7 @@ export async function buildFocusedRunPairContext(
   }
 
   let setupComparison: EngineerFocusedRunPairContext["setupComparison"] = null;
+  let setupCompareKbSnippets: VehicleDynamicsKbSnippet[] = [];
   if (compareSlice) {
     const sameCar =
       Boolean(primarySlice.carId && compareSlice.carId && primarySlice.carId === compareSlice.carId);
@@ -513,28 +589,62 @@ export async function buildFocusedRunPairContext(
         comparable: false,
         reasonIfNot: "Runs are on different cars — setup field diff not shown.",
         sameCar: false,
+        columnReadingNote: null,
         changedRows: [],
+        rcEffectHints: [],
         changedRowCount: 0,
         truncated: false,
+        rollCentreBalanceNote: null,
+        frontAxleNetNote: null,
+        rearAxleNetNote: null,
+        frontLowerArmAntiGeometryNote: null,
+        rearLowerArmAntiGeometryNote: null,
       };
     } else {
       const a = normalizeSetupData(primary.setupSnapshot?.data);
       const b = normalizeSetupData(compare!.setupSnapshot?.data);
-      const rows = buildSetupDiffRows(a, b).filter((r) => r.changed);
-      const changedRowCount = rows.length;
+      const rows = buildSetupDiffRows(a, b).filter(
+        (r) => r.changed && isTuningComparisonKey(r.key)
+      );
+      const rawChangedCount = rows.length;
       const slice = rows.slice(0, MAX_SETUP_DIFF_ROWS);
+      const changedKeysInSlice = slice.map((r) => r.key);
+      const rollCentreBalanceNote = rollCentreBalanceNoteFromChangedKeys(changedKeysInSlice);
+      const changedRowsRaw = slice.map((r) => ({
+        key: r.key,
+        label: r.unit ? `${r.label} (${r.unit})` : r.label,
+        primary: r.current,
+        compare: r.previous ?? "—",
+      }));
+      const changedRows = collapseSetupDiffRowsForEngineer(changedRowsRaw);
+      const { frontAxleNetNote, rearAxleNetNote } = buildFrontRearAxleNetNotes(changedRowsRaw);
+      const { frontLowerArmAntiGeometryNote, rearLowerArmAntiGeometryNote } =
+        buildLowerArmAntiGeometryNotes(a, b);
       setupComparison = {
         comparable: true,
         reasonIfNot: null,
         sameCar: true,
-        changedRows: slice.map((r) => ({
-          label: r.unit ? `${r.label} (${r.unit})` : r.label,
-          primary: r.current,
-          compare: r.previous ?? "—",
-        })),
-        changedRowCount,
-        truncated: changedRowCount > slice.length,
+        columnReadingNote: SETUP_COMPARE_COLUMN_NOTE,
+        changedRows,
+        rcEffectHints: buildRcEffectHintsFromChangedRows(changedRows),
+        changedRowCount: changedRows.length,
+        truncated: rawChangedCount > slice.length,
+        rollCentreBalanceNote,
+        frontAxleNetNote,
+        rearAxleNetNote,
+        frontLowerArmAntiGeometryNote,
+        rearLowerArmAntiGeometryNote,
       };
+      if (rawChangedCount > 0) {
+        let kbQuery = buildVehicleDynamicsKbQueryFromChangedKeys(changedKeysInSlice);
+        if (rollCentreBalanceNote) {
+          kbQuery += " upper link balance front rear roll centre";
+        }
+        if (changedKeysInSlice.some((k) => k.startsWith("under_lower_arm"))) {
+          kbQuery += " anti dive anti squat asymmetric lower arm";
+        }
+        setupCompareKbSnippets = await searchVehicleDynamicsKb(kbQuery, 10);
+      }
     }
   }
 
@@ -578,6 +688,7 @@ export async function buildFocusedRunPairContext(
     compare: compareSlice,
     lapComparison,
     setupComparison,
+    setupCompareKbSnippets,
     importedDriversOnPrimary,
     fieldImportSession,
   };

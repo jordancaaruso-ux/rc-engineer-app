@@ -55,6 +55,7 @@ export default async function SetupCalibrationDetailPage({
             ? `/api/setup-documents/${calibration.exampleDocumentId}/file`
             : ""
         }
+        exampleDocumentOriginalFilename={calibration.exampleDocument?.originalFilename ?? null}
         initialName={calibration.name}
         initialSourceType={calibration.sourceType}
         initialCalibrationData={calibration.calibrationDataJson}

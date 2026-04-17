@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getIncludedLapDashboardMetrics, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { listSetupKeysChangedBetweenSnapshots } from "@/lib/setupCompare/listSetupKeysChangedBetweenSnapshots";
+import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import type { PatternDigestRunRow } from "@/lib/engineerPhase5/patternDigestTypes";
 import type { RunSliceV1 } from "@/lib/engineerPhase5/runSliceTypes";
@@ -119,7 +120,8 @@ export async function buildRunSliceV1(params: {
     if (sameCarAsPrev) {
       setupKeysChangedFromPrevious = listSetupKeysChangedBetweenSnapshots(
         run.setupSnapshot?.data,
-        prevSetup
+        prevSetup,
+        { keyFilter: isTuningComparisonKey }
       );
       if (setupKeysChangedFromPrevious.length === 0) setupKeysChangedFromPrevious = [];
     }

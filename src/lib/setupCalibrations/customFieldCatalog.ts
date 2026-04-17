@@ -26,6 +26,7 @@ export const CUSTOM_FIELD_SECTION_PRESETS: Array<{ id: string; title: string }> 
   { id: "document", title: "Document / header" },
   { id: "event", title: "Event & track" },
   { id: "car", title: "Car & body" },
+  { id: "platform_chassis", title: "Chassis & hardware (other platform)" },
   { id: "drivetrain", title: "Drivetrain & hardware" },
   { id: "electronics", title: "Electronics" },
   { id: "tuning", title: "Tuning (additional)" },

@@ -5,8 +5,14 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getMyNameSetting } from "@/lib/appSettings";
 import { formatGroupDate } from "@/lib/formatDate";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
+import {
+  AnalysisCompareBar,
+  AnalysisCompareProvider,
+} from "@/components/runs/AnalysisCompareContext";
 import { compareRunTimestamp } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -165,6 +171,15 @@ export default async function RunHistoryPage(): Promise<ReactNode> {
   const runs = await fetchRuns(user.id);
   const groups = buildGroups(runs);
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
+  const initialTargetId = allRunsDescending[0]?.id ?? null;
+  const initialCompareId =
+    allRunsDescending.length >= 2 ? allRunsDescending[1]?.id ?? null : null;
+  const runLabels: Record<string, string> = {};
+  for (const r of runs) {
+    const car = r.car?.name ?? r.carNameSnapshot ?? "Car";
+    const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(r));
+    runLabels[r.id] = `${car} · ${when}`;
+  }
 
   return (
     <>
@@ -188,55 +203,66 @@ export default async function RunHistoryPage(): Promise<ReactNode> {
             No runs yet. <Link href="/runs/new" className="text-accent underline">Create your first run</Link>.
           </div>
         ) : (
-          <div className="space-y-2">
-            {groups.map((group) => (
-              <details
-                key={group.id}
-                className="rounded-lg border border-border bg-muted/50 overflow-hidden group/details"
-                open={false}
-              >
-                <summary className="list-none cursor-pointer">
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
-                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <span className="font-medium text-sm">{group.title}</span>
-                      <span className="text-xs text-muted-foreground">{group.type}</span>
-                      {group.trackName && (
-                        <span className="text-xs text-muted-foreground">· {group.trackName}</span>
-                      )}
-                      <span className="text-xs text-muted-foreground">{group.dateLabel}</span>
+          <AnalysisCompareProvider
+            runLabels={runLabels}
+            initialTargetId={initialTargetId}
+            initialCompareId={
+              initialCompareId && initialCompareId !== initialTargetId ? initialCompareId : null
+            }
+          >
+            <AnalysisCompareBar />
+            <div className="space-y-2">
+              {groups.map((group) => (
+                <details
+                  key={group.id}
+                  className="rounded-lg border border-border bg-muted/50 overflow-hidden group/details"
+                  open={false}
+                >
+                  <summary className="list-none cursor-pointer">
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="font-medium text-sm">{group.title}</span>
+                        <span className="text-xs text-muted-foreground">{group.type}</span>
+                        {group.trackName && (
+                          <span className="text-xs text-muted-foreground">· {group.trackName}</span>
+                        )}
+                        <span className="text-xs text-muted-foreground">{group.dateLabel}</span>
+                      </div>
+                      <span className="text-sm font-medium text-muted-foreground tabular-nums">
+                        {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
+                      </span>
                     </div>
-                    <span className="text-sm font-medium text-muted-foreground tabular-nums">
-                      {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
-                    </span>
+                  </summary>
+                  <div className="border-t border-border bg-muted/40">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/70 text-left text-xs font-medium text-muted-foreground">
+                            <th className="px-4 py-2">Date</th>
+                            <th className="px-4 py-2">Car</th>
+                            <th className="px-4 py-2">Track</th>
+                            <th className="px-4 py-2">Tires</th>
+                            <th className="px-4 py-2">Best</th>
+                            <th className="px-4 py-2">Avg top 5</th>
+                            <th className="px-4 py-2">Session</th>
+                            <th className="px-2 py-2 w-[7.5rem]">Pair</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <RunHistoryTable
+                            runs={group.runs}
+                            allRunsDescending={allRunsDescending.map(toCompareRunShape)}
+                            userDisplayName={userDisplayName}
+                            showComparePairColumn
+                          />
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </summary>
-                <div className="border-t border-border bg-muted/40">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border bg-muted/70 text-left text-xs font-medium text-muted-foreground">
-                          <th className="px-4 py-2">Date</th>
-                          <th className="px-4 py-2">Car</th>
-                          <th className="px-4 py-2">Track</th>
-                          <th className="px-4 py-2">Tires</th>
-                          <th className="px-4 py-2">Best</th>
-                          <th className="px-4 py-2">Avg top 5</th>
-                          <th className="px-4 py-2">Session</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <RunHistoryTable
-                          runs={group.runs}
-                          allRunsDescending={allRunsDescending.map(toCompareRunShape)}
-                          userDisplayName={userDisplayName}
-                        />
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </details>
-            ))}
-          </div>
+                </details>
+              ))}
+            </div>
+          </AnalysisCompareProvider>
         )}
       </section>
     </>

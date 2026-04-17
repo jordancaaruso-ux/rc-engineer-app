@@ -24,6 +24,14 @@ export const IQR_SCORE_CAP = 2.0;
 export const MIN_AGGREGATION_SAMPLE_COUNT_FOR_IQR_COMPARE = 5;
 
 /**
+ * Higher floor for community (all-eligible-setups) aggregations. Community rows pull from a
+ * large pool, so we can afford to demand more samples per parameter before trusting the IQR.
+ * Applied by `buildNumericAggregationMapFromCommunity` so low-sample keys don't end up in the
+ * compare map and harmlessly fall through to the non-IQR fallback.
+ */
+export const MIN_COMMUNITY_AGGREGATION_SAMPLE_COUNT_FOR_IQR_COMPARE = 20;
+
+/**
  * Returns gradient intensity in [0, 1], or null to use plain low-confidence “different” (no heat scale).
  */
 export function gradientIntensityFromIqrDelta(

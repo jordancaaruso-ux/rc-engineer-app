@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { A800RR_FIELD_CATALOG } from "@/lib/setupDocuments/fieldMap";
 import type {
@@ -32,6 +33,11 @@ import {
   suggestKeyFromPdfFieldName,
   validateCustomFieldKey,
 } from "@/lib/setupCalibrations/customFieldCatalog";
+import {
+  applyCalibrationFieldRecipe,
+  inferGroupedFieldDefaultsFromPdfNames,
+  inferSectionAndDomainForNewCustomField,
+} from "@/lib/setupCalibrations/calibrationCustomFieldHints";
 import { SetupFieldDefinitionForm } from "@/components/setup-documents/SetupFieldDefinitionForm";
 import { TEMPLATE_PRIORITY_FIELD_KEYS } from "@/lib/setupCalibrations/priorityFieldKeys";
 import {
@@ -227,8 +233,9 @@ function summarizeFormRuleForPanel(rule: PdfFormFieldMappingRule, pdfRow: PdfFor
 
 export function SetupCalibrationEditorClient({
   calibrationId,
-  documentId,
-  previewUrl,
+  documentId: initialDocumentId,
+  previewUrl: initialPreviewUrl,
+  exampleDocumentOriginalFilename: initialExampleDocumentOriginalFilename = null,
   initialName,
   initialSourceType,
   initialCalibrationData,
@@ -236,11 +243,22 @@ export function SetupCalibrationEditorClient({
   calibrationId: string;
   documentId: string;
   previewUrl: string;
+  exampleDocumentOriginalFilename?: string | null;
   initialName: string;
   initialSourceType: string;
   initialCalibrationData: unknown;
 }) {
   const router = useRouter();
+  const [documentId, setDocumentId] = useState(initialDocumentId);
+  const [previewUrl, setPreviewUrl] = useState(initialPreviewUrl);
+  const [linkedExampleFilename, setLinkedExampleFilename] = useState(
+    initialExampleDocumentOriginalFilename ?? ""
+  );
+  useEffect(() => {
+    setDocumentId(initialDocumentId);
+    setPreviewUrl(initialPreviewUrl);
+    setLinkedExampleFilename(initialExampleDocumentOriginalFilename ?? "");
+  }, [initialDocumentId, initialPreviewUrl, initialExampleDocumentOriginalFilename]);
   const normalized = normalizeCalibrationData(initialCalibrationData);
   const [tab, setTab] = useState<"sheet" | "form" | "text" | "region">("form");
   const [name, setName] = useState(initialName);
@@ -314,6 +332,7 @@ export function SetupCalibrationEditorClient({
 
   const sheetPdfContainerRef = useRef<HTMLDivElement | null>(null);
   const formPdfContainerRef = useRef<HTMLDivElement | null>(null);
+  const examplePdfSectionRef = useRef<HTMLDivElement | null>(null);
   const [pdfRenderWidth, setPdfRenderWidth] = useState<number>(900);
   /** PDF source multi-select: toggle per unmapped widget; `activeKey` drives the detail panel. */
   const [acroSelection, setAcroSelection] = useState<{ keys: string[]; activeKey: string | null }>({
@@ -368,6 +387,73 @@ export function SetupCalibrationEditorClient({
   const [saving, setSaving] = useState(false);
   const [savingAsNew, setSavingAsNew] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [attachListOpen, setAttachListOpen] = useState(false);
+  const [attachCandidates, setAttachCandidates] = useState<Array<{ id: string; originalFilename: string }>>([]);
+  const [attachListLoading, setAttachListLoading] = useState(false);
+  const [attachLinking, setAttachLinking] = useState(false);
+
+  const loadPdfCandidates = useCallback(async () => {
+    setAttachListLoading(true);
+    try {
+      const res = await fetch("/api/setup-documents?forExamplePdf=1", { cache: "no-store" });
+      const data = (await res.json().catch(() => ({}))) as {
+        documents?: Array<{ id: string; originalFilename: string; mimeType: string }>;
+        error?: string;
+      };
+      if (!res.ok) {
+        setAttachCandidates([]);
+        setStatus(data.error || "Could not load setup documents");
+        return;
+      }
+      const list = (data.documents ?? []).filter((d) => d.mimeType === "application/pdf");
+      setAttachCandidates(list.map((d) => ({ id: d.id, originalFilename: d.originalFilename })));
+    } catch {
+      setAttachCandidates([]);
+      setStatus("Could not load setup documents");
+    } finally {
+      setAttachListLoading(false);
+    }
+  }, []);
+
+  const openExamplePdfPicker = useCallback(() => {
+    setAttachListOpen(true);
+    void loadPdfCandidates();
+    requestAnimationFrame(() => {
+      examplePdfSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, [loadPdfCandidates]);
+
+  const linkExampleDocument = useCallback(
+    async (nextId: string) => {
+      if (!nextId.trim()) return;
+      setAttachLinking(true);
+      setStatus(null);
+      try {
+        const res = await fetch(`/api/setup-calibrations/${calibrationId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ exampleDocumentId: nextId.trim() }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) {
+          setStatus(data.error || "Failed to link example PDF");
+          return;
+        }
+        const meta = attachCandidates.find((d) => d.id === nextId.trim());
+        setDocumentId(nextId.trim());
+        setPreviewUrl(`/api/setup-documents/${nextId.trim()}/file`);
+        setLinkedExampleFilename(meta?.originalFilename ?? nextId.trim());
+        setAttachListOpen(false);
+        setStatus("Example PDF linked.");
+        router.refresh();
+      } catch {
+        setStatus("Failed to link example PDF");
+      } finally {
+        setAttachLinking(false);
+      }
+    },
+    [attachCandidates, calibrationId, router]
+  );
   const [pdfLoadDetail, setPdfLoadDetail] = useState<string | null>(null);
   const [lineFilter, setLineFilter] = useState("");
   const [inspectPage, setInspectPage] = useState(1);
@@ -1028,16 +1114,21 @@ export function SetupCalibrationEditorClient({
     setShowAddMappingForm(false);
     setShowCreateFieldForm(true);
     setPendingGroupOption(null);
-    initGroupedEditorFromSources(keys, "singleSelect");
+    const names = keys.map((k) => {
+      const ref = parseAcroKey(k);
+      return pdfRowByName.get(ref.pdfFieldName)?.name ?? ref.pdfFieldName;
+    });
+    const groupedInfer = inferGroupedFieldDefaultsFromPdfNames(names);
+    initGroupedEditorFromSources(keys, groupedInfer.groupBehaviorType);
     const first = parseAcroKey(keys[0]!);
     const row = pdfRowByName.get(first.pdfFieldName);
-    setCfKey(suggestKeyFromPdfFieldName(row?.name ?? "group_field"));
-    setCfLabel("Group field");
-    setCfUiType("select");
-    setCfValueType("string");
-    setCfFieldDomain("metadata");
-    setCfIsMetadata(true);
-    setCfSectionId("metadata");
+    setCfKey(suggestKeyFromPdfFieldName(names.join("_").slice(0, 64) || row?.name || "group_field"));
+    setCfLabel(groupedInfer.labelSuggestion);
+    setCfUiType(groupedInfer.groupBehaviorType === "visualMulti" ? "multiSelect" : "select");
+    setCfValueType(groupedInfer.groupBehaviorType === "visualMulti" ? "multi" : "string");
+    setCfFieldDomain(groupedInfer.fieldDomain);
+    setCfIsMetadata(groupedInfer.isMetadata);
+    setCfSectionId(groupedInfer.sectionId);
     setCfShowInSetupSheet(true);
     setCfShowInAnalysis(true);
     setCfPdfExportable(true);
@@ -1068,10 +1159,11 @@ export function SetupCalibrationEditorClient({
     setCreateFieldEditKey(null);
     setCreateFieldError(null);
     const row = selectedAcroPdfRow;
-    setCfKey(suggestKeyFromPdfFieldName(row?.name ?? "field"));
-    setCfLabel(row?.name ? row.name.replace(/_/g, " ") : "");
-    const uiBase = inferUiTypeFromAcroType(row?.type ?? "Text");
     const nameHint = row?.name ?? "";
+    const inferredPlacement = inferSectionAndDomainForNewCustomField(nameHint);
+    setCfKey(suggestKeyFromPdfFieldName(nameHint || "field"));
+    setCfLabel(nameHint ? nameHint.replace(/_/g, " ") : "");
+    const uiBase = inferUiTypeFromAcroType(row?.type ?? "Text");
     const looksLikeDate = /date|datum|time|event/i.test(nameHint);
     if (uiBase === "text" && looksLikeDate) {
       setCfUiType("date");
@@ -1080,9 +1172,9 @@ export function SetupCalibrationEditorClient({
       setCfUiType(uiBase);
       setCfValueType(uiBase === "checkbox" || uiBase === "groupOption" ? "boolean" : "string");
     }
-    setCfFieldDomain(/date|time/i.test(row?.name ?? "") ? "document" : "metadata");
-    setCfIsMetadata(true);
-    setCfSectionId("metadata");
+    setCfFieldDomain(inferredPlacement.fieldDomain);
+    setCfIsMetadata(inferredPlacement.isMetadata);
+    setCfSectionId(inferredPlacement.sectionId);
     setCfShowInSetupSheet(true);
     setCfShowInAnalysis(true);
     setCfPdfExportable(true);
@@ -1705,6 +1797,7 @@ export function SetupCalibrationEditorClient({
     return {
       name: trimmedName,
       sourceType: sourceType.trim() || "awesomatix_pdf",
+      exampleDocumentId: documentId.trim() || null,
       calibrationDataJson: {
         templateType: "pdf_form_fields" as const,
         calibrationMeta: {
@@ -1759,7 +1852,6 @@ export function SetupCalibrationEditorClient({
       const payload = {
         ...buildCalibrationPayload("saveAsNew"),
         clonedFromCalibrationId: calibrationId,
-        exampleDocumentId: documentId || null,
       };
       const res = await fetch("/api/setup-calibrations", {
         method: "POST",
@@ -2070,6 +2162,78 @@ export function SetupCalibrationEditorClient({
           </span>
           {status ? <span className="text-xs text-muted-foreground">{status}</span> : null}
         </div>
+        <div
+          ref={examplePdfSectionRef}
+          className="mt-2 rounded-md border border-border/70 bg-muted/25 px-3 py-2 text-[11px]"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="shrink-0 font-medium text-muted-foreground">Example PDF</span>
+            {documentId ? (
+              <span className="min-w-0 truncate text-foreground" title={linkedExampleFilename || documentId}>
+                {linkedExampleFilename || documentId}
+              </span>
+            ) : (
+              <span className="text-amber-200/90">None linked — form preview and field values need a PDF.</span>
+            )}
+            <button
+              type="button"
+              className="rounded border border-border bg-card px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
+              onClick={() => {
+                setAttachListOpen((o) => !o);
+                if (!attachListOpen) void loadPdfCandidates();
+              }}
+              disabled={attachLinking}
+            >
+              {attachListOpen ? "Close picker" : documentId ? "Change…" : "Link PDF…"}
+            </button>
+            <Link href="/setup-documents" className="text-xs text-sky-300/90 hover:text-sky-200">
+              Upload PDF
+            </Link>
+          </div>
+          {attachListOpen ? (
+            <div className="mt-2 space-y-2 border-t border-border/60 pt-2">
+              {attachListLoading ? (
+                <div className="text-muted-foreground">Loading your PDFs…</div>
+              ) : attachCandidates.length === 0 ? (
+                <div className="text-muted-foreground">
+                  No PDFs found.{" "}
+                  <Link href="/setup-documents" className="text-sky-300/90 hover:text-sky-200">
+                    Upload one
+                  </Link>{" "}
+                  (bulk-import PDFs are included here).
+                </div>
+              ) : (
+                <label className="flex flex-col gap-1 text-muted-foreground">
+                  <span className="text-[10px] uppercase tracking-wide">Choose document</span>
+                  <select
+                    className="max-w-full rounded border border-border bg-card px-2 py-1.5 font-mono text-xs text-foreground"
+                    disabled={attachLinking}
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v) void linkExampleDocument(v);
+                    }}
+                  >
+                    <option value="">{attachLinking ? "Linking…" : "Select a PDF…"}</option>
+                    {attachCandidates.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.originalFilename}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <button
+                type="button"
+                className="text-[10px] text-muted-foreground underline hover:text-foreground"
+                onClick={() => void loadPdfCandidates()}
+                disabled={attachListLoading || attachLinking}
+              >
+                Refresh list
+              </button>
+            </div>
+          ) : null}
+        </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 border-b border-border pb-2">
           <button
             type="button"
@@ -2174,8 +2338,15 @@ export function SetupCalibrationEditorClient({
 
               <div className="p-2">
                 {!previewUrl ? (
-                  <div className="rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
-                    No PDF preview URL — attach an example PDF to use the canvas.
+                  <div className="space-y-2 rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
+                    <div>No PDF preview URL — attach an example PDF to use the canvas.</div>
+                    <button
+                      type="button"
+                      className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted"
+                      onClick={openExamplePdfPicker}
+                    >
+                      Link example PDF…
+                    </button>
                   </div>
                 ) : (
                   <div
@@ -2581,8 +2752,15 @@ export function SetupCalibrationEditorClient({
               </div>
             </div>
             {!documentId ? (
-              <div className="rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
-                No example PDF is linked to this calibration.
+              <div className="space-y-2 rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
+                <div>No example PDF is linked to this calibration.</div>
+                <button
+                  type="button"
+                  className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted"
+                  onClick={openExamplePdfPicker}
+                >
+                  Link example PDF…
+                </button>
               </div>
             ) : pdfFormMeta?.loadError && pdfFormRows.length === 0 ? (
               <div className="space-y-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-3 text-xs text-rose-200">
@@ -2815,8 +2993,15 @@ export function SetupCalibrationEditorClient({
               </div>
             </div>
             {!documentId ? (
-              <div className="rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
-                No example PDF is linked to this calibration.
+              <div className="space-y-2 rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
+                <div>No example PDF is linked to this calibration.</div>
+                <button
+                  type="button"
+                  className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted"
+                  onClick={openExamplePdfPicker}
+                >
+                  Link example PDF…
+                </button>
               </div>
             ) : structureError ? (
               <div className="space-y-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-3 text-xs text-rose-200">
@@ -2914,8 +3099,15 @@ export function SetupCalibrationEditorClient({
               </div>
             </div>
             {!previewUrl ? (
-              <div className="rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
-                No example PDF attached to this calibration yet.
+              <div className="space-y-2 rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
+                <div>No example PDF attached to this calibration yet.</div>
+                <button
+                  type="button"
+                  className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted"
+                  onClick={openExamplePdfPicker}
+                >
+                  Link example PDF…
+                </button>
               </div>
             ) : (
               <div
@@ -3092,6 +3284,24 @@ export function SetupCalibrationEditorClient({
                     mode={createFieldEditKey ? "edit" : "create"}
                     fieldScope={setupFieldFormScope === "template" ? "template" : createFieldEditKey ? "custom" : "new"}
                     error={createFieldError}
+                    onApplyRecipe={
+                      setupFieldFormScope === "template"
+                        ? undefined
+                        : (recipe) => {
+                            applyCalibrationFieldRecipe(recipe, {
+                              cfFieldDomain,
+                              setCfFieldDomain,
+                              cfIsMetadata,
+                              setCfIsMetadata,
+                              cfUiType,
+                              setCfUiType,
+                              cfValueType,
+                              setCfValueType,
+                              cfSectionId,
+                              setCfSectionId,
+                            });
+                          }
+                    }
                     sectionOptions={mergedSectionOptions}
                     cfKey={cfKey}
                     setCfKey={setCfKey}
@@ -3686,9 +3896,15 @@ export function SetupCalibrationEditorClient({
             >
               Clear selected field
             </button>
-            <a href={`/setup-documents/${documentId}`} className="text-xs text-muted-foreground hover:text-foreground">
-              Back to document review
-            </a>
+            {documentId ? (
+              <Link href={`/setup-documents/${documentId}`} className="text-xs text-muted-foreground hover:text-foreground">
+                Back to document review
+              </Link>
+            ) : (
+              <Link href="/setup-documents" className="text-xs text-muted-foreground hover:text-foreground">
+                Open setup documents
+              </Link>
+            )}
           </div>
         </div>
       </div>

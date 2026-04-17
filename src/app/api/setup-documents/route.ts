@@ -11,14 +11,19 @@ import { SETUP_DOCUMENT_ALLOWED_MIME, SETUP_DOCUMENT_MAX_BYTES } from "@/lib/set
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const user = await getOrCreateLocalUser();
+  const { searchParams } = new URL(request.url);
+  const forExamplePdf = searchParams.get("forExamplePdf") === "1";
   const docs = await prisma.setupDocument.findMany({
-    where: { userId: user.id, setupImportBatchId: null },
+    where: forExamplePdf
+      ? { userId: user.id, mimeType: "application/pdf" }
+      : { userId: user.id, setupImportBatchId: null },
     orderBy: { createdAt: "desc" },
+    take: forExamplePdf ? 100 : undefined,
     select: {
       id: true,
       originalFilename: true,

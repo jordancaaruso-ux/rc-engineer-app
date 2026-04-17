@@ -272,12 +272,39 @@ export function compareSetupField(input: {
       };
     }
     const delta = Math.abs(an - bn);
+    if (delta === 0) {
+      return {
+        key,
+        areEqual: true,
+        severity: "same",
+        severityReason: "equal",
+        normalizedA: String(an),
+        normalizedB: String(bn),
+      };
+    }
+    // Prefer car-aggregation (IQR) scale when available so severity reflects real spread,
+    // not hardcoded relative thresholds. This covers numeric keys that lack a dedicated
+    // gradient config entry (e.g. bump_steer_shims_front).
+    const agg = input.numericAggregationByKey?.get(key) ?? null;
+    const gradientIntensity = gradientIntensityFromIqrDelta(delta, agg, key);
+    if (gradientIntensity != null) {
+      const severity = severityFromGradientIntensity(gradientIntensity);
+      return {
+        key,
+        areEqual: false,
+        severity,
+        severityReason: `Δ=${delta} (IQR-scaled)`,
+        normalizedA: String(an),
+        normalizedB: String(bn),
+        gradientIntensity,
+      };
+    }
     const baseAbs = Math.max(Math.abs(an), Math.abs(bn));
     const sev = severityForNumeric(delta, baseAbs, meta.thresholds);
     return {
       key,
-      areEqual: delta === 0,
-      severity: delta === 0 ? "same" : sev.severity,
+      areEqual: false,
+      severity: sev.severity,
       severityReason: sev.reason,
       normalizedA: String(an),
       normalizedB: String(bn),

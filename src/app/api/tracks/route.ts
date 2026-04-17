@@ -42,7 +42,7 @@ export async function GET(request: Request) {
             ? { ...whereBase, id: { in: [] } }
             : whereBase,
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, location: true },
+      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
     });
 
     if (favouritesFirst && favouriteTrackIds.length > 0) {
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
         name,
         location: body.location?.trim() || null,
       },
-      select: { id: true, name: true, location: true },
+      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
     });
     if (body.addToFavourites) {
       await addTrackToFavourites(user.id, track.id);

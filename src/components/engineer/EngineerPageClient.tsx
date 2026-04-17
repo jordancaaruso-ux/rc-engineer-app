@@ -1,26 +1,75 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareAndPattern";
-import { EngineerLatestRunSummary } from "@/components/engineer/EngineerLatestRunSummary";
-import { EngineerChatPanel } from "@/components/engineer/EngineerChatPanel";
+import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/engineer/EngineerChatPanel";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
-import { cn } from "@/lib/utils";
+import { getEngineerQuickPromptById } from "@/lib/engineerQuickPrompts";
 
 export function EngineerPageClient() {
   const [patternDigest, setPatternDigest] = useState<PatternDigestV1 | null>(null);
   const [includeRunCatalog, setIncludeRunCatalog] = useState(true);
+  const [queuedPrompt, setQueuedPrompt] = useState<EngineerQueuedChatPrompt | null>(null);
+
+  const queueEngineerPrompt = useCallback((text: string) => {
+    setQueuedPrompt((prev) => ({ id: (prev?.id ?? 0) + 1, text }));
+  }, []);
+
+  const clearQueuedPrompt = useCallback(() => setQueuedPrompt(null), []);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const autoPromptConsumedRef = useRef(false);
+
+  useEffect(() => {
+    if (autoPromptConsumedRef.current) return;
+    const promptId = searchParams.get("engineerPrompt")?.trim();
+    if (!promptId) return;
+    const def = getEngineerQuickPromptById(promptId);
+    if (!def) return;
+    const runId = searchParams.get("runId")?.trim() || null;
+    const compareRunId = searchParams.get("compareRunId")?.trim() || null;
+    if (def.requiresRunId !== false && !runId) return;
+    if (def.requiresCompare && !compareRunId) return;
+
+    autoPromptConsumedRef.current = true;
+    queueEngineerPrompt(def.prompt);
+
+    // Strip the engineerPrompt param so a refresh does not re-submit the canned message.
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("engineerPrompt");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router, queueEngineerPrompt]);
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6">
-      <EngineerLatestRunSummary />
+      <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">Compare &amp; trend</h2>
+          <p className="text-xs text-muted-foreground mt-1 leading-snug">
+            Choose target (primary) and comparison runs — same URL as Analysis &quot;Compare with Engineer&quot; (
+            <span className="font-mono">runId</span> / <span className="font-mono">compareRunId</span>). Run summary and
+            trend digest live here; chat is below.
+          </p>
+        </div>
+        <div className="p-4 md:p-5">
+          <EngineerCompareAndPattern
+            embedded
+            onDigestLoaded={setPatternDigest}
+            showRunSummaryPanel
+            onQueueEngineerChatPrompt={queueEngineerPrompt}
+          />
+        </div>
+      </section>
 
       <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
           <h2 className="text-lg font-semibold text-foreground tracking-tight">Ask the Engineer</h2>
           <p className="text-xs text-muted-foreground mt-1 leading-snug">
-            Main workspace — questions about your data, setup, and laps. Uses your latest summary above, optional
-            compare/digest from the section below, and the run catalog when enabled.
+            Conversational workspace — uses the run pair and digest from the section above, plus optional run catalog.
           </p>
         </div>
         <div className="p-4 md:p-5">
@@ -28,38 +77,12 @@ export function EngineerPageClient() {
             patternDigest={patternDigest}
             includeRunCatalog={includeRunCatalog}
             onIncludeRunCatalogChange={setIncludeRunCatalog}
+            queuedPrompt={queuedPrompt}
+            onQueuedPromptConsumed={clearQueuedPrompt}
+            onQuickPrompt={queueEngineerPrompt}
           />
         </div>
       </section>
-
-      <details className="engineer-compare-details rounded-xl border border-border bg-muted/15 overflow-hidden open:shadow-sm">
-        <style>{`
-          .engineer-compare-details[open] .engineer-compare-chevron {
-            transform: rotate(180deg);
-          }
-        `}</style>
-        <summary
-          className={cn(
-            "cursor-pointer list-none px-4 py-3.5 md:px-5 flex items-center justify-between gap-3",
-            "text-sm font-medium text-foreground hover:bg-muted/35 transition-colors",
-            "[&::-webkit-details-marker]:hidden"
-          )}
-        >
-          <span>Use engineer to compare runs</span>
-          <span className="text-muted-foreground text-xs shrink-0 hidden sm:inline">
-            Two-run compare · teammates · trend digest
-          </span>
-          <span
-            className="engineer-compare-chevron text-muted-foreground text-lg leading-none shrink-0 transition-transform duration-200 inline-block"
-            aria-hidden
-          >
-            ▼
-          </span>
-        </summary>
-        <div className="border-t border-border bg-card/60 px-3 pb-4 pt-1 md:px-4">
-          <EngineerCompareAndPattern embedded onDigestLoaded={setPatternDigest} />
-        </div>
-      </details>
     </div>
   );
 }

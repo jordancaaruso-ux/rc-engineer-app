@@ -33,6 +33,7 @@ model User {
   setupImportBatches SetupImportBatch[]
   importedLapTimeSessions ImportedLapTimeSession[]
   watchedLapSources WatchedLapSource[]
+  videoAssets     VideoAsset[]
   teammateLinksOwned TeammateLink[] @relation("TeammateLinksOwned")
   teammateLinksPeer  TeammateLink[] @relation("TeammateLinksPeer")
 }
@@ -98,7 +99,10 @@ model Track {
   id        String   @id @default(cuid())
   name      String
   location  String?
-  layout    String?
+  /** Multi-select grip tags (e.g. MEDIUM + HIGH); see `trackMetaTags.ts` ids. */
+  gripTags   String[] @default([])
+  /** Multi-select layout tags (e.g. TECHNICAL + FAST). */
+  layoutTags String[] @default([])
   createdAt DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id])
@@ -234,9 +238,13 @@ enum SetupDocumentImportOutcome {
   FAILED
 }
 
-/** MVP: only car × parameter; scopeKey duplicates carId for forward-compatible snapshots. */
+/**
+ * CAR_PARAMETER: all eligible snapshots per car (scopeKey = carId).
+ * CAR_PARAMETER_CONDITION: runs bucketed by track grip/layout signature (scopeKey = encoded condition).
+ */
 enum SetupAggregationScopeType {
   CAR_PARAMETER
+  CAR_PARAMETER_CONDITION
 }
 
 enum SetupAggregationValueType {
@@ -268,8 +276,40 @@ model SetupParameterAggregation {
   numericStatsJson     Json?
   categoricalStatsJson Json?
 
-  @@unique([scopeType, carId, parameterKey])
+  @@unique([scopeType, scopeKey, carId, parameterKey])
   @@index([carId])
+}
+
+/**
+ * App-wide parameter stats from every user's setup uploads flagged `eligibleForAggregationDataset`,
+ * grouped by `Car.setupSheetTemplate` (same keys as CAR_PARAMETER, no per-user isolation).
+ */
+model CommunitySetupParameterAggregation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /** Matches `Car.setupSheetTemplate` (e.g. awesomatix_a800rr). */
+  setupSheetTemplate String
+  /** Parsed setup surface bucket (asphalt | carpet). */
+  trackSurface String
+  /**
+   * Grip-level bucket derived from the doc's `traction` multi-select tag.
+   * Values: `any` (always emitted — all eligible docs for the surface),
+   * `low` / `medium` / `high` (one row per grip tag the doc claims; multi-tag docs land in multiple buckets).
+   */
+  gripLevel String @default("any")
+
+  parameterKey String
+  valueType    SetupAggregationValueType
+
+  sampleCount Int
+
+  numericStatsJson     Json?
+  categoricalStatsJson Json?
+
+  @@unique([setupSheetTemplate, trackSurface, gripLevel, parameterKey])
+  @@index([setupSheetTemplate, trackSurface, gripLevel])
 }
 
 /** User review for dataset / aggregation eligibility (bulk import workflow). */
@@ -326,6 +366,12 @@ model SetupDocument {
   calibrationUsedIsForcedDefault Boolean?
   extractedText    String?
   parsedDataJson   Json?
+  /** Original source URL when imported from a remote site (e.g. PetitRC). */
+  sourceUrl        String?
+  /** Optional source tag (e.g. \"petitrc\"). */
+  sourceSite       String?
+  /** SHA-256 of the original PDF bytes (dedupe across URL variants and old imports). */
+  sourceContentSha256 String?
   /** User corrected structured fields after parse (niche fixes; automated re-parse clears this). */
   parsedSetupManuallyEdited Boolean @default(false)
   /** Sticky calibration used for parse + render (forced default when missing). */
@@ -356,6 +402,8 @@ model SetupDocument {
   @@index([userId, parseStatus])
   @@index([setupImportBatchId])
   @@index([carId])
+  @@unique([userId, sourceUrl])
+  @@unique([userId, sourceContentSha256])
 }
 
 model SetupSheetCalibration {
@@ -405,6 +453,9 @@ model Run {
 
   event   Event?  @relation(fields: [eventId], references: [id])
   eventId String?
+
+  /** Session race class when not from event, or override (e.g. \"17.5 Stock\"). */
+  raceClass String?
 
   tireSet   TireSet? @relation(fields: [tireSetId], references: [id])
   tireSetId String?
@@ -608,5 +659,24 @@ model RunImportedLap {
   lapSetId String
 
   @@index([lapSetId, lapNumber])
+}
+
+model VideoAsset {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /** Blob URL or local `/uploads/...` ref (see storage helpers). */
+  storagePath      String
+  originalFilename String
+  mimeType         String
+  bytes            Int
+  /** Optional free-text label (e.g. "Q2 A-main onboard"). */
+  label            String?
+
+  @@index([userId, createdAt])
 }
 

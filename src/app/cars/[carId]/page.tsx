@@ -150,6 +150,22 @@ export default async function CarDetailPage(props: {
 
           <CarSetupSheetTemplateEdit carId={car.id} currentTemplate={car.setupSheetTemplate} />
 
+          {car.setupSheetTemplate ? (
+            <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-2">
+              <div className="ui-title text-sm text-muted-foreground">Community tuning archetypes</div>
+              <p className="text-xs text-muted-foreground">
+                Compare this car&apos;s latest setup against low / medium / high grip medians pooled from every
+                community-eligible upload sharing this setup sheet template.
+              </p>
+              <Link
+                href={`/cars/${car.id}/grip-archetypes`}
+                className="inline-flex rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted transition"
+              >
+                Open grip archetypes →
+              </Link>
+            </div>
+          ) : null}
+
           <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
             <div className="ui-title text-sm text-muted-foreground">Tires used with this car</div>
             {tireSetsOnCar.length === 0 ? (

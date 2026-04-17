@@ -35,6 +35,8 @@ export async function GET(_: Request, ctx: Ctx) {
           calibrationProfileId: true,
           parsedCalibrationProfileId: true,
           calibrationProfile: { select: { id: true, name: true } },
+          calibrationResolvedSource: true,
+          calibrationResolvedDebug: true,
           importDatasetReviewStatus: true,
           eligibleForAggregationDataset: true,
           createdAt: true,

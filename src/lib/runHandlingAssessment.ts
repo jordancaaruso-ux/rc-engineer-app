@@ -18,6 +18,7 @@ export const HANDLING_TRAIT_LABELS: Record<HandlingTraitTagId, string> = {
 
 export type CornerPhase = "entry" | "mid" | "exit";
 
+/** Legacy v1 JSON only; migrated on read. */
 export type HandlingSeverity = "mild" | "moderate" | "severe";
 
 export const HANDLING_SEVERITY_LABELS: Record<HandlingSeverity, string> = {
@@ -26,13 +27,49 @@ export const HANDLING_SEVERITY_LABELS: Record<HandlingSeverity, string> = {
   severe: "severe",
 };
 
+/** 1 (light) … 5 (strong); used only when migrating old v1/v2 rows. */
+export type HandlingIntensity1to5 = 1 | 2 | 3 | 4 | 5;
+
+/** −3 = strong push, 0 = neutral, +3 = strong oversteer (per corner phase). Same range as feel vs last run. */
+export type PhaseBalance = -3 | -2 | -1 | 0 | 1 | 2 | 3;
+
+export type FeelVsLastRun = PhaseBalance;
+
+export type RunHandlingAssessmentParsed = {
+  version: 3;
+  balanceByPhase?: {
+    entry?: PhaseBalance;
+    mid?: PhaseBalance;
+    exit?: PhaseBalance;
+  };
+  feelVsLastRun?: FeelVsLastRun;
+  traitTags?: HandlingTraitTagId[];
+  traitsOther?: string | null;
+  mainProblem?: string | null;
+  carDoesWell?: string | null;
+};
+
+/** @deprecated Legacy rows. */
 export type RunHandlingAssessmentV1 = {
   version: 1;
   understeer?: { entry?: boolean; mid?: boolean; exit?: boolean };
   oversteer?: { entry?: boolean; mid?: boolean; exit?: boolean };
-  /** When understeer phases are set; omit if legacy data. */
   understeerSeverity?: HandlingSeverity;
   oversteerSeverity?: HandlingSeverity;
+  traitTags?: HandlingTraitTagId[];
+  traitsOther?: string | null;
+  mainProblem?: string | null;
+  carDoesWell?: string | null;
+};
+
+/** @deprecated v2 dual-axis balance; migrated to v3 on read. */
+export type RunHandlingAssessmentV2 = {
+  version: 2;
+  understeer?: { entry?: boolean; mid?: boolean; exit?: boolean };
+  oversteer?: { entry?: boolean; mid?: boolean; exit?: boolean };
+  understeerIntensity?: HandlingIntensity1to5;
+  oversteerIntensity?: HandlingIntensity1to5;
+  feelVsLastRun?: FeelVsLastRun;
   traitTags?: HandlingTraitTagId[];
   traitsOther?: string | null;
   mainProblem?: string | null;
@@ -45,8 +82,22 @@ function isTraitTagId(s: string): s is HandlingTraitTagId {
   return (HANDLING_TRAIT_TAG_IDS as readonly string[]).includes(s);
 }
 
-function isSeverity(s: string): s is HandlingSeverity {
+function isLegacySeverity(s: string): s is HandlingSeverity {
   return s === "mild" || s === "moderate" || s === "severe";
+}
+
+function legacySeverityToIntensity(s: HandlingSeverity): HandlingIntensity1to5 {
+  if (s === "mild") return 2;
+  if (s === "moderate") return 3;
+  return 5;
+}
+
+function isIntensity1to5(n: unknown): n is HandlingIntensity1to5 {
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 5;
+}
+
+function isPhaseBalance(n: unknown): n is PhaseBalance {
+  return typeof n === "number" && Number.isInteger(n) && n >= -3 && n <= 3;
 }
 
 function normalizePhaseBlock(
@@ -61,15 +112,112 @@ function normalizePhaseBlock(
   return Object.keys(out).length ? out : undefined;
 }
 
-export function emptyHandlingAssessmentV1(): RunHandlingAssessmentV1 {
-  return { version: 1 };
+/** Map legacy 1–5 intensity to a −3…−1 or 1…3 magnitude for migration. */
+function legacyIntensityToMagnitude(i: HandlingIntensity1to5): 1 | 2 | 3 {
+  const m = Math.min(3, Math.max(1, Math.round((i * 3) / 5)));
+  return m as 1 | 2 | 3;
+}
+
+function mergeLegacyUsOsForPhase(
+  us: boolean | undefined,
+  os: boolean | undefined,
+  ui: HandlingIntensity1to5,
+  oi: HandlingIntensity1to5
+): PhaseBalance | null {
+  if (!us && !os) return null;
+  const magUs = legacyIntensityToMagnitude(ui);
+  const magOs = legacyIntensityToMagnitude(oi);
+  if (us && !os) return (-magUs) as PhaseBalance;
+  if (!us && os) return magOs as PhaseBalance;
+  if (us && os) {
+    if (magOs > magUs) return magOs as PhaseBalance;
+    if (magUs > magOs) return (-magUs) as PhaseBalance;
+    return 0;
+  }
+  return null;
+}
+
+function attachCommonFields(out: RunHandlingAssessmentParsed, o: Record<string, unknown>): void {
+  if (Array.isArray(o.traitTags)) {
+    const tags = o.traitTags.filter((t): t is HandlingTraitTagId => typeof t === "string" && isTraitTagId(t));
+    if (tags.length) out.traitTags = tags;
+  }
+  if (typeof o.traitsOther === "string" && o.traitsOther.trim()) out.traitsOther = o.traitsOther.trim();
+  if (typeof o.mainProblem === "string" && o.mainProblem.trim()) out.mainProblem = o.mainProblem.trim();
+  if (typeof o.carDoesWell === "string" && o.carDoesWell.trim()) out.carDoesWell = o.carDoesWell.trim();
+}
+
+function migrateV1ToV3(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
+  const understeer = normalizePhaseBlock(o.understeer);
+  const oversteer = normalizePhaseBlock(o.oversteer);
+  const ui =
+    typeof o.understeerSeverity === "string" && isLegacySeverity(o.understeerSeverity)
+      ? legacySeverityToIntensity(o.understeerSeverity)
+      : 3;
+  const oi =
+    typeof o.oversteerSeverity === "string" && isLegacySeverity(o.oversteerSeverity)
+      ? legacySeverityToIntensity(o.oversteerSeverity)
+      : 3;
+
+  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
+  for (const p of PHASES) {
+    const b = mergeLegacyUsOsForPhase(understeer?.[p], oversteer?.[p], ui, oi);
+    if (b !== null) balanceByPhase[p] = b;
+  }
+
+  const out: RunHandlingAssessmentParsed = { version: 3 };
+  if (Object.keys(balanceByPhase).length) out.balanceByPhase = balanceByPhase;
+  attachCommonFields(out, o);
+
+  if (!out.balanceByPhase && !out.traitTags && !out.traitsOther && !out.mainProblem && !out.carDoesWell) {
+    return null;
+  }
+  return out;
+}
+
+function migrateV2ToV3(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
+  const understeer = normalizePhaseBlock(o.understeer);
+  const oversteer = normalizePhaseBlock(o.oversteer);
+  const ui =
+    o.understeerIntensity != null && isIntensity1to5(o.understeerIntensity) ? o.understeerIntensity : 3;
+  const oi =
+    o.oversteerIntensity != null && isIntensity1to5(o.oversteerIntensity) ? o.oversteerIntensity : 3;
+
+  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
+  for (const p of PHASES) {
+    const b = mergeLegacyUsOsForPhase(understeer?.[p], oversteer?.[p], ui, oi);
+    if (b !== null) balanceByPhase[p] = b;
+  }
+
+  const fvl = o.feelVsLastRun != null && isPhaseBalance(o.feelVsLastRun) ? o.feelVsLastRun : undefined;
+
+  const out: RunHandlingAssessmentParsed = { version: 3 };
+  if (Object.keys(balanceByPhase).length) out.balanceByPhase = balanceByPhase;
+  if (fvl !== undefined) out.feelVsLastRun = fvl;
+  attachCommonFields(out, o);
+
+  if (
+    !out.balanceByPhase &&
+    out.feelVsLastRun === undefined &&
+    !out.traitTags &&
+    !out.traitsOther &&
+    !out.mainProblem &&
+    !out.carDoesWell
+  ) {
+    return null;
+  }
+  return out;
+}
+
+export function emptyHandlingAssessmentV1(): RunHandlingAssessmentParsed {
+  return { version: 3 };
 }
 
 export type HandlingAssessmentUiState = {
-  understeer: { entry?: boolean; mid?: boolean; exit?: boolean } | null;
-  oversteer: { entry?: boolean; mid?: boolean; exit?: boolean } | null;
-  understeerSeverity: HandlingSeverity;
-  oversteerSeverity: HandlingSeverity;
+  balanceEntry: PhaseBalance | null;
+  balanceMid: PhaseBalance | null;
+  balanceExit: PhaseBalance | null;
+  feelVsLastRun: FeelVsLastRun | null;
   traitTags: HandlingTraitTagId[];
   traitsOther: string;
   mainProblem: string;
@@ -78,10 +226,10 @@ export type HandlingAssessmentUiState = {
 
 export function emptyHandlingAssessmentUiState(): HandlingAssessmentUiState {
   return {
-    understeer: null,
-    oversteer: null,
-    understeerSeverity: "moderate",
-    oversteerSeverity: "moderate",
+    balanceEntry: null,
+    balanceMid: null,
+    balanceExit: null,
+    feelVsLastRun: null,
     traitTags: [],
     traitsOther: "",
     mainProblem: "",
@@ -89,13 +237,15 @@ export function emptyHandlingAssessmentUiState(): HandlingAssessmentUiState {
   };
 }
 
-export function uiStateFromParsed(parsed: RunHandlingAssessmentV1 | null): HandlingAssessmentUiState {
+export function uiStateFromParsed(parsed: RunHandlingAssessmentParsed | null): HandlingAssessmentUiState {
   if (!parsed) return emptyHandlingAssessmentUiState();
+  const b = parsed.balanceByPhase;
   return {
-    understeer: parsed.understeer ? { ...parsed.understeer } : null,
-    oversteer: parsed.oversteer ? { ...parsed.oversteer } : null,
-    understeerSeverity: parsed.understeerSeverity ?? "moderate",
-    oversteerSeverity: parsed.oversteerSeverity ?? "moderate",
+    balanceEntry: b?.entry != null && isPhaseBalance(b.entry) ? b.entry : null,
+    balanceMid: b?.mid != null && isPhaseBalance(b.mid) ? b.mid : null,
+    balanceExit: b?.exit != null && isPhaseBalance(b.exit) ? b.exit : null,
+    feelVsLastRun:
+      parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun) ? parsed.feelVsLastRun : null,
     traitTags: parsed.traitTags ? [...parsed.traitTags] : [],
     traitsOther: parsed.traitsOther ?? "",
     mainProblem: parsed.mainProblem ?? "",
@@ -103,28 +253,14 @@ export function uiStateFromParsed(parsed: RunHandlingAssessmentV1 | null): Handl
   };
 }
 
-export function persistedFromUiState(ui: HandlingAssessmentUiState): RunHandlingAssessmentV1 | null {
-  const t: RunHandlingAssessmentV1 = { version: 1 };
-  if (ui.understeer) {
-    const u: { entry?: boolean; mid?: boolean; exit?: boolean } = {};
-    for (const p of PHASES) {
-      if (ui.understeer[p]) u[p] = true;
-    }
-    if (Object.keys(u).length) {
-      t.understeer = u;
-      t.understeerSeverity = ui.understeerSeverity;
-    }
-  }
-  if (ui.oversteer) {
-    const o: { entry?: boolean; mid?: boolean; exit?: boolean } = {};
-    for (const p of PHASES) {
-      if (ui.oversteer[p]) o[p] = true;
-    }
-    if (Object.keys(o).length) {
-      t.oversteer = o;
-      t.oversteerSeverity = ui.oversteerSeverity;
-    }
-  }
+export function persistedFromUiState(ui: HandlingAssessmentUiState): RunHandlingAssessmentParsed | null {
+  const t: RunHandlingAssessmentParsed = { version: 3 };
+  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
+  if (ui.balanceEntry != null) balanceByPhase.entry = ui.balanceEntry;
+  if (ui.balanceMid != null) balanceByPhase.mid = ui.balanceMid;
+  if (ui.balanceExit != null) balanceByPhase.exit = ui.balanceExit;
+  if (Object.keys(balanceByPhase).length) t.balanceByPhase = balanceByPhase;
+  if (ui.feelVsLastRun != null) t.feelVsLastRun = ui.feelVsLastRun;
   if (ui.traitTags.length) t.traitTags = [...ui.traitTags];
   const traitsOther = ui.traitsOther.trim();
   if (traitsOther) t.traitsOther = traitsOther;
@@ -135,21 +271,18 @@ export function persistedFromUiState(ui: HandlingAssessmentUiState): RunHandling
   return parseHandlingAssessmentJson(t);
 }
 
-export function parseHandlingAssessmentJson(raw: unknown): RunHandlingAssessmentV1 | null {
-  if (raw == null) return null;
-  if (typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  if (o.version !== 1) return null;
-  const understeer = normalizePhaseBlock(o.understeer);
-  const oversteer = normalizePhaseBlock(o.oversteer);
-  const us =
-    typeof o.understeerSeverity === "string" && isSeverity(o.understeerSeverity)
-      ? o.understeerSeverity
-      : undefined;
-  const os =
-    typeof o.oversteerSeverity === "string" && isSeverity(o.oversteerSeverity)
-      ? o.oversteerSeverity
-      : undefined;
+function parseV3Raw(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
+  const bb = o.balanceByPhase;
+  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
+  if (bb && typeof bb === "object" && !Array.isArray(bb)) {
+    const r = bb as Record<string, unknown>;
+    for (const p of PHASES) {
+      const v = r[p];
+      if (v != null && isPhaseBalance(v)) balanceByPhase[p] = v;
+    }
+  }
+  const fvl = o.feelVsLastRun != null && isPhaseBalance(o.feelVsLastRun) ? o.feelVsLastRun : undefined;
+
   let traitTags: HandlingTraitTagId[] | undefined;
   if (Array.isArray(o.traitTags)) {
     const tags = o.traitTags.filter((t): t is HandlingTraitTagId => typeof t === "string" && isTraitTagId(t));
@@ -162,23 +295,17 @@ export function parseHandlingAssessmentJson(raw: unknown): RunHandlingAssessment
   const carDoesWell =
     typeof o.carDoesWell === "string" && o.carDoesWell.trim() ? o.carDoesWell.trim() : undefined;
 
-  const out: RunHandlingAssessmentV1 = { version: 1 };
-  if (understeer) {
-    out.understeer = understeer;
-    if (us) out.understeerSeverity = us;
-  }
-  if (oversteer) {
-    out.oversteer = oversteer;
-    if (os) out.oversteerSeverity = os;
-  }
+  const out: RunHandlingAssessmentParsed = { version: 3 };
+  if (Object.keys(balanceByPhase).length) out.balanceByPhase = balanceByPhase;
+  if (fvl !== undefined) out.feelVsLastRun = fvl;
   if (traitTags) out.traitTags = traitTags;
   if (traitsOther) out.traitsOther = traitsOther;
   if (mainProblem) out.mainProblem = mainProblem;
   if (carDoesWell) out.carDoesWell = carDoesWell;
 
   if (
-    !understeer &&
-    !oversteer &&
+    !out.balanceByPhase &&
+    out.feelVsLastRun === undefined &&
     !traitTags &&
     !traitsOther &&
     !mainProblem &&
@@ -189,27 +316,34 @@ export function parseHandlingAssessmentJson(raw: unknown): RunHandlingAssessment
   return out;
 }
 
-function hasAnyPhase(block?: { entry?: boolean; mid?: boolean; exit?: boolean }): boolean {
-  if (!block) return false;
-  return PHASES.some((p) => block[p] === true);
+export function parseHandlingAssessmentJson(raw: unknown): RunHandlingAssessmentParsed | null {
+  if (raw == null) return null;
+  if (typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const ver = o.version;
+
+  if (ver === 1) {
+    return migrateV1ToV3(o);
+  }
+  if (ver === 2) {
+    return migrateV2ToV3(o);
+  }
+  if (ver === 3) {
+    return parseV3Raw(o);
+  }
+  return null;
 }
 
-function formatBalanceLine(
-  label: "Understeer" | "Oversteer",
-  block: { entry?: boolean; mid?: boolean; exit?: boolean } | undefined,
-  severity: HandlingSeverity | undefined
-): string | null {
-  if (!block) return null;
-  const parts: string[] = [];
-  for (const p of PHASES) {
-    if (block[p]) parts.push(p);
-  }
-  if (!parts.length) return null;
-  const sev =
-    severity && HANDLING_SEVERITY_LABELS[severity]
-      ? ` (${HANDLING_SEVERITY_LABELS[severity]})`
-      : "";
-  return `${label}${sev}: ${parts.join(", ")}`;
+function formatFeelVsLastRun(v: FeelVsLastRun): string {
+  if (v === 0) return "same as last run on this car";
+  if (v < 0) return `${v} (worse than last run on this car)`;
+  return `+${v} (better than last run on this car)`;
+}
+
+function formatPhaseBalanceWord(v: PhaseBalance): string {
+  if (v === 0) return "neutral";
+  if (v < 0) return `understeer (${v})`;
+  return `oversteer (+${v})`;
 }
 
 /**
@@ -219,18 +353,20 @@ export function formatHandlingAssessmentForEngineer(raw: unknown): string {
   const parsed = parseHandlingAssessmentJson(raw);
   if (!parsed) return "";
   const lines: string[] = [];
-  const u = formatBalanceLine(
-    "Understeer",
-    parsed.understeer,
-    hasAnyPhase(parsed.understeer) ? parsed.understeerSeverity : undefined
-  );
-  const o = formatBalanceLine(
-    "Oversteer",
-    parsed.oversteer,
-    hasAnyPhase(parsed.oversteer) ? parsed.oversteerSeverity : undefined
-  );
-  if (u) lines.push(u);
-  if (o) lines.push(o);
+  if (parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun)) {
+    lines.push(`Feel vs last run on this car: ${formatFeelVsLastRun(parsed.feelVsLastRun)}`);
+  }
+  const b = parsed.balanceByPhase;
+  if (b && (b.entry != null || b.mid != null || b.exit != null)) {
+    const parts: string[] = [];
+    for (const p of PHASES) {
+      const v = b[p];
+      if (v != null && isPhaseBalance(v)) {
+        parts.push(`${p} ${formatPhaseBalanceWord(v)}`);
+      }
+    }
+    if (parts.length) lines.push(`Corner balance: ${parts.join("; ")}`);
+  }
   if (parsed.traitTags?.length) {
     const labels = parsed.traitTags.map((id) => HANDLING_TRAIT_LABELS[id] ?? id);
     lines.push(`Traits: ${labels.join(", ")}`);

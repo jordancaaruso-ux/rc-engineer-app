@@ -27,6 +27,7 @@ import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "
 import type { LapRow } from "@/lib/lapAnalysis";
 import Link from "next/link";
 import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
+import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 
 type Run = {
   id: string;
@@ -168,12 +169,15 @@ export function RunHistoryTable({
   allRunsDescending,
   runListSource = "my_runs",
   userDisplayName,
+  showComparePairColumn = false,
 }: {
   runs: Run[];
   allRunsDescending: CompareRunShape[];
   runListSource?: RunCompareListSource;
   /** User / driver name for primary lap column ("Me" if unset). */
   userDisplayName?: string | null;
+  /** Analysis page: target / comparison selection column (requires AnalysisCompareProvider). */
+  showComparePairColumn?: boolean;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -231,10 +235,11 @@ export function RunHistoryTable({
                   ) : null}
                 </div>
               </td>
+              {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>
             {isExpanded && (
               <tr className="border-b border-border/80 bg-muted/40">
-                <td colSpan={7} className="px-4 py-4">
+                <td colSpan={showComparePairColumn ? 8 : 7} className="px-4 py-4">
                   <RunDetail
                     run={run}
                     pickerRuns={allRunsDescending}
