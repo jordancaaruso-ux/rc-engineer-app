@@ -1,0 +1,33 @@
+---
+description: Vehicle-dynamics KB is hand-curated; do not edit without explicit approval
+globs: content/vehicle-dynamics/**/*.md
+alwaysApply: false
+---
+
+# Vehicle Dynamics KB Protection
+
+Files in `content/vehicle-dynamics/*.md` are the Engineer's ground-truth prose. The Engineer retrieves these files verbatim via `searchVehicleDynamicsKb` in `src/lib/engineerPhase5/vehicleDynamicsKb.ts` and quotes them back to drivers as authoritative RC setup advice. **Any language written here is presented to end users as if it is expert knowledge**, whether or not it actually matches the repo owner's voice or beliefs.
+
+Evocative language like "breathe", "squares up", "platforms", "dances", "comes alive" has previously slipped into these files from agent-authored prose and been repeated to users as gospel. Do not repeat that failure mode.
+
+## Hard rules
+
+1. **Do not modify** any file under `content/vehicle-dynamics/` unless the user's most recent message explicitly names the file or explicitly asks for KB content edits. "Improving clarity", "tightening grammar", "adding a missing concept" are NOT sufficient justification.
+
+2. **When the user asks for Engineer behaviour changes**, the fix probably does not belong in the KB. Consider these first:
+   - `src/lib/engineerPhase5/openaiEngineer.ts` — system prompt tone / rules / constraints.
+   - `src/lib/engineerPhase5/engineerRichContext.ts` — what structured data the Engineer sees.
+   - `src/lib/engineerPhase5/vehicleDynamicsKb.ts` — retrieval logic / tokenization / ranking.
+
+3. **If a KB edit is genuinely required**, propose the exact paragraphs in chat, show a single-file diff, and wait for the user to type explicit approval before writing.
+
+## Style rules (for approved edits)
+
+- Match the existing terse, bold-for-technical-terms prose. No bullet explosions, no headings added mid-section, no rewording for "flow".
+- Forbidden metaphorical vocabulary unless the user dictated it: **breathe, platforms, dances, comes alive, settles, marries, talks to, listens, wants, feels like** (when describing what the car "wants"). Use "tends to", "often", "typically" instead.
+- Preserve heading levels (`##` chunks are what `searchVehicleDynamicsKb` splits on — do not break them).
+- Keep each file under ~90 lines. If a concept genuinely needs more, propose a new file, don't bloat an existing one.
+
+## Audit note
+
+Every file in `content/vehicle-dynamics/` was introduced in commit `31836c4` by a prior Cursor agent session. The repo owner is gradually auditing this content against their actual engineering knowledge. Treat the current KB as "under audit" — do not add more unreviewed prose to it.

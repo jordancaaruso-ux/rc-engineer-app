@@ -4,8 +4,9 @@ node_modules/
 .env.local
 prisma/dev.db
 
-# Cursor local state / debug
-.cursor/
+# Cursor local state / debug (but keep project rules tracked — they're persistent guidance).
+.cursor/*
+!.cursor/rules/
 
 # TypeScript incremental cache
 *.tsbuildinfo
