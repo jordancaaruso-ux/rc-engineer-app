@@ -42,6 +42,16 @@ function parseNumericStats(raw: unknown): NumericStats | null {
   ) {
     return null;
   }
+  const valueHistogram: Record<string, number> = {};
+  if (o.valueHistogram && typeof o.valueHistogram === "object" && !Array.isArray(o.valueHistogram)) {
+    for (const [k, v] of Object.entries(o.valueHistogram as Record<string, unknown>)) {
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) valueHistogram[k] = v;
+    }
+  }
+  const distinctValueCount =
+    typeof o.distinctValueCount === "number" && Number.isFinite(o.distinctValueCount)
+      ? (o.distinctValueCount as number)
+      : Object.keys(valueHistogram).filter((k) => k !== "__other").length;
   return {
     sampleCount,
     mean,
@@ -56,6 +66,8 @@ function parseNumericStats(raw: unknown): NumericStats | null {
     p90,
     iqr,
     broadRange,
+    valueHistogram,
+    distinctValueCount,
   };
 }
 

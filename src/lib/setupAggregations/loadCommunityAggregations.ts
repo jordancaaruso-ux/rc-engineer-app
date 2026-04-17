@@ -106,12 +106,36 @@ export async function loadCommunityAggregationsForBucket(
  *
  * Only NUMERIC parameters are included, and only buckets with sampleCount >= {@link MIN_GRIP_BUCKET_SAMPLE_COUNT}.
  */
+/** Top-K modal value entry for a bucket. */
+export type BucketTopValueEntry = {
+  /** Native numeric value (e.g. 7000 for a 7k diff oil). */
+  value: number;
+  /** Raw count of documents in this bucket with this exact value. */
+  count: number;
+  /** `count / sampleCount` (0..1). */
+  frequency: number;
+};
+
 export type GripTrendBucketStats = {
   sampleCount: number;
   median: number;
   mean: number;
   min: number;
   max: number;
+  /** 25th percentile (p25). Together with p75 describes where the middle-50% of the bucket sits. */
+  p25: number;
+  /** 75th percentile (p75). */
+  p75: number;
+  /** Interquartile range (p75 − p25). Scale used for trend-magnitude scoring. */
+  iqr: number;
+  /** Sample standard deviation (Bessel-corrected, 0 when n === 1). */
+  stdDev: number;
+  /** Top-K most common exact values in the bucket (up to 5), with counts and frequencies. */
+  topValues: BucketTopValueEntry[];
+  /** Count of distinct numeric values observed in the bucket (before the histogram top-K cap). */
+  distinctValueCount: number;
+  /** Full capped histogram `{ valueKey: count }` — internal use for Cliff's delta computation. */
+  valueHistogram: Record<string, number>;
 };
 
 export type GripTrendByParameter = Map<
@@ -148,14 +172,66 @@ export async function loadCommunityNumericGripTrendsForBucket(args: {
   for (const r of rows) {
     if (r.sampleCount < MIN_GRIP_BUCKET_SAMPLE_COUNT) continue;
     const stats = r.numericStatsJson as
-      | { median?: number; mean?: number; min?: number; max?: number }
+      | {
+          median?: number;
+          mean?: number;
+          min?: number;
+          max?: number;
+          p25?: number;
+          p75?: number;
+          iqr?: number;
+          stdDev?: number;
+          valueHistogram?: Record<string, number>;
+          distinctValueCount?: number;
+        }
       | null;
     if (!stats) continue;
     const median = typeof stats.median === "number" ? stats.median : null;
     const mean = typeof stats.mean === "number" ? stats.mean : null;
     const min = typeof stats.min === "number" ? stats.min : null;
     const max = typeof stats.max === "number" ? stats.max : null;
-    if (median == null || mean == null || min == null || max == null) continue;
+    const p25 = typeof stats.p25 === "number" ? stats.p25 : null;
+    const p75 = typeof stats.p75 === "number" ? stats.p75 : null;
+    const iqr =
+      typeof stats.iqr === "number"
+        ? stats.iqr
+        : p25 != null && p75 != null
+          ? p75 - p25
+          : null;
+    const stdDev = typeof stats.stdDev === "number" ? stats.stdDev : null;
+    if (
+      median == null
+      || mean == null
+      || min == null
+      || max == null
+      || p25 == null
+      || p75 == null
+      || iqr == null
+      || stdDev == null
+    ) {
+      continue;
+    }
+
+    // Histogram / topValues are optional: rows built before Phase 1 won't have them, handle as empty.
+    const valueHistogram: Record<string, number> = {};
+    if (stats.valueHistogram && typeof stats.valueHistogram === "object") {
+      for (const [k, v] of Object.entries(stats.valueHistogram)) {
+        if (typeof v === "number" && Number.isFinite(v) && v > 0) valueHistogram[k] = v;
+      }
+    }
+    const distinctValueCount =
+      typeof stats.distinctValueCount === "number" && Number.isFinite(stats.distinctValueCount)
+        ? stats.distinctValueCount
+        : Object.keys(valueHistogram).filter((k) => k !== "__other").length;
+
+    const topValues: BucketTopValueEntry[] = [];
+    const histEntries = Object.entries(valueHistogram).filter(([k]) => k !== "__other");
+    histEntries.sort((a, b) => b[1] - a[1]);
+    for (const [k, c] of histEntries.slice(0, 5)) {
+      const num = Number(k);
+      if (!Number.isFinite(num)) continue;
+      topValues.push({ value: num, count: c, frequency: c / r.sampleCount });
+    }
 
     let perParam = out.get(r.parameterKey);
     if (!perParam) {
@@ -168,6 +244,13 @@ export async function loadCommunityNumericGripTrendsForBucket(args: {
       mean,
       min,
       max,
+      p25,
+      p75,
+      iqr,
+      stdDev,
+      topValues,
+      distinctValueCount,
+      valueHistogram,
     };
   }
 
