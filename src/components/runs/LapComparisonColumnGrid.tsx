@@ -33,7 +33,8 @@ type ImportedSet = {
   isPrimaryUser?: boolean;
   driverName: string;
   displayName?: string | null;
-  laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
+  /** Omitted until loaded for list views that defer nested laps to an API call. */
+  laps?: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
 };
 
 type SeriesMeta = {

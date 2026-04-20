@@ -79,7 +79,8 @@ type Run = {
     displayName?: string | null;
     normalizedName: string;
     isPrimaryUser: boolean;
-    laps: Array<{
+    /** Omitted on Sessions list SSR; loaded on demand for lap column compare. */
+    laps?: Array<{
       lapNumber: number;
       lapTimeSeconds: number;
       isIncluded?: boolean;
@@ -466,9 +467,69 @@ function RunDetail({
   const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [importedLapSetsFull, setImportedLapSetsFull] = useState<Run["importedLapSets"] | null>(
+    null
+  );
+  const [importedLapsLoading, setImportedLapsLoading] = useState(false);
+  const [importedLapsError, setImportedLapsError] = useState<string | null>(null);
   const [libraryLapSessions, setLibraryLapSessions] = useState<
     Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }>
   >([]);
+
+  const missingImportedLapRows =
+    (run.importedLapSets?.length ?? 0) > 0 &&
+    run.importedLapSets!.some((s) => !("laps" in s));
+
+  const runForLapCompare = useMemo((): Run => {
+    if (importedLapSetsFull?.length) {
+      return { ...run, importedLapSets: importedLapSetsFull };
+    }
+    return run;
+  }, [run, importedLapSetsFull]);
+
+  useEffect(() => {
+    if (!showLapAnalysis) return;
+    if ((run.importedLapSets?.length ?? 0) === 0) return;
+    if (importedLapSetsFull) return;
+    if (!missingImportedLapRows) {
+      setImportedLapSetsFull(run.importedLapSets);
+      return;
+    }
+    let alive = true;
+    setImportedLapsLoading(true);
+    setImportedLapsError(null);
+    fetch(`/api/runs/${encodeURIComponent(run.id)}/imported-lap-sets`)
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          sets?: Run["importedLapSets"];
+        };
+        if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+        return data.sets ?? [];
+      })
+      .then((sets) => {
+        if (alive) setImportedLapSetsFull(sets);
+      })
+      .catch((err) => {
+        if (alive) {
+          setImportedLapsError(
+            err instanceof Error ? err.message : "Failed to load imported laps"
+          );
+        }
+      })
+      .finally(() => {
+        if (alive) setImportedLapsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [
+    showLapAnalysis,
+    run.id,
+    run.importedLapSets,
+    importedLapSetsFull,
+    missingImportedLapRows,
+  ]);
 
   async function handleDeleteRun() {
     if (deleting) return;
@@ -740,16 +801,23 @@ function RunDetail({
             <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
               Column comparison
             </div>
-            <LapComparisonColumnGrid
-              myDisplayName={userDisplayName}
-              run={run}
-              currentRunId={run.id}
-              otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
-              compareAnchorRun={toCompareRunShape(run)}
-              pickerRunsForModal={pickerRunsSameCar}
-              runListSource={runListSource}
-              librarySessions={libraryLapSessions}
-            />
+            {importedLapsError ? (
+              <p className="text-xs text-red-600 dark:text-red-400 mb-2">{importedLapsError}</p>
+            ) : null}
+            {missingImportedLapRows && importedLapsLoading && !importedLapSetsFull ? (
+              <p className="text-xs text-muted-foreground py-3">Loading imported lap sets…</p>
+            ) : (
+              <LapComparisonColumnGrid
+                myDisplayName={userDisplayName}
+                run={runForLapCompare}
+                currentRunId={run.id}
+                otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
+                compareAnchorRun={toCompareRunShape(run)}
+                pickerRunsForModal={pickerRunsSameCar}
+                runListSource={runListSource}
+                librarySessions={libraryLapSessions}
+              />
+            )}
           </div>
         ) : null}
       </div>

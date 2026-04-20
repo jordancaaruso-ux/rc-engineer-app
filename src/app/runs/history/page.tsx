@@ -47,26 +47,27 @@ async function fetchRuns(userId: string) {
       tireSet: { select: { id: true, label: true, setNumber: true } },
       event: { include: { track: { select: { name: true } } } },
       setupSnapshot: { select: { id: true, data: true } },
+      // Nested laps are omitted here — they can be huge and are only needed when
+      // the user opens "Analyse lap times" on an expanded row. Loaded on demand via
+      // GET /api/runs/[id]/imported-lap-sets.
       importedLapSets: {
-        include: {
-          laps: { orderBy: { lapNumber: "asc" } },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          createdAt: true,
+          sessionCompletedAt: true,
+          sourceUrl: true,
+          driverId: true,
+          driverName: true,
+          displayName: true,
+          surname: true,
+          normalizedName: true,
+          isPrimaryUser: true,
         },
       },
     },
   });
 }
-
-// #region agent log
-function __dbgRunsHistory(tag: string, data: Record<string, unknown>): void {
-  try {
-    console.log(
-      `[dbg runs/history 5d0e69] ${tag} ${JSON.stringify({ ...data, ts: Date.now() })}`
-    );
-  } catch {
-    /* noop */
-  }
-}
-// #endregion
 
 // NOTE: A one-shot backfill for `carNameSnapshot`/`trackNameSnapshot` used to
 // run on every Analysis page load. It has been removed from the request path
@@ -161,59 +162,10 @@ export default async function RunHistoryPage({
     );
   }
 
-  // #region agent log
-  const __dbgT0 = Date.now();
-  __dbgRunsHistory("start", { region: process.env.VERCEL_REGION ?? null });
-  // #endregion
   const user = await requireCurrentUser();
-  // #region agent log
-  const __tAfterUser = Date.now();
-  __dbgRunsHistory("after requireCurrentUser", {
-    stepMs: __tAfterUser - __dbgT0,
-  });
-  // #endregion
   const userDisplayName = await getMyNameSetting(user.id);
-  // #region agent log
-  const __tAfterName = Date.now();
-  __dbgRunsHistory("after getMyNameSetting", {
-    stepMs: __tAfterName - __tAfterUser,
-  });
-  // #endregion
   const runs = await fetchRuns(user.id);
-  // #region agent log
-  const __tAfterFetch = Date.now();
-  let __totalLaps = 0;
-  let __runsWithSnapshot = 0;
-  let __approxSnapshotBytes = 0;
-  for (const r of runs) {
-    for (const s of r.importedLapSets ?? []) {
-      __totalLaps += s.laps?.length ?? 0;
-    }
-    if (r.setupSnapshot?.data != null) {
-      __runsWithSnapshot++;
-      try {
-        __approxSnapshotBytes += JSON.stringify(r.setupSnapshot.data).length;
-      } catch {
-        /* noop */
-      }
-    }
-  }
-  __dbgRunsHistory("after fetchRuns", {
-    stepMs: __tAfterFetch - __tAfterName,
-    runsCount: runs.length,
-    totalLaps: __totalLaps,
-    runsWithSnapshot: __runsWithSnapshot,
-    approxSnapshotBytes: __approxSnapshotBytes,
-  });
-  // #endregion
   const groups = buildGroups(runs);
-  // #region agent log
-  const __tAfterGroups = Date.now();
-  __dbgRunsHistory("after buildGroups", {
-    stepMs: __tAfterGroups - __tAfterFetch,
-    groupsCount: groups.length,
-  });
-  // #endregion
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
   const initialTargetId = allRunsDescending[0]?.id ?? null;
   const initialCompareId =
@@ -224,13 +176,6 @@ export default async function RunHistoryPage({
     const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(r));
     runLabels[r.id] = `${car} · ${when}`;
   }
-  // #region agent log
-  const __tAfterPrep = Date.now();
-  __dbgRunsHistory("after labels/compare prep", {
-    stepMs: __tAfterPrep - __tAfterGroups,
-    totalMs: __tAfterPrep - __dbgT0,
-  });
-  // #endregion
 
   return (
     <>
