@@ -83,6 +83,7 @@ export default async function EditRunPage({
           laps: { orderBy: { lapNumber: "asc" } },
         },
       },
+      loggingComplete: true,
     },
   });
 
@@ -185,6 +186,7 @@ export default async function EditRunPage({
                 isIncluded: l.isIncluded,
               })),
             })),
+            loggingComplete: run.loggingComplete,
           }}
         />
       </section>

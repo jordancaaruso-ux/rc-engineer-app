@@ -15,7 +15,7 @@ export async function GET() {
 
   const lastRun = await prisma.run.findFirst({
     where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
+    orderBy: { sortAt: "desc" },
     include: {
       car: { select: { id: true, name: true } },
       track: { select: { id: true, name: true } },

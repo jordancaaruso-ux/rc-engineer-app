@@ -7,6 +7,7 @@ import { getOrCreateLocalUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { buildLapSessionV1 } from "@/lib/lapSession/buildSession";
 import type { LapSourceKind } from "@/lib/lapSession/types";
+import { computePersistedRunLapSummary } from "@/lib/lapAnalysis";
 import { syncActionItemsFromRun } from "@/lib/actionItems";
 import {
   computeSetupDeltaForAudit,
@@ -59,6 +60,8 @@ type RunUpsertBody = {
   sessionLabel?: string | null;
   /** Race class for this session (e.g. \"17.5 Stock\"); complements event.raceClass when set. */
   raceClass?: string | null;
+  /** Optional LiveRC practice day URL captured while logging the run. */
+  practiceDayUrl?: string | null;
   importedLapSets?: Array<{
     sourceUrl?: string | null;
     driverId?: string | null;
@@ -128,6 +131,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     },
     perLap: body.lapIngestMeta?.perLap ?? null,
   });
+
+  // Materialize lap summary metrics so list views (Sessions / dashboard) can
+  // read `bestLapSeconds` / `avgTop5LapSeconds` directly instead of
+  // recomputing from the JSON lap arrays for every row.
+  const lapSummary = computePersistedRunLapSummary({ lapTimes, lapSession });
 
   const baselineId =
     typeof body.setupBaselineSnapshotId === "string" && body.setupBaselineSnapshotId.trim()
@@ -277,6 +285,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,
         lapTimes,
         lapSession: lapSession as unknown as PrismaTypes.InputJsonValue,
+        bestLapSeconds: lapSummary.bestLapSeconds,
+        avgTop5LapSeconds: lapSummary.avgTop5LapSeconds,
         notes: body.notes?.trim() || null,
         driverNotes: null,
         handlingProblems: null,
@@ -284,6 +294,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         suggestedChanges: body.suggestedChanges?.trim() || null,
         sessionLabel: body.sessionLabel?.trim() || null,
         raceClass: body.raceClass?.trim() || null,
+        practiceDayUrl: body.practiceDayUrl?.trim() || null,
         sessionCompletedAt: sessionCompletedAtResolved,
         loggingComplete,
       } as PrismaTypes.RunUncheckedCreateInput,
@@ -319,10 +330,13 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,
       lapTimes,
       lapSession: lapSession as unknown as PrismaTypes.InputJsonValue,
+      bestLapSeconds: lapSummary.bestLapSeconds,
+      avgTop5LapSeconds: lapSummary.avgTop5LapSeconds,
       notes: body.notes?.trim() || null,
       suggestedChanges: body.suggestedChanges?.trim() || null,
       sessionLabel: body.sessionLabel?.trim() || null,
       raceClass: body.raceClass?.trim() || null,
+      practiceDayUrl: body.practiceDayUrl?.trim() || null,
       engineerSummaryJson: Prisma.JsonNull,
       engineerSummaryRefRunId: null,
       engineerSummaryComputedAt: null,

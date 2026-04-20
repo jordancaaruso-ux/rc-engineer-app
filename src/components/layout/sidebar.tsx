@@ -10,12 +10,13 @@ const navItems = [
   { href: "/engineer", label: "Engineer" },
   { href: "/runs/new", label: "Log your run" },
   { href: "/laps/import", label: "Lap-time import" },
-  { href: "/runs/history", label: "Analysis" },
+  { href: "/runs/history", label: "Sessions" },
   { href: "/videos/overlay", label: "Video analysis" },
   { href: "/setup", label: "Setup" },
   { href: "/events", label: "Events" },
   { href: "/cars", label: "Cars" },
   { href: "/tracks", label: "Tracks" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export function Sidebar() {

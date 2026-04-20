@@ -87,20 +87,38 @@ function primaryLapTextFromFirstBlock(blocks: UrlImportBlock[]): string {
   return primary.laps.map((t) => t.toFixed(3)).join("\n");
 }
 
+type ScanDayCandidate = {
+  sessionId: string;
+  sessionUrl: string;
+  driverName: string;
+  sessionTime: string | null;
+  sessionCompletedAtIso: string | null;
+  matchesDriver: boolean | null;
+  alreadyImported: boolean;
+  linkedRunId: string | null;
+};
+
 export function LapTimesIngestPanel({
   value,
   onChange,
+  practiceDayUrl,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
+  /** Optional LiveRC practice day URL from the form; enables "scan day" picker. */
+  practiceDayUrl?: string | null;
 }) {
-  const [tab, setTab] = useState<IngestTab>("manual");
+  const [tab, setTab] = useState<IngestTab>(practiceDayUrl ? "url" : "manual");
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoNote, setPhotoNote] = useState<string | null>(null);
   const [photoConfidence, setPhotoConfidence] = useState<string | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
+  const [dayScanBusy, setDayScanBusy] = useState(false);
+  const [dayScanMessage, setDayScanMessage] = useState<string | null>(null);
+  const [dayScanCandidates, setDayScanCandidates] = useState<ScanDayCandidate[] | null>(null);
+  const [dayScanHasDriverName, setDayScanHasDriverName] = useState<boolean>(true);
   /** `${blockId}:${driverId}` for lap preview */
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
 
@@ -179,12 +197,67 @@ export function LapTimesIngestPanel({
     }
   }
 
+  async function scanDayUrl() {
+    const url = (practiceDayUrl ?? "").trim();
+    if (!url) {
+      setDayScanMessage("Add a practice day URL under Session type first.");
+      return;
+    }
+    setDayScanBusy(true);
+    setDayScanMessage(null);
+    try {
+      const res = await fetch("/api/laps/scan-day-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dayUrl: url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDayScanMessage((data as { error?: string })?.error || "Scan failed.");
+        setDayScanCandidates(null);
+        return;
+      }
+      const candidates = Array.isArray((data as { candidates?: unknown }).candidates)
+        ? ((data as { candidates: ScanDayCandidate[] }).candidates)
+        : [];
+      const hasDriver = Boolean((data as { hasDriverNameSetting?: boolean }).hasDriverNameSetting);
+      setDayScanHasDriverName(hasDriver);
+      setDayScanCandidates(candidates);
+      if (candidates.length === 0) {
+        setDayScanMessage("No sessions found on that day page.");
+      }
+    } catch {
+      setDayScanMessage("Scan failed.");
+    } finally {
+      setDayScanBusy(false);
+    }
+  }
+
+  async function importFromDayCandidate(c: ScanDayCandidate) {
+    setUrlInput(c.sessionUrl);
+    setDayScanMessage(null);
+    await fetchUrlPreviewWithUrl(c.sessionUrl);
+  }
+
+  async function fetchUrlPreviewWithUrl(explicit: string) {
+    const url = explicit.trim();
+    if (!url) {
+      setUrlMessage("Paste a timing/results URL first.");
+      return;
+    }
+    await runUrlImport(url);
+  }
+
   async function fetchUrlPreview() {
     const url = urlInput.trim();
     if (!url) {
       setUrlMessage("Paste a timing/results URL first.");
       return;
     }
+    await runUrlImport(url);
+  }
+
+  async function runUrlImport(url: string) {
     setUrlBusy(true);
     setUrlMessage(null);
     try {
@@ -288,6 +361,9 @@ export function LapTimesIngestPanel({
       }
       setUrlInput("");
       setUrlMessage(message);
+      setDayScanCandidates((prev) =>
+        prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
+      );
     } catch {
       setUrlMessage("Request failed.");
     } finally {
@@ -416,9 +492,9 @@ export function LapTimesIngestPanel({
       >
         {(
           [
+            ["url", "URL"],
             ["manual", "Manual"],
             ["photo", "Photo"],
-            ["url", "URL"],
             ["csv", "CSV"],
           ] as const
         ).map(([id, label]) => (
@@ -477,6 +553,70 @@ export function LapTimesIngestPanel({
 
       {tab === "url" ? (
         <div className="space-y-2 text-sm">
+          {practiceDayUrl ? (
+            <div className="space-y-2 rounded-md border border-border bg-muted/70 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="ui-title text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Practice day URL
+                  </div>
+                  <div className="text-[11px] text-muted-foreground break-all">{practiceDayUrl}</div>
+                </div>
+                <button
+                  type="button"
+                  disabled={dayScanBusy}
+                  className={cn(
+                    "shrink-0 rounded-md border border-border bg-card px-3 py-1.5 text-[11px] font-medium hover:bg-muted/90 transition",
+                    dayScanBusy && "opacity-60 pointer-events-none"
+                  )}
+                  onClick={() => void scanDayUrl()}
+                >
+                  {dayScanBusy ? "Scanning…" : dayScanCandidates ? "Rescan" : "Scan for my sessions"}
+                </button>
+              </div>
+              {!dayScanHasDriverName ? (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  No LiveRC driver name set — Settings → LiveRC driver name helps filter this to only your
+                  sessions.
+                </p>
+              ) : null}
+              {dayScanCandidates && dayScanCandidates.length > 0 ? (
+                <ul className="space-y-1">
+                  {dayScanCandidates.map((c) => (
+                    <li key={c.sessionId}>
+                      <button
+                        type="button"
+                        disabled={urlBusy || c.alreadyImported}
+                        className={cn(
+                          "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
+                          c.alreadyImported
+                            ? "border-border bg-muted/80 opacity-60 cursor-not-allowed"
+                            : "border-border bg-card hover:bg-muted/70"
+                        )}
+                        onClick={() => void importFromDayCandidate(c)}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-foreground">
+                            {c.driverName || "Unnamed driver"}
+                            {c.sessionTime ? ` · ${c.sessionTime}` : ""}
+                          </span>
+                          <span className="block truncate text-[10px] text-muted-foreground">
+                            {c.sessionUrl}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {c.alreadyImported ? (c.linkedRunId ? "Saved" : "Imported") : "Import"}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {dayScanMessage ? (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">{dayScanMessage}</p>
+              ) : null}
+            </div>
+          ) : null}
           <p className="text-[11px] text-muted-foreground">
             Paste an <span className="text-foreground/90">https</span> link and import. Add another URL anytime — each
             import stays below. Pick drivers per session; your first session&apos;s first selected driver is the primary

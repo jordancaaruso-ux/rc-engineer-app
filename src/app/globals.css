@@ -3,13 +3,13 @@
 
 :root {
   color-scheme: dark;
-  --background: #0b0f0e;
-  --foreground: #e8f0ed;
-  --surface: #131917;
-  --secondary-bg: #121716;
-  --muted-fg: #a7b3af;
-  --faint: #6b7572;
-  --border: #1f2624;
+  --background: #0e1312;
+  --foreground: #ecf2ef;
+  --surface: #19201d;
+  --secondary-bg: #151c1a;
+  --muted-fg: #b0bbb7;
+  --faint: #73807b;
+  --border: #2a332f;
   --accent: #2563eb;
   --primary: #c92a2a;
 }
@@ -22,21 +22,25 @@ html {
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
   min-height: 100%;
-  /* Corner glows + soft vertical rhythm so mid-page scroll is not a flat cutoff vs #0b0f0e */
-  background-color: #0b0f0e;
+  /* Lifted base + softer corner glows. The old gradients were strong enough
+     that mid-page reads as a heavy dark wash; we now lift the base a little
+     and tone down the corner alpha so cards / borders can do the
+     "broken up" work. */
+  background-color: #0e1312;
   background-image:
-    radial-gradient(ellipse 120% 90% at 0% 0%, rgba(201, 42, 42, 0.38), transparent 52%),
-    radial-gradient(ellipse 120% 90% at 100% 0%, rgba(37, 99, 235, 0.22), transparent 50%),
-    radial-gradient(ellipse 120% 90% at 0% 100%, rgba(37, 99, 235, 0.22), transparent 50%),
-    radial-gradient(ellipse 120% 90% at 100% 100%, rgba(201, 42, 42, 0.34), transparent 52%),
+    radial-gradient(ellipse 120% 90% at 0% 0%, rgba(201, 42, 42, 0.28), transparent 55%),
+    radial-gradient(ellipse 120% 90% at 100% 0%, rgba(37, 99, 235, 0.16), transparent 55%),
+    radial-gradient(ellipse 120% 90% at 0% 100%, rgba(37, 99, 235, 0.16), transparent 55%),
+    radial-gradient(ellipse 120% 90% at 100% 100%, rgba(201, 42, 42, 0.24), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 50% 30%, rgba(236, 242, 239, 0.025), transparent 70%),
     repeating-linear-gradient(
       180deg,
       transparent 0,
       transparent 420px,
-      rgba(201, 42, 42, 0.035) 420px,
-      rgba(201, 42, 42, 0.035) 840px,
-      rgba(37, 99, 235, 0.04) 840px,
-      rgba(37, 99, 235, 0.04) 1260px
+      rgba(201, 42, 42, 0.03) 420px,
+      rgba(201, 42, 42, 0.03) 840px,
+      rgba(37, 99, 235, 0.035) 840px,
+      rgba(37, 99, 235, 0.035) 1260px
     );
   background-attachment: scroll;
   @apply text-foreground antialiased font-normal;
@@ -83,17 +87,23 @@ body {
 }
 
 .page {
-  @apply flex flex-1 flex-col;
+  @apply flex flex-1 flex-col min-w-0;
 }
 
 .page-header {
-  @apply flex items-center justify-between border-b border-border px-5 py-3;
+  @apply flex items-center justify-between border-b border-border py-3;
+  /* Respect notch / rounded-corner safe areas so the far-left edge of the
+     header never lands under a device bezel. Desktop rendering is unaffected
+     (env() resolves to 0 when there's no inset). */
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
 }
 
-/* Mobile: reserve space for the fixed hamburger at top-left. */
+/* Mobile: reserve space for the fixed hamburger at top-left.
+   Still respect the safe-area inset so notched phones keep their left edge. */
 @media (max-width: 767px) {
   .page-header {
-    padding-left: 3.75rem; /* ~60px */
+    padding-left: calc(3.75rem + env(safe-area-inset-left));
   }
 }
 
@@ -122,7 +132,11 @@ body {
 }
 
 .page-body {
-  @apply flex-1 px-5 py-3;
+  @apply flex-1 py-3 min-w-0;
+  /* Horizontal padding respects iOS/Android safe-area insets so content on
+     notched or rounded-corner screens isn't clipped at the far-left edge. */
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
 }
 
 input[type="text"]:focus-visible,

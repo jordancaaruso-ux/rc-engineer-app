@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { DashboardIncompleteRunRow } from "@/lib/dashboardServer";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import { cn } from "@/lib/utils";
 function btnPrimary(className = "") {
   return `inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
@@ -86,7 +87,11 @@ export function NewRunImportLinkChooser({
                 </div>
                 <div className="text-foreground/90">{r.sessionLabel}</div>
                 <div className="mt-1 font-mono text-[10px] text-muted-foreground tabular-nums">
-                  Saved {formatAppTimestampUtc(r.createdAt)}
+                  Saved{" "}
+                  <RelativeTime
+                    iso={r.createdAt}
+                    fallback={formatAppTimestampUtc(r.createdAt)}
+                  />
                 </div>
               </div>
               <div className="flex shrink-0 flex-col gap-1.5 self-start sm:items-end">

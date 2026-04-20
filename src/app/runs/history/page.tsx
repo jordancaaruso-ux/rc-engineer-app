@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getMyNameSetting } from "@/lib/appSettings";
 import { formatGroupDate } from "@/lib/formatDate";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
+import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import {
   AnalysisCompareBar,
   AnalysisCompareProvider,
@@ -23,19 +24,22 @@ function dateKey(d: Date): string {
   return new Date(d).toISOString().slice(0, 10);
 }
 
+/**
+ * List-ordering instant. Always reads from `sortAt` (the stable ordering axis
+ * stamped once at create, mutated only by explicit user reorder). Falls back
+ * to createdAt defensively for rows older than the migration that somehow
+ * arrived without a sortAt value — shouldn't happen post-backfill.
+ */
 function runSessionSortInstant(run: RunInGroup): Date {
-  const s = run.sessionCompletedAt;
-  if (s) {
-    const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) return d;
-  }
-  return new Date(run.createdAt);
+  const s = run.sortAt ?? run.createdAt;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? new Date(run.createdAt) : d;
 }
 
 async function fetchRuns(userId: string) {
   return prisma.run.findMany({
     where: { userId },
-    orderBy: { createdAt: "desc" },
+    orderBy: { sortAt: "desc" },
     take: 200,
     include: {
       car: { select: { id: true, name: true, setupSheetTemplate: true } },
@@ -52,44 +56,13 @@ async function fetchRuns(userId: string) {
   });
 }
 
-async function backfillRunNameSnapshots(userId: string) {
-  // Best-effort, idempotent backfill for older runs created before snapshot fields existed.
-  const candidates = await prisma.run.findMany({
-    where: {
-      userId,
-      OR: [
-        { carNameSnapshot: null },
-        { trackNameSnapshot: null },
-      ],
-    },
-    select: {
-      id: true,
-      carId: true,
-      trackId: true,
-      carNameSnapshot: true,
-      trackNameSnapshot: true,
-      car: { select: { name: true } },
-      track: { select: { name: true } },
-    },
-    take: 500,
-  });
-
-  const updates = candidates
-    .map((r) => {
-      const nextCar = r.carNameSnapshot ?? r.car?.name ?? null;
-      const nextTrack = r.trackNameSnapshot ?? r.track?.name ?? null;
-      if (nextCar === r.carNameSnapshot && nextTrack === r.trackNameSnapshot) return null;
-      return { id: r.id, carNameSnapshot: nextCar, trackNameSnapshot: nextTrack };
-    })
-    .filter(Boolean) as Array<{ id: string; carNameSnapshot: string | null; trackNameSnapshot: string | null }>;
-
-  for (const u of updates) {
-    await prisma.run.update({
-      where: { id: u.id },
-      data: { carNameSnapshot: u.carNameSnapshot, trackNameSnapshot: u.trackNameSnapshot },
-    });
-  }
-}
+// NOTE: A one-shot backfill for `carNameSnapshot`/`trackNameSnapshot` used to
+// run on every Analysis page load. It has been removed from the request path
+// because (a) the UI already falls back to the relations when snapshots are
+// missing, and (b) scanning up to 500 rows and issuing N writes per page load
+// was the single biggest cause of Analysis feeling slow.
+// If old rows ever need patching, call a one-shot migration endpoint — do not
+// reintroduce this on render.
 
 type Group = {
   id: string;
@@ -146,13 +119,24 @@ function buildGroups(runs: RunInGroup[]): Group[] {
   return groups;
 }
 
-export default async function RunHistoryPage(): Promise<ReactNode> {
+export default async function RunHistoryPage({
+  searchParams,
+}: {
+  // `expandLatest=1` is set when the driver completes a run from the log
+  // form. Pre-opens the most recent group so the just-completed run is
+  // visible without an extra click.
+  searchParams?: Promise<{ expandLatest?: string | string[] }>;
+}): Promise<ReactNode> {
+  const resolvedSearch = (await searchParams) ?? {};
+  const rawExpand = resolvedSearch.expandLatest;
+  const expandLatest =
+    (Array.isArray(rawExpand) ? rawExpand[0] : rawExpand) === "1";
   if (!hasDatabaseUrl()) {
     return (
       <>
         <header className="page-header">
           <div>
-            <h1 className="page-title">Analysis</h1>
+            <h1 className="page-title">Sessions</h1>
             <p className="page-subtitle">Database not configured.</p>
           </div>
         </header>
@@ -166,7 +150,6 @@ export default async function RunHistoryPage(): Promise<ReactNode> {
   }
 
   const user = await getOrCreateLocalUser();
-  await backfillRunNameSnapshots(user.id);
   const userDisplayName = await getMyNameSetting(user.id);
   const runs = await fetchRuns(user.id);
   const groups = buildGroups(runs);
@@ -185,19 +168,26 @@ export default async function RunHistoryPage(): Promise<ReactNode> {
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">Analysis</h1>
+          <h1 className="page-title">Sessions</h1>
           <p className="page-subtitle">
             Review runs and compare to your working setup or another run. Load past setups from Log your run.
           </p>
         </div>
-        <Link
-          href="/runs/new"
-          className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition"
-        >
-          Log your run
-        </Link>
       </header>
       <section className="page-body space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href="/runs/new"
+            className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition"
+          >
+            Log new run
+          </Link>
+          <span className="text-[11px] text-muted-foreground">
+            {groups.length === 0
+              ? "No runs yet."
+              : `${runs.length} run${runs.length === 1 ? "" : "s"} across ${groups.length} session${groups.length === 1 ? "" : "s"}`}
+          </span>
+        </div>
         {groups.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             No runs yet. <Link href="/runs/new" className="text-accent underline">Create your first run</Link>.
@@ -212,11 +202,12 @@ export default async function RunHistoryPage(): Promise<ReactNode> {
           >
             <AnalysisCompareBar />
             <div className="space-y-2">
-              {groups.map((group) => (
+              <SessionGroupsPager initial={8} step={12}>
+                {groups.map((group, idx) => (
                 <details
                   key={group.id}
                   className="rounded-lg border border-border bg-muted/50 overflow-hidden group/details"
-                  open={false}
+                  open={expandLatest && idx === 0}
                 >
                   <summary className="list-none cursor-pointer">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
@@ -238,6 +229,7 @@ export default async function RunHistoryPage(): Promise<ReactNode> {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border bg-muted/70 text-left text-xs font-medium text-muted-foreground">
+                            <th className="w-6 px-1 py-2" aria-label="Drag to reorder" />
                             <th className="px-4 py-2">Date</th>
                             <th className="px-4 py-2">Car</th>
                             <th className="px-4 py-2">Track</th>
@@ -245,6 +237,7 @@ export default async function RunHistoryPage(): Promise<ReactNode> {
                             <th className="px-4 py-2">Best</th>
                             <th className="px-4 py-2">Avg top 5</th>
                             <th className="px-4 py-2">Session</th>
+                            <th className="px-2 py-2 w-[6rem]">Setup</th>
                             <th className="px-2 py-2 w-[7.5rem]">Pair</th>
                           </tr>
                         </thead>
@@ -254,13 +247,15 @@ export default async function RunHistoryPage(): Promise<ReactNode> {
                             allRunsDescending={allRunsDescending.map(toCompareRunShape)}
                             userDisplayName={userDisplayName}
                             showComparePairColumn
+                            enableReorder
                           />
                         </tbody>
                       </table>
                     </div>
                   </div>
                 </details>
-              ))}
+                ))}
+              </SessionGroupsPager>
             </div>
           </AnalysisCompareProvider>
         )}

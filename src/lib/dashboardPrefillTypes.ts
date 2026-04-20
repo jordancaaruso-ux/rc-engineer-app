@@ -29,6 +29,8 @@ export type DashboardSerializedRun = {
   driverNotes?: string | null;
   handlingProblems?: string | null;
   suggestedChanges?: string | null;
+  /** Optional LiveRC practice day URL captured with the run. */
+  practiceDayUrl?: string | null;
   lapTimes?: unknown;
   lapSession?: unknown;
 };

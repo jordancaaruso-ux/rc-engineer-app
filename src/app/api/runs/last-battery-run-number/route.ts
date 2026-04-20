@@ -10,13 +10,21 @@ export async function GET(request: Request) {
   const user = await getOrCreateLocalUser();
   const { searchParams } = new URL(request.url);
   const batteryId = searchParams.get("batteryId");
+  const excludeRunId = searchParams.get("excludeRunId");
 
   if (!batteryId) {
     return NextResponse.json({ error: "batteryId is required" }, { status: 400 });
   }
 
+  // Drafts do not claim a battery-run slot — only completed runs do. See
+  // the last-tire-run-number route for the full rationale.
   const last = await prisma.run.findFirst({
-    where: { userId: user.id, batteryId },
+    where: {
+      userId: user.id,
+      batteryId,
+      loggingComplete: true,
+      ...(excludeRunId ? { id: { not: excludeRunId } } : {}),
+    },
     orderBy: { createdAt: "desc" },
     select: { batteryRunNumber: true },
   });

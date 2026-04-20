@@ -39,12 +39,13 @@ export async function GET(request: Request) {
 
   const runs = await prisma.run.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy: { sortAt: "desc" },
     take,
     select: {
       id: true,
       createdAt: true,
       sessionCompletedAt: true,
+      sortAt: true,
       sessionLabel: true,
       sessionType: true,
       meetingSessionType: true,
@@ -74,6 +75,7 @@ export async function GET(request: Request) {
       const t = resolveRunDisplayInstant({
         createdAt: r.createdAt,
         sessionCompletedAt: r.sessionCompletedAt,
+        sortAt: r.sortAt,
       }).getTime();
       const d = new Date(t);
       if (from && d < from) return false;

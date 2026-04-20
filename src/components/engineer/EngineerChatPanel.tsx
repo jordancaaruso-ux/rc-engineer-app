@@ -165,104 +165,9 @@ export function EngineerChatPanel({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <label className="flex items-center gap-2 text-[11px] text-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            className="h-3.5 w-3.5 accent-primary shrink-0"
-            checked={includeRunCatalog}
-            onChange={(e) => onIncludeRunCatalogChange?.(e.target.checked)}
-          />
-          <span>Include account run catalog in answers</span>
-        </label>
-        <span className="text-[10px] text-muted-foreground sm:text-right">
-          Grounds replies in real run ids and dates when enabled.
-        </span>
-      </div>
-
-      {(runIdFromUrl && compareRunIdFromUrl) || runIdFromUrl || patternDigest ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground rounded-md bg-muted/40 px-2.5 py-2 border border-border/60">
-          {runIdFromUrl && compareRunIdFromUrl ? (
-            <span>
-              <span className="text-foreground font-medium">Two runs</span> in URL — Engineer has lap + setup context.
-              Structured summary is in the compare section above; chat is conversational.
-            </span>
-          ) : runIdFromUrl ? (
-            <span>
-              <span className="text-foreground font-medium">Focused run</span> from URL.
-            </span>
-          ) : null}
-          {patternDigest ? (
-            <span>
-              Trend digest: <span className="text-foreground font-medium">{patternDigest.runs.length}</span> runs (from
-              compare section above).
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-
-      {includeRunCatalog && catalogBanner ? (
-        <div className="text-[10px] text-muted-foreground rounded-md border border-border/80 bg-muted/25 px-2.5 py-2">
-          Catalog in context:{" "}
-          <span className="text-foreground font-medium">{catalogBanner.includedRunCount}</span> of{" "}
-          <span className="text-foreground font-medium">{catalogBanner.totalRunCount}</span> runs
-          {catalogBanner.truncated ? (
-            <span className="text-amber-600 dark:text-amber-500">
-              {" "}
-              ({catalogBanner.omittedCount} not listed — narrow filters in the compare section above or name a run id)
-            </span>
-          ) : null}
-          .
-        </div>
-      ) : null}
-          {includeRunCatalog && catalogBannerErr ? (
-        <div className="text-[10px] text-destructive">{catalogBannerErr}</div>
-      ) : null}
-      {!includeRunCatalog ? (
-        <div className="text-[10px] text-muted-foreground">Catalog off — chat uses summary and digest only.</div>
-      ) : null}
-      <p className="text-[10px] text-muted-foreground leading-snug">
-        You can ask for runs by time (&quot;last weekend&quot;) or teammate name — the Engineer can search and set the
-        focused run in the page URL when it finds a match.
-      </p>
-
-      {onQuickPrompt ? (
-        <div className="space-y-1.5 rounded-md border border-border/80 bg-muted/20 px-2.5 py-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Quick prompts</div>
-          <div className="flex flex-wrap gap-1.5">
-            {chatPanelQuickPrompts.map((def) => {
-              const dis = engineerQuickPromptDisabled(def, {
-                hasRunId: Boolean(runIdFromUrl),
-                hasCompareRunId: Boolean(compareRunIdFromUrl),
-                hasPatternDigest: patternDigest != null,
-              });
-              let hint = def.label;
-              if (dis) {
-                if (def.requiresRunId !== false && !runIdFromUrl) hint = "Set a primary run above first";
-                else if (def.requiresCompare && !compareRunIdFromUrl) hint = "Pick a compare run above first";
-                else if (def.requiresPatternDigest && !patternDigest)
-                  hint = "Load trend digest in Compare & trend above first";
-              }
-              return (
-                <button
-                  key={def.id}
-                  type="button"
-                  title={hint}
-                  disabled={dis}
-                  className={chatQuickBtnClass}
-                  onClick={() => onQuickPrompt(def.prompt)}
-                >
-                  {def.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="rounded-lg border border-border bg-background min-h-[220px] sm:min-h-[280px] flex flex-col">
-        <div className="flex-1 overflow-y-auto p-3 space-y-3 max-h-[min(52vh,420px)]">
+    <div className="space-y-3">
+      <div className="rounded-lg border border-border bg-background flex flex-col">
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-[220px] sm:min-h-[280px] max-h-[min(52vh,420px)]">
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground leading-relaxed">
               Ask anything—one run or a compare—like a normal engineer. Replies use your context (summary, catalog when
@@ -286,40 +191,136 @@ export function EngineerChatPanel({
           )}
         </div>
         {chatErr ? (
-          <div className="text-xs text-destructive px-3 pb-2 space-y-1">
-            <div className="font-medium text-[11px] uppercase tracking-wide">Error</div>
+          <div className="text-xs text-destructive px-3 pb-2 space-y-1 border-t border-border">
+            <div className="font-medium text-[11px] uppercase tracking-wide pt-2">Error</div>
             <pre className="whitespace-pre-wrap break-words font-sans text-[11px] leading-snug opacity-95">
               {chatErr}
             </pre>
           </div>
         ) : null}
-        <div className="border-t border-border p-3 flex flex-col sm:flex-row gap-2 bg-muted/20">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void sendMessage();
+      </div>
+
+      {onQuickPrompt ? (
+        <div className="space-y-1.5 rounded-md border border-border/80 bg-muted/20 px-2.5 py-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Quick prompts</div>
+          <div className="flex flex-wrap gap-1.5">
+            {chatPanelQuickPrompts.map((def) => {
+              const dis = engineerQuickPromptDisabled(def, {
+                hasRunId: Boolean(runIdFromUrl),
+                hasCompareRunId: Boolean(compareRunIdFromUrl),
+                hasPatternDigest: patternDigest != null,
+              });
+              let hint = def.label;
+              if (dis) {
+                if (def.requiresRunId !== false && !runIdFromUrl) hint = "Set a primary run in Compare & trend below first";
+                else if (def.requiresCompare && !compareRunIdFromUrl) hint = "Pick a compare run in Compare & trend below first";
+                else if (def.requiresPatternDigest && !patternDigest)
+                  hint = "Load trend digest in Compare & trend below first";
               }
-            }}
-            className="flex-1 rounded-md border border-border bg-background px-3 py-2.5 text-sm outline-none min-h-[44px]"
-            placeholder="Ask the engineer…"
-            disabled={chatBusy}
-            aria-label="Message to engineer"
-          />
-          <button
-            type="button"
-            onClick={() => void sendMessage()}
-            disabled={chatBusy || !input.trim()}
-            className={cn(
-              "inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-105 shrink-0 min-h-[44px]",
-              (chatBusy || !input.trim()) && "opacity-60 pointer-events-none"
-            )}
-          >
-            {chatBusy ? "…" : "Send"}
-          </button>
+              return (
+                <button
+                  key={def.id}
+                  type="button"
+                  title={hint}
+                  disabled={dis}
+                  className={chatQuickBtnClass}
+                  onClick={() => onQuickPrompt(def.prompt)}
+                >
+                  {def.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
+      ) : null}
+
+      <div className="rounded-lg border border-border bg-muted/20 p-3 flex flex-col sm:flex-row gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void sendMessage();
+            }
+          }}
+          className="flex-1 rounded-md border border-border bg-background px-3 py-2.5 text-sm outline-none min-h-[44px]"
+          placeholder="Custom text — ask the engineer…"
+          disabled={chatBusy}
+          aria-label="Message to engineer"
+        />
+        <button
+          type="button"
+          onClick={() => void sendMessage()}
+          disabled={chatBusy || !input.trim()}
+          className={cn(
+            "inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-105 shrink-0 min-h-[44px]",
+            (chatBusy || !input.trim()) && "opacity-60 pointer-events-none"
+          )}
+        >
+          {chatBusy ? "…" : "Send"}
+        </button>
+      </div>
+
+      <div className="space-y-2 pt-1 text-[10px] text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <label className="flex items-center gap-2 text-[11px] text-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary shrink-0"
+              checked={includeRunCatalog}
+              onChange={(e) => onIncludeRunCatalogChange?.(e.target.checked)}
+            />
+            <span>Include account run catalog in answers</span>
+          </label>
+          <span className="sm:text-right">Grounds replies in real run ids and dates when enabled.</span>
+        </div>
+
+        {(runIdFromUrl && compareRunIdFromUrl) || runIdFromUrl || patternDigest ? (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 rounded-md bg-muted/40 px-2.5 py-2 border border-border/60">
+            {runIdFromUrl && compareRunIdFromUrl ? (
+              <span>
+                <span className="text-foreground font-medium">Two runs</span> in URL — Engineer has lap + setup context.
+                Structured summary is in Compare &amp; trend below; chat is conversational.
+              </span>
+            ) : runIdFromUrl ? (
+              <span>
+                <span className="text-foreground font-medium">Focused run</span> from URL.
+              </span>
+            ) : null}
+            {patternDigest ? (
+              <span>
+                Trend digest: <span className="text-foreground font-medium">{patternDigest.runs.length}</span> runs
+                (from Compare &amp; trend below).
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {includeRunCatalog && catalogBanner ? (
+          <div className="rounded-md border border-border/80 bg-muted/25 px-2.5 py-2">
+            Catalog in context:{" "}
+            <span className="text-foreground font-medium">{catalogBanner.includedRunCount}</span> of{" "}
+            <span className="text-foreground font-medium">{catalogBanner.totalRunCount}</span> runs
+            {catalogBanner.truncated ? (
+              <span className="text-amber-600 dark:text-amber-500">
+                {" "}
+                ({catalogBanner.omittedCount} not listed — narrow filters in Compare &amp; trend below or name a run id)
+              </span>
+            ) : null}
+            .
+          </div>
+        ) : null}
+        {includeRunCatalog && catalogBannerErr ? (
+          <div className="text-destructive">{catalogBannerErr}</div>
+        ) : null}
+        {!includeRunCatalog ? (
+          <div>Catalog off — chat uses summary and digest only.</div>
+        ) : null}
+        <p className="leading-snug">
+          You can ask for runs by time (&quot;last weekend&quot;) or teammate name — the Engineer can search and set the
+          focused run in the page URL when it finds a match.
+        </p>
       </div>
     </div>
   );

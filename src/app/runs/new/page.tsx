@@ -37,6 +37,10 @@ export default async function NewRunPage({
   const dashboardPrefill = await getDashboardNewRunPrefill(user.id, sp);
   const initialEventId =
     typeof sp.eventId === "string" && sp.eventId.trim().length > 0 ? sp.eventId.trim() : null;
+  const focusSection: "setup" | null =
+    typeof sp.focus === "string" && sp.focus.trim().toLowerCase() === "setup"
+      ? "setup"
+      : null;
   const importedLapTimeSessionIdRaw =
     typeof sp.importedLapTimeSessionId === "string" ? sp.importedLapTimeSessionId.trim() : "";
   const incompleteRunsForImport =
@@ -85,6 +89,7 @@ export default async function NewRunPage({
             favouriteTracks={favouriteTracks}
             dashboardPrefill={dashboardPrefill}
             initialEventId={initialEventId}
+            focusSection={focusSection}
           />
         </NewRunImportLinkChooser>
       </section>

@@ -230,6 +230,23 @@ export function computeIncludedLapMetricsFromRun(run: {
   return computeLapMetrics(times);
 }
 
+/**
+ * Summary metrics persisted on `Run` (`bestLapSeconds`, `avgTop5LapSeconds`)
+ * so list pages don't have to recompute from the full lap JSON for every row.
+ * Writers call this at save time; list readers prefer the stored columns and
+ * only fall back to this for legacy rows where the columns are null.
+ */
+export function computePersistedRunLapSummary(run: {
+  lapTimes: unknown;
+  lapSession?: unknown;
+}): { bestLapSeconds: number | null; avgTop5LapSeconds: number | null } {
+  const rows = primaryLapRowsFromRun(run);
+  return {
+    bestLapSeconds: getBestLap(rows),
+    avgTop5LapSeconds: getAverageTopN(rows, 5),
+  };
+}
+
 export function importedSetToLapRows(
   laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>
 ): LapRow[] {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { DashboardIncompleteRunRow } from "@/lib/dashboardServer";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import { cn } from "@/lib/utils";
 
 function btnPrimary(className = "") {
@@ -64,7 +65,11 @@ export function IncompleteLoggingRunsBanner({ rows }: { rows: DashboardIncomplet
                   Logging incomplete
                 </span>
                 <span className="ml-2 font-mono text-[10px] text-muted-foreground tabular-nums">
-                  Saved {formatAppTimestampUtc(r.createdAt)}
+                  Saved{" "}
+                  <RelativeTime
+                    iso={r.createdAt}
+                    fallback={formatAppTimestampUtc(r.createdAt)}
+                  />
                 </span>
               </div>
             </div>

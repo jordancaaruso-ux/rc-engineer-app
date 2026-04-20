@@ -26,13 +26,21 @@ import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import type { LapRow } from "@/lib/lapAnalysis";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 
 type Run = {
   id: string;
   createdAt: Date | string;
   sessionCompletedAt?: Date | string | null;
+  /**
+   * Stable ordering axis. Stamped once on create; only changes when the user
+   * explicitly drags a run to a new position in this table. Reading it here
+   * lets the component compute drop-target neighbours without a round-trip.
+   */
+  sortAt?: Date | string | null;
   /** False until user marks "Run completed" when saving. */
   loggingComplete?: boolean;
   carId: string | null;
@@ -45,6 +53,13 @@ type Run = {
   trackNameSnapshot?: string | null;
   tireRunNumber: number;
   lapTimes: unknown;
+  /**
+   * Materialized lap summary columns (written at save time). List rows prefer
+   * these; when null (legacy rows written before the columns existed) the
+   * table falls back to computing from `lapTimes` / `lapSession`.
+   */
+  bestLapSeconds?: number | null;
+  avgTop5LapSeconds?: number | null;
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;
@@ -170,6 +185,7 @@ export function RunHistoryTable({
   runListSource = "my_runs",
   userDisplayName,
   showComparePairColumn = false,
+  enableReorder = false,
 }: {
   runs: Run[];
   allRunsDescending: CompareRunShape[];
@@ -178,15 +194,84 @@ export function RunHistoryTable({
   userDisplayName?: string | null;
   /** Analysis page: target / comparison selection column (requires AnalysisCompareProvider). */
   showComparePairColumn?: boolean;
+  /**
+   * Analysis page: allow the driver to drag rows up/down to fix chronology
+   * when the auto-stamped `sortAt` isn't quite right (e.g. ran out of order,
+   * logged a run a day late). Within-group only — crossing day / event
+   * boundaries by drag is intentionally not supported for now; easier to
+   * reason about and avoids accidental reshuffles.
+   */
+  enableReorder?: boolean;
 }) {
+  const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [setupModalRunId, setSetupModalRunId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<
+    { runId: string; edge: "above" | "below" } | null
+  >(null);
+  const [reorderErr, setReorderErr] = useState<string | null>(null);
+  const [reorderBusy, setReorderBusy] = useState(false);
 
   function toggleRow(runId: string) {
     setExpandedId((prev) => (prev === runId ? null : runId));
   }
 
+  const totalCols =
+    (enableReorder ? 1 : 0) /* drag handle */ +
+    1 /* date */ + 1 + 1 + 1 + 1 + 1 + 1 /* session */ + 1 /* setup */ + (showComparePairColumn ? 1 : 0);
+
+  async function commitReorder(draggedId: string, targetId: string, edge: "above" | "below") {
+    if (draggedId === targetId) return;
+    // Build the would-be neighbour pair from the rendered list with the
+    // dragged row removed. Newer-first, so "above" = lower index.
+    const withoutDragged = runs.filter((r) => r.id !== draggedId);
+    const tIdx = withoutDragged.findIndex((r) => r.id === targetId);
+    if (tIdx < 0) return;
+    let beforeId: string | null;
+    let afterId: string | null;
+    if (edge === "above") {
+      beforeId = withoutDragged[tIdx - 1]?.id ?? null;
+      afterId = withoutDragged[tIdx]?.id ?? null;
+    } else {
+      beforeId = withoutDragged[tIdx]?.id ?? null;
+      afterId = withoutDragged[tIdx + 1]?.id ?? null;
+    }
+    if (!beforeId && !afterId) return;
+    setReorderBusy(true);
+    setReorderErr(null);
+    try {
+      const res = await fetch(`/api/runs/${encodeURIComponent(draggedId)}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ beforeId, afterId }),
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || `Reorder failed (${res.status})`);
+      }
+      router.refresh();
+    } catch (err) {
+      setReorderErr(err instanceof Error ? err.message : "Reorder failed");
+    } finally {
+      setReorderBusy(false);
+    }
+  }
+
+  const setupModalRun = useMemo(
+    () => runs.find((r) => r.id === setupModalRunId) ?? null,
+    [runs, setupModalRunId]
+  );
+
   return (
     <>
+      {enableReorder && reorderErr ? (
+        <tr>
+          <td colSpan={totalCols} className="px-4 py-2 text-xs text-red-600 dark:text-red-300">
+            {reorderErr}
+          </td>
+        </tr>
+      ) : null}
       {runs.map((run) => {
         const isExpanded = expandedId === run.id;
         const carDisplay = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
@@ -194,12 +279,73 @@ export function RunHistoryTable({
         const tiresDisplay = run.tireSet
           ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
           : "—";
+        const isDragging = draggingId === run.id;
+        const showDropAbove = dropTarget?.runId === run.id && dropTarget.edge === "above";
+        const showDropBelow = dropTarget?.runId === run.id && dropTarget.edge === "below";
 
         return (
           <React.Fragment key={run.id}>
             <tr
               role="button"
               tabIndex={0}
+              draggable={enableReorder && !reorderBusy}
+              onDragStart={
+                enableReorder
+                  ? (e) => {
+                      setDraggingId(run.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      try {
+                        e.dataTransfer.setData("text/plain", run.id);
+                      } catch {
+                        // Some browsers/environments reject setData — non-fatal.
+                      }
+                    }
+                  : undefined
+              }
+              onDragEnd={
+                enableReorder
+                  ? () => {
+                      setDraggingId(null);
+                      setDropTarget(null);
+                    }
+                  : undefined
+              }
+              onDragOver={
+                enableReorder
+                  ? (e) => {
+                      if (!draggingId || draggingId === run.id) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const midpoint = rect.top + rect.height / 2;
+                      const edge: "above" | "below" = e.clientY < midpoint ? "above" : "below";
+                      setDropTarget((prev) =>
+                        prev?.runId === run.id && prev.edge === edge ? prev : { runId: run.id, edge }
+                      );
+                    }
+                  : undefined
+              }
+              onDragLeave={
+                enableReorder
+                  ? () => {
+                      setDropTarget((prev) => (prev?.runId === run.id ? null : prev));
+                    }
+                  : undefined
+              }
+              onDrop={
+                enableReorder
+                  ? (e) => {
+                      e.preventDefault();
+                      const dragged = draggingId;
+                      const edge = dropTarget?.edge ?? "below";
+                      setDraggingId(null);
+                      setDropTarget(null);
+                      if (dragged && dragged !== run.id) {
+                        void commitReorder(dragged, run.id, edge);
+                      }
+                    }
+                  : undefined
+              }
               onClick={() => toggleRow(run.id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -207,20 +353,44 @@ export function RunHistoryTable({
                   toggleRow(run.id);
                 }
               }}
-              className="border-b border-border/80 hover:bg-muted/50 cursor-pointer select-none"
+              className={cn(
+                "border-b border-border/80 hover:bg-muted/50 cursor-pointer select-none",
+                isDragging && "opacity-50",
+                showDropAbove && "shadow-[inset_0_2px_0_0_var(--color-primary,#2563eb)]",
+                showDropBelow && "shadow-[inset_0_-2px_0_0_var(--color-primary,#2563eb)]"
+              )}
               aria-expanded={isExpanded}
             >
+              {enableReorder ? (
+                <td
+                  className="w-6 px-1 py-2 text-center text-muted-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  title="Drag to reorder"
+                  aria-label="Drag to reorder"
+                >
+                  <span className="inline-block cursor-grab select-none text-sm leading-none">⋮⋮</span>
+                </td>
+              ) : null}
               <td className="px-4 py-2">
-                {formatRunCreatedAtDateTime(resolveRunDisplayInstant(run))}
+                <RelativeTime
+                  iso={resolveRunDisplayInstant(run)}
+                  fallback={formatRunCreatedAtDateTime(resolveRunDisplayInstant(run))}
+                  display="combo"
+                />
               </td>
               <td className="px-4 py-2">{carDisplay}</td>
               <td className="px-4 py-2">{trackDisplay}</td>
               <td className="px-4 py-2">{tiresDisplay}</td>
               <td className="px-4 py-2">
-                {formatLap(getBestLap(primaryLapRowsFromRun(run)))}
+                {formatLap(
+                  run.bestLapSeconds ?? getBestLap(primaryLapRowsFromRun(run))
+                )}
               </td>
               <td className="px-4 py-2">
-                {formatLap(getAverageTopN(primaryLapRowsFromRun(run), 5))}
+                {formatLap(
+                  run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRowsFromRun(run), 5)
+                )}
               </td>
               <td className="px-4 py-2">
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -235,11 +405,25 @@ export function RunHistoryTable({
                   ) : null}
                 </div>
               </td>
+              <td
+                className="px-2 py-2 align-middle"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSetupModalRunId(run.id)}
+                  className="rounded-md border border-border bg-background px-2 py-1 text-[10px] font-medium text-foreground hover:bg-muted/80 transition whitespace-nowrap"
+                  title="View setup sheet for this run; compare to another run from the modal"
+                >
+                  View setup
+                </button>
+              </td>
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>
             {isExpanded && (
               <tr className="border-b border-border/80 bg-muted/40">
-                <td colSpan={showComparePairColumn ? 8 : 7} className="px-4 py-4">
+                <td colSpan={totalCols} className="px-4 py-4">
                   <RunDetail
                     run={run}
                     pickerRuns={allRunsDescending}
@@ -252,6 +436,17 @@ export function RunHistoryTable({
           </React.Fragment>
         );
       })}
+      <SetupSheetModal
+        open={setupModalRunId !== null}
+        onClose={() => setSetupModalRunId(null)}
+        run={setupModalRun as SetupSheetModalRun | null}
+        pickerRuns={
+          (setupModalRun?.carId
+            ? allRunsDescending.filter((r) => r.car?.id === setupModalRun.carId)
+            : allRunsDescending) as SetupSheetModalRun[]
+        }
+        runListSource={runListSource}
+      />
     </>
   );
 }
@@ -267,11 +462,38 @@ function RunDetail({
   runListSource: RunCompareListSource;
   userDisplayName?: string | null;
 }) {
-  const [setupOpen, setSetupOpen] = React.useState(false);
+  const router = useRouter();
   const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [libraryLapSessions, setLibraryLapSessions] = useState<
     Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }>
   >([]);
+
+  async function handleDeleteRun() {
+    if (deleting) return;
+    const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run));
+    const carLabel = run.car?.name ?? run.carNameSnapshot ?? "this run";
+    const ok = window.confirm(
+      `Delete ${carLabel} run from ${when}?\n\nThis removes the run and its lap data. Setup snapshots are kept.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/runs/${encodeURIComponent(run.id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || `Delete failed (${res.status})`);
+      }
+      router.refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete run");
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -369,29 +591,24 @@ function RunDetail({
 
       <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
         <Link
-          href={engineerThisRunHref}
+          href={engineerVsPreviousHref ?? engineerThisRunHref}
           className="inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition"
         >
-          Ask Engineer (this run)
+          {engineerVsPreviousHref ? "Open in Engineer (vs previous same car)" : "Open in Engineer"}
         </Link>
-        {engineerVsPreviousHref ? (
-          <Link
-            href={engineerVsPreviousHref}
-            className="inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition"
-          >
-            Ask Engineer vs previous same car
-          </Link>
-        ) : null}
       </div>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
         <div className="min-w-0 space-y-3 xl:max-w-[min(100%,28rem)]">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Run details</h3>
           <div className="flex flex-wrap gap-x-5 gap-y-3">
-            <CompactField
-              label="Date / time"
-              value={formatRunCreatedAtDateTime(resolveRunDisplayInstant(run))}
-            />
+            <CompactField label="Date / time">
+              <RelativeTime
+                iso={resolveRunDisplayInstant(run)}
+                fallback={formatRunCreatedAtDateTime(resolveRunDisplayInstant(run))}
+                display="combo"
+              />
+            </CompactField>
             <CompactField
               label="Session type"
               value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}
@@ -556,10 +773,26 @@ function RunDetail({
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <button type="button" onClick={() => setSetupOpen(true)} className={analyseActionButtonClass}>
+          <Link
+            href={engineerVsPreviousHref ?? engineerThisRunHref}
+            className={cn(analyseActionButtonClass, "no-underline")}
+            title="Open this run in the Engineer tab for full setup + lap analysis"
+          >
             Analyse setup
+          </Link>
+          <button
+            type="button"
+            onClick={handleDeleteRun}
+            disabled={deleting}
+            className="ml-auto rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-[11px] font-medium text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
+            title="Permanently delete this run"
+          >
+            {deleting ? "Deleting…" : "Delete run"}
           </button>
         </div>
+        {deleteError ? (
+          <p className="text-[11px] text-destructive">{deleteError}</p>
+        ) : null}
         <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Setup vs previous run</div>
         {setupPreview.mode === "no_baseline" ? (
           <p className="text-muted-foreground text-xs">
@@ -588,13 +821,6 @@ function RunDetail({
         )}
       </div>
 
-      <SetupSheetModal
-        open={setupOpen}
-        onClose={() => setSetupOpen(false)}
-        run={run as SetupSheetModalRun}
-        pickerRuns={pickerRunsSameCar as SetupSheetModalRun[]}
-        runListSource={runListSource}
-      />
     </div>
   );
 }

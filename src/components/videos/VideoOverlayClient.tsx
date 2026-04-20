@@ -124,6 +124,21 @@ export function VideoOverlayClient() {
     }
   });
 
+  // Live preview of the offset slider / nudge buttons while paused. Without
+  // this, the top video only re-syncs via (a) the raf loop during playback,
+  // or (b) a bottom-video seek event — so dragging the offset slider on a
+  // paused video looked dead until the user pressed play+pause. Reapply the
+  // sync on any `offsetSec` change so the new frame is shown immediately.
+  useEffect(() => {
+    const bottom = bottomRef.current;
+    const top = topRef.current;
+    if (!bottom || !top) return;
+    const target = bottom.currentTime + offsetSec;
+    if (Number.isFinite(target)) {
+      top.currentTime = Math.max(0, target);
+    }
+  }, [offsetSec]);
+
   return (
     <div className="space-y-6">
       <div className="grid gap-3 max-w-4xl">

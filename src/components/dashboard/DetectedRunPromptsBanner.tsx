@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +72,7 @@ export function DetectedRunPromptsBanner({ prompts }: { prompts: DetectedRunProm
             p.promptKind === "finish" ? "Finish logging this run" : "Log this run";
           const timeLabel = formatLap(p.bestLapSeconds);
           const lapsLabel = p.lapCount != null ? `${p.lapCount} lap${p.lapCount === 1 ? "" : "s"}` : "—";
-          const whenUtc = formatPromptSessionWhen(p.sessionCompletedAtIso);
+          const whenFallback = formatPromptSessionWhen(p.sessionCompletedAtIso);
           const kindLabel = p.sourceType === "practice" ? "Practice" : "Race / qualifying";
           const sessionTitle =
             p.sessionListLabel?.trim() ||
@@ -94,9 +95,15 @@ export function DetectedRunPromptsBanner({ prompts }: { prompts: DetectedRunProm
                 <div className="mt-1 space-y-0.5 text-muted-foreground">
                   <div>
                     <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">
-                      Session time (UTC)
+                      Session time
                     </span>
-                    <span className="ml-1.5 font-mono tabular-nums text-foreground/90">{whenUtc}</span>
+                    <span className="ml-1.5 font-mono tabular-nums text-foreground/90">
+                      <RelativeTime
+                        iso={p.sessionCompletedAtIso}
+                        fallback={whenFallback}
+                        display="combo"
+                      />
+                    </span>
                   </div>
                   {p.sourceType === "practice" ? (
                     <div>Driver (your laps): {p.displayDriverName}</div>

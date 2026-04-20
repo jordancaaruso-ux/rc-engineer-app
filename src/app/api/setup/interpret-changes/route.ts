@@ -9,6 +9,7 @@ import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { buildCatalogFromTemplate } from "@/lib/setupFieldCatalog";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { isDerivedSetupKey } from "@/lib/setupCalculations/a800rrDerived";
+import { getCalibrationFieldKind } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -64,12 +65,21 @@ export async function POST(request: Request) {
   const setup = normalizeSetupData(body?.setupData) as SetupSnapshotData;
   const allowed = catalog
     .filter((f) => !isDerivedSetupKey(f.key))
-    .map((f) => ({
-      fieldKey: f.key,
-      fieldLabel: f.label,
-      unit: f.unit ?? "",
-      currentValue: toScalarString(setup[f.key]),
-    }))
+    .map((f) => {
+      // Tell the LLM what kind of scalar each field expects so it doesn't truncate
+      // a full preset name like "Wolverine .4" down to just ".4" (seen in the wild
+      // when the model decides a trailing decimal is the "numeric" change).
+      const kind = getCalibrationFieldKind(f.key);
+      const expects: "number" | "text" =
+        kind === "number" || kind === "paired" ? "number" : "text";
+      return {
+        fieldKey: f.key,
+        fieldLabel: f.label,
+        unit: f.unit ?? "",
+        expects,
+        currentValue: toScalarString(setup[f.key]),
+      };
+    })
     .filter((f) => f.fieldKey && f.fieldLabel);
 
   // Keep prompt compact: only send keys that have a current scalar value or look likely to be edited.
@@ -99,6 +109,11 @@ Return ONLY JSON with this shape:
 Rules:
 - If the user says "+0.5 rear camber", compute new value from currentValue when it is numeric; otherwise return no edit.
 - If the user says "softer rear spring" but no numeric direction is possible, return no edit unless a clear numeric mapping exists in currentValue.
+- Each field has an "expects" tag ("number" or "text"):
+  - For "text" fields (body shells, wings, tires, motors, ESCs, etc.), the \`toValue\`
+    MUST be the full descriptive string the user wrote (e.g. "Wolverine .4",
+    NOT just ".4"). Preserve brand + version together.
+  - For "number" fields, \`toValue\` must be a plain number string (no units).
 - Prefer returning fewer edits rather than guessing.`;
 
   const apiKey = mustKey();
@@ -151,6 +166,13 @@ Rules:
     if (!meta) continue;
     // Hard safety: derived keys are never allowed.
     if (isDerivedSetupKey(fieldKey)) continue;
+    // Hard safety: a "text" field (bodyshell, wing, motor, tires, etc.) must not
+    // be written with a bare numeric / decimal token. The LLM occasionally
+    // truncates "Wolverine .4" → ".4"; reject those proposals so the user isn't
+    // shown a useless diff like `Twister → .4`.
+    if (meta.expects === "text" && /^[.,]?\d+(?:[.,]\d+)?$/.test(toValue)) {
+      continue;
+    }
     out.push({
       fieldKey,
       fieldLabel: meta.fieldLabel,

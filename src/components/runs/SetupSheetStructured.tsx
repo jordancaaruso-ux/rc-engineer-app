@@ -834,16 +834,16 @@ function EditableSingle({
       <div
         data-setup-field-key={fieldKey}
         className={cn(
-          "flex min-h-[2.25rem] items-stretch border-b border-border/80 last:border-b-0",
+          "flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0",
           changed && rowHighlight.className
         )}
         style={changed && rowHighlight.style ? rowHighlight.style : undefined}
       >
-        <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
+        <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
           {label}
           {unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({unit})</span> : null}
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-1">
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-0.5">
           {options ? (
             options.multi ? (
               <OptionSquareFieldDisplay
@@ -907,12 +907,12 @@ function EditableSingle({
     <div
       data-setup-field-key={fieldKey}
       className={cn(
-        "flex min-h-[2.25rem] items-stretch border-b border-border/80 last:border-b-0",
+        "flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0",
         changed && rowHighlight.className
       )}
       style={changed && rowHighlight.style ? rowHighlight.style : undefined}
     >
-      <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
+      <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
         {label}
         {unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({unit})</span> : null}
       </div>
@@ -1145,13 +1145,13 @@ function PairSideCell({
       <div
         data-setup-field-key={fieldKey}
         className={cn(
-          "flex min-h-[2.25rem] flex-1 flex-col border-l border-border/60 px-2 py-1 first:border-l-0 md:border-border/60",
+          "flex min-h-[1.9rem] flex-1 flex-col border-l border-border/60 px-2 py-0.5 first:border-l-0 md:border-border/60",
           c && hl.className
         )}
         style={c && hl.style ? hl.style : undefined}
+        aria-label={side}
       >
-        <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{side}</div>
-        <div className="mt-0.5 flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           {options ? (
             options.multi ? (
               <OptionSquareFieldDisplay
@@ -1207,14 +1207,14 @@ function PairSideCell({
     <div
       data-setup-field-key={fieldKey}
       className={cn(
-        "flex min-h-[2.25rem] flex-1 flex-col border-l border-border/60 px-2 py-1 first:border-l-0 md:border-border/60",
+        "flex min-h-[1.9rem] flex-1 flex-col border-l border-border/60 px-2 py-0.5 first:border-l-0 md:border-border/60",
         c && hl.className
       )}
       style={c && hl.style ? hl.style : undefined}
+      aria-label={side}
     >
-      <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{side}</div>
       {options ? (
-        <div className="mt-0.5">
+        <div>
           {options.multi ? (
             <OptionSquareFieldDisplay
               value={v}
@@ -1242,7 +1242,7 @@ function PairSideCell({
         <input
           ref={inputRef}
           className={cn(
-            "mt-0.5 w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
+            "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
             "bg-card ring-1 ring-accent/40"
           )}
           value={local}
@@ -1255,7 +1255,7 @@ function PairSideCell({
       ) : showCompareEdit ? (
         <button
           type="button"
-          className="mt-0.5 w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
+          className="w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
           onClick={beginEdit}
         >
           <InlineValueCompare
@@ -1270,7 +1270,7 @@ function PairSideCell({
         <input
           ref={inputRef}
           className={cn(
-            "mt-0.5 w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
+            "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
             focused && "bg-card ring-1 ring-accent/40"
           )}
           value={focused ? local : v}
@@ -1311,7 +1311,7 @@ function PairRow({
         "flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch"
       )}
     >
-      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
         {row.unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({row.unit})</span> : null}
       </div>
@@ -1361,58 +1361,63 @@ function Corner4Row({
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
 }) {
-  const corners: { k: string; lab: string }[] = [
-    { k: row.ff, lab: "FF" },
-    { k: row.fr, lab: "FR" },
-    { k: row.rf, lab: "RF" },
-    { k: row.rr, lab: "RR" },
+  const sides: { title: "Front" | "Rear"; cells: { k: string; lab: string }[] }[] = [
+    { title: "Front", cells: [{ k: row.ff, lab: "FF" }, { k: row.fr, lab: "FR" }] },
+    { title: "Rear", cells: [{ k: row.rf, lab: "RF" }, { k: row.rr, lab: "RR" }] },
   ];
   return (
-    <div
-      className={cn(
-        "border-b border-border/80 last:border-b-0"
-      )}
-    >
-      <div className="border-b border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className={cn("flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch")}>
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
         {row.unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({row.unit})</span> : null}
       </div>
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60">
-        {corners.map(({ k, lab }) => {
-          const v = fieldValue(value, k);
-          const b = baseline ? fieldValue(baseline, k) : "";
-          const cornerCmp = keyFieldCompareResult(k, value, baseline, highlightChangedKeys, numericAggregationByKey);
-          const cornerHl = compareResultToHighlight(cornerCmp);
-          const c = !cornerCmp.areEqual;
-          return (
-            <div
-              key={k}
-              data-setup-field-key={k}
-              className={cn("p-1.5", c && cornerHl.className)}
-              style={c && cornerHl.style ? cornerHl.style : undefined}
-            >
-              <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{lab}</div>
-              {readOnly ? (
-                <InlineValueCompare
-                  value={v}
-                  baseline={b}
-                  hasBaseline={hasBaseline}
-                  fieldKind="text"
-                  title={springRateFieldTooltip(value, k)}
-                />
-              ) : (
-                <CornerCell
-                  fieldKey={k}
-                  value={v}
-                  baseline={b}
-                  hasBaseline={hasBaseline}
-                  onCommit={onCommit}
-                  setupSnapshot={value}
-                />
-              )}
-            </div>
-          );
-        })}
+      <div className="grid flex-1 grid-cols-2 divide-x divide-border/60">
+        {sides.map((side) => (
+          <div key={side.title} className="grid grid-cols-2 divide-x divide-border/40" aria-label={side.title}>
+            {side.cells.map(({ k, lab }) => {
+              const v = fieldValue(value, k);
+              const b = baseline ? fieldValue(baseline, k) : "";
+              const cornerCmp = keyFieldCompareResult(k, value, baseline, highlightChangedKeys, numericAggregationByKey);
+              const cornerHl = compareResultToHighlight(cornerCmp);
+              const c = !cornerCmp.areEqual;
+              return (
+                <div
+                  key={k}
+                  data-setup-field-key={k}
+                  className={cn(
+                    "flex min-h-[1.9rem] min-w-0 items-center gap-1 px-2 py-0.5",
+                    c && cornerHl.className
+                  )}
+                  style={c && cornerHl.style ? cornerHl.style : undefined}
+                >
+                  <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {lab}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    {readOnly ? (
+                      <InlineValueCompare
+                        value={v}
+                        baseline={b}
+                        hasBaseline={hasBaseline}
+                        fieldKind="text"
+                        title={springRateFieldTooltip(value, k)}
+                      />
+                    ) : (
+                      <CornerCell
+                        fieldKey={k}
+                        value={v}
+                        baseline={b}
+                        hasBaseline={hasBaseline}
+                        onCommit={onCommit}
+                        setupSnapshot={value}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1453,7 +1458,7 @@ function CornerCell({
         <input
           ref={inputRef}
           className={cn(
-            "mt-0.5 w-full rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
+            "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
             "bg-card ring-1 ring-accent/40"
           )}
           value={local}
@@ -1466,7 +1471,7 @@ function CornerCell({
       ) : showCompareEdit ? (
         <button
           type="button"
-          className="mt-0.5 w-full rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
+          className="w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
           onClick={beginEdit}
         >
           <InlineValueCompare
@@ -1481,7 +1486,7 @@ function CornerCell({
         <input
           ref={inputRef}
           className={cn(
-            "mt-0.5 w-full rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
+            "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
             focused && "bg-card ring-1 ring-accent/40"
           )}
           value={focused ? local : value}
@@ -1531,10 +1536,10 @@ function ScrewStripRow({
         "flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch"
       )}
     >
-      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-2">
+      <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-1">
         <AwesomatixScrewStrip
           variant={variant}
           selected={sel}
@@ -1619,12 +1624,36 @@ function TopDeckBlock({
   );
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+/** Section has at least one Front/Rear pair-style row → render a column header. */
+function sectionHasPairs(rows: readonly StructuredRow[]): boolean {
+  return rows.some(
+    (r) => r.type === "pair" || r.type === "corner4" || r.type === "top_deck_block" || r.type === "screw_strip"
+  );
+}
+
+function SectionCard({
+  title,
+  children,
+  showFrontRearHeader,
+}: {
+  title: string;
+  children: React.ReactNode;
+  showFrontRearHeader: boolean;
+}) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-muted/40">
-      <div className="border-b border-border bg-card/80 px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="border-b border-border bg-card/80 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </div>
+      {showFrontRearHeader ? (
+        <div className="hidden border-b border-border/70 bg-card/40 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:flex">
+          <div className="w-[38%] shrink-0 border-r border-border/60 px-2 py-1">Parameter</div>
+          <div className="grid flex-1 grid-cols-2 divide-x divide-border/60">
+            <div className="px-2 py-1">Front</div>
+            <div className="px-2 py-1">Rear</div>
+          </div>
+        </div>
+      ) : null}
       <div className="divide-y divide-border/30">{children}</div>
     </div>
   );
@@ -1763,7 +1792,7 @@ export function SetupSheetStructured({
         <SetupFieldJumpSearch entries={fieldSearchEntries} rootRef={sheetRootRef} />
       ) : null}
       {sections.map((sec) => (
-        <SectionCard key={sec.id} title={sec.title}>
+        <SectionCard key={sec.id} title={sec.title} showFrontRearHeader={sectionHasPairs(sec.rows)}>
           {sec.rows.map((row) => renderRow(row))}
         </SectionCard>
       ))}

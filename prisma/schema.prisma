@@ -490,6 +490,16 @@ model Run {
   // Structured lap ingestion: source, metrics, multi-driver/field-ready entries (see src/lib/lapSession/types.ts).
   lapSession Json?
 
+  /**
+   * Materialized lap summary metrics computed from `lapTimes` / `lapSession` at
+   * save time. List views (Sessions / dashboard) read these instead of
+   * recomputing from the JSON lap arrays for every row. Nullable for legacy
+   * runs written before the column existed — callers fall back to computing
+   * from the lap arrays in that case.
+   */
+  bestLapSeconds   Float?
+  avgTop5LapSeconds Float?
+
   notes            String?  // unified notes (new); legacy fields below for older runs
   driverNotes      String?
   handlingProblems String?
@@ -518,12 +528,33 @@ model Run {
   /** Dashboard / import chooser: hide "incomplete logging" reminder without deleting the run. */
   incompleteLoggingPromptDismissedAt DateTime?
 
+  /**
+   * Stable ordering axis for run lists. Stamped once at create time (= server `now()`)
+   * and never auto-updated. Only changes when the user explicitly drags a run to a new
+   * position (reorder endpoint) or opts in to "use session time". Display time-of-day
+   * is independent (see `sessionCompletedAt` / `createdAt`); this column exists purely
+   * so "if B was completed after A, B stays above A forever" holds regardless of edits,
+   * re-imports, or lap-time changes. Backfilled from `COALESCE(sessionCompletedAt, createdAt)`.
+   */
+  sortAt DateTime @default(now())
+
   /** Cached deterministic Engineer Summary JSON (invalidated on run update). */
   engineerSummaryJson         Json?
   engineerSummaryRefRunId     String?
   engineerSummaryComputedAt   DateTime?
   /** Optional structured Deep Dive answers (versioned object). */
   engineerDeepDiveJson        Json?
+
+  /**
+   * Optional URL to the practice day results page (e.g. LiveRC practice day)
+   * that the Lap Times "url" ingest tab uses to list candidate sessions for this
+   * driver. Captured per-run (vs the user-wide `currentPracticeDayUrl` setting)
+   * so historical runs remember which day they came from even when the user
+   * moves on to a new day.
+   */
+  practiceDayUrl String?
+
+  @@index([userId, sortAt])
 }
 
 /**

@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { buildSetupSpreadForEngineer } from "@/lib/engineerPhase5/setupSpreadForEngineer";
 import { searchVehicleDynamicsKb } from "@/lib/engineerPhase5/vehicleDynamicsKb";
+import { expandEngineerUserMessageForKbSearch } from "@/lib/engineerPhase5/intentVocabularyExpansion";
 import { formatGripTagsForDisplay, formatLayoutTagsForDisplay } from "@/lib/trackMetaTags";
 import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
 import {
@@ -91,7 +92,12 @@ export async function buildEngineerRichContextV1(params: {
   anchorRunId: string | null;
   lastUserMessage: string;
 }): Promise<EngineerRichContextV1 | null> {
-  const kb = await searchVehicleDynamicsKb(params.lastUserMessage, 5);
+  // Phase A bandaid: expand free-text intent with canonical parameter vocab and
+  // retrieve a wider top-K so goal-shaped questions ("more rear grip") don't drop
+  // obviously-relevant parameter sections out of context. Phase B will replace
+  // this with a structured effect-index lookup joined by parameter key.
+  const kbQuery = expandEngineerUserMessageForKbSearch(params.lastUserMessage);
+  const kb = await searchVehicleDynamicsKb(kbQuery, 12);
 
   if (!params.anchorRunId?.trim()) {
     if (kb.length === 0) return null;

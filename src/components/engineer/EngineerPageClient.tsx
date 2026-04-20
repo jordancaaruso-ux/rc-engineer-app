@@ -48,29 +48,7 @@ export function EngineerPageClient() {
     <div className="max-w-4xl mx-auto w-full space-y-6">
       <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Compare &amp; trend</h2>
-          <p className="text-xs text-muted-foreground mt-1 leading-snug">
-            Choose target (primary) and comparison runs — same URL as Analysis &quot;Compare with Engineer&quot; (
-            <span className="font-mono">runId</span> / <span className="font-mono">compareRunId</span>). Run summary and
-            trend digest live here; chat is below.
-          </p>
-        </div>
-        <div className="p-4 md:p-5">
-          <EngineerCompareAndPattern
-            embedded
-            onDigestLoaded={setPatternDigest}
-            showRunSummaryPanel
-            onQueueEngineerChatPrompt={queueEngineerPrompt}
-          />
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
           <h2 className="text-lg font-semibold text-foreground tracking-tight">Ask the Engineer</h2>
-          <p className="text-xs text-muted-foreground mt-1 leading-snug">
-            Conversational workspace — uses the run pair and digest from the section above, plus optional run catalog.
-          </p>
         </div>
         <div className="p-4 md:p-5">
           <EngineerChatPanel
@@ -80,6 +58,25 @@ export function EngineerPageClient() {
             queuedPrompt={queuedPrompt}
             onQueuedPromptConsumed={clearQueuedPrompt}
             onQuickPrompt={queueEngineerPrompt}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">Compare &amp; trend</h2>
+          <p className="text-xs text-muted-foreground mt-1 leading-snug">
+            Choose target (primary) and comparison runs — same URL as Analysis &quot;Compare with Engineer&quot; (
+            <span className="font-mono">runId</span> / <span className="font-mono">compareRunId</span>). Run summary and
+            trend digest feed the chat above.
+          </p>
+        </div>
+        <div className="p-4 md:p-5">
+          <EngineerCompareAndPattern
+            embedded
+            onDigestLoaded={setPatternDigest}
+            showRunSummaryPanel
+            onQueueEngineerChatPrompt={queueEngineerPrompt}
           />
         </div>
       </section>

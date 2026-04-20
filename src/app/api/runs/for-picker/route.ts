@@ -19,12 +19,13 @@ export async function GET(request: Request) {
       carId && scopeCarIds?.length
         ? { userId: user.id, carId: { in: scopeCarIds } }
         : { userId: user.id },
-    orderBy: { createdAt: "desc" },
+    orderBy: { sortAt: "desc" },
     take: 200,
     select: {
       id: true,
       createdAt: true,
       sessionCompletedAt: true,
+      sortAt: true,
       sessionLabel: true,
       sessionType: true,
       meetingSessionType: true,
