@@ -13,7 +13,7 @@ export async function GET(_: Request, ctx: Ctx) {
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: { id, userId: user.id },
+    where: { id, OR: [{ userId: user.id }, { communityShared: true }] },
     select: {
       id: true,
       name: true,
@@ -22,6 +22,8 @@ export async function GET(_: Request, ctx: Ctx) {
       exampleDocumentId: true,
       createdAt: true,
       updatedAt: true,
+      userId: true,
+      communityShared: true,
     },
   });
   if (!calibration) return NextResponse.json({ error: "Not found" }, { status: 404 });

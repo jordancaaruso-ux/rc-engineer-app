@@ -463,6 +463,11 @@ model SetupSheetCalibration {
   sourceType String
   calibrationDataJson Json
   exampleDocumentId String?
+  /**
+   * True when this row is one of the top calibrations (by use on aggregation-eligible uploads), recomputed
+   * on community rebuild—readable and applicable by all authenticated users for setup uploads.
+   */
+  communityShared Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
@@ -473,6 +478,7 @@ model SetupSheetCalibration {
   setupImportBatches        SetupImportBatch[]
 
   @@index([userId, createdAt])
+  @@index([communityShared, createdAt])
 }
 
 enum SessionType {

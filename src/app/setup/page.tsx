@@ -5,6 +5,8 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { NewSetupUploadButton } from "@/components/setup/NewSetupUploadButton";
+import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 
 type SetupPageSearchParams = {
   created?: string;
@@ -50,6 +52,7 @@ export default async function SetupPage({
   }
 
   const user = await requireCurrentUser();
+  await ensureCommunitySharedCalibrationsIfEmpty();
   const [documents, runs, calibrations, cars] = await Promise.all([
     prisma.setupDocument.findMany({
       where: { userId: user.id, setupImportBatchId: null },
@@ -79,10 +82,10 @@ export default async function SetupPage({
       },
     }),
     prisma.setupSheetCalibration.findMany({
-      where: { userId: user.id },
+      where: calibrationsVisibleToUserWhere(user.id),
       orderBy: { createdAt: "desc" },
       take: 20,
-      select: { id: true, name: true, sourceType: true, createdAt: true },
+      select: { id: true, name: true, sourceType: true, createdAt: true, communityShared: true },
     }),
     prisma.car.findMany({
       where: { userId: user.id },

@@ -26,7 +26,10 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: { id: effective.calibrationId, userId: user.id },
+    where: {
+      id: effective.calibrationId,
+      OR: [{ userId: user.id }, { communityShared: true }],
+    },
     select: { id: true, name: true },
   });
   if (!calibration) return NextResponse.json({ error: "Calibration not found" }, { status: 404 });

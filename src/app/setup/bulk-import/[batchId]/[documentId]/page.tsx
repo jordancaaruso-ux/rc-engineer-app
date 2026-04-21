@@ -5,6 +5,8 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { BulkImportDocReviewClient } from "@/components/setup/BulkImportDocReviewClient";
+import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 
 export default async function BulkImportDocumentPage({
   params,
@@ -22,6 +24,7 @@ export default async function BulkImportDocumentPage({
 
   const { batchId, documentId } = await params;
   const user = await requireCurrentUser();
+  await ensureCommunitySharedCalibrationsIfEmpty();
 
   const [doc, calibrations] = await Promise.all([
     prisma.setupDocument.findFirst({
@@ -46,11 +49,18 @@ export default async function BulkImportDocumentPage({
         updatedAt: true,
       },
     }),
-    // Calibrations are global/shared; list all for selection (document remains user-scoped above).
+    // Own calibrations plus community-shared (top 3 from aggregation-eligible pool, refreshed on community rebuild).
     prisma.setupSheetCalibration.findMany({
+      where: calibrationsVisibleToUserWhere(user.id),
       orderBy: { createdAt: "desc" },
       take: 60,
-      select: { id: true, name: true, sourceType: true, calibrationDataJson: true },
+      select: {
+        id: true,
+        name: true,
+        sourceType: true,
+        calibrationDataJson: true,
+        communityShared: true,
+      },
     }),
   ]);
   if (!doc) notFound();

@@ -11,6 +11,7 @@ import {
 } from "@/lib/setupAggregations/eligibleDocAggregationCore";
 import { geometryDerivedScalarObservations } from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
 import { GRIP_BUCKET_ANY, gripBucketsForDoc } from "@/lib/setupAggregations/gripBuckets";
+import { refreshCommunitySharedCalibrationsFromEligibleDocs } from "@/lib/setupCalibrations/communitySharedCalibrations";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
 export type RebuildCommunityAggregationsExclusionCounts = {
@@ -189,6 +190,10 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
       await tx.communitySetupParameterAggregation.createMany({ data: rows });
     }
     return { deleted: del.count, created: rows.length };
+  });
+
+  await refreshCommunitySharedCalibrationsFromEligibleDocs().catch((e) => {
+    console.error("[rebuildCommunityTemplateAggregations] refreshCommunitySharedCalibrations", e);
   });
 
   return {

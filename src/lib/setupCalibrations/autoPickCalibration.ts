@@ -44,7 +44,7 @@ export async function buildCalibrationFingerprints(input: {
   const minNameCount = input.minNameCount ?? 8;
   const calibrations = await prisma.setupSheetCalibration.findMany({
     where: {
-      userId: input.userId,
+      OR: [{ userId: input.userId }, { communityShared: true }],
       ...(input.restrictToNames && input.restrictToNames.length > 0
         ? { name: { in: [...input.restrictToNames] } }
         : {}),
@@ -64,8 +64,9 @@ export async function buildCalibrationFingerprints(input: {
   const exampleIds = deduped.map((c) => c.exampleDocumentId).filter(Boolean) as string[];
   if (exampleIds.length === 0) return [];
 
+  // Example PDFs can belong to the calibration author; community-shared cals use their example doc.
   const docs = await prisma.setupDocument.findMany({
-    where: { id: { in: exampleIds }, userId: input.userId },
+    where: { id: { in: exampleIds } },
     select: { id: true, storagePath: true, originalFilename: true, mimeType: true },
   });
   const docById = new Map(docs.map((d) => [d.id, d] as const));

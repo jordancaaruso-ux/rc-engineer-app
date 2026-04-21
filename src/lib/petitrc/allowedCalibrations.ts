@@ -17,7 +17,10 @@ export const ALLOWED_CALIBRATION_NAMES = [
  */
 export async function resolveAllowedCalibrationIds(userId: string): Promise<string[]> {
   const rows = await prisma.setupSheetCalibration.findMany({
-    where: { userId, name: { in: [...ALLOWED_CALIBRATION_NAMES] } },
+    where: {
+      name: { in: [...ALLOWED_CALIBRATION_NAMES] },
+      OR: [{ userId }, { communityShared: true }],
+    },
     select: { id: true, name: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   });

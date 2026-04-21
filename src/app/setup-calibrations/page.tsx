@@ -3,6 +3,8 @@ import Link from "next/link";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
+import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 
 export default async function SetupCalibrationsPage(): Promise<ReactNode> {
@@ -19,10 +21,19 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
     );
   }
   const user = await requireCurrentUser();
+  await ensureCommunitySharedCalibrationsIfEmpty();
   const calibrations = await prisma.setupSheetCalibration.findMany({
-    where: { userId: user.id },
+    where: calibrationsVisibleToUserWhere(user.id),
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, sourceType: true, calibrationDataJson: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      sourceType: true,
+      calibrationDataJson: true,
+      createdAt: true,
+      userId: true,
+      communityShared: true,
+    },
   });
   return (
     <>

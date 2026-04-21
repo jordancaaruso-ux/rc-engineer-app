@@ -14,7 +14,13 @@ export async function GET(_request: Request, ctx: Ctx) {
   const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const doc = await prisma.setupDocument.findFirst({
-    where: { id, userId: user.id },
+    where: {
+      id,
+      OR: [
+        { userId: user.id },
+        { exampleForCalibrations: { some: { communityShared: true } } },
+      ],
+    },
     select: { storagePath: true, mimeType: true, originalFilename: true },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });

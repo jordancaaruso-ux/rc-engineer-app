@@ -43,7 +43,10 @@ export async function getEffectiveCalibrationProfileId(input: {
 
   for (const candidate of candidates) {
     const exists = await prisma.setupSheetCalibration.findFirst({
-      where: { id: candidate.id, userId: input.userId },
+      where: {
+        id: candidate.id,
+        OR: [{ userId: input.userId }, { communityShared: true }],
+      },
       select: { id: true },
     });
     if (exists) {

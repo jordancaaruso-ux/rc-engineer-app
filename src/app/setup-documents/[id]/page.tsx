@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
+import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDocumentReviewClient";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 
@@ -26,6 +28,7 @@ export default async function SetupDocumentDetailPage({
 
   const { id } = await params;
   const user = await requireCurrentUser();
+  await ensureCommunitySharedCalibrationsIfEmpty();
   const [doc, cars, calibrations] = await Promise.all([
     prisma.setupDocument.findFirst({
       where: { id, userId: user.id },
@@ -67,7 +70,7 @@ export default async function SetupDocumentDetailPage({
       select: { id: true, name: true },
     }),
     prisma.setupSheetCalibration.findMany({
-      where: { userId: user.id },
+      where: calibrationsVisibleToUserWhere(user.id),
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -75,6 +78,7 @@ export default async function SetupDocumentDetailPage({
         sourceType: true,
         calibrationDataJson: true,
         createdAt: true,
+        communityShared: true,
       },
     }),
   ]);
