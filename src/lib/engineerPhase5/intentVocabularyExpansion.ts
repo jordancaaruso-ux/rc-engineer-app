@@ -94,6 +94,35 @@ const SETUP_INTENT_HINTS = [
   "mid-corner",
 ];
 
+/** Bulkhead inner pickup split / anti-dive / anti-squat phrasing → canonical keys for KB retrieval. */
+const BULKHEAD_SPLIT_HINTS = [
+  "split",
+  "bulkhead",
+  "pickup split",
+  "pickup differential",
+  "anti-dive",
+  "anti dive",
+  "anti-squat",
+  "anti squat",
+] as const;
+
+const BULKHEAD_SPLIT_VOCAB = [
+  "upper_inner_shims_ff",
+  "upper_inner_shims_fr",
+  "upper_inner_shims_rf",
+  "upper_inner_shims_rr",
+  "under_lower_arm_shims_ff",
+  "under_lower_arm_shims_fr",
+  "under_lower_arm_shims_rf",
+  "under_lower_arm_shims_rr",
+  "upper_outer_shims_front",
+  "upper_outer_shims_rear",
+  "roll centre",
+  "upper link",
+  "flatter",
+  "angled",
+].join(" ");
+
 /**
  * Canonical rear parameter keys + prose tokens likely to appear in rear-focused KB sections.
  * Exported as an array so `vehicleDynamicsKb.ts` can run a guaranteed-coverage pass for any
@@ -217,8 +246,9 @@ export function expandEngineerUserMessageForKbSearch(message: string): string {
   const hasFront = containsAny(lower, FRONT_HINTS);
   const hasBumps = containsAny(lower, BUMPS_HINTS);
   const hasGeneric = containsAny(lower, SETUP_INTENT_HINTS);
+  const hasBulkheadSplit = containsAny(lower, BULKHEAD_SPLIT_HINTS);
 
-  if (!hasRear && !hasFront && !hasBumps && !hasGeneric) {
+  if (!hasRear && !hasFront && !hasBumps && !hasGeneric && !hasBulkheadSplit) {
     return message;
   }
 
@@ -229,6 +259,7 @@ export function expandEngineerUserMessageForKbSearch(message: string): string {
   if (!hasRear && !hasFront && !hasBumps && hasGeneric) {
     parts.push(BOTH_ENDS_VOCAB);
   }
+  if (hasBulkheadSplit) parts.push(BULKHEAD_SPLIT_VOCAB);
 
   return parts.join(" ");
 }

@@ -15,7 +15,9 @@ import {
 } from "@/lib/setupAggregations/gripBuckets";
 import {
   loadCommunityAggregationsForBucket,
+  loadCommunityAggregationsMergedSurfaces,
   loadCommunityNumericGripTrendsForBucket,
+  loadCommunityNumericGripTrendsMergedSurfaces,
   type BucketTopValueEntry,
   type GripTrendBucketStats,
 } from "@/lib/setupAggregations/loadCommunityAggregations";
@@ -471,6 +473,9 @@ export async function buildSetupSpreadForEngineer(params: {
     surfaceRaw === "asphalt" || surfaceRaw === "carpet" ? surfaceRaw : null;
   const gripLevel: GripBucket = runReadGripBucket(normalized as Record<string, SetupSnapshotData[string]>);
 
+  const communityFromSnapshotSurface = Boolean(setupSheetTemplate && trackSurface);
+  const communityMergedSurfaces = Boolean(setupSheetTemplate && !trackSurface);
+
   const [aggRows, communityRows, gripTrends] = await Promise.all([
     prisma.setupParameterAggregation.findMany({
       where: {
@@ -486,25 +491,36 @@ export async function buildSetupSpreadForEngineer(params: {
         carId: true,
       },
     }),
-    setupSheetTemplate && trackSurface
+    communityFromSnapshotSurface
       ? loadCommunityAggregationsForBucket({
-          setupSheetTemplate,
-          trackSurface,
+          setupSheetTemplate: setupSheetTemplate!,
+          trackSurface: trackSurface!,
           gripLevel,
           parameterKeys: keys,
         })
-      : Promise.resolve(
-          [] as Awaited<ReturnType<typeof loadCommunityAggregationsForBucket>>
-        ),
-    setupSheetTemplate && trackSurface
+      : communityMergedSurfaces
+        ? loadCommunityAggregationsMergedSurfaces({
+            setupSheetTemplate: setupSheetTemplate!,
+            gripLevel,
+            parameterKeys: keys,
+          })
+        : Promise.resolve(
+            [] as Awaited<ReturnType<typeof loadCommunityAggregationsForBucket>>
+          ),
+    communityFromSnapshotSurface
       ? loadCommunityNumericGripTrendsForBucket({
-          setupSheetTemplate,
-          trackSurface,
+          setupSheetTemplate: setupSheetTemplate!,
+          trackSurface: trackSurface!,
           parameterKeys: keys,
         })
-      : Promise.resolve(
-          new Map() as Awaited<ReturnType<typeof loadCommunityNumericGripTrendsForBucket>>
-        ),
+      : communityMergedSurfaces
+        ? loadCommunityNumericGripTrendsMergedSurfaces({
+            setupSheetTemplate: setupSheetTemplate!,
+            parameterKeys: keys,
+          })
+        : Promise.resolve(
+            new Map() as Awaited<ReturnType<typeof loadCommunityNumericGripTrendsForBucket>>
+          ),
   ]);
 
   const bestGarageByKey = new Map<
@@ -636,9 +652,9 @@ export async function buildSetupSpreadForEngineer(params: {
 
   const communityContext: EngineerCommunityContext = {
     setupSheetTemplate,
-    trackSurface,
+    trackSurface: communityMergedSurfaces ? null : trackSurface,
     gripLevel,
-    label: describeCommunityContext(setupSheetTemplate, trackSurface, gripLevel),
+    label: describeCommunityContext(setupSheetTemplate, trackSurface, gripLevel, communityMergedSurfaces),
   };
 
   return {
@@ -654,9 +670,13 @@ export async function buildSetupSpreadForEngineer(params: {
 function describeCommunityContext(
   template: string | null,
   surface: "asphalt" | "carpet" | null,
-  grip: GripBucket
+  grip: GripBucket,
+  mergedAcrossSurfaces: boolean
 ): string {
   if (!template) return "no template — community stats unavailable";
+  if (mergedAcrossSurfaces) {
+    return `${template} · asphalt + carpet merged · ${gripBucketLabel(grip)} (set track_surface on the setup sheet to lock one surface)`;
+  }
   const surfaceLabel = surface ?? "unknown surface";
   return `${template} · ${surfaceLabel} · ${gripBucketLabel(grip)}`;
 }

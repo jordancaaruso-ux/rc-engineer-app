@@ -44,6 +44,6 @@ export function buildSetupCompareRetryUserMessage(reasons: string[]): string {
     reasons.join(" ") +
     " Follow the FIXED ANSWER SHAPE (sections A–C). Never claim raising upper inner increases roll centre. " +
     "Never describe flatter / lower RC as increasing responsiveness—use smoother, more in the track, less initial bite, or mid-corner / overall grip language from the KB. " +
-    "Quote frontAxleNetNote, rearAxleNetNote, frontLowerArmAntiGeometryNote and rearLowerArmAntiGeometryNote when non-null, and every rcEffectLine verbatim in section A."
+    "Quote frontAxleNetNote, rearAxleNetNote, bulkheadFrontVsRearAvgNote, frontUpperInnerBulkheadSplitNote, rearUpperInnerBulkheadSplitNote, frontLowerArmAntiGeometryNote and rearLowerArmAntiGeometryNote when non-null, and every rcEffectLine verbatim in section A."
   );
 }

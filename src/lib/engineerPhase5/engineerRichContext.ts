@@ -9,6 +9,11 @@ import { buildParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffec
 import type { ParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/types";
 import { formatGripTagsForDisplay, formatLayoutTagsForDisplay } from "@/lib/trackMetaTags";
 import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
+import { normalizeSetupData } from "@/lib/runSetup";
+import {
+  BULKHEAD_INNER_SPLIT_SIGN_NOTE,
+  computeBulkheadInnerSplitsMm,
+} from "@/lib/engineerPhase5/setupBulkheadInnerSplits";
 import {
   buildConditionalSetupEmpiricalV1,
   type ConditionalSetupEmpiricalV1,
@@ -69,6 +74,27 @@ export type EngineerRichContextV1 = {
    * intent may still be set — the catalog has no approved entries yet.
    */
   parameterIntentMatches: ParameterIntentMatches | null;
+  /**
+   * Derived FF−FR / RF−RR bulkhead pickup splits (mm) on the anchored run’s setup snapshot.
+   * Null when no run is anchored; fields null when values missing or non-numeric.
+   */
+  bulkheadInnerSplits: null | {
+    signNote: string;
+    /** FF−FR (upper inner). */
+    frontUpperInnerMm: number | null;
+    /** RF−RR (upper inner). */
+    rearUpperInnerMm: number | null;
+    /** FF−FR (under lower) → anti-dive split. */
+    frontUnderLowerMm: number | null;
+    /** RF−RR (under lower) → anti-squat split. */
+    rearUnderLowerMm: number | null;
+    frontUpperInnerAvgMm: number | null;
+    rearUpperInnerAvgMm: number | null;
+    upperInnerFrontAvgMinusRearAvgMm: number | null;
+    frontUnderLowerAvgMm: number | null;
+    rearUnderLowerAvgMm: number | null;
+    underLowerFrontAvgMinusRearAvgMm: number | null;
+  };
 };
 
 const runSelectRich = {
@@ -154,6 +180,7 @@ export async function buildEngineerRichContextV1(params: {
         sourcePath: k.sourcePath,
       })),
       parameterIntentMatches,
+      bulkheadInnerSplits: null,
     };
   }
 
@@ -215,6 +242,22 @@ export async function buildEngineerRichContextV1(params: {
     `${garageNote}${communityNote}` +
     " Only chassis/suspension tuning parameters are included (excludes motor, pinion, wing, ESC, etc.). Each row includes spreadSource: community_eligible_uploads vs your_garage when numeric bands apply.";
 
+  const setupData = normalizeSetupData(run.setupSnapshot?.data);
+  const splitMm = computeBulkheadInnerSplitsMm(setupData);
+  const bulkheadInnerSplits = {
+    signNote: BULKHEAD_INNER_SPLIT_SIGN_NOTE,
+    frontUpperInnerMm: splitMm.frontUpperInnerMm,
+    rearUpperInnerMm: splitMm.rearUpperInnerMm,
+    frontUnderLowerMm: splitMm.frontUnderLowerMm,
+    rearUnderLowerMm: splitMm.rearUnderLowerMm,
+    frontUpperInnerAvgMm: splitMm.frontUpperInnerAvgMm,
+    rearUpperInnerAvgMm: splitMm.rearUpperInnerAvgMm,
+    upperInnerFrontAvgMinusRearAvgMm: splitMm.upperInnerFrontAvgMinusRearAvgMm,
+    frontUnderLowerAvgMm: splitMm.frontUnderLowerAvgMm,
+    rearUnderLowerAvgMm: splitMm.rearUnderLowerAvgMm,
+    underLowerFrontAvgMinusRearAvgMm: splitMm.underLowerFrontAvgMinusRearAvgMm,
+  };
+
   return {
     version: 1,
     generatedAtIso: new Date().toISOString(),
@@ -262,5 +305,6 @@ export async function buildEngineerRichContextV1(params: {
       sourcePath: k.sourcePath,
     })),
     parameterIntentMatches,
+    bulkheadInnerSplits,
   };
 }

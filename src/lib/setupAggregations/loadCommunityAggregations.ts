@@ -96,6 +96,82 @@ export async function loadCommunityAggregationsForBucket(
   return [...merged.values()];
 }
 
+/** Prefer the row with more samples when the same parameter appears twice (e.g. asphalt vs carpet). */
+function mergeCommunityRowsPreferHigherSample(
+  a: CommunityAggregationRow[],
+  b: CommunityAggregationRow[]
+): CommunityAggregationRow[] {
+  const byKey = new Map<string, CommunityAggregationRow>();
+  for (const r of [...a, ...b]) {
+    const prev = byKey.get(r.parameterKey);
+    if (!prev || r.sampleCount > prev.sampleCount) byKey.set(r.parameterKey, r);
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * When the anchored setup has no `track_surface`, load community stats for **both** asphalt and
+ * carpet and pick the stronger row per parameter. Same template bucket as a single surface — avoids
+ * dropping community spread for cars/runs that never filled track_surface on the sheet.
+ */
+export async function loadCommunityAggregationsMergedSurfaces(args: {
+  setupSheetTemplate: string;
+  gripLevel: GripBucket;
+  parameterKeys?: string[];
+}): Promise<CommunityAggregationRow[]> {
+  const { setupSheetTemplate, gripLevel, parameterKeys } = args;
+  const [asphalt, carpet] = await Promise.all([
+    loadCommunityAggregationsForBucket({
+      setupSheetTemplate,
+      trackSurface: "asphalt",
+      gripLevel,
+      parameterKeys,
+    }),
+    loadCommunityAggregationsForBucket({
+      setupSheetTemplate,
+      trackSurface: "carpet",
+      gripLevel,
+      parameterKeys,
+    }),
+  ]);
+  return mergeCommunityRowsPreferHigherSample(asphalt, carpet);
+}
+
+function mergeGripTrendByParameterMaps(a: GripTrendByParameter, b: GripTrendByParameter): GripTrendByParameter {
+  const out: GripTrendByParameter = new Map();
+  const allParams = new Set<string>([...a.keys(), ...b.keys()]);
+  for (const pk of allParams) {
+    const pa = a.get(pk);
+    const pb = b.get(pk);
+    if (!pa && !pb) continue;
+    const merged: Partial<Record<GripBucket, GripTrendBucketStats>> = {};
+    const bucketNames = new Set<GripBucket>();
+    if (pa) for (const k of Object.keys(pa) as GripBucket[]) bucketNames.add(k);
+    if (pb) for (const k of Object.keys(pb) as GripBucket[]) bucketNames.add(k);
+    for (const gl of bucketNames) {
+      const sa = pa?.[gl];
+      const sb = pb?.[gl];
+      if (sa && sb) merged[gl] = sa.sampleCount >= sb.sampleCount ? sa : sb;
+      else merged[gl] = sa ?? sb!;
+    }
+    out.set(pk, merged);
+  }
+  return out;
+}
+
+/** Grip-trend strips for both surfaces merged per (parameter, grip bucket) by higher sampleCount. */
+export async function loadCommunityNumericGripTrendsMergedSurfaces(args: {
+  setupSheetTemplate: string;
+  parameterKeys?: string[];
+}): Promise<GripTrendByParameter> {
+  const { setupSheetTemplate, parameterKeys } = args;
+  const [ta, tc] = await Promise.all([
+    loadCommunityNumericGripTrendsForBucket({ setupSheetTemplate, trackSurface: "asphalt", parameterKeys }),
+    loadCommunityNumericGripTrendsForBucket({ setupSheetTemplate, trackSurface: "carpet", parameterKeys }),
+  ]);
+  return mergeGripTrendByParameterMaps(ta, tc);
+}
+
 /**
  * Per-parameter low/medium/high/any median summary ("does this param trend with grip?").
  *

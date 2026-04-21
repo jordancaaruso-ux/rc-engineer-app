@@ -30,8 +30,10 @@ import {
   collapseSetupDiffRowsForEngineer,
 } from "@/lib/engineerPhase5/collapseSetupDiffForEngineer";
 import {
+  buildBulkheadFrontVsRearAvgCompareNote,
   buildFrontRearAxleNetNotes,
   buildLowerArmAntiGeometryNotes,
+  buildUpperInnerBulkheadSplitNotes,
 } from "@/lib/engineerPhase5/setupCompareAxleNet";
 
 export type EngineerContextPacketV1 = {
@@ -288,7 +290,7 @@ const SETUP_COMPARE_COLUMN_NOTE =
   "Change compare→primary (shim stack mm): primary minus compare — positive means a raised stack on primary vs compare. " +
   "Do not swap columns or invert this sign. Use `rcEffectHints` for roll-centre direction on upper inner and under lower arm shims. " +
   SETUP_COMPARE_CORNER_KEY_LEGEND +
-  " When front-left and front-right (or rear-left and rear-right) show the same compare→primary change, the table uses one merged row—do not repeat the same axle twice.";
+  " When both inner pickups on an axle (FF & FR or RF & RR) show the same compare→primary change, the table uses one merged row—do not repeat the same axle twice.";
 
 /** User-selected runs for engineer chat (lap + setup diff + imported drivers on primary). */
 export type EngineerFocusedRunPairContext = {
@@ -340,10 +342,15 @@ export type EngineerFocusedRunPairContext = {
     frontAxleNetNote: string | null;
     rearAxleNetNote: string | null;
     /**
-     * Left–right inner lower arm split (FF–FR / RF–RR) for anti-dive / anti-squat vs averaged RC on the axle.
+     * Under–lower-arm bulkhead pickup split (FF–FR / RF–RR) for anti-dive / anti-squat vs averaged RC on the axle.
      */
     frontLowerArmAntiGeometryNote: string | null;
     rearLowerArmAntiGeometryNote: string | null;
+    /** Upper-inner bulkhead pickup split vs compare (forward vs rearward inner stacks on the axle). */
+    frontUpperInnerBulkheadSplitNote: string | null;
+    rearUpperInnerBulkheadSplitNote: string | null;
+    /** mean(FF,FR) vs mean(RF,RR) for upper inner and under lower; f_avg − r_avg compare→primary. */
+    bulkheadFrontVsRearAvgNote: string | null;
   };
   importedDriversOnPrimary: Array<{
     label: string;
@@ -599,6 +606,9 @@ export async function buildFocusedRunPairContext(
         rearAxleNetNote: null,
         frontLowerArmAntiGeometryNote: null,
         rearLowerArmAntiGeometryNote: null,
+        frontUpperInnerBulkheadSplitNote: null,
+        rearUpperInnerBulkheadSplitNote: null,
+        bulkheadFrontVsRearAvgNote: null,
       };
     } else {
       const a = normalizeSetupData(primary.setupSnapshot?.data);
@@ -620,6 +630,9 @@ export async function buildFocusedRunPairContext(
       const { frontAxleNetNote, rearAxleNetNote } = buildFrontRearAxleNetNotes(changedRowsRaw);
       const { frontLowerArmAntiGeometryNote, rearLowerArmAntiGeometryNote } =
         buildLowerArmAntiGeometryNotes(a, b);
+      const { frontUpperInnerBulkheadSplitNote, rearUpperInnerBulkheadSplitNote } =
+        buildUpperInnerBulkheadSplitNotes(a, b);
+      const bulkheadFrontVsRearAvgNote = buildBulkheadFrontVsRearAvgCompareNote(a, b);
       setupComparison = {
         comparable: true,
         reasonIfNot: null,
@@ -634,6 +647,9 @@ export async function buildFocusedRunPairContext(
         rearAxleNetNote,
         frontLowerArmAntiGeometryNote,
         rearLowerArmAntiGeometryNote,
+        frontUpperInnerBulkheadSplitNote,
+        rearUpperInnerBulkheadSplitNote,
+        bulkheadFrontVsRearAvgNote,
       };
       if (rawChangedCount > 0) {
         let kbQuery = buildVehicleDynamicsKbQueryFromChangedKeys(changedKeysInSlice);
@@ -641,7 +657,7 @@ export async function buildFocusedRunPairContext(
           kbQuery += " upper link balance front rear roll centre";
         }
         if (changedKeysInSlice.some((k) => k.startsWith("under_lower_arm"))) {
-          kbQuery += " anti dive anti squat asymmetric lower arm";
+          kbQuery += " anti dive anti squat bulkhead pickup split lower arm";
         }
         setupCompareKbSnippets = await searchVehicleDynamicsKb(kbQuery, 10);
       }

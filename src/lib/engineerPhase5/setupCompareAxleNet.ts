@@ -2,10 +2,25 @@ import "server-only";
 
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import { parseSetupShimMm } from "@/lib/engineerPhase5/rcEffectHintsFromSetupComparison";
+import {
+  BULKHEAD_SPLIT_EPS_MM,
+  frontUnderLowerBulkheadSplitMm,
+  rearUnderLowerBulkheadSplitMm,
+  frontUpperInnerBulkheadSplitMm,
+  rearUpperInnerBulkheadSplitMm,
+  frontUpperInnerAvgMm,
+  rearUpperInnerAvgMm,
+  upperInnerFrontAvgMinusRearAvgMm,
+  frontUnderLowerAvgMm,
+  rearUnderLowerAvgMm,
+  underLowerFrontAvgMinusRearAvgMm,
+} from "@/lib/engineerPhase5/setupBulkheadInnerSplits";
 
 const EPS = 1e-4;
-/** Left–right inner-lower split treated as symmetric below this (mm). */
-const SPLIT_EPS = 0.02;
+const SPLIT_EPS = BULKHEAD_SPLIT_EPS_MM;
+/** Averaged inner delta can hide a material pickup split when per-corner deltas disagree. */
+const PICKUP_DELTA_SPREAD_MM = 0.05;
+const PICKUP_AVG_SMALL_MM = 0.05;
 
 export type SetupCompareRow = { key: string; label: string; primary: string; compare: string };
 
@@ -27,6 +42,22 @@ function avgDeltaForKeys(rows: SetupCompareRow[], keys: readonly string[]): numb
   }
   if (ds.length === 0) return null;
   return ds.reduce((a, b) => a + b, 0) / ds.length;
+}
+
+function deltaForKey(rows: SetupCompareRow[], key: string): number | null {
+  const row = rows.find((r) => r.key === key);
+  return row ? deltaRow(row) : null;
+}
+
+/**
+ * True when the two per-corner upper-inner compare→primary deltas differ materially
+ * but their average is small — averaged RC line in the axle note can mislead.
+ */
+function upperInnerAverageHidesPickupDelta(dA: number | null, dB: number | null): boolean {
+  if (dA == null || dB == null) return false;
+  const avg = (dA + dB) / 2;
+  if (Math.abs(dA - dB) < PICKUP_DELTA_SPREAD_MM) return false;
+  return Math.abs(avg) < PICKUP_AVG_SMALL_MM;
 }
 
 /** RC tendency: -1 = lowers RC, +1 = raises RC (platform rules). */
@@ -60,14 +91,15 @@ function buildOneAxleNetNote(
   end: "Front" | "Rear",
   dUI: number | null,
   dUO: number | null,
-  dULA: number | null
+  dULA: number | null,
+  bulkheadPickupCaveat: string | null
 ): string | null {
   if (
     (dUI == null || Math.abs(dUI) < EPS) &&
     (dUO == null || Math.abs(dUO) < EPS) &&
     (dULA == null || Math.abs(dULA) < EPS)
   ) {
-    return null;
+    return bulkheadPickupCaveat ? `${end} axle (compare→primary): ${bulkheadPickupCaveat}` : null;
   }
 
   const parts: string[] = [];
@@ -123,7 +155,8 @@ function buildOneAxleNetNote(
     else angleBit = " Upper-link angle: **mixed** (inner vs outer oppose).";
   }
 
-  return `${end} axle (compare→primary): ${parts.join(" ")} **Combined RC tendency:** ${netSentence}${angleBit}`;
+  const caveatBit = bulkheadPickupCaveat ? ` ${bulkheadPickupCaveat}` : "";
+  return `${end} axle (compare→primary): ${parts.join(" ")} **Combined RC tendency:** ${netSentence}${angleBit}${caveatBit}`;
 }
 
 /**
@@ -134,6 +167,11 @@ export function buildFrontRearAxleNetNotes(rows: SetupCompareRow[]): {
   frontAxleNetNote: string | null;
   rearAxleNetNote: string | null;
 } {
+  const dUIff = deltaForKey(rows, "upper_inner_shims_ff");
+  const dUIfr = deltaForKey(rows, "upper_inner_shims_fr");
+  const dUIrf = deltaForKey(rows, "upper_inner_shims_rf");
+  const dUIrr = deltaForKey(rows, "upper_inner_shims_rr");
+
   const dUIFront = avgDeltaForKeys(rows, ["upper_inner_shims_ff", "upper_inner_shims_fr"]);
   const dUIRear = avgDeltaForKeys(rows, ["upper_inner_shims_rf", "upper_inner_shims_rr"]);
 
@@ -145,36 +183,20 @@ export function buildFrontRearAxleNetNotes(rows: SetupCompareRow[]): {
     ? deltaRow(map.get("upper_outer_shims_rear")!)
     : null;
 
-  /** Averaged per axle — intended for roll-centre / support net with upper link; not left–right anti geometry. */
   const dULAFront = avgDeltaForKeys(rows, ["under_lower_arm_shims_ff", "under_lower_arm_shims_fr"]);
   const dULARear = avgDeltaForKeys(rows, ["under_lower_arm_shims_rf", "under_lower_arm_shims_rr"]);
 
+  const frontCaveat = upperInnerAverageHidesPickupDelta(dUIff, dUIfr)
+    ? "**Pickup split:** averaged upper-inner delta is small but FF vs FR compare→primary deltas **differ materially**—read **frontUpperInnerBulkheadSplitNote**; do not treat the average alone as the full upper-inner story."
+    : null;
+  const rearCaveat = upperInnerAverageHidesPickupDelta(dUIrf, dUIrr)
+    ? "**Pickup split:** averaged upper-inner delta is small but RF vs RR compare→primary deltas **differ materially**—read **rearUpperInnerBulkheadSplitNote**; do not treat the average alone as the full upper-inner story."
+    : null;
+
   return {
-    frontAxleNetNote: buildOneAxleNetNote("Front", dUIFront, dUOFront, dULAFront),
-    rearAxleNetNote: buildOneAxleNetNote("Rear", dUIRear, dUORear, dULARear),
+    frontAxleNetNote: buildOneAxleNetNote("Front", dUIFront, dUOFront, dULAFront, frontCaveat),
+    rearAxleNetNote: buildOneAxleNetNote("Rear", dUIRear, dUORear, dULARear, rearCaveat),
   };
-}
-
-function shimMm(data: SetupSnapshotData, key: string): number | null {
-  const v = data[key];
-  if (v == null) return null;
-  return parseSetupShimMm(String(v));
-}
-
-/** FF − FR (mm). Null if either corner missing/unparseable. */
-export function frontLowerArmLeftRightSplitMm(data: SetupSnapshotData): number | null {
-  const ff = shimMm(data, "under_lower_arm_shims_ff");
-  const fr = shimMm(data, "under_lower_arm_shims_fr");
-  if (ff == null || fr == null) return null;
-  return ff - fr;
-}
-
-/** RF − RR (mm). Null if either corner missing/unparseable. */
-export function rearLowerArmLeftRightSplitMm(data: SetupSnapshotData): number | null {
-  const rf = shimMm(data, "under_lower_arm_shims_rf");
-  const rr = shimMm(data, "under_lower_arm_shims_rr");
-  if (rf == null || rr == null) return null;
-  return rf - rr;
 }
 
 function formatSplitMm(split: number): string {
@@ -182,7 +204,69 @@ function formatSplitMm(split: number): string {
   return split >= 0 ? `+${s}` : s;
 }
 
-function buildAntiGeometryLine(params: {
+function higherKeyForSplit(diffLabel: "FF−FR" | "RF−RR", split: number): string {
+  if (diffLabel === "FF−FR") return split > 0 ? "FF" : "FR";
+  return split > 0 ? "RF" : "RR";
+}
+
+function lowerKeyForSplit(diffLabel: "FF−FR" | "RF−RR", split: number): string {
+  if (diffLabel === "FF−FR") return split > 0 ? "FR" : "FF";
+  return split > 0 ? "RR" : "RF";
+}
+
+function buildUpperInnerBulkheadSplitLine(params: {
+  end: "Front" | "Rear";
+  diffLabel: "FF−FR" | "RF−RR";
+  splitPrimary: number | null;
+  splitCompare: number | null;
+}): string | null {
+  const { end, diffLabel, splitPrimary, splitCompare } = params;
+  if (splitPrimary == null && splitCompare == null) return null;
+
+  const parts: string[] = [];
+  parts.push(
+    `${end} **upper-inner bulkhead pickup split** (${diffLabel} mm) — differential between the two chassis-side upper-inner stacks on this axle (forward vs rearward along the bulkhead); steers **upper-link angle along the car**. Separate from **averaged** upper-inner wording in ${end === "Front" ? "front" : "rear"}AxleNetNote; combine with upper outer + vehicleDynamicsKb for **net** link line / RC.`
+  );
+
+  if (splitPrimary != null) {
+    if (Math.abs(splitPrimary) < SPLIT_EPS) {
+      parts.push(`Primary: **no pickup differential** (${diffLabel} ${formatSplitMm(splitPrimary)}).`);
+    } else {
+      const hi = higherKeyForSplit(diffLabel, splitPrimary);
+      const lo = lowerKeyForSplit(diffLabel, splitPrimary);
+      parts.push(
+        `Primary: **non-zero pickup differential** (${diffLabel} ${formatSplitMm(splitPrimary)}; **${hi}** inner stack higher than **${lo}**).`
+      );
+    }
+  } else {
+    parts.push("Primary: upper-inner FF/FR or RF/RR values incomplete — split unknown.");
+  }
+
+  if (splitCompare != null) {
+    if (Math.abs(splitCompare) < SPLIT_EPS) {
+      parts.push(`Compare: **no pickup differential** (${diffLabel} ${formatSplitMm(splitCompare)}).`);
+    } else {
+      parts.push(`Compare: **non-zero pickup differential** (${diffLabel} ${formatSplitMm(splitCompare)}).`);
+    }
+  } else {
+    parts.push("Compare: upper-inner values incomplete — split unknown.");
+  }
+
+  if (splitPrimary != null && splitCompare != null) {
+    const dSplit = splitPrimary - splitCompare;
+    if (Math.abs(dSplit) < SPLIT_EPS) {
+      parts.push("Pickup split **unchanged** compare→primary.");
+    } else {
+      parts.push(
+        `Split change compare→primary: **${formatSplitMm(dSplit)}** mm (${dSplit > 0 ? "more" : "less"} pickup differential on primary).`
+      );
+    }
+  }
+
+  return parts.join(" ");
+}
+
+function buildUnderLowerBulkheadSplitLine(params: {
   end: "Front" | "Rear";
   antiLabel: "anti-dive" | "anti-squat";
   diffLabel: "FF−FR" | "RF−RR";
@@ -192,34 +276,24 @@ function buildAntiGeometryLine(params: {
   const { end, antiLabel, diffLabel, splitPrimary, splitCompare } = params;
   if (splitPrimary == null && splitCompare == null) return null;
 
+  const antiExplain =
+    end === "Front"
+      ? "**Anti-dive** — **FF vs FR** inner-lower stacks (pickup split FF−FR)."
+      : "**Anti-squat** — **RF vs RR** inner-lower stacks (pickup split RF−RR).";
+
   const parts: string[] = [];
   parts.push(
-    `${end} inner-lower left–right split (${diffLabel} mm) — **${antiLabel}** geometry (side-view lower-arm asymmetry); separate from **averaged** under–lower-arm RC height in ${end.toLowerCase()}AxleNetNote.`
+    `${end} **under–lower-arm bulkhead pickup split** (${diffLabel} mm) — ${antiExplain} Side-view geometry between forward vs rearward chassis pickups; separate from **averaged** under–lower-arm RC height in ${end === "Front" ? "front" : "rear"}AxleNetNote.`
   );
 
   if (splitPrimary != null) {
-    const sym = Math.abs(splitPrimary) < SPLIT_EPS;
-    if (sym) {
-      parts.push(`Primary: **symmetric** (${diffLabel} ${formatSplitMm(splitPrimary)}).`);
+    if (Math.abs(splitPrimary) < SPLIT_EPS) {
+      parts.push(`Primary: **no pickup differential** (${diffLabel} ${formatSplitMm(splitPrimary)}).`);
     } else {
-      const hi =
-        diffLabel === "FF−FR"
-          ? splitPrimary > 0
-            ? "FF"
-            : "FR"
-          : splitPrimary > 0
-            ? "RF"
-            : "RR";
-      const lo =
-        diffLabel === "FF−FR"
-          ? splitPrimary > 0
-            ? "FR"
-            : "FF"
-          : splitPrimary > 0
-            ? "RR"
-            : "RF";
+      const hi = higherKeyForSplit(diffLabel, splitPrimary);
+      const lo = lowerKeyForSplit(diffLabel, splitPrimary);
       parts.push(
-        `Primary: **asymmetric** (${diffLabel} ${formatSplitMm(splitPrimary)}; ${hi} inner-lower stack higher than ${lo}).`
+        `Primary: **non-zero pickup differential** (${diffLabel} ${formatSplitMm(splitPrimary)}; **${hi}** inner-lower stack higher than **${lo}**).`
       );
     }
   } else {
@@ -227,12 +301,11 @@ function buildAntiGeometryLine(params: {
   }
 
   if (splitCompare != null) {
-    const sym = Math.abs(splitCompare) < SPLIT_EPS;
-    parts.push(
-      sym
-        ? `Compare: **symmetric** (${diffLabel} ${formatSplitMm(splitCompare)}).`
-        : `Compare: **asymmetric** (${diffLabel} ${formatSplitMm(splitCompare)}).`
-    );
+    if (Math.abs(splitCompare) < SPLIT_EPS) {
+      parts.push(`Compare: **no pickup differential** (${diffLabel} ${formatSplitMm(splitCompare)}).`);
+    } else {
+      parts.push(`Compare: **non-zero pickup differential** (${diffLabel} ${formatSplitMm(splitCompare)}).`);
+    }
   } else {
     parts.push("Compare: inner-lower values incomplete — split unknown.");
   }
@@ -240,10 +313,10 @@ function buildAntiGeometryLine(params: {
   if (splitPrimary != null && splitCompare != null) {
     const dSplit = splitPrimary - splitCompare;
     if (Math.abs(dSplit) < SPLIT_EPS) {
-      parts.push("Left–right split **unchanged** compare→primary.");
+      parts.push("Pickup split **unchanged** compare→primary.");
     } else {
       parts.push(
-        `Split change compare→primary: **${formatSplitMm(dSplit)}** mm (${dSplit > 0 ? "more" : "less"} asymmetry on primary).`
+        `Split change compare→primary: **${formatSplitMm(dSplit)}** mm (${dSplit > 0 ? "more" : "less"} pickup differential on primary).`
       );
     }
   }
@@ -251,9 +324,31 @@ function buildAntiGeometryLine(params: {
   return parts.join(" ");
 }
 
+export function buildUpperInnerBulkheadSplitNotes(
+  primarySetup: SetupSnapshotData,
+  compareSetup: SetupSnapshotData
+): {
+  frontUpperInnerBulkheadSplitNote: string | null;
+  rearUpperInnerBulkheadSplitNote: string | null;
+} {
+  return {
+    frontUpperInnerBulkheadSplitNote: buildUpperInnerBulkheadSplitLine({
+      end: "Front",
+      diffLabel: "FF−FR",
+      splitPrimary: frontUpperInnerBulkheadSplitMm(primarySetup),
+      splitCompare: frontUpperInnerBulkheadSplitMm(compareSetup),
+    }),
+    rearUpperInnerBulkheadSplitNote: buildUpperInnerBulkheadSplitLine({
+      end: "Rear",
+      diffLabel: "RF−RR",
+      splitPrimary: rearUpperInnerBulkheadSplitMm(primarySetup),
+      splitCompare: rearUpperInnerBulkheadSplitMm(compareSetup),
+    }),
+  };
+}
+
 /**
- * Left–right inner lower arm positions (FF vs FR, RF vs RR) for anti-dive / anti-squat reasoning.
- * Roll-centre net on each axle still uses averaged under–lower-arm delta in `buildFrontRearAxleNetNotes`.
+ * Under–lower-arm bulkhead pickup split (FF−FR / RF−RR) for anti-dive / anti-squat vs averaged RC on the axle.
  */
 export function buildLowerArmAntiGeometryNotes(
   primarySetup: SetupSnapshotData,
@@ -262,25 +357,69 @@ export function buildLowerArmAntiGeometryNotes(
   frontLowerArmAntiGeometryNote: string | null;
   rearLowerArmAntiGeometryNote: string | null;
 } {
-  const sp = frontLowerArmLeftRightSplitMm(primarySetup);
-  const sc = frontLowerArmLeftRightSplitMm(compareSetup);
-  const srP = rearLowerArmLeftRightSplitMm(primarySetup);
-  const srC = rearLowerArmLeftRightSplitMm(compareSetup);
-
   return {
-    frontLowerArmAntiGeometryNote: buildAntiGeometryLine({
+    frontLowerArmAntiGeometryNote: buildUnderLowerBulkheadSplitLine({
       end: "Front",
       antiLabel: "anti-dive",
       diffLabel: "FF−FR",
-      splitPrimary: sp,
-      splitCompare: sc,
+      splitPrimary: frontUnderLowerBulkheadSplitMm(primarySetup),
+      splitCompare: frontUnderLowerBulkheadSplitMm(compareSetup),
     }),
-    rearLowerArmAntiGeometryNote: buildAntiGeometryLine({
+    rearLowerArmAntiGeometryNote: buildUnderLowerBulkheadSplitLine({
       end: "Rear",
       antiLabel: "anti-squat",
       diffLabel: "RF−RR",
-      splitPrimary: srP,
-      splitCompare: srC,
+      splitPrimary: rearUnderLowerBulkheadSplitMm(primarySetup),
+      splitCompare: rearUnderLowerBulkheadSplitMm(compareSetup),
     }),
   };
 }
+
+function fmtAvg(n: number): string {
+  return n.toFixed(2);
+}
+
+/**
+ * Front mean (FF+FR)/2 vs rear mean (RF+RR)/2 for upper inner and under lower — compare→primary deltas of (f_avg − r_avg).
+ */
+export function buildBulkheadFrontVsRearAvgCompareNote(
+  primarySetup: SetupSnapshotData,
+  compareSetup: SetupSnapshotData
+): string | null {
+  const uPf = frontUpperInnerAvgMm(primarySetup);
+  const uPr = rearUpperInnerAvgMm(primarySetup);
+  const uCf = frontUpperInnerAvgMm(compareSetup);
+  const uCr = rearUpperInnerAvgMm(compareSetup);
+  const uBalP = upperInnerFrontAvgMinusRearAvgMm(primarySetup);
+  const uBalC = upperInnerFrontAvgMinusRearAvgMm(compareSetup);
+
+  const lPf = frontUnderLowerAvgMm(primarySetup);
+  const lPr = rearUnderLowerAvgMm(primarySetup);
+  const lCf = frontUnderLowerAvgMm(compareSetup);
+  const lCr = rearUnderLowerAvgMm(compareSetup);
+  const lBalP = underLowerFrontAvgMinusRearAvgMm(primarySetup);
+  const lBalC = underLowerFrontAvgMinusRearAvgMm(compareSetup);
+
+  const parts: string[] = [];
+
+  if (uPf != null && uPr != null && uCf != null && uCr != null && uBalP != null && uBalC != null) {
+    const dBal = uBalP - uBalC;
+    parts.push(
+      `Upper inner **front avg vs rear avg** (mean(FF,FR) mm vs mean(RF,RR) mm): primary front ${fmtAvg(uPf)} rear ${fmtAvg(uPr)} (**f_avg − r_avg** ${formatSplitMm(uBalP)}); compare front ${fmtAvg(uCf)} rear ${fmtAvg(uCr)} (**f_avg − r_avg** ${formatSplitMm(uBalC)}); change in (**f_avg − r_avg**) compare→primary **${formatSplitMm(dBal)}** mm.`
+    );
+  }
+
+  if (lPf != null && lPr != null && lCf != null && lCr != null && lBalP != null && lBalC != null) {
+    const dBal = lBalP - lBalC;
+    parts.push(
+      `Under lower **front avg vs rear avg**: primary front ${fmtAvg(lPf)} rear ${fmtAvg(lPr)} (**f_avg − r_avg** ${formatSplitMm(lBalP)}); compare front ${fmtAvg(lCf)} rear ${fmtAvg(lCr)} (**f_avg − r_avg** ${formatSplitMm(lBalC)}); change compare→primary **${formatSplitMm(dBal)}** mm. **Anti-dive** = FF−FR split; **anti-squat** = RF−RR split (separate from these axle means).`
+    );
+  }
+
+  return parts.length ? parts.join(" ") : null;
+}
+
+/** @deprecated Use frontUnderLowerBulkheadSplitMm from setupBulkheadInnerSplits. */
+export const frontLowerArmLeftRightSplitMm = frontUnderLowerBulkheadSplitMm;
+/** @deprecated Use rearUnderLowerBulkheadSplitMm from setupBulkheadInnerSplits. */
+export const rearLowerArmLeftRightSplitMm = rearUnderLowerBulkheadSplitMm;
