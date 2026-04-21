@@ -1,10 +1,13 @@
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import {
   getCurrentPracticeDayUrlSetting,
   getLiveRcDriverNameSetting,
   getMyNameSetting,
 } from "@/lib/appSettings";
 import { SettingsClient } from "@/components/settings/SettingsClient";
+import { AccountSection } from "@/components/settings/AccountSection";
+import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +21,7 @@ export default async function SettingsPage() {
       </div>
     );
   }
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const [myName, liveRcDriverName, currentPracticeDayUrl] = await Promise.all([
     getMyNameSetting(user.id),
     getLiveRcDriverNameSetting(user.id),
@@ -39,6 +42,8 @@ export default async function SettingsPage() {
             currentPracticeDayUrl: currentPracticeDayUrl ?? "",
           }}
         />
+        <AccountSection email={user.email ?? ""} />
+        {isAuthAdminEmail(user.email) ? <AllowlistAdminSection /> : null}
       </div>
     </div>
   );

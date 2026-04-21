@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import {
   normalizeSetupSnapshotForStorage,
@@ -34,7 +34,8 @@ export async function PATCH(
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
 
   const existing = await prisma.run.findFirst({

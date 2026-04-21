@@ -91,8 +91,12 @@ const SETUP_INTENT_HINTS = [
   "mid-corner",
 ];
 
-/** Canonical rear parameter keys + prose tokens likely to appear in rear-focused KB sections. */
-const REAR_PARAM_VOCAB = [
+/**
+ * Canonical rear parameter keys + prose tokens likely to appear in rear-focused KB sections.
+ * Exported as an array so `vehicleDynamicsKb.ts` can run a guaranteed-coverage pass for any
+ * canonical key the user's expanded query named.
+ */
+export const REAR_PARAM_VOCAB_KEYS: readonly string[] = [
   "rear",
   "toe_rear",
   "camber_rear",
@@ -122,10 +126,14 @@ const REAR_PARAM_VOCAB = [
   "under lower arm",
   "bump steer",
   "diff oil",
-].join(" ");
+];
+const REAR_PARAM_VOCAB = REAR_PARAM_VOCAB_KEYS.join(" ");
 
-/** Canonical front parameter keys + prose tokens likely to appear in front-focused KB sections. */
-const FRONT_PARAM_VOCAB = [
+/**
+ * Canonical front parameter keys + prose tokens likely to appear in front-focused KB sections.
+ * Exported as an array so `vehicleDynamicsKb.ts` can run a guaranteed-coverage pass.
+ */
+export const FRONT_PARAM_VOCAB_KEYS: readonly string[] = [
   "front",
   "toe_front",
   "camber_front",
@@ -153,7 +161,8 @@ const FRONT_PARAM_VOCAB = [
   "upper inner",
   "under lower arm",
   "bump steer",
-].join(" ");
+];
+const FRONT_PARAM_VOCAB = FRONT_PARAM_VOCAB_KEYS.join(" ");
 
 /** Vocabulary that highlights damper / spring / flex chunks for bumps-related questions. */
 const BUMPS_VOCAB = [

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { syncActionItemsFromLogFormDraft } from "@/lib/actionItems";
 
@@ -10,7 +10,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   try {
-    const user = await getOrCreateLocalUser();
+    const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json()) as { suggestedChanges?: string | null };
     const suggestedChanges =
       typeof body.suggestedChanges === "string" ? body.suggestedChanges : body.suggestedChanges ?? null;

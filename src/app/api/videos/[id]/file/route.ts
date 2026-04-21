@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { readVideoBytesFromStorageRef } from "@/lib/videos/storage";
 
@@ -37,7 +37,8 @@ export async function GET(request: Request, ctx: Ctx) {
   }
 
   const { id } = await ctx.params;
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const asset = await prisma.videoAsset.findFirst({
     where: { id, userId: user.id },
     select: { storagePath: true, mimeType: true, originalFilename: true, bytes: true },

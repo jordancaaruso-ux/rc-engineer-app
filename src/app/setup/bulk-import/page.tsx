@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { BulkImportHubClient } from "@/components/setup/BulkImportHubClient";
 
@@ -24,7 +24,7 @@ export default async function BulkImportPage(): Promise<ReactNode> {
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const [batches, cars] = await Promise.all([
     prisma.setupImportBatch.findMany({
     where: { userId: user.id },

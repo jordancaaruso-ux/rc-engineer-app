@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const links = await prisma.teammateLink.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
@@ -31,7 +32,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { email?: string } | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!email || !email.includes("@")) {

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { SetupAggregationsDebugClient } from "@/components/setup/SetupAggregationsDebugClient";
 
@@ -21,7 +21,7 @@ export default async function SetupAggregationsDebugPage(): Promise<ReactNode> {
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const cars = await prisma.car.findMany({
     where: { userId: user.id },
     orderBy: { name: "asc" },

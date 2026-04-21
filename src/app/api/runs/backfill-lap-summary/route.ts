@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { computePersistedRunLapSummary } from "@/lib/lapAnalysis";
 
@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let limit = 2000;
   try {

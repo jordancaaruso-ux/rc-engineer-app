@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Suspense } from "react";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { EngineerPageClient } from "@/components/engineer/EngineerPageClient";
 
@@ -20,7 +20,7 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
     );
   }
 
-  await getOrCreateLocalUser();
+  await requireCurrentUser();
 
   return (
     <>

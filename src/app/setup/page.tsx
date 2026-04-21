@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { NewSetupUploadButton } from "@/components/setup/NewSetupUploadButton";
@@ -49,7 +49,7 @@ export default async function SetupPage({
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const [documents, runs, calibrations, cars] = await Promise.all([
     prisma.setupDocument.findMany({
       where: { userId: user.id, setupImportBatchId: null },

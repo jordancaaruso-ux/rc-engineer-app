@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 
@@ -8,7 +8,8 @@ export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rows = await prisma.importedLapTimeSession.findMany({
     where: { userId: user.id },

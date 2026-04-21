@@ -54,6 +54,8 @@ body {
 .app-shell {
   /* overflow-y visible so document scroll paints body background; clip horizontal bleed only */
   @apply relative flex min-h-screen overflow-x-hidden overflow-y-visible bg-transparent text-foreground;
+  /* Home indicator / gesture bar on iOS (Capacitor WebView). */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* NOTE: Avoid creating sibling stacking contexts here.

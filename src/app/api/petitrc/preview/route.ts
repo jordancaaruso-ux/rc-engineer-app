@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { discoverPetitRcSetupPdfs } from "@/lib/petitrc/discoverPetitRcPdfs";
 
@@ -10,7 +10,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { url?: string; maxPdfs?: number };
   const rawUrl = typeof body.url === "string" ? body.url.trim() : "";
   if (!rawUrl) return NextResponse.json({ error: "url is required" }, { status: 400 });

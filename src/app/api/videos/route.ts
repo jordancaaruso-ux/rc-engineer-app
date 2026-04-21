@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import {
   storeVideoFile,
@@ -12,7 +12,8 @@ export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const videos = await prisma.videoAsset.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ct = request.headers.get("content-type") ?? "";
   if (!ct.includes("multipart/form-data")) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasOpenAiApiKey, getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { prisma } from "@/lib/prisma";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
@@ -43,7 +43,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "OPENAI_API_KEY is not set" }, { status: 500 });
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => null)) as
     | { carId?: unknown; setupData?: unknown; changesText?: unknown }
     | null;

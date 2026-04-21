@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -10,8 +10,10 @@ export async function GET(_: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
+  const user = await getAuthenticatedApiUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: { id },
+    where: { id, userId: user.id },
     select: {
       id: true,
       name: true,
@@ -31,7 +33,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as {
     name?: string;
     sourceType?: string;

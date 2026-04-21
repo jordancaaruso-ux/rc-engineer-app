@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function GET() {
@@ -10,7 +10,8 @@ export async function GET() {
       { status: 500 }
     );
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const tireSets = await prisma.tireSet.findMany({
     where: { userId: user.id },
     orderBy: [{ label: "asc" }, { setNumber: "asc" }, { createdAt: "desc" }],
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
     );
   }
   try {
-    const user = await getOrCreateLocalUser();
+    const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json()) as {
       label?: string;
       setNumber?: number;

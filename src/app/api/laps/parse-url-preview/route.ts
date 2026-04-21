@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { parseTimingUrl } from "@/lib/lapUrlParsers/registry";
 import { validateTimingHttpUrl } from "@/lib/lapImport/service";
 
@@ -9,7 +9,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  await getOrCreateLocalUser();
+  const __authUser = await getAuthenticatedApiUser();
+    if (!__authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as { url?: string } | null;
   const url = body?.url?.trim() ?? "";

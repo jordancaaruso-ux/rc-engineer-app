@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { formatEventDate } from "@/lib/formatDate";
 import Link from "next/link";
@@ -28,7 +28,7 @@ export default async function EventDetailPage(props: {
   }
 
   const { eventId } = await props.params;
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, userId: user.id },

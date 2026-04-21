@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { GripArchetypesClient } from "@/components/setup/GripArchetypesClient";
@@ -22,7 +22,7 @@ export default async function CarGripArchetypesPage(props: {
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const { carId } = await props.params;
 
   const car = await prisma.car.findFirst({

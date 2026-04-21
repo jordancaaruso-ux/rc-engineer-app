@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { ensureRenderedRunSetupPdf } from "@/lib/setup/ensureRunSetupPdf";
 import { SETUP_PDF_RENDER_PIPELINE_VERSION } from "@/lib/setup/renderTypes";
@@ -15,7 +15,8 @@ export async function GET(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
   const { searchParams } = new URL(request.url);
   const download = searchParams.get("download") === "1";

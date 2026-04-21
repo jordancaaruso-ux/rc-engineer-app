@@ -1,27 +1,38 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireDatabaseUrl } from "@/lib/env";
+import type { User } from "@prisma/client";
 
 /**
- * Temporary local-user helper for early app features.
- * Once auth is added, replace this with real session-based user lookup.
+ * Authenticated user for Route Handlers — returns null with no redirect (use 401 JSON).
  */
-export async function getOrCreateLocalUser() {
+export async function getAuthenticatedApiUser(): Promise<User | null> {
   requireDatabaseUrl();
-  const email = "local@rc.engineer";
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) return existing;
-
-  return prisma.user.create({ data: { email, name: "Local User" } });
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) return null;
+  return prisma.user.findUnique({ where: { id } });
 }
 
-/** Current-user bridge for routes/pages. Replace with real auth later. */
-export async function requireCurrentUser() {
-  return getOrCreateLocalUser();
+/**
+ * Server Components / server actions — redirect to login if missing session.
+ */
+export async function requireCurrentUser(): Promise<User> {
+  requireDatabaseUrl();
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) {
+    redirect("/login");
+  }
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) {
+    redirect("/login");
+  }
+  return user;
 }
 
-/** Convenience helper when only the id is needed. */
+/** Convenience when only the id is needed (RSC). */
 export async function requireCurrentUserId(): Promise<string> {
-  const u = await requireCurrentUser();
-  return u.id;
+  return (await requireCurrentUser()).id;
 }
-

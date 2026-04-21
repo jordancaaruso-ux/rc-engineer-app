@@ -12,11 +12,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String?  @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
 
   cars            Car[]
   runs            Run[]
@@ -36,6 +41,50 @@ model User {
   videoAssets     VideoAsset[]
   teammateLinksOwned TeammateLink[] @relation("TeammateLinksOwned")
   teammateLinksPeer  TeammateLink[] @relation("TeammateLinksPeer")
+}
+
+/** Emails allowed to receive magic-link sign-in (invite list). */
+model AuthAllowedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+/** Auth.js / NextAuth — OAuth-style account linkage (email magic link uses this). */
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+/** Auth.js database sessions (kept for adapter compatibility; app uses JWT sessions in middleware). */
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 /** Viewer (`userId`) may browse peer runs in Engineer when same track (enforced in APIs + context). */
@@ -86,7 +135,7 @@ model Car {
   setupSheetTemplate String?  // "awesomatix_a800rr" | null/"none" = no sheet
   createdAt          DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs      Run[]
@@ -105,7 +154,7 @@ model Track {
   layoutTags String[] @default([])
   createdAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs            Run[]
@@ -132,7 +181,7 @@ model Event {
   notes      String?
   createdAt  DateTime  @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
@@ -163,7 +212,7 @@ model TireSet {
   notes      String?
   createdAt  DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs Run[]
@@ -178,7 +227,7 @@ model Battery {
   notes           String?
   createdAt       DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs Run[]
@@ -190,7 +239,7 @@ model SetupSnapshot {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)
@@ -442,7 +491,7 @@ model Run {
   carNameSnapshot      String?
   trackNameSnapshot    String?
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)

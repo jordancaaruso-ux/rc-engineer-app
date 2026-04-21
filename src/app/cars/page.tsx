@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { CarList } from "@/components/cars/CarList";
 
@@ -26,7 +26,7 @@ export default async function CarManagerPage(): Promise<ReactNode> {
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const cars = await prisma.car.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },

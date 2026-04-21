@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { NewRunForm } from "@/components/runs/NewRunForm";
@@ -28,7 +28,7 @@ export default async function EditRunPage({
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const { id } = await params;
   const sp = await searchParams;
   const dashboardPrefill = await getDashboardNewRunPrefill(user.id, sp);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import type { NumericStats } from "@/lib/setupAggregations/numericStats";
 import {
@@ -53,7 +53,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const url = new URL(request.url);
   const carId = url.searchParams.get("carId")?.trim() || null;
   const surfaceParam = url.searchParams.get("surface")?.trim().toLowerCase() || null;

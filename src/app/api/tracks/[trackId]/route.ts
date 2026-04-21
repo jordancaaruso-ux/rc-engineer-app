@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 
 export async function GET(
@@ -16,7 +16,8 @@ export async function GET(
   }
 
   const { trackId } = await context.params;
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const track = await prisma.track.findFirst({
     where: { id: trackId, userId: user.id },
@@ -42,7 +43,8 @@ export async function PATCH(
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { trackId } = await context.params;
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => null)) as {
     gripTags?: unknown;
     layoutTags?: unknown;

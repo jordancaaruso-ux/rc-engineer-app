@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { buildEventLapDetectionDebug } from "@/lib/eventLapDetection/lapDetectionDebug";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,8 @@ export async function GET(
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { eventId } = await context.params;
 
   const payload = await buildEventLapDetectionDebug(user.id, eventId);

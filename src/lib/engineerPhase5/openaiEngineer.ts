@@ -112,6 +112,16 @@ PARAMETER CHANGE RECOMMENDATIONS (strict — apply every single time you suggest
 
 (6) PHRASING FOR BALANCE SHIFTS. Do not describe "softer front ARB" as "shifts balance rearward" — per \`droop-downstop-arb.md\` softer front ARB tends to ADD mid-corner front steering (i.e. balance shifts FORWARD at that phase, not rearward). If you want to suggest reducing front bite, name the actual KB-supported lever (thicker front oil, less front toe magnitude, etc.) and cite the file.
 
+(7) TOE-GAIN / BUMP-STEER SHIM DIRECTION (LOCK — the Engineer has been observed reversing this). Per \`bump-steer-toe-gain.md\` on this platform: for **toe_gain_shims_rear**, FEWER shims = more bump-in / more toe gain on compression = more rear grip mid–exit; MORE shims = more bump-out / toe loss on compression = less rear grip. For **bump_steer_shims_front**, MORE shims = more bump-in (front toe-in on compression, adds initial bite, edgier); FEWER shims = more bump-out (less initial bite, straighter on throttle). To ADD rear toe gain / rear grip, recommend REDUCING rear toe-gain shims (e.g. 3.0 → 2.75 mm), never increasing them. Never write "more rear toe gain" or "more toe-in through travel" as a reason to add shims — both are reversed. When the user pulls static rear toe out and you want to restore exit grip with toe gain, the correct move is FEWER rear toe-gain shims, not more. Cite \`bump-steer-toe-gain.md\` when recommending either knob.
+
+(8) PREDICTABLE-FIRST ORDERING FOR CONFIDENCE-PHRASED GOALS. When the user's phrasing signals confidence / predictability / "push harder" / "won't step out" / "no surprises" / "safer" / "consistent" / "stable rear/front" / "won't catch me out", LEAD with KB-documented **direct-causal** levers — never with hedged knobs. Direct-causal rear-grip levers per this KB: **raising rear under_lower_arm_shims_rf/rr** (support-lower-inner.md: "addresses rear support at the source"), **more rear toe** (camber-caster-toe.md: "usually increases rear grip... safer and easier, especially mid-corner to exit"), **thicker damper_oil_rear** (damper-oil.md: "less rotation, easier, more compliant"), **higher under_hub_shims_rear** stack (initial-vs-overall-grip.md: "higher stack → more overall grip"), **fewer toe_gain_shims_rear** (bump-steer-toe-gain.md: "more toe gain... adds rear grip mid–exit"). Hedged knobs per this KB that MUST NOT lead the list: **arb_rear**, **spring_rear** / rear spring rate, **droop_rear** / **downstop_rear** — each KB entry lists both directions. Hedged knobs may appear later in the list and MUST be labelled "hedged — test both directions" with the KB caveat. Same principle for the front: for confidence-phrased front-grip goals, lead with under-lower-arm / front toe / thicker front oil, not front ARB or front spring. Applies whether the user names the goal directly ("more rear grip") or by feel ("want confidence to push the car without the rear stepping out").
+
+(9) CROSS-AXLE DIAGNOSIS — CHECK THE OPPOSITE END BEFORE RECOMMENDING. When the user asks for more grip / less slide at one end (rear or front), BEFORE recommending only same-end changes, scan \`setupVsSpread.rows\` for the OPPOSITE end. If any of \`spring_*\`, \`arb_*\`, \`damper_oil_*\`, \`toe_*\`, \`upper_inner_shims_*\`, \`under_lower_arm_shims_*\` on the opposite end has \`positionBand\` of \`above_typical\` or \`high\`, name it as a candidate root cause in one sentence before continuing with same-end suggestions: e.g. "front spring 305 gf/mm is above typical — the front may be too aggressive for the current rear, which can read as rear looseness; consider softening the front spring one step (per spring-rate.md) as an alternative to only adding rear grip". Same for below_typical / low on grip-relevant parameters. Cite the KB file for the opposite-end lever. Do not tunnel-vision on the complained-about axle; symptomatic end ≠ causal end.
+
+(10) WHEN SPREAD IS UNRELIABLE, RECOMMEND FROM KB THEORY — DO NOT SILENTLY DROP THE PARAMETER. If a \`setupVsSpread\` row shows a huge numeric gap between the user's current value and the community median (e.g. user 22.4 vs median 4.6 for \`downstop_rear\`), or \`spreadSource\` is \`none\`, or the row's \`spread.sampleCount\` is very small relative to \`totalRunCount\`, treat the numeric band as UNRELIABLE (likely different-sheet-convention scale mismatch). Do two things: (a) state the caveat once — "spread for this parameter looks scale-mismatched (user 22.4 vs community median 4.6 — different sheet conventions); ignoring the numeric band"; (b) STILL consider that parameter as a candidate lever and recommend a DIRECTION (go lower / go higher) from the KB file itself, letting the driver judge magnitude from their own sheet. Never skip a KB-supported lever just because its spread row looks weird — weird spread is a data-quality signal, not a reason to hide the KB. Applies especially to \`droop_*\` / \`downstop_*\` where different sheets use different conventions (see droop-downstop-arb.md — "sheets differ in whether droop and downstop are separate or combined").
+
+(11) NEVER CLAIM "NO KB COVERAGE" FOR A CANONICAL PARAMETER. Before writing "I don't have KB coverage for X", "treat as driving preference", "no KB coverage — optional trim", or any similar disclaimer for a setup parameter, check: is the parameter one of these canonical keys (toe_rear, toe_front, camber_rear, camber_front, caster_rear, caster_front, spring_rear, spring_front, damper_oil_rear, damper_oil_front, arb_rear, arb_front, droop_rear, droop_front, downstop_rear, downstop_front, toe_gain_shims_rear, bump_steer_shims_front, upper_inner_shims_*, upper_outer_shims_*, under_lower_arm_shims_*, under_hub_shims_*)? Every one of these has KB coverage somewhere in vehicleDynamicsKb. If you don't see a matching excerpt in the context, DO NOT disclaim — instead acknowledge the limit honestly ("KB excerpt for this parameter didn't make retrieval — I'll answer from the parameter's canonical direction per camber-caster-toe.md / support-lower-inner.md / etc."). Reserve "no KB coverage" for genuinely off-vocabulary parameters (diff rings, belt tension, motor timing, body choice) that do not appear in any \`content/vehicle-dynamics/\` file.
+
 If the user asks outside the context, ask a short clarifying question or explain what info is missing.
 Do not invent facts or lap times. Keep answers practical and racing-specific.`;
 
@@ -318,6 +328,15 @@ export async function generateEngineerChatReplyWithTools(params: {
   ];
 
   const MAX_ITERS = 10;
+  // #region agent log
+  const __dbgSend = (payload: Record<string, unknown>) => {
+    fetch('http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4f2a81' },
+      body: JSON.stringify({ sessionId: '4f2a81', timestamp: Date.now(), ...payload }),
+    }).catch(() => {});
+  };
+  // #endregion
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const opts = getEngineerChatModelAndTemperature();
     messagesApi[0] = {
@@ -326,20 +345,41 @@ export async function generateEngineerChatReplyWithTools(params: {
     };
 
     const useTools = true;
+    // #region agent log
+    const __dbgIterT0 = Date.now();
+    const __dbgBodyStr = JSON.stringify(
+      buildChatCompletionBody(opts.model, opts.temperature, {
+        messages: messagesApi,
+        ...(useTools ? { tools: TOOLS, tool_choice: "auto" as const } : { tool_choice: "none" as const }),
+      })
+    );
+    __dbgSend({
+      runId: 'llm-iter',
+      hypothesisId: 'H1,H2',
+      location: 'src/lib/engineerPhase5/openaiEngineer.ts:iter-start',
+      message: 'iteration start',
+      data: {
+        iter,
+        messagesCount: messagesApi.length,
+        contextSysMsgChars:
+          typeof messagesApi[1]?.content === 'string' ? (messagesApi[1].content as string).length : 0,
+        totalBodyChars: __dbgBodyStr.length,
+        model: opts.model,
+      },
+    });
+    // #endregion
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(
-        buildChatCompletionBody(opts.model, opts.temperature, {
-          messages: messagesApi,
-          ...(useTools ? { tools: TOOLS, tool_choice: "auto" as const } : { tool_choice: "none" as const }),
-        })
-      ),
+      body: __dbgBodyStr,
     });
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    // #region agent log
+    const __dbgIterMs = Date.now() - __dbgIterT0;
+    // #endregion
     if (!res.ok) {
       const msg = (data.error as { message?: string } | undefined)?.message || `OpenAI error (${res.status})`;
       throw new Error(msg);
@@ -348,6 +388,23 @@ export async function generateEngineerChatReplyWithTools(params: {
     const msg = choice?.message;
     const toolCalls = msg?.tool_calls as ToolCall[] | undefined;
     const content = (msg?.content as string | null | undefined) ?? null;
+    // #region agent log
+    __dbgSend({
+      runId: 'llm-iter',
+      hypothesisId: 'H1',
+      location: 'src/lib/engineerPhase5/openaiEngineer.ts:iter-end',
+      message: 'iteration end',
+      data: {
+        iter,
+        iterMs: __dbgIterMs,
+        toolCallsCount: toolCalls ? toolCalls.length : 0,
+        toolCallNames: (toolCalls ?? []).map((t) => t.function?.name ?? ''),
+        contentChars: typeof content === 'string' ? content.length : 0,
+        usage: (data as { usage?: unknown }).usage ?? null,
+        httpStatus: res.status,
+      },
+    });
+    // #endregion
 
     if (toolCalls && toolCalls.length > 0) {
       messagesApi.push({
@@ -377,12 +434,42 @@ export async function generateEngineerChatReplyWithTools(params: {
             typeof argsObj.compare_run_id === "string" && argsObj.compare_run_id.trim()
               ? argsObj.compare_run_id.trim()
               : null;
+          // #region agent log
+          const __dbgFocusT0 = Date.now();
+          // #endregion
           const applied = await applyEngineerFocusTool(params.userId, primary, compare);
           if (!applied.ok) {
             messagesApi.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: applied.error }) });
+            // #region agent log
+            __dbgSend({
+              runId: 'llm-tool',
+              hypothesisId: 'H5',
+              location: 'src/lib/engineerPhase5/openaiEngineer.ts:apply-focus-fail',
+              message: 'apply_engineer_focus failed',
+              data: { iter, ms: Date.now() - __dbgFocusT0, error: applied.error },
+            });
+            // #endregion
             continue;
           }
+          // #region agent log
+          const __dbgMergeT0 = Date.now();
+          // #endregion
           workingContext = await params.mergeContextWithFocusedPair(applied.focusedRunPair);
+          // #region agent log
+          __dbgSend({
+            runId: 'llm-tool',
+            hypothesisId: 'H5',
+            location: 'src/lib/engineerPhase5/openaiEngineer.ts:apply-focus-ok',
+            message: 'apply_engineer_focus + merge context',
+            data: {
+              iter,
+              applyMs: __dbgMergeT0 - __dbgFocusT0,
+              mergeMs: Date.now() - __dbgMergeT0,
+              primaryRunId: applied.focusedRunPair.primaryRunId,
+              hasCompare: Boolean(applied.focusedRunPair.compareRunId),
+            },
+          });
+          // #endregion
           resolvedFocus = {
             runId: applied.focusedRunPair.primaryRunId,
             compareRunId: applied.focusedRunPair.compareRunId,
@@ -403,7 +490,25 @@ export async function generateEngineerChatReplyWithTools(params: {
           continue;
         }
 
+        // #region agent log
+        const __dbgToolT0 = Date.now();
+        // #endregion
         const toolContent = await executeSearchOrListTool(name, args, params.userId);
+        // #region agent log
+        __dbgSend({
+          runId: 'llm-tool',
+          hypothesisId: 'H1',
+          location: 'src/lib/engineerPhase5/openaiEngineer.ts:search-list-tool',
+          message: 'search/list tool executed',
+          data: {
+            iter,
+            tool: name,
+            argsChars: args.length,
+            ms: Date.now() - __dbgToolT0,
+            resultChars: toolContent.length,
+          },
+        });
+        // #endregion
         messagesApi.push({ role: "tool", tool_call_id: tc.id, content: toolContent });
       }
       continue;

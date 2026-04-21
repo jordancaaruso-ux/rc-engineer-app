@@ -46,6 +46,11 @@ Try those before proposing a KB edit.
 
 Commit trailers like `Made-with: Cursor` are welcome — they make it easy to audit which commits were agent-authored later.
 
+## Auth
+
+- **Magic link** via Auth.js (`src/auth.ts`): allowlist in `AuthAllowedEmail` + env `AUTH_ALLOWED_EMAILS` (see `src/lib/authAllowlist.ts`). Session bridge: `src/lib/currentUser.ts` (`requireCurrentUser`, `getAuthenticatedApiUser`).
+- **iOS shell**: Capacitor (`capacitor.config.ts`, `ios/`), checklist in `docs/TESTFLIGHT.md`.
+
 ## Other areas worth knowing
 
 - **Setup comparison logic**: `src/lib/setupCompare/` (IQR gradient scaling, community aggregation lookups).

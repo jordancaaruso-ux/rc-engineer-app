@@ -3,6 +3,8 @@ import { Montserrat } from "next/font/google";
 import "./globals.css";
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
+import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLinkBridge";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -32,10 +34,13 @@ export default function RootLayout({ children }: { children: ReactNode }): React
   return (
     <html lang="en" className={`${montserrat.variable} dark`}>
       <body className="min-h-screen font-sans font-normal antialiased">
-        <div className="app-shell">
-          <Sidebar />
-          <main className="page">{children}</main>
-        </div>
+        <AuthSessionProvider>
+          <CapacitorDeepLinkBridge />
+          <div className="app-shell">
+            <Sidebar />
+            <main className="page">{children}</main>
+          </div>
+        </AuthSessionProvider>
       </body>
     </html>
   );
