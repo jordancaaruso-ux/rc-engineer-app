@@ -9,6 +9,7 @@ import {
   resolveNormalizedAggregationData,
   type PerKeyState,
 } from "@/lib/setupAggregations/eligibleDocAggregationCore";
+import { geometryDerivedScalarObservations } from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
 import { GRIP_BUCKET_ANY, gripBucketsForDoc } from "@/lib/setupAggregations/gripBuckets";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
@@ -148,6 +149,9 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
       const obs = extractObservation(key, val);
       if (!obs) continue;
       obsPerKey.push([key, obs]);
+    }
+    for (const [dk, obs] of geometryDerivedScalarObservations(data)) {
+      obsPerKey.push([dk, obs]);
     }
 
     for (const bucket of gripBuckets) {

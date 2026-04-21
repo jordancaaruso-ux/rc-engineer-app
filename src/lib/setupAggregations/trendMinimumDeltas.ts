@@ -13,6 +13,8 @@
 const DEFAULT_MIN_DELTA = 0.1;
 
 const BY_PREFIX_AND_KEY: Array<{ test: (k: string) => boolean; min: number }> = [
+  // Derived link-index composites (mm): one shim step ≈ 0.25 mm.
+  { test: (k) => k.startsWith("derived_"), min: 0.25 },
   // Ride height and droop: 0.2 mm is about half the typical adjustment click.
   { test: (k) => k.startsWith("ride_height_"), min: 0.2 },
   { test: (k) => k.startsWith("droop_"), min: 0.2 },

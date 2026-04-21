@@ -97,6 +97,13 @@ export const PARAMETER_CLASSIFICATION_OVERRIDES: Record<string, ParameterClassif
   upper_outer_shims_front: "numeric",
   upper_outer_shims_rear: "numeric",
 
+  derived_upper_link_index_front_mm: "numeric",
+  derived_upper_link_index_rear_mm: "numeric",
+  derived_upper_link_stagger_mm: "numeric",
+  derived_lower_link_index_front_mm: "numeric",
+  derived_lower_link_index_rear_mm: "numeric",
+  derived_lower_link_stagger_mm: "numeric",
+
   // --- Presence/indicator fields that parse as "1" but are really categorical ---
   abh_front: "categorical",
   abh_rear: "categorical",

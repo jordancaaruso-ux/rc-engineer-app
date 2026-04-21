@@ -240,7 +240,8 @@ export async function buildEngineerRichContextV1(params: {
     : " Community spread is unavailable until aggregations are rebuilt or your car has a setupSheetTemplate with eligible uploads.";
   const note =
     `${garageNote}${communityNote}` +
-    " Only chassis/suspension tuning parameters are included (excludes motor, pinion, wing, ESC, etc.). Each row includes spreadSource: community_eligible_uploads vs your_garage when numeric bands apply.";
+    " Only chassis/suspension tuning parameters are included (excludes motor, pinion, wing, ESC, etc.). Each row includes spreadSource: community_eligible_uploads vs your_garage when numeric bands apply." +
+    " Rows with parameterKey starting with derived_ are additive mm link indices (mean upper inner per axle + upper outer; mean under-lower inner per axle + under hub; stagger = front − rear for upper and lower)—compare medians/IQRs like other numeric rows; not literal suspension angles.";
 
   const setupData = normalizeSetupData(run.setupSnapshot?.data);
   const splitMm = computeBulkheadInnerSplitsMm(setupData);

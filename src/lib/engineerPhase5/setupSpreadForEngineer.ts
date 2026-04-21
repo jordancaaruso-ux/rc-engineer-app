@@ -26,8 +26,14 @@ import {
   SETUP_SHEET_TEMPLATE_A800RR,
   canonicalSetupSheetTemplateId,
 } from "@/lib/setupSheetTemplateId";
+import {
+  SETUP_GEOMETRY_DERIVED_KEYS_ORDERED,
+  computeSetupGeometryDerivedMetrics,
+  isSetupGeometryDerivedKey,
+} from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
 
-const MAX_PARAMS = 45;
+/** Base tuning rows plus six derived link-index keys. */
+const MAX_PARAMS = 52;
 
 /** When `Car.setupSheetTemplate` is unset, infer A800RR community bucket from structured top-deck / motor keys. */
 const A800RR_SNAPSHOT_SIGNAL_KEYS = new Set([
@@ -484,7 +490,7 @@ export async function buildSetupSpreadForEngineer(params: {
     setupSheetTemplate = SETUP_SHEET_TEMPLATE_A800RR;
   }
 
-  const keys = Object.keys(normalized)
+  const baseKeys = Object.keys(normalized)
     .filter((k) => {
       const v = normalized[k];
       if (v == null) return false;
@@ -493,7 +499,21 @@ export async function buildSetupSpreadForEngineer(params: {
       return true;
     })
     .filter(isTuningComparisonKey)
+    .filter((k) => !isSetupGeometryDerivedKey(k))
     .sort((a, b) => a.localeCompare(b));
+
+  const keys: string[] = [];
+  for (const k of SETUP_GEOMETRY_DERIVED_KEYS_ORDERED) {
+    keys.push(k);
+  }
+  for (const k of baseKeys) {
+    if (keys.length >= MAX_PARAMS) break;
+    keys.push(k);
+  }
+
+  const geometryDerivedMetrics = computeSetupGeometryDerivedMetrics(
+    normalized as Record<string, SetupSnapshotData[string]>
+  );
 
   const surfaceRaw = String((normalized as Record<string, unknown>)["track_surface"] ?? "").trim().toLowerCase();
   const trackSurface: "asphalt" | "carpet" | null =
@@ -594,8 +614,13 @@ export async function buildSetupSpreadForEngineer(params: {
       truncated = true;
       break;
     }
-    const cur = normalized[key];
-    const currentDisplay = formatSetupVal(cur);
+    const cur = isSetupGeometryDerivedKey(key)
+      ? geometryDerivedMetrics[key]
+      : normalized[key];
+    const currentDisplay =
+      isSetupGeometryDerivedKey(key) && typeof cur === "number" && Number.isFinite(cur)
+        ? `${cur.toFixed(2)} mm`
+        : formatSetupVal(cur);
 
     const comm = communityByKey.get(key);
     const garage = bestGarageByKey.get(key);

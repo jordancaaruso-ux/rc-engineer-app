@@ -15,6 +15,7 @@ import {
   snapshotDataHasKeys,
   type PerKeyState,
 } from "@/lib/setupAggregations/eligibleDocAggregationCore";
+import { geometryDerivedScalarObservations } from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
 
 /** Car for bucketing: explicit id, else the user's only car (safe when unambiguous). */
 function resolveAggregationCarId(
@@ -237,6 +238,9 @@ export async function rebuildSetupAggregationsForUserCars(
       const obs = extractObservation(key, val);
       if (!obs) continue;
       getOrCreateBucket(keyMap, key, obs);
+    }
+    for (const [dk, obs] of geometryDerivedScalarObservations(data)) {
+      getOrCreateBucket(keyMap, dk, obs);
     }
   }
 

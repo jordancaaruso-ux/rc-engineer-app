@@ -19,6 +19,13 @@ const EXACT_TUNING_KEYS = new Set<string>([
   "toe_gain_shims_rear",
   "under_hub_shims_front",
   "under_hub_shims_rear",
+  /** Additive mm link indices (see setupGeometryDerivedMetrics). */
+  "derived_upper_link_index_front_mm",
+  "derived_upper_link_index_rear_mm",
+  "derived_upper_link_stagger_mm",
+  "derived_lower_link_index_front_mm",
+  "derived_lower_link_index_rear_mm",
+  "derived_lower_link_stagger_mm",
   // Fluids / springs (explicit)
   "diff_oil",
   "front_spring_rate_gf_mm",
