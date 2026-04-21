@@ -48,7 +48,7 @@ Commit trailers like `Made-with: Cursor` are welcome — they make it easy to au
 
 ## Auth
 
-- **Magic link** via Auth.js (`src/auth.ts`): allowlist in `AuthAllowedEmail` + env `AUTH_ALLOWED_EMAILS` (see `src/lib/authAllowlist.ts`). Session bridge: `src/lib/currentUser.ts` (`requireCurrentUser`, `getAuthenticatedApiUser`).
+- **Magic link + optional Google OAuth** via Auth.js (`src/auth.ts`): allowlist in `AuthAllowedEmail` + env `AUTH_ALLOWED_EMAILS` (see `src/lib/authAllowlist.ts`). Google: `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, callback `{AUTH_URL}/api/auth/callback/google`. Admins: `AUTH_ADMIN_EMAILS`, `src/lib/authAdmin.ts`. Session bridge: `src/lib/currentUser.ts` (`requireCurrentUser`, `getAuthenticatedApiUser`).
 - **iOS shell**: Capacitor (`capacitor.config.ts`, `ios/`), checklist in `docs/TESTFLIGHT.md`.
 
 ## Other areas worth knowing

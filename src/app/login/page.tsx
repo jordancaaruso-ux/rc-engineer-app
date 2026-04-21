@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 function LoginForm() {
   const router = useRouter();
@@ -12,14 +12,43 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [googleOAuthConfigured, setGoogleOAuthConfigured] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  const from = searchParams.get("from") || "/";
+  const callbackUrl = from.startsWith("/") ? from : "/";
+
+  useEffect(() => {
+    if (searchParams.get("error") === "AccessDenied") {
+      setError("That sign-in is not allowed. Ask for an invite (allowlisted email).");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const hintRes = await fetch("/api/auth/config-hint");
+        const hint = (await hintRes.json()) as { googleOAuthConfigured?: boolean };
+        if (!cancelled && hint.googleOAuthConfigured === true) {
+          setGoogleOAuthConfigured(true);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setConfigLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setPending(true);
     try {
-      const from = searchParams.get("from") || "/";
-      const callbackUrl = from.startsWith("/") ? from : "/";
       const res = await signIn("nodemailer", {
         email: email.trim().toLowerCase(),
         callbackUrl,
@@ -54,8 +83,20 @@ function LoginForm() {
     <main className="mx-auto max-w-sm px-4 py-16">
       <h1 className="text-lg font-semibold text-foreground">Sign in to RC Engineer</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        We&apos;ll email you a magic link. Only invited addresses can sign in.
+        Only invited email addresses can sign in. Ask the app owner to add yours to the allowlist.
       </p>
+      {configLoaded && googleOAuthConfigured ? (
+        <div className="mt-6">
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-secondary px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary/80"
+            onClick={() => void signIn("google", { callbackUrl })}
+          >
+            Continue with Google
+          </button>
+          <p className="mt-3 text-center text-xs text-muted-foreground">or use email</p>
+        </div>
+      ) : null}
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <label className="block text-sm">
           <span className="text-muted-foreground">Email</span>
