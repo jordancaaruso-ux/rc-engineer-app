@@ -1,8 +1,34 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { hasTeammateLink } from "@/lib/teammateRunAccess";
+
+export async function GET(request: Request) {
+  if (!hasDatabaseUrl()) {
+    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+  }
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { searchParams } = new URL(request.url);
+  const forUserId = searchParams.get("forUserId")?.trim() || null;
+
+  const targetUserId = forUserId && forUserId !== user.id ? forUserId : user.id;
+  if (targetUserId !== user.id) {
+    const ok = await hasTeammateLink(user.id, targetUserId);
+    if (!ok) {
+      return NextResponse.json({ error: "Not allowed to list this user’s cars" }, { status: 403 });
+    }
+  }
+
+  const cars = await prisma.car.findMany({
+    where: { userId: targetUserId },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+  return NextResponse.json({ cars });
+}
 
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -12,7 +38,8 @@ export async function POST(request: Request) {
     );
   }
   try {
-    const user = await getOrCreateLocalUser();
+    const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json()) as {
       name?: string;
       chassis?: string | null;

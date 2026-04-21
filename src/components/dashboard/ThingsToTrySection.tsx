@@ -1,13 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
 
-export function ThingsToTrySection({ initialItems }: { initialItems: DashboardActionItemRow[] }) {
+export function ThingsToTrySection({
+  initialItems,
+  embedded = false,
+}: {
+  initialItems: DashboardActionItemRow[];
+  /** When true, drop outer card chrome for use inside another panel. */
+  embedded?: boolean;
+}) {
   const [items, setItems] = useState(initialItems);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/action-items")
+      .then((res) => res.json().catch(() => null))
+      .then((data: { items?: DashboardActionItemRow[] } | null) => {
+        if (!alive || !data?.items) return;
+        setItems(
+          data.items.map((i) => ({
+            id: i.id,
+            text: i.text,
+            sourceType: i.sourceType,
+            createdAt: typeof i.createdAt === "string" ? i.createdAt : String(i.createdAt),
+            sourceRunId: i.sourceRunId ?? null,
+          }))
+        );
+      })
+      .catch(() => {
+        if (!alive) return;
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   async function archive(id: string) {
     setError(null);
@@ -68,11 +99,22 @@ export function ThingsToTrySection({ initialItems }: { initialItems: DashboardAc
     }
   }
 
+  const shell =
+    embedded
+      ? "rounded-md border-0 bg-transparent p-0 shadow-none"
+      : "rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25";
+
   return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25">
+    <div className={shell}>
       <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
         <div className="text-sm font-medium tracking-tight text-foreground">Things to try</div>
-        <p className="text-[10px] leading-snug text-muted-foreground sm:max-w-[55%] sm:text-right">
+        <p
+          className={
+            embedded
+              ? "text-[10px] leading-snug text-muted-foreground"
+              : "text-[10px] leading-snug text-muted-foreground sm:max-w-[55%] sm:text-right"
+          }
+        >
           From logged runs and manual adds. Remove archives the item.
         </p>
       </div>

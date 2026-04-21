@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { formatEventDate } from "@/lib/formatDate";
 import Link from "next/link";
+import { EventLapSourcesPanel } from "@/components/events/EventLapSourcesPanel";
 
 export default async function EventDetailPage(props: {
   params: Promise<{ eventId: string }>;
@@ -27,7 +28,7 @@ export default async function EventDetailPage(props: {
   }
 
   const { eventId } = await props.params;
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, userId: user.id },
@@ -75,6 +76,13 @@ export default async function EventDetailPage(props: {
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
+          <EventLapSourcesPanel
+            eventId={event.id}
+            practiceSourceUrl={event.practiceSourceUrl}
+            resultsSourceUrl={event.resultsSourceUrl}
+            raceClass={event.raceClass}
+          />
+
           <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
             <div className="grid gap-2">
               <div>

@@ -29,10 +29,30 @@ export type DashboardSerializedRun = {
   driverNotes?: string | null;
   handlingProblems?: string | null;
   suggestedChanges?: string | null;
+  /** Optional LiveRC practice day URL captured with the run. */
+  practiceDayUrl?: string | null;
   lapTimes?: unknown;
   lapSession?: unknown;
 };
 
 export type DashboardNewRunPrefill =
   | { mode: "first"; eventId: string; trackId: string | null }
-  | { mode: "continue"; run: DashboardSerializedRun };
+  | { mode: "continue"; run: DashboardSerializedRun }
+  | {
+      mode: "imported_lap_session";
+      importedLapTimeSession: {
+        id: string;
+        sourceUrl: string;
+        parserId: string;
+        /** DB `sessionCompletedAt` as ISO (canonical session instant when set). */
+        sessionCompletedAtIso: string | null;
+        parsedPayload: unknown;
+        /** Import row `createdAt` — last-resort instant for labels when completion time is missing. */
+        createdAt: string;
+        eventDetectionSource: "practice" | "race" | null;
+        linkedEventId: string | null;
+        liveRcDriverName: string | null;
+      };
+      /** True when session came from event lap watch / detection — any save counts as logging complete. */
+      fromEventDetection: boolean;
+    };

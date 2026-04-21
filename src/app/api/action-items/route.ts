@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeActionItemKey } from "@/lib/actionItems";
 
@@ -8,7 +9,8 @@ export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const items = await prisma.actionItem.findMany({
     where: { userId: user.id, isArchived: false },
     orderBy: { createdAt: "desc" },
@@ -32,7 +34,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json()) as { text?: string };
   const text = typeof body.text === "string" ? body.text.trim() : "";
   if (!text) {
@@ -66,6 +69,10 @@ export async function POST(request: Request) {
       sourceRunId: true,
     },
   });
+
+  revalidatePath("/");
+  revalidatePath("/runs/new");
+  revalidatePath("/engineer");
 
   return NextResponse.json({
     item: {

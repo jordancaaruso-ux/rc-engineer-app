@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { NewRunForm } from "@/components/runs/NewRunForm";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
+import { getDashboardNewRunPrefill, loadIncompleteRunsForImportChooser } from "@/lib/dashboardServer";
+import { NewRunImportLinkChooser } from "@/components/runs/NewRunImportLinkChooser";
 
 export default async function NewRunPage({
   searchParams,
@@ -31,9 +32,21 @@ export default async function NewRunPage({
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const sp = await searchParams;
   const dashboardPrefill = await getDashboardNewRunPrefill(user.id, sp);
+  const initialEventId =
+    typeof sp.eventId === "string" && sp.eventId.trim().length > 0 ? sp.eventId.trim() : null;
+  const focusSection: "setup" | null =
+    typeof sp.focus === "string" && sp.focus.trim().toLowerCase() === "setup"
+      ? "setup"
+      : null;
+  const importedLapTimeSessionIdRaw =
+    typeof sp.importedLapTimeSessionId === "string" ? sp.importedLapTimeSessionId.trim() : "";
+  const incompleteRunsForImport =
+    importedLapTimeSessionIdRaw.length > 0
+      ? await loadIncompleteRunsForImportChooser(user.id, initialEventId)
+      : [];
 
   const [cars, allTracks, favouriteTrackIds] = await Promise.all([
     prisma.car.findMany({
@@ -44,7 +57,7 @@ export default async function NewRunPage({
     prisma.track.findMany({
       where: { userId: user.id },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true },
+      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
     }),
     getFavouriteTrackIdsForUser(user.id),
   ]);
@@ -64,13 +77,21 @@ export default async function NewRunPage({
         </div>
       </header>
       <section className="page-body">
-        <NewRunForm
-          cars={cars}
-          tracks={tracks}
-          favouriteTrackIds={favouriteTrackIds}
-          favouriteTracks={favouriteTracks}
-          dashboardPrefill={dashboardPrefill}
-        />
+        <NewRunImportLinkChooser
+          incompleteRuns={incompleteRunsForImport}
+          importedLapTimeSessionId={importedLapTimeSessionIdRaw || null}
+          eventId={initialEventId}
+        >
+          <NewRunForm
+            cars={cars}
+            tracks={tracks}
+            favouriteTrackIds={favouriteTrackIds}
+            favouriteTracks={favouriteTracks}
+            dashboardPrefill={dashboardPrefill}
+            initialEventId={initialEventId}
+            focusSection={focusSection}
+          />
+        </NewRunImportLinkChooser>
       </section>
     </>
   );

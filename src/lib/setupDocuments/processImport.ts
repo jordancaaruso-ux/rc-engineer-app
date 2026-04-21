@@ -35,18 +35,54 @@ function capObject(input: Record<string, unknown>, maxChars = 4000): Record<stri
   }
 }
 
+function isTransientDbDisconnect(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("SqlState(E57P01)")
+    || msg.includes("terminating connection due to administrator command")
+    || msg.includes("Connection terminated unexpectedly")
+    || msg.includes("ECONNRESET")
+    || msg.includes("ETIMEDOUT")
+  );
+}
+
+async function withDbRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  const maxAttempts = 5;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (!isTransientDbDisconnect(e) || attempt === maxAttempts) throw e;
+      const backoffMs = 200 * Math.pow(2, attempt - 1);
+      console.warn(`[setup-import/db-retry] ${label} attempt ${attempt}/${maxAttempts} backoff=${backoffMs}ms`);
+      await new Promise((r) => setTimeout(r, backoffMs));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
 async function appendDebugLog(docId: string, entry: DebugLogEntry) {
-  const doc = await prisma.setupDocument.findUnique({
-    where: { id: docId },
-    select: { importDebugLogJson: true },
-  });
+  const doc = await withDbRetry(
+    () =>
+      prisma.setupDocument.findUnique({
+        where: { id: docId },
+        select: { importDebugLogJson: true },
+      }),
+    "appendDebugLog:findUnique"
+  );
   const cur = Array.isArray(doc?.importDebugLogJson) ? (doc!.importDebugLogJson as unknown[]) : [];
   const next = [...cur, entry];
   const capped = next.length > 80 ? next.slice(next.length - 80) : next;
-  await prisma.setupDocument.update({
-    where: { id: docId },
-    data: { importDebugLogJson: capped as unknown as object },
-  });
+  await withDbRetry(
+    () =>
+      prisma.setupDocument.update({
+        where: { id: docId },
+        data: { importDebugLogJson: capped as unknown as object },
+      }),
+    "appendDebugLog:update"
+  );
 }
 
 async function startStage(input: {
@@ -63,15 +99,19 @@ async function startStage(input: {
     event: "start",
     data: input.extra ? capObject(input.extra) : undefined,
   });
-  await prisma.setupDocument.update({
-    where: { id: input.docId },
-    data: {
-      importStatus: input.status,
-      currentStage: input.stage,
-      stageStartedAt: new Date(),
-      stageFinishedAt: null,
-    },
-  });
+  await withDbRetry(
+    () =>
+      prisma.setupDocument.update({
+        where: { id: input.docId },
+        data: {
+          importStatus: input.status,
+          currentStage: input.stage,
+          stageStartedAt: new Date(),
+          stageFinishedAt: null,
+        },
+      }),
+    `startStage:update:${input.stage}`
+  );
 }
 
 async function finishStage(input: {
@@ -90,14 +130,18 @@ async function finishStage(input: {
     ms: input.ms,
     data: input.extra ? capObject(input.extra) : undefined,
   });
-  await prisma.setupDocument.update({
-    where: { id: input.docId },
-    data: {
-      importStatus: input.status,
-      lastCompletedStage: input.stage,
-      stageFinishedAt: new Date(),
-    },
-  });
+  await withDbRetry(
+    () =>
+      prisma.setupDocument.update({
+        where: { id: input.docId },
+        data: {
+          importStatus: input.status,
+          lastCompletedStage: input.stage,
+          stageFinishedAt: new Date(),
+        },
+      }),
+    `finishStage:update:${input.stage}`
+  );
 }
 
 async function failImport(input: { docId: string; stage: string; error: unknown }) {
@@ -109,19 +153,23 @@ async function failImport(input: { docId: string; stage: string; error: unknown 
     event: "error",
     data: { error: msg.slice(0, 2000) },
   });
-  await prisma.setupDocument.update({
-    where: { id: input.docId },
-    data: {
-      importStatus: "FAILED",
-      importOutcome: "PARTIAL_DIAGNOSTIC",
-      currentStage: input.stage,
-      importErrorMessage: msg.slice(0, 2000),
-      stageFinishedAt: new Date(),
-      parseFinishedAt: new Date(),
-      // Keep parseStatus explicit: failed import is not a trusted parse.
-      parseStatus: "PARTIAL",
-    },
-  });
+  await withDbRetry(
+    () =>
+      prisma.setupDocument.update({
+        where: { id: input.docId },
+        data: {
+          importStatus: "FAILED",
+          importOutcome: "PARTIAL_DIAGNOSTIC",
+          currentStage: input.stage,
+          importErrorMessage: msg.slice(0, 2000),
+          stageFinishedAt: new Date(),
+          parseFinishedAt: new Date(),
+          // Keep parseStatus explicit: failed import is not a trusted parse.
+          parseStatus: "PARTIAL",
+        },
+      }),
+    `failImport:update:${input.stage}`
+  );
 }
 
 async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
@@ -198,27 +246,8 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     if (procDbg()) {
       console.log(`[setup-process-timing] doc=${doc.id} getEffectiveCalibrationProfileId ${(performance.now() - tCal).toFixed(1)}ms`);
     }
-    if (!effectiveCalibration.calibrationId) {
-      await prisma.setupDocument.update({
-        where: { id: doc.id },
-        data: {
-          importStatus: "PENDING",
-          parseStatus: "PENDING",
-          currentStage: SetupDocumentImportStages.AWAITING_CALIBRATION,
-          calibrationResolvedProfileId: null,
-          calibrationResolvedSource: effectiveCalibration.source,
-          calibrationResolvedDebug: effectiveCalibration.debug,
-          calibrationUsedIsForcedDefault: false,
-        },
-      });
-      await appendDebugLog(doc.id, {
-        at: nowIso(),
-        stage: SetupDocumentImportStages.AWAITING_CALIBRATION,
-        event: "info",
-        data: { message: "No calibration selected. Waiting for explicit calibration selection." },
-      });
-      return;
-    }
+    // Always proceed with parsing even when calibration is unknown. The user's workflow should be:
+    // import everything automatically, then optionally refine calibration + re-parse during review.
     await prisma.setupDocument.update({
       where: { id: doc.id },
       data: {
@@ -233,7 +262,9 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
             : undefined,
       },
     });
-    stage = SetupDocumentImportStages.CALIBRATION_SELECTED;
+    stage = effectiveCalibration.calibrationId
+      ? SetupDocumentImportStages.CALIBRATION_SELECTED
+      : SetupDocumentImportStages.AWAITING_CALIBRATION;
     await startStage({
       docId: doc.id,
       stage,
@@ -326,7 +357,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       console.log(`[setup-process-timing] doc=${doc.id} prisma base parse persist ${(performance.now() - tBaseDb).toFixed(1)}ms`);
     }
 
-    // Calibration parse for PDFs (more accurate).
+    // Calibration parse for PDFs (more accurate) when calibration exists.
     if (sourceType === "PDF" && effectiveCalibration.calibrationId) {
       const calRow = await prisma.setupSheetCalibration.findFirst({
         where: { id: effectiveCalibration.calibrationId },
@@ -453,7 +484,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       });
       await finishStage({ docId: doc.id, stage, status: "PROCESSING" });
     } else if (sourceType === "PDF") {
-      // No selected calibration: keep normalized basic parse and leave parsedCalibrationProfileId unset.
+      // No selected calibration: we still did a basic parse above. Keep it and record that calibration mapping was skipped.
       await prisma.setupDocument.update({
         where: { id: doc.id },
         data: {
@@ -462,7 +493,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
             filename: doc.originalFilename,
             calibrationAttemptedId: null,
             calibrationAttemptedName: null,
-            note: "No calibration selected; skipped calibration mapping.",
+            note: "No calibration selected; used basic parse only (calibration mapping skipped).",
           } as object,
           importOutcome: "PARTIAL_DIAGNOSTIC",
         },

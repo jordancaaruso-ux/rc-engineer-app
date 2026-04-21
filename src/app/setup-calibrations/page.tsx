@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 
@@ -18,7 +18,9 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
       </>
     );
   }
+  const user = await requireCurrentUser();
   const calibrations = await prisma.setupSheetCalibration.findMany({
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     select: { id: true, name: true, sourceType: true, calibrationDataJson: true, createdAt: true },
   });

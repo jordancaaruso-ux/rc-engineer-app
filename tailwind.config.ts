@@ -10,34 +10,39 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#0B0F0E",
-        foreground: "#E8F0ED",
+        // Slightly lifted dark palette — each surface nudged ~4–10 points up
+        // from the original so the UI reads as "broken up" rather than a flat
+        // heavy dark. Keep identity: same green-tinted black, same primary red.
+        background: "#0E1312",
+        foreground: "#ECF2EF",
         card: {
-          DEFAULT: "#131917",
-          foreground: "#E8F0ED"
+          DEFAULT: "#19201D",
+          foreground: "#ECF2EF"
         },
         primary: {
           DEFAULT: "#C92A2A",
           foreground: "#F8F9FA"
         },
         secondary: {
-          DEFAULT: "#121716",
-          foreground: "#E8F0ED"
+          DEFAULT: "#151C1A",
+          foreground: "#ECF2EF"
         },
         muted: {
-          DEFAULT: "#121716",
-          foreground: "#A7B3AF"
+          DEFAULT: "#171F1C",
+          foreground: "#B0BBB7"
         },
         accent: {
           DEFAULT: "#2563EB",
           foreground: "#F8F9FA"
         },
         destructive: "#7A1E1E",
-        border: "#1F2624",
-        input: "#161C1A",
+        // Border tone bumped hardest — it's what makes cards feel like distinct
+        // panels instead of a single dark wash.
+        border: "#2A332F",
+        input: "#1A211F",
         ring: "#C92A2A",
         /** Extra-muted labels (spec) */
-        faint: "#6B7572"
+        faint: "#73807B"
       },
       borderRadius: {
         lg: "0.5rem",

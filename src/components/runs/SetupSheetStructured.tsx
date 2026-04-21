@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 import { cn } from "@/lib/utils";
 import {
   coerceSetupValue,
@@ -68,7 +76,119 @@ type Props = {
   highlightChangedKeys: Set<string> | null;
   /** Car aggregation numeric stats: IQR scale for comparison gradient only. */
   numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
+  /** Search + jump to field rows (edit flows). */
+  enableFieldSearch?: boolean;
 };
+
+/** Keys and labels for “find field” (mirrors row rendering, including top deck block). */
+function collectFieldSearchEntries(sections: StructuredSection[]): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  for (const sec of sections) {
+    for (const row of sec.rows) {
+      if (row.type === "single") {
+        out.push({ key: row.key, label: row.label });
+      } else if (row.type === "pair") {
+        out.push({ key: row.leftKey, label: `${row.label} · Front` });
+        out.push({ key: row.rightKey, label: `${row.label} · Rear` });
+      } else if (row.type === "corner4") {
+        const corners: { k: string; lab: string }[] = [
+          { k: row.ff, lab: "FF" },
+          { k: row.fr, lab: "FR" },
+          { k: row.rf, lab: "RF" },
+          { k: row.rr, lab: "RR" },
+        ];
+        for (const { k, lab } of corners) {
+          out.push({ key: k, label: `${row.label} · ${lab}` });
+        }
+      } else if (row.type === "top_deck_block") {
+        out.push({ key: "top_deck_front", label: "Top deck · Front" });
+        out.push({ key: "top_deck_rear", label: "Top deck · Rear" });
+        out.push({ key: "top_deck_cuts", label: "Top deck cuts" });
+        out.push({ key: "top_deck_single", label: "Top deck · Single" });
+      } else if (row.type === "screw_strip") {
+        out.push({ key: row.key, label: row.label });
+      }
+    }
+  }
+  return out;
+}
+
+function SetupFieldJumpSearch({
+  entries,
+  rootRef,
+}: {
+  entries: readonly { key: string; label: string }[];
+  rootRef: RefObject<HTMLDivElement | null>;
+}) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return [];
+    return entries.filter(
+      (e) => e.label.toLowerCase().includes(s) || e.key.toLowerCase().includes(s)
+    );
+  }, [entries, q]);
+
+  const jumpTo = (key: string) => {
+    const root = rootRef.current;
+    if (!root || typeof CSS === "undefined" || typeof CSS.escape !== "function") return;
+    const el = root.querySelector(`[data-setup-field-key="${CSS.escape(key)}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("ring-2", "ring-accent/70", "rounded-sm");
+    window.setTimeout(() => {
+      el.classList.remove("ring-2", "ring-accent/70", "rounded-sm");
+    }, 1400);
+    setOpen(false);
+    setQ("");
+  };
+
+  return (
+    <div className="relative mb-3">
+      <label htmlFor="setup-field-search" className="sr-only">
+        Find setup field
+      </label>
+      <input
+        id="setup-field-search"
+        type="search"
+        autoComplete="off"
+        placeholder="Find field…"
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 180)}
+        className="w-full max-w-md rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-accent/50"
+      />
+      {open && filtered.length > 0 ? (
+        <ul
+          className="absolute z-20 mt-1 max-h-48 w-full max-w-md overflow-auto rounded-md border border-border bg-card py-1 text-xs shadow-md"
+          role="listbox"
+        >
+          {filtered.slice(0, 50).map((e) => (
+            <li key={e.key} role="option">
+              <button
+                type="button"
+                className="flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left hover:bg-muted/80"
+                onMouseDown={(ev) => {
+                  ev.preventDefault();
+                  jumpTo(e.key);
+                }}
+              >
+                <span className="font-medium text-foreground">{e.label}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{e.key}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 function formatDerivedSpringRateNumber(n: number): string {
   return n.toFixed(3);
@@ -712,17 +832,18 @@ function EditableSingle({
   if (effectiveReadOnly || fieldKind === "bool") {
     return (
       <div
+        data-setup-field-key={fieldKey}
         className={cn(
-          "flex min-h-[2.25rem] items-stretch border-b border-border/80 last:border-b-0",
+          "flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0",
           changed && rowHighlight.className
         )}
         style={changed && rowHighlight.style ? rowHighlight.style : undefined}
       >
-        <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
+        <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
           {label}
           {unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({unit})</span> : null}
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-1">
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-0.5">
           {options ? (
             options.multi ? (
               <OptionSquareFieldDisplay
@@ -784,13 +905,14 @@ function EditableSingle({
 
   return (
     <div
+      data-setup-field-key={fieldKey}
       className={cn(
-        "flex min-h-[2.25rem] items-stretch border-b border-border/80 last:border-b-0",
+        "flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0",
         changed && rowHighlight.className
       )}
       style={changed && rowHighlight.style ? rowHighlight.style : undefined}
     >
-      <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
+      <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
         {label}
         {unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({unit})</span> : null}
       </div>
@@ -1021,14 +1143,15 @@ function PairSideCell({
   if (readOnly || fk === "bool") {
     return (
       <div
+        data-setup-field-key={fieldKey}
         className={cn(
-          "flex min-h-[2.25rem] flex-1 flex-col border-l border-border/60 px-2 py-1 first:border-l-0 md:border-border/60",
+          "flex min-h-[1.9rem] flex-1 flex-col border-l border-border/60 px-2 py-0.5 first:border-l-0 md:border-border/60",
           c && hl.className
         )}
         style={c && hl.style ? hl.style : undefined}
+        aria-label={side}
       >
-        <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{side}</div>
-        <div className="mt-0.5 flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           {options ? (
             options.multi ? (
               <OptionSquareFieldDisplay
@@ -1082,15 +1205,16 @@ function PairSideCell({
 
   return (
     <div
+      data-setup-field-key={fieldKey}
       className={cn(
-        "flex min-h-[2.25rem] flex-1 flex-col border-l border-border/60 px-2 py-1 first:border-l-0 md:border-border/60",
+        "flex min-h-[1.9rem] flex-1 flex-col border-l border-border/60 px-2 py-0.5 first:border-l-0 md:border-border/60",
         c && hl.className
       )}
       style={c && hl.style ? hl.style : undefined}
+      aria-label={side}
     >
-      <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{side}</div>
       {options ? (
-        <div className="mt-0.5">
+        <div>
           {options.multi ? (
             <OptionSquareFieldDisplay
               value={v}
@@ -1118,7 +1242,7 @@ function PairSideCell({
         <input
           ref={inputRef}
           className={cn(
-            "mt-0.5 w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
+            "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
             "bg-card ring-1 ring-accent/40"
           )}
           value={local}
@@ -1131,7 +1255,7 @@ function PairSideCell({
       ) : showCompareEdit ? (
         <button
           type="button"
-          className="mt-0.5 w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
+          className="w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
           onClick={beginEdit}
         >
           <InlineValueCompare
@@ -1146,7 +1270,7 @@ function PairSideCell({
         <input
           ref={inputRef}
           className={cn(
-            "mt-0.5 w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
+            "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
             focused && "bg-card ring-1 ring-accent/40"
           )}
           value={focused ? local : v}
@@ -1187,7 +1311,7 @@ function PairRow({
         "flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch"
       )}
     >
-      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
         {row.unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({row.unit})</span> : null}
       </div>
@@ -1237,57 +1361,63 @@ function Corner4Row({
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
 }) {
-  const corners: { k: string; lab: string }[] = [
-    { k: row.ff, lab: "FF" },
-    { k: row.fr, lab: "FR" },
-    { k: row.rf, lab: "RF" },
-    { k: row.rr, lab: "RR" },
+  const sides: { title: "Front" | "Rear"; cells: { k: string; lab: string }[] }[] = [
+    { title: "Front", cells: [{ k: row.ff, lab: "FF" }, { k: row.fr, lab: "FR" }] },
+    { title: "Rear", cells: [{ k: row.rf, lab: "RF" }, { k: row.rr, lab: "RR" }] },
   ];
   return (
-    <div
-      className={cn(
-        "border-b border-border/80 last:border-b-0"
-      )}
-    >
-      <div className="border-b border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className={cn("flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch")}>
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
         {row.unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({row.unit})</span> : null}
       </div>
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/60">
-        {corners.map(({ k, lab }) => {
-          const v = fieldValue(value, k);
-          const b = baseline ? fieldValue(baseline, k) : "";
-          const cornerCmp = keyFieldCompareResult(k, value, baseline, highlightChangedKeys, numericAggregationByKey);
-          const cornerHl = compareResultToHighlight(cornerCmp);
-          const c = !cornerCmp.areEqual;
-          return (
-            <div
-              key={k}
-              className={cn("p-1.5", c && cornerHl.className)}
-              style={c && cornerHl.style ? cornerHl.style : undefined}
-            >
-              <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{lab}</div>
-              {readOnly ? (
-                <InlineValueCompare
-                  value={v}
-                  baseline={b}
-                  hasBaseline={hasBaseline}
-                  fieldKind="text"
-                  title={springRateFieldTooltip(value, k)}
-                />
-              ) : (
-                <CornerCell
-                  fieldKey={k}
-                  value={v}
-                  baseline={b}
-                  hasBaseline={hasBaseline}
-                  onCommit={onCommit}
-                  setupSnapshot={value}
-                />
-              )}
-            </div>
-          );
-        })}
+      <div className="grid flex-1 grid-cols-2 divide-x divide-border/60">
+        {sides.map((side) => (
+          <div key={side.title} className="grid grid-cols-2 divide-x divide-border/40" aria-label={side.title}>
+            {side.cells.map(({ k, lab }) => {
+              const v = fieldValue(value, k);
+              const b = baseline ? fieldValue(baseline, k) : "";
+              const cornerCmp = keyFieldCompareResult(k, value, baseline, highlightChangedKeys, numericAggregationByKey);
+              const cornerHl = compareResultToHighlight(cornerCmp);
+              const c = !cornerCmp.areEqual;
+              return (
+                <div
+                  key={k}
+                  data-setup-field-key={k}
+                  className={cn(
+                    "flex min-h-[1.9rem] min-w-0 items-center gap-1 px-2 py-0.5",
+                    c && cornerHl.className
+                  )}
+                  style={c && cornerHl.style ? cornerHl.style : undefined}
+                >
+                  <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {lab}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    {readOnly ? (
+                      <InlineValueCompare
+                        value={v}
+                        baseline={b}
+                        hasBaseline={hasBaseline}
+                        fieldKind="text"
+                        title={springRateFieldTooltip(value, k)}
+                      />
+                    ) : (
+                      <CornerCell
+                        fieldKey={k}
+                        value={v}
+                        baseline={b}
+                        hasBaseline={hasBaseline}
+                        onCommit={onCommit}
+                        setupSnapshot={value}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1328,7 +1458,7 @@ function CornerCell({
         <input
           ref={inputRef}
           className={cn(
-            "mt-0.5 w-full rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
+            "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
             "bg-card ring-1 ring-accent/40"
           )}
           value={local}
@@ -1341,7 +1471,7 @@ function CornerCell({
       ) : showCompareEdit ? (
         <button
           type="button"
-          className="mt-0.5 w-full rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
+          className="w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
           onClick={beginEdit}
         >
           <InlineValueCompare
@@ -1356,7 +1486,7 @@ function CornerCell({
         <input
           ref={inputRef}
           className={cn(
-            "mt-0.5 w-full rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
+            "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
             focused && "bg-card ring-1 ring-accent/40"
           )}
           value={focused ? local : value}
@@ -1401,14 +1531,15 @@ function ScrewStripRow({
 
   return (
     <div
+      data-setup-field-key={row.key}
       className={cn(
         "flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch"
       )}
     >
-      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-2">
+      <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-1">
         <AwesomatixScrewStrip
           variant={variant}
           selected={sel}
@@ -1493,12 +1624,36 @@ function TopDeckBlock({
   );
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+/** Section has at least one Front/Rear pair-style row → render a column header. */
+function sectionHasPairs(rows: readonly StructuredRow[]): boolean {
+  return rows.some(
+    (r) => r.type === "pair" || r.type === "corner4" || r.type === "top_deck_block" || r.type === "screw_strip"
+  );
+}
+
+function SectionCard({
+  title,
+  children,
+  showFrontRearHeader,
+}: {
+  title: string;
+  children: React.ReactNode;
+  showFrontRearHeader: boolean;
+}) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-muted/40">
-      <div className="border-b border-border bg-card/80 px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="border-b border-border bg-card/80 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </div>
+      {showFrontRearHeader ? (
+        <div className="hidden border-b border-border/70 bg-card/40 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:flex">
+          <div className="w-[38%] shrink-0 border-r border-border/60 px-2 py-1">Parameter</div>
+          <div className="grid flex-1 grid-cols-2 divide-x divide-border/60">
+            <div className="px-2 py-1">Front</div>
+            <div className="px-2 py-1">Rear</div>
+          </div>
+        </div>
+      ) : null}
       <div className="divide-y divide-border/30">{children}</div>
     </div>
   );
@@ -1512,9 +1667,12 @@ export function SetupSheetStructured({
   baselineValue,
   highlightChangedKeys,
   numericAggregationByKey = null,
+  enableFieldSearch = false,
 }: Props) {
   const baseline = baselineValue ?? null;
   const hasBaseline = baseline != null;
+  const sheetRootRef = useRef<HTMLDivElement>(null);
+  const fieldSearchEntries = useMemo(() => collectFieldSearchEntries(sections), [sections]);
 
   const commit = useCallback(
     (key: string, raw: SetupSnapshotValue) => {
@@ -1629,9 +1787,12 @@ export function SetupSheetStructured({
   };
 
   return (
-    <div className="space-y-3">
+    <div ref={sheetRootRef} className="space-y-3">
+      {enableFieldSearch && !readOnly ? (
+        <SetupFieldJumpSearch entries={fieldSearchEntries} rootRef={sheetRootRef} />
+      ) : null}
       {sections.map((sec) => (
-        <SectionCard key={sec.id} title={sec.title}>
+        <SectionCard key={sec.id} title={sec.title} showFrontRearHeader={sectionHasPairs(sec.rows)}>
           {sec.rows.map((row) => renderRow(row))}
         </SectionCard>
       ))}

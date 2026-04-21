@@ -12,11 +12,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String?  @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
 
   cars            Car[]
   runs            Run[]
@@ -31,6 +36,70 @@ model User {
   setupDocuments  SetupDocument[]
   setupCalibrations SetupSheetCalibration[]
   setupImportBatches SetupImportBatch[]
+  importedLapTimeSessions ImportedLapTimeSession[]
+  watchedLapSources WatchedLapSource[]
+  videoAssets     VideoAsset[]
+  teammateLinksOwned TeammateLink[] @relation("TeammateLinksOwned")
+  teammateLinksPeer  TeammateLink[] @relation("TeammateLinksPeer")
+}
+
+/** Emails allowed to receive magic-link sign-in (invite list). */
+model AuthAllowedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+/** Auth.js / NextAuth — OAuth-style account linkage (email magic link uses this). */
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+/** Auth.js database sessions (kept for adapter compatibility; app uses JWT sessions in middleware). */
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/** Viewer (`userId`) may browse peer runs in Engineer when same track (enforced in APIs + context). */
+model TeammateLink {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  userId     String
+  peerUserId String
+
+  user User @relation("TeammateLinksOwned", fields: [userId], references: [id], onDelete: Cascade)
+  peer User @relation("TeammateLinksPeer", fields: [peerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, peerUserId])
+  @@index([userId])
+  @@index([peerUserId])
 }
 
 enum ActionItemSourceType {
@@ -66,7 +135,7 @@ model Car {
   setupSheetTemplate String?  // "awesomatix_a800rr" | null/"none" = no sheet
   createdAt          DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs      Run[]
@@ -79,10 +148,13 @@ model Track {
   id        String   @id @default(cuid())
   name      String
   location  String?
-  layout    String?
+  /** Multi-select grip tags (e.g. MEDIUM + HIGH); see `trackMetaTags.ts` ids. */
+  gripTags   String[] @default([])
+  /** Multi-select layout tags (e.g. TECHNICAL + FAST). */
+  layoutTags String[] @default([])
   createdAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs            Run[]
@@ -109,13 +181,26 @@ model Event {
   notes      String?
   createdAt  DateTime  @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
   trackId String?
 
+  /** LiveRC practice session list URL for this event (optional). */
+  practiceSourceUrl String?
+  /** LiveRC results index URL for this event (optional). */
+  resultsSourceUrl  String?
+  /** Race class to watch on results index (e.g. \"17.5 Stock\"). */
+  raceClass         String?
+
+  /** Watermark for practice auto-import (canonical session completion instant). */
+  practiceLastSeenSessionCompletedAt DateTime?
+  /** Watermark for results auto-import. */
+  resultsLastSeenSessionCompletedAt    DateTime?
+
   runs Run[]
+  importedLapTimeSessions ImportedLapTimeSession[]
   // Future: timetable/scheduled sessions (timetableSessions?), reminders, "most likely session" suggestions
 }
 
@@ -127,7 +212,7 @@ model TireSet {
   notes      String?
   createdAt  DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs Run[]
@@ -142,7 +227,7 @@ model Battery {
   notes           String?
   createdAt       DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs Run[]
@@ -154,7 +239,7 @@ model SetupSnapshot {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)
@@ -202,9 +287,13 @@ enum SetupDocumentImportOutcome {
   FAILED
 }
 
-/** MVP: only car × parameter; scopeKey duplicates carId for forward-compatible snapshots. */
+/**
+ * CAR_PARAMETER: all eligible snapshots per car (scopeKey = carId).
+ * CAR_PARAMETER_CONDITION: runs bucketed by track grip/layout signature (scopeKey = encoded condition).
+ */
 enum SetupAggregationScopeType {
   CAR_PARAMETER
+  CAR_PARAMETER_CONDITION
 }
 
 enum SetupAggregationValueType {
@@ -236,8 +325,40 @@ model SetupParameterAggregation {
   numericStatsJson     Json?
   categoricalStatsJson Json?
 
-  @@unique([scopeType, carId, parameterKey])
+  @@unique([scopeType, scopeKey, carId, parameterKey])
   @@index([carId])
+}
+
+/**
+ * App-wide parameter stats from every user's setup uploads flagged `eligibleForAggregationDataset`,
+ * grouped by `Car.setupSheetTemplate` (same keys as CAR_PARAMETER, no per-user isolation).
+ */
+model CommunitySetupParameterAggregation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /** Matches `Car.setupSheetTemplate` (e.g. awesomatix_a800rr). */
+  setupSheetTemplate String
+  /** Parsed setup surface bucket (asphalt | carpet). */
+  trackSurface String
+  /**
+   * Grip-level bucket derived from the doc's `traction` multi-select tag.
+   * Values: `any` (always emitted — all eligible docs for the surface),
+   * `low` / `medium` / `high` (one row per grip tag the doc claims; multi-tag docs land in multiple buckets).
+   */
+  gripLevel String @default("any")
+
+  parameterKey String
+  valueType    SetupAggregationValueType
+
+  sampleCount Int
+
+  numericStatsJson     Json?
+  categoricalStatsJson Json?
+
+  @@unique([setupSheetTemplate, trackSurface, gripLevel, parameterKey])
+  @@index([setupSheetTemplate, trackSurface, gripLevel])
 }
 
 /** User review for dataset / aggregation eligibility (bulk import workflow). */
@@ -294,6 +415,12 @@ model SetupDocument {
   calibrationUsedIsForcedDefault Boolean?
   extractedText    String?
   parsedDataJson   Json?
+  /** Original source URL when imported from a remote site (e.g. PetitRC). */
+  sourceUrl        String?
+  /** Optional source tag (e.g. \"petitrc\"). */
+  sourceSite       String?
+  /** SHA-256 of the original PDF bytes (dedupe across URL variants and old imports). */
+  sourceContentSha256 String?
   /** User corrected structured fields after parse (niche fixes; automated re-parse clears this). */
   parsedSetupManuallyEdited Boolean @default(false)
   /** Sticky calibration used for parse + render (forced default when missing). */
@@ -324,6 +451,8 @@ model SetupDocument {
   @@index([userId, parseStatus])
   @@index([setupImportBatchId])
   @@index([carId])
+  @@unique([userId, sourceUrl])
+  @@unique([userId, sourceContentSha256])
 }
 
 model SetupSheetCalibration {
@@ -362,7 +491,7 @@ model Run {
   carNameSnapshot      String?
   trackNameSnapshot    String?
 
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)
@@ -373,6 +502,9 @@ model Run {
 
   event   Event?  @relation(fields: [eventId], references: [id])
   eventId String?
+
+  /** Session race class when not from event, or override (e.g. \"17.5 Stock\"). */
+  raceClass String?
 
   tireSet   TireSet? @relation(fields: [tireSetId], references: [id])
   tireSetId String?
@@ -407,14 +539,162 @@ model Run {
   // Structured lap ingestion: source, metrics, multi-driver/field-ready entries (see src/lib/lapSession/types.ts).
   lapSession Json?
 
+  /**
+   * Materialized lap summary metrics computed from `lapTimes` / `lapSession` at
+   * save time. List views (Sessions / dashboard) read these instead of
+   * recomputing from the JSON lap arrays for every row. Nullable for legacy
+   * runs written before the column existed — callers fall back to computing
+   * from the lap arrays in that case.
+   */
+  bestLapSeconds   Float?
+  avgTop5LapSeconds Float?
+
   notes            String?  // unified notes (new); legacy fields below for older runs
   driverNotes      String?
   handlingProblems String?
+  /** Optional structured handling tags / balance / prompts (see runHandlingAssessment). */
+  handlingAssessmentJson Json?
   suggestedChanges String?
   appliedChanges   String?
 
   importedLapSets RunImportedLapSet[]
   actionItems     ActionItem[]
+
+  /** Lap-time imports linked to this run (optional; see ImportedLapTimeSession). */
+  linkedImportedLapSessions ImportedLapTimeSession[] @relation("ImportedLapSessionLinkedRun")
+
+  /** Primary imported lap-time session when this run was created from detection / URL import. */
+  importedLapTimeSessionId String?                 @unique
+  detectedImportedLapSession ImportedLapTimeSession? @relation("RunDetectedImport", fields: [importedLapTimeSessionId], references: [id], onDelete: SetNull)
+
+  /**
+   * When the on-track session actually occurred (from timing import / LiveRC), if known.
+   * Distinct from createdAt (when this row was saved in the app).
+   */
+  sessionCompletedAt DateTime?
+  /** User finished the logging workflow (Run completed), or saved from event-detected import. */
+  loggingComplete  Boolean  @default(false)
+  /** Dashboard / import chooser: hide "incomplete logging" reminder without deleting the run. */
+  incompleteLoggingPromptDismissedAt DateTime?
+
+  /**
+   * Stable ordering axis for run lists. Stamped once at create time (= server `now()`)
+   * and never auto-updated. Only changes when the user explicitly drags a run to a new
+   * position (reorder endpoint) or opts in to "use session time". Display time-of-day
+   * is independent (see `sessionCompletedAt` / `createdAt`); this column exists purely
+   * so "if B was completed after A, B stays above A forever" holds regardless of edits,
+   * re-imports, or lap-time changes. Backfilled from `COALESCE(sessionCompletedAt, createdAt)`.
+   */
+  sortAt DateTime @default(now())
+
+  /** Cached deterministic Engineer Summary JSON (invalidated on run update). */
+  engineerSummaryJson         Json?
+  engineerSummaryRefRunId     String?
+  engineerSummaryComputedAt   DateTime?
+  /** Optional structured Deep Dive answers (versioned object). */
+  engineerDeepDiveJson        Json?
+
+  /**
+   * Optional URL to the practice day results page (e.g. LiveRC practice day)
+   * that the Lap Times "url" ingest tab uses to list candidate sessions for this
+   * driver. Captured per-run (vs the user-wide `currentPracticeDayUrl` setting)
+   * so historical runs remember which day they came from even when the user
+   * moves on to a new day.
+   */
+  practiceDayUrl String?
+
+  @@index([userId, sortAt])
+}
+
+/**
+ * Parsed lap-time session from a timing URL (e.g. LiveRC), reusable outside a single run.
+ * Optional links to Run / Event for continuity; ingestion uses parseTimingUrl (shared parser registry).
+ */
+model ImportedLapTimeSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  sourceUrl  String
+  parserId   String
+  /** e.g. liverc, timing_url */
+  sourceType String   @default("timing_url")
+
+  /** Snapshot of LapUrlParseResult fields for rehydration (laps, sessionDrivers, sessionHint, …). */
+  parsedPayload Json
+
+  /**
+   * When the timing provider exposes session/run wall time (e.g. LiveRC HTML), stored as UTC.
+   * Distinct from createdAt (when this row was imported). Null for legacy rows or unparseable pages.
+   */
+  sessionCompletedAt DateTime?
+
+  linkedRun   Run?    @relation("ImportedLapSessionLinkedRun", fields: [linkedRunId], references: [id], onDelete: SetNull)
+  linkedRunId String?
+
+  linkedEvent   Event?  @relation(fields: [linkedEventId], references: [id], onDelete: SetNull)
+  linkedEventId String?
+
+  /** When populated by event lap detection: practice vs race scope. */
+  eventDetectionSource String?
+  /** Race class label when `eventDetectionSource` is race. */
+  eventRaceClass       String?
+  /**
+   * Human label from the LiveRC list row when detected (e.g. race result link text:
+   * "Race 15: ISTC Modified (ISTC Modified A3-Main)"). Null for legacy imports.
+   */
+  eventDetectionSessionLabel String?
+
+  /** User hid this session from the dashboard "Detected sessions" prompt (does not delete import). */
+  detectionPromptDismissedAt DateTime?
+
+  detectedPrimaryForRun Run? @relation("RunDetectedImport")
+
+  @@index([userId, createdAt])
+  @@index([userId, sourceUrl])
+  @@index([linkedEventId])
+}
+
+model WatchedLapSource {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /** Timing/result URL to check (practice view_session or race view_race_result). */
+  sourceUrl String
+  /**
+   * Targeting semantics:
+   * - `driver`: personal practice sessions (match canonical parsed driver name)
+   * - `class`: race results index scoped by class; user row resolved via stored LiveRC driver name
+   * - `none`: generic watch (no targeting)
+   */
+  targetMode String @default("none")
+  /** Optional: target class for results index sources (e.g. \"17.5 Stock\"). */
+  targetClass String?
+  /** Optional override for practice driver matching (otherwise uses user setting `liveRcDriverName`). */
+  targetDriverOverride String?
+
+  /**
+   * Legacy: older sources stored a per-source driver name.
+   * Kept for backward compatibility; new sources should use targetMode + targetDriverOverride.
+   */
+  driverName String?
+  /** Optional: choose a car for prefill suggestions when logging. */
+  carId String?
+
+  /** Last time we checked this source (audit only). */
+  lastCheckedAt DateTime?
+  /** Last observed session completion time (UTC) to detect new sessions. */
+  lastSeenSessionCompletedAt DateTime?
+
+  @@index([userId, updatedAt])
+  @@index([userId, sourceUrl])
 }
 
 model AppSetting {
@@ -433,6 +713,8 @@ model AppSetting {
 model RunImportedLapSet {
   id             String   @id @default(cuid())
   createdAt      DateTime @default(now())
+  /** Denormalized from ImportedLapTimeSession at save time; null for legacy URL-import rows. */
+  sessionCompletedAt DateTime?
   sourceUrl      String?
   driverId       String?
   driverName     String
@@ -457,5 +739,24 @@ model RunImportedLap {
   lapSetId String
 
   @@index([lapSetId, lapNumber])
+}
+
+model VideoAsset {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /** Blob URL or local `/uploads/...` ref (see storage helpers). */
+  storagePath      String
+  originalFilename String
+  mimeType         String
+  bytes            Int
+  /** Optional free-text label (e.g. "Q2 A-main onboard"). */
+  label            String?
+
+  @@index([userId, createdAt])
 }
 

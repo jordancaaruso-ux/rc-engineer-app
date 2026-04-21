@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { loadDashboardHomeModel } from "@/lib/dashboardServer";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
@@ -24,7 +24,7 @@ export default async function DashboardPage(): Promise<ReactNode> {
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const model = await loadDashboardHomeModel(user.id);
 
   return <DashboardHome model={model} />;

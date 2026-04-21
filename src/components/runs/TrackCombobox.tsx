@@ -3,7 +3,13 @@
 import { Fragment, useRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export type TrackOption = { id: string; name: string; location?: string | null };
+export type TrackOption = {
+  id: string;
+  name: string;
+  location?: string | null;
+  gripTags?: string[];
+  layoutTags?: string[];
+};
 
 type TrackSortMode = "favourites_then_alpha";
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { applyCalibrationToSetupDocument } from "@/lib/setupDocuments/applyCalibrationToDocument";
@@ -12,7 +12,8 @@ export async function POST(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { calibrationId?: string };
   // Explicit calibration selection path.
   const effective = await getEffectiveCalibrationProfileId({
@@ -25,7 +26,7 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: { id: effective.calibrationId },
+    where: { id: effective.calibrationId, userId: user.id },
     select: { id: true, name: true },
   });
   if (!calibration) return NextResponse.json({ error: "Calibration not found" }, { status: 404 });

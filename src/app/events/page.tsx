@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { EventList } from "@/components/events/EventList";
+
+/** Match /tracks + /runs/new: always load user events/tracks fresh (avoids stale static RSC for selectors). */
+export const dynamic = "force-dynamic";
 
 export default async function EventsPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -23,7 +26,7 @@ export default async function EventsPage(): Promise<ReactNode> {
     );
   }
 
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const [events, tracks] = await Promise.all([
     prisma.event.findMany({
       where: { userId: user.id },

@@ -4,7 +4,19 @@ node_modules/
 .env.local
 prisma/dev.db
 
+# Cursor local state / debug (but keep project rules tracked — they're persistent guidance).
+.cursor/*
+!.cursor/rules/
+
+# TypeScript incremental cache
+*.tsbuildinfo
+
 # Local dev PDFs (Blob in production). Outside `public/` so they are not traced into serverless bundles.
 .local-uploads/
 # Legacy dev path — keep out of repo/deploy; migrate files to `.local-uploads/` if needed (same filenames).
 public/uploads/
+
+# Capacitor / Xcode (keep project; ignore local build artifacts)
+ios/App/build/
+ios/DerivedData/
+*.xcuserstate

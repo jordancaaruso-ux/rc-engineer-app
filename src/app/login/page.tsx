@@ -1,13 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Suspense, useState } from "react";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -16,24 +18,32 @@ function LoginForm() {
     setError(null);
     setPending(true);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; gateDisabled?: boolean };
-      if (!res.ok) {
-        setError(data.error ?? "Login failed");
-        return;
-      }
-      if (data.gateDisabled) {
-        const from = searchParams.get("from") || "/";
-        router.push(from.startsWith("/") ? from : "/");
-        router.refresh();
-        return;
-      }
       const from = searchParams.get("from") || "/";
-      router.push(from.startsWith("/") ? from : "/");
+      const callbackUrl = from.startsWith("/") ? from : "/";
+      const res = await signIn("nodemailer", {
+        email: email.trim().toLowerCase(),
+        callbackUrl,
+        redirect: false,
+      });
+      if (res?.error) {
+        setError("Could not send sign-in email. Check server logs and SMTP configuration.");
+        return;
+      }
+      let delivery: string | undefined;
+      try {
+        const hintRes = await fetch("/api/auth/config-hint");
+        const hint = (await hintRes.json()) as { smtpConfigured?: boolean };
+        if (hint.smtpConfigured !== true) {
+          delivery = "console";
+        }
+      } catch {
+        /* ignore */
+      }
+      const verifyUrl =
+        delivery === "console"
+          ? "/login/verify-request?delivery=console"
+          : "/login/verify-request";
+      router.push(verifyUrl);
       router.refresh();
     } finally {
       setPending(false);
@@ -41,33 +51,47 @@ function LoginForm() {
   }
 
   return (
-    <main style={{ padding: "2rem", maxWidth: 360, margin: "10vh auto", fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>RC Engineer — private access</h1>
-      <form onSubmit={onSubmit}>
-        <label style={{ display: "block", marginBottom: "0.5rem" }}>
-          Password
+    <main className="mx-auto max-w-sm px-4 py-16">
+      <h1 className="text-lg font-semibold text-foreground">Sign in to RC Engineer</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        We&apos;ll email you a magic link. Only invited addresses can sign in.
+      </p>
+      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <label className="block text-sm">
+          <span className="text-muted-foreground">Email</span>
           <input
-            type="password"
-            name="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "0.5rem" }}
+            type="email"
+            name="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
             required
+            className="mt-1 w-full rounded-md border border-border bg-secondary px-3 py-2 text-foreground"
           />
         </label>
-        {error ? <p style={{ color: "crimson", fontSize: 14, marginBottom: 8 }}>{error}</p> : null}
-        <button type="submit" disabled={pending} style={{ padding: "0.5rem 1rem" }}>
-          {pending ? "…" : "Continue"}
+        {error ? <p className="text-sm text-primary">{error}</p> : null}
+        <button
+          type="submit"
+          disabled={pending}
+          className="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {pending ? "Sending…" : "Email me a link"}
         </button>
       </form>
+      <p className="mt-6 text-center text-xs text-faint">
+        <Link href="/" className="underline-offset-2 hover:underline">
+          Back to home
+        </Link>
+      </p>
     </main>
   );
 }
 
 export default function LoginPage(): ReactNode {
   return (
-    <Suspense fallback={<main style={{ padding: "2rem" }}>Loading…</main>}>
+    <Suspense
+      fallback={<main className="px-4 py-16 text-center text-muted-foreground">Loading…</main>}
+    >
       <LoginForm />
     </Suspense>
   );

@@ -3,6 +3,14 @@ import { Prisma } from "@prisma/client";
 
 export const APP_SETTING_KEYS = {
   myName: "myName",
+  liveRcDriverName: "liveRcDriverName",
+  /**
+   * Current practice day timing-URL (e.g. LiveRC day results page) the driver
+   * is working from. Persists across `New Run` forms so "copy last run" / fresh
+   * Log Your Run sessions keep the same day URL pre-filled. Cleared manually
+   * in the Settings tab when moving on to the next day.
+   */
+  currentPracticeDayUrl: "currentPracticeDayUrl",
 } as const;
 
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[keyof typeof APP_SETTING_KEYS];
@@ -61,4 +69,20 @@ export async function getMyNameSetting(userId: string): Promise<string | null> {
 
 export async function setMyNameSetting(userId: string, value: string | null): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.myName, value);
+}
+
+export async function getLiveRcDriverNameSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.liveRcDriverName);
+}
+
+export async function setLiveRcDriverNameSetting(userId: string, value: string | null): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.liveRcDriverName, value);
+}
+
+export async function getCurrentPracticeDayUrlSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.currentPracticeDayUrl);
+}
+
+export async function setCurrentPracticeDayUrlSetting(userId: string, value: string | null): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.currentPracticeDayUrl, value);
 }

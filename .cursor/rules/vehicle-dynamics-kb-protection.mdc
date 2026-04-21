@@ -1,0 +1,38 @@
+---
+description: Vehicle-dynamics KB is hand-curated; do not edit without explicit approval
+globs: content/vehicle-dynamics/**/*.md,src/lib/engineerPhase5/parameterEffects/catalog.ts
+alwaysApply: false
+---
+
+# Vehicle Dynamics KB Protection
+
+Files in `content/vehicle-dynamics/*.md` are the Engineer's ground-truth prose. The Engineer retrieves these files verbatim via `searchVehicleDynamicsKb` in `src/lib/engineerPhase5/vehicleDynamicsKb.ts` and quotes them back to drivers as authoritative RC setup advice. **Any language written here is presented to end users as if it is expert knowledge**, whether or not it actually matches the repo owner's voice or beliefs.
+
+The structured parameter-effect catalog at `src/lib/engineerPhase5/parameterEffects/catalog.ts` is treated as an extension of this KB — every entry is authored content that the Engineer quotes back to drivers as ground truth, so the same approval gate applies.
+
+Evocative language like "breathe", "squares up", "platforms", "dances", "comes alive" has previously slipped into these files from agent-authored prose and been repeated to users as gospel. Do not repeat that failure mode.
+
+## Hard rules
+
+1. **Do not modify** any file under `content/vehicle-dynamics/` or the entries in `src/lib/engineerPhase5/parameterEffects/catalog.ts` unless the user's most recent message explicitly names the file or explicitly asks for KB content edits. "Improving clarity", "tightening grammar", "adding a missing concept" are NOT sufficient justification.
+
+2. **When the user asks for Engineer behaviour changes**, the fix probably does not belong in the KB. Consider these first:
+   - `src/lib/engineerPhase5/openaiEngineer.ts` — system prompt tone / rules / constraints.
+   - `src/lib/engineerPhase5/engineerRichContext.ts` — what structured data the Engineer sees.
+   - `src/lib/engineerPhase5/vehicleDynamicsKb.ts` — retrieval logic / tokenization / ranking.
+   - `src/lib/engineerPhase5/parameterEffects/` — intent classifier and query helpers are safe to modify; only `catalog.ts` entries are locked.
+
+3. **If a KB edit is genuinely required**, propose the exact paragraphs (or catalog entries) in chat, show a single-file diff, and wait for the user to type explicit approval before writing.
+
+4. **Catalog entries must trace back to KB prose.** Every `effects.<outcome>` direction, hedge flag, and strength added to `catalog.ts` must be derivable from the matching KB file + `kbSection` anchor. Never infer directions from general racing knowledge or prior agent-authored commentary. When proposing an entry, quote the KB line that supports each effect.
+
+## Style rules (for approved edits)
+
+- Match the existing terse, bold-for-technical-terms prose. No bullet explosions, no headings added mid-section, no rewording for "flow".
+- Forbidden metaphorical vocabulary unless the user dictated it: **breathe, platforms, dances, comes alive, settles, marries, talks to, listens, wants, feels like** (when describing what the car "wants"). Use "tends to", "often", "typically" instead.
+- Preserve heading levels (`##` chunks are what `searchVehicleDynamicsKb` splits on — do not break them).
+- Keep each file under ~90 lines. If a concept genuinely needs more, propose a new file, don't bloat an existing one.
+
+## Audit note
+
+Every file in `content/vehicle-dynamics/` was introduced in commit `31836c4` by a prior Cursor agent session. The repo owner is gradually auditing this content against their actual engineering knowledge. Treat the current KB as "under audit" — do not add more unreviewed prose to it.

@@ -4,13 +4,15 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
+import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
+import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
+import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
-import { formatEventDate, formatEventRelativeLabel } from "@/lib/formatDate";
+import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
@@ -18,14 +20,35 @@ import { formatRunListScanLine, formatRunPickerLineRelativeWhen } from "@/lib/ru
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { normalizeLapTimes } from "@/lib/runLaps";
+import type { LapRow } from "@/lib/lapAnalysis";
+import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
+import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import {
   LapTimesIngestPanel,
   defaultLapIngestValue,
   type LapIngestFormValue,
 } from "@/components/runs/LapTimesIngestPanel";
+import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
+import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
+import { TrackMetaChipGroups } from "@/components/runs/TrackMetaChipGroups";
+import {
+  emptyHandlingAssessmentUiState,
+  isHandlingAssessmentMeaningful,
+  parseHandlingAssessmentJson,
+  persistedFromUiState,
+  uiStateFromParsed,
+  type HandlingAssessmentUiState,
+} from "@/lib/runHandlingAssessment";
 
 type CarOption = { id: string; name: string; setupSheetTemplate?: string | null };
-type TrackOption = { id: string; name: string; location?: string | null };
+type TrackOption = {
+  id: string;
+  name: string;
+  location?: string | null;
+  gripTags?: string[];
+  layoutTags?: string[];
+};
 type TireSetOption = { id: string; label: string; setNumber?: number; initialRunCount?: number };
 type BatteryPackOption = { id: string; label: string; packNumber?: number; initialRunCount?: number };
 
@@ -65,8 +88,25 @@ type LastRun = {
   driverNotes?: string | null;
   handlingProblems?: string | null;
   suggestedChanges?: string | null;
+  handlingAssessmentJson?: unknown;
+  /** Session race class when not only from event (e.g. practice). */
+  raceClass?: string | null;
   lapTimes?: unknown;
   lapSession?: unknown;
+  importedLapSets?: Array<{
+    driverName: string;
+    displayName: string | null;
+    isPrimaryUser: boolean;
+    laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
+  }>;
+  /** Optional practice-day results URL saved with this run. */
+  practiceDayUrl?: string | null;
+  /**
+   * Whether the user has marked this run as finished logging. Drafts
+   * (`loggingComplete === false`) get amber "finish me" styling in the
+   * post-run section when the form is opened to edit an existing run.
+   */
+  loggingComplete?: boolean;
 };
 
 type DownloadedSetupOption = {
@@ -131,12 +171,35 @@ function normalizeThingsToTryFromStorage(raw: string): string {
   return "• " + first.replace(/^\s*•\s?/, "") + rest;
 }
 
+function setupSnapshotWithDerived(raw: unknown): SetupSnapshotData {
+  return applyDerivedFieldsToSnapshot(normalizeSetupData(raw));
+}
+
+/** Deep copy a setup snapshot so mutating `setupData` later doesn't drag the baseline along. */
+function cloneSetupSnapshot(d: SetupSnapshotData): SetupSnapshotData {
+  try {
+    return JSON.parse(JSON.stringify(d)) as SetupSnapshotData;
+  } catch {
+    return { ...d };
+  }
+}
+
 export function NewRunForm(props: {
   cars: CarOption[];
   tracks: TrackOption[];
   favouriteTrackIds?: string[];
   favouriteTracks?: TrackOption[];
   dashboardPrefill?: DashboardNewRunPrefill | null;
+  /** Optional event to attach (e.g. from dashboard detection deep link). */
+  initialEventId?: string | null;
+  /** When set, the form edits an existing run (owner-only enforced by server update route). */
+  editRun?: LastRun | null;
+  /**
+   * Deep-link hint from the dashboard "Log changes for next run" shortcut.
+   * When `"setup"`, the Setup card is auto-expanded and scrolled into view on
+   * mount so the driver lands directly on the setup-changes free-text box.
+   */
+  focusSection?: "setup" | null;
 }) {
   const router = useRouter();
   const cars = props.cars;
@@ -144,10 +207,19 @@ export function NewRunForm(props: {
   const favouriteTrackIds = props.favouriteTrackIds ?? [];
   const favouriteTracks = props.favouriteTracks ?? [];
   const dashboardPrefill = props.dashboardPrefill ?? null;
+  const initialEventId = props.initialEventId?.trim() || null;
 
   const [sessionType, setSessionType] = useState<"TESTING" | "RACE_MEETING">("TESTING");
   const [meetingSessionType, setMeetingSessionType] = useState<MeetingSessionType>("PRACTICE");
   const [meetingSessionCustom, setMeetingSessionCustom] = useState<string>(""); // when type is OTHER
+  /**
+   * Practice-day results URL that persists across runs for this driver. The form
+   * hydrates this from (in priority order) editRun → copy-last-run source →
+   * `currentPracticeDayUrl` user setting, and sends it up with the save payload
+   * so we can recall it later for the Lap Times URL picker. The input is only
+   * visible under TESTING sessions — RACE_MEETING has its own event wiring.
+   */
+  const [practiceDayUrl, setPracticeDayUrl] = useState<string>("");
   const [carId, setCarId] = useState<string>(cars[0]?.id ?? "");
   const [tracksList, setTracksList] = useState<TrackOption[]>(tracks);
   const [trackId, setTrackId] = useState<string>("");
@@ -189,13 +261,33 @@ export function NewRunForm(props: {
   const [setupData, setSetupData] = useState<SetupSnapshotData>({});
   /** Baseline SetupSnapshot id for server merge + audit (null = scratch / no prior snapshot). */
   const [setupBaselineSnapshotId, setSetupBaselineSnapshotId] = useState<string | null>(null);
+  /** Deep-frozen copy of the setup that was loaded (past run / downloaded / replicate / edit-run hydrate /
+   *  local "Save setup snapshot"). Drives the "X changes from loaded setup" badge in the collapsed view. */
+  const [setupBaselineData, setSetupBaselineData] = useState<SetupSnapshotData | null>(null);
+  const [setupSnapshotSaveStatus, setSetupSnapshotSaveStatus] = useState<
+    { kind: "ok" | "error"; text: string } | null
+  >(null);
+  const [setupSnapshotSaving, setSetupSnapshotSaving] = useState(false);
   const [lapIngest, setLapIngest] = useState<LapIngestFormValue>(() => defaultLapIngestValue());
   const [notes, setNotes] = useState("");
+  const [raceClass, setRaceClass] = useState("");
   const [suggestedChanges, setSuggestedChanges] = useState("");
+  const [setupChangesText, setSetupChangesText] = useState("");
+  const [setupChangesBusy, setSetupChangesBusy] = useState(false);
+  const [setupChangesError, setSetupChangesError] = useState<string | null>(null);
+  const [setupChangesProposal, setSetupChangesProposal] = useState<
+    Array<{ fieldKey: string; fieldLabel: string; fromValue: string; toValue: string; confidence: "low" | "medium" | "high"; note?: string | null }>
+  >([]);
   const [notesSubTab, setNotesSubTab] = useState<"notes" | "things">("notes");
+  const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
+  const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("car");
+  const [trackGripTags, setTrackGripTags] = useState<string[]>([]);
+  const [trackLayoutTags, setTrackLayoutTags] = useState<string[]>([]);
   const thingsTryRef = useRef<HTMLTextAreaElement>(null);
   const thingsTryCursorRef = useRef<number | null>(null);
+  /** True after user edits “Things to try”; avoids syncing (or wiping) on initial API hydrate. */
+  const thingsToTryDirtyRef = useRef(false);
 
   const [showNewTireSetPanel, setShowNewTireSetPanel] = useState(false);
   const [creatingTireSet, setCreatingTireSet] = useState(false);
@@ -225,15 +317,291 @@ export function NewRunForm(props: {
   const [otherSetupSource, setOtherSetupSource] = useState<"downloaded_setups">("downloaded_setups");
   const [downloadedSetups, setDownloadedSetups] = useState<DownloadedSetupOption[]>([]);
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
+  /**
+   * When editing a saved run (including drafts being finished), the setup the
+   * run was logged with is already nailed down. Forcing the user through the
+   * "choose a run" source picker makes the section feel unfinished, so we hide
+   * the source controls behind an explicit opt-in ("Change source") in that
+   * flow. New-run mode keeps the controls visible because the user still needs
+   * to pick a baseline.
+   */
+  const [showSetupSourceControls, setShowSetupSourceControls] = useState(false);
+  /**
+   * "Saved from draft" collapse flags for the two other muted sections the
+   * driver already filled in when they logged the draft. Drafts open with
+   * these sections rolled up to a read-only summary + "Edit" button; new-run
+   * mode leaves them expanded since the driver is still filling them out.
+   * Seeded from `editRun` at construction so the initial render matches the
+   * final state (no flash of expanded → collapsed).
+   */
+  const initialDraftCollapsed =
+    Boolean(props.editRun?.id) && props.editRun?.loggingComplete === false;
+  const [sessionExpanded, setSessionExpanded] = useState<boolean>(!initialDraftCollapsed);
+  const [runDetailsExpanded, setRunDetailsExpanded] = useState<boolean>(!initialDraftCollapsed);
+
+  const tireSetIdRef = useRef(tireSetId);
+  tireSetIdRef.current = tireSetId;
+  const batteryIdRef = useRef(batteryId);
+  batteryIdRef.current = batteryId;
+  const tireRunUserTouchedRef = useRef(false);
+  const batteryRunUserTouchedRef = useRef(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
+  const editRun = props.editRun ?? null;
+  const isEditing = Boolean(editRun?.id);
+  /**
+   * True when we're editing a run that was saved as a draft (user hit "Save
+   * draft" earlier and hasn't marked it complete yet). Drives the amber
+   * highlight on the "After the run" divider + the empty Notes textarea so
+   * drivers can see what's still expected before clicking "Run complete".
+   */
+  const isDraft = isEditing && editRun?.loggingComplete === false;
+  /**
+   * Two-step save confirmation when the user has edited the setup sheet but
+   * never hit "Save setup snapshot". Null = no confirmation pending, otherwise
+   * the intent that's waiting on the user to acknowledge the unsaved setup
+   * edits before we hit the backend. The actual run payload always includes
+   * `setupData`, so the backend stores the edits either way — this just gives
+   * the driver a last look at what they changed before the run is written.
+   */
+  const [pendingSaveIntent, setPendingSaveIntent] = useState<
+    "draft" | "completed" | null
+  >(null);
+  const focusSection = props.focusSection ?? null;
+  const setupSectionRef = useRef<HTMLDivElement>(null);
+  const focusAppliedRef = useRef(false);
 
   const dashboardPrefillAppliedRef = useRef(false);
+  const editPrefillAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (initialEventId) setEventId(initialEventId);
+  }, [initialEventId]);
+
+  /**
+   * Dashboard "Log changes for next run" deep-link: when `focusSection === "setup"`,
+   * expand the Setup card and scroll it into view so the driver lands on the
+   * free-text setup-changes box without hunting for it. Runs once; the effect
+   * guards itself with `focusAppliedRef` so re-renders don't re-scroll.
+   */
+  useEffect(() => {
+    if (focusAppliedRef.current) return;
+    if (focusSection !== "setup") return;
+    focusAppliedRef.current = true;
+    setSetupSectionExpanded(true);
+    const raf = requestAnimationFrame(() => {
+      setupSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focusSection]);
+
+  // Hydrate user-level settings (current practice day URL + LiveRC driver name)
+  // on mount so the Testing session block can prefill the URL and the Lap
+  // Times URL picker has the name it needs to filter candidates.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [dayRes, drvRes] = await Promise.all([
+          fetch("/api/settings/current-practice-day-url"),
+          fetch("/api/settings/live-rc-driver"),
+        ]);
+        if (!alive) return;
+        if (dayRes.ok) {
+          const json = (await dayRes.json().catch(() => ({}))) as { currentPracticeDayUrl?: string | null };
+          if (alive && !practiceDayUrl && typeof json.currentPracticeDayUrl === "string") {
+            setPracticeDayUrl(json.currentPracticeDayUrl);
+          }
+        }
+        // Touch drvRes to keep the settings fetch warm; Settings page is source of truth.
+        void drvRes.ok;
+      } catch {
+        // Best-effort hydrate; the Settings page is the source of truth.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Edit-run load must run before dashboard/import prefill so opening /runs/:id/edit?importedLapTimeSessionId=…
+  // does not reset lap ingest after the import block is applied.
+  useEffect(() => {
+    const r = editRun;
+    if (!r || editPrefillAppliedRef.current) return;
+    editPrefillAppliedRef.current = true;
+
+    const nextCarId = (r.carId || r.car?.id || "").toString();
+    if (nextCarId && cars.some((c) => c.id === nextCarId)) {
+      setCarId(nextCarId);
+    }
+    setTrackId(r.trackId ?? "");
+
+    if (r.sessionType === "RACE_MEETING" || r.sessionType === "PRACTICE") {
+      setSessionType("RACE_MEETING");
+      const sub = r.meetingSessionType as MeetingSessionType | undefined;
+      if (sub === "SEEDING" || sub === "QUALIFYING" || sub === "RACE" || sub === "OTHER") {
+        setMeetingSessionType(sub);
+      } else {
+        setMeetingSessionType("PRACTICE");
+      }
+      setMeetingSessionCustom(sub === "OTHER" ? (r.meetingSessionCode?.trim() ?? "") : "");
+    } else {
+      setSessionType("TESTING");
+      setMeetingSessionCustom("");
+    }
+
+    setEventId(r.eventId ?? "");
+    setRaceClass((r.raceClass ?? "").trim());
+    setTireSetId(r.tireSetId ?? "");
+    // `runsCompleted` is always the count of *prior* runs on this tire set —
+    // save() sends `runsCompleted + 1`. When hydrating an existing run we want
+    // that re-save to preserve the run's current tireRunNumber, not bump it,
+    // so subtract one from the stored number. Same for battery. Before this
+    // fix, editing any saved run (especially a draft being completed) added
+    // +1 to the tire/battery slot on every save, producing the "+2 per
+    // draft→complete cycle" behavior.
+    setRunsCompleted(Math.max(0, (r.tireRunNumber ?? 1) - 1));
+    setBatteryId(r.batteryId ?? "");
+    setBatteryRunsCompleted(Math.max(0, (r.batteryRunNumber ?? 1) - 1));
+    if (typeof r.practiceDayUrl === "string") setPracticeDayUrl(r.practiceDayUrl);
+
+    const nextSetup = setupSnapshotWithDerived(r.setupSnapshot?.data);
+    setSetupData(nextSetup);
+    setActiveSetupData(nextSetup, nextCarId || carId || null);
+    setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
+    setSetupBaselineData(cloneSetupSnapshot(nextSetup));
+
+    setNotes((r.notes ?? "").trim());
+    setSuggestedChanges((r.suggestedChanges ?? "").trim());
+    const parsedHandling = parseHandlingAssessmentJson(r.handlingAssessmentJson);
+    setHandlingUi(uiStateFromParsed(parsedHandling));
+    setHandlingDetailExpanded(isHandlingAssessmentMeaningful(r.handlingAssessmentJson));
+
+    const existingLaps = normalizeLapTimes(r.lapTimes ?? []);
+    const existingText = existingLaps.length ? existingLaps.map((n) => n.toFixed(3)).join("\n") : "";
+    setLapIngest({
+      ...defaultLapIngestValue(),
+      manualText: existingText,
+      sourceKind: existingText ? "manual" : "manual",
+      sourceDetail: r.lapSession ? "Existing laps loaded (edit)" : null,
+      parserId: null,
+      urlLapRows: null,
+      urlImportBlocks: [],
+    });
+
+    setReplicateLast(false);
+    // When reloading a saved run — especially a draft being completed — the
+    // setup, session type, and run details are already nailed down. Keep the
+    // Setup sheet collapsed so the user sees the "Saved from draft" summary
+    // with diff rows, and can hit Edit only if something needs to change.
+    setSetupSectionExpanded(false);
+  }, [editRun, cars]);
 
   useEffect(() => {
     const p = dashboardPrefill;
     if (!p || dashboardPrefillAppliedRef.current) return;
     dashboardPrefillAppliedRef.current = true;
+
+    if (p.mode === "imported_lap_session") {
+      const sess = p.importedLapTimeSession;
+      const ingestMode =
+        sess.eventDetectionSource === "practice"
+          ? "practice_user_only"
+          : sess.eventDetectionSource === "race"
+            ? "race_full_field"
+            : "race_full_field";
+      const plan = buildImportedIngestPlanFromPayload(sess.parsedPayload, {
+        mode: ingestMode,
+        liveRcDriverName: sess.liveRcDriverName,
+      });
+      const parsed = plan
+        ? null
+        : primaryLapRowsFromImportedPayload(sess.parsedPayload);
+      if (plan) {
+        const driverLapRowsByDriverId: Record<string, LapRow[]> = {};
+        for (const d of plan.sessionDrivers) {
+          driverLapRowsByDriverId[d.driverId] = d.laps.map((t, i) => ({
+            lapNumber: i + 1,
+            lapTimeSeconds: t,
+            isIncluded: true,
+          }));
+        }
+        const primaryLaps = plan.primaryRows.map((r) => r.lapTimeSeconds);
+        if (sess.linkedEventId) setEventId(sess.linkedEventId);
+        if (sess.eventDetectionSource === "race") {
+          setSessionType("RACE_MEETING");
+          setMeetingSessionType("RACE");
+        } else if (sess.eventDetectionSource === "practice") {
+          setSessionType("RACE_MEETING");
+          setMeetingSessionType("PRACTICE");
+        }
+        setLapIngest({
+          ...defaultLapIngestValue(),
+          manualText: primaryLaps.map((n) => n.toFixed(3)).join("\n"),
+          sourceKind: "url",
+          sourceDetail: sess.sourceUrl,
+          parserId: sess.parserId,
+          urlLapRows: null,
+          urlImportBlocks: [
+            {
+              blockId: crypto.randomUUID(),
+              importedSessionId: sess.id,
+              sourceUrl: sess.sourceUrl,
+              parserId: sess.parserId,
+              recordedAt: sess.createdAt,
+              sessionCompletedAtDbIso: sess.sessionCompletedAtIso,
+              sessionCompletedAtIso: sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload),
+              sessionDrivers: plan.sessionDrivers,
+              selectedDriverIds: plan.selectedDriverIds,
+              driverLapRowsByDriverId,
+              urlLapRows: null,
+            },
+          ],
+        });
+        setSetupSectionExpanded(true);
+      } else if (parsed) {
+        const laps = parsed.rows.map((r) => r.lapTimeSeconds);
+        if (sess.linkedEventId) setEventId(sess.linkedEventId);
+        setLapIngest({
+          ...defaultLapIngestValue(),
+          manualText: laps.map((n) => n.toFixed(3)).join("\n"),
+          sourceKind: "url",
+          sourceDetail: sess.sourceUrl,
+          parserId: sess.parserId,
+          urlLapRows: null,
+          urlImportBlocks: [
+            {
+              blockId: crypto.randomUUID(),
+              importedSessionId: sess.id,
+              sourceUrl: sess.sourceUrl,
+              parserId: sess.parserId,
+              recordedAt: sess.createdAt,
+              sessionCompletedAtDbIso: sess.sessionCompletedAtIso,
+              sessionCompletedAtIso: sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload),
+              sessionDrivers: [
+                {
+                  id: "prefill",
+                  driverId: "prefill",
+                  driverName: parsed.driverName,
+                  normalizedName: parsed.driverName.toLowerCase(),
+                  laps,
+                  lapCount: laps.length,
+                },
+              ],
+              selectedDriverIds: ["prefill"],
+              driverLapRowsByDriverId: {
+                prefill: parsed.rows,
+              },
+              urlLapRows: null,
+            },
+          ],
+        });
+        setSetupSectionExpanded(true);
+      }
+      return;
+    }
 
     if (p.mode === "first") {
       setSessionType("RACE_MEETING");
@@ -269,16 +637,40 @@ export function NewRunForm(props: {
     setRunsCompleted(r.tireRunNumber ?? 0);
     setBatteryId(r.batteryId ?? "");
     setBatteryRunsCompleted(r.batteryRunNumber ?? 0);
+    if (typeof r.practiceDayUrl === "string") setPracticeDayUrl(r.practiceDayUrl);
 
-    const nextSetup = normalizeSetupData(r.setupSnapshot?.data);
+    const nextSetup = setupSnapshotWithDerived(r.setupSnapshot?.data);
     setSetupData(nextSetup);
     setActiveSetupData(nextSetup, nextCarId || carId || null);
     setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
+    setSetupBaselineData(cloneSetupSnapshot(nextSetup));
     setNotes("");
-    setSuggestedChanges("");
     setLapIngest(defaultLapIngestValue());
     setReplicateLast(false);
   }, [dashboardPrefill, cars]);
+
+  function applyTireBatteryToSetupSnapshot(nextTireSetId: string, nextBatteryId: string) {
+    const tire = nextTireSetId ? tireSets.find((t) => t.id === nextTireSetId) ?? null : null;
+    const bat = nextBatteryId ? batteries.find((b) => b.id === nextBatteryId) ?? null : null;
+    const tireLabel = tire ? `${tire.label}${tire.setNumber != null ? ` #${tire.setNumber}` : ""}` : "";
+    const batLabel = bat ? `${bat.label}${bat.packNumber != null ? ` #${bat.packNumber}` : ""}` : "";
+    setSetupData((prev) =>
+      prev.tires === (tireLabel || undefined) && prev.battery === (batLabel || undefined)
+        ? prev
+        : applyDerivedFieldsToSnapshot({
+            ...prev,
+            tires: tireLabel || undefined,
+            battery: batLabel || undefined,
+          })
+    );
+  }
+
+  // Deterministic sync: snapshot tires/battery always mirror the run context selections,
+  // including on initial load and when option lists arrive async.
+  useEffect(() => {
+    applyTireBatteryToSetupSnapshot(tireSetId, batteryId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tireSetId, batteryId, tireSets, batteries]);
 
   const selectedCar = useMemo(() => cars.find((c) => c.id === carId) ?? null, [cars, carId]);
   const setupTemplate = useMemo(() => {
@@ -290,6 +682,28 @@ export function NewRunForm(props: {
     () => (loadSetupSelection ? pickerRuns.find((r) => r.id === loadSetupSelection) ?? null : null),
     [loadSetupSelection, pickerRuns]
   );
+
+  /**
+   * How many parameters in `setupData` differ from `setupBaselineData` (the last-loaded /
+   * last-saved snapshot). Zero when nothing has been edited since load, or when there's
+   * no baseline yet (scratch setup). Drives the "X changes since loaded" badge in the
+   * collapsed Setup view so drivers can see at a glance that they've touched the sheet
+   * without having to re-expand it.
+   */
+  const setupChangedRowsSinceBaseline = useMemo(() => {
+    if (!setupBaselineData) return [] as ReturnType<typeof buildSetupDiffRows>;
+    return buildSetupDiffRows(setupData, setupBaselineData).filter((r) => r.changed);
+  }, [setupData, setupBaselineData]);
+  const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
+
+  /** Prior run on this car exists → show “feel vs last run” (−3…+3). */
+  const feelVsLastRunEligible = useMemo(() => {
+    if (!carId) return false;
+    if (isEditing && editRun?.id) {
+      return pickerRuns.some((r) => r.id !== editRun.id);
+    }
+    return pickerRuns.length > 0;
+  }, [carId, isEditing, editRun?.id, pickerRuns]);
   const loadSetupControlLabel = loadedSetupRun
     ? formatRunPickerLineRelativeWhen(loadedSetupRun)
     : "Load from past run";
@@ -298,7 +712,7 @@ export function NewRunForm(props: {
     [loadOtherSetupSelection, downloadedSetups]
   );
   const loadOtherSetupLabel = selectedDownloadedSetup
-    ? `${selectedDownloadedSetup.originalFilename} · ${new Date(selectedDownloadedSetup.createdAt).toLocaleDateString()}`
+    ? `${selectedDownloadedSetup.originalFilename} · ${formatRunCreatedAtDateTime(selectedDownloadedSetup.createdAt)}`
     : "Load from downloaded setup";
 
   const needsEvent = sessionType === "RACE_MEETING";
@@ -324,9 +738,71 @@ export function NewRunForm(props: {
     migrateLegacyLoadedSetup();
   }, []);
 
+  /** Same list as dashboard: ActionItem rows → textarea (order matches GET /api/action-items). */
   useEffect(() => {
-    setTracksList(tracks);
-  }, [tracks]);
+    let alive = true;
+    jsonFetch<{ items: Array<{ id: string; text: string }> }>("/api/action-items")
+      .then(({ items }) => {
+        if (!alive) return;
+        if (isEditing && suggestedChanges.trim().length > 0) return;
+        const lines = (items ?? []).map((i) => `• ${i.text.trim()}`).filter((l) => l.length > 2);
+        setSuggestedChanges(lines.length ? normalizeThingsToTryFromStorage(lines.join("\n")) : "");
+      })
+      .catch(() => {
+        if (!alive) return;
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** Authoritative list for run + event track pickers (matches /events and DB; avoids stale RSC-only props). */
+  const tracksFingerprint = useMemo(() => tracks.map((t) => t.id).sort().join(","), [tracks]);
+  useEffect(() => {
+    let alive = true;
+    jsonFetch<{ tracks: TrackOption[] }>("/api/tracks")
+      .then(({ tracks: list }) => {
+        if (!alive || !Array.isArray(list)) return;
+        setTracksList(list);
+      })
+      .catch(() => {
+        if (!alive) return;
+      });
+    return () => {
+      alive = false;
+    };
+  }, [tracksFingerprint]);
+
+  useEffect(() => {
+    const t = tracksList.find((x) => x.id === trackId);
+    if (t) {
+      setTrackGripTags(Array.isArray(t.gripTags) ? [...t.gripTags] : []);
+      setTrackLayoutTags(Array.isArray(t.layoutTags) ? [...t.layoutTags] : []);
+    } else {
+      setTrackGripTags([]);
+      setTrackLayoutTags([]);
+    }
+  }, [trackId, tracksList]);
+
+  /** Persist bullets to ActionItem rows while typing (dashboard uses same table). */
+  useEffect(() => {
+    if (!thingsToTryDirtyRef.current) return;
+    const t = window.setTimeout(() => {
+      if (!thingsToTryDirtyRef.current) return;
+      void fetch("/api/action-items/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestedChanges }),
+      })
+        .then((res) => {
+          if (res.ok) thingsToTryDirtyRef.current = false;
+        })
+        .catch(() => {
+          /* keep dirty for retry on next edit */
+        });
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [suggestedChanges]);
 
   /** Past-run + downloaded setup lists scoped to the selected car. */
   useEffect(() => {
@@ -372,30 +848,85 @@ export function NewRunForm(props: {
     if (!runId) {
       setLoadSetupSelection("");
       setSetupBaselineSnapshotId(null);
+      setSetupBaselineData(null);
       return;
     }
     const picked = pickerRuns.find((r) => r.id === runId);
     if (!picked) return;
     setLoadSetupSelection(runId);
-    const next = normalizeSetupData(picked.setupSnapshot?.data);
+    const next = setupSnapshotWithDerived(picked.setupSnapshot?.data);
     setSetupData(next);
     setActiveSetupData(next, carId || null);
     setSetupBaselineSnapshotId(picked.setupSnapshot?.id ?? null);
+    setSetupBaselineData(cloneSetupSnapshot(next));
+  }
+
+  /**
+   * "Save setup snapshot to this run" handler.
+   *
+   *  - In edit mode (`isEditing`): PATCH `/api/runs/<id>/setup-snapshot` with the
+   *    current `setupData`; server creates a new `SetupSnapshot` (delta vs existing)
+   *    and re-points `Run.setupSnapshotId` at it. On success we re-baseline locally
+   *    so the "X changes since loaded" badge resets, and collapse the expanded sheet.
+   *  - In new-run mode: no run exists yet, so we just re-baseline the in-memory
+   *    setup (locks the current values in as the new "loaded" state) and collapse.
+   */
+  async function handleSaveSetupSnapshot() {
+    setSetupSnapshotSaveStatus(null);
+    if (isEditing && editRun?.id) {
+      setSetupSnapshotSaving(true);
+      try {
+        const res = await fetch(`/api/runs/${editRun.id}/setup-snapshot`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ setupData }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          snapshot?: { id: string; data: SetupSnapshotData };
+        };
+        if (!res.ok || !json.ok || !json.snapshot) {
+          throw new Error(json.error ?? `HTTP ${res.status}`);
+        }
+        const merged = setupSnapshotWithDerived(json.snapshot.data);
+        setSetupData(merged);
+        setActiveSetupData(merged, carId || null);
+        setSetupBaselineSnapshotId(json.snapshot.id);
+        setSetupBaselineData(cloneSetupSnapshot(merged));
+        setSetupSectionExpanded(false);
+        setSetupSnapshotSaveStatus({ kind: "ok", text: "Setup snapshot saved to this run." });
+      } catch (err) {
+        setSetupSnapshotSaveStatus({
+          kind: "error",
+          text: err instanceof Error ? err.message : "Failed to save setup snapshot.",
+        });
+      } finally {
+        setSetupSnapshotSaving(false);
+      }
+      return;
+    }
+    // New-run mode: just re-baseline locally.
+    setSetupBaselineData(cloneSetupSnapshot(setupData));
+    setSetupSectionExpanded(false);
+    setSetupSnapshotSaveStatus({ kind: "ok", text: "Setup locked in; will save with the run." });
   }
 
   function applyDownloadedSetupOnly(docId: string) {
     if (!docId) {
       setLoadOtherSetupSelection("");
       setSetupBaselineSnapshotId(null);
+      setSetupBaselineData(null);
       return;
     }
     const picked = downloadedSetups.find((d) => d.id === docId);
     if (!picked) return;
     setLoadOtherSetupSelection(docId);
-    const next = normalizeSetupData(picked.setupData);
+    const next = setupSnapshotWithDerived(picked.setupData);
     setSetupData(next);
     setActiveSetupData(next, picked.carId ?? carId ?? null);
     setSetupBaselineSnapshotId(picked.baselineSetupSnapshotId ?? null);
+    setSetupBaselineData(cloneSetupSnapshot(next));
   }
 
   useEffect(() => {
@@ -422,6 +953,7 @@ export function NewRunForm(props: {
   function handleThingsToTryKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey) return;
     if (e.nativeEvent.isComposing) return;
+    thingsToTryDirtyRef.current = true;
     e.preventDefault();
     const el = e.currentTarget;
     const start = el.selectionStart;
@@ -440,6 +972,7 @@ export function NewRunForm(props: {
   }
 
   function handleThingsToTryChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    thingsToTryDirtyRef.current = true;
     const raw = e.target.value;
     if (raw === "") {
       setSuggestedChanges("");
@@ -506,10 +1039,14 @@ export function NewRunForm(props: {
           const validBatId = prevBatId && batteries.some((b) => b.id === prevBatId) ? prevBatId : "";
           setBatteryId(validBatId);
           setBatteryRunsCompleted(validBatId ? (lastRun.batteryRunNumber ?? 0) : 0);
-          const nextSetup = normalizeSetupData(lastRun.setupSnapshot?.data);
+          if (typeof lastRun.practiceDayUrl === "string" && lastRun.practiceDayUrl.trim()) {
+            setPracticeDayUrl(lastRun.practiceDayUrl);
+          }
+          const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot?.data);
           setSetupData(nextSetup);
           setActiveSetupData(nextSetup, carId || null);
           setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
+          setSetupBaselineData(cloneSetupSnapshot(nextSetup));
         } else {
           // Keep current form state unless user explicitly copies last run.
         }
@@ -547,10 +1084,14 @@ export function NewRunForm(props: {
     const prevBatId = lastRun.batteryId ?? "";
     setBatteryId(prevBatId);
     setBatteryRunsCompleted(prevBatId ? (lastRun.batteryRunNumber ?? 0) : 0);
-    const nextSetup = normalizeSetupData(lastRun.setupSnapshot?.data);
+    if (typeof lastRun.practiceDayUrl === "string" && lastRun.practiceDayUrl.trim()) {
+      setPracticeDayUrl(lastRun.practiceDayUrl);
+    }
+    const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot?.data);
     setSetupData(nextSetup);
     setActiveSetupData(nextSetup, carId || null);
     setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
+    setSetupBaselineData(cloneSetupSnapshot(nextSetup));
   }, [replicateLast, lastRun, carId]);
 
   useEffect(() => {
@@ -691,56 +1232,83 @@ export function NewRunForm(props: {
       setLoadSetupSelection("");
       setLoadOtherSetupSelection("");
       setSetupBaselineSnapshotId(null);
+      setSetupBaselineData(null);
     }
-    const copied = normalizeSetupData(r.setupSnapshot?.data);
+    const copied = setupSnapshotWithDerived(r.setupSnapshot?.data);
     setSetupData(copied);
     setActiveSetupData(copied, nextCarId || prevCarId || null);
     setSetupBaselineSnapshotId(r.setupSnapshot?.id ?? null);
+    setSetupBaselineData(cloneSetupSnapshot(copied));
+    if (typeof r.practiceDayUrl === "string" && r.practiceDayUrl.trim()) {
+      setPracticeDayUrl(r.practiceDayUrl);
+    }
     // Session-specific text and laps are not copied — only structured fields + setup above.
     setNotes("");
-    setSuggestedChanges("");
     setLapIngest(defaultLapIngestValue());
     setLoadSetupSelection(r.id);
     setReplicateLast(true);
   }
 
   useEffect(() => {
+    tireRunUserTouchedRef.current = false;
+  }, [tireSetId]);
+
+  useEffect(() => {
     if (!tireSetId) return;
+    const id = tireSetId;
     let alive = true;
+    // When editing, exclude this run from the "most recent slot" query.
+    // Otherwise, a run being re-saved would see itself as the latest,
+    // adding +1 to its own tireRunNumber every time.
+    const excludeParam = editRun?.id
+      ? `&excludeRunId=${encodeURIComponent(editRun.id)}`
+      : "";
     jsonFetch<{ lastTireRunNumber: number | null }>(
-      `/api/runs/last-tire-run-number?tireSetId=${tireSetId}`
+      `/api/runs/last-tire-run-number?tireSetId=${encodeURIComponent(id)}${excludeParam}`
     )
       .then(({ lastTireRunNumber }) => {
-        if (!alive) return;
+        if (!alive || tireSetIdRef.current !== id) return;
+        if (tireRunUserTouchedRef.current) return;
         setRunsCompleted(lastTireRunNumber ?? 0);
       })
       .catch(() => {
-        if (!alive) return;
+        if (!alive || tireSetIdRef.current !== id) return;
+        if (tireRunUserTouchedRef.current) return;
         setRunsCompleted(0);
       });
     return () => {
       alive = false;
     };
-  }, [tireSetId]);
+  }, [tireSetId, editRun?.id]);
+
+  useEffect(() => {
+    batteryRunUserTouchedRef.current = false;
+  }, [batteryId]);
 
   useEffect(() => {
     if (!batteryId) return;
+    const id = batteryId;
     let alive = true;
+    const excludeParam = editRun?.id
+      ? `&excludeRunId=${encodeURIComponent(editRun.id)}`
+      : "";
     jsonFetch<{ lastBatteryRunNumber: number | null }>(
-      `/api/runs/last-battery-run-number?batteryId=${batteryId}`
+      `/api/runs/last-battery-run-number?batteryId=${encodeURIComponent(id)}${excludeParam}`
     )
       .then(({ lastBatteryRunNumber }) => {
-        if (!alive) return;
+        if (!alive || batteryIdRef.current !== id) return;
+        if (batteryRunUserTouchedRef.current) return;
         setBatteryRunsCompleted(lastBatteryRunNumber ?? 0);
       })
       .catch(() => {
-        if (!alive) return;
+        if (!alive || batteryIdRef.current !== id) return;
+        if (batteryRunUserTouchedRef.current) return;
         setBatteryRunsCompleted(0);
       });
     return () => {
       alive = false;
     };
-  }, [batteryId]);
+  }, [batteryId, editRun?.id]);
 
   async function createEvent(e?: React.MouseEvent) {
     e?.preventDefault();
@@ -847,6 +1415,7 @@ export function NewRunForm(props: {
       const { tireSet } = await Promise.race([runCreate(), timeout]);
       setTireSets((prev) => [tireSet, ...prev]);
       setTireSetId(tireSet.id);
+      tireRunUserTouchedRef.current = true;
       setRunsCompleted(initialRunCount);
       setNewTireLabel("");
       setNewTireSetNumber(1);
@@ -907,6 +1476,7 @@ export function NewRunForm(props: {
       const { battery } = await Promise.race([runCreate(), timeout]);
       setBatteries((prev) => [battery, ...prev]);
       setBatteryId(battery.id);
+      batteryRunUserTouchedRef.current = true;
       setBatteryRunsCompleted(initialRunCount);
       setNewBatteryLabel("");
       setNewBatteryPackNumber(1);
@@ -929,32 +1499,12 @@ export function NewRunForm(props: {
     driverName: string;
     normalizedName: string;
     isPrimaryUser: boolean;
+    sessionCompletedAt: string | null;
     laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
   }> {
     if (current.sourceKind !== "url") return [];
-    const sessionDrivers = current.sessionDrivers ?? [];
-    if (sessionDrivers.length === 0) return [];
-
-    const sourceUrl = current.sourceDetail ?? null;
-    const selected = new Set(current.selectedDriverIds ?? []);
-    const selectedOrdered = sessionDrivers.filter((d) => selected.has(d.driverId));
-    const primary = selectedOrdered[0] ?? null;
-
-    function structuredLapsForDriver(d: (typeof sessionDrivers)[number]) {
-      const rows = current.driverLapRowsByDriverId?.[d.driverId];
-      if (rows && rows.length > 0) {
-        return rows.map((r) => ({
-          lapNumber: r.lapNumber,
-          lapTimeSeconds: r.lapTimeSeconds,
-          isIncluded: r.isIncluded,
-        }));
-      }
-      return d.laps.map((t, i) => ({
-        lapNumber: i + 1,
-        lapTimeSeconds: t,
-        isIncluded: true,
-      }));
-    }
+    const blocks = current.urlImportBlocks ?? [];
+    if (blocks.length === 0) return [];
 
     const out: Array<{
       sourceUrl: string | null;
@@ -962,37 +1512,145 @@ export function NewRunForm(props: {
       driverName: string;
       normalizedName: string;
       isPrimaryUser: boolean;
+      sessionCompletedAt: string | null;
       laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
     }> = [];
 
-    if (primary && primary.laps.length > 0) {
-      out.push({
-        sourceUrl,
-        driverId: primary.driverId,
-        driverName: primary.driverName,
-        normalizedName: primary.normalizedName,
-        isPrimaryUser: true,
-        laps: structuredLapsForDriver(primary),
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const block = blocks[bi]!;
+      const sessionDrivers = block.sessionDrivers ?? [];
+      if (sessionDrivers.length === 0) continue;
+      const sourceUrl = block.sourceUrl ?? null;
+      const sessionCompletedAt = resolveImportedSessionDisplayTimeIso({
+        sessionCompletedAt: block.sessionCompletedAtDbIso ?? null,
+        parsedPayload:
+          block.sessionCompletedAtIso != null && block.sessionCompletedAtIso.trim()
+            ? { sessionCompletedAtIso: block.sessionCompletedAtIso.trim() }
+            : undefined,
+        createdAt: block.recordedAt,
       });
-    }
+      const selected = new Set(block.selectedDriverIds ?? []);
+      const selectedOrdered = sessionDrivers.filter((d) => selected.has(d.driverId));
+      const primary = selectedOrdered[0] ?? null;
 
-    for (const d of selectedOrdered) {
-      if (primary && d.driverId === primary.driverId) continue;
-      if (d.laps.length === 0) continue;
-      out.push({
-        sourceUrl,
-        driverId: d.driverId,
-        driverName: d.driverName,
-        normalizedName: d.normalizedName,
-        isPrimaryUser: false,
-        laps: structuredLapsForDriver(d),
-      });
+      function structuredLapsForDriver(d: (typeof sessionDrivers)[number]) {
+        const rows = block.driverLapRowsByDriverId?.[d.driverId];
+        if (rows && rows.length > 0) {
+          return rows.map((r) => ({
+            lapNumber: r.lapNumber,
+            lapTimeSeconds: r.lapTimeSeconds,
+            isIncluded: r.isIncluded,
+          }));
+        }
+        return d.laps.map((t, i) => ({
+          lapNumber: i + 1,
+          lapTimeSeconds: t,
+          isIncluded: true,
+        }));
+      }
+
+      if (primary && primary.laps.length > 0) {
+        out.push({
+          sourceUrl,
+          driverId: primary.driverId,
+          driverName: primary.driverName,
+          normalizedName: primary.normalizedName,
+          isPrimaryUser: bi === 0,
+          sessionCompletedAt,
+          laps: structuredLapsForDriver(primary),
+        });
+      }
+
+      for (const d of selectedOrdered) {
+        if (primary && d.driverId === primary.driverId) continue;
+        if (d.laps.length === 0) continue;
+        out.push({
+          sourceUrl,
+          driverId: d.driverId,
+          driverName: d.driverName,
+          normalizedName: d.normalizedName,
+          isPrimaryUser: false,
+          sessionCompletedAt,
+          laps: structuredLapsForDriver(d),
+        });
+      }
     }
 
     return out;
   }
 
-  async function saveRun(e?: React.MouseEvent) {
+  async function interpretSetupChanges() {
+    const text = setupChangesText.trim();
+    if (!text) {
+      setSetupChangesError("Type your setup changes first.");
+      return;
+    }
+    if (!carId) {
+      setSetupChangesError("Select a car first.");
+      return;
+    }
+    setSetupChangesBusy(true);
+    setSetupChangesError(null);
+    try {
+      const res = await fetch("/api/setup/interpret-changes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          carId,
+          setupData,
+          changesText: text,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSetupChangesError((data as { error?: string })?.error ?? "Could not interpret setup changes.");
+        setSetupChangesProposal([]);
+        return;
+      }
+      const edits = Array.isArray((data as { edits?: unknown }).edits) ? ((data as { edits: unknown[] }).edits as unknown[]) : [];
+      const mapped: Array<{ fieldKey: string; fieldLabel: string; fromValue: string; toValue: string; confidence: "low" | "medium" | "high"; note?: string | null }> =
+        edits
+          .map((e) => (e && typeof e === "object" ? (e as Record<string, unknown>) : null))
+          .filter(Boolean)
+          .map((e) => ({
+            fieldKey: typeof e!.fieldKey === "string" ? e!.fieldKey : "",
+            fieldLabel: typeof e!.fieldLabel === "string" ? e!.fieldLabel : "",
+            fromValue: typeof e!.fromValue === "string" ? e!.fromValue : "",
+            toValue: typeof e!.toValue === "string" ? e!.toValue : "",
+            confidence: (e!.confidence === "high" || e!.confidence === "medium" || e!.confidence === "low"
+              ? (e!.confidence as "low" | "medium" | "high")
+              : "low"),
+            note: typeof e!.note === "string" ? e!.note : null,
+          }))
+          .filter((x) => x.fieldKey && x.toValue);
+      setSetupChangesProposal(mapped);
+      if (mapped.length === 0) {
+        setSetupChangesError("No safe changes could be proposed from that text. Try being more specific (field + direction + amount).");
+      }
+    } catch (e) {
+      setSetupChangesError(e instanceof Error ? e.message : "Could not interpret setup changes.");
+      setSetupChangesProposal([]);
+    } finally {
+      setSetupChangesBusy(false);
+    }
+  }
+
+  function applySetupChangesProposal() {
+    if (setupChangesProposal.length === 0) return;
+    const next: SetupSnapshotData = { ...setupData };
+    for (const p of setupChangesProposal) {
+      next[p.fieldKey] = coerceSetupValue(p.toValue);
+    }
+    setSetupData(applyDerivedFieldsToSnapshot(next));
+    setSetupChangesProposal([]);
+    setSetupChangesError(null);
+  }
+
+  async function saveRun(
+    e?: React.MouseEvent,
+    intent: "draft" | "completed" = "completed",
+    opts: { bypassUnsavedSetupCheck?: boolean } = {}
+  ) {
     e?.preventDefault();
     setInlineError(null);
     setStatus(null);
@@ -1000,22 +1658,36 @@ export function NewRunForm(props: {
       setInlineError("Select a car.");
       return;
     }
+    // Surface unsaved setup edits before we write — the driver gets to review
+    // exactly what they changed vs. the loaded baseline. Continuing from the
+    // confirmation passes `bypassUnsavedSetupCheck: true` so we don't loop.
+    if (
+      !opts.bypassUnsavedSetupCheck &&
+      setupChangedRowsSinceBaseline.length > 0 &&
+      setupBaselineData
+    ) {
+      setPendingSaveIntent(intent);
+      return;
+    }
+    setPendingSaveIntent(null);
     setSaving(true);
     try {
       let lapTimes: number[];
       if (lapIngest.sourceKind === "url") {
-        const sessionDrivers = lapIngest.sessionDrivers ?? [];
-        const selectedIds = lapIngest.selectedDriverIds ?? [];
+        const blocks = lapIngest.urlImportBlocks ?? [];
+        const firstBlock = blocks[0];
+        const sessionDrivers = firstBlock?.sessionDrivers ?? [];
+        const selectedIds = firstBlock?.selectedDriverIds ?? [];
         const selectedSet = new Set(selectedIds);
         const selectedOrdered = sessionDrivers.filter((d) => selectedSet.has(d.driverId));
         const primary = selectedOrdered[0] ?? null;
 
         if (!primary) {
-          setInlineError("Select at least one imported driver.");
+          setInlineError("Select at least one driver in your first imported session.");
           setSaving(false);
           return;
         }
-        const primaryRows = lapIngest.driverLapRowsByDriverId?.[primary.driverId];
+        const primaryRows = firstBlock?.driverLapRowsByDriverId?.[primary.driverId];
         lapTimes =
           primaryRows && primaryRows.length > 0
             ? primaryRows.map((r) => r.lapTimeSeconds)
@@ -1025,9 +1697,15 @@ export function NewRunForm(props: {
       }
       const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
       const { run } = await jsonFetch<{ run: { id: string; createdAt: string } }>("/api/runs", {
-        method: "POST",
+        method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          loggingIntent: intent,
+          fromEventDetection:
+            !isEditing &&
+            dashboardPrefill?.mode === "imported_lap_session" &&
+            dashboardPrefill.fromEventDetection === true,
+          runId: isEditing ? editRun?.id : undefined,
           carId,
           sessionType: sessionType === "RACE_MEETING" ? "RACE_MEETING" : "TESTING",
           meetingSessionType: needsEvent ? meetingSessionType : null,
@@ -1038,7 +1716,7 @@ export function NewRunForm(props: {
           tireRunNumber: Math.max(1, runsCompleted + 1),
           batteryId: batteryId || null,
           batteryRunNumber: Math.max(1, batteryRunsCompleted + 1),
-          setupData,
+          setupData: applyDerivedFieldsToSnapshot(setupData),
           setupBaselineSnapshotId,
           sourceSetupDocumentId:
             setupSource === "other" && loadOtherSetupSelection ? loadOtherSetupSelection : null,
@@ -1049,11 +1727,12 @@ export function NewRunForm(props: {
             parserId: lapIngest.parserId,
             perLap: (() => {
               if (lapIngest.sourceKind === "url") {
-                const sessionDrivers = lapIngest.sessionDrivers ?? [];
-                const selectedIds = lapIngest.selectedDriverIds ?? [];
+                const firstBlock = lapIngest.urlImportBlocks?.[0];
+                const sessionDrivers = firstBlock?.sessionDrivers ?? [];
+                const selectedIds = firstBlock?.selectedDriverIds ?? [];
                 const selectedOrdered = sessionDrivers.filter((d) => selectedIds.includes(d.driverId));
                 const primary = selectedOrdered[0] ?? null;
-                const primaryRows = primary ? lapIngest.driverLapRowsByDriverId?.[primary.driverId] : null;
+                const primaryRows = primary ? firstBlock?.driverLapRowsByDriverId?.[primary.driverId] : null;
                 if (primaryRows && primaryRows.length === lapTimes.length) {
                   return primaryRows.map((row, i) => ({
                     isOutlierWarning: lapIngest.urlLapRows?.[i]?.isOutlierWarning,
@@ -1081,33 +1760,85 @@ export function NewRunForm(props: {
             })(),
           },
           notes: notes.trim() || null,
+          practiceDayUrl: sessionType === "TESTING" && practiceDayUrl.trim() ? practiceDayUrl.trim() : null,
+          raceClass: raceClass.trim() || null,
           suggestedChanges: suggestedChanges.trim() || null,
+          handlingAssessmentJson: persistedFromUiState(handlingUi),
           sessionLabel: null,
           importedLapSets,
+          importedLapTimeSessionIds:
+            lapIngest.sourceKind === "url"
+              ? lapIngest.urlImportBlocks.map((b) => b.importedSessionId)
+              : [],
         })
       });
 
       setSaveSuccess(true);
-      setStatus("Run saved. Redirecting to Analysis…");
+      setStatus(isEditing ? "Changes saved." : "Run saved.");
 
-      const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
-        `/api/runs/last?carId=${carId}`
-      ).catch(() => ({ lastRun: null }));
-      setLastRun(refreshed);
-      if (replicateLast && refreshed) {
-        setRunsCompleted(refreshed.tireRunNumber ?? 0);
-        setBatteryRunsCompleted(refreshed.batteryRunNumber ?? 0);
+      if (sessionType === "TESTING" && practiceDayUrl.trim()) {
+        void fetch("/api/settings/current-practice-day-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ currentPracticeDayUrl: practiceDayUrl.trim() }),
+        }).catch(() => {});
       }
 
-      setTimeout(() => {
-        router.push("/runs/history");
-      }, 1000);
+      // Completing a run ships the driver over to Sessions with the newest
+      // test day pre-expanded — they can scan laps/notes for the session they
+      // just finished without first navigating away from a form that no
+      // longer has anything to do. Drafts stay put: editing goes back to the
+      // dashboard (or stays on the edit page to keep iterating).
+      if (intent === "completed") {
+        setTimeout(() => {
+          router.push("/runs/history?expandLatest=1");
+        }, 600);
+      } else if (isEditing) {
+        const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
+          `/api/runs/last?carId=${carId}`
+        ).catch(() => ({ lastRun: null }));
+        setLastRun(refreshed);
+        if (replicateLast && refreshed) {
+          setRunsCompleted(refreshed.tireRunNumber ?? 0);
+          setBatteryRunsCompleted(refreshed.batteryRunNumber ?? 0);
+        }
+      } else {
+        // New run saved as draft: send the driver back to the dashboard.
+        // Prevents the tire/battery counters from re-anchoring on this
+        // just-saved draft (which caused a double-increment when they
+        // returned to finish it).
+        setTimeout(() => {
+          router.push("/");
+        }, 600);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save run";
       setStatus(msg);
       setInlineError(msg);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function persistTrackPatch(overrides?: { gripTags?: string[]; layoutTags?: string[] }) {
+    if (!trackId) return;
+    const gripTags = overrides?.gripTags ?? trackGripTags;
+    const layoutTags = overrides?.layoutTags ?? trackLayoutTags;
+    try {
+      const res = await fetch(`/api/tracks/${encodeURIComponent(trackId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gripTags,
+          layoutTags,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { track?: TrackOption };
+      if (res.ok && data.track) {
+        setTracksList((prev) => prev.map((x) => (x.id === trackId ? { ...x, ...data.track } : x)));
+      }
+    } catch {
+      /* ignore */
     }
   }
 
@@ -1151,7 +1882,15 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      {/* Copy last run shortcut (optional) */}
+      {isEditing && editRun?.id && editRun.importedLapSets && editRun.importedLapSets.length >= 2 ? (
+        <div className="space-y-2">
+          <ImportedFieldSessionCard importedLapSets={editRun.importedLapSets} />
+        </div>
+      ) : null}
+
+      {/* Copy last run shortcut (optional) — hidden when finishing a draft,
+          since the run already has its own baseline nailed down. */}
+      {!isDraft ? (
       <div className="rounded-lg border border-border bg-muted/50 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="ui-title text-sm text-muted-foreground">Shortcut</div>
@@ -1199,42 +1938,146 @@ export function NewRunForm(props: {
           )}
         </div>
       </div>
+      ) : null}
 
-      {/* 2. Session type: Testing or Race Meeting only */}
-      <div className="rounded-lg border border-border bg-muted/70 p-4">
-        <div className="ui-title text-sm text-muted-foreground mb-2">Session type</div>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              name="sessionType"
-              value="TESTING"
-              checked={sessionType === "TESTING"}
-              onChange={() => setSessionType("TESTING")}
-              className="h-4 w-4 shrink-0 accent-primary"
-            />
-            <span>Testing</span>
-          </label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              name="sessionType"
-              value="RACE_MEETING"
-              checked={sessionType === "RACE_MEETING"}
-              onChange={() => setSessionType("RACE_MEETING")}
-              className="h-4 w-4 shrink-0 accent-primary"
-            />
-            <span>Race Meeting</span>
-          </label>
+      <div className="flex items-center gap-3 pt-2">
+        <div className="h-px flex-1 bg-border/60" />
+        <div className="flex flex-col items-center">
+          <div className="ui-title text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Before the run
+          </div>
+          <div className="text-[11px] text-muted-foreground/80">
+            Car, tires, battery, setup
+          </div>
         </div>
-        <div className="mt-1 text-[11px] text-muted-foreground">
-          {sessionType === "TESTING"
-            ? "Flexible run-by-run development. No event context."
-            : "Tied to an event weekend. Select the event below, then choose track and session details."}
-        </div>
+        <div className="h-px flex-1 bg-border/60" />
       </div>
 
-      {needsEvent ? (
+      {/* 2. Session type: Testing or Race Meeting only */}
+      <div
+        className={cn(
+          "rounded-lg border p-4",
+          isDraft
+            ? "border-emerald-500/40 bg-emerald-500/5"
+            : "border-border bg-muted/70"
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="ui-title text-sm text-muted-foreground">Session type</div>
+            {isDraft ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+                title="This was saved when the draft was logged. Click Edit to change."
+              >
+                <span aria-hidden>✓</span>
+                <span>Saved from draft</span>
+              </span>
+            ) : null}
+          </div>
+          {isDraft ? (
+            <button
+              type="button"
+              onClick={() => setSessionExpanded((v) => !v)}
+              className="rounded-md border border-border bg-card/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+            >
+              {sessionExpanded ? "Done" : "Edit"}
+            </button>
+          ) : null}
+        </div>
+        {isDraft && !sessionExpanded ? (
+          // Static summary when finishing a draft. Shows enough to confirm the
+          // right session context without re-rendering the radios + URL field.
+          <div className="mt-2 text-xs text-foreground/90">
+            {sessionType === "TESTING" ? (
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-medium">Testing</span>
+                {practiceDayUrl.trim() ? (
+                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                    Practice day URL set
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-medium">Race Meeting</span>
+                {(() => {
+                  const ev = events.find((e) => e.id === eventId);
+                  if (!ev) return null;
+                  return (
+                    <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                      {ev.name}
+                    </span>
+                  );
+                })()}
+                <span className="text-[11px] text-muted-foreground">
+                  {meetingSessionType === "OTHER" && meetingSessionCustom.trim()
+                    ? meetingSessionCustom.trim()
+                    : meetingSessionType.charAt(0) +
+                      meetingSessionType.slice(1).toLowerCase()}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="mt-2 flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="sessionType"
+                  value="TESTING"
+                  checked={sessionType === "TESTING"}
+                  onChange={() => setSessionType("TESTING")}
+                  className="h-4 w-4 shrink-0 accent-primary"
+                />
+                <span>Testing</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="sessionType"
+                  value="RACE_MEETING"
+                  checked={sessionType === "RACE_MEETING"}
+                  onChange={() => setSessionType("RACE_MEETING")}
+                  className="h-4 w-4 shrink-0 accent-primary"
+                />
+                <span>Race Meeting</span>
+              </label>
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              {sessionType === "TESTING"
+                ? "Flexible run-by-run development. No event context."
+                : "Tied to an event weekend. Select the event below, then choose track and session details."}
+            </div>
+            {sessionType === "TESTING" ? (
+              <div className="mt-3 space-y-1 text-sm">
+                <label
+                  htmlFor="practice-day-url-input"
+                  className="block text-xs font-medium text-muted-foreground"
+                >
+                  Practice day URL (optional)
+                </label>
+                <input
+                  id="practice-day-url-input"
+                  type="url"
+                  value={practiceDayUrl}
+                  onChange={(e) => setPracticeDayUrl(e.target.value)}
+                  placeholder="https://example.liverc.com/…/practice/?p=session_list&d=YYYY-MM-DD"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-accent/50"
+                  aria-label="Practice day results URL"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Lap Times → <span className="font-medium text-foreground">URL</span> will scan this page for your
+                  driver sessions. Persists across runs (stored under Settings → current practice day URL).
+                </p>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+
+      {needsEvent && (sessionExpanded || !isDraft) ? (
         <div className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="ui-title text-sm text-muted-foreground">Event / Race meeting</div>
@@ -1451,8 +2294,69 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
-        <div className="ui-title text-sm text-muted-foreground">Run details</div>
+      <div
+        className={cn(
+          "rounded-lg border p-4 space-y-3",
+          isDraft
+            ? "border-emerald-500/40 bg-emerald-500/5"
+            : "border-border bg-muted/50"
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="ui-title text-sm text-muted-foreground">Run details</div>
+            {isDraft ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+                title="This was saved when the draft was logged. Click Edit to change."
+              >
+                <span aria-hidden>✓</span>
+                <span>Saved from draft</span>
+              </span>
+            ) : null}
+          </div>
+          {isDraft ? (
+            <button
+              type="button"
+              onClick={() => setRunDetailsExpanded((v) => !v)}
+              className="rounded-md border border-border bg-card/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+            >
+              {runDetailsExpanded ? "Done" : "Edit"}
+            </button>
+          ) : null}
+        </div>
+        {isDraft && !runDetailsExpanded ? (
+          // Static run-details summary while finishing a draft. The tabs +
+          // editors stay mounted only when the user hits Edit — this block
+          // just shows enough for them to confirm nothing's amiss.
+          <div className="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 text-[11px] sm:grid-cols-[5rem_1fr]">
+            <span className="text-muted-foreground">Car</span>
+            <span className="min-w-0 truncate font-medium text-foreground">
+              {selectedCar?.name ?? "—"}
+            </span>
+            <span className="text-muted-foreground">Track</span>
+            <span className="min-w-0 truncate text-foreground/90">
+              {tracksList.find((t) => t.id === trackId)?.name ?? "—"}
+            </span>
+            <span className="text-muted-foreground">Tires</span>
+            <span className="min-w-0 truncate text-foreground/90">
+              {(() => {
+                const t = tireSets.find((x) => x.id === tireSetId);
+                if (!t) return "—";
+                return `${t.label}${t.setNumber != null ? ` #${t.setNumber}` : ""}`;
+              })()}
+            </span>
+            <span className="text-muted-foreground">Battery</span>
+            <span className="min-w-0 truncate text-foreground/90">
+              {(() => {
+                const b = batteries.find((x) => x.id === batteryId);
+                if (!b) return "—";
+                return `${b.label}${b.packNumber != null ? ` #${b.packNumber}` : ""}`;
+              })()}
+            </span>
+          </div>
+        ) : (
+          <>
         <div
           className="flex flex-wrap border-b border-border gap-x-0.5"
           role="tablist"
@@ -1518,6 +2422,7 @@ export function NewRunForm(props: {
                     setLoadSetupSelection("");
                     setLoadOtherSetupSelection("");
                     setSetupBaselineSnapshotId(null);
+                    setSetupBaselineData(null);
                     setSetupData({});
                     setActiveSetupData({}, next);
                   }
@@ -1537,6 +2442,8 @@ export function NewRunForm(props: {
             <p className="text-[11px] text-muted-foreground">
               Drives setup sheet template, tire set list, and last-run defaults for this vehicle.
             </p>
+            {/* Race class (optional) field intentionally hidden from Log Your Run.
+                `raceClass` state + save payload are kept so the feature can be re-enabled later. */}
           </div>
         ) : null}
 
@@ -1584,6 +2491,29 @@ export function NewRunForm(props: {
               <div className="text-[11px] text-muted-foreground">{copyTrackWarning}</div>
             )}
 
+            {trackId ? (
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">
+                  Track details (saved on track)
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Tap chips to describe grip and layout; you can select multiple (e.g. medium + high grip).
+                </p>
+                <TrackMetaChipGroups
+                  gripTags={trackGripTags}
+                  layoutTags={trackLayoutTags}
+                  onGripChange={(next) => {
+                    setTrackGripTags(next);
+                    void persistTrackPatch({ gripTags: next });
+                  }}
+                  onLayoutChange={(next) => {
+                    setTrackLayoutTags(next);
+                    void persistTrackPatch({ layoutTags: next });
+                  }}
+                />
+              </div>
+            ) : null}
+
             {showAddTrack && (
               <div className="rounded-md border border-border bg-muted/60 p-3 space-y-2">
                 <input
@@ -1617,6 +2547,9 @@ export function NewRunForm(props: {
         {runDetailsTab === "tires" ? (
           <div className="space-y-4 pt-1">
             <div className="space-y-2 text-sm">
+              <p className="text-[11px] text-muted-foreground leading-snug rounded-md border border-border/60 bg-muted/30 px-2 py-1.5">
+                Saved setup snapshot always stores the tire set and battery pack selected here for this run, even if the setup preview below still shows values from a loaded previous setup.
+              </p>
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="ui-title text-sm text-muted-foreground">Tire set</div>
@@ -1637,7 +2570,9 @@ export function NewRunForm(props: {
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={tireSetId}
                 onChange={(e) => {
-                  setTireSetId(e.target.value);
+                  const nextId = e.target.value;
+                  setTireSetId(nextId);
+                  applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
                   setCopyTireWarning(null);
                 }}
                 aria-label="Tire set"
@@ -1684,7 +2619,7 @@ export function NewRunForm(props: {
                   </div>
                 </div>
                 <div className="space-y-1 text-sm">
-                  <div className="ui-title text-sm text-muted-foreground">How many runs have these tires done?</div>
+                  <div className="ui-title text-sm text-muted-foreground">Prior runs on this set (before first log)</div>
                   <input
                     type="number"
                     min={0}
@@ -1694,15 +2629,15 @@ export function NewRunForm(props: {
                     onChange={(e) =>
                       setNewTireInitialRunCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))
                     }
-                    aria-label="How many runs have these tires done"
+                    aria-label="Prior runs on this tire set before first log"
                   />
                   <div className="text-[11px] text-muted-foreground">
+                    First log on this set will be <span className="font-medium text-foreground">tire run #{newTireInitialRunCount + 1}</span>
                     {newTireInitialRunCount === 0
-                      ? "0 runs on this set before this log."
+                      ? " (no prior runs)."
                       : newTireInitialRunCount === 1
-                        ? "1 run on this set before this log."
-                        : `${newTireInitialRunCount} runs on this set before this log.`}{" "}
-                    Your next save will be run #{newTireInitialRunCount + 1}.
+                        ? " (1 prior run)."
+                        : ` (${newTireInitialRunCount} prior runs).`}
                   </div>
                 </div>
                 <button
@@ -1721,19 +2656,27 @@ export function NewRunForm(props: {
 
             {!showNewTireSetPanel && tireSetId ? (
               <div className="space-y-1 text-sm">
-                <div className="ui-title text-sm text-muted-foreground">How many runs have these tires done?</div>
+                <div className="ui-title text-sm text-muted-foreground">Prior runs on this set (before this log)</div>
                 <input
                   type="number"
                   min={0}
                   className="w-full max-w-md rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   inputMode="numeric"
                   value={runsCompleted}
-                  onChange={(e) => setRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                  aria-label="Runs completed on this tire set"
+                  onChange={(e) => {
+                    tireRunUserTouchedRef.current = true;
+                    setRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)));
+                  }}
+                  aria-label="Prior runs on this tire set before this log"
                 />
                 <div className="text-[11px] text-muted-foreground">
-                  {runsCompleted === 0 ? "0 runs" : runsCompleted === 1 ? "1 run" : `${runsCompleted} runs`}{" "}
-                  completed on this set. This run will be run #{runsCompleted + 1}.
+                  This log saves as{" "}
+                  <span className="font-medium text-foreground">tire run #{runsCompleted + 1}</span>
+                  {runsCompleted === 0
+                    ? " (first run on this set)."
+                    : runsCompleted === 1
+                      ? " (after 1 prior run on this set)."
+                      : ` (after ${runsCompleted} prior runs on this set).`}
                 </div>
               </div>
             ) : null}
@@ -1759,7 +2702,9 @@ export function NewRunForm(props: {
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={batteryId}
                 onChange={(e) => {
-                  setBatteryId(e.target.value);
+                  const nextId = e.target.value;
+                  setBatteryId(nextId);
+                  applyTireBatteryToSetupSnapshot(tireSetIdRef.current, nextId);
                   setCopyBatteryWarning(null);
                 }}
                 aria-label="Battery pack"
@@ -1798,7 +2743,7 @@ export function NewRunForm(props: {
                   />
                 </div>
                 <div className="space-y-1 text-sm">
-                  <div className="ui-title text-sm text-muted-foreground">How many runs has this pack done?</div>
+                  <div className="ui-title text-sm text-muted-foreground">Prior runs on this pack (before first log)</div>
                   <input
                     type="number"
                     min={0}
@@ -1808,8 +2753,12 @@ export function NewRunForm(props: {
                     onChange={(e) =>
                       setNewBatteryInitialRunCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))
                     }
-                    aria-label="Runs before this log"
+                    aria-label="Prior runs on this battery pack before first log"
                   />
+                  <div className="text-[11px] text-muted-foreground">
+                    First log on this pack will be{" "}
+                    <span className="font-medium text-foreground">battery run #{newBatteryInitialRunCount + 1}</span>.
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -1827,146 +2776,212 @@ export function NewRunForm(props: {
 
             {!showNewBatteryPanel && batteryId ? (
               <div className="space-y-1 text-sm">
-                <div className="ui-title text-sm text-muted-foreground">How many runs has this pack done?</div>
+                <div className="ui-title text-sm text-muted-foreground">Prior runs on this pack (before this log)</div>
                 <input
                   type="number"
                   min={0}
                   className="w-full max-w-md rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   inputMode="numeric"
                   value={batteryRunsCompleted}
-                  onChange={(e) =>
-                    setBatteryRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                  }
-                  aria-label="Runs completed on this battery pack"
+                  onChange={(e) => {
+                    batteryRunUserTouchedRef.current = true;
+                    setBatteryRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)));
+                  }}
+                  aria-label="Prior runs on this battery pack before this log"
                 />
                 <div className="text-[11px] text-muted-foreground">
+                  This log saves as{" "}
+                  <span className="font-medium text-foreground">battery run #{batteryRunsCompleted + 1}</span>
                   {batteryRunsCompleted === 0
-                    ? "0 runs"
+                    ? " (first run on this pack)."
                     : batteryRunsCompleted === 1
-                      ? "1 run"
-                      : `${batteryRunsCompleted} runs`}{" "}
-                  completed on this pack. This run will be run #{batteryRunsCompleted + 1}.
+                      ? " (after 1 prior run on this pack)."
+                      : ` (after ${batteryRunsCompleted} prior runs on this pack).`}
                 </div>
               </div>
             ) : null}
           </div>
         ) : null}
-      </div>
-
-      <LapTimesIngestPanel value={lapIngest} onChange={setLapIngest} />
-
-      <div className="space-y-2 text-sm">
-        <div className="ui-title text-sm text-muted-foreground">Notes</div>
-        <div className="flex border-b border-border" role="tablist" aria-label="Notes and things to try">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={notesSubTab === "notes"}
-            className={cn(
-              "px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
-              notesSubTab === "notes"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setNotesSubTab("notes")}
-          >
-            Notes
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={notesSubTab === "things"}
-            className={cn(
-              "px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
-              notesSubTab === "things"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setNotesSubTab("things")}
-          >
-            Things to try
-          </button>
-        </div>
-        {notesSubTab === "notes" ? (
-          <textarea
-            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            placeholder="Session notes, handling, track conditions…"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            aria-label="Session notes"
-          />
-        ) : (
-          <textarea
-            ref={thingsTryRef}
-            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            placeholder="First character becomes a bullet line. Enter: new • line. Shift+Enter: line break inside an item."
-            value={suggestedChanges}
-            onChange={handleThingsToTryChange}
-            onKeyDown={handleThingsToTryKeyDown}
-            aria-label="Things to try"
-          />
+          </>
         )}
       </div>
 
-      <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-4">
-        <div className="ui-title text-sm text-muted-foreground">Setup</div>
+      <div
+        ref={setupSectionRef}
+        className={cn(
+          "rounded-lg border p-4 space-y-4 transition-colors",
+          // Green "Saved from draft" treatment when the user is finishing a
+          // draft run and the sheet is collapsed. Non-draft edits keep the
+          // default muted background.
+          isDraft && !setupSectionExpanded && setupBaselineData
+            ? "border-emerald-500/40 bg-emerald-500/5"
+            : "border-border bg-muted/50"
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="ui-title text-sm text-muted-foreground">Setup</div>
+            {isDraft && !setupSectionExpanded && setupBaselineData ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+                title="This was saved when the draft was logged. Click Edit to change."
+              >
+                <span aria-hidden>✓</span>
+                <span>Saved from draft</span>
+              </span>
+            ) : null}
+            {setupChangeCountSinceBaseline > 0 ? (
+              <span
+                className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                title="Number of parameters that differ from the loaded setup."
+              >
+                {setupChangeCountSinceBaseline} change{setupChangeCountSinceBaseline === 1 ? "" : "s"} since loaded
+              </span>
+            ) : null}
+          </div>
+          {isDraft && !setupSectionExpanded ? (
+            <button
+              type="button"
+              onClick={() => setSetupSectionExpanded(true)}
+              className="rounded-md border border-border bg-card/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+            >
+              Edit
+            </button>
+          ) : null}
+        </div>
         {!setupSectionExpanded ? (
+          isDraft ? (
+            // Minimal draft view: just the diff rows vs. the loaded baseline.
+            // Source picker + "Change source" button are not rendered — the
+            // setup was already chosen when the draft was saved, so showing
+            // "Choose a run…" here just looks unfinished.
+            setupChangedRowsSinceBaseline.length > 0 ? (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
+                <div className="mb-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                  Changes from{" "}
+                  {setupSource === "previous_runs" && loadedSetupRun
+                    ? loadSetupControlLabel
+                    : setupSource === "other" && selectedDownloadedSetup
+                      ? loadOtherSetupLabel
+                      : "the loaded setup"}
+                  :
+                </div>
+                <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
+                  {setupChangedRowsSinceBaseline.map((r) => (
+                    <li key={r.key} className="flex flex-wrap items-baseline gap-1">
+                      <span className="truncate font-medium text-foreground">{r.label}</span>
+                      {r.unit ? <span className="text-[10px] text-muted-foreground">({r.unit})</span> : null}
+                      <span className="ml-auto font-mono tabular-nums text-muted-foreground">
+                        <span className="line-through opacity-70">{r.previous ?? "—"}</span>
+                        <span className="mx-1 text-foreground/60">→</span>
+                        <span className="font-semibold text-foreground">{r.current || "—"}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="text-[11px] text-muted-foreground">
+                No changes from the loaded setup.
+              </div>
+            )
+          ) : (
           <div className="space-y-3">
             <div className="flex flex-col gap-3 max-w-2xl">
-              <div className="space-y-1 text-sm">
-                <div className="text-sm font-medium text-muted-foreground">Setup source</div>
-                <select
-                  className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
-                  value={setupSource}
-                  onChange={(e) =>
-                    handleSetupSourceChange(e.target.value as "previous_runs" | "other")
-                  }
-                >
-                  <option value="previous_runs">Setups from previous runs</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              {setupSource === "previous_runs" ? (
-                <RunPickerSelect
-                  label={loadSetupControlLabel}
-                  runs={pickerRuns}
-                  value={loadSetupSelection}
-                  onChange={applyPastSetupOnly}
-                  placeholder="Choose a run…"
-                  disabled={pickerRuns.length === 0}
-                  formatLine={formatRunPickerLineRelativeWhen}
-                />
-              ) : (
-                <div className="space-y-2">
-                  <div className="space-y-1 text-sm">
-                    <div className="text-sm font-medium text-muted-foreground">Other source</div>
-                    <select
-                      className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
-                      value={otherSetupSource}
-                      onChange={(e) => setOtherSetupSource(e.target.value as "downloaded_setups")}
+              {isEditing && !showSetupSourceControls ? (
+                // Lean "locked in" summary: just what setup this run was built
+                // from + the edit affordances. The source picker is tucked
+                // behind an explicit opt-in so drivers finishing a draft aren't
+                // nagged with "Choose a run…" when the answer's already known.
+                <div className="space-y-1 text-sm">
+                  <div className="text-sm font-medium text-muted-foreground">Setup used</div>
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-500/30 bg-card/60 px-3 py-2 text-xs">
+                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                      {setupSource === "previous_runs" && loadedSetupRun
+                        ? loadSetupControlLabel
+                        : setupSource === "other" && selectedDownloadedSetup
+                          ? loadOtherSetupLabel
+                          : "This run's saved snapshot"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSetupSourceControls(true)}
+                      className="rounded border border-border bg-background/60 px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground transition"
                     >
-                      <option value="downloaded_setups">Downloaded setups</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
-                      {loadOtherSetupLabel}
-                    </div>
-                    <select
-                      className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none font-mono"
-                      value={loadOtherSetupSelection}
-                      onChange={(e) => applyDownloadedSetupOnly(e.target.value)}
-                      disabled={downloadedSetups.length === 0}
-                    >
-                      <option value="">Choose a downloaded setup…</option>
-                      {downloadedSetups.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {`${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`}
-                        </option>
-                      ))}
-                    </select>
+                      Change source
+                    </button>
                   </div>
                 </div>
+              ) : (
+                <>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-medium text-muted-foreground">Setup source</div>
+                      {isEditing ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowSetupSourceControls(false)}
+                          className="text-[10px] text-muted-foreground underline decoration-border underline-offset-2 hover:text-foreground"
+                          title="Hide the source controls and keep the current setup as-is."
+                        >
+                          Keep current
+                        </button>
+                      ) : null}
+                    </div>
+                    <select
+                      className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                      value={setupSource}
+                      onChange={(e) =>
+                        handleSetupSourceChange(e.target.value as "previous_runs" | "other")
+                      }
+                    >
+                      <option value="previous_runs">Setups from previous runs</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  {setupSource === "previous_runs" ? (
+                    <RunPickerSelect
+                      label={loadSetupControlLabel}
+                      runs={pickerRuns}
+                      value={loadSetupSelection}
+                      onChange={applyPastSetupOnly}
+                      placeholder="Choose a run…"
+                      disabled={pickerRuns.length === 0}
+                      formatLine={formatRunPickerLineRelativeWhen}
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="space-y-1 text-sm">
+                        <div className="text-sm font-medium text-muted-foreground">Other source</div>
+                        <select
+                          className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                          value={otherSetupSource}
+                          onChange={(e) => setOtherSetupSource(e.target.value as "downloaded_setups")}
+                        >
+                          <option value="downloaded_setups">Downloaded setups</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
+                          {loadOtherSetupLabel}
+                        </div>
+                        <select
+                          className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none font-mono"
+                          value={loadOtherSetupSelection}
+                          onChange={(e) => applyDownloadedSetupOnly(e.target.value)}
+                          disabled={downloadedSetups.length === 0}
+                        >
+                          <option value="">Choose a downloaded setup…</option>
+                          {downloadedSetups.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {`${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
               <button
                 type="button"
@@ -1976,6 +2991,34 @@ export function NewRunForm(props: {
                 Edit setup
               </button>
             </div>
+            {setupChangedRowsSinceBaseline.length > 0 ? (
+              <div className="max-w-2xl rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
+                <div className="mb-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                  Setup is{" "}
+                  {setupSource === "previous_runs" && loadedSetupRun
+                    ? `from ${loadSetupControlLabel}`
+                    : setupSource === "other" && selectedDownloadedSetup
+                      ? `from ${loadOtherSetupLabel}`
+                      : isEditing
+                        ? "this run's saved snapshot"
+                        : "the loaded baseline"}
+                  {" "}with the following {setupChangedRowsSinceBaseline.length === 1 ? "change" : "changes"}:
+                </div>
+                <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
+                  {setupChangedRowsSinceBaseline.map((r) => (
+                    <li key={r.key} className="flex flex-wrap items-baseline gap-1">
+                      <span className="truncate font-medium text-foreground">{r.label}</span>
+                      {r.unit ? <span className="text-[10px] text-muted-foreground">({r.unit})</span> : null}
+                      <span className="ml-auto font-mono tabular-nums text-muted-foreground">
+                        <span className="line-through opacity-70">{r.previous ?? "—"}</span>
+                        <span className="mx-1 text-foreground/60">→</span>
+                        <span className="font-semibold text-foreground">{r.current || "—"}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">No past runs yet, or list failed to load.</p>
             ) : null}
@@ -1986,6 +3029,7 @@ export function NewRunForm(props: {
               </p>
             ) : null}
           </div>
+          )
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2000,6 +3044,19 @@ export function NewRunForm(props: {
                 Collapse
               </button>
             </div>
+            {setupSnapshotSaveStatus ? (
+              <div
+                className={`text-[11px] ${
+                  setupSnapshotSaveStatus.kind === "error" ? "text-destructive" : "text-emerald-700 dark:text-emerald-300"
+                }`}
+              >
+                {setupSnapshotSaveStatus.text}
+              </div>
+            ) : null}
+            {/* Setup-changes free-text "Interpret changes" panel intentionally hidden from Log Your Run.
+                State (setupChangesText/Busy/Error/Proposal) and handlers (interpretSetupChanges,
+                applySetupChangesProposal) are kept in this file so the feature can be re-enabled
+                by restoring the JSX block from git history. */}
             <div className="max-w-2xl space-y-2">
               <div className="space-y-1 text-sm">
                 <div className="text-sm font-medium text-muted-foreground">Setup source</div>
@@ -2049,7 +3106,7 @@ export function NewRunForm(props: {
                       <option value="">Choose a downloaded setup…</option>
                       {downloadedSetups.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {`${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`}
+                          {`${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`}
                         </option>
                       ))}
                     </select>
@@ -2057,7 +3114,12 @@ export function NewRunForm(props: {
                 </div>
               )}
             </div>
-            <SetupSheetView value={setupData} onChange={setSetupData} template={setupTemplate} />
+            <SetupSheetView
+              value={setupData}
+              onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
+              template={setupTemplate}
+              enableFieldSearch
+            />
             {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">No past runs yet, or list failed to load.</p>
             ) : null}
@@ -2067,9 +3129,168 @@ export function NewRunForm(props: {
                 or bulk import, or pick a car that matches the setup’s assigned car when one is set.
               </p>
             ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
+              <p className="text-[11px] text-muted-foreground">
+                Lock in the sheet as the new baseline so later changes show as deltas against it.
+              </p>
+              <button
+                type="button"
+                onClick={handleSaveSetupSnapshot}
+                disabled={setupSnapshotSaving || setupChangeCountSinceBaseline === 0}
+                className="rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-emerald-300 transition"
+                title={
+                  setupChangeCountSinceBaseline === 0
+                    ? "No changes to save — the setup is still identical to the loaded snapshot."
+                    : isEditing
+                      ? "Save the current sheet as a new snapshot attached to this run."
+                      : "Lock in the current sheet so it counts as the loaded baseline."
+                }
+              >
+                {setupSnapshotSaving
+                  ? "Saving…"
+                  : isEditing
+                    ? "Save setup snapshot to this run"
+                    : "Lock in setup changes"}
+              </button>
+            </div>
           </>
         )}
       </div>
+
+      <div className="flex items-center gap-3 pt-2">
+        <div
+          className={cn(
+            "h-px flex-1",
+            isDraft ? "bg-amber-500/50" : "bg-border/60"
+          )}
+        />
+        <div className="flex flex-col items-center">
+          <div
+            className={cn(
+              "ui-title text-[11px] uppercase tracking-[0.18em]",
+              isDraft ? "text-amber-600 dark:text-amber-300" : "text-muted-foreground"
+            )}
+          >
+            After the run
+          </div>
+          <div
+            className={cn(
+              "text-[11px]",
+              isDraft
+                ? "text-amber-700/90 dark:text-amber-200/80"
+                : "text-muted-foreground/80"
+            )}
+          >
+            Lap times, notes, how it felt
+          </div>
+        </div>
+        <div
+          className={cn(
+            "h-px flex-1",
+            isDraft ? "bg-amber-500/50" : "bg-border/60"
+          )}
+        />
+      </div>
+
+      {isDraft ? (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-foreground">
+          <span className="font-medium text-amber-700 dark:text-amber-300">
+            Draft run.
+          </span>{" "}
+          Finish logging how the session went, then hit{" "}
+          <span className="font-medium">Run complete</span> below to take it off the
+          unfinished list.
+        </div>
+      ) : null}
+
+      <LapTimesIngestPanel
+        value={lapIngest}
+        onChange={setLapIngest}
+        practiceDayUrl={sessionType === "TESTING" ? practiceDayUrl.trim() || null : null}
+      />
+
+      <div className="space-y-2 text-sm">
+        <div className="ui-title text-sm text-muted-foreground">Notes</div>
+        <div className="flex border-b border-border" role="tablist" aria-label="Notes and things to try">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={notesSubTab === "notes"}
+            className={cn(
+              "px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              notesSubTab === "notes"
+                ? "border-accent text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setNotesSubTab("notes")}
+          >
+            Notes
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={notesSubTab === "things"}
+            className={cn(
+              "px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              notesSubTab === "things"
+                ? "border-accent text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setNotesSubTab("things")}
+          >
+            Things to try
+          </button>
+        </div>
+        {notesSubTab === "notes" ? (
+          <textarea
+            className={cn(
+              "h-32 w-full resize-none rounded-md border bg-card px-3 py-2 text-sm outline-none",
+              isDraft && notes.trim().length === 0
+                ? "border-amber-500/50 ring-1 ring-amber-500/30"
+                : "border-border"
+            )}
+            placeholder={
+              isDraft && notes.trim().length === 0
+                ? "How did the run feel? Grip, balance, any issues, what you'd change…"
+                : "Session notes, handling, track conditions…"
+            }
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            aria-label="Session notes"
+          />
+        ) : (
+          <textarea
+            ref={thingsTryRef}
+            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+            placeholder="First character becomes a bullet line. Enter: new • line. Shift+Enter: line break inside an item."
+            value={suggestedChanges}
+            onChange={handleThingsToTryChange}
+            onKeyDown={handleThingsToTryKeyDown}
+            aria-label="Things to try"
+          />
+        )}
+        <div className="pt-1">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md border border-border/80 bg-muted/30 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
+            aria-expanded={handlingDetailExpanded}
+            onClick={() => setHandlingDetailExpanded((v) => !v)}
+          >
+            <span>Handling detail (optional)</span>
+            <span className="text-[10px] opacity-70">{handlingDetailExpanded ? "Hide" : "Show"}</span>
+          </button>
+          {handlingDetailExpanded ? (
+            <div className="mt-2">
+              <HandlingAssessmentFields
+                value={handlingUi}
+                onChange={setHandlingUi}
+                feelVsLastRunEligible={feelVsLastRunEligible}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+
 
       {inlineError ? (
         <div className="rounded-md border border-border bg-destructive/10 px-3 py-2 text-xs text-foreground">
@@ -2087,19 +3308,95 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className={cn(
-            "inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
-            (!canSave || saving) && "opacity-70 pointer-events-none"
-          )}
-          onClick={(e) => saveRun(e)}
-          disabled={!canSave || saving}
-          aria-busy={saving}
-        >
-          {saving ? "Saving…" : saveSuccess ? "Saved" : "Save run"}
-        </button>
+      {pendingSaveIntent ? (
+        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            Unsaved changes to setup
+          </div>
+          <p className="mt-1 text-[11px] leading-snug text-foreground/90">
+            You&apos;ve edited{" "}
+            <span className="font-medium">
+              {setupChangedRowsSinceBaseline.length} parameter
+              {setupChangedRowsSinceBaseline.length === 1 ? "" : "s"}
+            </span>{" "}
+            but haven&apos;t locked them into a new snapshot. Saving will include these
+            changes with the run — review them first:
+          </p>
+          <ul className="mt-2 grid max-h-40 grid-cols-1 gap-x-4 gap-y-0.5 overflow-auto sm:grid-cols-2">
+            {setupChangedRowsSinceBaseline.map((r) => (
+              <li key={r.key} className="flex flex-wrap items-baseline gap-1">
+                <span className="truncate font-medium text-foreground">{r.label}</span>
+                {r.unit ? (
+                  <span className="text-[10px] text-muted-foreground">({r.unit})</span>
+                ) : null}
+                <span className="ml-auto font-mono tabular-nums text-muted-foreground">
+                  <span className="line-through opacity-70">{r.previous ?? "—"}</span>
+                  <span className="mx-1 text-foreground/60">→</span>
+                  <span className="font-semibold text-foreground">{r.current || "—"}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-md border border-border bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+              onClick={() => setPendingSaveIntent(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-amber-500/60 bg-amber-500/20 px-3 py-1.5 text-[11px] font-medium text-amber-800 hover:bg-amber-500/30 dark:text-amber-200 transition"
+              onClick={(e) =>
+                saveRun(e, pendingSaveIntent, { bypassUnsavedSetupCheck: true })
+              }
+            >
+              {pendingSaveIntent === "draft"
+                ? "Save changes + save draft"
+                : "Save changes + run complete"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-sm">
+          <span className="font-medium text-foreground">Save draft</span> to come back and finish after the run.
+          <span className="mx-1 text-muted-foreground/60">·</span>
+          <span className="font-medium text-foreground">Run complete</span> when nothing else is left to add.
+        </p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted/60",
+              (!canSave || saving) && "opacity-70 pointer-events-none"
+            )}
+            onClick={(e) => saveRun(e, "draft")}
+            disabled={!canSave || saving}
+            aria-busy={saving}
+            title="Save what you have so far and finish logging after the run."
+          >
+            {saving ? "Saving…" : saveSuccess ? "Saved" : "Save draft"}
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+              (!canSave || saving) && "opacity-70 pointer-events-none"
+            )}
+            onClick={(e) => saveRun(e, "completed")}
+            disabled={!canSave || saving}
+            aria-busy={saving}
+            title="Mark this run finished. It will stop showing up in the incomplete-runs banner."
+          >
+            {saving ? "Saving…" : saveSuccess ? "Saved" : "Run complete"}
+            <span className="text-sm leading-none" aria-hidden>
+              🏁
+            </span>
+          </button>
+        </div>
       </div>
     </form>
   );

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { isTrackFavourite } from "@/lib/track-favourites";
 import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
@@ -29,7 +29,7 @@ export default async function TrackDetailPage(props: {
   }
 
   const { trackId } = await props.params;
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const track = await prisma.track.findFirst({
     where: { id: trackId, userId: user.id },
     select: { id: true, name: true, location: true, createdAt: true },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { readSetupField } from "@/lib/a800rrSetupRead";
 import { coerceSetupValue, type SetupSnapshotData } from "@/lib/runSetup";
@@ -11,6 +11,7 @@ import {
 } from "@/lib/setupSheetTemplate";
 import { SetupSheetStructured } from "@/components/runs/SetupSheetStructured";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
+import { getDifferenceColor } from "@/lib/setupCompare/differenceColor";
 
 export type SetupSheetViewProps = {
   value: SetupSnapshotData;
@@ -26,6 +27,8 @@ export type SetupSheetViewProps = {
   template?: SetupSheetTemplate;
   /** Optional car aggregation stats for IQR-scaled compare gradient. */
   numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
+  /** When true, show search to jump to fields (edit flows only). */
+  enableFieldSearch?: boolean;
 };
 
 function fieldValue(v: SetupSnapshotData, key: string): string {
@@ -66,12 +69,19 @@ function SheetCell({
     if (!focused) setLocal(value);
   }, [value, focused]);
 
+  const changedStyle: CSSProperties | undefined = changed
+    ? {
+        backgroundColor: getDifferenceColor(0.6),
+        borderLeftWidth: 3,
+        borderLeftStyle: "solid",
+        borderLeftColor: "rgba(255, 0, 0, 0.45)",
+      }
+    : undefined;
+
   return (
     <div
-      className={cn(
-        "flex items-stretch border-b border-border last:border-b-0 min-h-[2.25rem]",
-        changed && "bg-amber-500/15 dark:bg-amber-500/10 border-l-2 border-l-amber-500/60"
-      )}
+      className={cn("flex items-stretch border-b border-border last:border-b-0 min-h-[2.25rem]")}
+      style={changedStyle}
     >
       <div className="w-[38%] shrink-0 px-2 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wide border-r border-border/80 flex items-center">
         {field.label}
@@ -185,6 +195,7 @@ export function SetupSheetView({
   className,
   template: templateProp,
   numericAggregationByKey = null,
+  enableFieldSearch = false,
 }: SetupSheetViewProps) {
   const template = templateProp ?? getDefaultSetupSheetTemplate();
   const baseline = baselineValue ?? null;
@@ -242,6 +253,7 @@ export function SetupSheetView({
           baselineValue={baseline}
           highlightChangedKeys={highlightChangedKeys ?? null}
           numericAggregationByKey={numericAggregationByKey}
+          enableFieldSearch={enableFieldSearch}
         />
       ) : null}
 

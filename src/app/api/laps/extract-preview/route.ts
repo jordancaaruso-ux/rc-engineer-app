@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { openaiVisionLapExtractor } from "@/lib/lapImageExtract/openaiVisionExtractor";
 
 const MAX_BYTES = 6 * 1024 * 1024;
@@ -10,7 +10,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  await getOrCreateLocalUser();
+  const __authUser = await getAuthenticatedApiUser();
+    if (!__authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ct = request.headers.get("content-type") ?? "";
   if (!ct.includes("multipart/form-data")) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import {
   sourceTypeFromMime,
@@ -11,14 +11,20 @@ import { SETUP_DOCUMENT_ALLOWED_MIME, SETUP_DOCUMENT_MAX_BYTES } from "@/lib/set
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { searchParams } = new URL(request.url);
+  const forExamplePdf = searchParams.get("forExamplePdf") === "1";
   const docs = await prisma.setupDocument.findMany({
-    where: { userId: user.id, setupImportBatchId: null },
+    where: forExamplePdf
+      ? { userId: user.id, mimeType: "application/pdf" }
+      : { userId: user.id, setupImportBatchId: null },
     orderBy: { createdAt: "desc" },
+    take: forExamplePdf ? 100 : undefined,
     select: {
       id: true,
       originalFilename: true,
@@ -45,8 +51,9 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
-  if (dbg) console.log(`[setup-upload-timing] after getOrCreateLocalUser ${(performance.now() - t0).toFixed(1)}ms`);
+  const user = await getAuthenticatedApiUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (dbg) console.log(`[setup-upload-timing] after auth ${(performance.now() - t0).toFixed(1)}ms`);
   const ct = request.headers.get("content-type") ?? "";
   if (!ct.includes("multipart/form-data")) {
     return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 });

@@ -54,8 +54,46 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
     try {
       const res = await fetch("/api/setup-aggregations/rebuild", { method: "POST" });
       const data = (await res.json()) as {
+        userCars?: {
+          deletedRows?: number;
+          createdRows?: number;
+          conditionDeletedRows?: number;
+          conditionCreatedRows?: number;
+          documentsConsidered?: number;
+          documentsIncluded?: number;
+          exclusionCounts?: {
+            totalUserDocuments?: number;
+            excludedNotEligible?: number;
+            excludedParseStatus?: number;
+            excludedPlaceholder?: number;
+            excludedNoPayload?: number;
+            excludedNoCar?: number;
+            excludedAmbiguousCar?: number;
+            excludedSnapshotCarWrongOwner?: number;
+            excludedSparseData?: number;
+            eligibleDocuments?: number;
+          };
+        };
+        community?: {
+          deletedRows?: number;
+          createdRows?: number;
+          documentsIncluded?: number;
+          exclusionCounts?: {
+            totalDocumentsExamined?: number;
+            excludedNotEligible?: number;
+            excludedParseStatus?: number;
+            excludedNoPayload?: number;
+            excludedNoCar?: number;
+            excludedNoTemplate?: number;
+            excludedSparseData?: number;
+            eligibleDocuments?: number;
+          };
+        };
+        /** Legacy flat shape (older API) */
         deletedRows?: number;
         createdRows?: number;
+        conditionDeletedRows?: number;
+        conditionCreatedRows?: number;
         documentsConsidered?: number;
         documentsIncluded?: number;
         exclusionCounts?: {
@@ -73,16 +111,27 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
         error?: string;
       };
       if (!res.ok) throw new Error(data.error || res.statusText);
-      const x = data.exclusionCounts;
+      const uc = data.userCars ?? data;
+      const x = uc.exclusionCounts;
       const detail =
         x != null
-          ? ` · examined ${x.totalUserDocuments ?? "—"} docs · eligible ${x.eligibleDocuments ?? data.documentsIncluded ?? 0}` +
+          ? ` · examined ${x.totalUserDocuments ?? "—"} docs · eligible ${x.eligibleDocuments ?? uc.documentsIncluded ?? 0}` +
             ` · excl: not-eligible ${x.excludedNotEligible ?? 0}, parse ${x.excludedParseStatus ?? 0}, placeholder ${x.excludedPlaceholder ?? 0}` +
             `, no-payload ${x.excludedNoPayload ?? 0}, no-car ${x.excludedNoCar ?? 0}, multi-car ${x.excludedAmbiguousCar ?? 0}` +
             `, car-mismatch ${x.excludedSnapshotCarWrongOwner ?? 0}, sparse ${x.excludedSparseData ?? 0}`
           : "";
+      const comm = data.community;
+      const commLine =
+        comm != null
+          ? ` Community (eligible uploads by template): ${comm.createdRows ?? 0} rows, ${comm.documentsIncluded ?? 0} docs; deleted ${comm.deletedRows ?? 0} prior.` +
+            (comm.exclusionCounts
+              ? ` Examined ${comm.exclusionCounts.totalDocumentsExamined ?? "—"} · eligible ${comm.exclusionCounts.eligibleDocuments ?? 0}` +
+                ` · excl: no-template ${comm.exclusionCounts.excludedNoTemplate ?? 0}, sparse ${comm.exclusionCounts.excludedSparseData ?? 0}.`
+              : "")
+          : "";
       setMessage(
-        `Rebuild OK: ${data.createdRows ?? 0} aggregation rows (${data.documentsIncluded ?? 0} docs included); deleted ${data.deletedRows ?? 0} prior rows.${detail}`
+        `Rebuild OK: ${uc.createdRows ?? 0} CAR_PARAMETER rows (${uc.documentsIncluded ?? 0} docs included); deleted ${uc.deletedRows ?? 0} prior rows.` +
+          ` Condition: ${uc.conditionCreatedRows ?? 0} rows (deleted ${uc.conditionDeletedRows ?? 0} prior).${detail}${commLine}`
       );
       await load();
     } catch (e) {

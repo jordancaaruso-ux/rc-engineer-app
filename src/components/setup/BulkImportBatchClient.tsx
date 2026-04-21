@@ -16,6 +16,8 @@ type DocRow = {
   calibrationProfileId: string | null;
   parsedCalibrationProfileId: string | null;
   calibrationProfile: { id: string; name: string } | null;
+  calibrationResolvedSource: string | null;
+  calibrationResolvedDebug: string | null;
   importDatasetReviewStatus: string;
   eligibleForAggregationDataset: boolean;
   identity: {
@@ -48,6 +50,8 @@ export function BulkImportBatchClient({
   const [uploading, setUploading] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [uploadCarId, setUploadCarId] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetResult, setResetResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (cars.length !== 1 || uploadCarId) return;
@@ -112,6 +116,47 @@ export function BulkImportBatchClient({
       setActionErr(msg);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function resetAggregationsToThisBatch() {
+    const confirmed = window.confirm(
+      "Clear aggregation eligibility on all your setup documents, then include only exact-match PARSED docs from this batch, and rebuild aggregations?"
+    );
+    if (!confirmed) return;
+    setActionErr(null);
+    setResetResult(null);
+    setResetBusy(true);
+    try {
+      const res = await fetch("/api/setup-aggregations/reset-to-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId, include: "parsed_exact" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        disabledCount?: number;
+        enabledCount?: number;
+        qualifyingInBatch?: number;
+        community?: { documentsIncluded?: number; createdRows?: number };
+      };
+      if (!res.ok) {
+        setActionErr(data.error ?? "Failed to reset aggregations to this batch.");
+        return;
+      }
+      setResetResult(
+        `Cleared ${data.disabledCount ?? 0} eligible docs, enabled ${data.enabledCount ?? 0} (of ${
+          data.qualifyingInBatch ?? 0
+        } qualifying). Community rebuild included ${data.community?.documentsIncluded ?? 0} docs across ${
+          data.community?.createdRows ?? 0
+        } rows.`
+      );
+      await load();
+      router.refresh();
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "Reset failed.");
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -184,6 +229,26 @@ export function BulkImportBatchClient({
           />
         </div>
         {uploading ? <span className="text-xs text-muted-foreground">Uploading…</span> : null}
+        <div className="ml-auto flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={() => void resetAggregationsToThisBatch()}
+            disabled={resetBusy || uploading}
+            className="rounded-md border border-border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            title="Clear eligibility on all your docs, include only exact-match PARSED docs from this batch, and rebuild aggregations."
+          >
+            {resetBusy ? "Rebuilding…" : "Use only this batch for aggregations"}
+          </button>
+          {resetResult ? (
+            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 max-w-xs text-right">{resetResult}</div>
+          ) : null}
+          <a
+            href="/setup/aggregations-debug"
+            className="text-[10px] text-muted-foreground hover:text-foreground underline"
+          >
+            View parameter audit / grip archetypes on a car page
+          </a>
+        </div>
       </div>
       {actionErr ? <div className="text-xs text-destructive">{actionErr}</div> : null}
 
@@ -213,8 +278,18 @@ export function BulkImportBatchClient({
                   <td className="px-3 py-2 max-w-[180px] truncate" title={d.originalFilename}>
                     {d.originalFilename}
                   </td>
-                  <td className="px-3 py-2 max-w-[140px] text-[10px] text-muted-foreground" title={d.calibrationProfile?.name ?? ""}>
-                    {d.calibrationProfile?.name ?? "— none —"}
+                  <td
+                    className="px-3 py-2 max-w-[180px] text-[10px] text-muted-foreground"
+                    title={d.calibrationResolvedDebug ?? d.calibrationProfile?.name ?? ""}
+                  >
+                    <div className="truncate">{d.calibrationProfile?.name ?? "— none —"}</div>
+                    {d.calibrationResolvedSource === "exact_fingerprint" ? (
+                      <div className="text-[9px] text-emerald-600 dark:text-emerald-400">auto: exact match</div>
+                    ) : d.calibrationResolvedDebug ? (
+                      <div className="text-[9px] text-amber-600 dark:text-amber-400 truncate" title={d.calibrationResolvedDebug}>
+                        {d.calibrationResolvedDebug.replace(/^petitrc:auto\s*/i, "")}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span
@@ -260,7 +335,12 @@ export function BulkImportBatchClient({
 
       <p className="text-[11px] text-muted-foreground">
         Open a PDF to choose a calibration and parse. Re-parse with another calibration anytime; the latest result
-        replaces the previous one for that file. Each PDF can use a different calibration.
+        replaces the previous one for that file. Each PDF can use a different calibration. To pull setups from PetitRC,
+        create a new batch on{" "}
+        <Link href="/setup/bulk-import" className="underline underline-offset-2 hover:text-foreground">
+          Bulk setup import
+        </Link>{" "}
+        (batch name + PetitRC URL).
       </p>
     </div>
   );

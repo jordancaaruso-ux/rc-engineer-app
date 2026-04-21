@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function PATCH(
@@ -10,7 +11,8 @@ export async function PATCH(
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getOrCreateLocalUser();
+  const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
   const body = (await request.json()) as { isArchived?: boolean };
   if (body.isArchived !== true) {
@@ -32,6 +34,10 @@ export async function PATCH(
   if (updated.count === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  revalidatePath("/");
+  revalidatePath("/runs/new");
+  revalidatePath("/engineer");
 
   return NextResponse.json({ ok: true });
 }

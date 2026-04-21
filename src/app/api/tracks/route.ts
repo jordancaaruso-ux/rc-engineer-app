@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser, addTrackToFavourites } from "@/lib/track-favourites";
 
 export async function GET(request: Request) {
@@ -18,7 +18,8 @@ export async function GET(request: Request) {
     const favouritesOnly = searchParams.get("favouritesOnly") === "1";
     const favouritesFirst = searchParams.get("favouritesFirst") === "1";
 
-    const user = await getOrCreateLocalUser();
+    const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const favouriteTrackIds =
       favouritesOnly || favouritesFirst ? await getFavouriteTrackIdsForUser(user.id) : [];
 
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
             ? { ...whereBase, id: { in: [] } }
             : whereBase,
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, location: true },
+      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
     });
 
     if (favouritesFirst && favouriteTrackIds.length > 0) {
@@ -91,20 +92,22 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const user = await getOrCreateLocalUser();
+    const user = await getAuthenticatedApiUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const track = await prisma.track.create({
       data: {
         userId: user.id,
         name,
         location: body.location?.trim() || null,
       },
-      select: { id: true, name: true, location: true },
+      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
     });
     if (body.addToFavourites) {
       await addTrackToFavourites(user.id, track.id);
     }
     revalidatePath("/tracks");
     revalidatePath("/runs/new");
+    revalidatePath("/events");
     return NextResponse.json({ track }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create track";

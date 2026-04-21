@@ -1,13 +1,14 @@
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import authConfig from "@/auth.config";
 
-let accessPasswordWarned = false;
+const { auth } = NextAuth(authConfig);
 
-/** Set DEBUG_ACCESS_GATE=1 in .env.local to log pathname, gate presence, cookie, redirect (dev debugging). */
+/** Set DEBUG_ACCESS_GATE=1 to log auth middleware decisions (dev). */
 const debugGate = process.env.DEBUG_ACCESS_GATE === "1";
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
   if (pathname.startsWith("/_next")) {
     return NextResponse.next();
@@ -15,52 +16,37 @@ export function middleware(request: NextRequest) {
   if (pathname === "/login" || pathname.startsWith("/login/")) {
     return NextResponse.next();
   }
+  if (pathname === "/privacy") {
+    return NextResponse.next();
+  }
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
-
-  const password = process.env.ACCESS_PASSWORD?.trim();
-  const auth = request.cookies.get("rc-auth")?.value;
-
-  if (debugGate) {
-    const masked = password ? `[set len=${password.length}]` : "missing";
-    console.log("[middleware] pathname:", pathname);
-    console.log("[middleware] ACCESS_PASSWORD:", password ? "present" : "missing/empty", masked);
-    console.log("[middleware] rc-auth cookie:", auth ? `[set len=${auth.length}]` : "missing");
-  }
-
-  if (!password) {
-    if (!accessPasswordWarned) {
-      accessPasswordWarned = true;
-      console.warn(
-        "[middleware] ACCESS_PASSWORD is not set — app password gate is disabled (OK for local dev)."
-      );
-    }
+  if (pathname.startsWith("/api/health/")) {
     return NextResponse.next();
   }
 
-  if (auth !== password) {
-    if (debugGate) {
-      console.log("[middleware] redirect → /login (cookie mismatch or missing)");
+  const authed = Boolean(req.auth);
+
+  if (debugGate) {
+    console.log("[middleware] pathname:", pathname, "authed:", authed);
+  }
+
+  if (!authed) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (debugGate) {
-    console.log("[middleware] allow (cookie matches ACCESS_PASSWORD)");
-  }
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
-    /*
-     * Include "/" explicitly: patterns like "/((?!_next/static|_next/image).*)" often do NOT match
-     * the bare root path in Next.js, so middleware never ran for "/" and the gate looked "off".
-     */
     "/",
-    "/((?!_next/static|_next/image).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

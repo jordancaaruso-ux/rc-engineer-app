@@ -4,22 +4,18 @@ import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashb
 import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { eventIsActiveOnLocalToday, startOfLocalDay } from "@/lib/eventActive";
+import { loadDetectedRunPrompts, syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
+import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
+import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
+import { buildSetupDiffRows } from "@/lib/setupDiff";
+import type { SetupSnapshotData } from "@/lib/runSetup";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
+export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 
-function startOfLocalDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-/** Event calendar range includes today (local midnight boundaries). */
-export function eventIsActiveOnLocalToday(ev: { startDate: Date; endDate: Date }): boolean {
-  const today = startOfLocalDay(new Date());
-  const start = startOfLocalDay(ev.startDate);
-  const end = startOfLocalDay(ev.endDate);
-  return start.getTime() <= today.getTime() && today.getTime() <= end.getTime();
-}
+/** @deprecated import from `@/lib/eventActive` */
+export { eventIsActiveOnLocalToday } from "@/lib/eventActive";
 
 function localTodayBounds(): { start: Date; end: Date } {
   const start = startOfLocalDay(new Date());
@@ -79,6 +75,7 @@ function serializeRunForPrefill(
     driverNotes: string | null;
     handlingProblems: string | null;
     suggestedChanges: string | null;
+    practiceDayUrl?: string | null;
     lapTimes: unknown;
     lapSession: unknown;
   }
@@ -112,6 +109,7 @@ function serializeRunForPrefill(
     driverNotes: run.driverNotes,
     handlingProblems: run.handlingProblems,
     suggestedChanges: run.suggestedChanges,
+    practiceDayUrl: run.practiceDayUrl ?? null,
     lapTimes: run.lapTimes,
     lapSession: run.lapSession,
   };
@@ -121,6 +119,45 @@ export async function getDashboardNewRunPrefill(
   userId: string,
   raw: Record<string, string | string[] | undefined>
 ): Promise<DashboardNewRunPrefill | null> {
+  const importedLapTimeSessionId =
+    typeof raw.importedLapTimeSessionId === "string" ? raw.importedLapTimeSessionId.trim() : "";
+  if (importedLapTimeSessionId) {
+    const [sess, liveRcDriverName] = await Promise.all([
+      prisma.importedLapTimeSession.findFirst({
+        where: { id: importedLapTimeSessionId, userId },
+        select: {
+          id: true,
+          sourceUrl: true,
+          parserId: true,
+          sessionCompletedAt: true,
+          parsedPayload: true,
+          createdAt: true,
+          eventDetectionSource: true,
+          linkedEventId: true,
+        },
+      }),
+      getLiveRcDriverNameSetting(userId),
+    ]);
+    if (!sess) return null;
+    const src = sess.eventDetectionSource;
+    const eventDetectionSource = src === "practice" || src === "race" ? src : null;
+    return {
+      mode: "imported_lap_session",
+      importedLapTimeSession: {
+        id: sess.id,
+        sourceUrl: sess.sourceUrl,
+        parserId: sess.parserId,
+        sessionCompletedAtIso: sess.sessionCompletedAt ? sess.sessionCompletedAt.toISOString() : null,
+        parsedPayload: sess.parsedPayload,
+        createdAt: sess.createdAt.toISOString(),
+        eventDetectionSource,
+        linkedEventId: sess.linkedEventId,
+        liveRcDriverName,
+      },
+      fromEventDetection: eventDetectionSource === "practice" || eventDetectionSource === "race",
+    };
+  }
+
   const from = typeof raw.fromDashboard === "string" ? raw.fromDashboard : undefined;
   const eventId = typeof raw.eventId === "string" ? raw.eventId : undefined;
   if (!from || !eventId) return null;
@@ -158,7 +195,20 @@ export type DashboardActionItemRow = {
   sourceRunId: string | null;
 };
 
+export type DashboardIncompleteRunRow = {
+  id: string;
+  createdAt: string;
+  sessionCompletedAt: string | null;
+  carName: string;
+  trackName: string | null;
+  eventName: string | null;
+  sessionLabel: string;
+};
+
 export type DashboardHomeModel = {
+  detectedRunPrompts: DetectedRunPrompt[];
+  /** Saved runs where the user has not clicked "Run completed" yet. */
+  incompleteRuns: DashboardIncompleteRunRow[];
   thingsToTry: DashboardActionItemRow[];
   activeEvent: null | {
     id: string;
@@ -172,13 +222,44 @@ export type DashboardHomeModel = {
     };
   };
   hasRunToday: boolean;
-  perfBestLap: number | null;
-  perfAvgTop5: number | null;
+  /** Best lap recorded among runs logged today (not all-time). */
+  todayBestLap: number | null;
+  /** Avg top 5 from the today run that produced the best lap. */
+  todayBestAvgTop5: number | null;
+  /** Label describing which today run owns the best lap (e.g. "Q2 · Onroad"). */
+  todayBestRunLabel: string | null;
+  todayBestRunId: string | null;
+  /** Number of runs logged today. */
+  todayRunCount: number;
+  /**
+   * Most recent _incomplete_ (draft) run logged today, if one exists. Drives
+   * the dashboard's contextual primary button ("Complete logging") so the
+   * driver jumps straight back into whichever draft needs finishing instead
+   * of being forced through the new-run flow first.
+   */
+  todayDraftRunId: string | null;
+  /** ISO timestamp when today's draft was first saved — powers the "Saved X ago" label on the dashboard card. */
+  todayDraftSavedAt: string | null;
+  /** Per-run setup changes made today, chronological (first-of-day uses yesterday's last run as baseline). */
+  todaysChanges: Array<{
+    runId: string;
+    when: string;
+    runLabel: string;
+    rows: Array<{
+      key: string;
+      label: string;
+      unit: string;
+      previous: string | null;
+      current: string;
+    }>;
+  }>;
   recentRun: null | {
     id: string;
     createdAt: string;
+    sessionCompletedAt: string | null;
     carName: string;
     trackName: string | null;
+    eventName: string | null;
     sessionLabel: string;
     bestLap: number | null;
     avgTop5: number | null;
@@ -188,6 +269,8 @@ export type DashboardHomeModel = {
 const recentRunSelect = {
   id: true,
   createdAt: true,
+  sessionCompletedAt: true,
+  sortAt: true,
   lapTimes: true,
   lapSession: true,
   sessionType: true,
@@ -199,10 +282,91 @@ const recentRunSelect = {
   event: { select: { id: true, name: true } },
 } as const;
 
+const incompleteRunSelect = {
+  id: true,
+  createdAt: true,
+  sessionCompletedAt: true,
+  sortAt: true,
+  sessionType: true,
+  meetingSessionType: true,
+  meetingSessionCode: true,
+  sessionLabel: true,
+  car: { select: { name: true } },
+  track: { select: { name: true } },
+  event: { select: { name: true } },
+} as const;
+
+function toDashboardIncompleteRunRow(
+  r: {
+    id: string;
+    createdAt: Date;
+    sessionCompletedAt: Date | null;
+    sortAt: Date;
+    sessionType: string;
+    meetingSessionType: string | null;
+    meetingSessionCode: string | null;
+    sessionLabel: string | null;
+    car: { name: string } | null;
+    track: { name: string } | null;
+    event: { name: string } | null;
+  }
+): DashboardIncompleteRunRow {
+  return {
+    id: r.id,
+    createdAt: r.createdAt.toISOString(),
+    sessionCompletedAt: r.sessionCompletedAt ? r.sessionCompletedAt.toISOString() : null,
+    carName: r.car?.name ?? "—",
+    trackName: r.track?.name ?? null,
+    eventName: r.event?.name ?? null,
+    sessionLabel: formatRunSessionDisplay({
+      sessionType: r.sessionType,
+      meetingSessionType: r.meetingSessionType,
+      meetingSessionCode: r.meetingSessionCode,
+      sessionLabel: r.sessionLabel,
+    }),
+  };
+}
+
+/**
+ * Incomplete runs for linking a LiveRC import to an existing draft (same event first, then any).
+ */
+export async function loadIncompleteRunsForImportChooser(
+  userId: string,
+  eventId: string | null
+): Promise<DashboardIncompleteRunRow[]> {
+  const baseWhere = {
+    userId,
+    loggingComplete: false as const,
+    incompleteLoggingPromptDismissedAt: null,
+  };
+  let rows = await prisma.run.findMany({
+    where: eventId ? { ...baseWhere, eventId } : baseWhere,
+    orderBy: { sortAt: "desc" },
+    take: 15,
+    select: incompleteRunSelect,
+  });
+  if (rows.length === 0 && eventId) {
+    rows = await prisma.run.findMany({
+      where: baseWhere,
+      orderBy: { sortAt: "desc" },
+      take: 15,
+      select: incompleteRunSelect,
+    });
+  }
+  return rows.map(toDashboardIncompleteRunRow);
+}
+
 export async function loadDashboardHomeModel(userId: string): Promise<DashboardHomeModel> {
   const { start: todayStart, end: todayEnd } = localTodayBounds();
 
-  const [events, hasRunToday, recentRun, runsForPerf] = await Promise.all([
+  // Fire-and-forget: this performs sequential LiveRC HTTP fetches + per-event
+  // Prisma writes and can take 1-2s. Awaiting it blocked every dashboard
+  // render. Detected-run prompts are read from the DB below; whatever this
+  // sync writes will be visible on the next dashboard load (one-load delay).
+  void syncRecentEventLapSources(userId).catch(() => {});
+  const detectedRunPrompts = await loadDetectedRunPrompts(userId);
+
+  const [events, recentRun, todaysRuns, priorRun, incompleteRunsRows] = await Promise.all([
     prisma.event.findMany({
       where: { userId },
       orderBy: { startDate: "desc" },
@@ -210,21 +374,52 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       include: { track: { select: { id: true, name: true, location: true } } },
     }),
     prisma.run.findFirst({
-      where: { userId, createdAt: { gte: todayStart, lt: todayEnd } },
-      select: { id: true },
-    }),
-    prisma.run.findFirst({
       where: { userId },
-      orderBy: { createdAt: "desc" },
+      orderBy: { sortAt: "desc" },
       select: recentRunSelect,
     }),
+    // Today's runs in chronological order, with setup snapshot + lap summary.
+    // Drives the "today's best" widget and the "changes today" feed (per-run
+    // diff vs. the immediately prior logged snapshot).
     prisma.run.findMany({
-      where: { userId },
-      select: { lapTimes: true, lapSession: true },
-      take: 400,
-      orderBy: { createdAt: "desc" },
+      where: { userId, createdAt: { gte: todayStart, lt: todayEnd } },
+      orderBy: { sortAt: "asc" },
+      select: {
+        id: true,
+        createdAt: true,
+        sessionCompletedAt: true,
+        sortAt: true,
+        sessionType: true,
+        meetingSessionType: true,
+        meetingSessionCode: true,
+        sessionLabel: true,
+        bestLapSeconds: true,
+        avgTop5LapSeconds: true,
+        lapTimes: true,
+        lapSession: true,
+        loggingComplete: true,
+        car: { select: { id: true, name: true } },
+        track: { select: { id: true, name: true } },
+        event: { select: { id: true, name: true } },
+        setupSnapshot: { select: { id: true, data: true } },
+      },
+    }),
+    // Last run _before_ today so the first today row's changes are diffed
+    // against yesterday's final snapshot instead of appearing as a full
+    // "everything changed" blob.
+    prisma.run.findFirst({
+      where: { userId, createdAt: { lt: todayStart } },
+      orderBy: { sortAt: "desc" },
+      select: { setupSnapshot: { select: { id: true, data: true } } },
+    }),
+    prisma.run.findMany({
+      where: { userId, loggingComplete: false, incompleteLoggingPromptDismissedAt: null },
+      orderBy: { sortAt: "desc" },
+      take: 5,
+      select: incompleteRunSelect,
     }),
   ]);
+  const hasRunToday = todaysRuns.length > 0;
 
   let actionItems: Array<{
     id: string;
@@ -264,7 +459,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       prisma.run.count({ where: { userId, eventId: activeEvent.id } }),
       prisma.run.findFirst({
         where: { userId, eventId: activeEvent.id },
-        orderBy: { createdAt: "desc" },
+        orderBy: { sortAt: "desc" },
         select: {
     lapTimes: true,
     lapSession: true,
@@ -306,15 +501,51 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     };
   }
 
-  let perfBestLap: number | null = null;
-  let perfAvgTop5: number | null = null;
-  for (const r of runsForPerf) {
-    const m = computeIncludedLapMetricsFromRun(r);
-    if (m.bestLap != null) {
-      if (perfBestLap == null || m.bestLap < perfBestLap) {
-        perfBestLap = m.bestLap;
-        perfAvgTop5 = m.averageTop5;
+  let todayBestLap: number | null = null;
+  let todayBestAvgTop5: number | null = null;
+  let todayBestRunId: string | null = null;
+  let todayBestRunLabel: string | null = null;
+  for (const r of todaysRuns) {
+    let best = r.bestLapSeconds;
+    let avg5 = r.avgTop5LapSeconds;
+    if (best == null) {
+      const m = computeIncludedLapMetricsFromRun(r);
+      best = m.bestLap;
+      avg5 = m.averageTop5;
+    }
+    if (best != null && (todayBestLap == null || best < todayBestLap)) {
+      todayBestLap = best;
+      todayBestAvgTop5 = avg5;
+      todayBestRunId = r.id;
+      todayBestRunLabel = formatRunSessionDisplay(r);
+    }
+  }
+
+  const todaysChanges: DashboardHomeModel["todaysChanges"] = [];
+  {
+    let prevSnapshot: SetupSnapshotData | null =
+      (priorRun?.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
+    for (const r of todaysRuns) {
+      const cur = (r.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
+      if (!cur) continue;
+      if (prevSnapshot) {
+        const diffRows = buildSetupDiffRows(cur, prevSnapshot).filter((row) => row.changed);
+        if (diffRows.length > 0) {
+          todaysChanges.push({
+            runId: r.id,
+            when: (r.sessionCompletedAt ?? r.createdAt).toISOString(),
+            runLabel: formatRunSessionDisplay(r),
+            rows: diffRows.map((row) => ({
+              key: row.key,
+              label: row.label,
+              unit: row.unit,
+              previous: row.previous,
+              current: row.current,
+            })),
+          });
+        }
       }
+      prevSnapshot = cur;
     }
   }
 
@@ -324,15 +555,23 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     recent = {
       id: recentRun.id,
       createdAt: recentRun.createdAt.toISOString(),
+      sessionCompletedAt: recentRun.sessionCompletedAt
+        ? recentRun.sessionCompletedAt.toISOString()
+        : null,
       carName: recentRun.car?.name ?? "—",
       trackName: recentRun.track?.name ?? null,
+      eventName: recentRun.event?.name ?? null,
       sessionLabel: formatRunSessionDisplay(recentRun),
       bestLap: m.bestLap,
       avgTop5: m.averageTop5,
     };
   }
 
+  const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
+
   return {
+    detectedRunPrompts,
+    incompleteRuns,
     thingsToTry: actionItems.map((i) => ({
       id: i.id,
       text: i.text,
@@ -341,9 +580,21 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       sourceRunId: i.sourceRunId,
     })),
     activeEvent: activeBlock,
-    hasRunToday: Boolean(hasRunToday),
-    perfBestLap,
-    perfAvgTop5,
+    hasRunToday,
+    todayBestLap,
+    todayBestAvgTop5,
+    todayBestRunId,
+    todayBestRunLabel,
+    todayRunCount: todaysRuns.length,
+    todayDraftRunId:
+      [...todaysRuns]
+        .reverse()
+        .find((r) => r.loggingComplete === false)?.id ?? null,
+    todayDraftSavedAt:
+      [...todaysRuns]
+        .reverse()
+        .find((r) => r.loggingComplete === false)?.createdAt.toISOString() ?? null,
+    todaysChanges,
     recentRun: recent,
   };
 }

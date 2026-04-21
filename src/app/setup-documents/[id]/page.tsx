@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getOrCreateLocalUser } from "@/lib/currentUser";
+import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDocumentReviewClient";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
@@ -25,7 +25,7 @@ export default async function SetupDocumentDetailPage({
   }
 
   const { id } = await params;
-  const user = await getOrCreateLocalUser();
+  const user = await requireCurrentUser();
   const [doc, cars, calibrations] = await Promise.all([
     prisma.setupDocument.findFirst({
       where: { id, userId: user.id },

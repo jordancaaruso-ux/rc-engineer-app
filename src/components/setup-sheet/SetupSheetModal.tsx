@@ -14,6 +14,11 @@ import {
   ACTIVE_SETUP_CHANGED_EVENT,
 } from "@/lib/activeSetupContext";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
+import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
+import {
+  buildNumericAggregationMapForCar,
+  type SetupAggApiRow,
+} from "@/lib/setupCompare/buildNumericAggregationMap";
 
 export type SetupSheetModalRun = {
   id: string;
@@ -53,6 +58,10 @@ export function SetupSheetModal({
   const [mode, setMode] = useState<CompareMode>("current_setup");
   const [otherRunId, setOtherRunId] = useState("");
   const [activeTick, setActiveTick] = useState(0);
+  const [numericAggregationByKey, setNumericAggregationByKey] = useState<Map<
+    string,
+    NumericAggregationCompareSlice
+  > | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -68,6 +77,30 @@ export function SetupSheetModal({
     window.addEventListener(ACTIVE_SETUP_CHANGED_EVENT, bump);
     return () => window.removeEventListener(ACTIVE_SETUP_CHANGED_EVENT, bump);
   }, []);
+
+  const aggregationCarId = run?.car?.id?.trim() || null;
+
+  useEffect(() => {
+    if (!open || !aggregationCarId) {
+      setNumericAggregationByKey(null);
+      return;
+    }
+    let alive = true;
+    const q = `?carId=${encodeURIComponent(aggregationCarId)}`;
+    fetch(`/api/setup-aggregations${q}`)
+      .then((res) => res.json())
+      .then((data: { aggregations?: SetupAggApiRow[] }) => {
+        if (!alive) return;
+        const rows = Array.isArray(data.aggregations) ? data.aggregations : [];
+        setNumericAggregationByKey(buildNumericAggregationMapForCar(rows, aggregationCarId));
+      })
+      .catch(() => {
+        if (alive) setNumericAggregationByKey(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, aggregationCarId]);
 
   // PDF viewer intentionally removed from Analyse run (Setup is app-native / parsed-first).
 
@@ -203,6 +236,7 @@ export function SetupSheetModal({
                 readOnly
                 template={template}
                 baselineValue={baselineValue}
+                numericAggregationByKey={numericAggregationByKey}
               />
             </>
           )}

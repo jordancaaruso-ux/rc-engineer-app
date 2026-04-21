@@ -3,6 +3,25 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { buildCatalogFromTemplate, buildFieldMetaMap } from "@/lib/setupFieldCatalog";
 import { isMultiSelectFieldKey, multiSelectSetEquals } from "@/lib/setup/multiSelect";
 
+/** Treat 2 / 2.0 / "2 mm" as equal so "changed" matches numeric reality for shims. */
+function parseNumericForDiff(s: string): number | null {
+  const t = s.trim();
+  if (!t || t === "—" || t === "-") return null;
+  const cleaned = t.replace(/mm/gi, "").replace(",", ".").trim();
+  const n = Number.parseFloat(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function scalarValuesEqualForDiff(curStr: string, prevStr: string): boolean {
+  if (curStr === prevStr) return true;
+  const n1 = parseNumericForDiff(curStr);
+  const n2 = parseNumericForDiff(prevStr);
+  if (n1 != null && n2 != null) {
+    return Math.abs(n1 - n2) < 1e-4;
+  }
+  return false;
+}
+
 /** All keys from both snapshots, with labels where known */
 export function buildSetupDiffRows(
   current: SetupSnapshotData,
@@ -53,11 +72,12 @@ export function buildSetupDiffRows(
     const p = previous?.[key];
     const curStr = formatSetupVal(c);
     const prevStr = previous == null ? null : formatSetupVal(p);
-    const changed = previous != null
-      ? isMultiSelectFieldKey(key)
-        ? !multiSelectSetEquals(key, c, p)
-        : curStr !== prevStr
-      : false;
+    const changed =
+      previous != null
+        ? isMultiSelectFieldKey(key)
+          ? !multiSelectSetEquals(key, c, p)
+          : !scalarValuesEqualForDiff(curStr, prevStr!)
+        : false;
     rows.push({
       key,
       label: meta2?.label ?? meta?.label ?? key.replace(/_/g, " "),
