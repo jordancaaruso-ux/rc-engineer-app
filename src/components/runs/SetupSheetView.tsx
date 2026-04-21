@@ -11,6 +11,7 @@ import {
 } from "@/lib/setupSheetTemplate";
 import { SetupSheetStructured } from "@/components/runs/SetupSheetStructured";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
+import type { CompareColumnRole } from "@/lib/setupCompare/compareHighlight";
 import { getDifferenceColor } from "@/lib/setupCompare/differenceColor";
 
 export type SetupSheetViewProps = {
@@ -29,6 +30,8 @@ export type SetupSheetViewProps = {
   numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
   /** When true, show search to jump to fields (edit flows only). */
   enableFieldSearch?: boolean;
+  /** Setup compare: tint changed value cells A=blue / B=red (labels stay neutral). */
+  compareValueColumnRole?: CompareColumnRole | null;
 };
 
 function fieldValue(v: SetupSnapshotData, key: string): string {
@@ -196,6 +199,7 @@ export function SetupSheetView({
   template: templateProp,
   numericAggregationByKey = null,
   enableFieldSearch = false,
+  compareValueColumnRole = null,
 }: SetupSheetViewProps) {
   const template = templateProp ?? getDefaultSetupSheetTemplate();
   const baseline = baselineValue ?? null;
@@ -254,6 +258,7 @@ export function SetupSheetView({
           highlightChangedKeys={highlightChangedKeys ?? null}
           numericAggregationByKey={numericAggregationByKey}
           enableFieldSearch={enableFieldSearch}
+          compareValueColumnRole={compareValueColumnRole}
         />
       ) : null}
 

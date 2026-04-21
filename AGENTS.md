@@ -42,6 +42,8 @@ If the user asks for "the Engineer to answer X better", the fix usually belongs 
 
 Try those before proposing a KB edit.
 
+For a **physics-first KB expansion checklist** (draft topics only—not retrieved KB), see `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md`.
+
 ## Commits
 
 Commit trailers like `Made-with: Cursor` are welcome — they make it easy to audit which commits were agent-authored later.

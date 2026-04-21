@@ -14,3 +14,9 @@ export const SETUP_SHEET_TEMPLATE_OPTIONS: Array<{ value: string; label: string 
 export function isA800RRCar(template: string | null | undefined): boolean {
   return template === SETUP_SHEET_TEMPLATE_A800RR;
 }
+
+/** Short label for car lists and setup UX (“car type” for structured setup features). */
+export function labelForSetupSheetTemplate(template: string | null | undefined): string {
+  if (template === SETUP_SHEET_TEMPLATE_A800RR) return "Awesomatix A800RR";
+  return "No setup template";
+}

@@ -35,7 +35,10 @@ import {
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { AwesomatixScrewStrip } from "@/components/setup-sheet/AwesomatixScrewStrip";
 import { compareSetupField, maxSeverity } from "@/lib/setupCompare/compare";
-import { compareResultToHighlight } from "@/lib/setupCompare/compareHighlight";
+import {
+  compareResultToHighlight,
+  type CompareColumnRole,
+} from "@/lib/setupCompare/compareHighlight";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import type { FieldCompareResult } from "@/lib/setupCompare/types";
 import {
@@ -78,6 +81,11 @@ type Props = {
   numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
   /** Search + jump to field rows (edit flows). */
   enableFieldSearch?: boolean;
+  /**
+   * Setup compare side-by-side: value column only uses A=blue / B=red tints; labels stay neutral.
+   * Omit everywhere except the two Setup compare panels.
+   */
+  compareValueColumnRole?: CompareColumnRole | null;
 };
 
 /** Keys and labels for “find field” (mirrors row rendering, including top deck block). */
@@ -456,6 +464,7 @@ function OptionSquareFieldDisplay({
   multi,
   readOnly,
   onSelect,
+  chipAccent = "sky",
 }: {
   value: string;
   /** When set, chip selection uses this instead of `value` (preset token on canonical key). */
@@ -467,6 +476,8 @@ function OptionSquareFieldDisplay({
   multi: boolean;
   readOnly: boolean;
   onSelect?: (opt: string) => void;
+  /** Setup A vs B compare: sky = column A, rose = column B. */
+  chipAccent?: "sky" | "rose";
 }) {
   // Preset + free-text: highlight chips only from selectedPreset, never from otherText / display string.
   const chipSource = hasCompanionOther
@@ -489,6 +500,10 @@ function OptionSquareFieldDisplay({
           const isSelected = multi
             ? Boolean(selectedMulti?.has(opt))
             : (selected != null && normalizeOptionToken(selected) === normalizeOptionToken(opt));
+          const selectedChip =
+            chipAccent === "rose"
+              ? "border-rose-500/90 bg-rose-500/25 text-foreground"
+              : "border-sky-500/90 bg-sky-500/25 text-foreground";
           return (
             <button
               key={opt}
@@ -497,7 +512,7 @@ function OptionSquareFieldDisplay({
               onClick={() => onSelect?.(opt)}
               className={cn(
                 "rounded border px-2 py-1 text-[11px] font-sans tabular-nums font-semibold transition-colors",
-                isSelected ? "border-sky-500/90 bg-sky-500/25 text-foreground" : "border-border bg-muted/40 text-muted-foreground",
+                isSelected ? selectedChip : "border-border bg-muted/40 text-muted-foreground",
                 !readOnly && "hover:bg-muted/70",
                 readOnly && "cursor-default"
               )}
@@ -522,6 +537,7 @@ function PresetWithOtherChipEditor({
   readOnly,
   onCommit,
   options,
+  chipAccent = "sky",
 }: {
   fieldKey: string;
   value: SetupSnapshotData;
@@ -530,6 +546,7 @@ function PresetWithOtherChipEditor({
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   options: string[];
+  chipAccent?: "sky" | "rose";
 }) {
   const catalogOpts = getSingleSelectChipOptions(fieldKey);
   const title = springRateFieldTooltip(value, fieldKey);
@@ -558,6 +575,7 @@ function PresetWithOtherChipEditor({
       options={options}
       multi={false}
       readOnly={readOnly}
+      chipAccent={chipAccent}
       onSelect={(opt) => {
         const next: PresetWithOtherValue = {
           selectedPreset: commitOptionValue(opt, options),
@@ -621,6 +639,7 @@ function LegacyCompanionOtherChipEditor({
   readOnly,
   onCommit,
   options,
+  chipAccent = "sky",
 }: {
   fieldKey: string;
   value: SetupSnapshotData;
@@ -629,6 +648,7 @@ function LegacyCompanionOtherChipEditor({
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   options: string[];
+  chipAccent?: "sky" | "rose";
 }) {
   const otherK = companionOtherTextKeyForSingleSelect(fieldKey);
   const v = fieldValue(value, fieldKey);
@@ -654,6 +674,7 @@ function LegacyCompanionOtherChipEditor({
         options={options}
         multi={false}
         readOnly={readOnly}
+        chipAccent={chipAccent}
         onSelect={(opt) => onCommit(fieldKey, commitOptionValue(opt, options))}
       />
     );
@@ -696,6 +717,7 @@ function LegacyCompanionOtherChipEditor({
       options={options}
       multi={false}
       readOnly={readOnly}
+      chipAccent={chipAccent}
       onSelect={(opt) => onCommit(fieldKey, commitOptionValue(opt, options))}
     />
   );
@@ -742,17 +764,16 @@ function LegacyCompanionOtherChipEditor({
  * - Canonical preset+other fields: `{ selectedPreset, otherText }` on one key (see `presetWithOther.ts`).
  * - Legacy: `{key}_other` companion when catalog still exposes it.
  */
-function SingleSelectChipWithOptionalOther(
-  props: {
-    fieldKey: string;
-    value: SetupSnapshotData;
-    baseline: SetupSnapshotData | null;
-    hasBaseline: boolean;
-    readOnly: boolean;
-    onCommit: (key: string, raw: SetupSnapshotValue) => void;
-    options: string[];
-  }
-) {
+function SingleSelectChipWithOptionalOther(props: {
+  fieldKey: string;
+  value: SetupSnapshotData;
+  baseline: SetupSnapshotData | null;
+  hasBaseline: boolean;
+  readOnly: boolean;
+  onCommit: (key: string, raw: SetupSnapshotValue) => void;
+  options: string[];
+  chipAccent?: "sky" | "rose";
+}) {
   if (isPresetWithOtherFieldKey(props.fieldKey)) {
     return <PresetWithOtherChipEditor {...props} />;
   }
@@ -791,6 +812,7 @@ function EditableSingle({
   hasBaseline,
   changed,
   rowHighlight,
+  compareColumnRole,
   readOnly,
   onCommit,
 }: {
@@ -804,9 +826,11 @@ function EditableSingle({
   hasBaseline: boolean;
   changed: boolean;
   rowHighlight: { className: string; style?: CSSProperties };
+  compareColumnRole?: CompareColumnRole;
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
 }) {
+  const chipAccent: "sky" | "rose" = compareColumnRole === "b" ? "rose" : "sky";
   const v = fieldValue(value, fieldKey);
   const b = baseline ? fieldValue(baseline, fieldKey) : "";
   const [local, setLocal] = useState(v);
@@ -833,17 +857,19 @@ function EditableSingle({
     return (
       <div
         data-setup-field-key={fieldKey}
-        className={cn(
-          "flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0",
-          changed && rowHighlight.className
-        )}
-        style={changed && rowHighlight.style ? rowHighlight.style : undefined}
+        className="flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0"
       >
         <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
           {label}
           {unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({unit})</span> : null}
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-0.5">
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col justify-center px-2 py-0.5",
+            changed && rowHighlight.className
+          )}
+          style={changed && rowHighlight.style ? rowHighlight.style : undefined}
+        >
           {options ? (
             options.multi ? (
               <OptionSquareFieldDisplay
@@ -852,6 +878,7 @@ function EditableSingle({
                 options={options.options}
                 multi
                 readOnly={effectiveReadOnly}
+                chipAccent={chipAccent}
                 onSelect={(opt) =>
                   onCommit(fieldKey, toggleOptionSelection(v, opt, options.options))
                 }
@@ -865,6 +892,7 @@ function EditableSingle({
                 readOnly={effectiveReadOnly}
                 onCommit={onCommit}
                 options={options.options}
+                chipAccent={chipAccent}
               />
             )
           ) : fieldKind === "bool" && !effectiveReadOnly ? (
@@ -906,17 +934,19 @@ function EditableSingle({
   return (
     <div
       data-setup-field-key={fieldKey}
-      className={cn(
-        "flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0",
-        changed && rowHighlight.className
-      )}
-      style={changed && rowHighlight.style ? rowHighlight.style : undefined}
+      className="flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0"
     >
       <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
         {label}
         {unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({unit})</span> : null}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-1">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col justify-center px-1",
+          changed && rowHighlight.className
+        )}
+        style={changed && rowHighlight.style ? rowHighlight.style : undefined}
+      >
         {options ? (
           <div className="px-1 py-1">
             {options.multi ? (
@@ -926,6 +956,7 @@ function EditableSingle({
                 options={options.options}
                 multi
                 readOnly={effectiveReadOnly}
+                chipAccent={chipAccent}
                 onSelect={(opt) =>
                   onCommit(fieldKey, toggleOptionSelection(v, opt, options.options))
                 }
@@ -939,6 +970,7 @@ function EditableSingle({
                 readOnly={effectiveReadOnly}
                 onCommit={onCommit}
                 options={options.options}
+                chipAccent={chipAccent}
               />
             )}
           </div>
@@ -1107,6 +1139,7 @@ function PairSideCell({
   fieldKind,
   highlightChangedKeys,
   numericAggregationByKey,
+  compareValueColumnRole,
 }: {
   fieldKey: string;
   side: "Front" | "Rear";
@@ -1118,11 +1151,14 @@ function PairSideCell({
   fieldKind?: "text" | "bool" | "multi";
   highlightChangedKeys: Set<string> | null;
   numericAggregationByKey: ReadonlyMap<string, NumericAggregationCompareSlice> | null | undefined;
+  compareValueColumnRole?: CompareColumnRole | null;
 }) {
   const v = fieldValue(value, fieldKey);
   const b = baseline ? fieldValue(baseline, fieldKey) : "";
   const cmp = keyFieldCompareResult(fieldKey, value, baseline, highlightChangedKeys, numericAggregationByKey);
-  const hl = compareResultToHighlight(cmp);
+  const role = compareValueColumnRole ?? undefined;
+  const hl = compareResultToHighlight(cmp, role);
+  const chipAccent: "sky" | "rose" = compareValueColumnRole === "b" ? "rose" : "sky";
   const c = !cmp.areEqual;
   const fk = fieldKind ?? "text";
   const [local, setLocal] = useState(v);
@@ -1160,6 +1196,7 @@ function PairSideCell({
                 options={options.options}
                 multi
                 readOnly={readOnly}
+                chipAccent={chipAccent}
                 onSelect={(opt) =>
                   onCommit(fieldKey, toggleOptionSelection(v, opt, options.options))
                 }
@@ -1173,6 +1210,7 @@ function PairSideCell({
                 readOnly={readOnly}
                 onCommit={onCommit}
                 options={options.options}
+                chipAccent={chipAccent}
               />
             )
           ) : fk === "bool" && !readOnly ? (
@@ -1222,6 +1260,7 @@ function PairSideCell({
               options={options.options}
               multi
               readOnly={readOnly}
+              chipAccent={chipAccent}
               onSelect={(opt) =>
                 onCommit(fieldKey, toggleOptionSelection(v, opt, options.options))
               }
@@ -1235,6 +1274,7 @@ function PairSideCell({
               readOnly={readOnly}
               onCommit={onCommit}
               options={options.options}
+              chipAccent={chipAccent}
             />
           )}
         </div>
@@ -1298,9 +1338,10 @@ function PairRow({
   onCommit,
   highlightChangedKeys,
   numericAggregationByKey,
+  compareValueColumnRole,
 }: {
   row: Extract<StructuredRow, { type: "pair" }>;
-} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey"> & {
+} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey" | "compareValueColumnRole"> & {
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
@@ -1327,6 +1368,7 @@ function PairRow({
           fieldKind={row.fieldKind}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
+          compareValueColumnRole={compareValueColumnRole}
         />
         <PairSideCell
           fieldKey={row.rightKey}
@@ -1339,6 +1381,7 @@ function PairRow({
           fieldKind={row.fieldKind}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
+          compareValueColumnRole={compareValueColumnRole}
         />
       </div>
     </div>
@@ -1354,13 +1397,15 @@ function Corner4Row({
   onCommit,
   highlightChangedKeys,
   numericAggregationByKey,
+  compareValueColumnRole,
 }: {
   row: Extract<StructuredRow, { type: "corner4" }>;
-} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey"> & {
+} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey" | "compareValueColumnRole"> & {
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
 }) {
+  const role = compareValueColumnRole ?? undefined;
   const sides: { title: "Front" | "Rear"; cells: { k: string; lab: string }[] }[] = [
     { title: "Front", cells: [{ k: row.ff, lab: "FF" }, { k: row.fr, lab: "FR" }] },
     { title: "Rear", cells: [{ k: row.rf, lab: "RF" }, { k: row.rr, lab: "RR" }] },
@@ -1378,22 +1423,21 @@ function Corner4Row({
               const v = fieldValue(value, k);
               const b = baseline ? fieldValue(baseline, k) : "";
               const cornerCmp = keyFieldCompareResult(k, value, baseline, highlightChangedKeys, numericAggregationByKey);
-              const cornerHl = compareResultToHighlight(cornerCmp);
+              const cornerHl = compareResultToHighlight(cornerCmp, role);
               const c = !cornerCmp.areEqual;
               return (
                 <div
                   key={k}
                   data-setup-field-key={k}
-                  className={cn(
-                    "flex min-h-[1.9rem] min-w-0 items-center gap-1 px-2 py-0.5",
-                    c && cornerHl.className
-                  )}
-                  style={c && cornerHl.style ? cornerHl.style : undefined}
+                  className="flex min-h-[1.9rem] min-w-0 items-center gap-1 px-2 py-0.5"
                 >
                   <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                     {lab}
                   </span>
-                  <div className="min-w-0 flex-1">
+                  <div
+                    className={cn("min-w-0 flex-1 rounded-sm", c && cornerHl.className)}
+                    style={c && cornerHl.style ? cornerHl.style : undefined}
+                  >
                     {readOnly ? (
                       <InlineValueCompare
                         value={v}
@@ -1513,9 +1557,11 @@ function ScrewStripRow({
   readOnly,
   onScrewChange,
   highlightChangedKeys,
+  numericAggregationByKey,
+  compareValueColumnRole,
 }: {
   row: Extract<StructuredRow, { type: "screw_strip" }>;
-} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys"> & {
+} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey" | "compareValueColumnRole"> & {
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   onScrewChange: (key: "motor_mount_screws" | "top_deck_screws" | "top_deck_cuts", next: string[]) => void;
@@ -1528,6 +1574,9 @@ function ScrewStripRow({
         : "top_deck";
   const sel = readSetupScrewSelection(value, row.key);
   const baseSel = baseline ? readSetupScrewSelection(baseline, row.key) : [];
+  const screwCmp = keyFieldCompareResult(row.key, value, baseline, highlightChangedKeys, numericAggregationByKey);
+  const screwHl = compareResultToHighlight(screwCmp, compareValueColumnRole ?? undefined);
+  const screwChanged = !screwCmp.areEqual;
 
   return (
     <div
@@ -1539,7 +1588,13 @@ function ScrewStripRow({
       <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-2 py-1">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col justify-center px-2 py-1",
+          screwChanged && screwHl.className
+        )}
+        style={screwChanged && screwHl.style ? screwHl.style : undefined}
+      >
         <AwesomatixScrewStrip
           variant={variant}
           selected={sel}
@@ -1562,7 +1617,8 @@ function TopDeckBlock({
   onScrewChange,
   highlightChangedKeys,
   numericAggregationByKey,
-}: Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey"> & {
+  compareValueColumnRole,
+}: Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey" | "compareValueColumnRole"> & {
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
@@ -1594,6 +1650,7 @@ function TopDeckBlock({
         onCommit={onCommit}
         highlightChangedKeys={highlightChangedKeys}
         numericAggregationByKey={numericAggregationByKey}
+        compareValueColumnRole={compareValueColumnRole}
       />
       <ScrewStripRow
         row={{ type: "screw_strip", key: "top_deck_cuts", label: "Top deck cuts" }}
@@ -1603,6 +1660,8 @@ function TopDeckBlock({
         readOnly={readOnly}
         onScrewChange={onScrewChange}
         highlightChangedKeys={highlightChangedKeys}
+        numericAggregationByKey={numericAggregationByKey}
+        compareValueColumnRole={compareValueColumnRole}
       />
       <EditableSingle
         fieldKey="top_deck_single"
@@ -1611,7 +1670,8 @@ function TopDeckBlock({
         baseline={baseline}
         hasBaseline={!!hasBaseline}
         changed={!topDeckSingleCmp.areEqual}
-        rowHighlight={compareResultToHighlight(topDeckSingleCmp)}
+        rowHighlight={compareResultToHighlight(topDeckSingleCmp, compareValueColumnRole ?? undefined)}
+        compareColumnRole={compareValueColumnRole ?? undefined}
         readOnly={readOnly}
         onCommit={onCommit}
       />
@@ -1668,9 +1728,11 @@ export function SetupSheetStructured({
   highlightChangedKeys,
   numericAggregationByKey = null,
   enableFieldSearch = false,
+  compareValueColumnRole = null,
 }: Props) {
   const baseline = baselineValue ?? null;
   const hasBaseline = baseline != null;
+  const compareRole = compareValueColumnRole ?? undefined;
   const sheetRootRef = useRef<HTMLDivElement>(null);
   const fieldSearchEntries = useMemo(() => collectFieldSearchEntries(sections), [sections]);
 
@@ -1705,7 +1767,7 @@ export function SetupSheetStructured({
   const renderRow = (row: StructuredRow) => {
     if (row.type === "single") {
       const cmp = keyFieldCompareResult(row.key, value, baseline, highlightChangedKeys, numericAggregationByKey);
-      const rowHl = compareResultToHighlight(cmp);
+      const rowHl = compareResultToHighlight(cmp, compareRole);
       return (
         <EditableSingle
           key={row.key}
@@ -1719,6 +1781,7 @@ export function SetupSheetStructured({
           hasBaseline={hasBaseline}
           changed={!cmp.areEqual}
           rowHighlight={rowHl}
+          compareColumnRole={compareRole}
           readOnly={readOnly}
           onCommit={commit}
         />
@@ -1736,6 +1799,7 @@ export function SetupSheetStructured({
           onCommit={commit}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
+          compareValueColumnRole={compareValueColumnRole}
         />
       );
     }
@@ -1751,6 +1815,7 @@ export function SetupSheetStructured({
           onCommit={commit}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
+          compareValueColumnRole={compareValueColumnRole}
         />
       );
     }
@@ -1766,6 +1831,7 @@ export function SetupSheetStructured({
           onScrewChange={commitScrews}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
+          compareValueColumnRole={compareValueColumnRole}
         />
       );
     }
@@ -1780,6 +1846,8 @@ export function SetupSheetStructured({
           readOnly={readOnly}
           onScrewChange={commitScrews}
           highlightChangedKeys={highlightChangedKeys}
+          numericAggregationByKey={numericAggregationByKey}
+          compareValueColumnRole={compareValueColumnRole}
         />
       );
     }

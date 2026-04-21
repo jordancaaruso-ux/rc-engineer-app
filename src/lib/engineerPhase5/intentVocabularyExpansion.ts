@@ -1,8 +1,11 @@
 import "server-only";
 
 /**
- * PHASE A BANDAID — remove when Phase B (structured parameter-effect index in KB
- * frontmatter) ships. See ARCHITECTURE note at the bottom of this file.
+ * PHASE A BANDAID — narrowed automatically when Phase B returns catalog matches.
+ * `buildEngineerRichContextV1` uses the raw user message for KB search when
+ * `parameterIntentMatches.matches.length > 0` (see `kbSearchQueryForMessage` in
+ * `engineerRichContext.ts`). Otherwise this expansion still runs. See ARCHITECTURE
+ * note at the bottom of this file.
  *
  * The vehicle-dynamics KB retriever (`searchVehicleDynamicsKb`) is a plain
  * bag-of-words scorer: each `##` section is scored by how many unique query
@@ -231,12 +234,10 @@ export function expandEngineerUserMessageForKbSearch(message: string): string {
 }
 
 /*
- * ARCHITECTURE NOTE — Phase B target:
- * Replace this helper with a structured parameter-effect index authored as
- * YAML frontmatter in each `content/vehicle-dynamics/*.md` file. For goal-shaped
- * questions ("how do I add rear grip", "less push mid-corner"), the engineer will
- * resolve intent → outcome → list of parameter keys via that index, joined by
- * key to the user's `setupVsSpread` rows. Embedding-based retrieval will cover
- * free-form conceptual questions. At that point the bag-of-words path (and
- * therefore this expansion helper) becomes dead code and should be deleted.
+ * ARCHITECTURE NOTE — Phase B (live):
+ * The parameter-effect catalog (`parameterEffects/catalog.ts`, KB-gated) plus
+ * `buildParameterIntentMatches` supplies deterministic ordering when populated.
+ * This expansion remains the fallback when the catalog is empty or no intent
+ * matches. Delete this helper only when retrieval no longer needs the extra
+ * tokens for any supported flow.
  */

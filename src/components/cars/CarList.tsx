@@ -4,9 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { SETUP_SHEET_TEMPLATE_OPTIONS } from "@/lib/setupSheetTemplateId";
+import { labelForSetupSheetTemplate, SETUP_SHEET_TEMPLATE_OPTIONS } from "@/lib/setupSheetTemplateId";
 
-type Car = { id: string; name: string; chassis?: string | null; notes?: string | null; setupSheetTemplate?: string | null };
+type Car = {
+  id: string;
+  name: string;
+  chassis?: string | null;
+  notes?: string | null;
+  setupSheetTemplate?: string | null;
+};
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
@@ -36,6 +42,12 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
     if (!trimmed) {
       setMessage("Name is required.");
       return;
+    }
+    if (!setupSheetTemplate) {
+      const ok = window.confirm(
+        "Add this car without a setup sheet template? Engineer community spread, setup compare, and structured setup tools need a template. Choose “Awesomatix A800RR” if this car uses that sheet."
+      );
+      if (!ok) return;
     }
     setMessage(null);
     setAdding(true);
@@ -98,7 +110,9 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
             />
           </div>
           <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Setup sheet template</label>
+            <label className="block text-[11px] text-muted-foreground mb-1">
+              Setup sheet template <span className="text-amber-600 dark:text-amber-500">(recommended)</span>
+            </label>
             <select
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={setupSheetTemplate}
@@ -108,6 +122,11 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
                 <option key={o.value || "none"} value={o.value}>{o.label}</option>
               ))}
             </select>
+            {!setupSheetTemplate ? (
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                Without a template, community stats and Engineer spread won’t apply to this car.
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -144,6 +163,9 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
                     {c.name}
                   </Link>
                   {c.chassis && <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>}
+                  <span className="block text-[11px] text-muted-foreground mt-0.5">
+                    Setup type: {labelForSetupSheetTemplate(c.setupSheetTemplate ?? null)}
+                  </span>
                 </div>
                 <span className="text-[11px] text-muted-foreground font-mono">{c.id.slice(0, 8)}</span>
               </li>

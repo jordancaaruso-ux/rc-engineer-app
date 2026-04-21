@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { buildSetupSpreadForEngineer } from "@/lib/engineerPhase5/setupSpreadForEngineer";
 import { searchVehicleDynamicsKb } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import { expandEngineerUserMessageForKbSearch } from "@/lib/engineerPhase5/intentVocabularyExpansion";
+import { detectOutcomeIntent } from "@/lib/engineerPhase5/parameterEffects/intentFromMessage";
+import { buildParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/query";
+import type { ParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/types";
 import { formatGripTagsForDisplay, formatLayoutTagsForDisplay } from "@/lib/trackMetaTags";
 import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
 import {
@@ -60,6 +63,12 @@ export type EngineerRichContextV1 = {
   /** Your garage: median tuning values in this track-condition bucket vs overall (runs-based; min sample gate). */
   conditionalSetupEmpirical: ConditionalSetupEmpiricalV1 | null;
   vehicleDynamicsKb: Array<{ title: string; excerpt: string; sourcePath: string }>;
+  /**
+   * Phase B: detected outcome intent joined to the parameter-effect catalog and setup-spread rows.
+   * Null when no intent matched or intent classifier returned nothing. When `matches` is empty,
+   * intent may still be set — the catalog has no approved entries yet.
+   */
+  parameterIntentMatches: ParameterIntentMatches | null;
 };
 
 const runSelectRich = {
@@ -81,6 +90,16 @@ const runSelectRich = {
   tireSet: { select: { id: true, label: true, setNumber: true } },
 } as const;
 
+function kbSearchQueryForMessage(
+  lastUserMessage: string,
+  parameterIntentMatches: ParameterIntentMatches | null
+): string {
+  const hasCatalogJoin =
+    parameterIntentMatches != null && parameterIntentMatches.matches.length > 0;
+  if (hasCatalogJoin) return lastUserMessage.trim();
+  return expandEngineerUserMessageForKbSearch(lastUserMessage);
+}
+
 /**
  * Structured engineer context: car, class, tires, track (layout + grip), setup vs historical spread
  * for the same chassis template, plus retrieved vehicle-dynamics KB snippets from the last user message.
@@ -92,14 +111,20 @@ export async function buildEngineerRichContextV1(params: {
   anchorRunId: string | null;
   lastUserMessage: string;
 }): Promise<EngineerRichContextV1 | null> {
-  // Phase A bandaid: expand free-text intent with canonical parameter vocab and
-  // retrieve a wider top-K so goal-shaped questions ("more rear grip") don't drop
-  // obviously-relevant parameter sections out of context. Phase B will replace
-  // this with a structured effect-index lookup joined by parameter key.
-  const kbQuery = expandEngineerUserMessageForKbSearch(params.lastUserMessage);
-  const kb = await searchVehicleDynamicsKb(kbQuery, 12);
+  const detectedIntent = detectOutcomeIntent(params.lastUserMessage);
 
   if (!params.anchorRunId?.trim()) {
+    const parameterIntentMatches =
+      detectedIntent != null
+        ? buildParameterIntentMatches({
+            outcome: detectedIntent.outcome,
+            direction: detectedIntent.direction,
+            matchedPhrase: detectedIntent.matchedPhrase,
+            spreadRows: [],
+          })
+        : null;
+    const kbQuery = kbSearchQueryForMessage(params.lastUserMessage, parameterIntentMatches);
+    const kb = await searchVehicleDynamicsKb(kbQuery, 12);
     if (kb.length === 0) return null;
     return {
       version: 1,
@@ -128,6 +153,7 @@ export async function buildEngineerRichContextV1(params: {
         excerpt: k.excerpt,
         sourcePath: k.sourcePath,
       })),
+      parameterIntentMatches,
     };
   }
 
@@ -151,6 +177,19 @@ export async function buildEngineerRichContextV1(params: {
     carId: run.carId,
     setupSnapshotData: run.setupSnapshot?.data ?? null,
   });
+
+  const parameterIntentMatches =
+    detectedIntent != null
+      ? buildParameterIntentMatches({
+          outcome: detectedIntent.outcome,
+          direction: detectedIntent.direction,
+          matchedPhrase: detectedIntent.matchedPhrase,
+          spreadRows: spread.rows,
+        })
+      : null;
+
+  const kbQuery = kbSearchQueryForMessage(params.lastUserMessage, parameterIntentMatches);
+  const kb = await searchVehicleDynamicsKb(kbQuery, 12);
 
   const conditionSig = run.track
     ? encodeTrackConditionSignature(run.track.gripTags ?? [], run.track.layoutTags ?? [])
@@ -222,5 +261,6 @@ export async function buildEngineerRichContextV1(params: {
       excerpt: k.excerpt,
       sourcePath: k.sourcePath,
     })),
+    parameterIntentMatches,
   };
 }

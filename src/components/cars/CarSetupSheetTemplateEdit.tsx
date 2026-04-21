@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { SETUP_SHEET_TEMPLATE_OPTIONS } from "@/lib/setupSheetTemplateId";
+import { labelForSetupSheetTemplate, SETUP_SHEET_TEMPLATE_OPTIONS } from "@/lib/setupSheetTemplateId";
 
 export function CarSetupSheetTemplateEdit({
   carId,
@@ -20,6 +20,12 @@ export function CarSetupSheetTemplateEdit({
 
   async function handleSave() {
     if (!dirty) return;
+    if (value === "" && (currentTemplate ?? "")) {
+      const ok = window.confirm(
+        "Clear the setup sheet template? Engineer community spread, setup compare, and structured setup features won’t apply until you set a template again."
+      );
+      if (!ok) return;
+    }
     setMessage(null);
     setSaving(true);
     try {
@@ -43,7 +49,12 @@ export function CarSetupSheetTemplateEdit({
 
   return (
     <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
-      <div className="text-sm font-medium text-muted-foreground mb-2">Setup sheet template</div>
+      <div className="text-sm font-medium text-muted-foreground mb-2">
+        Setup sheet template <span className="font-normal">(car type for setup features)</span>
+      </div>
+      <p className="text-[11px] text-muted-foreground mb-2">
+        Current: <span className="font-medium text-foreground">{labelForSetupSheetTemplate(currentTemplate)}</span>
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <select
           className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
@@ -74,7 +85,9 @@ export function CarSetupSheetTemplateEdit({
         )}
       </div>
       <p className="text-[11px] text-muted-foreground mt-2">
-        When set to Awesomatix A800RR, Analysis run details will show a &quot;View setup sheet&quot; button for runs with this car.
+        This links the car to structured setup data: community aggregations, Engineer spread, and setup compare are keyed by
+        template. When set to Awesomatix A800RR, Analysis run details will show a &quot;View setup sheet&quot; button for runs with
+        this car.
       </p>
     </div>
   );

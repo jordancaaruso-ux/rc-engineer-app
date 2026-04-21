@@ -543,6 +543,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
               template={A800RR_SETUP_SHEET_V1}
               baselineValue={selectionB.data}
               numericAggregationByKey={numericAggregationByKey}
+              compareValueColumnRole="a"
             />
           </div>
           <div className="rounded-lg border border-border bg-card p-3">
@@ -554,6 +555,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
               template={A800RR_SETUP_SHEET_V1}
               baselineValue={selectionA.data}
               numericAggregationByKey={numericAggregationByKey}
+              compareValueColumnRole="b"
             />
           </div>
         </div>

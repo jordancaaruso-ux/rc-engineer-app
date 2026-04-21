@@ -62,9 +62,9 @@ For **support** (how load is carried geometrically vs spring/ARB alone), **rear-
 
 ## Axle height (under hub — outer lower shims)
 
-**Keys:** `under_hub_shims_front`, `under_hub_shims_rear`. **Outer lower** = shims **under the hub**. Use for **initial vs overall** grip trim after upper link and inner lower arm. **Lower** hub stack → more **initial** grip; **higher** stack → more **overall** grip.
+**Keys:** `under_hub_shims_front`, `under_hub_shims_rear`. **Outer lower** = shims **under the hub**. Use for **response vs sustained grip** trim after upper link and inner lower arm. **Lower** hub stack → more **response**; **higher** stack → more **sustained grip**.
 
-For **Step 4** — initial vs overall personality **by corner phase** (entry / mid / exit), see **`initial-vs-overall-grip.md`** in this folder.
+For **Step 4** — **response vs sustained grip** personality **by corner phase** (entry / mid / exit), see **`response-vs-sustained-grip.md`** in this folder.
 
 ## High roll centre — jacking and loose tracks
 
@@ -84,4 +84,4 @@ Sharp into the corner, less mid-corner steer, rotation from the **rear**; on pow
 
 ## RC balance: order of adjustments
 
-Tune **net** geometry: **upper inner + upper outer**, **under lower arm**, **under-hub** shims, link length. You mainly set **front/rear RC balance** with **upper link** and **inner lower arm** front and rear, then trim **initial vs overall** with hub and link length. You can later move **both** ends together to shift **on vs in the track** without changing the **front/rear relationship** as much.
+Tune **net** geometry: **upper inner + upper outer**, **under lower arm**, **under-hub** shims, link length. You mainly set **front/rear RC balance** with **upper link** and **inner lower arm** front and rear, then trim **response vs sustained grip** with hub and link length. You can later move **both** ends together to shift **on vs in the track** without changing the **front/rear relationship** as much.
