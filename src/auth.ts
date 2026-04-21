@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import Google from "next-auth/providers/google";
 import Nodemailer from "next-auth/providers/nodemailer";
 import { createTransport } from "nodemailer";
 import authConfig from "@/auth.config";
@@ -8,11 +9,23 @@ import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
 
 const hasSmtpConfig = isMagicLinkSmtpConfigured();
+const googleId = process.env.AUTH_GOOGLE_ID?.trim();
+const googleSecret = process.env.AUTH_GOOGLE_SECRET?.trim();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   providers: [
+    ...(googleId && googleSecret
+      ? [
+          Google({
+            clientId: googleId,
+            clientSecret: googleSecret,
+            /** Same person may switch between Google and magic link when emails match. */
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
     Nodemailer({
       server: process.env.EMAIL_SERVER?.trim() || { jsonTransport: true },
       from: process.env.EMAIL_FROM?.trim() || "RC Engineer <dev@localhost>",
