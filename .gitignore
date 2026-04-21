@@ -11,6 +11,9 @@ prisma/dev.db
 # TypeScript incremental cache
 *.tsbuildinfo
 
+# Local agent debug NDJSON (Cursor / dev sessions)
+debug-*.log
+
 # Local dev PDFs (Blob in production). Outside `public/` so they are not traced into serverless bundles.
 .local-uploads/
 # Legacy dev path — keep out of repo/deploy; migrate files to `.local-uploads/` if needed (same filenames).

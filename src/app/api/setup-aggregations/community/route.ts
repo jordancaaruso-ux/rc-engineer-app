@@ -6,6 +6,7 @@ import {
   GRIP_BUCKET_ANY,
   type GripBucket,
 } from "@/lib/setupAggregations/gripBuckets";
+import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
 /**
  * Community-wide spread across ALL eligible setups for a template bucket.
@@ -47,8 +48,13 @@ export async function GET(request: Request) {
     );
   }
 
+  const templateKey = canonicalSetupSheetTemplateId(setupSheetTemplate) ?? setupSheetTemplate;
   const rows = await prisma.communitySetupParameterAggregation.findMany({
-    where: { setupSheetTemplate, trackSurface, gripLevel },
+    where: {
+      setupSheetTemplate: { equals: templateKey, mode: "insensitive" },
+      trackSurface,
+      gripLevel,
+    },
     orderBy: [{ parameterKey: "asc" }],
     select: {
       parameterKey: true,
@@ -69,7 +75,7 @@ export async function GET(request: Request) {
   }));
 
   return NextResponse.json({
-    bucket: { setupSheetTemplate, trackSurface, gripLevel },
+    bucket: { setupSheetTemplate: templateKey, trackSurface, gripLevel },
     aggregations,
   });
 }

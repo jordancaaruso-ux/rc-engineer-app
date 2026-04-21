@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { hasTeammateLink } from "@/lib/teammateRunAccess";
+import { SETUP_SHEET_TEMPLATE_A800RR, canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -53,9 +54,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const setupSheetTemplate = body.setupSheetTemplate === "awesomatix_a800rr"
-      ? "awesomatix_a800rr"
-      : null;
+    const setupSheetTemplateRaw = canonicalSetupSheetTemplateId(body.setupSheetTemplate ?? null);
+    const setupSheetTemplate =
+      setupSheetTemplateRaw === SETUP_SHEET_TEMPLATE_A800RR ? SETUP_SHEET_TEMPLATE_A800RR : null;
     const car = await prisma.car.create({
       data: {
         name,

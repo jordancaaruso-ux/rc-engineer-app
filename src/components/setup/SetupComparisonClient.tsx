@@ -7,7 +7,10 @@ import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { getActiveSetupData } from "@/lib/activeSetupContext";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
+import {
+  SETUP_SHEET_TEMPLATE_A800RR,
+  canonicalSetupSheetTemplateId,
+} from "@/lib/setupSheetTemplateId";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { compareSetupSnapshots } from "@/lib/setupCompare/compare";
@@ -209,22 +212,32 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
     router.push(`/engineer?${params.toString()}`);
   }, [engineerCompareState, router]);
 
-  // Community aggregations are bucketed by (template, surface, grip). We only ship the A800RR
-  // template today, so it's hardcoded here and will become a selector when more ship.
-  const setupSheetTemplate = SETUP_SHEET_TEMPLATE_A800RR;
+  /** Community IQR uses the same (template, surface, grip) buckets as `CommunitySetupParameterAggregation`. */
+  const communityTemplateKey = useMemo(() => {
+    if (aKind !== "run" || bKind !== "run" || !aId || !bId) {
+      return SETUP_SHEET_TEMPLATE_A800RR;
+    }
+    const runA = runs.find((r) => r.id === aId) ?? null;
+    const runB = runs.find((r) => r.id === bId) ?? null;
+    if (!runA || !runB) return SETUP_SHEET_TEMPLATE_A800RR;
+    const tA = canonicalSetupSheetTemplateId(runA.car?.setupSheetTemplate ?? null);
+    const tB = canonicalSetupSheetTemplateId(runB.car?.setupSheetTemplate ?? null);
+    if (tA && tB && tA !== tB) return null;
+    return tA ?? tB ?? SETUP_SHEET_TEMPLATE_A800RR;
+  }, [aKind, bKind, aId, bId, runs]);
   const [trackSurface, setTrackSurface] = useState<TrackSurface>("asphalt");
   const [gripLevel, setGripLevel] = useState<GripBucket>(GRIP_BUCKET_ANY);
 
   const [aggregationBundle, setAggregationBundle] = useState<AggregationFetchBundle | null>(null);
 
   useEffect(() => {
-    if (!dbReady) {
+    if (!dbReady || communityTemplateKey == null) {
       setAggregationBundle(null);
       return;
     }
     let alive = true;
     const q = new URLSearchParams({
-      setupSheetTemplate,
+      setupSheetTemplate: communityTemplateKey,
       trackSurface,
       gripLevel,
     }).toString();
@@ -245,7 +258,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
     return () => {
       alive = false;
     };
-  }, [dbReady, setupSheetTemplate, trackSurface, gripLevel]);
+  }, [dbReady, communityTemplateKey, trackSurface, gripLevel]);
 
   const numericAggregationByKey = aggregationBundle?.parsedMap ?? null;
   const communitySampleCount = useMemo(() => {
@@ -451,7 +464,10 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             </div>
             <div>
               Spread scale from all eligible setups in the community (template{" "}
-              <span className="text-foreground/80">{setupSheetTemplate}</span> · {trackSurface} · {gripBucketLabel(gripLevel)}
+              <span className="text-foreground/80">
+                {communityTemplateKey ?? "mixed — community IQR off"}
+              </span>{" "}
+              · {trackSurface} · {gripBucketLabel(gripLevel)}
               {communitySampleCount > 0 ? ` · ~${communitySampleCount} docs in bucket` : " · no docs in bucket yet"}
               ). Fields without enough community samples fall back to low-confidence grey.
             </div>
@@ -473,7 +489,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
           <div className="text-muted-foreground font-sans">
             NUMERIC aggregation keys in community bucket{" "}
             <span className="text-foreground/90">
-              {setupSheetTemplate} · {trackSurface} · {gripBucketLabel(gripLevel)}
+              {communityTemplateKey ?? "mixed (off)"} · {trackSurface} · {gripBucketLabel(gripLevel)}
             </span>{" "}
             ({numericAggregationParameterKeys.length}):{" "}
             <span className="text-foreground/90 break-all">{numericAggregationParameterKeys.join(", ") || "—"}</span>

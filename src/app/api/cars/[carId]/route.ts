@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { SETUP_SHEET_TEMPLATE_A800RR, canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function GET(
@@ -103,7 +104,8 @@ export async function PATCH(
   if (body.chassis !== undefined) data.chassis = body.chassis?.trim() || null;
   if (body.notes !== undefined) data.notes = body.notes?.trim() || null;
   if (body.setupSheetTemplate !== undefined) {
-    data.setupSheetTemplate = body.setupSheetTemplate === "awesomatix_a800rr" ? "awesomatix_a800rr" : null;
+    const c = canonicalSetupSheetTemplateId(body.setupSheetTemplate);
+    data.setupSheetTemplate = c === SETUP_SHEET_TEMPLATE_A800RR ? SETUP_SHEET_TEMPLATE_A800RR : null;
   }
   if (Object.keys(data).length === 0) {
     const car = await prisma.car.findFirst({

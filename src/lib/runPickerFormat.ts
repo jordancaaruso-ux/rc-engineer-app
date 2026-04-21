@@ -14,7 +14,7 @@ export type RunPickerRun = {
   event?: { name: string } | null;
   /** Present when API returns car-scoped runs. */
   carId?: string | null;
-  car?: { name: string } | null;
+  car?: { name: string; setupSheetTemplate?: string | null } | null;
   carNameSnapshot?: string | null;
   /** When API returns it (e.g. runs/search). */
   trackId?: string | null;

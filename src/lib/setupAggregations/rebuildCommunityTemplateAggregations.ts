@@ -10,6 +10,7 @@ import {
   type PerKeyState,
 } from "@/lib/setupAggregations/eligibleDocAggregationCore";
 import { GRIP_BUCKET_ANY, gripBucketsForDoc } from "@/lib/setupAggregations/gripBuckets";
+import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
 export type RebuildCommunityAggregationsExclusionCounts = {
   totalDocumentsExamined: number;
@@ -120,6 +121,7 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
       exclusionCounts.excludedNoTemplate += 1;
       continue;
     }
+    const templateForBucket = canonicalSetupSheetTemplateId(rawTemplate) ?? rawTemplate;
 
     const surfaceRaw = String((data as Record<string, unknown>)["track_surface"] ?? "").trim().toLowerCase();
     const trackSurface = surfaceRaw === "asphalt" || surfaceRaw === "carpet" ? surfaceRaw : "";
@@ -149,7 +151,7 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
     }
 
     for (const bucket of gripBuckets) {
-      const bucketKey = `${rawTemplate}\x1e${trackSurface}\x1e${bucket}`;
+      const bucketKey = `${templateForBucket}\x1e${trackSurface}\x1e${bucket}`;
       let keyMap = byTemplateSurfaceGrip.get(bucketKey);
       if (!keyMap) {
         keyMap = new Map();

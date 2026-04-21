@@ -11,12 +11,23 @@ export const SETUP_SHEET_TEMPLATE_OPTIONS: Array<{ value: string; label: string 
   { value: SETUP_SHEET_TEMPLATE_A800RR, label: "Awesomatix A800RR" },
 ];
 
+/**
+ * Canonical value for `Car.setupSheetTemplate` and community aggregation keys.
+ * Maps any casing of the A800RR id to `awesomatix_a800rr`; other non-empty strings return trimmed as-is.
+ */
+export function canonicalSetupSheetTemplateId(raw: string | null | undefined): string | null {
+  const t = raw?.trim();
+  if (!t) return null;
+  if (t.toLowerCase() === SETUP_SHEET_TEMPLATE_A800RR) return SETUP_SHEET_TEMPLATE_A800RR;
+  return t;
+}
+
 export function isA800RRCar(template: string | null | undefined): boolean {
-  return template === SETUP_SHEET_TEMPLATE_A800RR;
+  return canonicalSetupSheetTemplateId(template ?? null) === SETUP_SHEET_TEMPLATE_A800RR;
 }
 
 /** Short label for car lists and setup UX (“car type” for structured setup features). */
 export function labelForSetupSheetTemplate(template: string | null | undefined): string {
-  if (template === SETUP_SHEET_TEMPLATE_A800RR) return "Awesomatix A800RR";
+  if (canonicalSetupSheetTemplateId(template ?? null) === SETUP_SHEET_TEMPLATE_A800RR) return "Awesomatix A800RR";
   return "No setup template";
 }

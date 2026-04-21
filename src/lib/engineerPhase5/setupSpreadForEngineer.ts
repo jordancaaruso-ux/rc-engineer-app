@@ -22,8 +22,30 @@ import {
   type GripTrendBucketStats,
 } from "@/lib/setupAggregations/loadCommunityAggregations";
 import { getMinMeaningfulDelta } from "@/lib/setupAggregations/trendMinimumDeltas";
+import {
+  SETUP_SHEET_TEMPLATE_A800RR,
+  canonicalSetupSheetTemplateId,
+} from "@/lib/setupSheetTemplateId";
 
 const MAX_PARAMS = 45;
+
+/** When `Car.setupSheetTemplate` is unset, infer A800RR community bucket from structured top-deck / motor keys. */
+const A800RR_SNAPSHOT_SIGNAL_KEYS = new Set([
+  "top_deck_front",
+  "top_deck_rear",
+  "top_deck_single",
+  "top_deck_cuts",
+  "top_deck_screws",
+  "motor_mount_screws",
+]);
+
+function inferA800RRSetupFromSnapshotData(data: SetupSnapshotData): boolean {
+  let hits = 0;
+  for (const k of Object.keys(data)) {
+    if (A800RR_SNAPSHOT_SIGNAL_KEYS.has(k)) hits++;
+  }
+  return hits >= 2;
+}
 
 /**
  * Trend-score thresholds: |delta across grip| divided by the larger of the two endpoint IQRs.
@@ -454,9 +476,14 @@ export async function buildSetupSpreadForEngineer(params: {
     where: { id: params.carId, userId: params.userId },
     select: { setupSheetTemplate: true },
   });
-  const setupSheetTemplate = carRow?.setupSheetTemplate?.trim() || null;
-
   const normalized = normalizeSetupData(params.setupSnapshotData as SetupSnapshotData | null);
+  let setupSheetTemplate = canonicalSetupSheetTemplateId(carRow?.setupSheetTemplate ?? null);
+  const inferredForCommunity =
+    !setupSheetTemplate && inferA800RRSetupFromSnapshotData(normalized);
+  if (inferredForCommunity) {
+    setupSheetTemplate = SETUP_SHEET_TEMPLATE_A800RR;
+  }
+
   const keys = Object.keys(normalized)
     .filter((k) => {
       const v = normalized[k];
@@ -654,7 +681,13 @@ export async function buildSetupSpreadForEngineer(params: {
     setupSheetTemplate,
     trackSurface: communityMergedSurfaces ? null : trackSurface,
     gripLevel,
-    label: describeCommunityContext(setupSheetTemplate, trackSurface, gripLevel, communityMergedSurfaces),
+    label: describeCommunityContext(
+      setupSheetTemplate,
+      trackSurface,
+      gripLevel,
+      communityMergedSurfaces,
+      inferredForCommunity
+    ),
   };
 
   return {
@@ -671,12 +704,16 @@ function describeCommunityContext(
   template: string | null,
   surface: "asphalt" | "carpet" | null,
   grip: GripBucket,
-  mergedAcrossSurfaces: boolean
+  mergedAcrossSurfaces: boolean,
+  templateInferred: boolean
 ): string {
   if (!template) return "no template — community stats unavailable";
+  const inferNote = templateInferred
+    ? " · template inferred from A800RR setup keys (set Awesomatix A800RR on the car for garage/sibling scope)"
+    : "";
   if (mergedAcrossSurfaces) {
-    return `${template} · asphalt + carpet merged · ${gripBucketLabel(grip)} (set track_surface on the setup sheet to lock one surface)`;
+    return `${template} · asphalt + carpet merged · ${gripBucketLabel(grip)} (set track_surface on the setup sheet to lock one surface)${inferNote}`;
   }
   const surfaceLabel = surface ?? "unknown surface";
-  return `${template} · ${surfaceLabel} · ${gripBucketLabel(grip)}`;
+  return `${template} · ${surfaceLabel} · ${gripBucketLabel(grip)}${inferNote}`;
 }

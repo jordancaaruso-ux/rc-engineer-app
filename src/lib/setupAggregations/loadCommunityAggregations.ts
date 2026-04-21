@@ -10,10 +10,17 @@
  */
 import { SetupAggregationValueType, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import {
   GRIP_BUCKET_ANY,
   type GripBucket,
 } from "@/lib/setupAggregations/gripBuckets";
+
+/** Match community rows even if `CommunitySetupParameterAggregation.setupSheetTemplate` casing drifted vs `Car`. */
+function communitySetupTemplateWhere(setupSheetTemplate: string) {
+  const c = canonicalSetupSheetTemplateId(setupSheetTemplate) ?? setupSheetTemplate.trim();
+  return { equals: c, mode: "insensitive" as const };
+}
 
 /** Minimum samples in a grip-specific bucket before we use it instead of `any`. */
 export const MIN_GRIP_BUCKET_SAMPLE_COUNT = 10;
@@ -51,7 +58,7 @@ export async function loadCommunityAggregationsForBucket(
 
   const rows = await prisma.communitySetupParameterAggregation.findMany({
     where: {
-      setupSheetTemplate,
+      setupSheetTemplate: communitySetupTemplateWhere(setupSheetTemplate),
       trackSurface,
       gripLevel: { in: gripLevelsToQuery },
       ...(parameterKeys && parameterKeys.length > 0
@@ -230,7 +237,7 @@ export async function loadCommunityNumericGripTrendsForBucket(args: {
 
   const rows = await prisma.communitySetupParameterAggregation.findMany({
     where: {
-      setupSheetTemplate,
+      setupSheetTemplate: communitySetupTemplateWhere(setupSheetTemplate),
       trackSurface,
       valueType: SetupAggregationValueType.NUMERIC,
       ...(parameterKeys && parameterKeys.length > 0
@@ -348,7 +355,7 @@ export async function summarizeCommunityBuckets(
 ): Promise<CommunityBucketSummary[]> {
   if (!setupSheetTemplate || !trackSurface) return [];
   const rows = await prisma.communitySetupParameterAggregation.findMany({
-    where: { setupSheetTemplate, trackSurface },
+    where: { setupSheetTemplate: communitySetupTemplateWhere(setupSheetTemplate), trackSurface },
     select: { gripLevel: true, sampleCount: true },
   });
   const maxByGrip = new Map<string, number>();
