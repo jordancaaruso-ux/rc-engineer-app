@@ -49,6 +49,7 @@ import {
   usesSingleSelectChipWorkflow,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { awesomatixGroupKind, awesomatixGroupOptions } from "@/lib/setupDocuments/awesomatixWidgetGroups";
+import { customFieldGroupedChipContext } from "@/lib/setupCalibrations/customFieldGroupedChips";
 import {
   filterCrossFieldConflicts,
   findAppKeysForWidget,
@@ -311,6 +312,8 @@ export function SetupCalibrationEditorClient({
   const [groupedOptionDrafts, setGroupedOptionDrafts] = useState<
     Record<string, { optionLabel: string; optionValue: string; notes: string }>
   >({});
+  /** When creating / editing a grouped custom field: table of drafts vs pick-chip then click-PDF. */
+  const [groupedMappingPanelMode, setGroupedMappingPanelMode] = useState<"table" | "chips">("table");
   /** custom | template | new — drives commit behavior and form fieldScope. */
   const [setupFieldFormScope, setSetupFieldFormScope] = useState<"new" | "custom" | "template">("new");
   /** Explicit editor mode so create vs edit vs source selection do not compete. */
@@ -595,16 +598,38 @@ export function SetupCalibrationEditorClient({
     if (usesSingleSelectChipWorkflow(fieldKey)) return "single";
     const vm = getVisualMultiOptions(fieldKey);
     if (vm && vm.length > 0) return "multi";
-    return awesomatixGroupKind(fieldKey);
+    const aw = awesomatixGroupKind(fieldKey);
+    if (aw) return aw;
+    const def = customFieldByKey.get(fieldKey);
+    return customFieldGroupedChipContext(def)?.kind ?? null;
   }
 
-  function chipOptionsForField(fieldKey: string | null): string[] {
+  /** Catalog + Awesomatix keys only (not custom groupedOptions). */
+  function baseCatalogChipOptionValues(fieldKey: string | null): string[] {
     if (!fieldKey) return [];
     const ss = getSingleSelectChipOptions(fieldKey);
     if (ss && ss.length > 0) return [...ss];
     const vm = getVisualMultiOptions(fieldKey);
     if (vm && vm.length > 0) return [...vm];
     return [...(awesomatixGroupOptions(fieldKey) ?? [])];
+  }
+
+  function chipOptionsForField(fieldKey: string | null): string[] {
+    if (!fieldKey) return [];
+    const base = baseCatalogChipOptionValues(fieldKey);
+    if (base.length > 0) return base;
+    const def = customFieldByKey.get(fieldKey);
+    const ctx = customFieldGroupedChipContext(def);
+    return ctx ? ctx.entries.map((e) => e.value) : [];
+  }
+
+  /** Value + display label for chip buttons (custom options can show optionLabel). */
+  function chipOptionEntriesForField(fieldKey: string | null): Array<{ value: string; label: string }> {
+    if (!fieldKey) return [];
+    const def = customFieldByKey.get(fieldKey);
+    const custom = customFieldGroupedChipContext(def);
+    if (custom) return custom.entries;
+    return baseCatalogChipOptionValues(fieldKey).map((v) => ({ value: v, label: v }));
   }
 
   const mappedSheetPdfFieldNames = useMemo(() => {
@@ -894,8 +919,22 @@ export function SetupCalibrationEditorClient({
         },
       };
     });
-    const ak = acroSourceKey({ pdfFieldName, instanceIndex });
-    setAcroSelection({ keys: [ak], activeKey: ak });
+
+    const sk = acroSourceKey({ pdfFieldName, instanceIndex });
+    setCustomFieldDefinitions((prev) =>
+      prev.map((c) => {
+        if (c.key !== targetCanonicalKey || !c.groupedOptions?.length) return c;
+        if (!c.groupedOptions.some((o) => o.optionValue === optionValue)) return c;
+        return {
+          ...c,
+          groupedOptions: c.groupedOptions.map((o) =>
+            o.optionValue === optionValue ? { ...o, sourceKey: sk } : o
+          ),
+        };
+      })
+    );
+
+    setAcroSelection({ keys: [sk], activeKey: sk });
     setActiveSetupFieldKey(targetCanonicalKey);
     setStatus(null);
   }
@@ -972,12 +1011,14 @@ export function SetupCalibrationEditorClient({
     setGroupedEditorSourceKeys(sourceKeys);
     setGroupedOptionDrafts(drafts);
     setGroupBehaviorType(behavior);
+    setGroupedMappingPanelMode("table");
   }
 
   function clearGroupedEditorState() {
     setGroupedEditorSourceKeys(null);
     setGroupedOptionDrafts({});
     setGroupBehaviorType("singleSelect");
+    setGroupedMappingPanelMode("table");
   }
 
   function deriveGroupedEditorFromRule(
@@ -1015,6 +1056,7 @@ export function SetupCalibrationEditorClient({
       setGroupedEditorSourceKeys(keys);
       setGroupedOptionDrafts(drafts);
       setGroupBehaviorType(behavior);
+      setGroupedMappingPanelMode("table");
       return;
     }
 
@@ -1042,6 +1084,7 @@ export function SetupCalibrationEditorClient({
       setGroupedEditorSourceKeys(keys);
       setGroupedOptionDrafts(drafts);
       setGroupBehaviorType(behavior);
+      setGroupedMappingPanelMode("table");
       return;
     }
     clearGroupedEditorState();
@@ -1607,6 +1650,36 @@ export function SetupCalibrationEditorClient({
     const row = pdfRowByName.get(pdfFieldName);
     const mappingKeys = findAppKeysForWidget(formFieldMappings, pdfFieldName, instanceIndex, row);
     const toggleKey = acroSourceKey({ pdfFieldName, instanceIndex });
+
+    if (pendingGroupOption && showCreateFieldForm && groupedEditorSourceKeys?.includes(toggleKey)) {
+      const inGroupedEditor =
+        editorMode === "createGroupedField"
+        || (editorMode === "editSetupField" && (groupedEditorSourceKeys?.length ?? 0) >= 2);
+      if (inGroupedEditor) {
+        const v = pendingGroupOption;
+        setGroupedOptionDrafts((prev) => {
+          const refk = parseAcroKey(toggleKey);
+          const row0 = pdfRowByName.get(refk.pdfFieldName);
+          const defDraft = {
+            optionLabel: (row0?.name ?? refk.pdfFieldName).replace(/_/g, " "),
+            optionValue: inferOptionValueFromPdfName(row0?.name ?? refk.pdfFieldName),
+            notes: "",
+          };
+          const cur = prev[toggleKey] ?? defDraft;
+          return {
+            ...prev,
+            [toggleKey]: {
+              ...cur,
+              optionValue: v,
+              optionLabel: cur.optionLabel?.trim() ? cur.optionLabel : humanizeCanonicalStoredValue(v),
+            },
+          };
+        });
+        setPendingGroupOption(null);
+        setStatus(`Stored value “${v}” linked to this PDF control.`);
+        return;
+      }
+    }
 
     /**
      * If the user picked a catalog field first (armed target), a click on a PDF widget must bind
@@ -3404,67 +3477,150 @@ export function SetupCalibrationEditorClient({
                       </select>
                     </label>
                   </div>
-                  <div className="rounded border border-border/60 bg-card/50 p-2">
-                    <div className="text-[10px] font-medium text-muted-foreground">
-                      Options ({groupedEditorSourceKeys.length} PDF sources)
-                    </div>
-                    <div className="mt-2 max-h-56 space-y-2 overflow-y-auto">
-                      {groupedEditorSourceKeys.map((sourceKey) => {
-                        const ref = parseAcroKey(sourceKey);
-                        const row = pdfRowByName.get(ref.pdfFieldName);
-                        const draft = groupedOptionDrafts[sourceKey] ?? {
-                          optionLabel: row?.name ?? ref.pdfFieldName,
-                          optionValue: inferOptionValueFromPdfName(row?.name ?? ref.pdfFieldName),
-                          notes: "",
-                        };
-                        return (
-                          <div key={sourceKey} className="rounded border border-border/60 bg-muted/20 p-2">
-                            <div className="text-[10px] text-muted-foreground">
-                              PDF source: <span className="font-mono text-foreground/90">{sourceKey}</span>
-                            </div>
-                            <div className="mt-1 grid grid-cols-1 gap-2 md:grid-cols-2">
-                              <label className="block text-[10px] text-muted-foreground md:col-span-2">
-                                Display label
-                                <input
-                                  className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                                  value={draft.optionLabel}
-                                  onChange={(e) => setGroupedOptionDrafts((prev) => ({
-                                    ...prev,
-                                    [sourceKey]: { ...draft, optionLabel: e.target.value },
-                                  }))}
-                                  placeholder="e.g. Technical"
-                                />
-                              </label>
-                              <label className="block text-[10px] text-muted-foreground md:col-span-2">
-                                Stored value (canonical)
-                                <input
-                                  className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                                  value={draft.optionValue}
-                                  onChange={(e) => setGroupedOptionDrafts((prev) => ({
-                                    ...prev,
-                                    [sourceKey]: { ...draft, optionValue: e.target.value },
-                                  }))}
-                                  placeholder="e.g. technical"
-                                />
-                              </label>
-                              <label className="block text-[10px] text-muted-foreground md:col-span-2">
-                                Notes (optional)
-                                <input
-                                  className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                                  value={draft.notes}
-                                  onChange={(e) => setGroupedOptionDrafts((prev) => ({
-                                    ...prev,
-                                    [sourceKey]: { ...draft, notes: e.target.value },
-                                  }))}
-                                  placeholder=""
-                                />
-                              </label>
-                            </div>
-                          </div>
-                        );
-                      })}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
+                    <div className="text-[10px] font-medium text-muted-foreground">Option mapping</div>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className={`rounded border px-2 py-0.5 text-[10px] ${
+                          groupedMappingPanelMode === "table"
+                            ? "border-fuchsia-500/60 bg-fuchsia-500/15"
+                            : "border-border hover:bg-muted/50"
+                        }`}
+                        onClick={() => setGroupedMappingPanelMode("table")}
+                      >
+                        Table
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded border px-2 py-0.5 text-[10px] ${
+                          groupedMappingPanelMode === "chips"
+                            ? "border-fuchsia-500/60 bg-fuchsia-500/15"
+                            : "border-border hover:bg-muted/50"
+                        }`}
+                        onClick={() => setGroupedMappingPanelMode("chips")}
+                      >
+                        Map on PDF (chips)
+                      </button>
                     </div>
                   </div>
+                  {groupedMappingPanelMode === "chips" ? (
+                    <div className="rounded border border-border/60 bg-card/50 p-2">
+                      <p className="text-[10px] text-muted-foreground">
+                        Arm a <strong>stored value</strong> with a chip, then click the matching control on the PDF. Switch
+                        to <strong>Table</strong> to edit display names and keep each stored value unique.
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {(() => {
+                          const seen = new Set<string>();
+                          const chips: { value: string; label: string }[] = [];
+                          for (const sk of groupedEditorSourceKeys) {
+                            const ref = parseAcroKey(sk);
+                            const r = pdfRowByName.get(ref.pdfFieldName);
+                            const d = groupedOptionDrafts[sk] ?? {
+                              optionLabel: r?.name ?? ref.pdfFieldName,
+                              optionValue: inferOptionValueFromPdfName(r?.name ?? ref.pdfFieldName),
+                              notes: "",
+                            };
+                            const v = d.optionValue.trim();
+                            if (!v || seen.has(v)) continue;
+                            seen.add(v);
+                            chips.push({ value: v, label: d.optionLabel?.trim() ? d.optionLabel : v });
+                          }
+                          return chips;
+                        })().map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            className={`max-w-full truncate rounded border px-2 py-0.5 text-[10px] ${
+                              pendingGroupOption === value
+                                ? "border-blue-500/90 bg-blue-500/25 text-foreground"
+                                : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
+                            }`}
+                            title={label !== value ? `Stored: ${value}` : value}
+                            onClick={() => setPendingGroupOption((c) => (c === value ? null : value))}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded border border-border/60 bg-card/50 p-2">
+                      <div className="text-[10px] font-medium text-muted-foreground">
+                        Options ({groupedEditorSourceKeys.length} PDF sources)
+                      </div>
+                      <div className="mt-2 max-h-56 space-y-2 overflow-y-auto">
+                        {groupedEditorSourceKeys.map((sourceKey) => {
+                          const ref = parseAcroKey(sourceKey);
+                          const row = pdfRowByName.get(ref.pdfFieldName);
+                          const draft = groupedOptionDrafts[sourceKey] ?? {
+                            optionLabel: row?.name ?? ref.pdfFieldName,
+                            optionValue: inferOptionValueFromPdfName(row?.name ?? ref.pdfFieldName),
+                            notes: "",
+                          };
+                          return (
+                            <div key={sourceKey} className="rounded border border-border/60 bg-muted/20 p-2">
+                              <details className="text-[10px] text-muted-foreground">
+                                <summary className="cursor-pointer text-foreground/80">AcroForm source (advanced)</summary>
+                                <div className="mt-1 break-all font-mono text-[9px] text-foreground/80">{sourceKey}</div>
+                              </details>
+                              <div className="mt-1 grid grid-cols-1 gap-2 md:grid-cols-2">
+                                <label className="block text-[10px] text-muted-foreground md:col-span-2">
+                                  Display label
+                                  <input
+                                    className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 text-xs"
+                                    value={draft.optionLabel}
+                                    onChange={(e) => setGroupedOptionDrafts((prev) => ({
+                                      ...prev,
+                                      [sourceKey]: { ...draft, optionLabel: e.target.value },
+                                    }))}
+                                    placeholder="e.g. Technical"
+                                  />
+                                </label>
+                                <label className="block text-[10px] text-muted-foreground md:col-span-2">
+                                  Stored value (canonical)
+                                  <input
+                                    className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
+                                    value={draft.optionValue}
+                                    onChange={(e) => setGroupedOptionDrafts((prev) => ({
+                                      ...prev,
+                                      [sourceKey]: { ...draft, optionValue: e.target.value },
+                                    }))}
+                                    placeholder="e.g. technical"
+                                  />
+                                </label>
+                                <label className="block text-[10px] text-muted-foreground md:col-span-2">
+                                  Notes (optional)
+                                  <input
+                                    className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 text-xs"
+                                    value={draft.notes}
+                                    onChange={(e) => setGroupedOptionDrafts((prev) => ({
+                                      ...prev,
+                                      [sourceKey]: { ...draft, notes: e.target.value },
+                                    }))}
+                                    placeholder=""
+                                  />
+                                </label>
+                              </div>
+                              <button
+                                type="button"
+                                className="mt-2 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-100 hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={!draft.optionValue.trim()}
+                                onClick={() => {
+                                  if (!draft.optionValue.trim()) return;
+                                  setPendingGroupOption(draft.optionValue.trim());
+                                  setStatus("Click the matching PDF control to link this stored value…");
+                                }}
+                              >
+                                Link: arm value, then click PDF
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : null}
 
@@ -3720,20 +3876,23 @@ export function SetupCalibrationEditorClient({
                         traction, bodyshell, … share this workflow).
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1">
-                        {chipOptionsForField(activeSetupFieldKey).map((opt) => (
+                        {chipOptionEntriesForField(activeSetupFieldKey).map(({ value, label }) => (
                           <button
-                            key={opt}
+                            key={value}
                             type="button"
-                            className={`rounded border px-2 py-0.5 font-mono text-[10px] ${
-                              pendingGroupOption === opt
+                            className={`max-w-full truncate rounded border px-2 py-0.5 text-[10px] ${
+                              customFieldByKey.get(activeSetupFieldKey) ? "font-sans" : "font-mono"
+                            } ${
+                              pendingGroupOption === value
                                 ? "border-blue-500/90 bg-blue-500/25 text-foreground"
                                 : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
                             }`}
+                            title={label !== value ? `Stored: ${value}` : value}
                             onClick={() =>
-                              setPendingGroupOption((cur) => (cur === opt ? null : opt))
+                              setPendingGroupOption((cur) => (cur === value ? null : value))
                             }
                           >
-                            {opt}
+                            {label}
                           </button>
                         ))}
                       </div>

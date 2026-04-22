@@ -104,7 +104,9 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
           <span className="text-foreground/90">motor mount screws</span> or <span className="text-foreground/90">top deck cuts</span>, select
           multiple PDF widgets, then use the pink <span className="text-fuchsia-200/90">grouped field</span> panel:{" "}
           <span className="italic">Visual multi</span> for screw strips, <span className="italic">Single-select</span> for one-of deck/cut
-          layouts.
+          layouts. After you save, use <span className="text-foreground/90">Map on PDF (chips)</span> in that panel or the same{" "}
+          <span className="text-foreground/90">chip → click PDF</span> flow in the field catalog as for built-in single-select
+          fields (e.g. chassis).
         </p>
       ) : null}
       {showRecipes && p.onApplyRecipe ? (
