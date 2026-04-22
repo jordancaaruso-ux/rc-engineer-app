@@ -49,12 +49,13 @@ export default async function SetupDocumentsPage(): Promise<ReactNode> {
       updatedAt: true,
       createdSetupId: true,
       carId: true,
+      setupSheetTemplate: true,
     },
   }),
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, setupSheetTemplate: true },
     }),
   ]);
 

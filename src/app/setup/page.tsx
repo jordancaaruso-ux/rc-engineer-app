@@ -90,7 +90,7 @@ export default async function SetupPage({
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, setupSheetTemplate: true },
     }),
   ]);
 

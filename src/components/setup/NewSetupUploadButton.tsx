@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { carTemplateSelectGroups, type CarForTemplateGroup } from "@/lib/cars/setupSheetTemplateCarGroups";
 
-type CarOption = { id: string; name: string };
+type CarOption = CarForTemplateGroup;
 
 type QuickCreateResponse = {
   documentId: string;
@@ -38,9 +39,14 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
   const [stage, setStage] = useState<UploadStage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [carPickerOpen, setCarPickerOpen] = useState(false);
-  const [selectedCarId, setSelectedCarId] = useState<string>(() =>
-    cars.length === 1 ? cars[0]!.id : ""
-  );
+  const templateGroups = useMemo(() => carTemplateSelectGroups(cars), [cars]);
+  const [selectedCarId, setSelectedCarId] = useState("");
+
+  useEffect(() => {
+    if (templateGroups.length === 1 && !selectedCarId) {
+      setSelectedCarId(templateGroups[0]!.defaultCarId);
+    }
+  }, [templateGroups, selectedCarId]);
 
   const noCars = cars.length === 0;
   const busy = stage !== "idle" && stage !== "done";
@@ -77,11 +83,16 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
     ev.currentTarget.value = "";
     if (!f) return;
     pendingFileRef.current = f;
-    if (cars.length > 1 && !selectedCarId) {
+    if (templateGroups.length > 1 && !selectedCarId) {
       setCarPickerOpen(true);
       return;
     }
-    void upload(f, selectedCarId || cars[0]!.id);
+    const carId = selectedCarId || templateGroups[0]?.defaultCarId;
+    if (!carId) {
+      setCarPickerOpen(true);
+      return;
+    }
+    void upload(f, carId);
   }
 
   async function upload(file: File, carId: string) {
@@ -185,16 +196,19 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
           aria-modal="true"
           className="absolute right-0 top-full z-20 mt-2 w-64 rounded-md border border-border bg-card p-3 shadow-lg"
         >
-          <div className="text-xs font-medium text-foreground">Which car is this setup for?</div>
+          <div className="text-xs font-medium text-foreground">Which setup sheet type is this for?</div>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Same type is shared for all cars of that type (e.g. two A800RR builds).
+          </p>
           <select
             className="mt-2 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             value={selectedCarId}
             onChange={(e) => setSelectedCarId(e.target.value)}
           >
-            <option value="">Select car…</option>
-            {cars.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+            <option value="">Select type…</option>
+            {templateGroups.map((g) => (
+              <option key={g.key} value={g.defaultCarId}>
+                {g.label}
               </option>
             ))}
           </select>

@@ -4,7 +4,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
-import { carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
+import { canonicalSetupTemplateForUserCarId, carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
 
 function jsonObjectNonEmpty(v: unknown): v is Record<string, unknown> {
   return v != null && typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).length > 0;
@@ -34,6 +34,7 @@ export async function GET(request: Request) {
       createdSetupId: true,
       parsedDataJson: true,
       carId: true,
+      setupSheetTemplate: true,
       createdSetup: { select: { data: true, carId: true } },
     },
   });
@@ -57,17 +58,28 @@ export async function GET(request: Request) {
         createdAt: d.createdAt,
         setupData,
         carId: carFromSnap,
+        documentSetupTemplate: d.setupSheetTemplate ?? null,
         baselineSetupSnapshotId: d.createdSetupId,
       },
     ];
   });
 
-  /** Unassigned setups apply to any car; assigned setups match any sibling with the same `setupSheetTemplate`. */
+  const currentTemplate = carId ? await canonicalSetupTemplateForUserCarId(user.id, carId) : null;
+  /** Unassigned setups apply to any car; typed documents match the car's canonical template. */
   const scopeCarIds = carId ? await carIdsSharingSetupTemplate(user.id, carId) : null;
   const scopeSet = scopeCarIds ? new Set(scopeCarIds) : null;
-  const downloadedSetups = carId && scopeSet
-    ? mapped.filter((d) => d.carId == null || (d.carId != null && scopeSet.has(d.carId)))
-    : mapped;
+  const downloadedSetups =
+    !carId || !scopeSet
+      ? mapped
+      : mapped.filter((d) => {
+          if (d.documentSetupTemplate) {
+            if (currentTemplate) {
+              return d.documentSetupTemplate === currentTemplate;
+            }
+            return false;
+          }
+          return d.carId == null || (d.carId != null && scopeSet.has(d.carId));
+        });
 
   return NextResponse.json({ downloadedSetups });
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
+import { isCarValidTargetForSetupDocument } from "@/lib/carSetupScope";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -17,7 +18,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const doc = await prisma.setupDocument.findFirst({
     where: { id, userId: user.id },
-    select: { id: true, createdSetupId: true, carId: true },
+    select: { id: true, createdSetupId: true, carId: true, setupSheetTemplate: true },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (doc.createdSetupId) {
@@ -35,6 +36,13 @@ export async function POST(request: Request, ctx: Ctx) {
   }
   const car = await prisma.car.findFirst({ where: { id: carId, userId: user.id }, select: { id: true } });
   if (!car) return NextResponse.json({ error: "Car not found" }, { status: 400 });
+  const allowed = await isCarValidTargetForSetupDocument(user.id, doc, carId);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "That car's setup sheet type does not match this document." },
+      { status: 400 }
+    );
+  }
 
   const setup = await prisma.setupSnapshot.create({
     data: {

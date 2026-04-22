@@ -19,7 +19,7 @@ const EXACT_TUNING_KEYS = new Set<string>([
   "toe_gain_shims_rear",
   "under_hub_shims_front",
   "under_hub_shims_rear",
-  /** Additive mm link indices (see setupGeometryDerivedMetrics). */
+  /** Shim-derived link indices mm (see setupGeometryDerivedMetrics). */
   "derived_upper_link_index_front_mm",
   "derived_upper_link_index_rear_mm",
   "derived_upper_link_stagger_mm",

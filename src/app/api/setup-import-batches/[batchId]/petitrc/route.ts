@@ -3,6 +3,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
+import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { StorageConfigurationError, storeSetupDocumentFile } from "@/lib/setupDocuments/storage";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
@@ -108,6 +109,7 @@ export async function POST(request: Request, ctx: Ctx) {
   if (!carResolved.ok) {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
+  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carResolved.carId);
 
   const maxPdfs =
     typeof body.maxPdfs === "number" && Number.isFinite(body.maxPdfs) && body.maxPdfs > 0
@@ -350,6 +352,7 @@ export async function POST(request: Request, ctx: Ctx) {
         data: {
           userId: user.id,
           carId: carResolved.carId,
+          setupSheetTemplate,
           setupImportBatchId: batch.id,
           originalFilename: item.suggestedFilename,
           storagePath,

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { carTemplateSelectGroups, type CarForTemplateGroup } from "@/lib/cars/setupSheetTemplateCarGroups";
+import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
 import { cn } from "@/lib/utils";
 
-type CarOption = { id: string; name: string };
+type CarOption = CarForTemplateGroup;
 
 type SetupDocListItem = {
   id: string;
@@ -24,6 +26,7 @@ type SetupDocListItem = {
   createdAtLabel?: string;
   createdSetupId: string | null;
   carId: string | null;
+  setupSheetTemplate?: string | null;
 };
 
 function statusClass(status: SetupDocListItem["parseStatus"]): string {
@@ -45,16 +48,17 @@ export function SetupDocumentLibraryClient({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const templateGroups = useMemo(() => carTemplateSelectGroups(cars), [cars]);
 
   useEffect(() => {
-    if (cars.length !== 1 || uploadCarId) return;
-    setUploadCarId(cars[0].id);
-  }, [cars, uploadCarId]);
+    if (templateGroups.length !== 1 || uploadCarId) return;
+    setUploadCarId(templateGroups[0]!.defaultCarId);
+  }, [templateGroups, uploadCarId]);
 
   async function onSelect(file: File | null) {
     if (!file) return;
     if (!uploadCarId) {
-      setError("Select which car this setup sheet is for.");
+      setError("Select which setup sheet type this is for.");
       return;
     }
     setUploading(true);
@@ -102,17 +106,17 @@ export function SetupDocumentLibraryClient({
           </p>
         ) : (
           <label className="mt-3 block text-xs">
-            <span className="text-muted-foreground">Car for this sheet</span>
+            <span className="text-muted-foreground">Setup sheet type (shared by all cars of that type)</span>
             <select
-              className="mt-1 block w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              className="mt-1 block w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-sm"
               value={uploadCarId}
               onChange={(e) => setUploadCarId(e.target.value)}
               disabled={uploading}
             >
-              <option value="">Select car…</option>
-              {cars.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+              <option value="">Select type…</option>
+              {templateGroups.map((g) => (
+                <option key={g.key} value={g.defaultCarId}>
+                  {g.label}
                 </option>
               ))}
             </select>
@@ -168,6 +172,9 @@ export function SetupDocumentLibraryClient({
                     </>
                   ) : null}
                     {doc.createdSetupId ? " · setup created" : ""}
+                    {doc.setupSheetTemplate
+                      ? ` · ${labelForSetupSheetTemplate(doc.setupSheetTemplate)}`
+                      : ""}
                   </div>
                 {doc.importStatus === "FAILED" && doc.importErrorMessage ? (
                   <div className="mt-1 text-[11px] text-rose-300 line-clamp-2">{doc.importErrorMessage}</div>

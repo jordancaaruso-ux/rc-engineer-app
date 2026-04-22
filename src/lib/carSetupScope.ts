@@ -22,3 +22,33 @@ export async function carIdsSharingSetupTemplate(userId: string, carId: string):
   });
   return rows.map((r) => r.id);
 }
+
+/** Canonical `setupSheetTemplate` for an owned car, or null. */
+export async function canonicalSetupTemplateForUserCarId(
+  userId: string,
+  carId: string
+): Promise<string | null> {
+  const car = await prisma.car.findFirst({
+    where: { id: carId, userId },
+    select: { setupSheetTemplate: true },
+  });
+  if (!car) return null;
+  return canonicalSetupSheetTemplateId(car.setupSheetTemplate ?? null);
+}
+
+/** True if `targetCarId` is allowed when turning this document into a `SetupSnapshot` (same type as upload, or legacy sibling). */
+export async function isCarValidTargetForSetupDocument(
+  userId: string,
+  doc: { carId: string | null; setupSheetTemplate: string | null },
+  targetCarId: string
+): Promise<boolean> {
+  if (doc.setupSheetTemplate) {
+    const t = await canonicalSetupTemplateForUserCarId(userId, targetCarId);
+    return t === doc.setupSheetTemplate;
+  }
+  if (doc.carId) {
+    const sib = await carIdsSharingSetupTemplate(userId, doc.carId);
+    return sib.includes(targetCarId);
+  }
+  return true;
+}

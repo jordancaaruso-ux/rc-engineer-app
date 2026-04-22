@@ -10,6 +10,7 @@ import {
 import { SETUP_DOCUMENT_ALLOWED_MIME, SETUP_DOCUMENT_MAX_BYTES } from "@/lib/setupDocuments/types";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
+import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
       updatedAt: true,
       createdSetupId: true,
       carId: true,
+      setupSheetTemplate: true,
     },
   });
   return NextResponse.json({ documents: docs });
@@ -70,6 +72,7 @@ export async function POST(request: Request) {
   if (!carResolved.ok) {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
+  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carResolved.carId);
   if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
   }
@@ -97,6 +100,7 @@ export async function POST(request: Request) {
     data: {
       userId: user.id,
       carId: carResolved.carId,
+      setupSheetTemplate,
       originalFilename: file.name || "upload",
       storagePath,
       mimeType,

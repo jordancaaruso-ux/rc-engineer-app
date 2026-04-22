@@ -13,6 +13,7 @@ import {
 } from "@/lib/setupDocuments/types";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
+import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
 import {
   buildCalibrationFingerprints,
   repickCalibrationForBytes,
@@ -62,6 +63,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
   const carId = carResolved.carId;
+  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carId);
 
   if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
@@ -128,6 +130,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     data: {
       userId: user.id,
       carId,
+      setupSheetTemplate,
       originalFilename: file.name || "upload",
       storagePath,
       mimeType,

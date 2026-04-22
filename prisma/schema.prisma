@@ -435,6 +435,8 @@ model SetupDocument {
 
   car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)
   carId String?
+  /// Canonical `Car.setupSheetTemplate` (e.g. awesomatix_a800rr). All cars of this type use the same sheet; not a single-vehicle link.
+  setupSheetTemplate String?
 
   setupImportBatchId String?
   setupImportBatch   SetupImportBatch? @relation(fields: [setupImportBatchId], references: [id], onDelete: Cascade)
@@ -449,6 +451,7 @@ model SetupDocument {
 
   @@index([userId, createdAt])
   @@index([userId, parseStatus])
+  @@index([userId, setupSheetTemplate])
   @@index([setupImportBatchId])
   @@index([carId])
   @@unique([userId, sourceUrl])

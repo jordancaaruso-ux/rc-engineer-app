@@ -10,6 +10,7 @@ import {
 import { SETUP_DOCUMENT_MAX_BYTES } from "@/lib/setupDocuments/types";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
+import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
 
 const PDF_MIME = "application/pdf";
 function looksLikePdf(file: File): boolean {
@@ -45,6 +46,7 @@ export async function POST(request: Request, ctx: Ctx) {
   if (!carResolved.ok) {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
+  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carResolved.carId);
 
   const files = form.getAll("files");
   const fileList = files.filter((f): f is File => f instanceof File);
@@ -78,6 +80,7 @@ export async function POST(request: Request, ctx: Ctx) {
       data: {
         userId: user.id,
         carId: carResolved.carId,
+        setupSheetTemplate,
         setupImportBatchId: batch.id,
         originalFilename: file.name || "upload.pdf",
         storagePath,

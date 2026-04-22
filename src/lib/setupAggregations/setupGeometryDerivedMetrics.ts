@@ -1,8 +1,11 @@
 /**
- * Additive mm indices for cross-setup comparison (not literal link angles).
- * Upper: mean(upper inner per axle) + upper outer (per axle).
- * Lower: mean(under–lower inner per axle) + under hub (per axle).
- * Stagger: front index − rear index for upper and lower respectively.
+ * Shim-derived mm scalars for cross-setup comparison (not literal link angles).
+ * Upper index (per axle): upper outer shims − average(upper inner shims left/right).
+ * Lower index (per axle): under hub shims − average(under-lower inner shims left/right)
+ * (hub side is the “outer” pick-up vs inboard under-lower, mirroring upper outer − inner).
+ * Stagger (each link): front index − rear index. Larger index ⇒ more outer stack vs inner
+ * on that axle (upper: relatively more angled link in the usual shim sense). Positive
+ * stagger ⇒ front axle index exceeds rear (for lower, rear is relatively less outer-heavy).
  */
 import type { SetupSnapshotValue } from "@/lib/runSetup";
 
@@ -25,12 +28,12 @@ export function isSetupGeometryDerivedKey(key: string): key is SetupGeometryDeri
 
 /** Human labels for Engineer / prompts (keys stay machine ids). */
 export const SETUP_GEOMETRY_DERIVED_LABELS: Record<SetupGeometryDerivedKey, string> = {
-  derived_upper_link_index_front_mm: "Upper link index front (avg upper inner + upper outer)",
-  derived_upper_link_index_rear_mm: "Upper link index rear (avg upper inner + upper outer)",
-  derived_upper_link_stagger_mm: "Upper link stagger (front index − rear index)",
-  derived_lower_link_index_front_mm: "Lower link index front (avg under-lower inner + under hub)",
-  derived_lower_link_index_rear_mm: "Lower link index rear (avg under-lower inner + under hub)",
-  derived_lower_link_stagger_mm: "Lower link stagger (front index − rear index)",
+  derived_upper_link_index_front_mm: "Upper link index front (upper outer − avg upper inner)",
+  derived_upper_link_index_rear_mm: "Upper link index rear (upper outer − avg upper inner)",
+  derived_upper_link_stagger_mm: "Upper link stagger (front index − rear index; + ⇒ front more angled)",
+  derived_lower_link_index_front_mm: "Lower link index front (under hub − avg under-lower inner)",
+  derived_lower_link_index_rear_mm: "Lower link index rear (under hub − avg under-lower inner)",
+  derived_lower_link_stagger_mm: "Lower link stagger (front index − rear index; + ⇒ rear less outer-heavy)",
 };
 
 function parseShimMm(v: unknown): number | null {
@@ -81,18 +84,18 @@ export function computeSetupGeometryDerivedMetrics(data: Record<string, SetupSna
   const lowerRear = avg2(ulrf, ulrr);
 
   const derived_upper_link_index_front_mm =
-    upperFront != null && uof != null ? upperFront + uof : null;
+    upperFront != null && uof != null ? uof - upperFront : null;
   const derived_upper_link_index_rear_mm =
-    upperRear != null && uor != null ? upperRear + uor : null;
+    upperRear != null && uor != null ? uor - upperRear : null;
   const derived_upper_link_stagger_mm =
     derived_upper_link_index_front_mm != null && derived_upper_link_index_rear_mm != null
       ? derived_upper_link_index_front_mm - derived_upper_link_index_rear_mm
       : null;
 
   const derived_lower_link_index_front_mm =
-    lowerFront != null && hubf != null ? lowerFront + hubf : null;
+    lowerFront != null && hubf != null ? hubf - lowerFront : null;
   const derived_lower_link_index_rear_mm =
-    lowerRear != null && hubr != null ? lowerRear + hubr : null;
+    lowerRear != null && hubr != null ? hubr - lowerRear : null;
   const derived_lower_link_stagger_mm =
     derived_lower_link_index_front_mm != null && derived_lower_link_index_rear_mm != null
       ? derived_lower_link_index_front_mm - derived_lower_link_index_rear_mm
