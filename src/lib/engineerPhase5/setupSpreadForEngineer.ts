@@ -31,6 +31,10 @@ import {
   computeSetupGeometryDerivedMetrics,
   isSetupGeometryDerivedKey,
 } from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
+import {
+  computeGripSpreadContrast,
+  type GripSpreadContrast,
+} from "@/lib/engineerPhase5/gripSpreadContrast";
 
 /** Base tuning rows plus six derived link-index keys. */
 const MAX_PARAMS = 52;
@@ -430,6 +434,11 @@ export type EngineerSetupSpreadRow = {
    * instead of re-deriving a magnitude from the raw bucket medians.
    */
   gripTrendSignal: GripTrendSignal | null;
+  /**
+   * When community medians across two grip endpoints are similar but IQR (spread) differs — e.g. same
+   * central tendency, more scatter in one grip bucket. Null when not applicable or ratio too small.
+   */
+  gripSpreadContrast: GripSpreadContrast | null;
   positionBand: SetupSpreadPositionBand;
 };
 
@@ -643,6 +652,9 @@ export async function buildSetupSpreadForEngineer(params: {
       : 0;
     const gripTrend = gripTrendBucketCount >= 2 ? gripTrendRaw : null;
     const gripTrendSignal = gripTrend ? computeGripTrendSignal(key, gripTrend) : null;
+    const gripSpreadContrast = gripTrend
+      ? computeGripSpreadContrast(key, gripTrend, gripTrendSignal)
+      : null;
 
     if (!numericChosen) {
       const meta = comm ?? garage;
@@ -655,6 +667,7 @@ export async function buildSetupSpreadForEngineer(params: {
         spread: null,
         gripTrend,
         gripTrendSignal,
+        gripSpreadContrast,
         positionBand: "no_spread_data",
       });
       continue;
@@ -671,6 +684,7 @@ export async function buildSetupSpreadForEngineer(params: {
         spread: null,
         gripTrend,
         gripTrendSignal,
+        gripSpreadContrast,
         positionBand: num == null ? "not_numeric" : "no_spread_data",
       });
       continue;
@@ -698,6 +712,7 @@ export async function buildSetupSpreadForEngineer(params: {
       },
       gripTrend,
       gripTrendSignal,
+      gripSpreadContrast,
       positionBand: bandForValue(num, stats),
     });
   }

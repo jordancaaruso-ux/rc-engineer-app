@@ -15,6 +15,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:migrate:deploy": "prisma migrate deploy",
+    "test:grip-spread": "npx tsx src/lib/engineerPhase5/gripSpreadContrast.test.ts",
     "check:legacy-local-user": "npx tsx scripts/check-legacy-local-user.ts",
     "backfill:setup-car": "npx tsx scripts/backfill-setup-documents-car-id.ts",
     "cap:sync": "cap sync ios",
