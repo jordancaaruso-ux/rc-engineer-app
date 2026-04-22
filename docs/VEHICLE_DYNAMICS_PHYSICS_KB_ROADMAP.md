@@ -40,7 +40,7 @@ Use each as a checklist; merge or split files to stay under ~90 lines per file w
 |---|------|--------|
 | 1 | `balance-and-grip.md` | **drafted** — review prose in repo; next file when satisfied |
 | 2 | `bump-steer-toe-gain.md` | **drafted** — mechanics + platform conventions |
-| 3 | `camber-caster-toe.md` | **in progress** — Q&A in chat; draft after answers |
+| 3 | `camber-caster-toe.md` | **drafted** from Jordan Q&A; review toe + prompt rule (6) alignment |
 | 4 | `damper-oil.md` | pending |
 | 5 | `droop-downstop-arb.md` | pending |
 | 6 | `flex-chassis.md` | pending |
