@@ -361,6 +361,22 @@ model CommunitySetupParameterAggregation {
   @@index([setupSheetTemplate, trackSurface, gripLevel])
 }
 
+/**
+ * Manufacturer baseline for a setup sheet (official PDF + optional summary).
+ * One row per `setupSheetTemplate`; not counted in community aggregation sample stats.
+ */
+model SetupSheetManufacturerBaseline {
+  setupSheetTemplate String @id
+  /** Official manufacturer PDF URL (https recommended). */
+  pdfUrl    String   @db.Text
+  /** Optional short notes for the Engineer when the PDF is not parsed into rows. */
+  summary   String?  @db.Text
+  /** Last admin confirmation that pdfUrl/summary still match the current kit doc. */
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /** User review for dataset / aggregation eligibility (bulk import workflow). */
 enum SetupImportDatasetReviewStatus {
   UNSET

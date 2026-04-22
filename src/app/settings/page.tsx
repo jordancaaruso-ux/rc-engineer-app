@@ -7,6 +7,7 @@ import {
 import { SettingsClient } from "@/components/settings/SettingsClient";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
+import { ManufacturerBaselineAdminSection } from "@/components/settings/ManufacturerBaselineAdminSection";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
 
@@ -43,7 +44,12 @@ export default async function SettingsPage() {
           }}
         />
         <AccountSection email={user.email ?? ""} />
-        {isAuthAdminEmail(user.email) ? <AllowlistAdminSection /> : null}
+        {isAuthAdminEmail(user.email) ? (
+          <>
+            <AllowlistAdminSection />
+            <ManufacturerBaselineAdminSection />
+          </>
+        ) : null}
       </div>
     </div>
   );

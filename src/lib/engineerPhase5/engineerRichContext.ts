@@ -10,6 +10,7 @@ import type { ParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffec
 import { formatGripTagsForDisplay, formatLayoutTagsForDisplay } from "@/lib/trackMetaTags";
 import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
 import { normalizeSetupData } from "@/lib/runSetup";
+import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import {
   BULKHEAD_INNER_SPLIT_SIGN_NOTE,
   computeBulkheadInnerSplitsMm,
@@ -78,6 +79,24 @@ export type EngineerRichContextV1 = {
    * Derived FF−FR / RF−RR bulkhead pickup splits (mm) on the anchored run’s setup snapshot.
    * Null when no run is anchored; fields null when values missing or non-numeric.
    */
+  /**
+   * Manufacturer baseline for this car's setup sheet template (admin-maintained).
+   * Not part of community sample counts. When status is missing, no DB row exists yet.
+   */
+  manufacturerBaseline:
+    | null
+    | {
+        setupSheetTemplate: string;
+        status: "listed";
+        pdfUrl: string;
+        summary: string | null;
+        reviewedAtIso: string | null;
+      }
+    | {
+        setupSheetTemplate: string;
+        status: "missing";
+        message: string;
+      };
   bulkheadInnerSplits: null | {
     signNote: string;
     /** FF−FR (upper inner). */
@@ -160,6 +179,7 @@ export async function buildEngineerRichContextV1(params: {
       sessionClass: { label: null, source: "none" },
       tires: null,
       track: null,
+      manufacturerBaseline: null,
       setupVsSpread: {
         note: "No run anchored — add ?runId= on the Engineer page or log a run for car/setup/track context.",
         siblingCarCount: 0,
@@ -189,6 +209,32 @@ export async function buildEngineerRichContextV1(params: {
     select: runSelectRich,
   });
   if (!run) return null;
+
+  const sheetTemplate = canonicalSetupSheetTemplateId(run.car?.setupSheetTemplate ?? null);
+  const manufacturerBaselineRow =
+    sheetTemplate != null
+      ? await prisma.setupSheetManufacturerBaseline.findUnique({
+          where: { setupSheetTemplate: sheetTemplate },
+          select: { setupSheetTemplate: true, pdfUrl: true, summary: true, reviewedAt: true },
+        })
+      : null;
+  const manufacturerBaseline: EngineerRichContextV1["manufacturerBaseline"] =
+    sheetTemplate == null
+      ? null
+      : manufacturerBaselineRow != null
+        ? {
+            setupSheetTemplate: manufacturerBaselineRow.setupSheetTemplate,
+            status: "listed",
+            pdfUrl: manufacturerBaselineRow.pdfUrl,
+            summary: manufacturerBaselineRow.summary,
+            reviewedAtIso: manufacturerBaselineRow.reviewedAt?.toISOString() ?? null,
+          }
+        : {
+            setupSheetTemplate: sheetTemplate,
+            status: "missing",
+            message:
+              "No manufacturer baseline row in the database for this setupSheetTemplate. Official kit PDF is not on file in the app yet—do not substitute community medians for it.",
+          };
 
   const runClassTrim = run.raceClass?.trim() || null;
   const eventClassTrim = run.event?.raceClass?.trim() || null;
@@ -241,7 +287,8 @@ export async function buildEngineerRichContextV1(params: {
   const note =
     `${garageNote}${communityNote}` +
     " Only chassis/suspension tuning parameters are included (excludes motor, pinion, wing, ESC, etc.). Each row includes spreadSource: community_eligible_uploads vs your_garage when numeric bands apply." +
-    " Rows with parameterKey starting with derived_: upper = upper outer − avg(upper inner L/R) per axle (larger = more angled upper in KB). Lower = avg(under-lower L/R) + under hub per axle (larger = more inner-lower+hub stack → higher RC on that end; not the same “angled” sign as upper—see arm-angles-camber-gain). Balance = front − rear. When describing the user’s setup, prefer concrete shim values (inner+outer per link) over a derived mm headline; use derived rows for field position and balance. Not literal °.";
+    " Rows with parameterKey starting with derived_: upper = upper outer − avg(upper inner L/R) per axle (larger = more angled upper in KB). Lower = avg(under-lower L/R) + under hub per axle (larger = more inner-lower+hub stack → higher RC on that end; not the same “angled” sign as upper—see arm-angles-camber-gain). Balance = front − rear. When describing the user’s setup, prefer concrete shim values (inner+outer per link) over a derived mm headline; use derived rows for field position and balance. Not literal °." +
+    " Community bands are NOT filtered by tire compound, race class, or upload recency—only template·surface·grip; name tires + sessionClass when citing “typical.” manufacturerBaseline (when present) is the official PDF reference—separate from community counts. Do not state absolute roll-centre height (mm); relative RC tendency only.";
 
   const setupData = normalizeSetupData(run.setupSnapshot?.data);
   const splitMm = computeBulkheadInnerSplitsMm(setupData);
@@ -291,6 +338,7 @@ export async function buildEngineerRichContextV1(params: {
           layoutSummary: formatLayoutTagsForDisplay(run.track.layoutTags ?? []),
         }
       : null,
+    manufacturerBaseline,
     setupVsSpread: {
       note,
       siblingCarCount: spread.siblingCarIds.length,
