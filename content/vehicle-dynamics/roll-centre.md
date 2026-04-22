@@ -58,6 +58,8 @@ A **flatter front** upper link often gives **smoother entry** and can **maintain
 
 **Convention:** **Raising** this stack **raises** RC on that corner; **lowering** it **lowers** RC. Pair with upper-link changes when you change the whole triangle.
 
+**Lower line in side view** vs the upper link’s “**flatter** / **more angled**” language, and **camber in roll** with the upper link, are spelled out in **`arm-angles-camber-gain.md`** in this folder—**do not** use **“more angled”** on the **lower** arm the same way as on the **upper**.
+
 For **support** (how load is carried geometrically vs spring/ARB alone), **rear-biased** trade-offs, **soft at the limit** vs **over-support**, and **front** inner-lower tendencies (entry, mid–exit, bumps, understeer feel), see **`support-lower-inner.md`** in this folder.
 
 ## Axle height (under hub — outer lower shims)

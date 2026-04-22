@@ -241,7 +241,7 @@ export async function buildEngineerRichContextV1(params: {
   const note =
     `${garageNote}${communityNote}` +
     " Only chassis/suspension tuning parameters are included (excludes motor, pinion, wing, ESC, etc.). Each row includes spreadSource: community_eligible_uploads vs your_garage when numeric bands apply." +
-    " Rows with parameterKey starting with derived_: upper = upper outer − avg(upper inner L/R) per axle (larger = more angled). Lower = avg(under-lower L/R) + under hub per axle. Balance = front index − rear index. Compare to field with position band / IQR; lead qualitative flatter/more-angled, not a wall of mm. Not literal °.";
+    " Rows with parameterKey starting with derived_: upper = upper outer − avg(upper inner L/R) per axle (larger = more angled upper in KB). Lower = avg(under-lower L/R) + under hub per axle (larger = more inner-lower+hub stack → higher RC on that end; not the same “angled” sign as upper—see arm-angles-camber-gain). Balance = front − rear. When describing the user’s setup, prefer concrete shim values (inner+outer per link) over a derived mm headline; use derived rows for field position and balance. Not literal °.";
 
   const setupData = normalizeSetupData(run.setupSnapshot?.data);
   const splitMm = computeBulkheadInnerSplitsMm(setupData);

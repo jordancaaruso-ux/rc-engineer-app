@@ -1,6 +1,6 @@
 ## Camber
 
-**Keys:** `camber_front`, `camber_rear` — camber is the **tilt of the tire relative to the ground** (angle in the wheel plane), usually measured static at ride height; **roll in cornering** changes the tire’s **effective** angle to the road.
+**Keys:** `camber_front`, `camber_rear` — camber is the **tilt of the tire relative to the ground** (angle in the wheel plane), usually measured static at ride height; **roll in cornering** changes the tire’s **effective** angle to the road. **Camber in roll** (camber **gain** from **links** and **roll centre**—not the same as these static values) is in **`arm-angles-camber-gain.md`**.
 
 **Mechanics:** **More negative camber** (top of tire inward) can help the **outside tire in roll** stay in a slightly **negative camber** attitude so the **contact patch** can produce **more peak lateral force** in many conditions. **Tire construction** dominates how much camber is optimal; the **best** camber for **maximum** grip **varies a lot** by tire. **Generally**, more camber tends toward **more peak lateral grip** until you pass the tire’s **usable window**, then **grip can fall off sharply**. **Less camber** often gives **less peak lateral force** but a **more progressive** slip curve.
 
