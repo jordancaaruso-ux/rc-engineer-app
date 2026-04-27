@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
+import { JrcRaceEngineerLogo } from "@/components/brand/JrcRaceEngineerLogo";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -11,6 +12,7 @@ const navItems = [
   { href: "/runs/new", label: "Log your run" },
   { href: "/laps/import", label: "Lap-time import" },
   { href: "/runs/history", label: "Sessions" },
+  { href: "/teams", label: "Teams" },
   { href: "/videos/overlay", label: "Video analysis" },
   { href: "/setup", label: "Setup" },
   { href: "/events", label: "Events" },
@@ -53,10 +55,14 @@ export function Sidebar() {
     <>
       {/* Desktop sidebar (unchanged) */}
       <aside className="sidebar hidden md:flex">
-        <div className="flex items-center justify-between">
-          <div className="sidebar-logo">
-            <span className="text-primary">RC</span> Engineer
-          </div>
+        <div className="w-full min-w-0">
+          <Link
+            href="/"
+            className="sidebar-logo block w-full min-w-0 not-italic normal-case"
+            aria-label="JRC Race Engineer — home"
+          >
+            <JrcRaceEngineerLogo fullWidth />
+          </Link>
         </div>
 
         <nav className="sidebar-nav">
@@ -125,10 +131,15 @@ export function Sidebar() {
               aria-label="Navigation menu"
               className="absolute left-0 top-0 h-full w-72 max-w-[85vw] border-r border-border bg-secondary/95 backdrop-blur-md shadow-glow-sm overflow-y-auto"
             >
-              <div className="flex items-center justify-between px-4 py-4 border-b border-border">
-                <div className="sidebar-logo">
-                  <span className="text-primary">RC</span> Engineer
-                </div>
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
+                <Link
+                  href="/"
+                  className="sidebar-logo block min-w-0 flex-1 not-italic normal-case"
+                  onClick={() => setMobileOpen(false)}
+                  aria-label="JRC Race Engineer — home"
+                >
+                  <JrcRaceEngineerLogo fullWidth />
+                </Link>
                 <button
                   type="button"
                   aria-label="Close menu"

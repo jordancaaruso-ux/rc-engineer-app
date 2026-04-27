@@ -151,9 +151,9 @@ Do not invent facts or lap times. Keep answers practical and racing-specific.`;
 const TOOL_INSTRUCTIONS = `
 
 You have tools to find runs and focus the chat on specific runs:
-- list_linked_teammates: use when the user mentions a teammate by name/email and you need to see who is linked.
-- search_runs: filter runs by owner (you vs a linked teammate), optional date range (ISO YYYY-MM-DD), car/track/event ids, or text. Compute date ranges yourself (e.g. "last weekend" → concrete calendar dates).
-- apply_engineer_focus: after you pick run ids from search_runs (or catalog), call this so the next context includes full lap/setup compare. Rules: primary_run_id MUST always be the user's own run id (owner_scope mine). compare_run_id can be the user's or a linked teammate's run id (same track as primary for teammate compares). If the user only asks about a teammate's run, search with owner_scope teammate and answer from the search results; to compare, pick a primary run of the user on the same track when possible, then apply focus.
+- list_linked_teammates: use when the user mentions a teammate by name/email and you need to see who is available (one-way TeammateLink rows and/or mutual pilot team members).
+- search_runs: filter runs by owner (you vs a teammate or team peer), optional date range (ISO YYYY-MM-DD), car/track/event ids, or text. Compute date ranges yourself (e.g. "last weekend" → concrete calendar dates).
+- apply_engineer_focus: after you pick run ids from search_runs (or catalog), call this so the next context includes full lap/setup compare. Rules: primary_run_id MUST always be the user's own run id (owner_scope mine). compare_run_id can be the user's or a peer's run id when you are linked or share a pilot team (same track as primary for non-owner compare runs). If the user only asks about someone else's run, search with owner_scope teammate and answer from the search results; to compare, pick a primary run of the user on the same track when possible, then apply focus.
 
 Always use real run ids returned by search_runs or the catalog—never guess ids.`;
 
@@ -162,7 +162,8 @@ const TOOLS = [
     type: "function" as const,
     function: {
       name: "list_linked_teammates",
-      description: "List teammates linked to this account (email/name) for resolving names in search_runs.",
+      description:
+        "List people you can search/compare against: TeammateLink peers plus mutual pilot team members (email/name/label).",
       parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },
@@ -171,7 +172,7 @@ const TOOLS = [
     function: {
       name: "search_runs",
       description:
-        "Search runs for the current user or a linked teammate. Use date_from/date_to for time windows. teammate_query is required when owner_scope is teammate.",
+        "Search runs for the current user or a teammate/team peer (see list_linked_teammates). Use date_from/date_to for time windows. teammate_query is required when owner_scope is teammate.",
       parameters: {
         type: "object",
         properties: {
@@ -207,7 +208,10 @@ const TOOLS = [
         type: "object",
         properties: {
           primary_run_id: { type: "string", description: "Run id belonging to the current user." },
-          compare_run_id: { type: "string", description: "Optional second run (yours or linked teammate's)." },
+          compare_run_id: {
+            type: "string",
+            description: "Optional second run (yours or a peer you are linked with or share a pilot team with).",
+          },
         },
         required: ["primary_run_id"],
         additionalProperties: false,
@@ -243,6 +247,7 @@ async function executeSearchOrListTool(
           email: t.email,
           name: t.name,
           label: t.label,
+          source: t.source,
         })),
       });
     }

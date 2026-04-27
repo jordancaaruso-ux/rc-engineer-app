@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { listTeamPeerUserIds } from "@/lib/teamAccess";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -18,13 +19,32 @@ export async function GET() {
       peer: { select: { name: true, email: true } },
     },
   });
+  const linkedIds = new Set(links.map((l) => l.peerUserId));
+  const teamPeerIds = (await listTeamPeerUserIds(user.id)).filter((id) => !linkedIds.has(id));
+  const teamPeers =
+    teamPeerIds.length === 0
+      ? []
+      : await prisma.user.findMany({
+          where: { id: { in: teamPeerIds } },
+          select: { id: true, name: true, email: true },
+        });
   return NextResponse.json({
-    teammates: links.map((l) => ({
-      id: l.id,
-      peerUserId: l.peerUserId,
-      name: l.peer.name?.trim() || null,
-      email: l.peer.email?.trim() || null,
-    })),
+    teammates: [
+      ...links.map((l) => ({
+        id: l.id,
+        peerUserId: l.peerUserId,
+        name: l.peer.name?.trim() || null,
+        email: l.peer.email?.trim() || null,
+        source: "link" as const,
+      })),
+      ...teamPeers.map((p) => ({
+        id: `team:${p.id}`,
+        peerUserId: p.id,
+        name: p.name?.trim() || null,
+        email: p.email?.trim() || null,
+        source: "team" as const,
+      })),
+    ],
   });
 }
 

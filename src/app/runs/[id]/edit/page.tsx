@@ -72,6 +72,7 @@ export default async function EditRunPage({
       driverNotes: true,
       handlingProblems: true,
       suggestedChanges: true,
+      suggestedPreRun: true,
       handlingAssessmentJson: true,
       lapTimes: true,
       lapSession: true,
@@ -84,6 +85,7 @@ export default async function EditRunPage({
         },
       },
       loggingComplete: true,
+      shareWithTeam: true,
     },
   });
 
@@ -173,6 +175,7 @@ export default async function EditRunPage({
             driverNotes: run.driverNotes,
             handlingProblems: run.handlingProblems,
             suggestedChanges: run.suggestedChanges,
+            suggestedPreRun: run.suggestedPreRun,
             handlingAssessmentJson: run.handlingAssessmentJson,
             lapTimes: run.lapTimes,
             lapSession: run.lapSession,
@@ -187,6 +190,7 @@ export default async function EditRunPage({
               })),
             })),
             loggingComplete: run.loggingComplete,
+            shareWithTeam: run.shareWithTeam,
           }}
         />
       </section>

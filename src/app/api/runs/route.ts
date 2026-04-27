@@ -57,6 +57,8 @@ type RunUpsertBody = {
   driverNotes?: string | null;
   handlingProblems?: string | null;
   suggestedChanges?: string | null;
+  /** Pre–next-run reminders; same bullet format as `suggestedChanges`. */
+  suggestedPreRun?: string | null;
   sessionLabel?: string | null;
   /** Race class for this session (e.g. \"17.5 Stock\"); complements event.raceClass when set. */
   raceClass?: string | null;
@@ -83,6 +85,11 @@ type RunUpsertBody = {
   fromEventDetection?: boolean;
   /** Optional structured handling assessment (versioned JSON). */
   handlingAssessmentJson?: unknown;
+  /**
+   * When false, mutual team members will not see this run in team Sessions / team-only Engineer paths.
+   * TeammateLink peers are unaffected. Default true when omitted.
+   */
+  shareWithTeam?: boolean;
 };
 
 function prismaJsonFromHandlingBody(raw: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
@@ -99,6 +106,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
 
   const sessionCompletedAtResolved = await resolveRunSessionCompletedAtFromUpsertBody(params.userId, body);
   const loggingComplete = body.loggingIntent !== "draft";
+
+  const shareWithTeam = body.shareWithTeam === false ? false : true;
 
   const tireRunNumber =
     typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
@@ -292,11 +301,14 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         handlingProblems: null,
         handlingAssessmentJson: prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null),
         suggestedChanges: body.suggestedChanges?.trim() || null,
+        suggestedPreRun: body.suggestedPreRun?.trim() || null,
         sessionLabel: body.sessionLabel?.trim() || null,
         raceClass: body.raceClass?.trim() || null,
         practiceDayUrl: body.practiceDayUrl?.trim() || null,
         sessionCompletedAt: sessionCompletedAtResolved,
         loggingComplete,
+        loggingCompletedAt: loggingComplete ? new Date() : null,
+        shareWithTeam,
       } as PrismaTypes.RunUncheckedCreateInput,
       select: { id: true, createdAt: true },
     });
@@ -307,7 +319,12 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     }
     const existing = await prisma.run.findFirst({
       where: { id: runId, userId: params.userId },
-      select: { id: true, createdAt: true },
+      select: {
+        id: true,
+        createdAt: true,
+        loggingComplete: true,
+        loggingCompletedAt: true,
+      },
     });
     if (!existing) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -334,6 +351,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       avgTop5LapSeconds: lapSummary.avgTop5LapSeconds,
       notes: body.notes?.trim() || null,
       suggestedChanges: body.suggestedChanges?.trim() || null,
+      suggestedPreRun: body.suggestedPreRun?.trim() || null,
       sessionLabel: body.sessionLabel?.trim() || null,
       raceClass: body.raceClass?.trim() || null,
       practiceDayUrl: body.practiceDayUrl?.trim() || null,
@@ -343,8 +361,14 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       sessionCompletedAt: sessionCompletedAtResolved,
       loggingComplete,
     };
+    if (loggingComplete && existing.loggingComplete === false && existing.loggingCompletedAt == null) {
+      updateData.loggingCompletedAt = new Date();
+    }
     if ("handlingAssessmentJson" in body) {
       updateData.handlingAssessmentJson = prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null);
+    }
+    if (typeof body.shareWithTeam === "boolean") {
+      updateData.shareWithTeam = body.shareWithTeam;
     }
     run = await prisma.run.update({
       where: { id: existing.id },
@@ -421,6 +445,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     userId: params.userId,
     runId: run.id,
     suggestedChanges: body.suggestedChanges?.trim() || null,
+    suggestedPreRun: body.suggestedPreRun?.trim() || null,
   });
 
   const lapImportIds = Array.isArray(body.importedLapTimeSessionIds)

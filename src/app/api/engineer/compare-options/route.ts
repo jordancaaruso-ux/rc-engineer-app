@@ -5,7 +5,7 @@ import { buildEngineerCompareOptions } from "@/lib/engineerPhase5/engineerCompar
 
 export const dynamic = "force-dynamic";
 
-/** Run picker options for Engineer compare (mine + linked teammates). */
+/** Run picker options for Engineer compare (mine + linked teammates + mutual team peers). */
 export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });

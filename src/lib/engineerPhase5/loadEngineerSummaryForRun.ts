@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { buildEngineerRunSummary, type RunShapeForEngineer } from "@/lib/engineerPhase5/buildEngineerRunSummary";
 import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
-import { hasTeammateLink } from "@/lib/teammateRunAccess";
+import { canViewPeerRuns, isRunSharedWithTeam, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
 
 const runSelect = {
   id: true,
@@ -169,10 +169,11 @@ export async function getOrComputeEngineerSummaryForRun(
 const runSelectWithOwner = {
   ...runSelect,
   userId: true,
+  shareWithTeam: true,
 } as const;
 
 /**
- * Compare an explicit pair of runs (primary must be the viewer's; compare may be a linked teammate's).
+ * Compare an explicit pair of runs (primary must be the viewer's; compare may be a peer via TeammateLink or mutual team).
  * Does not persist to `Run.engineerSummaryJson` (pair selection is ephemeral in the UI).
  */
 export async function getOrComputeEngineerSummaryForRunPair(
@@ -195,8 +196,14 @@ export async function getOrComputeEngineerSummaryForRunPair(
   if (!compare) return null;
 
   if (compare.userId !== viewerUserId) {
-    const ok = await hasTeammateLink(viewerUserId, compare.userId);
+    const ok = await canViewPeerRuns(viewerUserId, compare.userId);
     if (!ok) return null;
+    if (
+      (await peerAccessIsTeamOnly(viewerUserId, compare.userId)) &&
+      !isRunSharedWithTeam(compare)
+    ) {
+      return null;
+    }
   }
 
   const { userId: _uid, ...compareForShape } = compare;

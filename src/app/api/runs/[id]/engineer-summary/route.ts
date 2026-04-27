@@ -25,7 +25,10 @@ export async function GET(req: Request, ctx: Ctx) {
     const pair = await getOrComputeEngineerSummaryForRunPair(user.id, id, compareRunId);
     if (!pair) {
       return NextResponse.json(
-        { error: "Runs not found or compare not allowed (teammate must be linked)." },
+        {
+          error:
+            "Runs not found or compare not allowed (peer must be a linked teammate or share a pilot team; same track as primary for non-owner compare).",
+        },
         { status: 404 }
       );
     }

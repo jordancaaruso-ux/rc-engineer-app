@@ -11,7 +11,13 @@ import { cn } from "@/lib/utils";
 
 type CarOpt = { id: string; name: string };
 type EventOpt = { id: string; name: string };
-type TeammateOpt = { id: string; peerUserId: string; name: string | null; email: string | null };
+type TeammateOpt = {
+  id: string;
+  peerUserId: string;
+  name: string | null;
+  email: string | null;
+  source?: "link" | "team";
+};
 
 function toPickerRuns(raw: unknown[]): RunPickerRun[] {
   return raw.map((r) => {
@@ -349,9 +355,9 @@ export function EngineerCompareAndPattern({
         <>
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Compare runs</div>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            Pick a primary run, then compare with another run (lap + setup diff when same car). For teammates: add them by
-            email, choose their car — only runs at the same track as your primary run are listed. Selection is stored in
-            the URL.
+            Pick a primary run, then compare with another run (lap + setup diff when same car). For others&apos; runs: add a
+            teammate by email or pick someone who appears from a pilot team; choose their car — only runs at the same
+            track as your primary run are listed. Selection is stored in the URL.
           </p>
         </>
       ) : (
@@ -509,8 +515,9 @@ export function EngineerCompareAndPattern({
                   >
                     <option value="">Select teammate…</option>
                     {teammates.map((t) => (
-                      <option key={t.peerUserId} value={t.peerUserId}>
+                      <option key={t.id} value={t.peerUserId}>
                         {t.name?.trim() || t.email || t.peerUserId.slice(0, 8)}
+                        {t.source === "team" ? " (team)" : ""}
                       </option>
                     ))}
                   </select>

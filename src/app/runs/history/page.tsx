@@ -14,11 +14,37 @@ import { compareRunTimestamp } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import Link from "next/link";
+import { assertUserInTeam, listTeamMemberUserIds, listTeamsForUser } from "@/lib/teamAccess";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-type RunInGroup = Awaited<ReturnType<typeof fetchRuns>>[number];
+const runHistoryInclude = {
+  car: { select: { id: true, name: true, setupSheetTemplate: true } },
+  track: { select: { id: true, name: true } },
+  tireSet: { select: { id: true, label: true, setNumber: true } },
+  event: { include: { track: { select: { name: true } } } },
+  setupSnapshot: { select: { id: true, data: true } },
+  importedLapSets: {
+    orderBy: { createdAt: "asc" as const },
+    select: {
+      id: true,
+      createdAt: true,
+      sessionCompletedAt: true,
+      sourceUrl: true,
+      driverId: true,
+      driverName: true,
+      displayName: true,
+      surname: true,
+      normalizedName: true,
+      isPrimaryUser: true,
+    },
+  },
+} satisfies Prisma.RunInclude;
+
+type RunInGroup = Prisma.RunGetPayload<{ include: typeof runHistoryInclude }>;
 
 function dateKey(d: Date): string {
   return new Date(d).toISOString().slice(0, 10);
@@ -36,36 +62,12 @@ function runSessionSortInstant(run: RunInGroup): Date {
   return Number.isNaN(d.getTime()) ? new Date(run.createdAt) : d;
 }
 
-async function fetchRuns(userId: string) {
+async function fetchRunHistoryRows(where: Prisma.RunWhereInput, take: number): Promise<RunInGroup[]> {
   return prisma.run.findMany({
-    where: { userId },
+    where,
     orderBy: { sortAt: "desc" },
-    take: 200,
-    include: {
-      car: { select: { id: true, name: true, setupSheetTemplate: true } },
-      track: { select: { id: true, name: true } },
-      tireSet: { select: { id: true, label: true, setNumber: true } },
-      event: { include: { track: { select: { name: true } } } },
-      setupSnapshot: { select: { id: true, data: true } },
-      // Nested laps are omitted here — they can be huge and are only needed when
-      // the user opens "Analyse lap times" on an expanded row. Loaded on demand via
-      // GET /api/runs/[id]/imported-lap-sets.
-      importedLapSets: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          createdAt: true,
-          sessionCompletedAt: true,
-          sourceUrl: true,
-          driverId: true,
-          driverName: true,
-          displayName: true,
-          surname: true,
-          normalizedName: true,
-          isPrimaryUser: true,
-        },
-      },
-    },
+    take,
+    include: runHistoryInclude,
   });
 }
 
@@ -138,9 +140,19 @@ export default async function RunHistoryPage({
   // `expandLatest=1` is set when the driver completes a run from the log
   // form. Pre-opens the most recent group so the just-completed run is
   // visible without an extra click.
-  searchParams?: Promise<{ expandLatest?: string | string[] }>;
+  // `focusRun=<runId>` opens the session group that contains the run and
+  // expands that row (e.g. from dashboard "Open run" / "Open analysis").
+  searchParams?: Promise<{
+    expandLatest?: string | string[];
+    focusRun?: string | string[];
+    teamId?: string | string[];
+  }>;
 }): Promise<ReactNode> {
   const resolvedSearch = (await searchParams) ?? {};
+  const rawTeam = resolvedSearch.teamId;
+  const teamIdParam = Array.isArray(rawTeam) ? rawTeam[0] : rawTeam;
+  const teamId =
+    typeof teamIdParam === "string" && teamIdParam.trim() ? teamIdParam.trim() : null;
   const rawExpand = resolvedSearch.expandLatest;
   const expandLatest =
     (Array.isArray(rawExpand) ? rawExpand[0] : rawExpand) === "1";
@@ -163,31 +175,133 @@ export default async function RunHistoryPage({
   }
 
   const user = await requireCurrentUser();
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
   const userDisplayName = await getMyNameSetting(user.id);
-  const runs = await fetchRuns(user.id);
+  const teamsForUser = await listTeamsForUser(user.id);
+
+  let runs: RunInGroup[] = [];
+  let teamTitle: string | null = null;
+  let memberDisplayByUserId: Record<string, string> = {};
+  let teamAccessDenied = false;
+
+  if (teamId) {
+    const allowed = await assertUserInTeam(teamId, user.id);
+    if (!allowed) {
+      teamAccessDenied = true;
+    } else {
+      const teamRow = await prisma.team.findFirst({
+        where: { id: teamId },
+        select: { name: true },
+      });
+      teamTitle = teamRow?.name ?? "Team";
+      const memberIds = await listTeamMemberUserIds(teamId);
+      const take = Math.min(600, Math.max(200, 200 * memberIds.length));
+      runs = await fetchRunHistoryRows(
+        { userId: { in: memberIds }, shareWithTeam: true },
+        take
+      );
+      const members = await prisma.user.findMany({
+        where: { id: { in: memberIds } },
+        select: { id: true, name: true, email: true },
+      });
+      memberDisplayByUserId = Object.fromEntries(
+        members.map((m) => {
+          const base = m.name?.trim() || m.email?.trim() || m.id.slice(0, 8);
+          return [m.id, m.id === user.id ? `You (${base})` : base] as const;
+        })
+      );
+    }
+  } else {
+    runs = await fetchRunHistoryRows({ userId: user.id }, 200);
+  }
+
   const groups = buildGroups(runs);
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
-  const initialTargetId = allRunsDescending[0]?.id ?? null;
+  const rawFocus = resolvedSearch.focusRun;
+  const focusRunRaw = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;
+  const focusRunParam =
+    typeof focusRunRaw === "string" && focusRunRaw.trim() ? focusRunRaw.trim() : null;
+  const focusRunId =
+    focusRunParam && runs.some((r) => r.id === focusRunParam) ? focusRunParam : null;
+  const focusGroupIndex =
+    focusRunId == null ? -1 : groups.findIndex((g) => g.runs.some((r) => r.id === focusRunId));
+  const pagerInitial =
+    focusGroupIndex >= 0 ? Math.max(8, focusGroupIndex + 1) : 8;
+  const initialTargetId = focusRunId ?? allRunsDescending[0]?.id ?? null;
   const initialCompareId =
-    allRunsDescending.length >= 2 ? allRunsDescending[1]?.id ?? null : null;
+    allRunsDescending.find((r) => r.id !== initialTargetId)?.id ?? null;
   const runLabels: Record<string, string> = {};
   for (const r of runs) {
     const car = r.car?.name ?? r.carNameSnapshot ?? "Car";
-    const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(r));
-    runLabels[r.id] = `${car} · ${when}`;
+    const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(r), displayTimeZone);
+    const ownerBit =
+      teamId && r.userId && memberDisplayByUserId[r.userId]
+        ? `${memberDisplayByUserId[r.userId]} · `
+        : "";
+    runLabels[r.id] = `${ownerBit}${car} · ${when}`;
+  }
+
+  const teamMode = Boolean(teamId && !teamAccessDenied);
+  const pageTitle = teamAccessDenied ? "Sessions" : teamMode ? `Team — ${teamTitle}` : "Sessions";
+  const pageSubtitle = teamAccessDenied
+    ? "That team was not found or you are not a member."
+    : teamMode
+      ? "Runs from everyone in this team (mutual pilot). Reordering is disabled; open a member’s run read-only."
+      : "Review runs and compare to your working setup or another run. Load past setups from Log your run.";
+
+  if (teamAccessDenied) {
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <h1 className="page-title">{pageTitle}</h1>
+            <p className="page-subtitle">{pageSubtitle}</p>
+          </div>
+        </header>
+        <section className="page-body space-y-3">
+          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+            <Link href="/runs/history" className="text-accent underline">
+              Back to my sessions
+            </Link>
+          </div>
+        </section>
+      </>
+    );
   }
 
   return (
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">Sessions</h1>
-          <p className="page-subtitle">
-            Review runs and compare to your working setup or another run. Load past setups from Log your run.
-          </p>
+          <h1 className="page-title">{pageTitle}</h1>
+          <p className="page-subtitle">{pageSubtitle}</p>
         </div>
       </header>
       <section className="page-body space-y-3">
+        {teamsForUser.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground/80">View:</span>
+            <Link
+              href="/runs/history"
+              className={!teamMode ? "font-semibold text-foreground underline" : "hover:text-foreground underline-offset-2 hover:underline"}
+            >
+              My sessions
+            </Link>
+            {teamsForUser.map((t) => (
+              <Link
+                key={t.id}
+                href={`/runs/history?teamId=${encodeURIComponent(t.id)}`}
+                className={
+                  teamId === t.id
+                    ? "font-semibold text-foreground underline"
+                    : "hover:text-foreground underline-offset-2 hover:underline"
+                }
+              >
+                {t.name}
+              </Link>
+            ))}
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/runs/new"
@@ -203,7 +317,13 @@ export default async function RunHistoryPage({
         </div>
         {groups.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-            No runs yet. <Link href="/runs/new" className="text-accent underline">Create your first run</Link>.
+            {teamMode ? (
+              <>No runs from team members yet.</>
+            ) : (
+              <>
+                No runs yet. <Link href="/runs/new" className="text-accent underline">Create your first run</Link>.
+              </>
+            )}
           </div>
         ) : (
           <AnalysisCompareProvider
@@ -215,12 +335,16 @@ export default async function RunHistoryPage({
           >
             <AnalysisCompareBar />
             <div className="space-y-2">
-              <SessionGroupsPager initial={8} step={12}>
+              <SessionGroupsPager initial={pagerInitial} step={12}>
                 {groups.map((group, idx) => (
                 <details
                   key={group.id}
                   className="rounded-lg border border-border bg-muted/50 overflow-hidden group/details"
-                  open={expandLatest && idx === 0}
+                  open={
+                    focusRunId
+                      ? group.runs.some((r) => r.id === focusRunId)
+                      : expandLatest && idx === 0
+                  }
                 >
                   <summary className="list-none cursor-pointer">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
@@ -242,7 +366,10 @@ export default async function RunHistoryPage({
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border bg-muted/70 text-left text-xs font-medium text-muted-foreground">
-                            <th className="w-6 px-1 py-2" aria-label="Drag to reorder" />
+                            {!teamMode ? (
+                              <th className="w-6 px-1 py-2" aria-label="Drag to reorder" />
+                            ) : null}
+                            {teamMode ? <th className="px-3 py-2">Member</th> : null}
                             <th className="px-4 py-2">Date</th>
                             <th className="px-4 py-2">Car</th>
                             <th className="px-4 py-2">Track</th>
@@ -258,9 +385,19 @@ export default async function RunHistoryPage({
                           <RunHistoryTable
                             runs={group.runs}
                             allRunsDescending={allRunsDescending.map(toCompareRunShape)}
+                            runListSource={teamMode ? "team_runs" : "my_runs"}
                             userDisplayName={userDisplayName}
+                            displayTimeZone={displayTimeZone}
                             showComparePairColumn
-                            enableReorder
+                            enableReorder={!teamMode}
+                            viewerUserId={teamMode ? user.id : null}
+                            memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
+                            showMemberColumn={teamMode}
+                            initialExpandedRunId={
+                              focusRunId && group.runs.some((r) => r.id === focusRunId)
+                                ? focusRunId
+                                : null
+                            }
                           />
                         </tbody>
                       </table>

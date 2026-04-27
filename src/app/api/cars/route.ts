@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { hasTeammateLink } from "@/lib/teammateRunAccess";
+import { canViewPeerRuns } from "@/lib/teammateRunAccess";
 import { SETUP_SHEET_TEMPLATE_A800RR, canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
 export async function GET(request: Request) {
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
   const targetUserId = forUserId && forUserId !== user.id ? forUserId : user.id;
   if (targetUserId !== user.id) {
-    const ok = await hasTeammateLink(user.id, targetUserId);
+    const ok = await canViewPeerRuns(user.id, targetUserId);
     if (!ok) {
       return NextResponse.json({ error: "Not allowed to list this user’s cars" }, { status: 403 });
     }

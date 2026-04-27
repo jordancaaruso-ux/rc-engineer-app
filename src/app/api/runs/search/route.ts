@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { hasTeammateLink } from "@/lib/teammateRunAccess";
+import { canViewPeerRuns, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
 
 /** Filtered runs for Engineer compare pickers + search (same shape as for-picker). */
 export async function GET(request: Request) {
@@ -23,16 +23,19 @@ export async function GET(request: Request) {
   const take = Math.min(300, Math.max(1, Number(searchParams.get("take")) || 200));
 
   let runOwnerId = user.id;
+  let teamOnlyPeer = false;
   if (forUserIdRaw && forUserIdRaw !== user.id) {
-    const ok = await hasTeammateLink(user.id, forUserIdRaw);
+    const ok = await canViewPeerRuns(user.id, forUserIdRaw);
     if (!ok) {
       return NextResponse.json({ error: "Not allowed to list this user’s runs" }, { status: 403 });
     }
     runOwnerId = forUserIdRaw;
+    teamOnlyPeer = await peerAccessIsTeamOnly(user.id, forUserIdRaw);
   }
 
   const where: NonNullable<Parameters<typeof prisma.run.findMany>[0]>["where"] = {
     userId: runOwnerId,
+    ...(teamOnlyPeer ? { shareWithTeam: true } : {}),
   };
   if (carId) where.carId = carId;
   if (eventId) where.eventId = eventId;
@@ -46,6 +49,7 @@ export async function GET(request: Request) {
       id: true,
       createdAt: true,
       sessionCompletedAt: true,
+      loggingCompletedAt: true,
       sortAt: true,
       sessionLabel: true,
       sessionType: true,
@@ -76,6 +80,7 @@ export async function GET(request: Request) {
       const t = resolveRunDisplayInstant({
         createdAt: r.createdAt,
         sessionCompletedAt: r.sessionCompletedAt,
+        loggingCompletedAt: r.loggingCompletedAt,
         sortAt: r.sortAt,
       }).getTime();
       const d = new Date(t);

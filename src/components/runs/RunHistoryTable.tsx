@@ -16,6 +16,7 @@ import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-she
 import {
   getAverageTopN,
   getBestLap,
+  formatConsistencyScorePercent,
   getIncludedLapDashboardMetrics,
   primaryLapRowsFromRun,
 } from "@/lib/lapAnalysis";
@@ -33,8 +34,12 @@ import { RelativeTime } from "@/components/ui/RelativeTime";
 
 type Run = {
   id: string;
+  /** Present on SSR lists; used for team Sessions attribution. */
+  userId?: string | null;
   createdAt: Date | string;
   sessionCompletedAt?: Date | string | null;
+  /** First save with logging complete; see resolveRunDisplayInstant. */
+  loggingCompletedAt?: Date | string | null;
   /**
    * Stable ordering axis. Stamped once on create; only changes when the user
    * explicitly drags a run to a new position in this table. Reading it here
@@ -187,12 +192,19 @@ export function RunHistoryTable({
   userDisplayName,
   showComparePairColumn = false,
   enableReorder = false,
+  initialExpandedRunId = null,
+  displayTimeZone,
+  viewerUserId = null,
+  memberDisplayByUserId,
+  showMemberColumn = false,
 }: {
   runs: Run[];
   allRunsDescending: CompareRunShape[];
   runListSource?: RunCompareListSource;
   /** User / driver name for primary lap column ("Me" if unset). */
   userDisplayName?: string | null;
+  /** IANA zone for SSR run timestamps (from rc_tz cookie); matches device after cookie is set. */
+  displayTimeZone?: string | null;
   /** Analysis page: target / comparison selection column (requires AnalysisCompareProvider). */
   showComparePairColumn?: boolean;
   /**
@@ -203,9 +215,19 @@ export function RunHistoryTable({
    * reason about and avoids accidental reshuffles.
    */
   enableReorder?: boolean;
+  /** When set (e.g. `?focusRun=` deep link), start with this row expanded if it is in `runs`. */
+  initialExpandedRunId?: string | null;
+  /** Current user; with `memberDisplayByUserId`, attributes rows and hides peer edit/delete. */
+  viewerUserId?: string | null;
+  /** `userId` → display label for team Sessions (`?teamId=`). */
+  memberDisplayByUserId?: Record<string, string>;
+  showMemberColumn?: boolean;
 }) {
   const router = useRouter();
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(() => {
+    if (!initialExpandedRunId) return null;
+    return runs.some((r) => r.id === initialExpandedRunId) ? initialExpandedRunId : null;
+  });
   const [setupModalRunId, setSetupModalRunId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<
@@ -220,6 +242,7 @@ export function RunHistoryTable({
 
   const totalCols =
     (enableReorder ? 1 : 0) /* drag handle */ +
+    (showMemberColumn ? 1 : 0) +
     1 /* date */ + 1 + 1 + 1 + 1 + 1 + 1 /* session */ + 1 /* setup */ + (showComparePairColumn ? 1 : 0);
 
   async function commitReorder(draggedId: string, targetId: string, edge: "above" | "below") {
@@ -275,6 +298,17 @@ export function RunHistoryTable({
       ) : null}
       {runs.map((run) => {
         const isExpanded = expandedId === run.id;
+        const memberLabel =
+          showMemberColumn && run.userId
+            ? memberDisplayByUserId?.[run.userId] ?? "—"
+            : null;
+        const lapColumnDriverName =
+          viewerUserId && run.userId && memberDisplayByUserId
+            ? run.userId === viewerUserId
+              ? userDisplayName
+              : memberDisplayByUserId[run.userId] ?? null
+            : userDisplayName;
+        const allowRunMutations = !viewerUserId || !run.userId || run.userId === viewerUserId;
         const carDisplay = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
         const trackDisplay = run.track?.name ?? run.trackNameSnapshot ?? "—";
         const tiresDisplay = run.tireSet
@@ -373,10 +407,18 @@ export function RunHistoryTable({
                   <span className="inline-block cursor-grab select-none text-sm leading-none">⋮⋮</span>
                 </td>
               ) : null}
+              {showMemberColumn ? (
+                <td className="px-3 py-2 text-xs text-muted-foreground max-w-[10rem] truncate" title={memberLabel ?? ""}>
+                  {memberLabel}
+                </td>
+              ) : null}
               <td className="px-4 py-2">
                 <RelativeTime
                   iso={resolveRunDisplayInstant(run)}
-                  fallback={formatRunCreatedAtDateTime(resolveRunDisplayInstant(run))}
+                  fallback={formatRunCreatedAtDateTime(
+                    resolveRunDisplayInstant(run),
+                    displayTimeZone
+                  )}
                   display="combo"
                 />
               </td>
@@ -429,7 +471,9 @@ export function RunHistoryTable({
                     run={run}
                     pickerRuns={allRunsDescending}
                     runListSource={runListSource}
-                    userDisplayName={userDisplayName}
+                    userDisplayName={lapColumnDriverName}
+                    displayTimeZone={displayTimeZone}
+                    allowRunMutations={allowRunMutations}
                   />
                 </td>
               </tr>
@@ -457,11 +501,16 @@ function RunDetail({
   pickerRuns,
   runListSource,
   userDisplayName,
+  displayTimeZone,
+  allowRunMutations = true,
 }: {
   run: Run;
   pickerRuns: CompareRunShape[];
   runListSource: RunCompareListSource;
   userDisplayName?: string | null;
+  displayTimeZone?: string | null;
+  /** False for another member's run on team Sessions (read-only). */
+  allowRunMutations?: boolean;
 }) {
   const router = useRouter();
   const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
@@ -533,7 +582,7 @@ function RunDetail({
 
   async function handleDeleteRun() {
     if (deleting) return;
-    const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run));
+    const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run), displayTimeZone);
     const carLabel = run.car?.name ?? run.carNameSnapshot ?? "this run";
     const ok = window.confirm(
       `Delete ${carLabel} run from ${when}?\n\nThis removes the run and its lap data. Setup snapshots are kept.`
@@ -666,7 +715,7 @@ function RunDetail({
             <CompactField label="Date / time">
               <RelativeTime
                 iso={resolveRunDisplayInstant(run)}
-                fallback={formatRunCreatedAtDateTime(resolveRunDisplayInstant(run))}
+                fallback={formatRunCreatedAtDateTime(resolveRunDisplayInstant(run), displayTimeZone)}
                 display="combo"
               />
             </CompactField>
@@ -713,7 +762,9 @@ function RunDetail({
                 label="Consistency"
                 title="100 − CV; higher = more consistent laps"
                 value={
-                  lapDash.consistencyScore != null ? `${lapDash.consistencyScore.toFixed(1)}%` : "—"
+                  lapDash.consistencyScore != null
+                    ? formatConsistencyScorePercent(lapDash.consistencyScore)
+                    : "—"
                 }
               />
             </div>
@@ -781,13 +832,15 @@ function RunDetail({
             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lap analysis</h3>
             <p className="text-[11px] text-muted-foreground">{uploadedLapSetsLine}</p>
           </div>
-          <Link
-            href={`/runs/${encodeURIComponent(run.id)}/edit`}
-            className={cn(analyseActionButtonClass, "no-underline")}
-            onClick={(e) => e.stopPropagation()}
-          >
-            Edit run
-          </Link>
+          {allowRunMutations ? (
+            <Link
+              href={`/runs/${encodeURIComponent(run.id)}/edit`}
+              className={cn(analyseActionButtonClass, "no-underline")}
+              onClick={(e) => e.stopPropagation()}
+            >
+              Edit run
+            </Link>
+          ) : null}
           <button
             type="button"
             onClick={() => setShowLapAnalysis((v) => !v)}
@@ -848,15 +901,17 @@ function RunDetail({
           >
             Analyse setup
           </Link>
-          <button
-            type="button"
-            onClick={handleDeleteRun}
-            disabled={deleting}
-            className="ml-auto rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-[11px] font-medium text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
-            title="Permanently delete this run"
-          >
-            {deleting ? "Deleting…" : "Delete run"}
-          </button>
+          {allowRunMutations ? (
+            <button
+              type="button"
+              onClick={handleDeleteRun}
+              disabled={deleting}
+              className="ml-auto rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-[11px] font-medium text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
+              title="Permanently delete this run"
+            >
+              {deleting ? "Deleting…" : "Delete run"}
+            </button>
+          ) : null}
         </div>
         {deleteError ? (
           <p className="text-[11px] text-destructive">{deleteError}</p>

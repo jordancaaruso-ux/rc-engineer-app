@@ -15,6 +15,7 @@ import { buildSetupDiffRows, normalizeSetupData } from "@/lib/setupDiff";
 import { displayRunNotesTextOnly } from "@/lib/runNotes";
 import { formatHandlingAssessmentForEngineer } from "@/lib/runHandlingAssessment";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
+import { canViewPeerRuns, isRunSharedWithTeam, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
 import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
 import {
   buildRcEffectHintsFromChangedRows,
@@ -87,6 +88,7 @@ export type EngineerContextPacketV1 = {
     };
   };
   thingsToTry: Array<{ id: string; text: string }>;
+  thingsToDo: Array<{ id: string; text: string }>;
 };
 
 type LapSummary = {
@@ -127,12 +129,20 @@ function deltaDirection(delta: number | null): "improved" | "regressed" | "flat"
  * - does not include raw lap-by-lap tables
  */
 export async function buildEngineerContextPacketV1(userId: string): Promise<EngineerContextPacketV1> {
-  const thingsToTry = await prisma.actionItem.findMany({
-    where: { userId, isArchived: false },
-    orderBy: { createdAt: "desc" },
-    take: 25,
-    select: { id: true, text: true },
-  });
+  const [thingsToTry, thingsToDo] = await Promise.all([
+    prisma.actionItem.findMany({
+      where: { userId, isArchived: false, listKind: "THINGS_TO_TRY" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      take: 25,
+      select: { id: true, text: true },
+    }),
+    prisma.actionItem.findMany({
+      where: { userId, isArchived: false, listKind: "THINGS_TO_DO" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      take: 25,
+      select: { id: true, text: true },
+    }),
+  ]);
 
   const latest = await prisma.run.findFirst({
     where: { userId },
@@ -169,6 +179,7 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
       previousRun: null,
       comparison: null,
       thingsToTry: thingsToTry.map((t) => ({ id: t.id, text: t.text })),
+      thingsToDo: thingsToDo.map((t) => ({ id: t.id, text: t.text })),
     };
   }
 
@@ -280,6 +291,7 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
         }
       : null,
     thingsToTry: thingsToTry.map((t) => ({ id: t.id, text: t.text })),
+    thingsToDo: thingsToDo.map((t) => ({ id: t.id, text: t.text })),
   };
 }
 
@@ -522,15 +534,18 @@ async function loadCompareRunForFocusedContext(
 
   const other = await prisma.run.findFirst({
     where: { id: cid },
-    select: { userId: true, trackId: true },
+    select: { userId: true, trackId: true, shareWithTeam: true },
   });
   if (!other) return null;
 
-  const link = await prisma.teammateLink.findFirst({
-    where: { userId: viewerId, peerUserId: other.userId },
-    select: { id: true },
-  });
-  if (!link) return null;
+  const allowed = await canViewPeerRuns(viewerId, other.userId);
+  if (!allowed) return null;
+  if (
+    (await peerAccessIsTeamOnly(viewerId, other.userId)) &&
+    !isRunSharedWithTeam(other)
+  ) {
+    return null;
+  }
   if (!primaryTrackId || !other.trackId || primaryTrackId !== other.trackId) return null;
 
   return prisma.run.findFirst({
@@ -541,7 +556,8 @@ async function loadCompareRunForFocusedContext(
 
 /**
  * Deterministic context for comparing two user runs (any date). Setup diff only when same `carId`.
- * Compare run may be the viewer's or a teammate's (requires TeammateLink + same track as primary).
+ * Compare run may be the viewer's or a peer's (TeammateLink **or** mutual Team membership).
+ * Same-track rule: compare run must match primary's track (keeps setup diff and lap compare meaningful).
  */
 export async function buildFocusedRunPairContext(
   userId: string,

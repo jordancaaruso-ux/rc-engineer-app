@@ -5,7 +5,8 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { getIncludedLapDashboardMetrics, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
-import { hasTeammateLink } from "@/lib/teammateRunAccess";
+import { canViewPeerRuns, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
+import { listTeamPeerUserIds } from "@/lib/teamAccess";
 import { buildFocusedRunPairContext } from "@/lib/engineerPhase5/contextPacket";
 import { formatLocalCalendarDate } from "@/lib/engineerPhase5/localCalendarInTimeZone";
 
@@ -14,6 +15,8 @@ export type LinkedTeammateRow = {
   email: string | null;
   name: string | null;
   label: string;
+  /** `link` = one-way TeammateLink; `team` = mutual team only (no link row). */
+  source: "link" | "team";
 };
 
 export async function listLinkedTeammatesForEngineer(viewingUserId: string): Promise<LinkedTeammateRow[]> {
@@ -24,12 +27,26 @@ export async function listLinkedTeammatesForEngineer(viewingUserId: string): Pro
       peer: { select: { email: true, name: true } },
     },
   });
-  return links.map((l) => {
+  const fromLinks: LinkedTeammateRow[] = links.map((l) => {
     const email = l.peer.email ?? null;
     const name = l.peer.name ?? null;
     const label = name?.trim() || email?.trim() || l.peerUserId.slice(0, 8);
-    return { peerUserId: l.peerUserId, email, name, label };
+    return { peerUserId: l.peerUserId, email, name, label, source: "link" as const };
   });
+  const linkedIds = new Set(fromLinks.map((r) => r.peerUserId));
+  const teamPeerIds = (await listTeamPeerUserIds(viewingUserId)).filter((id) => !linkedIds.has(id));
+  if (teamPeerIds.length === 0) return fromLinks;
+  const extraUsers = await prisma.user.findMany({
+    where: { id: { in: teamPeerIds } },
+    select: { id: true, email: true, name: true },
+  });
+  const fromTeam: LinkedTeammateRow[] = extraUsers.map((u) => {
+    const email = u.email ?? null;
+    const name = u.name ?? null;
+    const label = `${name?.trim() || email?.trim() || u.id.slice(0, 8)} (team)`;
+    return { peerUserId: u.id, email, name, label, source: "team" as const };
+  });
+  return [...fromLinks, ...fromTeam];
 }
 
 /** Resolve "bob" / partial email to a single linked peer, or null if ambiguous / none. */
@@ -40,7 +57,13 @@ export async function resolveTeammatePeerUserId(
   const q = query.trim().toLowerCase();
   if (!q) return { ok: false, error: "Empty teammate query." };
   const all = await listLinkedTeammatesForEngineer(viewingUserId);
-  if (all.length === 0) return { ok: false, error: "No linked teammates. Add one on the Engineer compare section." };
+  if (all.length === 0) {
+    return {
+      ok: false,
+      error:
+        "No teammates available (add a linked teammate on the Engineer compare section, or join a pilot team).",
+    };
+  }
 
   const scored = all
     .map((t) => {
@@ -58,7 +81,7 @@ export async function resolveTeammatePeerUserId(
     .sort((a, b) => b.score - a.score);
 
   if (scored.length === 0) {
-    return { ok: false, error: `No linked teammate matched "${query}".`, candidates: all };
+    return { ok: false, error: `No teammate matched "${query}".`, candidates: all };
   }
   if (scored.length > 1 && scored[0]!.score === scored[1]!.score && scored[0]!.score < 90) {
     return {
@@ -109,6 +132,7 @@ export async function searchRunsForEngineerTool(
   const maxResults = Math.min(40, Math.max(1, raw.max_results ?? 25));
   let runOwnerId = viewingUserId;
   let teammateLabel: string | null = null;
+  let filterTeamOnlySharing = false;
 
   if (raw.owner_scope === "teammate") {
     const tq = raw.teammate_query?.trim();
@@ -117,14 +141,16 @@ export async function searchRunsForEngineerTool(
     }
     const resolved = await resolveTeammatePeerUserId(viewingUserId, tq);
     if (!resolved.ok) return { ok: false, error: resolved.error };
-    const allowed = await hasTeammateLink(viewingUserId, resolved.peer.peerUserId);
-    if (!allowed) return { ok: false, error: "Not allowed to view that teammate's runs." };
+    const allowed = await canViewPeerRuns(viewingUserId, resolved.peer.peerUserId);
+    if (!allowed) return { ok: false, error: "Not allowed to view that peer's runs." };
     runOwnerId = resolved.peer.peerUserId;
     teammateLabel = resolved.peer.label;
+    filterTeamOnlySharing = await peerAccessIsTeamOnly(viewingUserId, resolved.peer.peerUserId);
   }
 
   const where: NonNullable<Parameters<typeof prisma.run.findMany>[0]>["where"] = {
     userId: runOwnerId,
+    ...(filterTeamOnlySharing ? { shareWithTeam: true } : {}),
   };
   if (raw.car_id?.trim()) where.carId = raw.car_id.trim();
   if (raw.event_id?.trim()) where.eventId = raw.event_id.trim();
@@ -269,7 +295,7 @@ export async function applyEngineerFocusTool(
     return {
       ok: false,
       error:
-        "Compare run not found or not allowed. For teammate runs, primary must share the same track as the teammate compare run and you must be linked.",
+        "Compare run not found or not allowed. For a peer's run, primary must share the same track as the compare run and you must be linked or share a pilot team.",
     };
   }
 

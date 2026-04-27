@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
@@ -59,6 +60,10 @@ type EventOption = {
   startDate: string;
   endDate: string;
   notes?: string | null;
+  /** LiveRC practice day list URL (optional). */
+  practiceSourceUrl?: string | null;
+  /** LiveRC results / race timing page URL (optional). */
+  resultsSourceUrl?: string | null;
   track?: { id: string; name: string; location?: string | null } | null;
 };
 
@@ -88,6 +93,7 @@ type LastRun = {
   driverNotes?: string | null;
   handlingProblems?: string | null;
   suggestedChanges?: string | null;
+  suggestedPreRun?: string | null;
   handlingAssessmentJson?: unknown;
   /** Session race class when not only from event (e.g. practice). */
   raceClass?: string | null;
@@ -107,6 +113,8 @@ type LastRun = {
    * post-run section when the form is opened to edit an existing run.
    */
   loggingComplete?: boolean;
+  /** When false, mutual team members do not see this run in team Sessions / team-only Engineer lists. */
+  shareWithTeam?: boolean;
 };
 
 type DownloadedSetupOption = {
@@ -202,7 +210,7 @@ export function NewRunForm(props: {
   focusSection?: "setup" | null;
 }) {
   const router = useRouter();
-  const cars = props.cars;
+  const [carsList, setCarsList] = useState<CarOption[]>(props.cars);
   const tracks = props.tracks;
   const favouriteTrackIds = props.favouriteTrackIds ?? [];
   const favouriteTracks = props.favouriteTracks ?? [];
@@ -213,14 +221,13 @@ export function NewRunForm(props: {
   const [meetingSessionType, setMeetingSessionType] = useState<MeetingSessionType>("PRACTICE");
   const [meetingSessionCustom, setMeetingSessionCustom] = useState<string>(""); // when type is OTHER
   /**
-   * Practice-day results URL that persists across runs for this driver. The form
-   * hydrates this from (in priority order) editRun → copy-last-run source →
-   * `currentPracticeDayUrl` user setting, and sends it up with the save payload
-   * so we can recall it later for the Lap Times URL picker. The input is only
-   * visible under TESTING sessions — RACE_MEETING has its own event wiring.
+   * Practice-day results URL (LiveRC session list). Hydrates from editRun →
+   * copy-last-run → event `practiceSourceUrl` when empty → `currentPracticeDayUrl`
+   * (testing only). Shown for both Testing and Race meeting; saved on the run.
+   * Testing-only: also POSTs to Settings `currentPracticeDayUrl` on save.
    */
   const [practiceDayUrl, setPracticeDayUrl] = useState<string>("");
-  const [carId, setCarId] = useState<string>(cars[0]?.id ?? "");
+  const [carId, setCarId] = useState<string>(props.cars[0]?.id ?? "");
   const [tracksList, setTracksList] = useState<TrackOption[]>(tracks);
   const [trackId, setTrackId] = useState<string>("");
   const [tireSets, setTireSets] = useState<TireSetOption[]>([]);
@@ -237,6 +244,11 @@ export function NewRunForm(props: {
   const [newEventTrackId, setNewEventTrackId] = useState<string>("");
   const [newEventStartDate, setNewEventStartDate] = useState("");
   const [newEventEndDate, setNewEventEndDate] = useState("");
+  const [newEventPracticeUrl, setNewEventPracticeUrl] = useState("");
+  const [newEventResultsUrl, setNewEventResultsUrl] = useState("");
+  /** When logging a race meeting, timing URLs (stored on the Event; edited here, PATCH on save). */
+  const [eventPracticeTimingUrl, setEventPracticeTimingUrl] = useState("");
+  const [eventRaceTimingUrl, setEventRaceTimingUrl] = useState("");
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
   const [eventTrackSwitchPrompt, setEventTrackSwitchPrompt] = useState<{
@@ -244,12 +256,6 @@ export function NewRunForm(props: {
     eventTrackId: string;
     eventTrackName: string;
   } | null>(null);
-
-  const [showAddTrack, setShowAddTrack] = useState(false);
-  const [newTrackName, setNewTrackName] = useState("");
-  const [newTrackLocation, setNewTrackLocation] = useState("");
-  const [addingTrack, setAddingTrack] = useState(false);
-  const [trackSearch, setTrackSearch] = useState("");
 
   const [replicateLast, setReplicateLast] = useState(false);
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
@@ -272,13 +278,14 @@ export function NewRunForm(props: {
   const [notes, setNotes] = useState("");
   const [raceClass, setRaceClass] = useState("");
   const [suggestedChanges, setSuggestedChanges] = useState("");
+  const [suggestedPreRun, setSuggestedPreRun] = useState("");
   const [setupChangesText, setSetupChangesText] = useState("");
   const [setupChangesBusy, setSetupChangesBusy] = useState(false);
   const [setupChangesError, setSetupChangesError] = useState<string | null>(null);
   const [setupChangesProposal, setSetupChangesProposal] = useState<
     Array<{ fieldKey: string; fieldLabel: string; fromValue: string; toValue: string; confidence: "low" | "medium" | "high"; note?: string | null }>
   >([]);
-  const [notesSubTab, setNotesSubTab] = useState<"notes" | "things">("notes");
+  const [notesSubTab, setNotesSubTab] = useState<"notes" | "things" | "todo">("notes");
   const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
   const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("car");
@@ -286,8 +293,11 @@ export function NewRunForm(props: {
   const [trackLayoutTags, setTrackLayoutTags] = useState<string[]>([]);
   const thingsTryRef = useRef<HTMLTextAreaElement>(null);
   const thingsTryCursorRef = useRef<number | null>(null);
+  const thingsDoRef = useRef<HTMLTextAreaElement>(null);
+  const thingsDoCursorRef = useRef<number | null>(null);
   /** True after user edits “Things to try”; avoids syncing (or wiping) on initial API hydrate. */
   const thingsToTryDirtyRef = useRef(false);
+  const thingsToDoDirtyRef = useRef(false);
 
   const [showNewTireSetPanel, setShowNewTireSetPanel] = useState(false);
   const [creatingTireSet, setCreatingTireSet] = useState(false);
@@ -301,6 +311,7 @@ export function NewRunForm(props: {
   const [newBatteryPackNumber, setNewBatteryPackNumber] = useState<number>(1);
   const [newBatteryInitialRunCount, setNewBatteryInitialRunCount] = useState<number>(0);
 
+  const [shareWithTeam, setShareWithTeam] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -313,7 +324,7 @@ export function NewRunForm(props: {
   const [pickerRuns, setPickerRuns] = useState<RunPickerRun[]>([]);
   const [loadSetupSelection, setLoadSetupSelection] = useState("");
   const [loadOtherSetupSelection, setLoadOtherSetupSelection] = useState("");
-  const [setupSource, setSetupSource] = useState<"previous_runs" | "other">("previous_runs");
+  const [setupSource, setSetupSource] = useState<"previous_runs" | "other" | "new">("previous_runs");
   const [otherSetupSource, setOtherSetupSource] = useState<"downloaded_setups">("downloaded_setups");
   const [downloadedSetups, setDownloadedSetups] = useState<DownloadedSetupOption[]>([]);
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
@@ -375,6 +386,17 @@ export function NewRunForm(props: {
   const editPrefillAppliedRef = useRef(false);
 
   useEffect(() => {
+    setCarsList(props.cars);
+  }, [props.cars]);
+
+  useEffect(() => {
+    if (carsList.length === 0) return;
+    if (!carId || !carsList.some((c) => c.id === carId)) {
+      setCarId(carsList[0]!.id);
+    }
+  }, [carsList, carId]);
+
+  useEffect(() => {
     if (initialEventId) setEventId(initialEventId);
   }, [initialEventId]);
 
@@ -433,7 +455,7 @@ export function NewRunForm(props: {
     editPrefillAppliedRef.current = true;
 
     const nextCarId = (r.carId || r.car?.id || "").toString();
-    if (nextCarId && cars.some((c) => c.id === nextCarId)) {
+    if (nextCarId && carsList.some((c) => c.id === nextCarId)) {
       setCarId(nextCarId);
     }
     setTrackId(r.trackId ?? "");
@@ -475,6 +497,7 @@ export function NewRunForm(props: {
 
     setNotes((r.notes ?? "").trim());
     setSuggestedChanges((r.suggestedChanges ?? "").trim());
+    setSuggestedPreRun((r.suggestedPreRun ?? "").trim());
     const parsedHandling = parseHandlingAssessmentJson(r.handlingAssessmentJson);
     setHandlingUi(uiStateFromParsed(parsedHandling));
     setHandlingDetailExpanded(isHandlingAssessmentMeaningful(r.handlingAssessmentJson));
@@ -492,12 +515,13 @@ export function NewRunForm(props: {
     });
 
     setReplicateLast(false);
+    setShareWithTeam(r.shareWithTeam !== false);
     // When reloading a saved run — especially a draft being completed — the
     // setup, session type, and run details are already nailed down. Keep the
     // Setup sheet collapsed so the user sees the "Saved from draft" summary
     // with diff rows, and can hit Edit only if something needs to change.
     setSetupSectionExpanded(false);
-  }, [editRun, cars]);
+  }, [editRun, carsList]);
 
   useEffect(() => {
     const p = dashboardPrefill;
@@ -612,7 +636,7 @@ export function NewRunForm(props: {
 
     const r = p.run;
     const nextCarId = (r.carId || r.car?.id || "").toString();
-    if (nextCarId && cars.some((c) => c.id === nextCarId)) {
+    if (nextCarId && carsList.some((c) => c.id === nextCarId)) {
       setCarId(nextCarId);
     }
 
@@ -647,7 +671,7 @@ export function NewRunForm(props: {
     setNotes("");
     setLapIngest(defaultLapIngestValue());
     setReplicateLast(false);
-  }, [dashboardPrefill, cars]);
+  }, [dashboardPrefill, carsList]);
 
   function applyTireBatteryToSetupSnapshot(nextTireSetId: string, nextBatteryId: string) {
     const tire = nextTireSetId ? tireSets.find((t) => t.id === nextTireSetId) ?? null : null;
@@ -672,7 +696,7 @@ export function NewRunForm(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tireSetId, batteryId, tireSets, batteries]);
 
-  const selectedCar = useMemo(() => cars.find((c) => c.id === carId) ?? null, [cars, carId]);
+  const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
   const setupTemplate = useMemo(() => {
     if (isA800RRCar(selectedCar?.setupSheetTemplate)) return A800RR_SETUP_SHEET_V1;
     return getDefaultSetupSheetTemplate();
@@ -738,15 +762,20 @@ export function NewRunForm(props: {
     migrateLegacyLoadedSetup();
   }, []);
 
-  /** Same list as dashboard: ActionItem rows → textarea (order matches GET /api/action-items). */
+  /** Same lists as dashboard: ActionItem rows (order matches GET /api/action-items?list=…). */
   useEffect(() => {
+    if (isEditing) return;
     let alive = true;
-    jsonFetch<{ items: Array<{ id: string; text: string }> }>("/api/action-items")
-      .then(({ items }) => {
+    Promise.all([
+      jsonFetch<{ items: Array<{ id: string; text: string }> }>("/api/action-items?list=try"),
+      jsonFetch<{ items: Array<{ id: string; text: string }> }>("/api/action-items?list=do"),
+    ])
+      .then(([tryRes, doRes]) => {
         if (!alive) return;
-        if (isEditing && suggestedChanges.trim().length > 0) return;
-        const lines = (items ?? []).map((i) => `• ${i.text.trim()}`).filter((l) => l.length > 2);
-        setSuggestedChanges(lines.length ? normalizeThingsToTryFromStorage(lines.join("\n")) : "");
+        const tlines = (tryRes.items ?? []).map((i) => `• ${i.text.trim()}`).filter((l) => l.length > 2);
+        setSuggestedChanges(tlines.length ? normalizeThingsToTryFromStorage(tlines.join("\n")) : "");
+        const dlines = (doRes.items ?? []).map((i) => `• ${i.text.trim()}`).filter((l) => l.length > 2);
+        setSuggestedPreRun(dlines.length ? normalizeThingsToTryFromStorage(dlines.join("\n")) : "");
       })
       .catch(() => {
         if (!alive) return;
@@ -754,7 +783,7 @@ export function NewRunForm(props: {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [isEditing]);
 
   /** Authoritative list for run + event track pickers (matches /events and DB; avoids stale RSC-only props). */
   const tracksFingerprint = useMemo(() => tracks.map((t) => t.id).sort().join(","), [tracks]);
@@ -786,23 +815,34 @@ export function NewRunForm(props: {
 
   /** Persist bullets to ActionItem rows while typing (dashboard uses same table). */
   useEffect(() => {
-    if (!thingsToTryDirtyRef.current) return;
+    if (!thingsToTryDirtyRef.current && !thingsToDoDirtyRef.current) return;
     const t = window.setTimeout(() => {
-      if (!thingsToTryDirtyRef.current) return;
+      if (!thingsToTryDirtyRef.current && !thingsToDoDirtyRef.current) return;
+      const body: { suggestedChanges?: string | null; suggestedPreRun?: string | null } = {};
+      if (thingsToTryDirtyRef.current) {
+        body.suggestedChanges = suggestedChanges;
+      }
+      if (thingsToDoDirtyRef.current) {
+        body.suggestedPreRun = suggestedPreRun;
+      }
+      if (Object.keys(body).length === 0) return;
       void fetch("/api/action-items/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suggestedChanges }),
+        body: JSON.stringify(body),
       })
         .then((res) => {
-          if (res.ok) thingsToTryDirtyRef.current = false;
+          if (res.ok) {
+            if ("suggestedChanges" in body) thingsToTryDirtyRef.current = false;
+            if ("suggestedPreRun" in body) thingsToDoDirtyRef.current = false;
+          }
         })
         .catch(() => {
           /* keep dirty for retry on next edit */
         });
     }, 900);
     return () => window.clearTimeout(t);
-  }, [suggestedChanges]);
+  }, [suggestedChanges, suggestedPreRun]);
 
   /** Past-run + downloaded setup lists scoped to the selected car. */
   useEffect(() => {
@@ -833,8 +873,18 @@ export function NewRunForm(props: {
     };
   }, [carId]);
 
-  function handleSetupSourceChange(next: "previous_runs" | "other") {
+  function handleSetupSourceChange(next: "previous_runs" | "other" | "new") {
     setSetupSource(next);
+    if (next === "new") {
+      setLoadSetupSelection("");
+      setLoadOtherSetupSelection("");
+      const empty = setupSnapshotWithDerived({});
+      setSetupData(empty);
+      setActiveSetupData(empty, carId || null);
+      setSetupBaselineSnapshotId(null);
+      setSetupBaselineData(cloneSetupSnapshot(empty));
+      return;
+    }
     if (next === "previous_runs") {
       const r = pickerRuns.find((x) => x.id === loadSetupSelection);
       setSetupBaselineSnapshotId(r?.setupSnapshot?.id ?? null);
@@ -845,6 +895,7 @@ export function NewRunForm(props: {
   }
 
   function applyPastSetupOnly(runId: string) {
+    setSetupSource("previous_runs");
     if (!runId) {
       setLoadSetupSelection("");
       setSetupBaselineSnapshotId(null);
@@ -913,6 +964,7 @@ export function NewRunForm(props: {
   }
 
   function applyDownloadedSetupOnly(docId: string) {
+    setSetupSource("other");
     if (!docId) {
       setLoadOtherSetupSelection("");
       setSetupBaselineSnapshotId(null);
@@ -949,6 +1001,20 @@ export function NewRunForm(props: {
       }
     }
   }, [suggestedChanges]);
+
+  useLayoutEffect(() => {
+    const el = thingsDoRef.current;
+    const pos = thingsDoCursorRef.current;
+    if (pos != null && el) {
+      thingsDoCursorRef.current = null;
+      try {
+        el.focus();
+        el.setSelectionRange(pos, pos);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [suggestedPreRun]);
 
   function handleThingsToTryKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey) return;
@@ -994,6 +1060,52 @@ export function NewRunForm(props: {
       pos <= firstRaw.length ? Math.min(pos + delta, fixedFirst.length) : pos + delta;
     thingsTryCursorRef.current = start === end ? adjust(start) : adjust(Math.max(start, end));
     setSuggestedChanges(next);
+  }
+
+  function handleThingsToDoKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    if (e.nativeEvent.isComposing) return;
+    thingsToDoDirtyRef.current = true;
+    e.preventDefault();
+    const el = e.currentTarget;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const v = suggestedPreRun;
+    if (v.length === 0) {
+      const insert = "• ";
+      thingsDoCursorRef.current = insert.length;
+      setSuggestedPreRun(insert);
+      return;
+    }
+    const insert = "\n• ";
+    const next = v.slice(0, start) + insert + v.slice(end);
+    thingsDoCursorRef.current = start + insert.length;
+    setSuggestedPreRun(next);
+  }
+
+  function handleThingsToDoChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    thingsToDoDirtyRef.current = true;
+    const raw = e.target.value;
+    if (raw === "") {
+      setSuggestedPreRun("");
+      return;
+    }
+    const nl = raw.indexOf("\n");
+    const firstRaw = nl === -1 ? raw : raw.slice(0, nl);
+    const afterFirst = nl === -1 ? "" : raw.slice(nl);
+    if (firstRaw.startsWith("• ")) {
+      setSuggestedPreRun(raw);
+      return;
+    }
+    const fixedFirst = "• " + firstRaw.replace(/^\s*•\s?/, "");
+    const next = fixedFirst + afterFirst;
+    const delta = fixedFirst.length - firstRaw.length;
+    const start = e.target.selectionStart ?? 0;
+    const end = e.target.selectionEnd ?? 0;
+    const adjust = (pos: number) =>
+      pos <= firstRaw.length ? Math.min(pos + delta, fixedFirst.length) : pos + delta;
+    thingsDoCursorRef.current = start === end ? adjust(start) : adjust(Math.max(start, end));
+    setSuggestedPreRun(next);
   }
 
   useEffect(() => {
@@ -1167,12 +1279,24 @@ export function NewRunForm(props: {
     });
   }, [eventId, events, needsEvent, trackId, tracksList]);
 
+  useEffect(() => {
+    if (!needsEvent || !eventId) {
+      setEventPracticeTimingUrl("");
+      setEventRaceTimingUrl("");
+      return;
+    }
+    const ev = events.find((e) => e.id === eventId);
+    if (!ev) return;
+    setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
+    setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
+  }, [needsEvent, eventId, events]);
+
   function applyCopyFromPreview() {
     const r = copyPreviewRun;
     if (!r) return;
     const prevCarId = carId;
     const nextCarId = (r.carId || r.car?.id || "").toString();
-    if (nextCarId && cars.some((c) => c.id === nextCarId)) {
+    if (nextCarId && carsList.some((c) => c.id === nextCarId)) {
       setCarId(nextCarId);
       setCopyCarWarning(null);
     } else if (r.car?.name) {
@@ -1246,6 +1370,7 @@ export function NewRunForm(props: {
     setNotes("");
     setLapIngest(defaultLapIngestValue());
     setLoadSetupSelection(r.id);
+    setSetupSource("previous_runs");
     setReplicateLast(true);
   }
 
@@ -1340,6 +1465,8 @@ export function NewRunForm(props: {
           trackId: newEventTrackId || null,
           startDate: start,
           endDate: end,
+          practiceSourceUrl: newEventPracticeUrl.trim() || null,
+          resultsSourceUrl: newEventResultsUrl.trim() || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1362,6 +1489,8 @@ export function NewRunForm(props: {
       setNewEventTrackId("");
       setNewEventStartDate("");
       setNewEventEndDate("");
+      setNewEventPracticeUrl("");
+      setNewEventResultsUrl("");
       setShowNewEventPanel(false);
       setStatus("Event created — selected.");
     } catch (err) {
@@ -1760,10 +1889,18 @@ export function NewRunForm(props: {
             })(),
           },
           notes: notes.trim() || null,
-          practiceDayUrl: sessionType === "TESTING" && practiceDayUrl.trim() ? practiceDayUrl.trim() : null,
+          practiceDayUrl: (() => {
+            if (sessionType === "TESTING" && practiceDayUrl.trim()) return practiceDayUrl.trim();
+            if (sessionType === "RACE_MEETING" && eventId && eventPracticeTimingUrl.trim()) {
+              return eventPracticeTimingUrl.trim();
+            }
+            return null;
+          })(),
           raceClass: raceClass.trim() || null,
           suggestedChanges: suggestedChanges.trim() || null,
+          suggestedPreRun: suggestedPreRun.trim() || null,
           handlingAssessmentJson: persistedFromUiState(handlingUi),
+          shareWithTeam,
           sessionLabel: null,
           importedLapSets,
           importedLapTimeSessionIds:
@@ -1775,6 +1912,25 @@ export function NewRunForm(props: {
 
       setSaveSuccess(true);
       setStatus(isEditing ? "Changes saved." : "Run saved.");
+
+      if (sessionType === "RACE_MEETING" && needsEvent && eventId) {
+        const p = eventPracticeTimingUrl.trim() || null;
+        const r = eventRaceTimingUrl.trim() || null;
+        void fetch(`/api/events/${encodeURIComponent(eventId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ practiceSourceUrl: p, resultsSourceUrl: r }),
+        })
+          .then((res) => {
+            if (!res.ok) return;
+            setEvents((prev) =>
+              prev.map((e) =>
+                e.id === eventId ? { ...e, practiceSourceUrl: p, resultsSourceUrl: r } : e
+              )
+            );
+          })
+          .catch(() => {});
+      }
 
       if (sessionType === "TESTING" && practiceDayUrl.trim()) {
         void fetch("/api/settings/current-practice-day-url", {
@@ -1842,43 +1998,21 @@ export function NewRunForm(props: {
     }
   }
 
-  async function createTrack(e?: React.MouseEvent) {
-    e?.preventDefault();
-    const name = newTrackName.trim();
-    if (!name) {
-      setStatus("Track name is required.");
-      return;
-    }
-    setStatus(null);
-    setAddingTrack(true);
-    try {
-      const { track } = await jsonFetch<{ track: TrackOption }>("/api/tracks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, location: newTrackLocation.trim() || null }),
-      });
-      setTracksList((prev) => [track, ...prev]);
-      setTrackId(track.id);
-      setNewTrackName("");
-      setNewTrackLocation("");
-      setStatus("Track added and selected.");
-      setShowAddTrack(false);
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Failed to add track");
-    } finally {
-      setAddingTrack(false);
-    }
-  }
-
   return (
     <form
       className="max-w-3xl space-y-4"
       onSubmit={(e) => e.preventDefault()}
       noValidate
     >
-      {cars.length === 0 ? (
+      {carsList.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-          You need at least one car to log a run. Go to <a href="/cars" className="text-accent underline">Car Manager</a> to create one.
+          <p>
+            You need a car to log a run. Open{" "}
+            <Link href="/cars" className="text-accent underline font-medium">
+              Car Manager
+            </Link>{" "}
+            to add one, then return here.
+          </p>
         </div>
       ) : null}
 
@@ -2016,6 +2150,16 @@ export function NewRunForm(props: {
                     : meetingSessionType.charAt(0) +
                       meetingSessionType.slice(1).toLowerCase()}
                 </span>
+                {eventPracticeTimingUrl.trim() ? (
+                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                    Practice timing URL set
+                  </span>
+                ) : null}
+                {eventRaceTimingUrl.trim() ? (
+                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                    Race timing URL set
+                  </span>
+                ) : null}
               </div>
             )}
           </div>
@@ -2146,6 +2290,47 @@ export function NewRunForm(props: {
             })()}
           </select>
 
+          {eventId ? (
+            <div className="mt-2 space-y-2 text-sm">
+              <div className="space-y-1">
+                <label
+                  htmlFor="event-practice-timing-url"
+                  className="block text-xs font-medium text-muted-foreground"
+                >
+                  Practice timing URL (optional)
+                </label>
+                <input
+                  id="event-practice-timing-url"
+                  type="url"
+                  value={eventPracticeTimingUrl}
+                  onChange={(e) => setEventPracticeTimingUrl(e.target.value)}
+                  placeholder="LiveRC practice session list URL"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label
+                  htmlFor="event-race-timing-url"
+                  className="block text-xs font-medium text-muted-foreground"
+                >
+                  Race timing URL (optional)
+                </label>
+                <input
+                  id="event-race-timing-url"
+                  type="url"
+                  value={eventRaceTimingUrl}
+                  onChange={(e) => setEventRaceTimingUrl(e.target.value)}
+                  placeholder="LiveRC results / race timing page URL"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Saved on the event when you save this run. The Lap times → URL flow uses the practice link for
+                this meeting.
+              </p>
+            </div>
+          ) : null}
+
           {eventTrackSwitchPrompt && eventTrackSwitchPrompt.eventId === eventId && (
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
               <span className="text-foreground">
@@ -2225,6 +2410,26 @@ export function NewRunForm(props: {
                     setEventError(null);
                   }}
                   placeholder="End date"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] text-muted-foreground">Practice timing URL (optional)</label>
+                <input
+                  type="url"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                  value={newEventPracticeUrl}
+                  onChange={(e) => setNewEventPracticeUrl(e.target.value)}
+                  placeholder="LiveRC practice session list URL"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] text-muted-foreground">Race timing URL (optional)</label>
+                <input
+                  type="url"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                  value={newEventResultsUrl}
+                  onChange={(e) => setNewEventResultsUrl(e.target.value)}
+                  placeholder="LiveRC results / race timing page URL"
                 />
               </div>
               {isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate) ? (
@@ -2409,7 +2614,15 @@ export function NewRunForm(props: {
         {runDetailsTab === "car" ? (
           <div className="space-y-3 pt-1">
             <div className="space-y-1 text-sm">
-              <div className="ui-title text-sm text-muted-foreground">Car</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="ui-title text-sm text-muted-foreground">Car</div>
+                <Link
+                  href="/cars"
+                  className="rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                >
+                  Car Manager
+                </Link>
+              </div>
               <select
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                 value={carId}
@@ -2429,7 +2642,7 @@ export function NewRunForm(props: {
                 }}
                 aria-label="Car"
               >
-                {cars.map((c) => (
+                {carsList.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -2452,16 +2665,12 @@ export function NewRunForm(props: {
             <div className="space-y-1 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="ui-title text-sm text-muted-foreground">Track</div>
-                <button
-                  type="button"
-                  className="rounded-md border border-border bg-card px-2 py-1 text-[11px] hover:bg-muted transition"
-                  onClick={() => {
-                    setShowAddTrack((v) => !v);
-                    setStatus(null);
-                  }}
+                <Link
+                  href="/tracks"
+                  className="rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition"
                 >
-                  {showAddTrack ? "Cancel" : "Add track"}
-                </button>
+                  Track library
+                </Link>
               </div>
               <TrackCombobox
                 tracks={tracksList}
@@ -2513,34 +2722,6 @@ export function NewRunForm(props: {
                 />
               </div>
             ) : null}
-
-            {showAddTrack && (
-              <div className="rounded-md border border-border bg-muted/60 p-3 space-y-2">
-                <input
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                  placeholder="Track name"
-                  value={newTrackName}
-                  onChange={(e) => setNewTrackName(e.target.value)}
-                />
-                <input
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                  placeholder="Location (optional)"
-                  value={newTrackLocation}
-                  onChange={(e) => setNewTrackLocation(e.target.value)}
-                />
-                <button
-                  type="button"
-                  disabled={addingTrack || !newTrackName.trim()}
-                  className={cn(
-                    "rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
-                    (addingTrack || !newTrackName.trim()) && "opacity-60 pointer-events-none"
-                  )}
-                  onClick={(e) => createTrack(e)}
-                >
-                  {addingTrack ? "Adding…" : "Add track"}
-                </button>
-              </div>
-            )}
           </div>
         ) : null}
 
@@ -2863,7 +3044,9 @@ export function NewRunForm(props: {
                     ? loadSetupControlLabel
                     : setupSource === "other" && selectedDownloadedSetup
                       ? loadOtherSetupLabel
-                      : "the loaded setup"}
+                      : setupSource === "new"
+                        ? "a new blank setup"
+                        : "the loaded setup"}
                   :
                 </div>
                 <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
@@ -2901,7 +3084,9 @@ export function NewRunForm(props: {
                         ? loadSetupControlLabel
                         : setupSource === "other" && selectedDownloadedSetup
                           ? loadOtherSetupLabel
-                          : "This run's saved snapshot"}
+                          : setupSource === "new"
+                            ? "New blank setup"
+                            : "This run's saved snapshot"}
                     </span>
                     <button
                       type="button"
@@ -2932,11 +3117,14 @@ export function NewRunForm(props: {
                       className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
                       value={setupSource}
                       onChange={(e) =>
-                        handleSetupSourceChange(e.target.value as "previous_runs" | "other")
+                        handleSetupSourceChange(
+                          e.target.value as "previous_runs" | "other" | "new"
+                        )
                       }
                     >
                       <option value="previous_runs">Setups from previous runs</option>
                       <option value="other">Other</option>
+                      <option value="new">New</option>
                     </select>
                   </div>
                   {setupSource === "previous_runs" ? (
@@ -2949,7 +3137,7 @@ export function NewRunForm(props: {
                       disabled={pickerRuns.length === 0}
                       formatLine={formatRunPickerLineRelativeWhen}
                     />
-                  ) : (
+                  ) : setupSource === "other" ? (
                     <div className="space-y-2">
                       <div className="space-y-1 text-sm">
                         <div className="text-sm font-medium text-muted-foreground">Other source</div>
@@ -2980,6 +3168,10 @@ export function NewRunForm(props: {
                         </select>
                       </div>
                     </div>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      Blank setup for this car — edit the sheet below, or lock in when you are ready.
+                    </p>
                   )}
                 </>
               )}
@@ -2999,9 +3191,11 @@ export function NewRunForm(props: {
                     ? `from ${loadSetupControlLabel}`
                     : setupSource === "other" && selectedDownloadedSetup
                       ? `from ${loadOtherSetupLabel}`
-                      : isEditing
-                        ? "this run's saved snapshot"
-                        : "the loaded baseline"}
+                      : setupSource === "new"
+                        ? "from a new blank setup"
+                        : isEditing
+                          ? "this run's saved snapshot"
+                          : "the loaded baseline"}
                   {" "}with the following {setupChangedRowsSinceBaseline.length === 1 ? "change" : "changes"}:
                 </div>
                 <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
@@ -3020,12 +3214,16 @@ export function NewRunForm(props: {
               </div>
             ) : null}
             {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">No past runs yet, or list failed to load.</p>
+              <p className="text-[11px] text-muted-foreground">
+                No past runs yet, or list failed to load. You can choose <span className="font-medium">New</span> above
+                to start from a blank sheet.
+              </p>
             ) : null}
             {setupSource === "other" && downloadedSetups.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
                 No parsed setups available for this car (or parse not run). Parse a PDF under Setup → Downloaded setups
-                or bulk import, or pick a car that matches the setup’s assigned car when one is set.
+                or bulk import, or pick a car that matches the setup’s assigned car when one is set. You can choose{" "}
+                <span className="font-medium">New</span> to start blank.
               </p>
             ) : null}
           </div>
@@ -3064,11 +3262,12 @@ export function NewRunForm(props: {
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
                   value={setupSource}
                   onChange={(e) =>
-                    handleSetupSourceChange(e.target.value as "previous_runs" | "other")
+                    handleSetupSourceChange(e.target.value as "previous_runs" | "other" | "new")
                   }
                 >
                   <option value="previous_runs">Setups from previous runs</option>
                   <option value="other">Other</option>
+                  <option value="new">New</option>
                 </select>
               </div>
               {setupSource === "previous_runs" ? (
@@ -3081,7 +3280,7 @@ export function NewRunForm(props: {
                   disabled={pickerRuns.length === 0}
                   formatLine={formatRunPickerLineRelativeWhen}
                 />
-              ) : (
+              ) : setupSource === "other" ? (
                 <div className="space-y-2">
                   <div className="space-y-1 text-sm">
                     <div className="text-sm font-medium text-muted-foreground">Other source</div>
@@ -3112,6 +3311,10 @@ export function NewRunForm(props: {
                     </select>
                   </div>
                 </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Blank setup for this car — edit the sheet below, or lock in when you are ready.
+                </p>
               )}
             </div>
             <SetupSheetView
@@ -3121,12 +3324,16 @@ export function NewRunForm(props: {
               enableFieldSearch
             />
             {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">No past runs yet, or list failed to load.</p>
+              <p className="text-[11px] text-muted-foreground">
+                No past runs yet, or list failed to load. You can choose <span className="font-medium">New</span> above
+                to start from a blank sheet.
+              </p>
             ) : null}
             {setupSource === "other" && downloadedSetups.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
                 No parsed setups available for this car (or parse not run). Parse a PDF under Setup → Downloaded setups
-                or bulk import, or pick a car that matches the setup’s assigned car when one is set.
+                or bulk import, or pick a car that matches the setup’s assigned car when one is set. You can choose{" "}
+                <span className="font-medium">New</span> to start blank.
               </p>
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
@@ -3206,18 +3413,44 @@ export function NewRunForm(props: {
       <LapTimesIngestPanel
         value={lapIngest}
         onChange={setLapIngest}
-        practiceDayUrl={sessionType === "TESTING" ? practiceDayUrl.trim() || null : null}
+        practiceDayUrl={
+          sessionType === "TESTING"
+            ? practiceDayUrl.trim() || null
+            : sessionType === "RACE_MEETING" && eventId
+              ? eventPracticeTimingUrl.trim() || null
+              : null
+        }
       />
 
-      <div className="space-y-2 text-sm">
-        <div className="ui-title text-sm text-muted-foreground">Notes</div>
-        <div className="flex border-b border-border" role="tablist" aria-label="Notes and things to try">
+      <label className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={shareWithTeam}
+          onChange={(e) => setShareWithTeam(e.target.checked)}
+          className="mt-0.5 shrink-0"
+        />
+        <span>
+          <span className="font-medium text-foreground">Share this run with my teams</span>
+          <span className="block text-muted-foreground mt-1 leading-snug">
+            When off, people you share a team with will not see this run in Team Sessions or team-only Engineer lists.
+            One-way teammate links are unchanged.
+          </span>
+        </span>
+      </label>
+
+      <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3 text-sm">
+        <div className="ui-title text-sm text-muted-foreground">Feedback</div>
+        <div
+          className="flex flex-wrap border-b border-border gap-x-0.5"
+          role="tablist"
+          aria-label="Notes, things to try, and pre-run reminders"
+        >
           <button
             type="button"
             role="tab"
             aria-selected={notesSubTab === "notes"}
             className={cn(
-              "px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
               notesSubTab === "notes"
                 ? "border-accent text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -3231,7 +3464,7 @@ export function NewRunForm(props: {
             role="tab"
             aria-selected={notesSubTab === "things"}
             className={cn(
-              "px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
               notesSubTab === "things"
                 ? "border-accent text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -3239,6 +3472,20 @@ export function NewRunForm(props: {
             onClick={() => setNotesSubTab("things")}
           >
             Things to try
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={notesSubTab === "todo"}
+            className={cn(
+              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              notesSubTab === "todo"
+                ? "border-accent text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setNotesSubTab("todo")}
+          >
+            Things to do
           </button>
         </div>
         {notesSubTab === "notes" ? (
@@ -3258,7 +3505,7 @@ export function NewRunForm(props: {
             onChange={(e) => setNotes(e.target.value)}
             aria-label="Session notes"
           />
-        ) : (
+        ) : notesSubTab === "things" ? (
           <textarea
             ref={thingsTryRef}
             className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
@@ -3267,6 +3514,16 @@ export function NewRunForm(props: {
             onChange={handleThingsToTryChange}
             onKeyDown={handleThingsToTryKeyDown}
             aria-label="Things to try"
+          />
+        ) : (
+          <textarea
+            ref={thingsDoRef}
+            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+            placeholder="Double-check before the next run (droop screws, balance, a bolt…). Bullets and Enter work like Things to try."
+            value={suggestedPreRun}
+            onChange={handleThingsToDoChange}
+            onKeyDown={handleThingsToDoKeyDown}
+            aria-label="Things to do before next run"
           />
         )}
         <div className="pt-1">
