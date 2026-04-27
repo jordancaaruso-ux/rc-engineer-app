@@ -12,14 +12,27 @@ export async function POST(request: Request) {
   try {
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const body = (await request.json()) as { suggestedChanges?: string | null };
-    const suggestedChanges =
-      typeof body.suggestedChanges === "string" ? body.suggestedChanges : body.suggestedChanges ?? null;
-
-    await syncActionItemsFromLogFormDraft({
-      userId: user.id,
-      suggestedChanges,
-    });
+    const raw = (await request.json()) as {
+      suggestedChanges?: string | null;
+      suggestedPreRun?: string | null;
+    };
+    if (!("suggestedChanges" in raw) && !("suggestedPreRun" in raw)) {
+      return NextResponse.json({ error: "No fields to sync" }, { status: 400 });
+    }
+    const draft: {
+      userId: string;
+      suggestedChanges?: string | null;
+      suggestedPreRun?: string | null;
+    } = { userId: user.id };
+    if (Object.prototype.hasOwnProperty.call(raw, "suggestedChanges")) {
+      const v = raw.suggestedChanges;
+      draft.suggestedChanges = typeof v === "string" ? v : v ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(raw, "suggestedPreRun")) {
+      const v = raw.suggestedPreRun;
+      draft.suggestedPreRun = typeof v === "string" ? v : v ?? null;
+    }
+    await syncActionItemsFromLogFormDraft(draft);
 
     revalidatePath("/");
     revalidatePath("/runs/new");
