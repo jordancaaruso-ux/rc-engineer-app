@@ -5,11 +5,15 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
  * **does not** read `sortAt`: the displayed time must stay put even when the
  * driver drags a run to a new position in the history list. Ordering lives in
  * a different column (`sortAt`, set once at create, mutated only by explicit
- * drag); display reflects "when did this run happen", which shouldn't move.
+ * drag); display reflects when the run was first marked logging-complete (or
+ * legacy fallbacks), not the draggable order key.
  *
  * Preference order:
- *   1. `sessionCompletedAt` — on-track wall time from a timing import.
- *   2. `createdAt` — row insert / first-save time.
+ *   1. `loggingCompletedAt` — first server instant the run was saved as complete
+ *      (non-draft); set once and kept immutable.
+ *   2. `sessionCompletedAt` — on-track wall time from a timing import (legacy rows
+ *      and drafts that never stamped `loggingCompletedAt`).
+ *   3. `createdAt` — row insert / first-save time.
  *
  * Accept `sortAt` in the input type (so callers that already select it still
  * compile) but intentionally ignore it here.
@@ -18,7 +22,13 @@ export function resolveRunDisplayInstant(run: {
   createdAt: Date | string;
   sessionCompletedAt?: Date | string | null;
   sortAt?: Date | string | null;
+  loggingCompletedAt?: Date | string | null;
 }): Date {
+  const lc = run.loggingCompletedAt;
+  if (lc != null) {
+    const d = typeof lc === "string" ? new Date(lc) : lc;
+    if (!Number.isNaN(d.getTime())) return d;
+  }
   const s = run.sessionCompletedAt;
   if (s != null) {
     const d = typeof s === "string" ? new Date(s) : s;
@@ -59,6 +69,7 @@ export function resolveRunSortInstant(run: {
 export function formatCompareRunMetaLine(run: {
   createdAt: Date | string;
   sessionCompletedAt?: Date | string | null;
+  loggingCompletedAt?: Date | string | null;
   sortAt?: Date | string | null;
   event?: { name: string } | null;
   track?: { name: string } | null;
