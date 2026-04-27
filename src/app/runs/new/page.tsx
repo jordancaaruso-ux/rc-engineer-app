@@ -6,6 +6,7 @@ import { NewRunForm } from "@/components/runs/NewRunForm";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getDashboardNewRunPrefill, loadIncompleteRunsForImportChooser } from "@/lib/dashboardServer";
 import { NewRunImportLinkChooser } from "@/components/runs/NewRunImportLinkChooser";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 
 export default async function NewRunPage({
   searchParams,
@@ -33,6 +34,7 @@ export default async function NewRunPage({
   }
 
   const user = await requireCurrentUser();
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
   const sp = await searchParams;
   const dashboardPrefill = await getDashboardNewRunPrefill(user.id, sp);
   const initialEventId =
@@ -81,6 +83,7 @@ export default async function NewRunPage({
           incompleteRuns={incompleteRunsForImport}
           importedLapTimeSessionId={importedLapTimeSessionIdRaw || null}
           eventId={initialEventId}
+          displayTimeZone={displayTimeZone}
         >
           <NewRunForm
             cars={cars}

@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Privacy — RC Engineer",
-  description: "Privacy policy for RC Engineer",
+  title: "Privacy — JRC Race Engineer",
+  description: "Privacy policy for JRC Race Engineer",
 };
 
 export default function PrivacyPage() {
@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <div className="container mx-auto max-w-2xl px-4 py-10 text-sm leading-relaxed text-foreground">
       <h1 className="text-xl font-semibold">Privacy policy</h1>
       <p className="mt-4 text-muted-foreground">
-        RC Engineer is a personal motorsports setup and run logging tool. This page summarizes what the hosted
+        JRC Race Engineer is a personal motorsports setup and run logging tool. This page summarizes what the hosted
         service processes so you can complete App Store Connect disclosures.
       </p>
       <h2 className="mt-8 text-base font-semibold">Account and authentication</h2>

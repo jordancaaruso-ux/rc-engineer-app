@@ -188,6 +188,7 @@ export async function POST(request: Request) {
     /** Account-wide run inventory (compact rows); null when client disables to save tokens. */
     runCatalog,
     thingsToTry: basePacket.thingsToTry,
+    thingsToDo: basePacket.thingsToDo,
   };
 
   const baseForMerge = {
@@ -196,6 +197,7 @@ export async function POST(request: Request) {
     patternDigest,
     runCatalog,
     thingsToTry: basePacket.thingsToTry,
+    thingsToDo: basePacket.thingsToDo,
   };
 
   // #region agent log

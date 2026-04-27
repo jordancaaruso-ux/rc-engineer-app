@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       id: true,
       createdAt: true,
       sessionCompletedAt: true,
+      loggingCompletedAt: true,
       sortAt: true,
       sessionLabel: true,
       sessionType: true,

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { JrcRaceEngineerLogo } from "@/components/brand/JrcRaceEngineerLogo";
 import { Suspense, useEffect, useState } from "react";
 
 function LoginForm() {
@@ -81,8 +82,11 @@ function LoginForm() {
 
   return (
     <main className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="text-lg font-semibold text-foreground">Sign in to RC Engineer</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <div className="flex flex-col items-center text-center sm:items-stretch sm:text-left">
+        <JrcRaceEngineerLogo className="h-12 w-auto sm:h-14" priority />
+        <h1 className="mt-4 text-lg font-semibold text-foreground not-italic normal-case">Sign in</h1>
+      </div>
+      <p className="mt-4 text-sm text-muted-foreground">
         Only invited email addresses can sign in. Ask the app owner to add yours to the allowlist.
       </p>
       {configLoaded && googleOAuthConfigured ? (

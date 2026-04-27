@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { DashboardIncompleteRunRow } from "@/lib/dashboardServer";
-import { formatAppTimestampUtc } from "@/lib/formatDate";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,13 @@ function btnPrimary(className = "") {
   return `inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
 }
 
-export function IncompleteLoggingRunsBanner({ rows }: { rows: DashboardIncompleteRunRow[] }) {
+export function IncompleteLoggingRunsBanner({
+  rows,
+  displayTimeZone,
+}: {
+  rows: DashboardIncompleteRunRow[];
+  displayTimeZone: string;
+}) {
   const router = useRouter();
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [dismissErr, setDismissErr] = useState<string | null>(null);
@@ -68,7 +74,7 @@ export function IncompleteLoggingRunsBanner({ rows }: { rows: DashboardIncomplet
                   Saved{" "}
                   <RelativeTime
                     iso={r.createdAt}
-                    fallback={formatAppTimestampUtc(r.createdAt)}
+                    fallback={formatRunCreatedAtDateTime(r.createdAt, displayTimeZone)}
                   />
                 </span>
               </div>

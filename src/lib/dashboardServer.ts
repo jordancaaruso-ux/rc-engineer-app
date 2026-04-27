@@ -4,6 +4,7 @@ import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashb
 import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { eventIsActiveOnLocalToday, startOfLocalDay } from "@/lib/eventActive";
 import { loadDetectedRunPrompts, syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
@@ -210,6 +211,8 @@ export type DashboardHomeModel = {
   /** Saved runs where the user has not clicked "Run completed" yet. */
   incompleteRuns: DashboardIncompleteRunRow[];
   thingsToTry: DashboardActionItemRow[];
+  /** Pre–next-run checks / reminders (same rows as `ActionItem` `THINGS_TO_DO`). */
+  thingsToDo: DashboardActionItemRow[];
   activeEvent: null | {
     id: string;
     name: string;
@@ -257,6 +260,7 @@ export type DashboardHomeModel = {
     id: string;
     createdAt: string;
     sessionCompletedAt: string | null;
+    loggingCompletedAt: string | null;
     carName: string;
     trackName: string | null;
     eventName: string | null;
@@ -270,6 +274,7 @@ const recentRunSelect = {
   id: true,
   createdAt: true,
   sessionCompletedAt: true,
+  loggingCompletedAt: true,
   sortAt: true,
   lapTimes: true,
   lapSession: true,
@@ -388,6 +393,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
         id: true,
         createdAt: true,
         sessionCompletedAt: true,
+        loggingCompletedAt: true,
         sortAt: true,
         sessionType: true,
         meetingSessionType: true,
@@ -421,28 +427,39 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
   ]);
   const hasRunToday = todaysRuns.length > 0;
 
-  let actionItems: Array<{
+  const actionItemSelect = {
+    id: true,
+    text: true,
+    sourceType: true,
+    createdAt: true,
+    sourceRunId: true,
+  } as const;
+  let thingsToTryRows: Array<{
     id: string;
     createdAt: Date;
     text: string;
     sourceType: ActionItemSourceType;
     sourceRunId: string | null;
   }> = [];
+  let thingsToDoRows: typeof thingsToTryRows = [];
   try {
-    actionItems = await prisma.actionItem.findMany({
-      where: { userId, isArchived: false },
-      orderBy: { createdAt: "desc" },
-      take: 120,
-      select: {
-        id: true,
-        text: true,
-        sourceType: true,
-        createdAt: true,
-        sourceRunId: true,
-      },
-    });
+    [thingsToTryRows, thingsToDoRows] = await Promise.all([
+      prisma.actionItem.findMany({
+        where: { userId, isArchived: false, listKind: "THINGS_TO_TRY" },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        take: 120,
+        select: actionItemSelect,
+      }),
+      prisma.actionItem.findMany({
+        where: { userId, isArchived: false, listKind: "THINGS_TO_DO" },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        take: 120,
+        select: actionItemSelect,
+      }),
+    ]);
   } catch {
-    actionItems = [];
+    thingsToTryRows = [];
+    thingsToDoRows = [];
   }
 
   const activeCandidates = events.filter(eventIsActiveOnLocalToday);
@@ -533,7 +550,12 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
         if (diffRows.length > 0) {
           todaysChanges.push({
             runId: r.id,
-            when: (r.sessionCompletedAt ?? r.createdAt).toISOString(),
+            when: resolveRunDisplayInstant({
+              createdAt: r.createdAt,
+              sessionCompletedAt: r.sessionCompletedAt,
+              loggingCompletedAt: r.loggingCompletedAt,
+              sortAt: r.sortAt,
+            }).toISOString(),
             runLabel: formatRunSessionDisplay(r),
             rows: diffRows.map((row) => ({
               key: row.key,
@@ -558,6 +580,9 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       sessionCompletedAt: recentRun.sessionCompletedAt
         ? recentRun.sessionCompletedAt.toISOString()
         : null,
+      loggingCompletedAt: recentRun.loggingCompletedAt
+        ? recentRun.loggingCompletedAt.toISOString()
+        : null,
       carName: recentRun.car?.name ?? "—",
       trackName: recentRun.track?.name ?? null,
       eventName: recentRun.event?.name ?? null,
@@ -572,7 +597,14 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
   return {
     detectedRunPrompts,
     incompleteRuns,
-    thingsToTry: actionItems.map((i) => ({
+    thingsToTry: thingsToTryRows.map((i) => ({
+      id: i.id,
+      text: i.text,
+      sourceType: i.sourceType,
+      createdAt: i.createdAt.toISOString(),
+      sourceRunId: i.sourceRunId,
+    })),
+    thingsToDo: thingsToDoRows.map((i) => ({
       id: i.id,
       text: i.text,
       sourceType: i.sourceType,

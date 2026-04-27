@@ -6,7 +6,7 @@ import { formatRunCreatedAtDateTime, formatAppTimestampUtc } from "@/lib/formatD
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { DetectedRunPromptsBanner } from "@/components/dashboard/DetectedRunPromptsBanner";
 import { IncompleteLoggingRunsBanner } from "@/components/dashboard/IncompleteLoggingRunsBanner";
-import { ThingsToTrySection } from "@/components/dashboard/ThingsToTrySection";
+import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
 import { TodaySummaryCard } from "@/components/dashboard/TodaySummaryCard";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 
@@ -18,11 +18,19 @@ function btnGhost(className = "") {
   return `inline-flex items-center justify-center rounded-lg border border-border bg-card/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-border hover:bg-muted/60 hover:text-foreground ${className}`;
 }
 
-export function DashboardHome({ model }: { model: DashboardHomeModel }) {
+export function DashboardHome({
+  model,
+  displayTimeZone,
+}: {
+  model: DashboardHomeModel;
+  /** IANA zone from rc_tz cookie (UTC until cookie exists). */
+  displayTimeZone: string;
+}) {
   const {
     activeEvent,
     recentRun,
     thingsToTry,
+    thingsToDo,
     detectedRunPrompts,
     incompleteRuns,
     todayBestLap,
@@ -70,8 +78,8 @@ export function DashboardHome({ model }: { model: DashboardHomeModel }) {
       </header>
 
       <section className="page-body flex max-w-3xl flex-col gap-3">
-        <DetectedRunPromptsBanner prompts={detectedRunPrompts} />
-        <IncompleteLoggingRunsBanner rows={incompleteRunsFiltered} />
+        <DetectedRunPromptsBanner prompts={detectedRunPrompts} displayTimeZone={displayTimeZone} />
+        <IncompleteLoggingRunsBanner rows={incompleteRunsFiltered} displayTimeZone={displayTimeZone} />
 
         <Link
           href={primaryAction.href}
@@ -126,7 +134,7 @@ export function DashboardHome({ model }: { model: DashboardHomeModel }) {
           <EventContextCard activeEvent={activeEvent} />
         ) : null}
 
-        <PreviousRunCard recentRun={recentRun} />
+        <PreviousRunCard recentRun={recentRun} displayTimeZone={displayTimeZone} />
 
         <div className="flex flex-wrap gap-1.5">
           <Link href="/engineer" className={btnGhost()}>
@@ -147,14 +155,30 @@ export function DashboardHome({ model }: { model: DashboardHomeModel }) {
           todayBestRunLabel={todayBestRunLabel}
           todayRunCount={todayRunCount}
           todaysChanges={todaysChanges}
+          displayTimeZone={displayTimeZone}
         />
 
         <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Things to try
+            Lists
           </div>
-          <div className="mt-2">
-            <ThingsToTrySection initialItems={thingsToTry} embedded />
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+            <ActionItemListPanel
+              list="try"
+              title="Things to try"
+              hint="From logged runs and manual adds. Remove archives the item."
+              addPlaceholder="Add an idea…"
+              initialItems={thingsToTry}
+              embedded
+            />
+            <ActionItemListPanel
+              list="do"
+              title="Things to do"
+              hint="Pre–next-run checks (e.g. verify a bolt). Same list as in Log your run. Remove archives the item."
+              addPlaceholder="Add a reminder…"
+              initialItems={thingsToDo}
+              embedded
+            />
           </div>
         </div>
       </section>
@@ -230,8 +254,10 @@ function EventContextCard({
 
 function PreviousRunCard({
   recentRun,
+  displayTimeZone,
 }: {
   recentRun: DashboardHomeModel["recentRun"];
+  displayTimeZone: string;
 }) {
   return (
     <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
@@ -249,7 +275,9 @@ function PreviousRunCard({
                 resolveRunDisplayInstant({
                   createdAt: recentRun.createdAt,
                   sessionCompletedAt: recentRun.sessionCompletedAt,
-                })
+                  loggingCompletedAt: recentRun.loggingCompletedAt,
+                }),
+                displayTimeZone
               )}
             </span>
             <span className="text-muted-foreground">Car</span>
@@ -277,13 +305,22 @@ function PreviousRunCard({
           </div>
           <div className="flex flex-wrap gap-1.5">
             <Link
-              href={`/runs/${encodeURIComponent(recentRun.id)}/edit`}
+              href={`/runs/history?focusRun=${encodeURIComponent(recentRun.id)}`}
               className={btnGhost()}
             >
               Open run
             </Link>
-            <Link href="/runs/history" className={btnGhost()}>
+            <Link
+              href={`/runs/history?focusRun=${encodeURIComponent(recentRun.id)}`}
+              className={btnGhost()}
+            >
               Open analysis
+            </Link>
+            <Link
+              href={`/runs/${encodeURIComponent(recentRun.id)}/edit`}
+              className={btnGhost()}
+            >
+              Edit log
             </Link>
           </div>
         </div>

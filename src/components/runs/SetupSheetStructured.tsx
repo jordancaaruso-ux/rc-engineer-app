@@ -475,7 +475,8 @@ function OptionSquareFieldDisplay({
   options: string[];
   multi: boolean;
   readOnly: boolean;
-  onSelect?: (opt: string) => void;
+  /** `null` = clear single-select (click same chip again). Multi-select always passes the option. */
+  onSelect?: (opt: string | null) => void;
   /** Setup A vs B compare: sky = column A, rose = column B. */
   chipAccent?: "sky" | "rose";
 }) {
@@ -509,7 +510,11 @@ function OptionSquareFieldDisplay({
               key={opt}
               type="button"
               disabled={readOnly}
-              onClick={() => onSelect?.(opt)}
+              onClick={() => {
+                if (multi) onSelect?.(opt);
+                else if (isSelected) onSelect?.(null);
+                else onSelect?.(opt);
+              }}
               className={cn(
                 "rounded border px-2 py-1 text-[11px] font-sans tabular-nums font-semibold transition-colors",
                 isSelected ? selectedChip : "border-border bg-muted/40 text-muted-foreground",
@@ -577,6 +582,13 @@ function PresetWithOtherChipEditor({
       readOnly={readOnly}
       chipAccent={chipAccent}
       onSelect={(opt) => {
+        if (opt === null) {
+          onCommit(fieldKey, {
+            selectedPreset: "",
+            otherText: otherFocused ? localOther : otherRaw,
+          });
+          return;
+        }
         const next: PresetWithOtherValue = {
           selectedPreset: commitOptionValue(opt, options),
           otherText: otherFocused ? localOther : otherRaw,
@@ -675,7 +687,7 @@ function LegacyCompanionOtherChipEditor({
         multi={false}
         readOnly={readOnly}
         chipAccent={chipAccent}
-        onSelect={(opt) => onCommit(fieldKey, commitOptionValue(opt, options))}
+        onSelect={(opt) => onCommit(fieldKey, opt === null ? "" : commitOptionValue(opt, options))}
       />
     );
   }
@@ -718,7 +730,7 @@ function LegacyCompanionOtherChipEditor({
       multi={false}
       readOnly={readOnly}
       chipAccent={chipAccent}
-      onSelect={(opt) => onCommit(fieldKey, commitOptionValue(opt, options))}
+      onSelect={(opt) => onCommit(fieldKey, opt === null ? "" : commitOptionValue(opt, options))}
     />
   );
 
@@ -879,9 +891,10 @@ function EditableSingle({
                 multi
                 readOnly={effectiveReadOnly}
                 chipAccent={chipAccent}
-                onSelect={(opt) =>
-                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options))
-                }
+                onSelect={(opt) => {
+                  if (opt == null) return;
+                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options));
+                }}
               />
             ) : (
               <SingleSelectChipWithOptionalOther
@@ -957,9 +970,10 @@ function EditableSingle({
                 multi
                 readOnly={effectiveReadOnly}
                 chipAccent={chipAccent}
-                onSelect={(opt) =>
-                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options))
-                }
+                onSelect={(opt) => {
+                  if (opt == null) return;
+                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options));
+                }}
               />
             ) : (
               <SingleSelectChipWithOptionalOther
@@ -1197,9 +1211,10 @@ function PairSideCell({
                 multi
                 readOnly={readOnly}
                 chipAccent={chipAccent}
-                onSelect={(opt) =>
-                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options))
-                }
+                onSelect={(opt) => {
+                  if (opt == null) return;
+                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options));
+                }}
               />
             ) : (
               <SingleSelectChipWithOptionalOther
@@ -1261,9 +1276,10 @@ function PairSideCell({
               multi
               readOnly={readOnly}
               chipAccent={chipAccent}
-              onSelect={(opt) =>
-                onCommit(fieldKey, toggleOptionSelection(v, opt, options.options))
-              }
+              onSelect={(opt) => {
+                if (opt == null) return;
+                onCommit(fieldKey, toggleOptionSelection(v, opt, options.options));
+              }}
             />
           ) : (
             <SingleSelectChipWithOptionalOther

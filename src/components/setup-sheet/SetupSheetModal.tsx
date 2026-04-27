@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { formatRunPickerLine } from "@/lib/runPickerFormat";
@@ -62,6 +63,11 @@ export function SetupSheetModal({
     string,
     NumericAggregationCompareSlice
   > | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -145,9 +151,9 @@ export function SetupSheetModal({
     });
   }, [activeSetup]);
 
-  if (!open) return null;
+  if (!open || !portalReady) return null;
 
-  return (
+  return createPortal(
     <div
       data-setup-sheet-modal
       className="setup-sheet-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -242,6 +248,7 @@ export function SetupSheetModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

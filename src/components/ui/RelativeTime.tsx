@@ -1,18 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-
-const LOCAL_DATETIME_OPTIONS: Intl.DateTimeFormatOptions = {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-};
+import {
+  RUN_DATETIME_LOCALE,
+  RUN_DISPLAY_DATETIME_OPTIONS,
+} from "@/lib/formatDate";
 
 function formatLocalExact(d: Date): string {
-  return new Intl.DateTimeFormat("en-AU", LOCAL_DATETIME_OPTIONS).format(d);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, {
+    ...RUN_DISPLAY_DATETIME_OPTIONS,
+    timeZone,
+  }).format(d);
 }
 
 function formatRelative(then: Date, now: Date): string {
@@ -53,7 +52,7 @@ function formatRelative(then: Date, now: Date): string {
  * UTC). After mount the component switches to the requested `display`:
  *   - `relative` → "5 minutes ago", with the exact local time on hover.
  *   - `exact`    → local date + time (12h), with ISO on hover.
- *   - `combo`    → "5 minutes ago · 7:42 pm".
+ *   - `combo`    → "5 minutes ago · 07:42 pm" (2-digit hour, device time zone).
  *
  * Relative mode re-ticks every 30 s so "just now" updates.
  */

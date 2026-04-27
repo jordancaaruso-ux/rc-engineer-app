@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { engineerQuickPromptDisabled, engineerQuickPromptsForSurface } from "@/lib/engineerQuickPrompts";
+import { formatConsistencyScorePercent } from "@/lib/lapAnalysis";
 
 function fmtSec(v: number | null | undefined, notMeaningful?: boolean): string {
   if (notMeaningful) return "—";
@@ -21,7 +22,7 @@ function fmtDeltaSec(v: number | null | undefined): string {
 function fmtDeltaScore(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   const sign = v >= 0 ? "+" : "";
-  return `${sign}${v.toFixed(0)}`;
+  return `${sign}${v.toFixed(2)}`;
 }
 
 function flagClass(flag: string): string {
@@ -249,7 +250,11 @@ export function EngineerRunSummaryPanel({
                   <tr key={label} className="border-b border-border/60 last:border-0">
                     <td className="py-1 px-2 text-foreground/80">{label}</td>
                     <td className="py-1 px-2">
-                      {kind === "sec" ? fmtSec(m.current, m.notMeaningful) : m.current != null ? m.current.toFixed(0) : "—"}
+                      {kind === "sec"
+                        ? fmtSec(m.current, m.notMeaningful)
+                        : m.current != null
+                          ? formatConsistencyScorePercent(m.current)
+                          : "—"}
                     </td>
                     <td className="py-1 px-2">
                       {kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}

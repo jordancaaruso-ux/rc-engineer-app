@@ -15,6 +15,8 @@ type EventItem = {
   startDate: string | Date;
   endDate: string | Date;
   notes: string | null;
+  practiceSourceUrl?: string | null;
+  resultsSourceUrl?: string | null;
   track: { id: string; name: string; location?: string | null } | null;
 };
 
@@ -115,6 +117,8 @@ export function EventList({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [practiceSourceUrl, setPracticeSourceUrl] = useState("");
+  const [resultsSourceUrl, setResultsSourceUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -183,6 +187,8 @@ export function EventList({
           startDate: start,
           endDate: end,
           notes: notes.trim() || null,
+          practiceSourceUrl: practiceSourceUrl.trim() || null,
+          resultsSourceUrl: resultsSourceUrl.trim() || null,
         }),
       });
       setEvents((prev) => [event, ...prev]);
@@ -191,6 +197,8 @@ export function EventList({
       setStartDate("");
       setEndDate("");
       setNotes("");
+      setPracticeSourceUrl("");
+      setResultsSourceUrl("");
       setMessage("Event created.");
       router.refresh();
     } catch (err) {
@@ -268,6 +276,26 @@ export function EventList({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Optional notes"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] text-muted-foreground mb-1">Practice timing URL (optional)</label>
+          <input
+            type="url"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+            value={practiceSourceUrl}
+            onChange={(e) => setPracticeSourceUrl(e.target.value)}
+            placeholder="LiveRC practice session list URL"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] text-muted-foreground mb-1">Race timing URL (optional)</label>
+          <input
+            type="url"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+            value={resultsSourceUrl}
+            onChange={(e) => setResultsSourceUrl(e.target.value)}
+            placeholder="LiveRC results / race timing page URL"
           />
         </div>
         <div className="flex items-center gap-2">

@@ -157,6 +157,22 @@ function normalizeGroupedBehaviorForStorage(
   return isSingleSelectGroupedBehavior(gt) ? "singleSelect" : gt;
 }
 
+/** User’s Editor control (cfUiType) must match PDF mapping group shape; the pink panel can lag behind. */
+function resolveGroupedBuildBehavior(
+  ui: CustomFieldUiType,
+  panel: GroupedFieldBehaviorType
+): GroupedFieldBehaviorType {
+  if (ui === "multiSelect") {
+    if (panel === "visualMulti" || panel === "multiChoiceGroup") return panel;
+    return "multiChoiceGroup";
+  }
+  if (ui === "select") {
+    if (isSingleSelectGroupedBehavior(panel)) return panel;
+    return "singleSelect";
+  }
+  return panel;
+}
+
 /** Pick one PDF widget to highlight for a canonical mapping rule (for catalog → PDF sync). */
 function resolveAcroFromCanonicalKey(
   key: string,
@@ -314,6 +330,14 @@ export function SetupCalibrationEditorClient({
   >({});
   /** When creating / editing a grouped custom field: table of drafts vs pick-chip then click-PDF. */
   const [groupedMappingPanelMode, setGroupedMappingPanelMode] = useState<"table" | "chips">("table");
+  /** Preset from "New field kind" — keeps Form editor control + PDF group shape aligned with user intent. */
+  const [newFieldKindPreset, setNewFieldKindPreset] = useState<{
+    valueType: CustomFieldValueType;
+    ui: CustomFieldUiType;
+    behavior: GroupedFieldBehaviorType;
+  } | null>(null);
+  /** One option name per line; if count matches # of selected PDFs, used as display labels when creating a grouped field. */
+  const [preGroupedOptionNameHints, setPreGroupedOptionNameHints] = useState<string>("");
   /** custom | template | new — drives commit behavior and form fieldScope. */
   const [setupFieldFormScope, setSetupFieldFormScope] = useState<"new" | "custom" | "template">("new");
   /** Explicit editor mode so create vs edit vs source selection do not compete. */
@@ -937,6 +961,7 @@ export function SetupCalibrationEditorClient({
     setAcroSelection({ keys: [sk], activeKey: sk });
     setActiveSetupFieldKey(targetCanonicalKey);
     setStatus(null);
+    setPendingGroupOption(optionValue);
   }
 
   function cancelPdfMappingConflict() {
@@ -993,15 +1018,25 @@ export function SetupCalibrationEditorClient({
   function initGroupedEditorFromSources(
     sourceKeys: string[],
     behavior: GroupedFieldBehaviorType,
-    existingOptions?: GroupedFieldOptionDefinition[]
+    existingOptions?: GroupedFieldOptionDefinition[],
+    optionHintLabels?: string[]
   ) {
     const existingBySource = new Map((existingOptions ?? []).map((o) => [o.sourceKey, o] as const));
     const drafts: Record<string, { optionLabel: string; optionValue: string; notes: string }> = {};
-    sourceKeys.forEach((k) => {
+    sourceKeys.forEach((k, i) => {
       const ref = parseAcroKey(k);
       const row = pdfRowByName.get(ref.pdfFieldName);
       const fallbackName = row?.name ?? ref.pdfFieldName;
       const existing = existingBySource.get(k);
+      const hint = optionHintLabels?.[i]?.trim();
+      if (hint) {
+        drafts[k] = {
+          optionLabel: hint,
+          optionValue: inferOptionValueFromPdfName(hint) || `option_${i + 1}`,
+          notes: existing?.notes ?? "",
+        };
+        return;
+      }
       drafts[k] = {
         optionLabel: existing?.optionLabel ?? fallbackName.replace(/_/g, " "),
         optionValue: existing?.optionValue ?? inferOptionValueFromPdfName(fallbackName),
@@ -1056,7 +1091,11 @@ export function SetupCalibrationEditorClient({
       setGroupedEditorSourceKeys(keys);
       setGroupedOptionDrafts(drafts);
       setGroupBehaviorType(behavior);
-      setGroupedMappingPanelMode("table");
+      setGroupedMappingPanelMode(
+        rule.mode === "multiSelectNamedFields" || (rule.mode === "singleChoiceNamedFields" && entries.length >= 2)
+          ? "chips"
+          : "table"
+      );
       return;
     }
 
@@ -1145,6 +1184,29 @@ export function SetupCalibrationEditorClient({
     setEditorMode(acroSelection.keys.length > 0 ? "sourceSelection" : "idle");
   }
 
+  function startNewFieldKind(kind: "text" | "single" | "multi") {
+    if (kind === "text") {
+      setNewFieldKindPreset(null);
+      setStatus(
+        "Text or single widget: select one control on the PDF, then use “Create new setup field” in the panel below."
+      );
+      return;
+    }
+    if (kind === "single") {
+      setNewFieldKindPreset({ valueType: "enum", ui: "select", behavior: "singleSelect" });
+      setGroupBehaviorType("singleSelect");
+      setStatus(
+        "One-of-many (like chassis): multi-select 2+ PDF controls, then “Create grouped setup field…”. Add optional names (one per line) below — same count as the PDFs you will select."
+      );
+    } else {
+      setNewFieldKindPreset({ valueType: "multi", ui: "multiSelect", behavior: "multiChoiceGroup" });
+      setGroupBehaviorType("multiChoiceGroup");
+      setStatus(
+        "Many of many: select 2+ PDF controls, Continue, fill in each option’s name, then Create. Links are applied in order. After that, use the option buttons (blue = active) and the PDF to change a link if needed."
+      );
+    }
+  }
+
   function beginCreateGroupedFromSelection() {
     const keys = acroSelection.keys;
     if (keys.length < 2) return;
@@ -1162,13 +1224,61 @@ export function SetupCalibrationEditorClient({
       return pdfRowByName.get(ref.pdfFieldName)?.name ?? ref.pdfFieldName;
     });
     const groupedInfer = inferGroupedFieldDefaultsFromPdfNames(names);
-    initGroupedEditorFromSources(keys, groupedInfer.groupBehaviorType);
+    const preset = newFieldKindPreset;
+    const behaviorForInit = preset?.behavior ?? groupedInfer.groupBehaviorType;
+    const lines = preGroupedOptionNameHints
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const hintList = lines.length === keys.length ? lines : undefined;
+    initGroupedEditorFromSources(keys, behaviorForInit, undefined, hintList);
+    if (hintList) {
+      // #region agent log
+      fetch("http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6b04c6" },
+        body: JSON.stringify({
+          sessionId: "6b04c6",
+          runId: "grouped-start",
+          hypothesisId: "H2",
+          location: "beginCreateGroupedFromSelection",
+          message: "option name hints applied",
+          data: { nKeys: keys.length, nHintLines: lines.length },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    }
+    if (preset) {
+      // #region agent log
+      fetch("http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6b04c6" },
+        body: JSON.stringify({
+          sessionId: "6b04c6",
+          runId: "grouped-start",
+          hypothesisId: "H3",
+          location: "beginCreateGroupedFromSelection",
+          message: "using newFieldKindPreset",
+          data: { ui: preset.ui, valueType: preset.valueType, behavior: preset.behavior },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    }
+    setNewFieldKindPreset(null);
     const first = parseAcroKey(keys[0]!);
     const row = pdfRowByName.get(first.pdfFieldName);
     setCfKey(suggestKeyFromPdfFieldName(names.join("_").slice(0, 64) || row?.name || "group_field"));
-    setCfLabel(groupedInfer.labelSuggestion);
-    setCfUiType(groupedInfer.groupBehaviorType === "visualMulti" ? "multiSelect" : "select");
-    setCfValueType(groupedInfer.groupBehaviorType === "visualMulti" ? "multi" : "string");
+    if (preset) {
+      setCfLabel(groupedInfer.labelSuggestion);
+      setCfUiType(preset.ui);
+      setCfValueType(preset.valueType);
+    } else {
+      setCfLabel(groupedInfer.labelSuggestion);
+      setCfUiType(groupedInfer.groupBehaviorType === "visualMulti" ? "multiSelect" : "select");
+      setCfValueType(groupedInfer.groupBehaviorType === "visualMulti" ? "multi" : "string");
+    }
     setCfFieldDomain(groupedInfer.fieldDomain);
     setCfIsMetadata(groupedInfer.isMetadata);
     setCfSectionId(groupedInfer.sectionId);
@@ -1365,7 +1475,23 @@ export function SetupCalibrationEditorClient({
           setCreateFieldError("Each grouped option needs a unique label and value.");
           return;
         }
-        const groupedRule = buildGroupedFormMappingFromPayload(groupBehaviorType, groupedPayload);
+        const buildB = resolveGroupedBuildBehavior(cfUiType, groupBehaviorType);
+        // #region agent log
+        fetch("http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6b04c6" },
+          body: JSON.stringify({
+            sessionId: "6b04c6",
+            runId: "commit-grouped",
+            hypothesisId: "H2",
+            location: "commitCreateField:template+grouped",
+            message: "buildGrouped",
+            data: { cfUiType, groupBehaviorType: groupBehaviorType, buildBehavior: buildB },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        const groupedRule = buildGroupedFormMappingFromPayload(buildB, groupedPayload);
         if (!groupedRule) {
           setCreateFieldError("Grouped fields require at least two valid source options.");
           return;
@@ -1405,8 +1531,10 @@ export function SetupCalibrationEditorClient({
         setCreateFieldError("Each grouped option needs a unique label and value.");
         return;
       }
-      const groupedRuleForEdit =
-        groupedPayloadForEdit ? buildGroupedFormMappingFromPayload(groupBehaviorType, groupedPayloadForEdit) : null;
+      const buildBEdit = resolveGroupedBuildBehavior(cfUiType, groupBehaviorType);
+      const groupedRuleForEdit = groupedPayloadForEdit
+        ? buildGroupedFormMappingFromPayload(buildBEdit, groupedPayloadForEdit)
+        : null;
       if (groupedPayloadForEdit && !groupedRuleForEdit) {
         setCreateFieldError("Grouped fields require at least two valid source options.");
         return;
@@ -1447,7 +1575,7 @@ export function SetupCalibrationEditorClient({
         groupKey: cfUiType === "groupOption" ? cfGroupKey.trim() : undefined,
         optionValue: cfUiType === "groupOption" ? cfOptionValue.trim() || undefined : undefined,
         groupBehaviorType: normalizeGroupedBehaviorForStorage(
-          groupBehaviorType,
+          buildBEdit,
           Boolean(groupedEditorSourceKeys && groupedEditorSourceKeys.length >= 2)
         ),
         groupedOptions:
@@ -1521,7 +1649,23 @@ export function SetupCalibrationEditorClient({
         setCreateFieldError("Each grouped option needs a unique label and value.");
         return;
       }
-      const groupedRule = buildGroupedFormMappingFromPayload(groupBehaviorType, groupedPayload);
+      const buildB = resolveGroupedBuildBehavior(cfUiType, groupBehaviorType);
+      // #region agent log
+      fetch("http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6b04c6" },
+        body: JSON.stringify({
+          sessionId: "6b04c6",
+          runId: "commit-grouped",
+          hypothesisId: "H2",
+          location: "commitCreateField:pending+grouped",
+          message: "buildGrouped",
+          data: { cfUiType, groupBehaviorType, buildBehavior: buildB },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      const groupedRule = buildGroupedFormMappingFromPayload(buildB, groupedPayload);
       if (!groupedRule) {
         setCreateFieldError("Grouped fields require at least two valid source options.");
         return;
@@ -1548,7 +1692,7 @@ export function SetupCalibrationEditorClient({
         uncheckedValue: cfUiType === "checkbox" || cfUiType === "groupOption" ? cfUncheckedValue : undefined,
         groupKey: cfUiType === "groupOption" ? cfGroupKey.trim() : undefined,
         optionValue: cfUiType === "groupOption" ? cfOptionValue.trim() || undefined : undefined,
-        groupBehaviorType: normalizeGroupedBehaviorForStorage(groupBehaviorType, true),
+        groupBehaviorType: normalizeGroupedBehaviorForStorage(buildB, true),
         groupedOptions: groupedPayload,
         notes: cfNotes.trim() || undefined,
       };
@@ -1557,16 +1701,23 @@ export function SetupCalibrationEditorClient({
         ...prev,
         [def.key]: groupedRule,
       }));
-      initGroupedEditorFromSources(pendingGroupedSourceKeys, groupBehaviorType, groupedPayload);
       setPendingGroupedSourceKeys(null);
       setAcroSelection({ keys: [], activeKey: null });
+      clearGroupedEditorState();
       setShowCreateFieldForm(false);
       setCreateFieldEditKey(null);
       setActiveSetupFieldKey(def.key);
       setSetupFieldFormScope("custom");
       setEditorMode("editSetupField");
-      openEditCustomFieldForKey(def.key, def);
-      setStatus("Created grouped setup field and mapping.");
+      setPendingGroupOption(null);
+      setStatus(
+        `Created “${def.displayLabel}” — the PDFs you selected are already linked in order. Scroll to Setup field catalog, keep this field active, and use the option buttons (blue = on, blue stays on when linked) to reassign. Save the calibration to persist.`
+      );
+      if (typeof window !== "undefined") {
+        window.setTimeout(() => {
+          document.getElementById("calibration-setup-field-catalog")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 50);
+      }
       return;
     }
 
@@ -1650,6 +1801,16 @@ export function SetupCalibrationEditorClient({
     const row = pdfRowByName.get(pdfFieldName);
     const mappingKeys = findAppKeysForWidget(formFieldMappings, pdfFieldName, instanceIndex, row);
     const toggleKey = acroSourceKey({ pdfFieldName, instanceIndex });
+    /** When a widget is part of a chip-mapped field, keep the corresponding chip selected (visual link feedback). */
+    const syncPendingChipFromMappedWidget = (kFocus: string) => {
+      const own = listPdfWidgetOwnershipDetails(formFieldMappings, pdfFieldName, instanceIndex, row);
+      const hit = own.find((d) => d.canonicalKey === kFocus);
+      if (hit?.optionValue && effectiveWidgetGroupKind(kFocus)) {
+        setPendingGroupOption(hit.optionValue);
+      } else {
+        setPendingGroupOption(null);
+      }
+    };
 
     if (pendingGroupOption && showCreateFieldForm && groupedEditorSourceKeys?.includes(toggleKey)) {
       const inGroupedEditor =
@@ -1675,7 +1836,7 @@ export function SetupCalibrationEditorClient({
             },
           };
         });
-        setPendingGroupOption(null);
+        setPendingGroupOption(v);
         setStatus(`Stored value “${v}” linked to this PDF control.`);
         return;
       }
@@ -1707,7 +1868,7 @@ export function SetupCalibrationEditorClient({
           setSetupFieldFormScope("new");
           setEditorMode("idle");
         }
-        setPendingGroupOption(null);
+        syncPendingChipFromMappedWidget(k0);
         setShowAddMappingForm(false);
         setStatus(null);
         return;
@@ -1718,7 +1879,7 @@ export function SetupCalibrationEditorClient({
       setPendingGroupedSourceKeys(null);
       setSetupFieldFormScope(customFieldKeySet.has(k0) ? "custom" : "template");
       openEditSetupFieldUnified(k0);
-      setPendingGroupOption(null);
+      syncPendingChipFromMappedWidget(k0);
       setEditorMode("editSetupField");
       setStatus(null);
       return;
@@ -2935,8 +3096,8 @@ export function SetupCalibrationEditorClient({
                     : null}
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Grouped setup fields: pick the field and option chip in the catalog, then click an unmapped widget. Details
-                  are in the right panel.
+                  For grouped fields: in the catalog, pick an option button (blue = active), then the PDF. The button stays
+                  blue when that option is linked. Details are in the right column.
                 </p>
                 <div className="mt-3 border-t border-border pt-2">
                   <button
@@ -3286,6 +3447,108 @@ export function SetupCalibrationEditorClient({
         <div className="rounded-lg border border-border bg-card p-3">
           {tab === "form" ? (
             <>
+              <div className="mb-3 space-y-3 rounded border border-border/80 bg-muted/25 p-3 text-xs">
+                <div className="ui-title text-[11px] text-foreground/90">Add a custom field</div>
+                <p className="text-[10px] leading-relaxed text-muted-foreground">
+                  <span className="font-medium text-foreground/85">Many of many</span> (independent checkboxes): pick that shape,
+                  optionally one name per line (same order as your PDF clicks), select 2+ PDF controls, continue, name each option
+                  in the form, then create. Your selection is linked in order; use the catalog option buttons to reassign if
+                  needed. <span className="font-medium text-foreground/85">Visual multi</span> (only in the grouped form) is for
+                  several boxes that share the <em>same</em> PDF field name (e.g. a row of positions) — not the same as many of
+                  many.
+                </p>
+                <div>
+                  <div className="text-[10px] font-medium text-muted-foreground">1. Field shape</div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <button
+                      type="button"
+                      className={`rounded border px-2 py-1 text-[10px] ${
+                        newFieldKindPreset == null
+                          ? "border-foreground/25 bg-foreground/10 text-foreground"
+                          : "border-border bg-card/60 text-muted-foreground hover:bg-muted/60"
+                      }`}
+                      onClick={() => {
+                        setNewFieldKindPreset(null);
+                        setStatus(
+                          "Single control: select it on the PDF, then in “Map this PDF control” use “Create new setup field (single control)”."
+                        );
+                      }}
+                    >
+                      Text or one control
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded border px-2 py-1 text-[10px] ${
+                        newFieldKindPreset?.ui === "select" && newFieldKindPreset.behavior === "singleSelect"
+                          ? "border-foreground/25 bg-foreground/10 text-foreground"
+                          : "border-border bg-card/60 text-muted-foreground hover:bg-muted/60"
+                      }`}
+                      onClick={() => startNewFieldKind("single")}
+                    >
+                      One of many
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded border px-2 py-1 text-[10px] ${
+                        newFieldKindPreset?.ui === "multiSelect" && newFieldKindPreset.behavior === "multiChoiceGroup"
+                          ? "border-foreground/25 bg-foreground/10 text-foreground"
+                          : "border-border bg-card/60 text-muted-foreground hover:bg-muted/60"
+                      }`}
+                      onClick={() => startNewFieldKind("multi")}
+                    >
+                      Many of many
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-medium text-muted-foreground">2. Option names (optional, grouped only)</div>
+                  <textarea
+                    className="mt-1 w-full min-h-12 rounded border border-border/80 bg-card px-2 py-1 font-sans text-[10px] text-foreground"
+                    value={preGroupedOptionNameHints}
+                    onChange={(e) => setPreGroupedOptionNameHints(e.target.value)}
+                    placeholder={"Line 1 = first PDF control, etc.\nSoft\nMedium\nFirm"}
+                    spellCheck={false}
+                  />
+                </div>
+                <div>
+                  <div className="text-[10px] font-medium text-muted-foreground">3. Add PDF controls to the selection</div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Click the PDF on the left. Unmapped widgets toggle in/out of the selection. Current selection:{" "}
+                    <span className="font-mono text-foreground/90">{acroSelection.keys.length}</span> widget
+                    {acroSelection.keys.length === 1 ? "" : "s"}.
+                  </p>
+                  {acroSelection.keys.length >= 2 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="rounded border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                        onClick={beginCreateGroupedFromSelection}
+                      >
+                        Continue — open grouped field form
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-border/70 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/80"
+                        onClick={() => {
+                          setAcroSelection({ keys: [], activeKey: null });
+                          clearGroupedEditorState();
+                          setPendingGroupedSourceKeys(null);
+                          setEditorMode("idle");
+                        }}
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 text-[10px] text-muted-foreground">
+                      For 2+ controls, keep adding until the count is at least 2, then use the button above. For a single
+                      text/checkbox, pick one control and use <strong>Map this PDF control</strong> (below) → &quot;Create new
+                      setup field (single control)&quot;.
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="mb-3 rounded border border-sky-500/35 bg-sky-500/10 p-3 text-xs">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Selected setup field</div>
@@ -3443,23 +3706,23 @@ export function SetupCalibrationEditorClient({
                 && activeSetupFieldKey
                 && usesSingleSelectChipWorkflow(activeSetupFieldKey)
               ) ? (
-                <div className="mb-3 space-y-3 rounded border border-fuchsia-500/35 bg-fuchsia-500/5 p-3 text-xs">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-fuchsia-100/90">
+                <div className="mb-3 space-y-3 rounded border border-border/80 bg-card/60 p-3 text-xs">
+                  <div className="text-[10px] font-medium text-foreground/90">
                     {isSingleSelectGroupedBehavior(groupBehaviorType)
-                      ? "Single-select field"
+                      ? "One-of-many (one stored value)"
                       : groupBehaviorType === "visualMulti"
-                        ? "Visual multi-select field"
-                        : "Multi-select field"}
+                        ? "Visual multi (one PDF name, many boxes in a row)"
+                        : "Many of many (independent checkboxes)"}
                   </div>
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
                     {isSingleSelectGroupedBehavior(groupBehaviorType)
-                      ? "Same class as chassis / front bumper / top deck: one canonical setup value, mutually exclusive PDF sources. The stored import value is the “Stored value” column; display name is for humans only."
+                      ? "Like chassis: one value in the app, one PDF control active. “Stored value” is what import uses; display name is for the UI only."
                       : groupBehaviorType === "visualMulti"
-                        ? "For screw strips and other position-based multi-select (e.g. motor mount screws). Multiple selections are valid."
-                        : "Many independent checkboxes can be on at once; values are combined for import."}
+                        ? "Use for several positions that share the same Acro name (e.g. screw A/B/C). This is not “many of many” — that uses separate PDF checkboxes, one option each."
+                        : "Each control is a separate on/off. Use Table to edit names. Use Map on PDF (chips) to pick which option you are moving, then click a PDF control — the chip stays blue when that option is linked (same as the catalog button row)."}
                   </p>
-                  <div className="rounded border border-border/60 bg-card/50 p-2">
-                    <div className="text-[10px] font-medium text-muted-foreground">Field behavior</div>
+                  <div className="rounded border border-border/60 bg-muted/30 p-2">
+                    <div className="text-[10px] font-medium text-muted-foreground">Field behavior (advanced)</div>
                     <label className="mt-2 block text-[11px] text-muted-foreground">
                       Type
                       <select
@@ -3471,20 +3734,20 @@ export function SetupCalibrationEditorClient({
                           else setGroupBehaviorType(v as "visualMulti" | "multiChoiceGroup");
                         }}
                       >
-                        <option value="singleSelect">Single-select · one canonical value (chassis, body, …)</option>
-                        <option value="visualMulti">Visual multi · screws / positions</option>
-                        <option value="multiChoiceGroup">Multi-select · many independent boxes</option>
+                        <option value="singleSelect">Single-select · one value, many choices (e.g. chassis, body type)</option>
+                        <option value="visualMulti">Visual multi · same Acro name, a row of boxes (screw/position A–D)</option>
+                        <option value="multiChoiceGroup">Many of many · separate PDF checkboxes, each is its own option</option>
                       </select>
                     </label>
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
                     <div className="text-[10px] font-medium text-muted-foreground">Option mapping</div>
                     <div className="flex gap-1">
                       <button
                         type="button"
                         className={`rounded border px-2 py-0.5 text-[10px] ${
                           groupedMappingPanelMode === "table"
-                            ? "border-fuchsia-500/60 bg-fuchsia-500/15"
+                            ? "border-foreground/30 bg-foreground/10"
                             : "border-border hover:bg-muted/50"
                         }`}
                         onClick={() => setGroupedMappingPanelMode("table")}
@@ -3495,20 +3758,21 @@ export function SetupCalibrationEditorClient({
                         type="button"
                         className={`rounded border px-2 py-0.5 text-[10px] ${
                           groupedMappingPanelMode === "chips"
-                            ? "border-fuchsia-500/60 bg-fuchsia-500/15"
+                            ? "border-foreground/30 bg-foreground/10"
                             : "border-border hover:bg-muted/50"
                         }`}
                         onClick={() => setGroupedMappingPanelMode("chips")}
                       >
-                        Map on PDF (chips)
+                        Reassign (chips)
                       </button>
                     </div>
                   </div>
                   {groupedMappingPanelMode === "chips" ? (
                     <div className="rounded border border-border/60 bg-card/50 p-2">
                       <p className="text-[10px] text-muted-foreground">
-                        Arm a <strong>stored value</strong> with a chip, then click the matching control on the PDF. Switch
-                        to <strong>Table</strong> to edit display names and keep each stored value unique.
+                        Click a chip so it is blue, then the PDF control for that option. The chip stays blue so you can see
+                        the link. If you just created the field with PDFs already selected, those links are already set — this
+                        is to fix or change one. Use <strong>Table</strong> for display names and unique stored values.
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {(() => {
@@ -3624,44 +3888,12 @@ export function SetupCalibrationEditorClient({
                 </div>
               ) : null}
 
-              <div className="ui-title text-xs text-muted-foreground">AcroForm source</div>
+              <div className="ui-title text-xs text-muted-foreground">Map this PDF control</div>
               <p className="mt-1 text-[10px] text-muted-foreground">
-                Unmapped widgets: click to toggle selection (multi-select). Mapped widgets: click opens that setup field in
-                the editor. With two or more unmapped widgets selected, create one grouped setup field and assign option
-                labels per checkbox.
+                Unmapped: click the PDF to add/remove from the selection (count is in <strong>Add a custom field</strong>).
+                Mapped: click to open that setup field. One widget: link or create a single field below. Two or more: use
+                the flow at the top first.
               </p>
-              {acroSelection.keys.length >= 2 ? (
-                <div className="mt-3 space-y-2 rounded border border-fuchsia-500/40 bg-fuchsia-500/5 p-2 text-[11px]">
-                  <div className="font-medium text-fuchsia-100/90">
-                    Multi-select ({acroSelection.keys.length} PDF widgets)
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    This creates one parent setup field and maps each selected source checkbox as a child option row.
-                    Choose behavior and option details in the grouped editor after opening it.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="rounded border border-fuchsia-500/60 bg-fuchsia-500/15 px-3 py-1.5 text-xs font-medium text-fuchsia-50 hover:bg-fuchsia-500/25"
-                      onClick={beginCreateGroupedFromSelection}
-                    >
-                      Create grouped setup field…
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-border px-3 py-1.5 text-xs hover:bg-muted"
-                      onClick={() => {
-                        setAcroSelection({ keys: [], activeKey: null });
-                        clearGroupedEditorState();
-                        setPendingGroupedSourceKeys(null);
-                        setEditorMode("idle");
-                      }}
-                    >
-                      Clear PDF selection
-                    </button>
-                  </div>
-                </div>
-              ) : null}
               {!selectedAcroField ? (
                 <div className="mt-3 rounded border border-border/60 bg-muted/20 px-3 py-6 text-xs text-muted-foreground">
                   {activeSetupFieldKey ? (
@@ -3752,7 +3984,7 @@ export function SetupCalibrationEditorClient({
                     </div>
                   ) : (
                     <div className="space-y-2 border-t border-border pt-2">
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Map this PDF field</div>
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Map this PDF control</div>
                       {!activeSetupFieldKey && !showAddMappingForm && !showCreateFieldForm ? (
                         <div className="flex flex-col gap-2">
                           <button
@@ -3769,10 +4001,10 @@ export function SetupCalibrationEditorClient({
                           </button>
                           <button
                             type="button"
-                            className="w-full rounded border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-left text-xs font-medium hover:bg-emerald-500/20"
+                            className="w-full rounded border border-border bg-card px-3 py-2 text-left text-xs font-medium hover:bg-muted"
                             onClick={openCreateFieldFromSelection}
                           >
-                            Create new setup field…
+                            Create new setup field (single control)…
                           </button>
                         </div>
                       ) : null}
@@ -3860,20 +4092,29 @@ export function SetupCalibrationEditorClient({
                 </div>
               )}
 
-              <details className="mt-4 border-t border-border pt-3" open>
+              <details
+                id="calibration-setup-field-catalog"
+                className="mt-4 border-t border-border pt-3"
+                open
+              >
                 <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Setup field catalog &amp; groups</summary>
                 <div className="mt-3 space-y-3">
                   {activeSetupFieldKey && effectiveWidgetGroupKind(activeSetupFieldKey) ? (
                     <div className="rounded border border-blue-500/40 bg-blue-500/10 p-2 text-[11px]">
                       <div className="text-[10px] font-medium text-blue-100/90">
-                        {effectiveWidgetGroupKind(activeSetupFieldKey) === "single" ? "Single-select" : "Visual multi-select"}
+                        {effectiveWidgetGroupKind(activeSetupFieldKey) === "single"
+                          ? "Single-select (one value)"
+                          : customFieldByKey.get(activeSetupFieldKey)?.groupBehaviorType === "visualMulti"
+                            ? "Visual multi (same field name, row of boxes)"
+                            : "Many of many (independent checkboxes)"}
                         <span className="ml-2 font-normal text-muted-foreground">
                           ({getLogicalFieldKind(activeSetupFieldKey)})
                         </span>
                       </div>
                       <p className="mt-1 text-[10px] text-muted-foreground">
-                        Pick an option chip, then click an <strong>unmapped</strong> widget on the PDF (chassis, track layout,
-                        traction, bodyshell, … share this workflow).
+                        Click a button so it is blue, then the PDF control. It stays blue when that option is linked. For a
+                        new control, use an <strong>unmapped</strong> widget; to move a link, click the control that already
+                        has it (chassis, custom groups, same idea).
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {chipOptionEntriesForField(activeSetupFieldKey).map(({ value, label }) => (

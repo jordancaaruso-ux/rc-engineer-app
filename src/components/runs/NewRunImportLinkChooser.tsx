@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { DashboardIncompleteRunRow } from "@/lib/dashboardServer";
-import { formatAppTimestampUtc } from "@/lib/formatDate";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { cn } from "@/lib/utils";
 function btnPrimary(className = "") {
@@ -21,11 +21,13 @@ export function NewRunImportLinkChooser({
   incompleteRuns,
   importedLapTimeSessionId,
   eventId,
+  displayTimeZone,
   children,
 }: {
   incompleteRuns: DashboardIncompleteRunRow[];
   importedLapTimeSessionId: string | null;
   eventId: string | null;
+  displayTimeZone: string;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -90,7 +92,7 @@ export function NewRunImportLinkChooser({
                   Saved{" "}
                   <RelativeTime
                     iso={r.createdAt}
-                    fallback={formatAppTimestampUtc(r.createdAt)}
+                    fallback={formatRunCreatedAtDateTime(r.createdAt, displayTimeZone)}
                   />
                 </div>
               </div>

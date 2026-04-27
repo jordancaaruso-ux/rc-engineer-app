@@ -23,12 +23,14 @@ export function toCompareRunShape(run: {
   tireRunNumber: number;
   setupSnapshot?: { id: string; data: unknown } | null;
   sessionCompletedAt?: Date | string | null;
+  loggingCompletedAt?: Date | string | null;
   sortAt?: Date | string | null;
 }): CompareRunShape {
   return {
     id: run.id,
     createdAt: run.createdAt,
     sessionCompletedAt: run.sessionCompletedAt ?? null,
+    loggingCompletedAt: run.loggingCompletedAt ?? null,
     sortAt: run.sortAt ?? null,
     sessionType: run.sessionType,
     meetingSessionType: run.meetingSessionType,

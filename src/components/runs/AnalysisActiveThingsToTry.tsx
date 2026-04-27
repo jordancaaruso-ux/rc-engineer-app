@@ -14,7 +14,7 @@ export function AnalysisActiveThingsToTry() {
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/action-items", { cache: "no-store" })
+    fetch("/api/action-items?list=try", { cache: "no-store" })
       .then((r) => r.json().catch(() => null))
       .then((data: { items?: Item[] } | null) => {
         if (!alive) return;

@@ -10,7 +10,7 @@ export function AccountSection({ email }: { email: string }) {
   async function onDeleteAccount() {
     if (
       !window.confirm(
-        "Delete your RC Engineer account and all runs, setups, and uploads? This cannot be undone."
+        "Delete your JRC Race Engineer account and all runs, setups, and uploads? This cannot be undone."
       )
     ) {
       return;

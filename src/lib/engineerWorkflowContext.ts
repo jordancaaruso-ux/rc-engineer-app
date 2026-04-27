@@ -18,6 +18,7 @@ export type EngineerWorkflowContext = {
     handlingPreview: string;
   };
   thingsToTry: { id: string; text: string }[];
+  thingsToDo: { id: string; text: string }[];
 };
 
 /**
@@ -25,7 +26,7 @@ export type EngineerWorkflowContext = {
  * Used as Phase-2 foundation for engineer / decision workflow context.
  */
 export async function loadEngineerWorkflowContext(userId: string): Promise<EngineerWorkflowContext> {
-  const [lastRun, thingsToTry] = await Promise.all([
+  const [lastRun, thingsToTry, thingsToDo] = await Promise.all([
     prisma.run.findFirst({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -48,14 +49,19 @@ export async function loadEngineerWorkflowContext(userId: string): Promise<Engin
       },
     }),
     prisma.actionItem.findMany({
-      where: { userId, isArchived: false },
-      orderBy: { createdAt: "desc" },
+      where: { userId, isArchived: false, listKind: "THINGS_TO_TRY" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true, text: true },
+    }),
+    prisma.actionItem.findMany({
+      where: { userId, isArchived: false, listKind: "THINGS_TO_DO" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: { id: true, text: true },
     }),
   ]);
 
   if (!lastRun) {
-    return { lastRun: null, thingsToTry };
+    return { lastRun: null, thingsToTry, thingsToDo };
   }
 
   const carName = lastRun.car?.name ?? lastRun.carNameSnapshot ?? "—";
@@ -86,5 +92,6 @@ export async function loadEngineerWorkflowContext(userId: string): Promise<Engin
       handlingPreview,
     },
     thingsToTry,
+    thingsToDo,
   };
 }

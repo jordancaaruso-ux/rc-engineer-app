@@ -13,6 +13,7 @@ type Props = {
   todayBestRunLabel: string | null;
   todayRunCount: number;
   todaysChanges: DashboardHomeModel["todaysChanges"];
+  displayTimeZone: string;
 };
 
 type Tab = "best" | "changes";
@@ -24,6 +25,7 @@ export function TodaySummaryCard({
   todayBestRunLabel,
   todayRunCount,
   todaysChanges,
+  displayTimeZone,
 }: Props) {
   const [tab, setTab] = useState<Tab>("best");
   const totalChanges = todaysChanges.reduce((acc, block) => acc + block.rows.length, 0);
@@ -66,7 +68,7 @@ export function TodaySummaryCard({
             todayBestRunLabel={todayBestRunLabel}
           />
         ) : (
-          <TodayChangesPanel blocks={todaysChanges} />
+          <TodayChangesPanel blocks={todaysChanges} displayTimeZone={displayTimeZone} />
         )}
       </div>
     </div>
@@ -130,7 +132,7 @@ function TodayBestPanel({
         <div className="min-w-0 truncate text-[11px] text-foreground">
           {todayBestRunId ? (
             <Link
-              href={`/runs/${encodeURIComponent(todayBestRunId)}/edit`}
+              href={`/runs/history?focusRun=${encodeURIComponent(todayBestRunId)}`}
               className="underline decoration-border underline-offset-2 hover:decoration-accent"
             >
               {todayBestRunLabel ?? "Open run"}
@@ -144,7 +146,13 @@ function TodayBestPanel({
   );
 }
 
-function TodayChangesPanel({ blocks }: { blocks: DashboardHomeModel["todaysChanges"] }) {
+function TodayChangesPanel({
+  blocks,
+  displayTimeZone,
+}: {
+  blocks: DashboardHomeModel["todaysChanges"];
+  displayTimeZone: string;
+}) {
   if (blocks.length === 0) {
     return (
       <p className="text-[11px] text-muted-foreground">
@@ -166,7 +174,7 @@ function TodayChangesPanel({ blocks }: { blocks: DashboardHomeModel["todaysChang
                 {block.runLabel}
               </Link>
               <div className="text-[10px] tabular-nums text-muted-foreground">
-                {formatRunCreatedAtDateTime(block.when)}
+                {formatRunCreatedAtDateTime(block.when, displayTimeZone)}
               </div>
             </div>
             <div className="text-[10px] text-muted-foreground">

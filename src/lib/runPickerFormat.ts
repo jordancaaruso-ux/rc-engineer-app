@@ -1,6 +1,7 @@
 import { bestLap, formatLap } from "@/lib/runLaps";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunPickerScanDate } from "@/lib/formatDate";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 
 /** Run shape needed for picker line (API + server components). */
 export type RunPickerRun = {
@@ -25,10 +26,16 @@ export type RunPickerRun = {
   setupSnapshot?: { id: string; data: unknown } | null;
   /** On-track session time when known (import). */
   sessionCompletedAt?: Date | string | null;
+  /** First save as complete; see {@link resolveRunDisplayInstant}. */
+  loggingCompletedAt?: Date | string | null;
 };
 
-function pickRunInstant(run: RunPickerRun): Date | string {
-  return run.sessionCompletedAt ?? run.createdAt;
+function pickRunInstant(run: RunPickerRun): Date {
+  return resolveRunDisplayInstant({
+    createdAt: run.createdAt,
+    sessionCompletedAt: run.sessionCompletedAt ?? null,
+    loggingCompletedAt: run.loggingCompletedAt ?? null,
+  });
 }
 
 /** Session segment: label if set, else meeting/testing fallback. */

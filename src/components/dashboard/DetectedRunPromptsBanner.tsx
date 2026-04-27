@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
-import { formatAppTimestampUtc } from "@/lib/formatDate";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
@@ -23,13 +23,13 @@ function promptHref(p: DetectedRunPrompt): string {
   return `/runs/new?${q.toString()}`;
 }
 
-function formatPromptSessionWhen(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return formatAppTimestampUtc(iso);
-}
-
-export function DetectedRunPromptsBanner({ prompts }: { prompts: DetectedRunPrompt[] }) {
+export function DetectedRunPromptsBanner({
+  prompts,
+  displayTimeZone,
+}: {
+  prompts: DetectedRunPrompt[];
+  displayTimeZone: string;
+}) {
   const router = useRouter();
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [dismissErr, setDismissErr] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export function DetectedRunPromptsBanner({ prompts }: { prompts: DetectedRunProm
             p.promptKind === "finish" ? "Finish logging this run" : "Log this run";
           const timeLabel = formatLap(p.bestLapSeconds);
           const lapsLabel = p.lapCount != null ? `${p.lapCount} lap${p.lapCount === 1 ? "" : "s"}` : "—";
-          const whenFallback = formatPromptSessionWhen(p.sessionCompletedAtIso);
+          const whenFallback = formatRunCreatedAtDateTime(p.sessionCompletedAtIso, displayTimeZone);
           const kindLabel = p.sourceType === "practice" ? "Practice" : "Race / qualifying";
           const sessionTitle =
             p.sessionListLabel?.trim() ||

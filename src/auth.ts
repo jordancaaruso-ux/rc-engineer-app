@@ -28,7 +28,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       : []),
     Nodemailer({
       server: process.env.EMAIL_SERVER?.trim() || { jsonTransport: true },
-      from: process.env.EMAIL_FROM?.trim() || "RC Engineer <dev@localhost>",
+      from: process.env.EMAIL_FROM?.trim() || "JRC Race Engineer <dev@localhost>",
       async sendVerificationRequest(params) {
         const { identifier, url, provider } = params;
         if (!(await isEmailAuthAllowed(identifier))) {
@@ -44,8 +44,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           to: identifier,
           from: provider.from,
           subject: `Sign in to ${host}`,
-          text: `Sign in to RC Engineer\n${url}\n`,
-          html: `<p>Sign in to <strong>RC Engineer</strong> (${host})</p><p><a href="${url}">Click here to continue</a></p>`,
+          text: `Sign in to JRC Race Engineer\n${url}\n`,
+          html: `<p>Sign in to <strong>JRC Race Engineer</strong> (${host})</p><p><a href="${url}">Click here to continue</a></p>`,
         });
         const rejected = result.rejected || [];
         const pending = result.pending || [];

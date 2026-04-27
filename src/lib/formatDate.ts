@@ -12,14 +12,22 @@ const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
 /** Fixed locale for run timestamps (history table, pickers, setup sheets). */
 export const RUN_DATETIME_LOCALE = "en-AU";
 
-const RUN_TABLE_DATETIME_OPTIONS: Intl.DateTimeFormatOptions = {
+/**
+ * Wall-clock slice for a run instant. Pass explicit `timeZone` (e.g. from the
+ * `rc_tz` cookie via {@link getExplicitTimeZoneForRunFormatting}) so SSR matches
+ * the device after the cookie is set; omit `timeZone` only when you intend the
+ * runtime default calendar (not recommended for run lists).
+ */
+export const RUN_DISPLAY_DATETIME_OPTIONS: Intl.DateTimeFormatOptions = {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
-  hour: "numeric",
+  hour: "2-digit",
   minute: "2-digit",
   hour12: true,
 };
+
+const RUN_TABLE_DATETIME_OPTIONS = RUN_DISPLAY_DATETIME_OPTIONS;
 
 const RUN_WEEKDAY_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   weekday: "short",
@@ -60,12 +68,19 @@ export function formatAppTimestampUtc(d: string | Date | null | undefined): stri
 }
 
 /**
- * Compact date+time for run history rows and detail (SSR-safe: fixed locale + options).
+ * Compact date+time for run history rows and detail.
+ * Prefer passing `timeZone` (IANA) so server output matches the signed-in device
+ * once the `rc_tz` cookie is present.
  */
-export function formatRunCreatedAtDateTime(d: string | Date): string {
+export function formatRunCreatedAtDateTime(d: string | Date, timeZone?: string | null): string {
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return "—";
-  return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, RUN_TABLE_DATETIME_OPTIONS).format(dt);
+  const tz = timeZone?.trim();
+  const opts: Intl.DateTimeFormatOptions = {
+    ...RUN_TABLE_DATETIME_OPTIONS,
+    ...(tz ? { timeZone: tz } : {}),
+  };
+  return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, opts).format(dt);
 }
 
 /**

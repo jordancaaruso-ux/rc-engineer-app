@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { loadDashboardHomeModel } from "@/lib/dashboardServer";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 
 export default async function DashboardPage(): Promise<ReactNode> {
@@ -26,6 +27,7 @@ export default async function DashboardPage(): Promise<ReactNode> {
 
   const user = await requireCurrentUser();
   const model = await loadDashboardHomeModel(user.id);
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
 
-  return <DashboardHome model={model} />;
+  return <DashboardHome model={model} displayTimeZone={displayTimeZone} />;
 }

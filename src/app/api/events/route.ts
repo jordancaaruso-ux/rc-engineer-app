@@ -69,6 +69,8 @@ export async function POST(request: Request) {
       startDate?: string;
       endDate?: string;
       notes?: string | null;
+      practiceSourceUrl?: string | null;
+      resultsSourceUrl?: string | null;
     };
 
     const name = body.name?.trim();
@@ -103,6 +105,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const practiceSourceUrl =
+      typeof body.practiceSourceUrl === "string" && body.practiceSourceUrl.trim()
+        ? body.practiceSourceUrl.trim()
+        : null;
+    const resultsSourceUrl =
+      typeof body.resultsSourceUrl === "string" && body.resultsSourceUrl.trim()
+        ? body.resultsSourceUrl.trim()
+        : null;
+
     const event = await prisma.event.create({
       data: {
         userId: user.id,
@@ -111,6 +122,8 @@ export async function POST(request: Request) {
         startDate,
         endDate,
         notes: body.notes?.trim() || null,
+        practiceSourceUrl,
+        resultsSourceUrl,
       },
       include: {
         track: { select: { id: true, name: true, location: true } },

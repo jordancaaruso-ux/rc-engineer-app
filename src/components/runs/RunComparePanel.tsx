@@ -37,6 +37,8 @@ export type CompareRunShape = {
   setupSnapshot?: { id: string; data: unknown } | null;
   /** On-track session instant when known (import / timing). */
   sessionCompletedAt?: Date | string | null;
+  /** First save as complete; see resolveRunDisplayInstant. */
+  loggingCompletedAt?: Date | string | null;
   /** Stable ordering axis; present on rows loaded post-migration. */
   sortAt?: Date | string | null;
 };
