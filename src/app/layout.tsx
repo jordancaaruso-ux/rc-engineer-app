@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Montserrat } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
 import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLinkBridge";
+import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
+import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -14,7 +17,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "RC Engineer",
+  title: "JRC Race Engineer",
   description:
     "Track runs, setups, and engineering-style guidance for competitive RC touring car drivers."
 };
@@ -34,7 +37,12 @@ export default function RootLayout({ children }: { children: ReactNode }): React
   return (
     <html lang="en" className={`${montserrat.variable} dark`}>
       <body className="min-h-screen font-sans font-normal antialiased">
+        <Script
+          id="rc-tz-cookie-bootstrap"
+          strategy="beforeInteractive"
+        >{`(function(){try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;document.cookie='${RC_TIMEZONE_COOKIE}='+encodeURIComponent(tz)+';path=/;max-age=31536000;SameSite=Lax';}catch(e){}})();`}</Script>
         <AuthSessionProvider>
+          <TimeZoneCookieSync />
           <CapacitorDeepLinkBridge />
           <div className="app-shell">
             <Sidebar />

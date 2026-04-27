@@ -324,6 +324,16 @@ export function computeConsistencyFromCV(cv: number): number {
   return score;
 }
 
+/** Canonical precision for consistency score everywhere it is shown or serialized. */
+export function roundConsistencyScore(score: number): number {
+  return Math.round(score * 100) / 100;
+}
+
+/** UI: RC consistency score (100 − CV %) with exactly two decimal places. */
+export function formatConsistencyScorePercent(score: number): string {
+  return `${roundConsistencyScore(score).toFixed(2)}%`;
+}
+
 /** Single pass over included laps for compact run-summary UI. */
 export function getIncludedLapDashboardMetrics(laps: LapRow[]): IncludedLapDashboardMetrics {
   const times = getIncludedLaps(laps).map((l) => l.lapTimeSeconds);
@@ -353,7 +363,8 @@ export function getIncludedLapDashboardMetrics(laps: LapRow[]): IncludedLapDashb
     analysis.consistencyStdDev != null
       ? (analysis.consistencyStdDev / analysis.averageLap) * 100
       : null;
-  const consistencyScore = cvPercent != null ? computeConsistencyFromCV(cvPercent) : null;
+  const consistencyScore =
+    cvPercent != null ? roundConsistencyScore(computeConsistencyFromCV(cvPercent)) : null;
   return {
     lapCount: times.length,
     stintSeconds,
