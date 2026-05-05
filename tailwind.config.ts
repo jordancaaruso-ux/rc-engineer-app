@@ -10,39 +10,41 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Slightly lifted dark palette — each surface nudged ~4–10 points up
-        // from the original so the UI reads as "broken up" rather than a flat
-        // heavy dark. Keep identity: same green-tinted black, same primary red.
-        background: "#0E1312",
-        foreground: "#ECF2EF",
+        // Driven by `globals.css` RGB triplets + `data-theme-preview` variants.
+        background: "rgb(var(--color-background) / <alpha-value>)",
+        foreground: "rgb(var(--color-foreground) / <alpha-value>)",
         card: {
-          DEFAULT: "#19201D",
-          foreground: "#ECF2EF"
+          DEFAULT: "rgb(var(--color-card) / <alpha-value>)",
+          foreground: "rgb(var(--color-card-foreground) / <alpha-value>)",
         },
         primary: {
-          DEFAULT: "#C92A2A",
-          foreground: "#F8F9FA"
+          DEFAULT: "rgb(var(--color-primary) / <alpha-value>)",
+          foreground: "rgb(var(--color-primary-foreground) / <alpha-value>)",
         },
         secondary: {
-          DEFAULT: "#151C1A",
-          foreground: "#ECF2EF"
+          DEFAULT: "rgb(var(--color-secondary) / <alpha-value>)",
+          foreground: "rgb(var(--color-secondary-foreground) / <alpha-value>)",
         },
         muted: {
-          DEFAULT: "#171F1C",
-          foreground: "#B0BBB7"
+          DEFAULT: "rgb(var(--color-muted) / <alpha-value>)",
+          foreground: "rgb(var(--color-muted-foreground) / <alpha-value>)",
         },
         accent: {
-          DEFAULT: "#2563EB",
-          foreground: "#F8F9FA"
+          DEFAULT: "rgb(var(--color-accent) / <alpha-value>)",
+          foreground: "rgb(var(--color-accent-foreground) / <alpha-value>)",
         },
-        destructive: "#7A1E1E",
-        // Border tone bumped hardest — it's what makes cards feel like distinct
-        // panels instead of a single dark wash.
-        border: "#2A332F",
-        input: "#1A211F",
-        ring: "#C92A2A",
+        destructive: "rgb(var(--color-destructive) / <alpha-value>)",
+        border: "rgb(var(--color-border) / <alpha-value>)",
+        input: "rgb(var(--color-input) / <alpha-value>)",
+        ring: "rgb(var(--color-ring) / <alpha-value>)",
         /** Extra-muted labels (spec) */
-        faint: "#73807B"
+        faint: "rgb(var(--color-faint) / <alpha-value>)",
+        /** Cool flat panels (runna-style neutrals; see globals.css) */
+        "surface-runna": {
+          DEFAULT: "rgb(var(--color-surface-runna) / <alpha-value>)",
+          deep: "rgb(var(--color-surface-runna-deep) / <alpha-value>)",
+          inset: "rgb(var(--color-surface-runna-inset) / <alpha-value>)",
+        },
       },
       borderRadius: {
         lg: "0.5rem",
@@ -54,9 +56,9 @@ const config: Config = {
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
       },
       boxShadow: {
-        glow: "0 0 24px -4px rgba(201, 42, 42, 0.28)",
-        "glow-sm": "0 0 16px -6px rgba(201, 42, 42, 0.22)"
-      }
+        glow: "0 0 24px -4px rgb(var(--glow-shadow-rgb) / 0.28)",
+        "glow-sm": "0 0 16px -6px rgb(var(--glow-shadow-rgb) / 0.22)",
+      },
     }
   },
   plugins: []

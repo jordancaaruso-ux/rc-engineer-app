@@ -35,21 +35,25 @@ export async function PATCH(
     practiceSourceUrl?: unknown;
     resultsSourceUrl?: unknown;
     raceClass?: unknown;
+    controlledTireLabel?: unknown;
   };
 
   const practiceSourceUrl = optString(body.practiceSourceUrl);
   const resultsSourceUrl = optString(body.resultsSourceUrl);
   const raceClass = optString(body.raceClass);
+  const controlledTireLabel = optString(body.controlledTireLabel);
 
   const data: {
     practiceSourceUrl?: string | null;
     resultsSourceUrl?: string | null;
     raceClass?: string | null;
+    controlledTireLabel?: string | null;
   } = {};
 
   if (practiceSourceUrl !== undefined) data.practiceSourceUrl = practiceSourceUrl;
   if (resultsSourceUrl !== undefined) data.resultsSourceUrl = resultsSourceUrl;
   if (raceClass !== undefined) data.raceClass = raceClass;
+  if (controlledTireLabel !== undefined) data.controlledTireLabel = controlledTireLabel;
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });

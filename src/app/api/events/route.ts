@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       notes?: string | null;
       practiceSourceUrl?: string | null;
       resultsSourceUrl?: string | null;
+      controlledTireLabel?: string | null;
     };
 
     const name = body.name?.trim();
@@ -113,6 +114,10 @@ export async function POST(request: Request) {
       typeof body.resultsSourceUrl === "string" && body.resultsSourceUrl.trim()
         ? body.resultsSourceUrl.trim()
         : null;
+    const controlledTireLabel =
+      typeof body.controlledTireLabel === "string" && body.controlledTireLabel.trim()
+        ? body.controlledTireLabel.trim()
+        : null;
 
     const event = await prisma.event.create({
       data: {
@@ -124,6 +129,7 @@ export async function POST(request: Request) {
         notes: body.notes?.trim() || null,
         practiceSourceUrl,
         resultsSourceUrl,
+        controlledTireLabel,
       },
       include: {
         track: { select: { id: true, name: true, location: true } },

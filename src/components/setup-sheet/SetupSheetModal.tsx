@@ -40,7 +40,7 @@ export type SetupSheetModalRun = {
   lapTimes?: unknown;
 };
 
-type CompareMode = "current_setup" | "choose_run";
+type CompareMode = "this_run_only" | "current_setup" | "choose_run";
 
 export function SetupSheetModal({
   open,
@@ -56,7 +56,7 @@ export function SetupSheetModal({
   pickerRuns?: SetupSheetModalRun[];
   runListSource?: RunCompareListSource;
 }) {
-  const [mode, setMode] = useState<CompareMode>("current_setup");
+  const [mode, setMode] = useState<CompareMode>("this_run_only");
   const [otherRunId, setOtherRunId] = useState("");
   const [activeTick, setActiveTick] = useState(0);
   const [numericAggregationByKey, setNumericAggregationByKey] = useState<Map<
@@ -77,6 +77,12 @@ export function SetupSheetModal({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    setMode("this_run_only");
+    setOtherRunId("");
+  }, [open, run?.id]);
 
   useEffect(() => {
     const bump = () => setActiveTick((t) => t + 1);
@@ -131,10 +137,13 @@ export function SetupSheetModal({
   );
 
   const baselineValue = useMemo<SetupSnapshotData | null>(() => {
-    if (mode === "choose_run" && baselineRun)
+    if (mode === "this_run_only") return null;
+    if (mode === "choose_run" && baselineRun) {
       return normalizeSetupData(baselineRun.setupSnapshot?.data ?? {});
-    if (mode === "current_setup" && activeSetup)
+    }
+    if (mode === "current_setup" && activeSetup) {
       return normalizeSetupData(activeSetup);
+    }
     return null;
   }, [mode, baselineRun, activeSetup]);
 
@@ -184,56 +193,89 @@ export function SetupSheetModal({
             <p className="text-sm text-muted-foreground">No run data.</p>
           ) : (
             <>
-              <div className="space-y-2">
-                <span className="ui-title text-xs text-muted-foreground uppercase tracking-wide">
-                  Compare to
-                </span>
-                <div className="flex flex-wrap gap-2 items-center">
-                  <button
-                    type="button"
-                    onClick={() => setMode("current_setup")}
-                    className={cn(
-                      "rounded-md border px-3 py-1.5 text-xs font-medium transition",
-                      mode === "current_setup"
-                        ? "border-accent bg-accent/15 text-foreground"
-                        : "border-border bg-card hover:bg-muted/90"
-                    )}
-                  >
-                    Current setup
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("choose_run")}
-                    disabled={otherRuns.length === 0}
-                    className={cn(
-                      "rounded-md border px-3 py-1.5 text-xs font-medium transition",
-                      otherRuns.length === 0
-                        ? "border-border/80 text-muted-foreground/50 cursor-not-allowed"
-                        : mode === "choose_run"
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <span className="ui-title text-xs text-muted-foreground uppercase tracking-wide">
+                    Compare to
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("this_run_only");
+                        setOtherRunId("");
+                      }}
+                      className={cn(
+                        "rounded-md border px-3 py-1.5 text-xs font-medium transition",
+                        mode === "this_run_only"
                           ? "border-accent bg-accent/15 text-foreground"
                           : "border-border bg-card hover:bg-muted/90"
+                      )}
+                    >
+                      This run
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("current_setup")}
+                      className={cn(
+                        "rounded-md border px-3 py-1.5 text-xs font-medium transition",
+                        mode === "current_setup"
+                          ? "border-accent bg-accent/15 text-foreground"
+                          : "border-border bg-card hover:bg-muted/90"
+                      )}
+                    >
+                      Current setup
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("choose_run")}
+                      disabled={otherRuns.length === 0}
+                      className={cn(
+                        "rounded-md border px-3 py-1.5 text-xs font-medium transition",
+                        otherRuns.length === 0
+                          ? "border-border/80 text-muted-foreground/50 cursor-not-allowed"
+                          : mode === "choose_run"
+                            ? "border-accent bg-accent/15 text-foreground"
+                            : "border-border bg-card hover:bg-muted/90"
+                      )}
+                    >
+                      Choose run
+                    </button>
+                    {mode === "choose_run" && otherRuns.length > 0 && (
+                      <div className="min-w-0 w-full max-w-md sm:w-auto sm:min-w-[12rem]">
+                        <RunPickerSelect
+                          label=""
+                          runs={otherRuns}
+                          value={otherRunId}
+                          onChange={setOtherRunId}
+                          placeholder="Select run…"
+                          formatLine={formatRunPickerLine}
+                        />
+                      </div>
                     )}
-                  >
-                    Choose run
-                  </button>
-                  {mode === "choose_run" && otherRuns.length > 0 && (
-                    <div className="min-w-0 max-w-md">
-                      <RunPickerSelect
-                        label=""
-                        runs={otherRuns}
-                        value={otherRunId}
-                        onChange={setOtherRunId}
-                        placeholder="Select run…"
-                        formatLine={formatRunPickerLine}
-                      />
-                    </div>
+                  </div>
+                  {mode === "current_setup" && !hasActiveSetup && (
+                    <p className="text-xs text-amber-600/90 dark:text-amber-400/90">
+                      No current setup. Use the Setup page or Log your run to set one.
+                    </p>
                   )}
                 </div>
-                {mode === "current_setup" && !hasActiveSetup && (
-                  <p className="text-xs text-amber-600/90 dark:text-amber-400/90">
-                    No current setup. Use the Setup page or Log your run to set one.
-                  </p>
-                )}
+                <div className="flex shrink-0 flex-col gap-1.5 sm:items-end sm:pl-2">
+                  <a
+                    href={`/api/runs/${encodeURIComponent(run.id)}/setup-pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-md border border-border bg-card px-3 py-1.5 text-center text-xs font-medium hover:bg-muted/90 transition"
+                  >
+                    Turn into a PDF
+                  </a>
+                  <a
+                    href={`/api/runs/${encodeURIComponent(run.id)}/setup-pdf?download=1`}
+                    className="text-[11px] text-muted-foreground underline hover:text-foreground"
+                  >
+                    Download PDF
+                  </a>
+                </div>
               </div>
 
               <SetupSheetView
@@ -242,7 +284,7 @@ export function SetupSheetModal({
                 readOnly
                 template={template}
                 baselineValue={baselineValue}
-                numericAggregationByKey={numericAggregationByKey}
+                numericAggregationByKey={mode === "this_run_only" ? null : numericAggregationByKey}
               />
             </>
           )}

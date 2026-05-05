@@ -3,6 +3,7 @@
 
 :root {
   color-scheme: dark;
+  /* Legacy single-hex aliases (some docs / snippets); UI uses Tailwind + rgb triplets below. */
   --background: #0e1312;
   --foreground: #ecf2ef;
   --surface: #19201d;
@@ -12,6 +13,181 @@
   --border: #2a332f;
   --accent: #2563eb;
   --primary: #c92a2a;
+
+  /* Tailwind theme bridge: space-separated RGB for `rgb(var(--x) / <alpha>)` */
+  --color-background: 14 19 18;
+  --color-foreground: 236 242 239;
+  --color-card: 25 32 29;
+  --color-card-foreground: 236 242 239;
+  --color-primary: 201 42 42;
+  --color-primary-foreground: 248 249 250;
+  --color-secondary: 21 28 26;
+  --color-secondary-foreground: 236 242 239;
+  --color-muted: 23 31 28;
+  --color-muted-foreground: 176 187 183;
+  --color-accent: 37 99 235;
+  --color-accent-foreground: 248 249 250;
+  --color-destructive: 122 30 30;
+  --color-border: 42 51 47;
+  --color-input: 26 33 31;
+  --color-ring: 201 42 42;
+  --color-faint: 115 128 123;
+
+  /* Body mesh gradient alphas (theme previews may override) */
+  --body-glow-red-strong: 0.28;
+  --body-glow-red-soft: 0.24;
+  --body-glow-blue: 0.16;
+  --body-glow-center: 0.025;
+  --body-stripe-red: 0.03;
+  --body-stripe-blue: 0.035;
+  /* boxShadow.glow / glow-sm (override per theme preview when primary feels too loud) */
+  --glow-shadow-rgb: 201 42 42;
+
+  /*
+   * Cool neutral flats (runna.com-style: --black #161616, inner panels ~#161616 / #333 border).
+   * Used where we want flat greys without the default theme’s green cast on `muted`.
+   */
+  --color-surface-runna-deep: 16 16 16;
+  --color-surface-runna: 22 22 22;
+  --color-surface-runna-inset: 26 26 26;
+}
+
+/* Near-black previews: darker base + surfaces; slightly softer corner glow so hues stay subtle. */
+html[data-theme-preview="carbon"] {
+  --color-background: 8 8 9;
+  --color-foreground: 232 234 236;
+  --color-card: 14 14 16;
+  --color-card-foreground: 232 234 236;
+  --color-primary: 201 42 42;
+  --color-primary-foreground: 248 249 250;
+  --color-secondary: 10 10 12;
+  --color-secondary-foreground: 230 232 234;
+  --color-muted: 12 12 14;
+  --color-muted-foreground: 152 156 160;
+  --color-accent: 37 99 235;
+  --color-accent-foreground: 248 249 250;
+  --color-destructive: 122 30 30;
+  --color-border: 28 28 32;
+  --color-input: 13 13 15;
+  --color-ring: 201 42 42;
+  --color-faint: 95 98 102;
+  --body-glow-red-strong: 0.2;
+  --body-glow-red-soft: 0.17;
+  --body-glow-blue: 0.11;
+  --body-glow-center: 0.018;
+  --body-stripe-red: 0.022;
+  --body-stripe-blue: 0.026;
+}
+
+html[data-theme-preview="forest"] {
+  --color-background: 6 10 8;
+  --color-foreground: 230 236 233;
+  --color-card: 11 16 13;
+  --color-card-foreground: 230 236 233;
+  --color-primary: 201 42 42;
+  --color-primary-foreground: 248 249 250;
+  --color-secondary: 8 12 10;
+  --color-secondary-foreground: 228 234 231;
+  --color-muted: 10 14 12;
+  --color-muted-foreground: 148 158 152;
+  --color-accent: 37 99 235;
+  --color-accent-foreground: 248 249 250;
+  --color-destructive: 122 30 30;
+  --color-border: 24 32 28;
+  --color-input: 11 15 13;
+  --color-ring: 201 42 42;
+  --color-faint: 90 100 94;
+  --body-glow-red-strong: 0.2;
+  --body-glow-red-soft: 0.17;
+  --body-glow-blue: 0.11;
+  --body-glow-center: 0.018;
+  --body-stripe-red: 0.022;
+  --body-stripe-blue: 0.026;
+}
+
+html[data-theme-preview="polar"] {
+  --color-background: 6 8 12;
+  --color-foreground: 228 234 240;
+  --color-card: 11 14 18;
+  --color-card-foreground: 228 234 240;
+  --color-primary: 201 42 42;
+  --color-primary-foreground: 248 249 250;
+  --color-secondary: 8 10 14;
+  --color-secondary-foreground: 226 232 238;
+  --color-muted: 10 12 16;
+  --color-muted-foreground: 145 154 168;
+  --color-accent: 37 99 235;
+  --color-accent-foreground: 248 249 250;
+  --color-destructive: 122 30 30;
+  --color-border: 26 30 38;
+  --color-input: 11 14 18;
+  --color-ring: 201 42 42;
+  --color-faint: 88 96 110;
+  --body-glow-red-strong: 0.2;
+  --body-glow-red-soft: 0.17;
+  --body-glow-blue: 0.11;
+  --body-glow-center: 0.018;
+  --body-stripe-red: 0.022;
+  --body-stripe-blue: 0.026;
+}
+
+html[data-theme-preview="ember"] {
+  --color-background: 10 7 6;
+  --color-foreground: 236 232 230;
+  --color-card: 16 12 11;
+  --color-card-foreground: 236 232 230;
+  --color-primary: 201 42 42;
+  --color-primary-foreground: 248 249 250;
+  --color-secondary: 12 9 8;
+  --color-secondary-foreground: 234 230 228;
+  --color-muted: 14 11 10;
+  --color-muted-foreground: 160 152 148;
+  --color-accent: 37 99 235;
+  --color-accent-foreground: 248 249 250;
+  --color-destructive: 122 30 30;
+  --color-border: 36 30 28;
+  --color-input: 15 12 11;
+  --color-ring: 201 42 42;
+  --color-faint: 102 96 92;
+  --body-glow-red-strong: 0.2;
+  --body-glow-red-soft: 0.17;
+  --body-glow-blue: 0.11;
+  --body-glow-center: 0.018;
+  --body-stripe-red: 0.022;
+  --body-stripe-blue: 0.026;
+}
+
+/*
+ * runna.com Webflow :root tokens (pulled from their shared CSS):
+ * --black:#161616, --grey:#333, --cool-grey:#a9acaf, --cool-dark-grey:#4e565d.
+ * Flat surfaces (card / muted / secondary / input) share the exact --black triplet.
+ */
+html[data-theme-preview="runna"] {
+  --color-background: 16 16 16;
+  --color-foreground: 236 242 239;
+  --color-card: 22 22 22;
+  --color-card-foreground: 236 242 239;
+  --color-primary: 201 42 42;
+  --color-primary-foreground: 248 249 250;
+  --color-secondary: 22 22 22;
+  --color-secondary-foreground: 236 242 239;
+  --color-muted: 22 22 22;
+  --color-muted-foreground: 169 172 175;
+  --color-accent: 37 99 235;
+  --color-accent-foreground: 248 249 250;
+  --color-destructive: 122 30 30;
+  --color-border: 51 51 51;
+  --color-input: 22 22 22;
+  --color-ring: 37 99 235;
+  --color-faint: 78 86 93;
+  /* Kill primary-tinted page wash + stripes; lean on cool accent + neutral lift */
+  --body-glow-red-strong: 0;
+  --body-glow-red-soft: 0;
+  --body-stripe-red: 0;
+  --body-glow-blue: 0.14;
+  --body-glow-center: 0.03;
+  --body-stripe-blue: 0.038;
+  --glow-shadow-rgb: 37 99 235;
 }
 
 html {
@@ -22,25 +198,45 @@ html {
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
   min-height: 100%;
-  background-color: #0e1312;
+  background-color: rgb(var(--color-background));
   /* Lifted base + softer corner glows. The old gradients were strong enough
      that mid-page reads as a heavy dark wash; we now lift the base a little
      and tone down the corner alpha so cards / borders can do the
      "broken up" work. */
   background-image:
-    radial-gradient(ellipse 120% 90% at 0% 0%, rgba(201, 42, 42, 0.28), transparent 55%),
-    radial-gradient(ellipse 120% 90% at 100% 0%, rgba(37, 99, 235, 0.16), transparent 55%),
-    radial-gradient(ellipse 120% 90% at 0% 100%, rgba(37, 99, 235, 0.16), transparent 55%),
-    radial-gradient(ellipse 120% 90% at 100% 100%, rgba(201, 42, 42, 0.24), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 50% 30%, rgba(236, 242, 239, 0.025), transparent 70%),
+    radial-gradient(
+      ellipse 120% 90% at 0% 0%,
+      rgb(var(--color-primary) / var(--body-glow-red-strong)),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 120% 90% at 100% 0%,
+      rgb(var(--color-accent) / var(--body-glow-blue)),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 120% 90% at 0% 100%,
+      rgb(var(--color-accent) / var(--body-glow-blue)),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 120% 90% at 100% 100%,
+      rgb(var(--color-primary) / var(--body-glow-red-soft)),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 50% 30%,
+      rgb(var(--color-foreground) / var(--body-glow-center)),
+      transparent 70%
+    ),
     repeating-linear-gradient(
       180deg,
       transparent 0,
       transparent 420px,
-      rgba(201, 42, 42, 0.03) 420px,
-      rgba(201, 42, 42, 0.03) 840px,
-      rgba(37, 99, 235, 0.035) 840px,
-      rgba(37, 99, 235, 0.035) 1260px
+      rgb(var(--color-primary) / var(--body-stripe-red)) 420px,
+      rgb(var(--color-primary) / var(--body-stripe-red)) 840px,
+      rgb(var(--color-accent) / var(--body-stripe-blue)) 840px,
+      rgb(var(--color-accent) / var(--body-stripe-blue)) 1260px
     );
   background-attachment: scroll;
   @apply text-foreground antialiased font-normal;
@@ -65,11 +261,12 @@ body {
 
 .sidebar {
   /* NOTE: do not set display here; responsive visibility is controlled in JSX */
-  @apply w-64 flex-col gap-3 border-r border-border bg-secondary/80 px-4 pt-3 pb-5 backdrop-blur-md;
-}
-
-.sidebar-logo {
-  @apply text-base font-medium tracking-tight uppercase text-foreground;
+  /*
+   * Top padding matches the approximate height of `.page-header` (title + subtitle + py-3),
+   * so the first nav row lines up with the header band / horizontal rule to the right.
+   */
+  @apply w-64 flex-col gap-3 border-r border-border bg-secondary/80 px-4 pb-5 backdrop-blur-md;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 4rem);
 }
 
 .sidebar-nav {
@@ -114,7 +311,7 @@ body {
 }
 
 /* Central heading/title standard: bold + italic + uppercase. */
-:where(h1, h2, h3, h4, h5, h6, .page-title, .sidebar-logo, .ui-title) {
+:where(h1, h2, h3, h4, h5, h6, .page-title, .ui-title) {
   font-family: var(--font-sans), system-ui, sans-serif;
   font-weight: 700;
   font-style: italic;
@@ -148,7 +345,7 @@ input[type="url"]:focus-visible,
 input[type="search"]:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  @apply outline-none ring-2 ring-primary/35 ring-offset-0 ring-offset-background border-primary/45;
+  @apply outline-none ring-2 ring-ring/35 ring-offset-0 ring-offset-background border-ring/45;
 }
 
 @media print {

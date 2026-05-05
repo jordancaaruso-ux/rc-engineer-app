@@ -95,7 +95,7 @@ export function DetectedRunPromptsBanner({
                 <div className="mt-1 space-y-0.5 text-muted-foreground">
                   <div>
                     <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">
-                      Session time
+                      {p.sessionTimeIsImportFallback ? "Imported" : "Session time"}
                     </span>
                     <span className="ml-1.5 font-mono tabular-nums text-foreground/90">
                       <RelativeTime

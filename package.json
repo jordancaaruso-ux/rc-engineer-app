@@ -18,6 +18,7 @@
     "test:grip-spread": "npx tsx src/lib/engineerPhase5/gripSpreadContrast.test.ts",
     "check:legacy-local-user": "npx tsx scripts/check-legacy-local-user.ts",
     "backfill:setup-car": "npx tsx scripts/backfill-setup-documents-car-id.ts",
+    "db:prune-calibrations": "npx tsx scripts/prune-calibrations-keep-community-shared.ts",
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios"
   },

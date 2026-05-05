@@ -20,10 +20,7 @@ import {
   type RepickOutcome,
 } from "@/lib/setupCalibrations/autoPickCalibration";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
-import {
-  normalizeSetupSnapshotForStorage,
-  type SetupSnapshotData,
-} from "@/lib/runSetup";
+import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
 
 const PDF_MIME = "application/pdf";
 
@@ -37,6 +34,8 @@ type QuickCreateResponse = {
   parseStatus: "PENDING" | "PARSED" | "PARTIAL" | "FAILED";
   needsReview: boolean;
   needsReviewReason: string | null;
+  /** True when multiple calibrations matched the PDF fingerprint; a best guess was applied. */
+  calibrationAmbiguous: boolean;
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -184,14 +183,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     },
   });
   const parseStatus = (latest?.parseStatus ?? "PENDING") as QuickCreateResponse["parseStatus"];
+  const calibrationAmbiguous = mimeType === PDF_MIME && outcome.pickSource === "ambiguous_suggestion";
 
   // Decide if the document is clean enough to materialise a SetupSnapshot automatically.
-  if (mimeType === PDF_MIME && outcome.pickSource === "ambiguous_suggestion") {
-    needsReview = true;
-    needsReviewReason =
-      needsReviewReason
-      ?? `Multiple calibrations match this PDF — confirm "${outcome.pickedCalibrationName}" or pick another.`;
-  } else if (!pickedCalibrationId && mimeType === PDF_MIME) {
+  if (!pickedCalibrationId && mimeType === PDF_MIME) {
     needsReview = true;
     needsReviewReason = needsReviewReason ?? "No calibration matched — pick one in review.";
   }
@@ -210,36 +205,25 @@ export async function POST(request: Request): Promise<NextResponse> {
     && (parseStatus === "PARSED" || parseStatus === "PARTIAL")
     && latest
     && !latest.createdSetupId
-    && latest.carId
   ) {
-    try {
-      const setup = await prisma.setupSnapshot.create({
-        data: {
-          userId: user.id,
-          carId: latest.carId,
-          data: normalizeSetupSnapshotForStorage(
-            (latest.parsedDataJson ?? {}) as SetupSnapshotData
-          ) as object,
-        },
-        select: { id: true },
-      });
-      const linked = await prisma.setupDocument.updateMany({
-        where: { id: created.id, userId: user.id, createdSetupId: null },
-        data: { createdSetupId: setup.id },
-      });
-      if (linked.count === 1) {
-        setupId = setup.id;
-        console.log(`[setup-documents/quick-create] doc=${created.id} setup=${setup.id} created`);
-      } else {
-        // Another code path raced us and linked a setup; leave the caller to reconcile.
+    const createdResult = await tryCreateSetupFromParsedDocument({
+      docId: created.id,
+      userId: user.id,
+    });
+    if (createdResult.ok) {
+      setupId = createdResult.setupId;
+      console.log(`[setup-documents/quick-create] doc=${created.id} setup=${setupId} created`);
+    } else {
+      if (createdResult.reason === "race_or_concurrent_link") {
         needsReview = true;
         needsReviewReason = "Setup was linked concurrently — re-open the document to verify.";
+      } else {
+        needsReview = true;
+        needsReviewReason = `Failed to create setup: ${createdResult.reason}`;
+        console.warn(
+          `[setup-documents/quick-create] doc=${created.id} tryCreateSetupFromParsedDocument ${createdResult.reason}`
+        );
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      needsReview = true;
-      needsReviewReason = `Failed to create setup: ${msg.slice(0, 200)}`;
-      console.warn(`[setup-documents/quick-create] doc=${created.id} createSetup error=${msg}`);
     }
   } else if (!needsReview && (parseStatus === "PARSED" || parseStatus === "PARTIAL")) {
     // Parse was ok but something else blocked setup creation (e.g. no car, pre-existing link).
@@ -257,6 +241,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     parseStatus,
     needsReview,
     needsReviewReason,
+    calibrationAmbiguous,
   };
   return NextResponse.json(payload, { status: 201 });
 }

@@ -4,7 +4,6 @@ import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { formatRunCreatedAtDateTime, formatAppTimestampUtc } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { DetectedRunPromptsBanner } from "@/components/dashboard/DetectedRunPromptsBanner";
 import { IncompleteLoggingRunsBanner } from "@/components/dashboard/IncompleteLoggingRunsBanner";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
 import { TodaySummaryCard } from "@/components/dashboard/TodaySummaryCard";
@@ -31,7 +30,6 @@ export function DashboardHome({
     recentRun,
     thingsToTry,
     thingsToDo,
-    detectedRunPrompts,
     incompleteRuns,
     todayBestLap,
     todayBestAvgTop5,
@@ -78,7 +76,6 @@ export function DashboardHome({
       </header>
 
       <section className="page-body flex max-w-3xl flex-col gap-3">
-        <DetectedRunPromptsBanner prompts={detectedRunPrompts} displayTimeZone={displayTimeZone} />
         <IncompleteLoggingRunsBanner rows={incompleteRunsFiltered} displayTimeZone={displayTimeZone} />
 
         <Link

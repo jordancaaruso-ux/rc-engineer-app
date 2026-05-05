@@ -6,9 +6,8 @@ import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { eventIsActiveOnLocalToday, startOfLocalDay } from "@/lib/eventActive";
-import { loadDetectedRunPrompts, syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
-import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
-import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
+import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
+import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 
@@ -123,7 +122,7 @@ export async function getDashboardNewRunPrefill(
   const importedLapTimeSessionId =
     typeof raw.importedLapTimeSessionId === "string" ? raw.importedLapTimeSessionId.trim() : "";
   if (importedLapTimeSessionId) {
-    const [sess, liveRcDriverName] = await Promise.all([
+    const [sess, liveRcDriverName, liveRcDriverId] = await Promise.all([
       prisma.importedLapTimeSession.findFirst({
         where: { id: importedLapTimeSessionId, userId },
         select: {
@@ -138,6 +137,7 @@ export async function getDashboardNewRunPrefill(
         },
       }),
       getLiveRcDriverNameSetting(userId),
+      getLiveRcDriverIdSetting(userId),
     ]);
     if (!sess) return null;
     const src = sess.eventDetectionSource;
@@ -154,6 +154,7 @@ export async function getDashboardNewRunPrefill(
         eventDetectionSource,
         linkedEventId: sess.linkedEventId,
         liveRcDriverName,
+        liveRcDriverId,
       },
       fromEventDetection: eventDetectionSource === "practice" || eventDetectionSource === "race",
     };
@@ -207,7 +208,6 @@ export type DashboardIncompleteRunRow = {
 };
 
 export type DashboardHomeModel = {
-  detectedRunPrompts: DetectedRunPrompt[];
   /** Saved runs where the user has not clicked "Run completed" yet. */
   incompleteRuns: DashboardIncompleteRunRow[];
   thingsToTry: DashboardActionItemRow[];
@@ -364,12 +364,10 @@ export async function loadIncompleteRunsForImportChooser(
 export async function loadDashboardHomeModel(userId: string): Promise<DashboardHomeModel> {
   const { start: todayStart, end: todayEnd } = localTodayBounds();
 
-  // Fire-and-forget: this performs sequential LiveRC HTTP fetches + per-event
-  // Prisma writes and can take 1-2s. Awaiting it blocked every dashboard
-  // render. Detected-run prompts are read from the DB below; whatever this
-  // sync writes will be visible on the next dashboard load (one-load delay).
+  // Fire-and-forget: LiveRC fetches + Prisma writes; can take 1–2s. Dashboard no
+  // longer shows detected-session prompts, but background sync keeps event lap
+  // sources fresh for next features / pages.
   void syncRecentEventLapSources(userId).catch(() => {});
-  const detectedRunPrompts = await loadDetectedRunPrompts(userId);
 
   const [events, recentRun, todaysRuns, priorRun, incompleteRunsRows] = await Promise.all([
     prisma.event.findMany({
@@ -595,7 +593,6 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
   const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
 
   return {
-    detectedRunPrompts,
     incompleteRuns,
     thingsToTry: thingsToTryRows.map((i) => ({
       id: i.id,

@@ -64,6 +64,8 @@ type EventOption = {
   practiceSourceUrl?: string | null;
   /** LiveRC results / race timing page URL (optional). */
   resultsSourceUrl?: string | null;
+  /** Optional spec compound (same style as TireSet.label), e.g. Sweep 32. */
+  controlledTireLabel?: string | null;
   track?: { id: string; name: string; location?: string | null } | null;
 };
 
@@ -223,7 +225,9 @@ export function NewRunForm(props: {
   /**
    * Practice-day results URL (LiveRC session list). Hydrates from editRun →
    * copy-last-run → event `practiceSourceUrl` when empty → `currentPracticeDayUrl`
-   * (testing only). Shown for both Testing and Race meeting; saved on the run.
+   * (testing only). Shown for Testing; saved on the run. For Lap times scan in
+   * Testing, this is the index URL. Race meetings use `lapTimesLiveRcScanIndexUrl`
+   * (practice vs race event URLs + meeting session type).
    * Testing-only: also POSTs to Settings `currentPracticeDayUrl` on save.
    */
   const [practiceDayUrl, setPracticeDayUrl] = useState<string>("");
@@ -246,16 +250,13 @@ export function NewRunForm(props: {
   const [newEventEndDate, setNewEventEndDate] = useState("");
   const [newEventPracticeUrl, setNewEventPracticeUrl] = useState("");
   const [newEventResultsUrl, setNewEventResultsUrl] = useState("");
+  const [newEventControlledTire, setNewEventControlledTire] = useState("");
   /** When logging a race meeting, timing URLs (stored on the Event; edited here, PATCH on save). */
   const [eventPracticeTimingUrl, setEventPracticeTimingUrl] = useState("");
   const [eventRaceTimingUrl, setEventRaceTimingUrl] = useState("");
+  const [eventControlledTireLabel, setEventControlledTireLabel] = useState("");
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
-  const [eventTrackSwitchPrompt, setEventTrackSwitchPrompt] = useState<{
-    eventId: string;
-    eventTrackId: string;
-    eventTrackName: string;
-  } | null>(null);
 
   const [replicateLast, setReplicateLast] = useState(false);
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
@@ -288,7 +289,7 @@ export function NewRunForm(props: {
   const [notesSubTab, setNotesSubTab] = useState<"notes" | "things" | "todo">("notes");
   const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
   const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
-  const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("car");
+  const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("tires");
   const [trackGripTags, setTrackGripTags] = useState<string[]>([]);
   const [trackLayoutTags, setTrackLayoutTags] = useState<string[]>([]);
   const thingsTryRef = useRef<HTMLTextAreaElement>(null);
@@ -302,13 +303,15 @@ export function NewRunForm(props: {
   const [showNewTireSetPanel, setShowNewTireSetPanel] = useState(false);
   const [creatingTireSet, setCreatingTireSet] = useState(false);
   const [newTireLabel, setNewTireLabel] = useState("");
-  const [newTireSetNumber, setNewTireSetNumber] = useState<number>(1);
+  const [newTireSetNumber, setNewTireSetNumber] = useState<string>("1");
   const [newTireInitialRunCount, setNewTireInitialRunCount] = useState<number>(0);
+  /** When true, compound came from event spec — show set # only until user overrides. */
+  const [newTireCompoundFromEvent, setNewTireCompoundFromEvent] = useState(false);
 
   const [showNewBatteryPanel, setShowNewBatteryPanel] = useState(false);
   const [creatingBattery, setCreatingBattery] = useState(false);
   const [newBatteryLabel, setNewBatteryLabel] = useState("");
-  const [newBatteryPackNumber, setNewBatteryPackNumber] = useState<number>(1);
+  const [newBatteryPackNumber, setNewBatteryPackNumber] = useState<string>("1");
   const [newBatteryInitialRunCount, setNewBatteryInitialRunCount] = useState<number>(0);
 
   const [shareWithTeam, setShareWithTeam] = useState(true);
@@ -358,6 +361,24 @@ export function NewRunForm(props: {
   const batteryRunUserTouchedRef = useRef(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
+  /** LiveRC index page for Lap times → URL scan: practice `session_list` or any `/results/` session index. */
+  const lapTimesLiveRcScanIndexUrl = useMemo(() => {
+    if (sessionType === "TESTING") return practiceDayUrl.trim() || null;
+    if (sessionType === "RACE_MEETING" && eventId) {
+      const p = eventPracticeTimingUrl.trim();
+      const r = eventRaceTimingUrl.trim();
+      if (meetingSessionType === "PRACTICE") return p || r || null;
+      return r || p || null;
+    }
+    return null;
+  }, [
+    sessionType,
+    eventId,
+    practiceDayUrl,
+    eventPracticeTimingUrl,
+    eventRaceTimingUrl,
+    meetingSessionType,
+  ]);
   const editRun = props.editRun ?? null;
   const isEditing = Boolean(editRun?.id);
   /**
@@ -539,6 +560,7 @@ export function NewRunForm(props: {
       const plan = buildImportedIngestPlanFromPayload(sess.parsedPayload, {
         mode: ingestMode,
         liveRcDriverName: sess.liveRcDriverName,
+        liveRcDriverId: sess.liveRcDriverId ?? null,
       });
       const parsed = plan
         ? null
@@ -740,6 +762,13 @@ export function NewRunForm(props: {
     : "Load from downloaded setup";
 
   const needsEvent = sessionType === "RACE_MEETING";
+
+  const selectedEventForRun = useMemo(
+    () => (needsEvent && eventId ? events.find((e) => e.id === eventId) ?? null : null),
+    [needsEvent, eventId, events]
+  );
+  /** Race meeting + event with a track: run track follows the event (picker disabled). */
+  const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
 
   useEffect(() => {
     let alive = true;
@@ -1251,44 +1280,28 @@ export function NewRunForm(props: {
   }, [showNewEventPanel]);
 
   useEffect(() => {
-    if (!needsEvent || !eventId) {
-      setEventTrackSwitchPrompt(null);
-      return;
-    }
+    if (!needsEvent || !eventId) return;
     const selected = events.find((e) => e.id === eventId) ?? null;
     const evTrackId = selected?.trackId ?? "";
-    if (!evTrackId || !selected) {
-      setEventTrackSwitchPrompt(null);
-      return;
-    }
-    const eventTrackName =
-      selected.track?.name ?? tracksList.find((t) => t.id === evTrackId)?.name ?? "event track";
-    if (!trackId) {
+    if (!evTrackId || !selected) return;
+    if (trackId !== evTrackId) {
       setTrackId(evTrackId);
-      setEventTrackSwitchPrompt(null);
-      return;
+      setCopyTrackWarning(null);
     }
-    if (trackId === evTrackId) {
-      setEventTrackSwitchPrompt(null);
-      return;
-    }
-    setEventTrackSwitchPrompt({
-      eventId: selected.id,
-      eventTrackId: evTrackId,
-      eventTrackName,
-    });
-  }, [eventId, events, needsEvent, trackId, tracksList]);
+  }, [eventId, events, needsEvent, trackId]);
 
   useEffect(() => {
     if (!needsEvent || !eventId) {
       setEventPracticeTimingUrl("");
       setEventRaceTimingUrl("");
+      setEventControlledTireLabel("");
       return;
     }
     const ev = events.find((e) => e.id === eventId);
     if (!ev) return;
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
+    setEventControlledTireLabel(ev.controlledTireLabel?.trim() ?? "");
   }, [needsEvent, eventId, events]);
 
   function applyCopyFromPreview() {
@@ -1467,6 +1480,7 @@ export function NewRunForm(props: {
           endDate: end,
           practiceSourceUrl: newEventPracticeUrl.trim() || null,
           resultsSourceUrl: newEventResultsUrl.trim() || null,
+          controlledTireLabel: newEventControlledTire.trim() || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1491,6 +1505,7 @@ export function NewRunForm(props: {
       setNewEventEndDate("");
       setNewEventPracticeUrl("");
       setNewEventResultsUrl("");
+      setNewEventControlledTire("");
       setShowNewEventPanel(false);
       setStatus("Event created — selected.");
     } catch (err) {
@@ -1498,6 +1513,35 @@ export function NewRunForm(props: {
     } finally {
       setCreatingEvent(false);
     }
+  }
+
+  function toggleNewTireSetPanel() {
+    if (showNewTireSetPanel) {
+      setNewTireLabel("");
+      setNewTireSetNumber("1");
+      setNewTireInitialRunCount(0);
+      setNewTireCompoundFromEvent(false);
+      setInlineError(null);
+      setShowNewTireSetPanel(false);
+      return;
+    }
+    setInlineError(null);
+    const specFromList = events.find((e) => e.id === eventId)?.controlledTireLabel?.trim() ?? "";
+    const specFromForm = eventControlledTireLabel.trim();
+    const spec =
+      sessionType === "RACE_MEETING" && eventId ? specFromForm || specFromList : "";
+    if (spec) {
+      setNewTireLabel(spec);
+      setNewTireCompoundFromEvent(true);
+      setNewTireSetNumber("1");
+      setNewTireInitialRunCount(0);
+    } else {
+      setNewTireLabel("");
+      setNewTireCompoundFromEvent(false);
+      setNewTireSetNumber("1");
+      setNewTireInitialRunCount(0);
+    }
+    setShowNewTireSetPanel(true);
   }
 
   async function createTireSet(e?: React.MouseEvent) {
@@ -1511,7 +1555,9 @@ export function NewRunForm(props: {
     setStatus(null);
     setCreatingTireSet(true);
 
-    const setNumber = newTireSetNumber >= 1 ? Math.floor(newTireSetNumber) : 1;
+    const setRaw = newTireSetNumber.trim();
+    const setParsed = setRaw === "" ? NaN : parseInt(setRaw, 10);
+    const setNumber = Number.isFinite(setParsed) && setParsed >= 1 ? setParsed : 1;
     const initialRunCount = newTireInitialRunCount >= 0 ? Math.floor(newTireInitialRunCount) : 0;
 
     const runCreate = async (): Promise<{ tireSet: TireSetOption }> => {
@@ -1547,8 +1593,9 @@ export function NewRunForm(props: {
       tireRunUserTouchedRef.current = true;
       setRunsCompleted(initialRunCount);
       setNewTireLabel("");
-      setNewTireSetNumber(1);
+      setNewTireSetNumber("1");
       setNewTireInitialRunCount(0);
+      setNewTireCompoundFromEvent(false);
       setShowNewTireSetPanel(false);
       setStatus("Tire set created — selected.");
       setInlineError(null);
@@ -1572,7 +1619,9 @@ export function NewRunForm(props: {
     setStatus(null);
     setCreatingBattery(true);
 
-    const packNumber = newBatteryPackNumber >= 1 ? Math.floor(newBatteryPackNumber) : 1;
+    const packRaw = newBatteryPackNumber.trim();
+    const packParsed = packRaw === "" ? NaN : parseInt(packRaw, 10);
+    const packNumber = Number.isFinite(packParsed) && packParsed >= 1 ? packParsed : 1;
     const initialRunCount = newBatteryInitialRunCount >= 0 ? Math.floor(newBatteryInitialRunCount) : 0;
 
     const runCreate = async (): Promise<{ battery: BatteryPackOption }> => {
@@ -1608,7 +1657,7 @@ export function NewRunForm(props: {
       batteryRunUserTouchedRef.current = true;
       setBatteryRunsCompleted(initialRunCount);
       setNewBatteryLabel("");
-      setNewBatteryPackNumber(1);
+      setNewBatteryPackNumber("1");
       setNewBatteryInitialRunCount(0);
       setShowNewBatteryPanel(false);
       setStatus("Battery pack created — selected.");
@@ -1678,29 +1727,19 @@ export function NewRunForm(props: {
         }));
       }
 
-      if (primary && primary.laps.length > 0) {
-        out.push({
-          sourceUrl,
-          driverId: primary.driverId,
-          driverName: primary.driverName,
-          normalizedName: primary.normalizedName,
-          isPrimaryUser: bi === 0,
-          sessionCompletedAt,
-          laps: structuredLapsForDriver(primary),
-        });
-      }
-
-      for (const d of selectedOrdered) {
-        if (primary && d.driverId === primary.driverId) continue;
+      /** Persist every parsed driver so field / Engineer comparisons stay available (selection only gates primary laps). */
+      for (const d of sessionDrivers) {
         if (d.laps.length === 0) continue;
+        const laps = structuredLapsForDriver(d);
+        if (laps.length === 0) continue;
         out.push({
           sourceUrl,
           driverId: d.driverId,
           driverName: d.driverName,
           normalizedName: d.normalizedName,
-          isPrimaryUser: false,
+          isPrimaryUser: Boolean(primary && bi === 0 && d.driverId === primary.driverId),
           sessionCompletedAt,
-          laps: structuredLapsForDriver(d),
+          laps,
         });
       }
     }
@@ -1916,16 +1955,23 @@ export function NewRunForm(props: {
       if (sessionType === "RACE_MEETING" && needsEvent && eventId) {
         const p = eventPracticeTimingUrl.trim() || null;
         const r = eventRaceTimingUrl.trim() || null;
+        const c = eventControlledTireLabel.trim() || null;
         void fetch(`/api/events/${encodeURIComponent(eventId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ practiceSourceUrl: p, resultsSourceUrl: r }),
+          body: JSON.stringify({
+            practiceSourceUrl: p,
+            resultsSourceUrl: r,
+            controlledTireLabel: c,
+          }),
         })
           .then((res) => {
             if (!res.ok) return;
             setEvents((prev) =>
               prev.map((e) =>
-                e.id === eventId ? { ...e, practiceSourceUrl: p, resultsSourceUrl: r } : e
+                e.id === eventId
+                  ? { ...e, practiceSourceUrl: p, resultsSourceUrl: r, controlledTireLabel: c }
+                  : e
               )
             );
           })
@@ -2081,7 +2127,7 @@ export function NewRunForm(props: {
             Before the run
           </div>
           <div className="text-[11px] text-muted-foreground/80">
-            Car, tires, battery, setup
+            Tires / batteries, car, track, setup
           </div>
         </div>
         <div className="h-px flex-1 bg-border/60" />
@@ -2128,7 +2174,7 @@ export function NewRunForm(props: {
                 <span className="font-medium">Testing</span>
                 {practiceDayUrl.trim() ? (
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-                    Practice day URL set
+                    LiveRC index URL set
                   </span>
                 ) : null}
               </div>
@@ -2159,6 +2205,9 @@ export function NewRunForm(props: {
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">
                     Race timing URL set
                   </span>
+                ) : null}
+                {eventControlledTireLabel.trim() ? (
+                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">Spec tire set</span>
                 ) : null}
               </div>
             )}
@@ -2200,20 +2249,21 @@ export function NewRunForm(props: {
                   htmlFor="practice-day-url-input"
                   className="block text-xs font-medium text-muted-foreground"
                 >
-                  Practice day URL (optional)
+                  LiveRC timing index URL (optional)
                 </label>
                 <input
                   id="practice-day-url-input"
                   type="url"
                   value={practiceDayUrl}
                   onChange={(e) => setPracticeDayUrl(e.target.value)}
-                  placeholder="https://example.liverc.com/…/practice/?p=session_list&d=YYYY-MM-DD"
+                  placeholder="https://…/practice/?p=session_list&d=YYYY-MM-DD or …/results/?p=view_event&id=…"
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-accent/50"
-                  aria-label="Practice day results URL"
+                  aria-label="LiveRC timing index URL for lap scan"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Lap Times → <span className="font-medium text-foreground">URL</span> will scan this page for your
-                  driver sessions. Persists across runs (stored under Settings → current practice day URL).
+                  Lap Times → <span className="font-medium text-foreground">URL</span> can scan this LiveRC practice
+                  list or results index for sessions (practice lists filter by your LiveRC driver name in
+                  Settings). Persists across runs (Settings → current practice day URL).
                 </p>
               </div>
             ) : null}
@@ -2324,37 +2374,29 @@ export function NewRunForm(props: {
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
                 />
               </div>
+              <div className="space-y-1">
+                <label
+                  htmlFor="event-controlled-tire-label"
+                  className="block text-xs font-medium text-muted-foreground"
+                >
+                  Controlled / spec tire (optional)
+                </label>
+                <input
+                  id="event-controlled-tire-label"
+                  type="text"
+                  value={eventControlledTireLabel}
+                  onChange={(e) => setEventControlledTireLabel(e.target.value)}
+                  placeholder="e.g. Sweep 32 — used when you add a new tire set during this event"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                />
+              </div>
               <p className="text-[11px] text-muted-foreground">
-                Saved on the event when you save this run. The Lap times → URL flow uses the practice link for
-                this meeting.
+                Saved on the event when you save this run. Lap times → URL uses the practice link when your
+                meeting session is Practice; otherwise it prefers the race/results link (either link can be
+                scanned). Spec tire is optional — when set, New tire set pre-fills that compound for this event.
               </p>
             </div>
           ) : null}
-
-          {eventTrackSwitchPrompt && eventTrackSwitchPrompt.eventId === eventId && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
-              <span className="text-foreground">
-                Event is at {eventTrackSwitchPrompt.eventTrackName}. Switch track to match event?
-              </span>
-              <button
-                type="button"
-                className="rounded bg-amber-600 px-2 py-1 font-medium text-amber-950 hover:bg-amber-500"
-                onClick={() => {
-                  setTrackId(eventTrackSwitchPrompt.eventTrackId);
-                  setEventTrackSwitchPrompt(null);
-                }}
-              >
-                Switch
-              </button>
-              <button
-                type="button"
-                className="rounded border border-border bg-card px-2 py-1 hover:bg-muted"
-                onClick={() => setEventTrackSwitchPrompt(null)}
-              >
-                Keep
-              </button>
-            </div>
-          )}
 
           {eventError && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-foreground">
@@ -2430,6 +2472,16 @@ export function NewRunForm(props: {
                   value={newEventResultsUrl}
                   onChange={(e) => setNewEventResultsUrl(e.target.value)}
                   placeholder="LiveRC results / race timing page URL"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] text-muted-foreground">Controlled / spec tire (optional)</label>
+                <input
+                  type="text"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                  value={newEventControlledTire}
+                  onChange={(e) => setNewEventControlledTire(e.target.value)}
+                  placeholder="e.g. Sweep 32"
                 />
               </div>
               {isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate) ? (
@@ -2535,14 +2587,6 @@ export function NewRunForm(props: {
           // editors stay mounted only when the user hits Edit — this block
           // just shows enough for them to confirm nothing's amiss.
           <div className="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 text-[11px] sm:grid-cols-[5rem_1fr]">
-            <span className="text-muted-foreground">Car</span>
-            <span className="min-w-0 truncate font-medium text-foreground">
-              {selectedCar?.name ?? "—"}
-            </span>
-            <span className="text-muted-foreground">Track</span>
-            <span className="min-w-0 truncate text-foreground/90">
-              {tracksList.find((t) => t.id === trackId)?.name ?? "—"}
-            </span>
             <span className="text-muted-foreground">Tires</span>
             <span className="min-w-0 truncate text-foreground/90">
               {(() => {
@@ -2559,6 +2603,14 @@ export function NewRunForm(props: {
                 return `${b.label}${b.packNumber != null ? ` #${b.packNumber}` : ""}`;
               })()}
             </span>
+            <span className="text-muted-foreground">Car</span>
+            <span className="min-w-0 truncate font-medium text-foreground">
+              {selectedCar?.name ?? "—"}
+            </span>
+            <span className="text-muted-foreground">Track</span>
+            <span className="min-w-0 truncate text-foreground/90">
+              {tracksList.find((t) => t.id === trackId)?.name ?? "—"}
+            </span>
           </div>
         ) : (
           <>
@@ -2567,6 +2619,20 @@ export function NewRunForm(props: {
           role="tablist"
           aria-label="Run details sections"
         >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={runDetailsTab === "tires"}
+            className={cn(
+              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              runDetailsTab === "tires"
+                ? "border-accent text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setRunDetailsTab("tires")}
+          >
+            Tires / batteries
+          </button>
           <button
             type="button"
             role="tab"
@@ -2594,20 +2660,6 @@ export function NewRunForm(props: {
             onClick={() => setRunDetailsTab("track")}
           >
             Track
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={runDetailsTab === "tires"}
-            className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
-              runDetailsTab === "tires"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setRunDetailsTab("tires")}
-          >
-            Tires & batteries
           </button>
         </div>
 
@@ -2672,29 +2724,35 @@ export function NewRunForm(props: {
                   Track library
                 </Link>
               </div>
-              <TrackCombobox
-                tracks={tracksList}
-                value={trackId}
-                onChange={(id) => {
-                  setTrackId(id);
-                  setCopyTrackWarning(null);
-                }}
-                lastRunTrackId={lastRun?.trackId ?? null}
-                favouriteTrackIds={favouriteTrackIds}
-                favouriteTracks={favouriteTracks}
-                placeholder="Search or select track"
-                aria-label="Track"
-              />
-              {needsEvent && eventId && trackId &&
-                (() => {
-                  const ev = events.find((e) => e.id === eventId);
-                  if (!ev?.trackId || ev.trackId === trackId) return null;
-                  return (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
-                      Track does not match selected event.
-                    </p>
-                  );
-                })()}
+              {trackLockedToEvent ? (
+                <div className="space-y-1">
+                  <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
+                    {(() => {
+                      const t = tracksList.find((x) => x.id === trackId);
+                      if (!t) return "—";
+                      return `${t.name}${t.location ? ` (${t.location})` : ""}`;
+                    })()}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Track is set by the selected event. Change the event (or its track in Events) to use a
+                    different venue.
+                  </p>
+                </div>
+              ) : (
+                <TrackCombobox
+                  tracks={tracksList}
+                  value={trackId}
+                  onChange={(id) => {
+                    setTrackId(id);
+                    setCopyTrackWarning(null);
+                  }}
+                  lastRunTrackId={lastRun?.trackId ?? null}
+                  favouriteTrackIds={favouriteTrackIds}
+                  favouriteTracks={favouriteTracks}
+                  placeholder="Search or select track"
+                  aria-label="Track"
+                />
+              )}
             </div>
             {copyTrackWarning && (
               <div className="text-[11px] text-muted-foreground">{copyTrackWarning}</div>
@@ -2740,8 +2798,7 @@ export function NewRunForm(props: {
                   type="button"
                   className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted transition"
                   onClick={() => {
-                    setShowNewTireSetPanel((v) => !v);
-                    setInlineError(null);
+                    toggleNewTireSetPanel();
                   }}
                 >
                   {showNewTireSetPanel ? "Cancel" : "New tire set"}
@@ -2773,31 +2830,46 @@ export function NewRunForm(props: {
 
             {showNewTireSetPanel && (
               <div className="rounded-md border border-border bg-muted/60 p-3 space-y-3">
-                <div className="grid gap-2 md:grid-cols-2">
-                  <input
-                    className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                    placeholder="Label (brand + compound, e.g. Sweep 32)"
-                    value={newTireLabel}
-                    onChange={(e) => setNewTireLabel(e.target.value)}
-                    aria-label="Tire set label"
-                  />
+                {newTireCompoundFromEvent && newTireLabel.trim() ? (
+                  <div className="space-y-2">
+                    <div className="rounded-md border border-border bg-card px-3 py-2 text-sm">
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Event spec compound
+                      </div>
+                      <div className="font-medium text-foreground mt-0.5">{newTireLabel.trim()}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-[11px] text-muted-foreground underline hover:text-foreground"
+                      onClick={() => setNewTireCompoundFromEvent(false)}
+                    >
+                      Different compound
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                      placeholder="Label (brand + compound, e.g. Sweep 32)"
+                      value={newTireLabel}
+                      onChange={(e) => setNewTireLabel(e.target.value)}
+                      aria-label="Tire set label"
+                    />
+                    <p className="text-[11px] text-muted-foreground">Brand + compound (e.g. Sweep 32)</p>
+                  </>
+                )}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-medium text-muted-foreground">Set number</label>
                   <input
                     type="number"
                     min={1}
-                    className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none md:max-w-xs"
                     placeholder="Set number"
                     value={newTireSetNumber}
-                    onChange={(e) => setNewTireSetNumber(Number(e.target.value) || 1)}
+                    onChange={(e) => setNewTireSetNumber(e.target.value)}
                     aria-label="Set number"
                   />
-                </div>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <div className="text-[11px] text-muted-foreground">
-                    Label: Brand + compound (e.g. Sweep 32)
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Set number: Physical tire set number (e.g. 1, 2, 3)
-                  </div>
+                  <p className="text-[11px] text-muted-foreground">Physical tire set number (e.g. 1, 2, 3)</p>
                 </div>
                 <div className="space-y-1 text-sm">
                   <div className="ui-title text-sm text-muted-foreground">Prior runs on this set (before first log)</div>
@@ -2919,7 +2991,7 @@ export function NewRunForm(props: {
                     className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                     placeholder="Pack number"
                     value={newBatteryPackNumber}
-                    onChange={(e) => setNewBatteryPackNumber(Number(e.target.value) || 1)}
+                    onChange={(e) => setNewBatteryPackNumber(e.target.value)}
                     aria-label="Pack number"
                   />
                 </div>
@@ -3413,13 +3485,8 @@ export function NewRunForm(props: {
       <LapTimesIngestPanel
         value={lapIngest}
         onChange={setLapIngest}
-        practiceDayUrl={
-          sessionType === "TESTING"
-            ? practiceDayUrl.trim() || null
-            : sessionType === "RACE_MEETING" && eventId
-              ? eventPracticeTimingUrl.trim() || null
-              : null
-        }
+        practiceDayUrl={lapTimesLiveRcScanIndexUrl}
+        lapImportEventId={sessionType === "RACE_MEETING" && eventId ? eventId : null}
       />
 
       <label className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs cursor-pointer select-none">

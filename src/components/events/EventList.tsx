@@ -17,6 +17,7 @@ type EventItem = {
   notes: string | null;
   practiceSourceUrl?: string | null;
   resultsSourceUrl?: string | null;
+  controlledTireLabel?: string | null;
   track: { id: string; name: string; location?: string | null } | null;
 };
 
@@ -119,6 +120,7 @@ export function EventList({
   const [notes, setNotes] = useState("");
   const [practiceSourceUrl, setPracticeSourceUrl] = useState("");
   const [resultsSourceUrl, setResultsSourceUrl] = useState("");
+  const [controlledTireLabel, setControlledTireLabel] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -189,6 +191,7 @@ export function EventList({
           notes: notes.trim() || null,
           practiceSourceUrl: practiceSourceUrl.trim() || null,
           resultsSourceUrl: resultsSourceUrl.trim() || null,
+          controlledTireLabel: controlledTireLabel.trim() || null,
         }),
       });
       setEvents((prev) => [event, ...prev]);
@@ -199,6 +202,7 @@ export function EventList({
       setNotes("");
       setPracticeSourceUrl("");
       setResultsSourceUrl("");
+      setControlledTireLabel("");
       setMessage("Event created.");
       router.refresh();
     } catch (err) {
@@ -296,6 +300,16 @@ export function EventList({
             value={resultsSourceUrl}
             onChange={(e) => setResultsSourceUrl(e.target.value)}
             placeholder="LiveRC results / race timing page URL"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] text-muted-foreground mb-1">Controlled / spec tire (optional)</label>
+          <input
+            type="text"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+            value={controlledTireLabel}
+            onChange={(e) => setControlledTireLabel(e.target.value)}
+            placeholder="e.g. Sweep 32"
           />
         </div>
         <div className="flex items-center gap-2">

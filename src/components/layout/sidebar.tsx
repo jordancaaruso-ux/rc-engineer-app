@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import { JrcRaceEngineerLogo } from "@/components/brand/JrcRaceEngineerLogo";
+import { ThemePreviewSwitcher } from "@/components/layout/ThemePreviewSwitcher";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -55,16 +55,6 @@ export function Sidebar() {
     <>
       {/* Desktop sidebar (unchanged) */}
       <aside className="sidebar hidden md:flex">
-        <div className="w-full min-w-0">
-          <Link
-            href="/"
-            className="sidebar-logo block w-full min-w-0 not-italic normal-case"
-            aria-label="JRC Race Engineer — home"
-          >
-            <JrcRaceEngineerLogo fullWidth />
-          </Link>
-        </div>
-
         <nav className="sidebar-nav">
           {navItems.map((item) => {
             const active = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
@@ -83,6 +73,7 @@ export function Sidebar() {
               </Link>
             );
           })}
+          <ThemePreviewSwitcher placement="sidebar" />
         </nav>
 
         <div className="sidebar-footer">
@@ -131,15 +122,7 @@ export function Sidebar() {
               aria-label="Navigation menu"
               className="absolute left-0 top-0 h-full w-72 max-w-[85vw] border-r border-border bg-secondary/95 backdrop-blur-md shadow-glow-sm overflow-y-auto"
             >
-              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
-                <Link
-                  href="/"
-                  className="sidebar-logo block min-w-0 flex-1 not-italic normal-case"
-                  onClick={() => setMobileOpen(false)}
-                  aria-label="JRC Race Engineer — home"
-                >
-                  <JrcRaceEngineerLogo fullWidth />
-                </Link>
+              <div className="flex justify-end px-4 py-3 border-b border-border">
                 <button
                   type="button"
                   aria-label="Close menu"
@@ -168,6 +151,7 @@ export function Sidebar() {
                     </Link>
                   );
                 })}
+                <ThemePreviewSwitcher placement="sidebar" />
               </nav>
 
               <div className="sidebar-footer px-4 py-4">

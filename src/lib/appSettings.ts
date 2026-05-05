@@ -4,6 +4,8 @@ import { Prisma } from "@prisma/client";
 export const APP_SETTING_KEYS = {
   myName: "myName",
   liveRcDriverName: "liveRcDriverName",
+  /** LiveRC `data-driver-id` for this account — used to disambiguate same-name drivers across mains. */
+  liveRcDriverId: "liveRcDriverId",
   /**
    * Current practice day timing-URL (e.g. LiveRC day results page) the driver
    * is working from. Persists across `New Run` forms so "copy last run" / fresh
@@ -77,6 +79,14 @@ export async function getLiveRcDriverNameSetting(userId: string): Promise<string
 
 export async function setLiveRcDriverNameSetting(userId: string, value: string | null): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.liveRcDriverName, value);
+}
+
+export async function getLiveRcDriverIdSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.liveRcDriverId);
+}
+
+export async function setLiveRcDriverIdSetting(userId: string, value: string | null): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.liveRcDriverId, value);
 }
 
 export async function getCurrentPracticeDayUrlSetting(userId: string): Promise<string | null> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { parseManualLapText } from "@/lib/lapSession/parseManual";
 import type { LapSourceKind } from "@/lib/lapSession/types";
@@ -9,6 +9,7 @@ import { computeLapMetrics, formatLap } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { getAverageTopN, getBestLap } from "@/lib/lapAnalysis";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
+import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 
 export type UrlImportBlock = {
@@ -98,17 +99,33 @@ type ScanDayCandidate = {
   linkedRunId: string | null;
 };
 
+/** Server: `/api/events/[eventId]/my-race-sessions` — driver verified on each race page. */
+type EventRaceSessionRow = {
+  sessionUrl: string;
+  listLinkText: string | null;
+  sessionTime: string | null;
+  sessionCompletedAtIso: string | null;
+  alreadyImported: boolean;
+  existingImportedSessionId: string | null;
+};
+
 export function LapTimesIngestPanel({
   value,
   onChange,
   practiceDayUrl,
+  lapImportEventId,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
-  /** Optional LiveRC practice day URL from the form; enables "scan day" picker. */
+  /**
+   * LiveRC index URL for "scan" (practice `session_list` day page, or any `/results/` page that lists sessions).
+   * Enables the scan picker above the manual URL field.
+   */
   practiceDayUrl?: string | null;
+  /** When set, LiveRC event hub imports filter by this event's race class list. */
+  lapImportEventId?: string | null;
 }) {
-  const [tab, setTab] = useState<IngestTab>(practiceDayUrl ? "url" : "manual");
+  const [tab, setTab] = useState<IngestTab>(() => ((practiceDayUrl ?? "").trim() ? "url" : "manual"));
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoNote, setPhotoNote] = useState<string | null>(null);
   const [photoConfidence, setPhotoConfidence] = useState<string | null>(null);
@@ -118,9 +135,78 @@ export function LapTimesIngestPanel({
   const [dayScanBusy, setDayScanBusy] = useState(false);
   const [dayScanMessage, setDayScanMessage] = useState<string | null>(null);
   const [dayScanCandidates, setDayScanCandidates] = useState<ScanDayCandidate[] | null>(null);
+  const [dayScanIndexKind, setDayScanIndexKind] = useState<"practice" | "results" | null>(null);
   const [dayScanHasDriverName, setDayScanHasDriverName] = useState<boolean>(true);
   /** `${blockId}:${driverId}` for lap preview */
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
+
+  const [liveRcDriverName, setLiveRcDriverName] = useState<string | null>(null);
+  const [liveRcDriverId, setLiveRcDriverId] = useState<string | null>(null);
+
+  const [eventRaceBusy, setEventRaceBusy] = useState(false);
+  const [eventRaceSessions, setEventRaceSessions] = useState<EventRaceSessionRow[] | null>(null);
+  const [eventRaceHint, setEventRaceHint] = useState<string | null>(null);
+
+  const loadEventRaceSessions = useCallback(async () => {
+    const eid = lapImportEventId?.trim();
+    if (!eid) {
+      setEventRaceSessions(null);
+      setEventRaceHint(null);
+      return;
+    }
+    setEventRaceBusy(true);
+    setEventRaceHint(null);
+    try {
+      const res = await fetch(`/api/events/${encodeURIComponent(eid)}/my-race-sessions`);
+      const data = (await res.json().catch(() => null)) as {
+        sessions?: EventRaceSessionRow[];
+        hint?: string | null;
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        setEventRaceSessions([]);
+        setEventRaceHint(data?.error ?? "Could not load sessions for this event.");
+        return;
+      }
+      setEventRaceSessions(Array.isArray(data?.sessions) ? data!.sessions! : []);
+      setEventRaceHint(typeof data?.hint === "string" && data.hint.trim() ? data.hint : null);
+    } catch {
+      setEventRaceSessions([]);
+      setEventRaceHint("Request failed.");
+    } finally {
+      setEventRaceBusy(false);
+    }
+  }, [lapImportEventId]);
+
+  useEffect(() => {
+    void loadEventRaceSessions();
+  }, [loadEventRaceSessions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/settings/live-rc-driver");
+        const data = (await res.json().catch(() => null)) as {
+          liveRcDriverName?: string | null;
+          liveRcDriverId?: string | null;
+        } | null;
+        if (cancelled || !res.ok || !data) return;
+        setLiveRcDriverName(typeof data.liveRcDriverName === "string" ? data.liveRcDriverName : null);
+        setLiveRcDriverId(typeof data.liveRcDriverId === "string" ? data.liveRcDriverId : null);
+      } catch {
+        /* keep nulls */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!(practiceDayUrl ?? "").trim()) return;
+    setTab((prev) => (prev === "manual" ? "url" : prev));
+  }, [practiceDayUrl]);
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
   const metrics = useMemo(() => computeLapMetrics(parsedLaps), [parsedLaps]);
@@ -200,16 +286,20 @@ export function LapTimesIngestPanel({
   async function scanDayUrl() {
     const url = (practiceDayUrl ?? "").trim();
     if (!url) {
-      setDayScanMessage("Add a practice day URL under Session type first.");
+      setDayScanMessage("Add a LiveRC timing index URL under Session type or Event first.");
       return;
     }
     setDayScanBusy(true);
     setDayScanMessage(null);
+    setDayScanIndexKind(null);
     try {
       const res = await fetch("/api/laps/scan-day-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dayUrl: url }),
+        body: JSON.stringify({
+          dayUrl: url,
+          eventId: lapImportEventId?.trim() || undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -221,6 +311,8 @@ export function LapTimesIngestPanel({
         ? ((data as { candidates: ScanDayCandidate[] }).candidates)
         : [];
       const hasDriver = Boolean((data as { hasDriverNameSetting?: boolean }).hasDriverNameSetting);
+      const ik = (data as { indexKind?: string }).indexKind;
+      setDayScanIndexKind(ik === "results" || ik === "practice" ? ik : null);
       setDayScanHasDriverName(hasDriver);
       setDayScanCandidates(candidates);
       if (candidates.length === 0) {
@@ -236,6 +328,12 @@ export function LapTimesIngestPanel({
   async function importFromDayCandidate(c: ScanDayCandidate) {
     setUrlInput(c.sessionUrl);
     setDayScanMessage(null);
+    await fetchUrlPreviewWithUrl(c.sessionUrl);
+  }
+
+  async function importFromEventRaceRow(c: EventRaceSessionRow) {
+    setUrlInput(c.sessionUrl);
+    setUrlMessage(null);
     await fetchUrlPreviewWithUrl(c.sessionUrl);
   }
 
@@ -264,28 +362,21 @@ export function LapTimesIngestPanel({
       const res = await fetch("/api/lap-time-sessions/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: [url] }),
+        body: JSON.stringify({
+          urls: [url],
+          ...(lapImportEventId?.trim() ? { eventId: lapImportEventId.trim() } : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setUrlMessage((data as { error?: string })?.error || "Request failed.");
         return;
       }
-      const results = (data as { results?: unknown }).results;
-      const first =
-        Array.isArray(results) && results.length > 0
-          ? (results[0] as { success?: boolean; error?: string })
-          : null;
-      if (!first || first.success === false) {
-        const err =
-          first && typeof first === "object" && "error" in first && typeof first.error === "string"
-            ? first.error
-            : "Could not import this URL.";
-        setUrlMessage(err);
-        return;
-      }
+      const results = Array.isArray((data as { results?: unknown }).results)
+        ? ((data as { results: unknown[] }).results as Record<string, unknown>[])
+        : [];
 
-      const row = first as {
+      type SuccessRow = {
         success: true;
         importedSessionId: string;
         recordedAt: string;
@@ -296,54 +387,83 @@ export function LapTimesIngestPanel({
         laps?: number[];
         lapRows?: LapImportLapRow[] | null;
         sessionDrivers?: LapUrlSessionDriver[];
+        url?: string;
       };
 
-      const parserId = row.parserId ?? "http_timing_v1";
-      const message = row.message ?? null;
-      const sessionDriversRaw = row.sessionDrivers ?? [];
-      const sessionDrivers = Array.isArray(sessionDriversRaw)
-        ? sessionDriversRaw.filter((d) => d && typeof d.driverId === "string" && Array.isArray(d.laps))
-        : [];
-      const topLaps = row.laps ?? [];
-      const lapRowsFromApi = row.lapRows;
+      const successes: SuccessRow[] = [];
+      const failures: { error: string }[] = [];
+      for (const r of results) {
+        if (!r || typeof r !== "object") continue;
+        if (r.success === true && typeof (r as SuccessRow).importedSessionId === "string") {
+          successes.push(r as SuccessRow);
+        } else if (r.success === false && typeof (r as { error?: string }).error === "string") {
+          failures.push({ error: (r as { error: string }).error });
+        }
+      }
 
-      const autoSelectIds =
-        sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
-          ? [sessionDrivers[0].driverId]
-          : sessionDrivers.length > 1
-            ? sessionDrivers.map((d) => d.driverId).filter((id): id is string => Boolean(id))
-            : [];
+      if (successes.length === 0) {
+        setUrlMessage(failures[0]?.error ?? "Could not import this URL.");
+        return;
+      }
 
-      const recordedAt = row.recordedAt ?? new Date().toISOString();
-      const sessionCompletedAtIso =
-        typeof row.sessionCompletedAtIso === "string" && row.sessionCompletedAtIso.trim()
-          ? row.sessionCompletedAtIso.trim()
-          : null;
-      const sessionCompletedAtDbIso =
-        typeof row.sessionCompletedAtDbIso === "string" && row.sessionCompletedAtDbIso.trim()
-          ? row.sessionCompletedAtDbIso.trim()
-          : null;
-      const newBlock: UrlImportBlock = {
-        blockId: crypto.randomUUID(),
-        importedSessionId: row.importedSessionId,
-        sourceUrl: url,
-        parserId,
-        recordedAt,
-        sessionCompletedAtDbIso,
-        sessionCompletedAtIso,
-        sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : [],
-        selectedDriverIds: autoSelectIds,
-        driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : {},
-        urlLapRows:
-          Array.isArray(lapRowsFromApi) && lapRowsFromApi.length > 0 && lapRowsFromApi.length === topLaps.length
-            ? lapRowsFromApi
-            : null,
-      };
+      let nextBlocks = [...value.urlImportBlocks];
+      let combinedMessage: string | null = null;
 
-      const nextBlocks = [...value.urlImportBlocks, newBlock];
+      for (const row of successes) {
+        const parserId = row.parserId ?? "http_timing_v1";
+        const message = row.message ?? null;
+        if (combinedMessage == null && message) combinedMessage = message;
+
+        const sessionDriversRaw = row.sessionDrivers ?? [];
+        const sessionDrivers = Array.isArray(sessionDriversRaw)
+          ? sessionDriversRaw.filter((d) => d && typeof d.driverId === "string" && Array.isArray(d.laps))
+          : [];
+        const topLaps = row.laps ?? [];
+        const lapRowsFromApi = row.lapRows;
+
+        const autoSelectIds =
+          sessionDrivers.length === 0
+            ? []
+            : sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
+              ? [sessionDrivers[0].driverId]
+              : [pickPrimarySessionDriver(sessionDrivers, { liveRcDriverId, liveRcDriverName }).driverId];
+
+        const recordedAt = row.recordedAt ?? new Date().toISOString();
+        const sessionCompletedAtIso =
+          typeof row.sessionCompletedAtIso === "string" && row.sessionCompletedAtIso.trim()
+            ? row.sessionCompletedAtIso.trim()
+            : null;
+        const sessionCompletedAtDbIso =
+          typeof row.sessionCompletedAtDbIso === "string" && row.sessionCompletedAtDbIso.trim()
+            ? row.sessionCompletedAtDbIso.trim()
+            : null;
+
+        const sourceUrl =
+          typeof row.url === "string" && row.url.trim() ? row.url.trim() : url;
+
+        const newBlock: UrlImportBlock = {
+          blockId: crypto.randomUUID(),
+          importedSessionId: row.importedSessionId,
+          sourceUrl,
+          parserId,
+          recordedAt,
+          sessionCompletedAtDbIso,
+          sessionCompletedAtIso,
+          sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : [],
+          selectedDriverIds: autoSelectIds,
+          driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : {},
+          urlLapRows:
+            Array.isArray(lapRowsFromApi) && lapRowsFromApi.length > 0 && lapRowsFromApi.length === topLaps.length
+              ? lapRowsFromApi
+              : null,
+        };
+
+        nextBlocks = [...nextBlocks, newBlock];
+      }
+
       const detail =
         nextBlocks.length === 1
-          ? url
+          ? nextBlocks[0]!.sourceUrl
           : `${nextBlocks.length} timing URLs`;
 
       onChange({
@@ -351,19 +471,25 @@ export function LapTimesIngestPanel({
         manualText: primaryLapTextFromFirstBlock(nextBlocks),
         sourceKind: "url",
         sourceDetail: detail,
-        parserId: nextBlocks[0]?.parserId ?? parserId,
+        parserId: nextBlocks[0]?.parserId ?? successes[0]!.parserId ?? "liverc_deterministic_v1",
         urlLapRows: nextBlocks[0]?.urlLapRows ?? null,
         urlImportBlocks: nextBlocks,
       });
-      const previewDriver = newBlock.sessionDrivers[0]?.driverId;
-      if (previewDriver) {
-        setActivePreviewKey(`${newBlock.blockId}:${previewDriver}`);
+      const lastBlock = nextBlocks[nextBlocks.length - 1];
+      const pid = lastBlock?.selectedDriverIds?.[0];
+      if (lastBlock && pid) {
+        setActivePreviewKey(`${lastBlock.blockId}:${pid}`);
       }
       setUrlInput("");
-      setUrlMessage(message);
+      if (successes.length > 1) {
+        setUrlMessage(`Imported ${successes.length} race sessions from the event page.${combinedMessage ? ` ${combinedMessage}` : ""}`);
+      } else {
+        setUrlMessage(combinedMessage);
+      }
       setDayScanCandidates((prev) =>
         prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
       );
+      void loadEventRaceSessions();
     } catch {
       setUrlMessage("Request failed.");
     } finally {
@@ -398,27 +524,22 @@ export function LapTimesIngestPanel({
     setActivePreviewKey(null);
   }
 
-  function toggleDriverSelection(blockId: string, driverId: string) {
+  /** One primary driver per block (whose laps are edited / drive the run). Click a row to switch. */
+  function selectPrimaryDriverForBlock(blockId: string, driverId: string, blockIndex: number) {
     const blocks = value.urlImportBlocks.map((b) => {
       if (b.blockId !== blockId) return b;
-      const drivers = b.sessionDrivers ?? [];
-      if (drivers.length === 0) return b;
-      const current = new Set(b.selectedDriverIds ?? []);
-      if (current.has(driverId)) current.delete(driverId);
-      else current.add(driverId);
-      const selectedOrderedIds = drivers.map((d) => d.driverId).filter((id) => current.has(id));
-      return {
-        ...b,
-        selectedDriverIds: selectedOrderedIds,
-        urlLapRows: null,
-      };
+      return { ...b, selectedDriverIds: [driverId], urlLapRows: null };
     });
-    const next = { ...value, urlImportBlocks: blocks };
     onChange({
-      ...next,
-      manualText: primaryLapTextFromFirstBlock(blocks),
-      urlLapRows: blocks[0]?.urlLapRows ?? null,
-      parserId: blocks[0]?.parserId ?? value.parserId,
+      ...value,
+      urlImportBlocks: blocks,
+      ...(blockIndex === 0
+        ? {
+            manualText: primaryLapTextFromFirstBlock(blocks),
+            urlLapRows: blocks[0]?.urlLapRows ?? null,
+            parserId: blocks[0]?.parserId ?? value.parserId,
+          }
+        : {}),
     });
   }
 
@@ -461,29 +582,20 @@ export function LapTimesIngestPanel({
     });
   }
 
-  function lapTextFromRows(block: UrlImportBlock, driverId: string, fallbackLaps: number[]): string {
-    const rows = block.driverLapRowsByDriverId?.[driverId];
-    if (rows && rows.length > 0) {
-      return rows.map((r) => r.lapTimeSeconds.toFixed(3)).join("\n");
-    }
-    return fallbackLaps.map((n) => n.toFixed(3)).join("\n");
-  }
-
-  const selectedLabels = useMemo(() => {
+  const primaryDriverLabels = useMemo(() => {
     const blocks = value.urlImportBlocks ?? [];
     const parts: string[] = [];
     for (const b of blocks) {
-      const sel = b.selectedDriverIds ?? [];
-      for (const id of sel) {
-        const d = b.sessionDrivers.find((x) => x.driverId === id);
-        if (d) parts.push(formatDriverSessionLabel(d.driverName, blockLabelTimeIso(b)));
-      }
+      const id = b.selectedDriverIds?.[0];
+      if (!id) continue;
+      const d = b.sessionDrivers.find((x) => x.driverId === id);
+      if (d) parts.push(formatDriverSessionLabel(d.driverName, blockLabelTimeIso(b)));
     }
     return parts;
   }, [value.urlImportBlocks]);
 
   return (
-    <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+    <div className="rounded-lg border border-border bg-surface-runna-deep p-4 space-y-3">
       <div className="ui-title text-sm text-muted-foreground">Lap times</div>
       <div
         className="flex flex-wrap border-b border-border gap-x-0.5"
@@ -538,7 +650,7 @@ export function LapTimesIngestPanel({
             type="file"
             accept="image/*"
             disabled={photoBusy}
-            className="block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-card file:px-2 file:py-1"
+            className="block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-surface-runna file:px-2 file:py-1"
             onChange={(e) => onPhotoSelected(e.target.files?.[0] ?? null)}
           />
           {photoBusy ? <p className="text-[11px] text-muted-foreground">Processing…</p> : null}
@@ -553,12 +665,88 @@ export function LapTimesIngestPanel({
 
       {tab === "url" ? (
         <div className="space-y-2 text-sm">
+          {lapImportEventId?.trim() ? (
+            <div className="space-y-2 rounded-md border border-accent/35 bg-accent/5 p-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="ui-title text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Your sessions at this event
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground leading-snug">
+                    Uses your LiveRC <span className="text-foreground/90">driver ID</span> from each result table (not
+                    just name), so you are not mixed up with someone else on another main. IDs are saved automatically in
+                    Settings when unambiguous; clear there if wrong.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={eventRaceBusy}
+                  className={cn(
+                    "shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1.5 text-[11px] font-medium hover:bg-surface-runna-inset transition",
+                    eventRaceBusy && "opacity-60 pointer-events-none"
+                  )}
+                  onClick={() => void loadEventRaceSessions()}
+                >
+                  {eventRaceBusy ? "Refreshing…" : "Refresh"}
+                </button>
+              </div>
+              {eventRaceBusy ? <p className="text-[11px] text-muted-foreground">Loading sessions…</p> : null}
+              {eventRaceSessions && eventRaceSessions.length > 0 ? (
+                <ul className="space-y-1">
+                  {eventRaceSessions.map((c) => {
+                    const added = value.urlImportBlocks.some(
+                      (b) => b.sourceUrl.trim() === c.sessionUrl.trim()
+                    );
+                    const title =
+                      c.listLinkText?.trim() || "Race session";
+                    return (
+                      <li key={c.sessionUrl}>
+                        <button
+                          type="button"
+                          disabled={urlBusy || added}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
+                            added || urlBusy
+                              ? "border-border bg-surface-runna opacity-70 cursor-not-allowed"
+                              : "border-border bg-surface-runna hover:bg-surface-runna-inset"
+                          )}
+                          onClick={() => void importFromEventRaceRow(c)}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-foreground">
+                              {title}
+                              {c.sessionTime ? ` · ${c.sessionTime}` : ""}
+                            </span>
+                            <span className="block truncate text-[10px] text-muted-foreground">{c.sessionUrl}</span>
+                          </span>
+                          <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            {added ? "Added" : c.alreadyImported ? "Import again" : "Import"}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              {!eventRaceBusy && eventRaceSessions !== null && eventRaceSessions.length === 0 ? (
+                <p className="text-[11px] text-amber-600 dark:text-amber-500">
+                  {eventRaceHint ??
+                    "No pending race sessions — add a LiveRC results URL on the event, or every session may already have a run logged."}
+                </p>
+              ) : null}
+              {!eventRaceBusy && eventRaceHint && eventRaceSessions && eventRaceSessions.length > 0 ? (
+                <p className="text-[11px] text-muted-foreground">{eventRaceHint}</p>
+              ) : null}
+            </div>
+          ) : null}
           {practiceDayUrl ? (
-            <div className="space-y-2 rounded-md border border-border bg-muted/70 p-2">
+            <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="ui-title text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Practice day URL
+                    {dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl)
+                      ? "Race / results index URL"
+                      : "Practice day URL"}
                   </div>
                   <div className="text-[11px] text-muted-foreground break-all">{practiceDayUrl}</div>
                 </div>
@@ -566,18 +754,31 @@ export function LapTimesIngestPanel({
                   type="button"
                   disabled={dayScanBusy}
                   className={cn(
-                    "shrink-0 rounded-md border border-border bg-card px-3 py-1.5 text-[11px] font-medium hover:bg-muted/90 transition",
+                    "shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1.5 text-[11px] font-medium hover:bg-surface-runna-inset transition",
                     dayScanBusy && "opacity-60 pointer-events-none"
                   )}
                   onClick={() => void scanDayUrl()}
                 >
-                  {dayScanBusy ? "Scanning…" : dayScanCandidates ? "Rescan" : "Scan for my sessions"}
+                  {dayScanBusy
+                    ? "Scanning…"
+                    : dayScanCandidates
+                      ? "Rescan"
+                      : dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl)
+                        ? "Scan for sessions"
+                        : "Scan for my sessions"}
                 </button>
               </div>
-              {!dayScanHasDriverName ? (
+              {!dayScanHasDriverName &&
+              (dayScanIndexKind !== "results" && !/\/results\b/i.test(practiceDayUrl)) ? (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                  No LiveRC driver name set — Settings → LiveRC driver name helps filter this to only your
-                  sessions.
+                  No LiveRC driver name set — Settings → LiveRC driver name helps filter practice list scans to
+                  only your sessions.
+                </p>
+              ) : null}
+              {dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl) ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Results pages list races by class or round — pick your session, then confirm your row on the
+                  timing page (your LiveRC driver name still applies there).
                 </p>
               ) : null}
               {dayScanCandidates && dayScanCandidates.length > 0 ? (
@@ -587,12 +788,12 @@ export function LapTimesIngestPanel({
                       <button
                         type="button"
                         disabled={urlBusy || c.alreadyImported}
-                        className={cn(
-                          "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
-                          c.alreadyImported
-                            ? "border-border bg-muted/80 opacity-60 cursor-not-allowed"
-                            : "border-border bg-card hover:bg-muted/70"
-                        )}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
+                            c.alreadyImported
+                              ? "border-border bg-surface-runna opacity-60 cursor-not-allowed"
+                              : "border-border bg-surface-runna hover:bg-surface-runna-inset"
+                          )}
                         onClick={() => void importFromDayCandidate(c)}
                       >
                         <span className="min-w-0">
@@ -618,9 +819,12 @@ export function LapTimesIngestPanel({
             </div>
           ) : null}
           <p className="text-[11px] text-muted-foreground">
-            Paste an <span className="text-foreground/90">https</span> link and import. Add another URL anytime — each
-            import stays below. Pick drivers per session; your first session&apos;s first selected driver is the primary
-            lap list for this run.
+            Paste an <span className="text-foreground/90">https</span> link and import. LiveRC{" "}
+            <span className="text-foreground/90">event results</span> pages (<code className="text-[10px]">p=view_event</code>)
+            import every race result session not already saved (optionally filtered by race class when this run is tied to
+            an event). Add another URL anytime — each import stays below. Multi-driver sessions default to your LiveRC
+            driver (Settings); competitor laps are kept for field comparisons. Click a row to use that driver&apos;s laps
+            for this run.
           </p>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
@@ -632,7 +836,7 @@ export function LapTimesIngestPanel({
                   void fetchUrlPreview();
                 }
               }}
-              className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              className="flex-1 rounded-md border border-border bg-surface-runna-inset px-3 py-2 text-sm outline-none"
               placeholder="Timing / results URL"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
@@ -642,7 +846,7 @@ export function LapTimesIngestPanel({
               type="button"
               disabled={urlBusy}
               className={cn(
-                "rounded-md border border-border bg-card px-4 py-2 text-xs font-medium hover:bg-muted/90 transition shrink-0 min-w-[88px]",
+                "rounded-md border border-border bg-surface-runna px-4 py-2 text-xs font-medium hover:bg-surface-runna-inset transition shrink-0 min-w-[88px]",
                 urlBusy && "opacity-60 pointer-events-none"
               )}
               onClick={() => void fetchUrlPreview()}
@@ -652,7 +856,7 @@ export function LapTimesIngestPanel({
           </div>
 
           {value.urlImportBlocks.map((block, blockIndex) => (
-            <div key={block.blockId} className="space-y-2 rounded-lg border border-border bg-muted/70 p-2" data-import-index={blockIndex}>
+            <div key={block.blockId} className="space-y-2 rounded-lg border border-border bg-surface-runna p-2" data-import-index={blockIndex}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -662,7 +866,7 @@ export function LapTimesIngestPanel({
                 </div>
                 <button
                   type="button"
-                  className="shrink-0 rounded-md border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-muted/80"
+                  className="shrink-0 rounded-md border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-surface-runna-inset"
                   onClick={() => removeBlock(block.blockId)}
                 >
                   Remove
@@ -673,9 +877,9 @@ export function LapTimesIngestPanel({
                 <>
                   <div className="space-y-2">
                     {block.sessionDrivers.map((d) => {
-                      const selected = Boolean(block.selectedDriverIds?.includes(d.driverId));
                       const key = `${block.blockId}:${d.driverId}`;
                       const isPreview = activePreviewKey === key;
+                      const isPrimaryForRun = block.selectedDriverIds?.[0] === d.driverId;
                       const stats = statsForDriver(block, d);
                       const primaryLabel = formatDriverSessionLabel(d.driverName, blockLabelTimeIso(block));
                       return (
@@ -684,35 +888,35 @@ export function LapTimesIngestPanel({
                           role="button"
                           tabIndex={0}
                           onClick={() => {
+                            selectPrimaryDriverForBlock(block.blockId, d.driverId, blockIndex);
                             setActivePreviewKey(key);
-                            if (blockIndex === 0) {
-                              onChange({
-                                ...value,
-                                manualText: lapTextFromRows(block, d.driverId, d.laps),
-                                urlLapRows: block.urlLapRows ?? null,
-                              });
-                            }
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
+                              selectPrimaryDriverForBlock(block.blockId, d.driverId, blockIndex);
                               setActivePreviewKey(key);
-                              if (blockIndex === 0) {
-                                onChange({
-                                  ...value,
-                                  manualText: lapTextFromRows(block, d.driverId, d.laps),
-                                  urlLapRows: block.urlLapRows ?? null,
-                                });
-                              }
                             }
                           }}
                           className={cn(
-                            "flex items-start justify-between gap-3 rounded-md border bg-muted/80 p-2 cursor-pointer transition",
-                            isPreview ? "border-accent/70 bg-accent/10" : "border-border hover:bg-muted/70"
+                            "flex items-start gap-3 rounded-md border p-2 cursor-pointer transition bg-surface-runna",
+                            isPreview
+                              ? "border-accent/70 bg-accent/10"
+                              : cn(
+                                  "border-border hover:bg-surface-runna-inset",
+                                  isPrimaryForRun && "border-primary/40 bg-primary/5"
+                                )
                           )}
                         >
-                          <div className="min-w-0">
-                            <div className="text-xs font-medium truncate">{primaryLabel}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <span className="text-xs font-medium truncate">{primaryLabel}</span>
+                              {isPrimaryForRun ? (
+                                <span className="shrink-0 rounded border border-primary/35 bg-primary/10 px-1.5 py-0 text-[10px] font-medium uppercase tracking-wide text-foreground/90">
+                                  Your laps
+                                </span>
+                              ) : null}
+                            </div>
                             <div className="text-[11px] text-muted-foreground mt-1">
                               <span className="font-medium text-muted-foreground">Best:</span>{" "}
                               {stats.bestLap != null ? `${stats.bestLap.toFixed(3)}s` : "—"} •{" "}
@@ -720,28 +924,13 @@ export function LapTimesIngestPanel({
                               {stats.avgTop10 != null ? `${stats.avgTop10.toFixed(3)}s` : "—"}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            className={cn(
-                              "shrink-0 rounded-md px-3 py-1.5 text-[11px] font-medium border transition",
-                              selected
-                                ? "border-accent bg-accent/20 text-foreground"
-                                : "border-border bg-card text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                            )}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleDriverSelection(block.blockId, d.driverId);
-                            }}
-                          >
-                            {selected ? "Selected" : "Select"}
-                          </button>
                         </div>
                       );
                     })}
                   </div>
 
-                  <div className="space-y-1 rounded-md border border-border bg-muted/60 p-2">
-                    <div className="ui-title text-sm text-muted-foreground">Lap preview (active)</div>
+                  <div className="space-y-1 rounded-md border border-border bg-surface-runna-inset p-2">
+                    <div className="ui-title text-sm text-muted-foreground">Lap preview</div>
                     {(() => {
                       const keys = activePreviewKey?.split(":");
                       const bId = keys?.[0];
@@ -757,7 +946,7 @@ export function LapTimesIngestPanel({
                           isIncluded: true,
                         }));
                       return (
-                        <ul className="font-mono text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-muted/80 p-2 space-y-1">
+                        <ul className="font-mono text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-surface-runna p-2 space-y-1">
                           {rows.map((row, i) => (
                             <li
                               key={`${active.driverId}-${row.lapNumber}-${i}`}
@@ -776,8 +965,8 @@ export function LapTimesIngestPanel({
                                 className={cn(
                                   "ml-auto shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium transition",
                                   row.isIncluded
-                                    ? "border-border bg-card hover:bg-muted"
-                                    : "border-border bg-muted/70 hover:bg-muted/70"
+                                    ? "border-border bg-surface-runna-inset hover:bg-surface-runna"
+                                    : "border-border bg-surface-runna hover:bg-surface-runna-inset"
                                 )}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -824,7 +1013,7 @@ export function LapTimesIngestPanel({
           </label>
           <textarea
             id="lap-times-edit"
-            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none font-mono"
+            className="h-32 w-full resize-none rounded-md border border-border bg-surface-runna-inset px-3 py-2 text-sm outline-none font-mono"
             placeholder={"12.341 12.298 12.410\nor comma / line separated"}
             value={value.manualText}
             onChange={(e) => {
@@ -843,7 +1032,7 @@ export function LapTimesIngestPanel({
         </div>
       ) : null}
 
-      <div className="rounded-md border border-border bg-muted/60 px-3 py-2 text-[11px] space-y-1">
+      <div className="rounded-md border border-border bg-surface-runna-inset px-3 py-2 text-[11px] space-y-1">
         <div className="ui-title text-sm text-muted-foreground">Preview</div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-foreground">
           <span>
@@ -874,10 +1063,10 @@ export function LapTimesIngestPanel({
             </>
           ) : null}
         </span>
-        {selectedLabels.length > 0 ? (
+        {primaryDriverLabels.length > 0 ? (
           <span className="text-muted-foreground block">
-            Selected:{" "}
-            <span className="text-foreground/90">{selectedLabels.join(" · ")}</span>
+            Your laps for this run:{" "}
+            <span className="text-foreground/90">{primaryDriverLabels.join(" · ")}</span>
           </span>
         ) : null}
       </div>

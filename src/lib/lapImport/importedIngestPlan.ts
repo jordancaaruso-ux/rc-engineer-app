@@ -1,5 +1,6 @@
 import type { LapRow } from "@/lib/lapAnalysis";
 import type { LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
+import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 
 function lapRowsFromNums(nums: number[]): LapRow[] {
@@ -16,7 +17,12 @@ function lapRowsFromNums(nums: number[]): LapRow[] {
  */
 export function buildImportedIngestPlanFromPayload(
   parsed: unknown,
-  opts: { mode: "practice_user_only" | "race_full_field"; liveRcDriverName: string | null }
+  opts: {
+    mode: "practice_user_only" | "race_full_field";
+    liveRcDriverName: string | null;
+    /** When stored payload uses LiveRC driver ids (race imports); optional for legacy rows. */
+    liveRcDriverId?: string | null;
+  }
 ): {
   sessionDrivers: LapUrlSessionDriver[];
   selectedDriverIds: string[];
@@ -83,21 +89,18 @@ export function buildImportedIngestPlanFromPayload(
   const sessionDrivers = opts.mode === "race_full_field" ? outDrivers : working;
 
   let primary: (typeof outDrivers)[number];
-  if (opts.mode === "race_full_field" && wantNorm) {
-    const userMatch = outDrivers.find((d) => normalizeLiveRcDriverNameForMatch(d.driverName) === wantNorm);
-    primary = userMatch ?? outDrivers[0]!;
+  if (opts.mode === "race_full_field") {
+    primary = pickPrimarySessionDriver(outDrivers, {
+      liveRcDriverId: opts.liveRcDriverId ?? null,
+      liveRcDriverName: opts.liveRcDriverName ?? null,
+    });
   } else {
     primary = working[0]!;
   }
 
   const nums = primary.laps;
-  const selectedDriverIds =
-    opts.mode === "race_full_field" && sessionDrivers.length > 1
-      ? [
-          primary.driverId,
-          ...sessionDrivers.filter((d) => d.driverId !== primary.driverId).map((d) => d.driverId),
-        ]
-      : [primary.driverId];
+  /** Race: only the user's row is selected for editing; full field still lives in `sessionDrivers` for persistence. */
+  const selectedDriverIds = [primary.driverId];
 
   return {
     sessionDrivers,

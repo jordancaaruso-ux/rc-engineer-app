@@ -451,11 +451,7 @@ export function LapComparisonColumnGrid({
 
   useEffect(() => {
     const valid = new Set(compareOptionRows.map((r) => r.id));
-    setSelectedComparisonIds((prev) => {
-      const filtered = prev.filter((id) => valid.has(id) && id !== targetId);
-      if (filtered.length > 0) return filtered;
-      return compareOptionRows.map((r) => r.id);
-    });
+    setSelectedComparisonIds((prev) => prev.filter((id) => valid.has(id) && id !== targetId));
   }, [compareOptionRows, targetId]);
 
   useEffect(() => {

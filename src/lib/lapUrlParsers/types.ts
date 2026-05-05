@@ -51,6 +51,8 @@ export interface LapUrlParseResult {
   message?: string | null;
   /** Machine-readable failure (e.g. driver_not_found). */
   errorCode?: string;
+  /** LiveRC event hub (`p=view_event`): child race result URLs discovered on the page (no laps on the hub itself). */
+  discoveredRaceUrls?: string[];
 }
 
 export type LapUrlParseContext = {

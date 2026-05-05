@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -26,6 +25,7 @@ type ImportResultRow =
 export function LapImportWorkspace() {
   const searchParams = useSearchParams();
   const sessionIdFromQuery = searchParams.get("sessionId");
+  const eventIdFromQuery = searchParams.get("eventId");
   const deepLinkedRef = useRef<string | null>(null);
 
   const [text, setText] = useState("");
@@ -113,7 +113,10 @@ export function LapImportWorkspace() {
       const res = await fetch("/api/lap-time-sessions/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls }),
+        body: JSON.stringify({
+          urls,
+          ...(eventIdFromQuery ? { eventId: eventIdFromQuery } : {}),
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -155,11 +158,8 @@ export function LapImportWorkspace() {
       <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25">
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Import from URLs</div>
         <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
-          Paste LiveRC (or other supported) timing links — one per line. Each line uses the same parser as{" "}
-          <Link href="/runs/new" className="text-accent underline underline-offset-2">
-            Log your run
-          </Link>
-          . Failed lines do not cancel the rest.
+          Paste LiveRC (or other supported) timing links — one per line. LiveRC event hub URLs expand to each race result.
+          Use <code className="text-[10px]">?eventId=…</code> on this page to filter by that event&apos;s race classes. Failed lines do not cancel the rest.
         </p>
         <textarea
           value={text}

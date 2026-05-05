@@ -8,7 +8,7 @@ import {
   extractRaceSessions,
   isLiveRcPracticeListUrl,
   isLiveRcResultsDiscoveryUrl,
-  raceListRowMatchesEventClass,
+  raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import {
@@ -182,7 +182,13 @@ export async function buildEventLapDetectionDebug(
     const rows: NonNullable<EventLapDetectionDebugPayload["race"]>["rows"] = [];
     let rowsTruncated = false;
 
-    const classNorm = raceClassConfigured ? normalizeLiveRcDriverNameForMatch(raceClassConfigured) : null;
+    const classNormDisplay = raceClassConfigured
+      ? raceClassConfigured
+          .split(/[,;]/)
+          .map((p) => normalizeLiveRcDriverNameForMatch(p.trim()))
+          .filter(Boolean)
+          .join(", ")
+      : null;
     const lastSeenResults = event.resultsLastSeenSessionCompletedAt;
 
     if (urlRecognized) {
@@ -196,7 +202,9 @@ export async function buildEventLapDetectionDebug(
 
         const decorated = raw.map((r) => {
           const rowNorm = r.raceClass ? normalizeLiveRcDriverNameForMatch(r.raceClass) : null;
-          const classMatchesEvent = Boolean(classNorm && raceListRowMatchesEventClass(r, classNorm));
+          const classMatchesEvent = raceClassConfigured
+            ? raceListRowMatchesAnyConfiguredClass(r, raceClassConfigured)
+            : false;
           const iso = r.sessionCompletedAtIso?.trim() ? r.sessionCompletedAtIso.trim() : null;
           const dt = iso ? new Date(iso) : null;
           const whenOk = dt != null && !Number.isNaN(dt.getTime());
@@ -244,7 +252,7 @@ export async function buildEventLapDetectionDebug(
       urlRecognized,
       fetchOk,
       fetchError,
-      eventClassNormalized: classNorm,
+      eventClassNormalized: classNormDisplay,
       resultsLastSeenSessionCompletedAtIso: lastSeenResults ? lastSeenResults.toISOString() : null,
       extractedRowCount,
       classMatchedRowCount,

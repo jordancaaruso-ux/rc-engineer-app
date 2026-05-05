@@ -1,12 +1,17 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { normalizeSetupData } from "@/lib/runSetup";
+import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { renderSetupPdfSnapshot } from "@/lib/setup/pdfRender";
 import { SETUP_PDF_RENDER_PIPELINE_VERSION } from "@/lib/setup/renderTypes";
 import { getEffectiveCalibrationProfileId, ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { buildDerivedRenderPatch } from "@/lib/setup/deriveRenderValues";
-import { readBytesFromStorageRef, storeRunRenderedSetupPdf, storageRefIsReadable } from "@/lib/setupDocuments/storage";
+import {
+  readBytesFromStorageRef,
+  storeRunRenderedSetupPdf,
+  storeSetupSnapshotRenderedSetupPdf,
+  storageRefIsReadable,
+} from "@/lib/setupDocuments/storage";
 
 /**
  * Resolves base PDF + calibration when Run rows predate source links:
@@ -94,6 +99,122 @@ async function resolvePdfSourceForRun(
   }
 
   return { document: doc, calibration: cal };
+}
+
+/**
+ * Resolves base PDF + calibration for a {@link SetupSnapshot} without a run: document whose
+ * `createdSetupId` matches the snapshot, or the same baseline walk as runs.
+ */
+async function resolvePdfSourceForSetupSnapshot(
+  userId: string,
+  setupSnapshotId: string
+): Promise<{
+  document: { id: string; storagePath: string; sourceType: string; mimeType: string };
+  calibration: { id: string; calibrationDataJson: unknown; name: string | null };
+} | null> {
+  let currentId: string | null = setupSnapshotId;
+  const seen = new Set<string>();
+  while (currentId && !seen.has(currentId)) {
+    seen.add(currentId);
+    const createdDoc = await prisma.setupDocument.findFirst({
+      where: { userId, createdSetupId: currentId, sourceType: "PDF" },
+      select: { id: true, storagePath: true, sourceType: true, mimeType: true, calibrationProfileId: true },
+    });
+    if (createdDoc) {
+      const ensuredDocCal = await ensureSetupDocumentCalibrationProfileId({
+        userId,
+        setupDocumentId: createdDoc.id,
+      });
+      const effective = await getEffectiveCalibrationProfileId({
+        userId,
+        storedCalibrationId: ensuredDocCal.calibrationId,
+        context: `setupSnapshotPdf:doc=${createdDoc.id}`,
+      });
+      if (!effective.calibrationId) return null;
+      const cal = await prisma.setupSheetCalibration.findFirst({
+        where: { id: effective.calibrationId },
+        select: { id: true, calibrationDataJson: true, name: true },
+      });
+      if (!cal?.calibrationDataJson) return null;
+      return { document: createdDoc, calibration: cal };
+    }
+    const nextBase: { baseSetupSnapshotId: string | null } | null = await prisma.setupSnapshot.findFirst({
+      where: { id: currentId, userId },
+      select: { baseSetupSnapshotId: true },
+    });
+    currentId = nextBase?.baseSetupSnapshotId ?? null;
+  }
+  return null;
+}
+
+/**
+ * Filled setup PDF for a stored snapshot (lazy cache on {@link SetupSnapshot}).
+ * Same render pipeline as {@link ensureRenderedRunSetupPdf} but keyed by snapshot id.
+ */
+export async function ensureRenderedSetupSnapshotPdf(params: {
+  userId: string;
+  setupSnapshotId: string;
+}): Promise<{ relativePath: string; cacheHit: boolean } | null> {
+  const snap = await prisma.setupSnapshot.findFirst({
+    where: { id: params.setupSnapshotId, userId: params.userId },
+    select: {
+      id: true,
+      data: true,
+      renderedSetupPdfPath: true,
+      setupPdfRenderVersion: true,
+    },
+  });
+  if (!snap) return null;
+
+  if (snap.renderedSetupPdfPath && snap.setupPdfRenderVersion === SETUP_PDF_RENDER_PIPELINE_VERSION) {
+    const ok = await storageRefIsReadable(snap.renderedSetupPdfPath);
+    if (ok) {
+      return { relativePath: snap.renderedSetupPdfPath, cacheHit: true };
+    }
+  }
+
+  const resolved = await resolvePdfSourceForSetupSnapshot(params.userId, snap.id);
+  if (!resolved) return null;
+
+  let baseBytes: Buffer;
+  try {
+    baseBytes = await readBytesFromStorageRef(resolved.document.storagePath);
+  } catch {
+    return null;
+  }
+
+  const setupValues = normalizeSetupData(snap.data);
+  const derivedPatch = buildDerivedRenderPatch({
+    setup: setupValues,
+    calibrationJson: resolved.calibration.calibrationDataJson,
+  });
+  const renderSetupValues = { ...setupValues } as Record<string, unknown>;
+  for (const k of derivedPatch.clear) delete renderSetupValues[k];
+  for (const [k, v] of Object.entries(derivedPatch.set)) renderSetupValues[k] = v;
+
+  if (derivedPatch.debug.length) {
+    console.log(`[setup-snapshot-pdf/derived] snapshot=${snap.id} ${derivedPatch.debug.join(" | ")}`);
+  }
+
+  const rendered = await renderSetupPdfSnapshot({
+    basePdfBytes: baseBytes,
+    calibrationJson: resolved.calibration.calibrationDataJson,
+    setupValues: renderSetupValues as unknown as SetupSnapshotData,
+  });
+  if (!rendered) return null;
+
+  const storageRef = await storeSetupSnapshotRenderedSetupPdf(snap.id, Buffer.from(rendered.pdfBytes));
+
+  await prisma.setupSnapshot.update({
+    where: { id: snap.id },
+    data: {
+      renderedSetupPdfPath: storageRef,
+      renderedSetupPdfGeneratedAt: new Date(),
+      setupPdfRenderVersion: rendered.pipelineVersion,
+    },
+  });
+
+  return { relativePath: storageRef, cacheHit: false };
 }
 
 /**

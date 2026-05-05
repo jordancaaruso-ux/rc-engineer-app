@@ -16,4 +16,6 @@ export type DetectedRunPrompt = {
   runId: string | null;
   isIncomplete: boolean;
   promptKind: "log_new" | "finish";
+  /** When true, `sessionCompletedAtIso` is import row time — label as "Imported" not on-track session time. */
+  sessionTimeIsImportFallback: boolean;
 };

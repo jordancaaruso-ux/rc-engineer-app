@@ -8,6 +8,7 @@ import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import type { LapImportLapRow, LapUrlParseResult, LapUrlSessionDriver } from "./types";
 import { fetchUrlText } from "./fetchText";
+import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import {
   extractLiveRcRaceSessionWhenRaw,
   parseLiveRcSessionDisplayTimeToUtcIso,
@@ -636,7 +637,30 @@ function buildCandidateRows(sessionDrivers: LapUrlSessionDriver[]): NonNullable<
   }));
 }
 
-export async function importLiveRcRaceResult(pageUrl: string, _contextName?: string): Promise<LapUrlParseResult> {
+/** Prefer LiveRC settings driver name when present; else first row with laps (table order). */
+function pickPrimaryRaceDriver(
+  driversWithLaps: LapUrlSessionDriver[],
+  contextName?: string
+): LapUrlSessionDriver {
+  const raw = typeof contextName === "string" ? contextName.trim() : "";
+  if (!raw) return driversWithLaps[0]!;
+  const want = normalizeLiveRcDriverNameForMatch(raw);
+  if (!want) return driversWithLaps[0]!;
+  const matched = driversWithLaps.find(
+    (d) => normalizeLiveRcDriverNameForMatch(d.driverName) === want
+  );
+  return matched ?? driversWithLaps[0]!;
+}
+
+function sessionDriversWithPrimaryFirst(
+  driversWithLaps: LapUrlSessionDriver[],
+  primary: LapUrlSessionDriver
+): LapUrlSessionDriver[] {
+  const rest = driversWithLaps.filter((d) => d.driverId !== primary.driverId);
+  return [primary, ...rest];
+}
+
+export async function importLiveRcRaceResult(pageUrl: string, contextName?: string): Promise<LapUrlParseResult> {
   const trimmedUrl = pageUrl.trim();
 
   if (!isLiveRcRaceResultUrl(trimmedUrl)) {
@@ -682,17 +706,18 @@ export async function importLiveRcRaceResult(pageUrl: string, _contextName?: str
     };
   }
 
-  const first = driversWithLaps[0]!;
-  const lapRows = markMedianOutlierWarnings(first.laps, 0.3);
+  const primary = pickPrimaryRaceDriver(driversWithLaps, contextName);
+  const orderedDrivers = sessionDriversWithPrimaryFirst(driversWithLaps, primary);
+  const lapRows = markMedianOutlierWarnings(primary.laps, 0.3);
   const laps = lapRows.map((r) => r.time);
 
   const $page = load(mainFetch.text);
-  const lapsLink = $page("a.driver_laps").filter((_, el) => $page(el).attr("data-driver-id") === first.driverId);
+  const lapsLink = $page("a.driver_laps").filter((_, el) => $page(el).attr("data-driver-id") === primary.driverId);
   const resultRow = lapsLink.first().closest("tr").get(0) ?? null;
   const displayedFastest = resultRow
     ? extractDisplayedFastestLapFromResultRow($page, resultRow as Element)
     : null;
-  const fastestExtracted = Math.min(...first.laps);
+  const fastestExtracted = Math.min(...primary.laps);
   if (displayedFastest != null) {
     const diff = Math.abs(fastestExtracted - displayedFastest);
     if (diff > 0.06) {
@@ -700,7 +725,7 @@ export async function importLiveRcRaceResult(pageUrl: string, _contextName?: str
         fastestExtracted,
         displayedFastest,
         diff,
-        driverId: first.driverId,
+        driverId: primary.driverId,
       });
     }
   }
@@ -710,8 +735,8 @@ export async function importLiveRcRaceResult(pageUrl: string, _contextName?: str
 
   console.info(LOG_PREFIX, "session_loaded", {
     drivers: driversWithLaps.length,
-    firstDriver: first.driverName,
-    firstDriverLapCount: first.laps.length,
+    primaryDriver: primary.driverName,
+    primaryDriverLapCount: primary.laps.length,
     sessionCompletedAtIso,
   });
 
@@ -720,8 +745,8 @@ export async function importLiveRcRaceResult(pageUrl: string, _contextName?: str
     laps,
     lapRows,
     sessionCompletedAtIso,
-    candidates: buildCandidateRows(driversWithLaps),
-    sessionDrivers: driversWithLaps,
+    candidates: buildCandidateRows(orderedDrivers),
+    sessionDrivers: orderedDrivers,
     message: `Imported session with ${driversWithLaps.length} drivers. Select one or more drivers below.`,
     sessionHint: { name: null, className: "racer_laps_session_loaded" },
   };

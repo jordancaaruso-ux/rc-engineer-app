@@ -36,6 +36,32 @@ export function resolveImportedSessionDisplayTimeIso(input: {
   return typeof input.createdAt === "string" ? input.createdAt : input.createdAt.toISOString();
 }
 
+/** True when payload, DB session time, or discovery hint gives an on-track wall time (not import `createdAt`). */
+export function resolveImportedSessionHasWallClockTime(input: {
+  sessionCompletedAt?: Date | string | null;
+  parsedPayload?: unknown;
+  sessionCompletedAtIsoHint?: string | null;
+}): boolean {
+  const fromPayload = sessionCompletedAtIsoFromImportedPayload(input.parsedPayload)?.trim();
+  if (fromPayload) {
+    const d = new Date(fromPayload);
+    if (!Number.isNaN(d.getTime())) return true;
+  }
+  if (input.sessionCompletedAt != null) {
+    const d =
+      typeof input.sessionCompletedAt === "string"
+        ? new Date(input.sessionCompletedAt.trim())
+        : input.sessionCompletedAt;
+    if (!Number.isNaN(d.getTime())) return true;
+  }
+  const hint = input.sessionCompletedAtIsoHint?.trim();
+  if (hint) {
+    const hd = new Date(hint);
+    if (!Number.isNaN(hd.getTime())) return true;
+  }
+  return false;
+}
+
 /**
  * Legacy three-arg helper: builds a minimal payload object from an explicit ISO string when present.
  * Prefer {@link resolveImportedSessionDisplayTimeIso} with full `parsedPayload` when available.

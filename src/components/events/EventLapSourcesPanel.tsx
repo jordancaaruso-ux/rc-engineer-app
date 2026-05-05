@@ -111,7 +111,7 @@ export function EventLapSourcesPanel(props: {
     <div className="rounded-lg border border-border bg-card p-4 text-sm shadow-sm shadow-black/20">
       <h2 className="text-sm font-medium text-foreground">LiveRC lap detection</h2>
       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-        Paste practice list or results index URLs. The app matches your LiveRC driver name and surfaces prompts on the dashboard when new sessions appear.
+        Paste practice list or results index URLs. The app matches your LiveRC driver name and surfaces prompts on the dashboard when new sessions appear. Use comma or semicolon between multiple race classes.
       </p>
       <div className="mt-3 grid gap-3">
         <label className="grid gap-1">
@@ -140,7 +140,7 @@ export function EventLapSourcesPanel(props: {
             className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
             value={raceClass}
             onChange={(e) => setRaceClass(e.target.value)}
-            placeholder="e.g. 17.5 Stock Buggy"
+            placeholder="e.g. 17.5 Stock Buggy; Modified — multiple classes allowed"
             autoComplete="off"
           />
         </label>

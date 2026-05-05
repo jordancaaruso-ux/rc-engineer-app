@@ -52,6 +52,7 @@ export type DashboardNewRunPrefill =
         eventDetectionSource: "practice" | "race" | null;
         linkedEventId: string | null;
         liveRcDriverName: string | null;
+        liveRcDriverId: string | null;
       };
       /** True when session came from event lap watch / detection — any save counts as logging complete. */
       fromEventDetection: boolean;

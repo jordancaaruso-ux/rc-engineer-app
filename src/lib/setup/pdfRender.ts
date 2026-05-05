@@ -42,11 +42,49 @@ function viewerRectToPdfRect(
   };
 }
 
+function normLabel(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+/**
+ * True when the snapshot’s current choice matches a calibration option label, ignoring
+ * case/edge whitespace (import may store C07R vs c07R vs calibration key “C07R”).
+ */
+function singleChoiceLabelMatchesCurrent(current: string, optionLabel: string): boolean {
+  if (!current.trim()) return false;
+  return normLabel(current) === normLabel(optionLabel);
+}
+
 function optionMatchesSelection(appKey: string, label: string, selected: string[]): boolean {
-  const norm = (s: string) => s.trim().toLowerCase();
-  const target = norm(label);
-  if (appKey === "top_deck_screws" || appKey === "top_deck_cuts") return selected.map(norm).includes(target);
-  return selected.map(norm).includes(target);
+  const target = normLabel(label);
+  if (appKey === "top_deck_screws" || appKey === "top_deck_cuts") return selected.map(normLabel).includes(target);
+  return selected.map(normLabel).includes(target);
+}
+
+/**
+ * Cover the template PDF’s baked-in checkbox / radio art so unselected options do not
+ * show false ticks. Widget-group modes do not use AcroForm check/uncheck (only X marks);
+ * the base file often still draws every position as “on”.
+ */
+function coverWidgetWithWhite(
+  page: ReturnType<PDFDocument["getPages"]>[number],
+  pageHeight: number,
+  rect: { x: number; y: number; width: number; height: number }
+): void {
+  const r = viewerRectToPdfRect(rect, pageHeight);
+  const pad = 1.2;
+  try {
+    page.drawRectangle({
+      x: r.x - pad,
+      y: r.y - pad,
+      width: r.width + 2 * pad,
+      height: r.height + 2 * pad,
+      color: rgb(1, 1, 1),
+      borderWidth: 0,
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 function drawSelectionMark(
@@ -96,7 +134,7 @@ export async function applySetupValuesToPdfDocument(
         for (const [label, ref] of Object.entries(rule.options)) {
           const field = form.getFieldMaybe(ref.pdfFieldName);
           if (!field || !(field instanceof PDFCheckBox)) continue;
-          if (current && current === label) field.check();
+          if (singleChoiceLabelMatchesCurrent(current, label)) field.check();
           else field.uncheck();
         }
         continue;
@@ -127,7 +165,8 @@ export async function applySetupValuesToPdfDocument(
           const page = pages[w.pageNumber - 1];
           if (!page) continue;
           const ph = page.getHeight();
-          if (current === label) drawSelectionMark(page, ph, w);
+          coverWidgetWithWhite(page, ph, w);
+          if (singleChoiceLabelMatchesCurrent(current, label)) drawSelectionMark(page, ph, w);
         }
         continue;
       }
@@ -141,12 +180,13 @@ export async function applySetupValuesToPdfDocument(
         if (!field) continue;
         const widgets = collectWidgetLayouts(pdfDoc, field);
         for (const [label, ref] of Object.entries(rule.options)) {
-          if (!optionMatchesSelection(appKey, label, selected)) continue;
           const w = widgets[ref.widgetInstanceIndex];
           if (!w) continue;
           const page = pages[w.pageNumber - 1];
           if (!page) continue;
-          drawSelectionMark(page, page.getHeight(), w);
+          const ph = page.getHeight();
+          coverWidgetWithWhite(page, ph, w);
+          if (optionMatchesSelection(appKey, label, selected)) drawSelectionMark(page, ph, w);
         }
         continue;
       }
@@ -188,10 +228,12 @@ function applySimpleMappingRule(
     const w = widgets[idx]!;
     const page = pages[w.pageNumber - 1];
     if (!page) return;
+    const ph = page.getHeight();
+    coverWidgetWithWhite(page, ph, w);
     const order = AWESOMATIX_MULTI_SELECT_GROUPS[appKey];
     const label = order?.[idx] ?? String(idx);
     if (selected.length > 0 && optionMatchesSelection(appKey, label, selected)) {
-      drawSelectionMark(page, page.getHeight(), w);
+      drawSelectionMark(page, ph, w);
     }
     return;
   }

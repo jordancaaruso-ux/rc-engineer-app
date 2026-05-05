@@ -108,18 +108,41 @@ export function readPresetWithOtherSelection(data: SetupSnapshotData, key: strin
   return pov.selectedPreset.trim();
 }
 
-/** Single-choice PDF widgets match on preset token, not free-text display. */
-export function readSetupSingleChoiceForPdf(data: SetupSnapshotData, key: string): string {
-  if (isPresetWithOtherFieldKey(key)) return readPresetWithOtherSelection(data, key);
-  return readSetupField(data, key);
-}
-
 /** Display string for review/print: otherText when set, else selectedPreset label. */
 export function readPresetWithOtherDisplay(data: SetupSnapshotData, key: string): string {
   if (!isPresetWithOtherFieldKey(key)) return readSetupField(data, key);
   const opts = getSingleSelectChipOptions(key);
   const pov = getPresetWithOtherFromData(data as Record<string, unknown>, key, opts);
   return displayPresetWithOther(pov);
+}
+
+const normForPdfToken = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * Single-choice PDF: match calibration option keys to a chip token. Uses
+ * `selectedPreset` when set; if empty, matches full display (e.g. otherText-only
+ * "C27MMX") to the catalog so export matches what the in-app field shows. Import
+ * from a tick-heavy PDF can leave only free text — this still maps to a chip.
+ */
+export function readSetupSingleChoiceForPdf(data: SetupSnapshotData, key: string): string {
+  if (!isPresetWithOtherFieldKey(key)) return readSetupField(data, key);
+  const opts = getSingleSelectChipOptions(key);
+  const presel = readPresetWithOtherSelection(data, key);
+  if (presel) {
+    if (opts?.length) {
+      for (const o of opts) {
+        if (normForPdfToken(presel) === normForPdfToken(o)) return o;
+      }
+    }
+    return presel;
+  }
+  const display = readPresetWithOtherDisplay(data, key).trim();
+  if (!display || !opts?.length) return "";
+  for (const o of opts) {
+    if (normForPdfToken(o) === "other") continue;
+    if (normForPdfToken(o) === normForPdfToken(display)) return o;
+  }
+  return "";
 }
 
 export function setupValuesDiffer(

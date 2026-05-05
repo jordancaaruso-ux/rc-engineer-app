@@ -12,6 +12,8 @@ type SetupPageSearchParams = {
   created?: string;
   setupId?: string;
   calibration?: string;
+  /** "1" when fingerprint matched multiple calibrations; a best guess was applied. */
+  calibrationAmbiguous?: string;
 };
 
 export default async function SetupPage({
@@ -32,6 +34,8 @@ export default async function SetupPage({
     typeof resolvedSearchParams.calibration === "string" && resolvedSearchParams.calibration.trim()
       ? resolvedSearchParams.calibration.trim()
       : null;
+  const calibrationAmbiguous =
+    resolvedSearchParams.calibrationAmbiguous === "1" || resolvedSearchParams.calibrationAmbiguous === "true";
 
   if (!hasDatabaseUrl()) {
     return (
@@ -100,6 +104,7 @@ export default async function SetupPage({
         select: { id: true, originalFilename: true, createdSetupId: true },
       })
     : null;
+  const bannerSetupId = createdSetupId ?? createdDoc?.createdSetupId ?? null;
 
   return (
     <>
@@ -117,6 +122,12 @@ export default async function SetupPage({
               Setup created from {createdDoc.originalFilename}
               {createdCalibrationName ? ` using ${createdCalibrationName}` : ""}.
             </div>
+            {calibrationAmbiguous ? (
+              <p className="mt-1 text-xs text-amber-200/90">
+                More than one calibration matched this PDF; the app picked the most recent. Open the
+                document if values look wrong.
+              </p>
+            ) : null}
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <Link
                 href={`/setup-documents/${createdDoc.id}`}
@@ -124,8 +135,27 @@ export default async function SetupPage({
               >
                 Open setup document
               </Link>
-              {createdSetupId ? (
-                <span className="font-mono text-[11px] opacity-80">setup id: {createdSetupId}</span>
+              {bannerSetupId ? (
+                <>
+                  <a
+                    href={`/api/setup-snapshots/${encodeURIComponent(bannerSetupId)}/setup-pdf`}
+                    className="underline text-emerald-200 hover:text-emerald-100"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View as PDF
+                  </a>
+                  <a
+                    href={`/api/setup-snapshots/${encodeURIComponent(bannerSetupId)}/setup-pdf?download=1`}
+                    className="underline text-emerald-200/80 hover:text-emerald-100"
+                    download
+                  >
+                    Download PDF
+                  </a>
+                </>
+              ) : null}
+              {bannerSetupId ? (
+                <span className="font-mono text-[11px] opacity-80">setup id: {bannerSetupId}</span>
               ) : null}
               <Link
                 href="/setup"
@@ -186,9 +216,20 @@ export default async function SetupPage({
                       {doc.createdSetupId ? " · setup created" : ""}
                     </div>
                   </div>
-                  <Link href={`/setup-documents/${doc.id}`} className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
-                    Review
-                  </Link>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {doc.createdSetupId ? (
+                      <a
+                        href={`/api/setup-snapshots/${encodeURIComponent(doc.createdSetupId)}/setup-pdf?download=1`}
+                        className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+                        download
+                      >
+                        PDF
+                      </a>
+                    ) : null}
+                    <Link href={`/setup-documents/${doc.id}`} className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
+                      Review
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>

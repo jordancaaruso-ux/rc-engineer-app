@@ -1759,12 +1759,24 @@ export function SetupSheetStructured({
         const opts = getSingleSelectChipOptions(key);
         const next = normalizePresetWithOtherFromUnknown(raw, undefined, opts);
         const nextData = { ...value };
-        if (isEmptyPresetWithOther(next)) delete nextData[key];
+        // `null` must be sent (key present in JSON) so merge/resolve on save can clear vs baseline;
+        // `delete` would omit the key and the server would keep the old value.
+        if (isEmptyPresetWithOther(next)) nextData[key] = null;
         else nextData[key] = next;
         onChange(nextData);
         return;
       }
       const nextValue = Array.isArray(raw) ? raw : coerceSetupValue(String(raw ?? ""));
+      if (Array.isArray(nextValue)) {
+        const nextData = { ...value };
+        nextData[key] = nextValue.length ? nextValue : null;
+        onChange(nextData);
+        return;
+      }
+      if (typeof nextValue === "string" && nextValue.trim() === "") {
+        onChange({ ...value, [key]: null });
+        return;
+      }
       onChange({ ...value, [key]: nextValue });
     },
     [value, onChange]
@@ -1773,8 +1785,7 @@ export function SetupSheetStructured({
   const commitScrews = useCallback(
     (key: "motor_mount_screws" | "top_deck_screws" | "top_deck_cuts", next: string[]) => {
       const nextData = { ...value };
-      if (next.length === 0) delete nextData[key];
-      else nextData[key] = next;
+      nextData[key] = next.length ? next : null;
       onChange(nextData);
     },
     [value, onChange]

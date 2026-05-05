@@ -104,6 +104,12 @@ export default async function EventDetailPage(props: {
                   </span>
                 </div>
               )}
+              {event.controlledTireLabel?.trim() ? (
+                <div>
+                  <span className="text-sm font-medium text-muted-foreground">Controlled / spec tire</span>
+                  <span className="ml-2">{event.controlledTireLabel.trim()}</span>
+                </div>
+              ) : null}
               <div>
                 <span className="text-sm font-medium text-muted-foreground">Runs</span>
                 <span className="ml-2">{runCount}</span>

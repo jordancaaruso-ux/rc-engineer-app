@@ -233,6 +233,8 @@ model Event {
   resultsSourceUrl  String?
   /** Race class to watch on results index (e.g. \"17.5 Stock\"). */
   raceClass         String?
+  /** Optional spec / controlled compound label (same style as TireSet.label), e.g. Sweep 32. */
+  controlledTireLabel String?
 
   /** Watermark for practice auto-import (canonical session completion instant). */
   practiceLastSeenSessionCompletedAt DateTime?
@@ -295,6 +297,11 @@ model SetupSnapshot {
 
   /** Keys that differed from baseSetupSnapshot after merge (audit). */
   setupDeltaJson Json?
+
+  /** Filled PDF from base template + calibration (same pipeline as runs); see `SETUP_PDF_RENDER_PIPELINE_VERSION`. */
+  renderedSetupPdfPath          String?
+  renderedSetupPdfGeneratedAt   DateTime?
+  setupPdfRenderVersion         Int      @default(1)
 
   runs Run[]
   sourceDocuments SetupDocument[] @relation("CreatedSetup")

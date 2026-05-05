@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
+import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
 import { fetchUrlText } from "@/lib/lapUrlParsers/fetchText";
 import {
@@ -9,11 +9,11 @@ import {
   extractRaceSessions,
   isLiveRcPracticeListUrl,
   isLiveRcResultsDiscoveryUrl,
-  raceListRowMatchesEventClass,
+  normalizeLiveRcDriverNameForMatch,
+  raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
-import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
+import { resolveImportedSessionDisplayTimeIso, resolveImportedSessionHasWallClockTime } from "@/lib/lapImport/labels";
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 import { eventIsActiveOnLocalToday } from "@/lib/eventActive";
@@ -210,19 +210,17 @@ async function syncResultsForEvent(
     raceClass: string | null;
     resultsLastSeenSessionCompletedAt: Date | null;
   },
-  _liveNorm: string,
+  liveNorm: string,
   liveName: string
 ): Promise<void> {
   const pageUrl = ev.resultsSourceUrl!.trim();
   if (!isLiveRcResultsDiscoveryUrl(pageUrl)) return;
 
-  const classNorm = normalizeLiveRcDriverNameForMatch(ev.raceClass!.trim());
-
   const fetched = await fetchUrlText(pageUrl);
   if (!fetched.ok) return;
 
   const raceList = extractRaceSessions(fetched.text, pageUrl).filter((r) =>
-    raceListRowMatchesEventClass(r, classNorm)
+    raceListRowMatchesAnyConfiguredClass(r, ev.raceClass!.trim())
   );
 
   const lastSeen = ev.resultsLastSeenSessionCompletedAt;
@@ -258,6 +256,9 @@ async function syncResultsForEvent(
     });
     if (!enriched) continue;
 
+    const canonNorm = normalizeLiveRcDriverNameForMatch(enriched.displayDriverName);
+    if (liveNorm && canonNorm !== liveNorm) continue;
+
     const displayIso = enriched.sessionCompletedAtIso;
     const when = displayIso ? new Date(displayIso) : null;
     if (when && !Number.isNaN(when.getTime())) {
@@ -291,7 +292,12 @@ function runIsIncomplete(run: { lapTimes: unknown; notes: string | null }): bool
 
 /** Build dashboard prompts after optional sync (caller runs sync first). */
 export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRunPrompt[]> {
-  const liveRcDriverName = (await getLiveRcDriverNameSetting(userId).catch(() => null))?.trim() ?? null;
+  const [liveRcDriverNameRaw, liveRcDriverIdRaw] = await Promise.all([
+    getLiveRcDriverNameSetting(userId).catch(() => null),
+    getLiveRcDriverIdSetting(userId).catch(() => null),
+  ]);
+  const liveRcDriverName = liveRcDriverNameRaw?.trim() ?? null;
+  const liveRcDriverId = liveRcDriverIdRaw?.trim() ?? null;
 
   const scope = await getEventLapDetectionScope(userId);
   if (scope.scopedEventIds.length === 0) return [];
@@ -360,6 +366,7 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
     const plan = buildImportedIngestPlanFromPayload(s.parsedPayload, {
       mode: ingestMode,
       liveRcDriverName,
+      liveRcDriverId,
     });
     const displayDriverName =
       plan?.primaryDriverName?.trim() ||
@@ -376,6 +383,10 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
       sessionCompletedAt: s.sessionCompletedAt,
       parsedPayload: s.parsedPayload,
       createdAt: s.createdAt,
+    });
+    const sessionTimeIsImportFallback = !resolveImportedSessionHasWallClockTime({
+      sessionCompletedAt: s.sessionCompletedAt,
+      parsedPayload: s.parsedPayload,
     });
 
     const orClause: Array<{ importedLapTimeSessionId: string } | { id: string }> = [
@@ -407,6 +418,7 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
       runId: run?.id ?? null,
       isIncomplete,
       promptKind,
+      sessionTimeIsImportFallback,
     });
   }
 

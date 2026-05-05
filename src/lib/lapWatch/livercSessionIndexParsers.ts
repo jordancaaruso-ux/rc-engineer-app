@@ -106,6 +106,24 @@ export function raceListRowMatchesEventClass(
   return false;
 }
 
+/** Multiple entries in one field: comma- or semicolon-separated class labels (same as Event race class UI). */
+export function raceListRowMatchesAnyConfiguredClass(
+  r: Pick<ExtractedRaceSession, "raceClass" | "listLinkText">,
+  configuredRaceClassField: string
+): boolean {
+  const parts = configuredRaceClassField
+    .split(/[,;]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return false;
+  for (const p of parts) {
+    const n = normalizeLiveRcDriverNameForMatch(p);
+    if (!n) continue;
+    if (raceListRowMatchesEventClass(r, n)) return true;
+  }
+  return false;
+}
+
 export function extractLiveRcRowTimeCandidate(rowText: string): string | null {
   const t = normalizeWhitespace(rowText);
   if (!t) return null;
@@ -143,6 +161,21 @@ export function isLiveRcResultsDiscoveryUrl(urlStr: string): boolean {
     if (!/\.liverc\.com$/i.test(u.hostname)) return false;
     const path = u.pathname.toLowerCase().replace(/\/+$/, "");
     return path.endsWith("/results");
+  } catch {
+    return false;
+  }
+}
+
+/** LiveRC event results hub: lists links to `p=view_race_result` sessions. */
+export function isLiveRcEventHubUrl(urlStr: string): boolean {
+  try {
+    const u = new URL(urlStr.trim());
+    if (!/\.liverc\.com$/i.test(u.hostname)) return false;
+    const path = u.pathname.toLowerCase().replace(/\/+$/, "");
+    if (!path.endsWith("/results")) return false;
+    const p = (u.searchParams.get("p") ?? "").toLowerCase();
+    const id = u.searchParams.get("id");
+    return p === "view_event" && Boolean(id?.trim());
   } catch {
     return false;
   }

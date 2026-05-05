@@ -139,6 +139,27 @@ export async function storeRunRenderedSetupPdf(runId: string, pdfBytes: Buffer):
   return rel;
 }
 
+/** Persist lazily rendered setup-snapshot PDF (no run). */
+export async function storeSetupSnapshotRenderedSetupPdf(setupSnapshotId: string, pdfBytes: Buffer): Promise<string> {
+  assertDurableStorageForWrites();
+  const key = `setup-snapshot-pdfs/${setupSnapshotId}.pdf`;
+  if (useBlobStorage()) {
+    const blob = await put(key, pdfBytes, {
+      access: "private",
+      contentType: "application/pdf",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    return blob.url;
+  }
+  const rel = `/uploads/setup-snapshot-pdfs/${setupSnapshotId}.pdf`;
+  const dir = path.join(LOCAL_UPLOAD_ROOT, "setup-snapshot-pdfs");
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, `${setupSnapshotId}.pdf`), pdfBytes);
+  return rel;
+}
+
 export function absolutePathForStoragePath(storagePath: string): string {
   if (isRemoteStorageRef(storagePath)) {
     throw new Error("absolutePathForStoragePath does not support remote URLs");

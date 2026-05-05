@@ -35,6 +35,7 @@ export function serializeParsePayload(parsed: LapUrlParseResult): Record<string,
     sessionDrivers: parsed.sessionDrivers ?? [],
     sessionHint: parsed.sessionHint ?? null,
     sessionCompletedAtIso: parsed.sessionCompletedAtIso ?? null,
+    discoveredRaceUrls: parsed.discoveredRaceUrls ?? null,
     message: parsed.message ?? null,
     errorCode: parsed.errorCode ?? null,
   };

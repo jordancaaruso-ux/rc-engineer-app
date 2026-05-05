@@ -17,6 +17,7 @@ type QuickCreateResponse = {
   parseStatus: "PENDING" | "PARSED" | "PARTIAL" | "FAILED";
   needsReview: boolean;
   needsReviewReason: string | null;
+  calibrationAmbiguous: boolean;
 };
 
 type UploadStage = "idle" | "uploading" | "detecting" | "creating" | "done";
@@ -132,6 +133,7 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
       params.set("created", docId);
       params.set("setupId", data.setupId);
       if (data.calibrationName) params.set("calibration", data.calibrationName);
+      if (data.calibrationAmbiguous) params.set("calibrationAmbiguous", "1");
       router.push(`/setup?${params.toString()}`);
       router.refresh();
     } catch (e) {

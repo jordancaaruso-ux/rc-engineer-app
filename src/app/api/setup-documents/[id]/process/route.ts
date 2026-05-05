@@ -3,6 +3,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
+import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -71,8 +72,9 @@ export async function POST(_: Request, ctx: Ctx) {
   const t0 = dbg ? performance.now() : 0;
   try {
     await processSetupDocumentImport({ docId: doc.id, userId: user.id });
+    const auto = await tryCreateSetupFromParsedDocument({ docId: doc.id, userId: user.id });
     if (dbg) console.log(`[setup-process-timing] POST /process handler total ${(performance.now() - t0).toFixed(1)}ms doc=${doc.id}`);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, autoCreateSetup: auto });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });

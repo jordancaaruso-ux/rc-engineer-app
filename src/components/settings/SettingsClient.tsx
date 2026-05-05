@@ -5,6 +5,8 @@ import { useState } from "react";
 type InitialSettings = {
   myName: string;
   liveRcDriverName: string;
+  /** LiveRC `data-driver-id` when known; disambiguates same name on A/B/C mains. */
+  liveRcDriverId: string;
   currentPracticeDayUrl: string;
 };
 
@@ -13,16 +15,18 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "ok" } | { kind
 export function SettingsClient({ initial }: { initial: InitialSettings }) {
   const [myName, setMyName] = useState(initial.myName);
   const [liveRcDriverName, setLiveRcDriverName] = useState(initial.liveRcDriverName);
+  const [liveRcDriverId, setLiveRcDriverId] = useState(initial.liveRcDriverId);
   const [currentPracticeDayUrl, setCurrentPracticeDayUrl] = useState(initial.currentPracticeDayUrl);
   const [savingMyName, setSavingMyName] = useState<SaveState>({ kind: "idle" });
   const [savingDriver, setSavingDriver] = useState<SaveState>({ kind: "idle" });
+  const [savingDriverId, setSavingDriverId] = useState<SaveState>({ kind: "idle" });
   const [savingDayUrl, setSavingDayUrl] = useState<SaveState>({ kind: "idle" });
 
   async function postSetting(
     url: string,
     payload: Record<string, string | null>,
     setState: (s: SaveState) => void
-  ) {
+  ): Promise<boolean> {
     setState({ kind: "saving" });
     try {
       const res = await fetch(url, {
@@ -36,11 +40,13 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
       }
       setState({ kind: "ok" });
       window.setTimeout(() => setState({ kind: "idle" }), 1600);
+      return true;
     } catch (err) {
       setState({
         kind: "error",
         text: err instanceof Error ? err.message : "Failed to save",
       });
+      return false;
     }
   }
 
@@ -57,7 +63,7 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
 
       <SettingField
         label="LiveRC driver name"
-        hint="Used by Lap Times to match your sessions on a practice day URL. Must match how the timing page spells your name."
+        hint="Must match how timing pages spell your name. Used together with your LiveRC driver ID so A/B/C mains don’t get mixed up with someone who shares your name."
         value={liveRcDriverName}
         onChange={setLiveRcDriverName}
         onSave={() =>
@@ -70,6 +76,42 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
         state={savingDriver}
         placeholder="e.g. Jordan Smith"
       />
+
+      <div className="space-y-1 text-sm">
+        <label className="block text-sm font-medium text-foreground">LiveRC driver ID</label>
+        <p className="text-[11px] text-muted-foreground">
+          From LiveRC result tables (<code className="text-[10px]">data-driver-id</code>). Usually filled automatically
+          when you import a race or open “Your sessions at this event.” Clear it if results pick the wrong person.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            readOnly
+            value={liveRcDriverId}
+            placeholder="(not set yet)"
+            className="w-full min-w-[260px] flex-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm font-mono text-muted-foreground outline-none"
+          />
+          <button
+            type="button"
+            disabled={!liveRcDriverId.trim() || savingDriverId.kind === "saving"}
+            onClick={async () => {
+              const ok = await postSetting(
+                "/api/settings/live-rc-driver",
+                { liveRcDriverId: null },
+                setSavingDriverId
+              );
+              if (ok) setLiveRcDriverId("");
+            }}
+            className="rounded-md border border-border bg-muted/70 px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-60"
+          >
+            Clear ID
+          </button>
+          {savingDriverId.kind === "ok" ? <span className="text-[11px] text-emerald-600">Cleared.</span> : null}
+          {savingDriverId.kind === "error" ? (
+            <span className="text-[11px] text-destructive">{savingDriverId.text}</span>
+          ) : null}
+        </div>
+      </div>
 
       <SettingField
         label="Current practice day URL"
