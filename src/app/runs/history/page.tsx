@@ -362,23 +362,44 @@ export default async function RunHistoryPage({
                     </div>
                   </summary>
                   <div className="border-t border-border bg-muted/40">
-                    <div className="overflow-x-auto">
+                    <div className="max-md:overflow-x-visible md:overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border bg-muted/70 text-left text-xs font-medium text-muted-foreground">
                             {!teamMode ? (
-                              <th className="w-6 px-1 py-2" aria-label="Drag to reorder" />
+                              <th
+                                className="hidden md:table-cell w-6 px-1 py-2"
+                                aria-label="Drag to reorder"
+                              />
                             ) : null}
-                            {teamMode ? <th className="px-3 py-2">Member</th> : null}
-                            <th className="px-4 py-2">Date</th>
-                            <th className="px-4 py-2">Car</th>
-                            <th className="px-4 py-2">Track</th>
-                            <th className="px-4 py-2">Tires</th>
-                            <th className="px-4 py-2">Best</th>
-                            <th className="px-4 py-2">Avg top 5</th>
-                            <th className="px-4 py-2">Session</th>
-                            <th className="px-2 py-2 w-[6rem]">Setup</th>
-                            <th className="px-2 py-2 w-[7.5rem]">Pair</th>
+                            {teamMode ? (
+                              <th className="px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
+                                <span className="hidden sm:inline">Member</span>
+                                <span className="sm:hidden">Who</span>
+                              </th>
+                            ) : null}
+                            <th className="px-2 py-1.5 md:px-4 md:py-2 min-w-0">
+                              Date
+                            </th>
+                            <th className="px-2 py-1.5 md:px-4 md:py-2 whitespace-nowrap">
+                              Best
+                            </th>
+                            <th className="px-2 py-1.5 md:px-4 md:py-2 min-w-0">
+                              Session
+                            </th>
+                            <th className="px-2 py-1.5 md:px-2 md:py-2 w-[4.5rem] md:w-auto whitespace-nowrap">
+                              Setup
+                            </th>
+                            <th className="hidden md:table-cell px-4 py-2">Car</th>
+                            <th className="hidden md:table-cell px-4 py-2">Track</th>
+                            <th className="hidden md:table-cell px-4 py-2">Tires</th>
+                            <th className="hidden md:table-cell px-4 py-2">
+                              <span className="hidden xl:inline">Avg top 5</span>
+                              <span className="xl:hidden">Avg 5</span>
+                            </th>
+                            <th className="hidden md:table-cell px-2 py-2 w-[7.5rem]">
+                              Pair
+                            </th>
                           </tr>
                         </thead>
                         <tbody>

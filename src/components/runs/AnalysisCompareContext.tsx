@@ -188,7 +188,7 @@ export function AnalysisCompareBar() {
 export function RunComparePairCell({ runId }: { runId: string }) {
   const ctx = useAnalysisCompare();
   if (!ctx) {
-    return <td className="px-2 py-2 w-[7.5rem]" />;
+    return <td className="hidden md:table-cell px-2 py-2 w-[7.5rem]" />;
   }
 
   const { targetRunId, compareRunId, setRunAsTarget, setRunAsCompare } = ctx;
@@ -197,7 +197,7 @@ export function RunComparePairCell({ runId }: { runId: string }) {
 
   return (
     <td
-      className="px-2 py-2 align-top w-[7.5rem]"
+      className="hidden md:table-cell px-2 py-2 align-top w-[7.5rem]"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >

@@ -114,7 +114,7 @@ function CompactField({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="min-w-[5.5rem] max-w-[220px] shrink-0">
+    <div className="min-w-0 max-w-[min(100%,220px)] sm:min-w-[5.5rem] sm:max-w-[220px] shrink">
       <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="text-xs text-foreground break-words">{children ?? value ?? "—"}</div>
     </div>
@@ -123,7 +123,10 @@ function CompactField({
 
 function LapStatChip({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div className="rounded border border-border bg-muted/80 px-2 py-1 min-w-[4.5rem]" title={title}>
+    <div
+      className="rounded border border-border bg-muted/80 px-1.5 py-0.5 md:px-2 md:py-1 min-w-0 md:min-w-[4.5rem]"
+      title={title}
+    >
       <div className="text-[9px] font-medium text-muted-foreground leading-none mb-0.5">{label}</div>
       <div className="text-[11px] font-mono tabular-nums text-foreground leading-tight">{value}</div>
     </div>
@@ -398,7 +401,7 @@ export function RunHistoryTable({
             >
               {enableReorder ? (
                 <td
-                  className="w-6 px-1 py-2 text-center text-muted-foreground"
+                  className="hidden md:table-cell w-6 px-1 py-1.5 md:py-2 text-center text-muted-foreground"
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}
                   title="Drag to reorder"
@@ -408,59 +411,66 @@ export function RunHistoryTable({
                 </td>
               ) : null}
               {showMemberColumn ? (
-                <td className="px-3 py-2 text-xs text-muted-foreground max-w-[10rem] truncate" title={memberLabel ?? ""}>
+                <td
+                  className="px-2 py-1.5 md:px-3 md:py-2 text-[11px] md:text-xs text-muted-foreground max-w-[4.5rem] md:max-w-[10rem] truncate"
+                  title={memberLabel ?? ""}
+                >
                   {memberLabel}
                 </td>
               ) : null}
-              <td className="px-4 py-2">
-                <RelativeTime
-                  iso={resolveRunDisplayInstant(run)}
-                  fallback={formatRunCreatedAtDateTime(
-                    resolveRunDisplayInstant(run),
-                    displayTimeZone
-                  )}
-                  display="combo"
-                />
+              <td className="px-2 py-1.5 md:px-4 md:py-2 align-top">
+                <div className="text-[11px] md:text-sm leading-snug">
+                  <RelativeTime
+                    iso={resolveRunDisplayInstant(run)}
+                    fallback={formatRunCreatedAtDateTime(
+                      resolveRunDisplayInstant(run),
+                      displayTimeZone
+                    )}
+                    display="combo"
+                  />
+                </div>
               </td>
-              <td className="px-4 py-2">{carDisplay}</td>
-              <td className="px-4 py-2">{trackDisplay}</td>
-              <td className="px-4 py-2">{tiresDisplay}</td>
-              <td className="px-4 py-2">
+              <td className="px-2 py-1.5 md:px-4 md:py-2 font-mono tabular-nums text-[11px] md:text-sm whitespace-nowrap">
                 {formatLap(
                   run.bestLapSeconds ?? getBestLap(primaryLapRowsFromRun(run))
                 )}
               </td>
-              <td className="px-4 py-2">
-                {formatLap(
-                  run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRowsFromRun(run), 5)
-                )}
-              </td>
-              <td className="px-4 py-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span>{formatRunSessionDisplay(run)}</span>
+              <td className="px-2 py-1.5 md:px-4 md:py-2 min-w-0 align-top">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span className="text-[11px] md:text-sm leading-snug line-clamp-2 md:line-clamp-none break-words">
+                    {formatRunSessionDisplay(run)}
+                  </span>
                   {run.loggingComplete === false ? (
                     <span
-                      className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-amber-900 dark:text-amber-100"
+                      className="shrink-0 w-fit rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[8px] md:text-[9px] font-medium uppercase tracking-wide text-amber-900 dark:text-amber-100"
                       title="Logging not marked complete"
                     >
-                      Not completed
+                      Draft
                     </span>
                   ) : null}
                 </div>
               </td>
               <td
-                className="px-2 py-2 align-middle"
+                className="px-2 py-1.5 md:px-2 md:py-2 align-middle"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
                 <button
                   type="button"
                   onClick={() => setSetupModalRunId(run.id)}
-                  className="rounded-md border border-border bg-background px-2 py-1 text-[10px] font-medium text-foreground hover:bg-muted/80 transition whitespace-nowrap"
+                  className="rounded-md border border-border bg-background px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] font-medium text-foreground hover:bg-muted/80 transition whitespace-nowrap"
                   title="View setup sheet for this run; compare to another run from the modal"
                 >
                   View setup
                 </button>
+              </td>
+              <td className="hidden md:table-cell px-4 py-2">{carDisplay}</td>
+              <td className="hidden md:table-cell px-4 py-2">{trackDisplay}</td>
+              <td className="hidden md:table-cell px-4 py-2">{tiresDisplay}</td>
+              <td className="hidden md:table-cell px-4 py-2 font-mono tabular-nums">
+                {formatLap(
+                  run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRowsFromRun(run), 5)
+                )}
               </td>
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>
@@ -711,7 +721,7 @@ function RunDetail({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
         <div className="min-w-0 space-y-3 xl:max-w-[min(100%,28rem)]">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Run details</h3>
-          <div className="flex flex-wrap gap-x-5 gap-y-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-3 max-md:gap-x-3">
             <CompactField label="Date / time">
               <RelativeTime
                 iso={resolveRunDisplayInstant(run)}
@@ -745,7 +755,7 @@ function RunDetail({
             <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Included-lap metrics
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1 md:gap-1.5">
               <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
               <LapStatChip
                 label="Stint"

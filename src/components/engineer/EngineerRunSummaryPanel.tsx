@@ -191,7 +191,45 @@ export function EngineerRunSummaryPanel({
                 Same timing import, multiple drivers. Rank and gap use each driver&apos;s best included lap vs session
                 best. Fade is mean(second half) − mean(first half) of included laps (needs ≥4 laps).
               </p>
-              <div className="overflow-x-auto rounded-md border border-border bg-muted/40">
+              <div className="md:hidden space-y-1.5">
+                {summary.fieldImportSession.ranked.map((row, i) => (
+                  <div
+                    key={`${row.label}-${i}-m`}
+                    className={cn(
+                      "rounded-md border border-border bg-muted/40 px-2 py-1.5 text-[10px] leading-tight",
+                      row.isPrimaryUser && "bg-primary/5"
+                    )}
+                  >
+                    <div className="font-sans text-foreground/90">
+                      {row.label}
+                      {row.isPrimaryUser ? (
+                        <span className="ml-1 text-[9px] text-muted-foreground">(you)</span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 grid grid-cols-4 gap-x-2 gap-y-0.5 font-mono text-[9px] text-foreground/85">
+                      <span>
+                        <span className="block text-[8px] font-sans text-muted-foreground">Rk</span>
+                        {row.rank}
+                      </span>
+                      <span>
+                        <span className="block text-[8px] font-sans text-muted-foreground">Best</span>
+                        {fmtSec(row.bestLapSeconds)}
+                      </span>
+                      <span>
+                        <span className="block text-[8px] font-sans text-muted-foreground">Gap</span>
+                        {row.gapToSessionBestSeconds == null || !Number.isFinite(row.gapToSessionBestSeconds)
+                          ? "—"
+                          : row.gapToSessionBestSeconds.toFixed(3)}
+                      </span>
+                      <span>
+                        <span className="block text-[8px] font-sans text-muted-foreground">Fade</span>
+                        {fmtSec(row.fadeSeconds)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block overflow-x-auto rounded-md border border-border bg-muted/40">
                 <table className="w-full text-left text-[10px]">
                   <thead>
                     <tr className="border-b border-border text-muted-foreground">
@@ -227,7 +265,36 @@ export function EngineerRunSummaryPanel({
             </div>
           ) : null}
 
-          <div className="rounded-md border border-border bg-muted/40 overflow-x-auto">
+          <div className="md:hidden space-y-1.5">
+            {(
+              [
+                ["Best", lo.best, "sec"],
+                ["Avg top 5", lo.avgTop5, "sec"],
+                ["Avg top 10", lo.avgTop10, "sec"],
+                ["Avg top 15", lo.avgTop15, "sec"],
+                ["Consistency", lo.consistencyScore, "score"],
+              ] as const
+            ).map(([label, m, kind]) => (
+              <div
+                key={`${label}-m`}
+                className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded-md border border-border bg-muted/40 px-2 py-1.5 text-[10px]"
+              >
+                <span className="font-medium text-foreground/85">{label}</span>
+                <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-right text-[10px]">
+                  <span>
+                    {kind === "sec"
+                      ? fmtSec(m.current, m.notMeaningful)
+                      : m.current != null
+                        ? formatConsistencyScorePercent(m.current)
+                        : "—"}
+                  </span>
+                  <span className="text-muted-foreground">{kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}</span>
+                  <span className={cn(flagClass(m.flag))}>{m.flag}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block rounded-md border border-border bg-muted/40 overflow-x-auto">
             <table className="w-full text-left text-[10px]">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
