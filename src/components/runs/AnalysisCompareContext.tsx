@@ -197,7 +197,7 @@ export function RunComparePairCell({ runId }: { runId: string }) {
 
   return (
     <td
-      className="hidden md:table-cell px-2 py-2 align-top w-[7.5rem]"
+      className="hidden md:table-cell px-2 py-2 align-middle w-[7.5rem]"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >

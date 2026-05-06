@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatRunSessionDisplay } from "@/lib/runSession";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { formatRunCreatedAtDateTime, formatRunDateOnly } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
@@ -128,10 +128,13 @@ function LapStatChip({ label, value, title }: { label: string; value: string; ti
       title={title}
     >
       <div className="text-[9px] font-medium text-muted-foreground leading-none mb-0.5">{label}</div>
-      <div className="text-[11px] font-mono tabular-nums text-foreground leading-tight">{value}</div>
+      <div className="text-[11px] tabular-nums tracking-tight text-foreground leading-tight">{value}</div>
     </div>
   );
 }
+
+/** Main sessions grid columns (excluding drag handle, member, compare pair). */
+const SESSION_TABLE_BODY_COLS = 9;
 
 /** Primary action buttons (analyse setup / lap times) — identical styling */
 const analyseActionButtonClass =
@@ -244,9 +247,10 @@ export function RunHistoryTable({
   }
 
   const totalCols =
-    (enableReorder ? 1 : 0) /* drag handle */ +
+    (enableReorder ? 1 : 0) +
     (showMemberColumn ? 1 : 0) +
-    1 /* date */ + 1 + 1 + 1 + 1 + 1 + 1 /* session */ + 1 /* setup */ + (showComparePairColumn ? 1 : 0);
+    SESSION_TABLE_BODY_COLS +
+    (showComparePairColumn ? 1 : 0);
 
   async function commitReorder(draggedId: string, targetId: string, edge: "above" | "below") {
     if (draggedId === targetId) return;
@@ -317,6 +321,14 @@ export function RunHistoryTable({
         const tiresDisplay = run.tireSet
           ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
           : "—";
+        const primaryLapRows = primaryLapRowsFromRun(run);
+        const bestLapDisplay = formatLap(
+          run.bestLapSeconds ?? getBestLap(primaryLapRows)
+        );
+        const avg5Display = formatLap(
+          run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRows, 5)
+        );
+        const avg10Display = formatLap(getAverageTopN(primaryLapRows, 10));
         const isDragging = draggingId === run.id;
         const showDropAbove = dropTarget?.runId === run.id && dropTarget.edge === "above";
         const showDropBelow = dropTarget?.runId === run.id && dropTarget.edge === "below";
@@ -401,7 +413,7 @@ export function RunHistoryTable({
             >
               {enableReorder ? (
                 <td
-                  className="hidden md:table-cell w-6 px-1 py-1.5 md:py-2 text-center text-muted-foreground"
+                  className="hidden md:table-cell w-6 px-1 py-1.5 md:py-2 align-middle text-center text-muted-foreground"
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}
                   title="Drag to reorder"
@@ -412,43 +424,49 @@ export function RunHistoryTable({
               ) : null}
               {showMemberColumn ? (
                 <td
-                  className="px-2 py-1.5 md:px-3 md:py-2 text-[11px] md:text-xs text-muted-foreground max-w-[4.5rem] md:max-w-[10rem] truncate"
+                  className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs text-muted-foreground max-w-[4.5rem] md:max-w-[10rem] truncate"
                   title={memberLabel ?? ""}
                 >
                   {memberLabel}
                 </td>
               ) : null}
-              <td className="px-2 py-1.5 md:px-4 md:py-2 align-top">
-                <div className="text-[11px] md:text-sm leading-snug">
-                  <RelativeTime
-                    iso={resolveRunDisplayInstant(run)}
-                    fallback={formatRunCreatedAtDateTime(
-                      resolveRunDisplayInstant(run),
-                      displayTimeZone
-                    )}
-                    display="combo"
-                  />
-                </div>
+              <td className="px-2 py-1.5 md:px-4 md:py-2 align-middle text-xs text-foreground leading-snug">
+                <RelativeTime
+                  iso={resolveRunDisplayInstant(run)}
+                  fallback={formatRunDateOnly(
+                    resolveRunDisplayInstant(run),
+                    displayTimeZone
+                  )}
+                  display="sessions"
+                  timeZone={displayTimeZone}
+                />
               </td>
-              <td className="px-2 py-1.5 md:px-4 md:py-2 font-mono tabular-nums text-[11px] md:text-sm whitespace-nowrap">
-                {formatLap(
-                  run.bestLapSeconds ?? getBestLap(primaryLapRowsFromRun(run))
-                )}
-              </td>
-              <td className="px-2 py-1.5 md:px-4 md:py-2 min-w-0 align-top">
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-[11px] md:text-sm leading-snug line-clamp-2 md:line-clamp-none break-words">
+              <td className="px-2 py-1.5 md:px-4 md:py-2 min-w-0 align-middle">
+                <div className="flex flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
+                  <span className="text-xs text-foreground leading-snug line-clamp-1 break-words min-w-0">
                     {formatRunSessionDisplay(run)}
                   </span>
                   {run.loggingComplete === false ? (
                     <span
-                      className="shrink-0 w-fit rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[8px] md:text-[9px] font-medium uppercase tracking-wide text-amber-900 dark:text-amber-100"
+                      className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[8px] md:text-[9px] font-medium uppercase tracking-wide text-amber-900 dark:text-amber-100"
                       title="Logging not marked complete"
                     >
                       Draft
                     </span>
                   ) : null}
                 </div>
+              </td>
+              <td className="px-2 py-1.5 md:px-4 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+                {bestLapDisplay}
+              </td>
+              <td className="px-2 py-1.5 md:px-4 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+                {avg5Display}
+              </td>
+              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+                {avg10Display}
+              </td>
+              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
+                {carDisplay}
               </td>
               <td
                 className="px-2 py-1.5 md:px-2 md:py-2 align-middle"
@@ -458,19 +476,17 @@ export function RunHistoryTable({
                 <button
                   type="button"
                   onClick={() => setSetupModalRunId(run.id)}
-                  className="rounded-md border border-border bg-background px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] font-medium text-foreground hover:bg-muted/80 transition whitespace-nowrap"
+                  className="ui-strong rounded-md border border-border bg-background px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition whitespace-nowrap"
                   title="View setup sheet for this run; compare to another run from the modal"
                 >
                   View setup
                 </button>
               </td>
-              <td className="hidden md:table-cell px-4 py-2">{carDisplay}</td>
-              <td className="hidden md:table-cell px-4 py-2">{trackDisplay}</td>
-              <td className="hidden md:table-cell px-4 py-2">{tiresDisplay}</td>
-              <td className="hidden md:table-cell px-4 py-2 font-mono tabular-nums">
-                {formatLap(
-                  run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRowsFromRun(run), 5)
-                )}
+              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
+                {trackDisplay}
+              </td>
+              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
+                {tiresDisplay}
               </td>
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>

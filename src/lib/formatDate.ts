@@ -98,6 +98,47 @@ export function formatRunPickerScanDate(d: string | Date): string {
   return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, RUN_PICKER_SCAN_DATE_OPTIONS).format(dt);
 }
 
+/**
+ * Date-only label for sessions list rows (no time). Prefer passing `timeZone`
+ * (IANA) so SSR matches the signed-in device once `rc_tz` is set.
+ */
+export function formatRunDateOnly(d: string | Date, timeZone?: string | null): string {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  const tz = timeZone?.trim();
+  const opts: Intl.DateTimeFormatOptions = {
+    ...RUN_PICKER_SCAN_DATE_OPTIONS,
+    ...(tz ? { timeZone: tz } : {}),
+  };
+  return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, opts).format(dt);
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Calendar-day distance between two instants in `timeZone` (IANA), or the
+ * runtime default zone when omitted. Non-negative when `a` is on or before `b`'s calendar day.
+ */
+export function calendarDayDifference(a: Date, b: Date, timeZone?: string | null): number {
+  const tz =
+    timeZone?.trim() ||
+    (typeof Intl !== "undefined"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : "UTC");
+  const key = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  const [ya, ma, da] = key(a).split("-").map(Number);
+  const [yb, mb, db] = key(b).split("-").map(Number);
+  const tA = Date.UTC(ya, ma - 1, da);
+  const tB = Date.UTC(yb, mb - 1, db);
+  return Math.round((tB - tA) / MS_PER_DAY);
+}
+
 export function formatEventDate(d: string | Date): string {
   return new Date(d).toLocaleDateString(LOCALE, DATE_OPTIONS);
 }
@@ -105,8 +146,6 @@ export function formatEventDate(d: string | Date): string {
 export function formatGroupDate(d: string | Date): string {
   return new Date(d).toLocaleDateString(LOCALE, DATE_OPTIONS);
 }
-
-const MS_PER_DAY = 86400000;
 
 /**
  * Relative timing for event dropdown: "in 5 days", "starts today", "day 2 of event", "ended 3 days ago".

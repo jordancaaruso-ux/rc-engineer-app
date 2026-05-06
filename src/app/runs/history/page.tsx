@@ -381,22 +381,26 @@ export default async function RunHistoryPage({
                             <th className="px-2 py-1.5 md:px-4 md:py-2 min-w-0">
                               Date
                             </th>
-                            <th className="px-2 py-1.5 md:px-4 md:py-2 whitespace-nowrap">
-                              Best
-                            </th>
                             <th className="px-2 py-1.5 md:px-4 md:py-2 min-w-0">
                               Session
                             </th>
-                            <th className="px-2 py-1.5 md:px-2 md:py-2 w-[4.5rem] md:w-auto whitespace-nowrap">
-                              Setup
+                            <th className="px-2 py-1.5 md:px-4 md:py-2 whitespace-nowrap">
+                              Best
                             </th>
-                            <th className="hidden md:table-cell px-4 py-2">Car</th>
-                            <th className="hidden md:table-cell px-4 py-2">Track</th>
-                            <th className="hidden md:table-cell px-4 py-2">Tires</th>
-                            <th className="hidden md:table-cell px-4 py-2">
+                            <th className="px-2 py-1.5 md:px-4 md:py-2 whitespace-nowrap">
                               <span className="hidden xl:inline">Avg top 5</span>
                               <span className="xl:hidden">Avg 5</span>
                             </th>
+                            <th className="hidden md:table-cell px-4 py-2 whitespace-nowrap">
+                              <span className="hidden xl:inline">Avg top 10</span>
+                              <span className="xl:hidden">Avg 10</span>
+                            </th>
+                            <th className="hidden md:table-cell px-4 py-2">Car</th>
+                            <th className="px-2 py-1.5 md:px-2 md:py-2 w-[4.5rem] md:w-auto whitespace-nowrap">
+                              Setup
+                            </th>
+                            <th className="hidden md:table-cell px-4 py-2">Track</th>
+                            <th className="hidden md:table-cell px-4 py-2">Tires</th>
                             <th className="hidden md:table-cell px-2 py-2 w-[7.5rem]">
                               Pair
                             </th>
