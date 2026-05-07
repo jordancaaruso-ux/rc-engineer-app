@@ -53,7 +53,6 @@ export function EngineerCompareAndPattern({
   const [events, setEvents] = useState<EventOpt[]>([]);
   const [carFilter, setCarFilter] = useState("");
   const [eventFilter, setEventFilter] = useState("");
-  const [q, setQ] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loadingRuns, setLoadingRuns] = useState(true);
@@ -66,6 +65,7 @@ export function EngineerCompareAndPattern({
   const [compareMode, setCompareMode] = useState<"mine" | "teammate">("mine");
   const compareModeRef = useRef(compareMode);
   const [sameTrackOnly, setSameTrackOnly] = useState(false);
+  const [compareCarId, setCompareCarId] = useState("");
   const [teammates, setTeammates] = useState<TeammateOpt[]>([]);
   const [teammateEmail, setTeammateEmail] = useState("");
   const [teammateAddBusy, setTeammateAddBusy] = useState(false);
@@ -205,7 +205,6 @@ export function EngineerCompareAndPattern({
     sp.set("take", "200");
     if (carFilter.trim()) sp.set("carId", carFilter.trim());
     if (eventFilter.trim()) sp.set("eventId", eventFilter.trim());
-    if (q.trim()) sp.set("q", q.trim());
     if (dateFrom.trim()) sp.set("dateFrom", dateFrom.trim());
     if (dateTo.trim()) sp.set("dateTo", dateTo.trim());
 
@@ -222,13 +221,13 @@ export function EngineerCompareAndPattern({
         .finally(() => {
           if (alive) setLoadingRuns(false);
         });
-    }, q.trim() ? 300 : 0);
+    }, 0);
 
     return () => {
       alive = false;
       window.clearTimeout(t);
     };
-  }, [carFilter, eventFilter, q, dateFrom, dateTo]);
+  }, [carFilter, eventFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     if (runIdUrl) return;
@@ -253,8 +252,11 @@ export function EngineerCompareAndPattern({
     if (sameTrackOnly && primaryTrackId) {
       list = list.filter((r) => r.trackId === primaryTrackId);
     }
+    if (compareCarId.trim()) {
+      list = list.filter((r) => r.carId === compareCarId.trim());
+    }
     return list;
-  }, [runs, runIdUrl, sameTrackOnly, primaryTrackId]);
+  }, [runs, runIdUrl, sameTrackOnly, primaryTrackId, compareCarId]);
 
   const compareRunsList = compareMode === "teammate" ? teammateRuns : compareOptionsMine;
   const compareFiltered = useMemo(
@@ -266,6 +268,12 @@ export function EngineerCompareAndPattern({
     const p = runs.find((r) => r.id === runIdUrl);
     return p?.carId?.trim() || "";
   }, [runs, runIdUrl]);
+
+  useEffect(() => {
+    if (compareCarId) return;
+    if (!primaryCarId) return;
+    setCompareCarId(primaryCarId);
+  }, [primaryCarId, compareCarId]);
 
   useEffect(() => {
     if (digestCarId || !primaryCarId) return;
@@ -351,38 +359,7 @@ export function EngineerCompareAndPattern({
         embedded ? "space-y-4" : "rounded-lg border border-border bg-card p-3 space-y-4"
       )}
     >
-      {!embedded ? (
-        <>
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Compare runs</div>
-          <p className="text-[11px] text-muted-foreground leading-snug">
-            Pick a primary run, then compare with another run (lap + setup diff when same car). For others&apos; runs: add a
-            teammate by email or pick someone who appears from a pilot team; choose their car — only runs at the same
-            track as your primary run are listed. Selection is stored in the URL.
-          </p>
-        </>
-      ) : (
-        <p className="text-[11px] text-muted-foreground leading-snug">
-          Filters scope the lists below. Primary and compare runs update the URL (<span className="font-mono">runId</span>{" "}
-          / <span className="font-mono">compareRunId</span>) for chat and for links from Analysis.
-        </p>
-      )}
-
       <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1 min-w-[140px]">
-          <label className="text-[10px] text-muted-foreground">Car filter</label>
-          <select
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none max-w-[220px]"
-            value={carFilter}
-            onChange={(e) => setCarFilter(e.target.value)}
-          >
-            <option value="">All cars</option>
-            {cars.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="space-y-1 min-w-[140px]">
           <label className="text-[10px] text-muted-foreground">Event filter</label>
           <select
@@ -397,15 +374,6 @@ export function EngineerCompareAndPattern({
               </option>
             ))}
           </select>
-        </div>
-        <div className="space-y-1 flex-1 min-w-[160px]">
-          <label className="text-[10px] text-muted-foreground">Search notes / labels</label>
-          <input
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Track, event, notes…"
-          />
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">From</label>
@@ -433,22 +401,41 @@ export function EngineerCompareAndPattern({
         <p className="text-[11px] text-muted-foreground">No runs match filters.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          <RunPickerSelect
-            label="Primary run (focus)"
-            runs={primaryOptions}
-            value={runIdUrl}
-            onChange={(id) => {
-              setQuery({
-                runId: id,
-                compareRunId: id === compareRunIdUrl ? null : compareRunIdUrl || null,
-              });
-            }}
-            placeholder="Select primary run…"
-            formatLine={formatRunPickerLine}
-          />
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-[10px] text-muted-foreground">Compare source</span>
+          <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Target</div>
+            <div className="space-y-1">
+              <label className="text-[10px] text-muted-foreground">Select car</label>
+              <select
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+                value={carFilter}
+                onChange={(e) => setCarFilter(e.target.value)}
+              >
+                <option value="">All cars</option>
+                {cars.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <RunPickerSelect
+              label="Select session"
+              runs={primaryOptions}
+              value={runIdUrl}
+              onChange={(id) => {
+                setQuery({
+                  runId: id,
+                  compareRunId: id === compareRunIdUrl ? null : compareRunIdUrl || null,
+                });
+              }}
+              placeholder="Select…"
+              formatLine={formatRunPickerLine}
+            />
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Comparison</div>
               <div className="flex rounded-md border border-border p-0.5 bg-muted/40">
                 <button
                   type="button"
@@ -458,7 +445,7 @@ export function EngineerCompareAndPattern({
                   )}
                   onClick={() => setCompareMode("mine")}
                 >
-                  My runs
+                  Mine
                 </button>
                 <button
                   type="button"
@@ -474,24 +461,40 @@ export function EngineerCompareAndPattern({
             </div>
 
             {compareMode === "mine" ? (
-              <label className="flex items-center gap-2 text-[10px] text-muted-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sameTrackOnly}
-                  onChange={(e) => setSameTrackOnly(e.target.checked)}
-                  disabled={!primaryTrackId}
-                />
-                Same track as primary
-              </label>
+              <>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground">Select car</label>
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+                    value={compareCarId}
+                    onChange={(e) => setCompareCarId(e.target.value)}
+                  >
+                    <option value="">(Same as target)</option>
+                    {cars.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-[10px] text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sameTrackOnly}
+                    onChange={(e) => setSameTrackOnly(e.target.checked)}
+                    disabled={!primaryTrackId}
+                  />
+                  Same track
+                </label>
+              </>
             ) : (
               <div className="space-y-2 rounded-md border border-border/80 bg-muted/30 p-2">
-                <div className="text-[10px] text-muted-foreground">Add teammate (their account email)</div>
                 <div className="flex flex-wrap gap-1">
                   <input
                     className="flex-1 min-w-[140px] rounded border border-border bg-background px-2 py-1 text-[11px] outline-none"
                     value={teammateEmail}
                     onChange={(e) => setTeammateEmail(e.target.value)}
-                    placeholder="email@example.com"
+                    placeholder="Add teammate email…"
                   />
                   <button
                     type="button"
@@ -523,7 +526,7 @@ export function EngineerCompareAndPattern({
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-muted-foreground">Their car</label>
+                  <label className="text-[10px] text-muted-foreground">Select car</label>
                   <select
                     className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
                     value={teammateCarId}
@@ -541,42 +544,34 @@ export function EngineerCompareAndPattern({
                     ))}
                   </select>
                 </div>
-                {!primaryTrackId && runIdUrl ? (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-500">
-                    Primary run needs a track to match your teammate at the same venue.
-                  </p>
-                ) : null}
               </div>
             )}
 
-            {compareMode === "teammate" && loadingTeammateRuns ? (
-              <p className="text-[11px] text-muted-foreground">Loading teammate runs…</p>
-            ) : (
-              <RunPickerSelect
-                label="Compare run (optional)"
-                runs={compareFiltered}
-                value={compareRunIdUrl}
-                onChange={(id) => setQuery({ compareRunId: id || null })}
-                placeholder={
-                  compareMode === "teammate" && !teammateCompareReady
-                    ? "Select driver, car, and primary with a track…"
-                    : "None — single-run context"
-                }
-                formatLine={formatRunPickerLine}
-                disabled={compareMode === "teammate" && !teammateCompareReady}
-              />
-            )}
+            <div className="pt-1">
+              {compareMode === "teammate" && loadingTeammateRuns ? (
+                <p className="text-[11px] text-muted-foreground">Loading teammate runs…</p>
+              ) : (
+                <RunPickerSelect
+                  label="Select session"
+                  runs={compareFiltered}
+                  value={compareRunIdUrl}
+                  onChange={(id) => setQuery({ compareRunId: id || null })}
+                  placeholder={
+                    compareMode === "teammate" && !teammateCompareReady
+                      ? "Select driver, car, and target with a track…"
+                      : "None"
+                  }
+                  formatLine={formatRunPickerLine}
+                  disabled={compareMode === "teammate" && !teammateCompareReady}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {showRunSummaryPanel && runIdUrl ? (
         <div className="border-t border-border pt-4 space-y-2">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Run summary</div>
-          <p className="text-[11px] text-muted-foreground leading-snug">
-            Lap and setup deltas for the primary run vs comparison (or previous on same car when compare is not set). Use
-            the buttons inside the summary to send a focused question to the Engineer.
-          </p>
           <EngineerRunSummaryPanel
             runId={runIdUrl}
             compareRunId={compareRunIdUrl || null}

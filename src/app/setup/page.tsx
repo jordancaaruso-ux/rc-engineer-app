@@ -240,7 +240,7 @@ export default async function SetupPage({
           <div className="flex items-center justify-between border-b border-border px-4 py-2">
             <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">Setups from runs</div>
             <Link href="/runs/history" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
-              Open analysis
+              View runs
             </Link>
           </div>
           {runs.length === 0 ? (

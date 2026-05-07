@@ -14,6 +14,7 @@ type Props = {
   todayRunCount: number;
   todaysChanges: DashboardHomeModel["todaysChanges"];
   displayTimeZone: string;
+  hasActiveEvent: boolean;
 };
 
 type Tab = "best" | "changes";
@@ -26,6 +27,7 @@ export function TodaySummaryCard({
   todayRunCount,
   todaysChanges,
   displayTimeZone,
+  hasActiveEvent,
 }: Props) {
   const [tab, setTab] = useState<Tab>("best");
   const totalChanges = todaysChanges.reduce((acc, block) => acc + block.rows.length, 0);
@@ -33,7 +35,9 @@ export function TodaySummaryCard({
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm shadow-black/25">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Today</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {hasActiveEvent ? "This event" : "Today"}
+        </div>
         <div className="text-[10px] text-muted-foreground">
           {todayRunCount === 0
             ? "No runs yet"

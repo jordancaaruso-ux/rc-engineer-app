@@ -2073,7 +2073,6 @@ export function NewRunForm(props: {
       {!isDraft ? (
       <div className="rounded-lg border border-border bg-muted/50 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="ui-title text-sm text-muted-foreground">Shortcut</div>
           <button
             type="button"
             className={cn(
@@ -2086,7 +2085,7 @@ export function NewRunForm(props: {
             }}
             disabled={!copyPreviewRun}
           >
-            Copy last run
+            Copy last run details
           </button>
         </div>
         {copyStatus ? <div className="mt-1 text-[11px] text-muted-foreground">{copyStatus}</div> : null}
@@ -2222,7 +2221,7 @@ export function NewRunForm(props: {
                   value="TESTING"
                   checked={sessionType === "TESTING"}
                   onChange={() => setSessionType("TESTING")}
-                  className="h-4 w-4 shrink-0 accent-primary"
+                  className="h-3 w-3 shrink-0 accent-red-500"
                 />
                 <span>Testing</span>
               </label>
@@ -2233,15 +2232,10 @@ export function NewRunForm(props: {
                   value="RACE_MEETING"
                   checked={sessionType === "RACE_MEETING"}
                   onChange={() => setSessionType("RACE_MEETING")}
-                  className="h-4 w-4 shrink-0 accent-primary"
+                  className="h-3 w-3 shrink-0 accent-red-500"
                 />
                 <span>Race Meeting</span>
               </label>
-            </div>
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              {sessionType === "TESTING"
-                ? "Flexible run-by-run development. No event context."
-                : "Tied to an event weekend. Select the event below, then choose track and session details."}
             </div>
             {sessionType === "TESTING" ? (
               <div className="mt-3 space-y-1 text-sm">
@@ -2249,7 +2243,7 @@ export function NewRunForm(props: {
                   htmlFor="practice-day-url-input"
                   className="block text-xs font-medium text-muted-foreground"
                 >
-                  LiveRC timing index URL (optional)
+                  LiveRC timing index URL
                 </label>
                 <input
                   id="practice-day-url-input"
@@ -2260,11 +2254,6 @@ export function NewRunForm(props: {
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-accent/50"
                   aria-label="LiveRC timing index URL for lap scan"
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Lap Times → <span className="font-medium text-foreground">URL</span> can scan this LiveRC practice
-                  list or results index for sessions (practice lists filter by your LiveRC driver name in
-                  Settings). Persists across runs (Settings → current practice day URL).
-                </p>
               </div>
             ) : null}
           </>
@@ -2704,9 +2693,6 @@ export function NewRunForm(props: {
                 <div className="text-[11px] text-destructive mt-1">{copyCarWarning}</div>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Drives setup sheet template, tire set list, and last-run defaults for this vehicle.
-            </p>
             {/* Race class (optional) field intentionally hidden from Log Your Run.
                 `raceClass` state + save payload are kept so the feature can be re-enabled later. */}
           </div>
@@ -2786,13 +2772,9 @@ export function NewRunForm(props: {
         {runDetailsTab === "tires" ? (
           <div className="space-y-4 pt-1">
             <div className="space-y-2 text-sm">
-              <p className="text-[11px] text-muted-foreground leading-snug rounded-md border border-border/60 bg-muted/30 px-2 py-1.5">
-                Saved setup snapshot always stores the tire set and battery pack selected here for this run, even if the setup preview below still shows values from a loaded previous setup.
-              </p>
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="ui-title text-sm text-muted-foreground">Tire set</div>
-                  <div className="text-[11px] text-muted-foreground">Optional.</div>
                 </div>
                 <button
                   type="button"
@@ -2938,7 +2920,6 @@ export function NewRunForm(props: {
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="ui-title text-sm text-muted-foreground">Battery pack</div>
-                  <div className="text-[11px] text-muted-foreground">Optional.</div>
                 </div>
                 <button
                   type="button"

@@ -141,7 +141,7 @@ export default async function RunHistoryPage({
   // form. Pre-opens the most recent group so the just-completed run is
   // visible without an extra click.
   // `focusRun=<runId>` opens the session group that contains the run and
-  // expands that row (e.g. from dashboard "Open run" / "Open analysis").
+  // expands that row (e.g. from dashboard "View run").
   searchParams?: Promise<{
     expandLatest?: string | string[];
     focusRun?: string | string[];
@@ -247,7 +247,7 @@ export default async function RunHistoryPage({
     ? "That team was not found or you are not a member."
     : teamMode
       ? "Runs from everyone in this team (mutual pilot). Reordering is disabled; open a member’s run read-only."
-      : "Review runs and compare to your working setup or another run. Load past setups from Log your run.";
+      : "";
 
   if (teamAccessDenied) {
     return (
@@ -274,7 +274,7 @@ export default async function RunHistoryPage({
       <header className="page-header">
         <div>
           <h1 className="page-title">{pageTitle}</h1>
-          <p className="page-subtitle">{pageSubtitle}</p>
+          {pageSubtitle ? <p className="page-subtitle">{pageSubtitle}</p> : null}
         </div>
       </header>
       <section className="page-body space-y-3">
@@ -326,17 +326,9 @@ export default async function RunHistoryPage({
             )}
           </div>
         ) : (
-          <AnalysisCompareProvider
-            runLabels={runLabels}
-            initialTargetId={initialTargetId}
-            initialCompareId={
-              initialCompareId && initialCompareId !== initialTargetId ? initialCompareId : null
-            }
-          >
-            <AnalysisCompareBar />
-            <div className="space-y-2">
-              <SessionGroupsPager initial={pagerInitial} step={12}>
-                {groups.map((group, idx) => (
+          <div className="space-y-2">
+            <SessionGroupsPager initial={pagerInitial} step={12}>
+              {groups.map((group, idx) => (
                 <details
                   key={group.id}
                   className="rounded-lg border border-border bg-muted/50 overflow-hidden group/details"
@@ -401,9 +393,6 @@ export default async function RunHistoryPage({
                             </th>
                             <th className="hidden md:table-cell px-4 py-2">Track</th>
                             <th className="hidden md:table-cell px-4 py-2">Tires</th>
-                            <th className="hidden md:table-cell px-2 py-2 w-[7.5rem]">
-                              Pair
-                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -413,7 +402,6 @@ export default async function RunHistoryPage({
                             runListSource={teamMode ? "team_runs" : "my_runs"}
                             userDisplayName={userDisplayName}
                             displayTimeZone={displayTimeZone}
-                            showComparePairColumn
                             enableReorder={!teamMode}
                             viewerUserId={teamMode ? user.id : null}
                             memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
@@ -429,10 +417,9 @@ export default async function RunHistoryPage({
                     </div>
                   </div>
                 </details>
-                ))}
-              </SessionGroupsPager>
-            </div>
-          </AnalysisCompareProvider>
+              ))}
+            </SessionGroupsPager>
+          </div>
         )}
       </section>
     </>

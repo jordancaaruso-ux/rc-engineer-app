@@ -9,7 +9,6 @@ import { getEngineerQuickPromptById } from "@/lib/engineerQuickPrompts";
 
 export function EngineerPageClient() {
   const [patternDigest, setPatternDigest] = useState<PatternDigestV1 | null>(null);
-  const [includeRunCatalog, setIncludeRunCatalog] = useState(true);
   const [queuedPrompt, setQueuedPrompt] = useState<EngineerQueuedChatPrompt | null>(null);
 
   const queueEngineerPrompt = useCallback((text: string) => {
@@ -53,8 +52,7 @@ export function EngineerPageClient() {
         <div className="p-4 md:p-5">
           <EngineerChatPanel
             patternDigest={patternDigest}
-            includeRunCatalog={includeRunCatalog}
-            onIncludeRunCatalogChange={setIncludeRunCatalog}
+            includeRunCatalog
             queuedPrompt={queuedPrompt}
             onQueuedPromptConsumed={clearQueuedPrompt}
             onQuickPrompt={queueEngineerPrompt}
@@ -65,11 +63,6 @@ export function EngineerPageClient() {
       <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
           <h2 className="text-lg font-semibold text-foreground tracking-tight">Compare &amp; trend</h2>
-          <p className="text-xs text-muted-foreground mt-1 leading-snug">
-            Choose target (primary) and comparison runs — same URL as Analysis &quot;Compare with Engineer&quot; (
-            <span className="font-mono">runId</span> / <span className="font-mono">compareRunId</span>). Run summary and
-            trend digest feed the chat above.
-          </p>
         </div>
         <div className="p-4 md:p-5">
           <EngineerCompareAndPattern

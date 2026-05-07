@@ -818,14 +818,6 @@ export function LapTimesIngestPanel({
               ) : null}
             </div>
           ) : null}
-          <p className="text-[11px] text-muted-foreground">
-            Paste an <span className="text-foreground/90">https</span> link and import. LiveRC{" "}
-            <span className="text-foreground/90">event results</span> pages (<code className="text-[10px]">p=view_event</code>)
-            import every race result session not already saved (optionally filtered by race class when this run is tied to
-            an event). Add another URL anytime — each import stays below. Multi-driver sessions default to your LiveRC
-            driver (Settings); competitor laps are kept for field comparisons. Click a row to use that driver&apos;s laps
-            for this run.
-          </p>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               id="url-import-input"

@@ -60,8 +60,7 @@ export function DashboardHome({
       }
     : {
         href: "/runs/new",
-        label: "Log new run",
-        blurb: "Start a fresh run log for your next session.",
+        label: "New Run",
       };
 
   return (
@@ -69,9 +68,6 @@ export function DashboardHome({
       <header className="page-header">
         <div className="min-w-0">
           <h1 className="page-title text-base">Dashboard</h1>
-          <p className="page-subtitle mt-0.5 max-w-xl text-[11px] leading-snug">
-            Previous run, today&apos;s numbers, and your active race meeting when there is one.
-          </p>
         </div>
       </header>
 
@@ -88,22 +84,19 @@ export function DashboardHome({
           )}
         >
           <div className="min-w-0">
-            <div
-              className={cn(
-                "text-[11px] font-medium uppercase tracking-wide",
-                todayDraftRunId
-                  ? "text-emerald-700 dark:text-emerald-300"
-                  : "text-muted-foreground"
-              )}
-            >
-              {todayDraftRunId ? "Unfinished run" : "Next"}
-            </div>
+            {todayDraftRunId ? (
+              <div className="text-[11px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                Unfinished run
+              </div>
+            ) : null}
             <div className="mt-0.5 text-sm font-medium leading-tight text-foreground">
               {primaryAction.label}
             </div>
-            <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-              {primaryAction.blurb}
-            </div>
+            {"blurb" in primaryAction && primaryAction.blurb ? (
+              <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                {primaryAction.blurb}
+              </div>
+            ) : null}
             {todayDraftRunId && todayDraftSavedAt ? (
               <div className="mt-0.5 text-[10px] font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
                 Saved{" "}
@@ -153,25 +146,21 @@ export function DashboardHome({
           todayRunCount={todayRunCount}
           todaysChanges={todaysChanges}
           displayTimeZone={displayTimeZone}
+          hasActiveEvent={Boolean(activeEvent)}
         />
 
         <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Lists
-          </div>
           <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <ActionItemListPanel
               list="try"
-              title="Things to try"
-              hint="From logged runs and manual adds. Remove archives the item."
+              title="Try"
               addPlaceholder="Add an idea…"
               initialItems={thingsToTry}
               embedded
             />
             <ActionItemListPanel
               list="do"
-              title="Things to do"
-              hint="Pre–next-run checks (e.g. verify a bolt). Same list as in Log your run. Remove archives the item."
+              title="Do"
               addPlaceholder="Add a reminder…"
               initialItems={thingsToDo}
               embedded
@@ -260,7 +249,7 @@ function PreviousRunCard({
     <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Previous run
+          Last Run
         </div>
       </div>
       {recentRun ? (
@@ -305,19 +294,13 @@ function PreviousRunCard({
               href={`/runs/history?focusRun=${encodeURIComponent(recentRun.id)}`}
               className={btnGhost()}
             >
-              Open run
-            </Link>
-            <Link
-              href={`/runs/history?focusRun=${encodeURIComponent(recentRun.id)}`}
-              className={btnGhost()}
-            >
-              Open analysis
+              View run
             </Link>
             <Link
               href={`/runs/${encodeURIComponent(recentRun.id)}/edit`}
               className={btnGhost()}
             >
-              Edit log
+              Edit run
             </Link>
           </div>
         </div>

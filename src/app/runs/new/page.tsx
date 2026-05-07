@@ -73,9 +73,6 @@ export default async function NewRunPage({
       <header className="page-header">
         <div>
           <h1 className="page-title">Log your run</h1>
-          <p className="page-subtitle">
-            Trackside-fast logging. Optionally copy your last run for this car, or load a past setup only.
-          </p>
         </div>
       </header>
       <section className="page-body">

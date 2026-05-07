@@ -59,7 +59,7 @@ export function EngineerRunSummaryPanel({
   const [err, setErr] = useState<string | null>(null);
   const [summary, setSummary] = useState<EngineerRunSummaryV2 | null>(null);
   const [cached, setCached] = useState(false);
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const expanded = defaultExpanded;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,17 +107,12 @@ export function EngineerRunSummaryPanel({
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted/50 transition"
-      >
+      <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
         <div className="ui-title text-[10px] uppercase tracking-wide text-muted-foreground">Engineer summary</div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           {cached && !compareRunId?.trim() ? <span>cached</span> : null}
-          <span>{expanded ? "▼" : "▶"}</span>
         </div>
-      </button>
+      </div>
 
       {expanded ? (
         <div className="border-t border-border px-3 py-3 space-y-3 text-[11px] leading-snug">
@@ -368,20 +363,6 @@ export function EngineerRunSummaryPanel({
               Refresh
             </button>
           </div>
-
-          {!(onCompareSetupsWithEngineer || onCompareLaptimesWithEngineer) ? (
-            <div className="border-t border-border pt-3 space-y-2">
-              <p className="text-muted-foreground">
-                Want to go deeper? Use the Engineer chat for questions and handling ideas about this run (optional).
-              </p>
-              <Link
-                href={engineerChatHref}
-                className="inline-flex rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground shadow-glow-sm hover:brightness-105"
-              >
-                Chat with Engineer
-              </Link>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

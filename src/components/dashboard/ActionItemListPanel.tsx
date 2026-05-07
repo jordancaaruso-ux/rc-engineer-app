@@ -17,7 +17,7 @@ export function ActionItemListPanel({
   list: ListParam;
   title: string;
   /** Short help line under the title. */
-  hint: string;
+  hint?: string;
   addPlaceholder: string;
   initialItems: DashboardActionItemRow[];
   embedded?: boolean;
@@ -169,15 +169,17 @@ export function ActionItemListPanel({
     <div className={shell}>
       <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
         <div className="text-sm font-medium tracking-tight text-foreground">{title}</div>
-        <p
-          className={
-            embedded
-              ? "text-[10px] leading-snug text-muted-foreground"
-              : "text-[10px] leading-snug text-muted-foreground sm:max-w-[55%] sm:text-right"
-          }
-        >
-          {hint}
-        </p>
+        {hint ? (
+          <p
+            className={
+              embedded
+                ? "text-[10px] leading-snug text-muted-foreground"
+                : "text-[10px] leading-snug text-muted-foreground sm:max-w-[55%] sm:text-right"
+            }
+          >
+            {hint}
+          </p>
+        ) : null}
       </div>
 
       <form onSubmit={addManual} className="mt-2 flex flex-wrap items-center gap-1.5">
