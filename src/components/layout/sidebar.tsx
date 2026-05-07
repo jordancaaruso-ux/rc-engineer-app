@@ -10,7 +10,6 @@ const navItems = [
   { href: "/", label: "Dashboard" },
   { href: "/engineer", label: "Engineer" },
   { href: "/runs/new", label: "Log your run" },
-  { href: "/laps/import", label: "Lap-time import" },
   { href: "/runs/history", label: "Sessions" },
   { href: "/teams", label: "Teams" },
   { href: "/videos/overlay", label: "Video analysis" },

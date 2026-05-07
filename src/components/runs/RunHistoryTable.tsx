@@ -30,6 +30,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
+import { SessionsEngineerPairLinks } from "@/components/runs/SessionsEngineerPairLinks";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 
 type Run = {
@@ -716,7 +717,6 @@ function RunDetail({
         ? "1 driver lap set uploaded"
         : `${uploadedLapSetCount} driver lap sets uploaded`;
 
-  const engineerThisRunHref = `/engineer?runId=${encodeURIComponent(run.id)}`;
   const engineerVsPreviousHref =
     previousRunOnCar &&
     `/engineer?runId=${encodeURIComponent(run.id)}&compareRunId=${encodeURIComponent(previousRunOnCar.id)}`;
@@ -725,13 +725,17 @@ function RunDetail({
     <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-5 text-sm">
       <EngineerRunSummaryPanel runId={run.id} defaultExpanded={false} />
 
-      <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
-        <Link
-          href={engineerVsPreviousHref ?? engineerThisRunHref}
-          className="inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition"
-        >
-          {engineerVsPreviousHref ? "Open in Engineer (vs previous same car)" : "Open in Engineer"}
-        </Link>
+      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Engineer</div>
+        <SessionsEngineerPairLinks runId={run.id} />
+        {engineerVsPreviousHref ? (
+          <Link
+            href={engineerVsPreviousHref}
+            className="inline-flex items-center rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+          >
+            Quick: vs previous on same car
+          </Link>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">

@@ -6,14 +6,8 @@ import { getMyNameSetting } from "@/lib/appSettings";
 import { formatGroupDate } from "@/lib/formatDate";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
-import {
-  AnalysisCompareBar,
-  AnalysisCompareProvider,
-} from "@/components/runs/AnalysisCompareContext";
 import { compareRunTimestamp } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
-import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import Link from "next/link";
 import { assertUserInTeam, listTeamMemberUserIds, listTeamsForUser } from "@/lib/teamAccess";
@@ -227,19 +221,6 @@ export default async function RunHistoryPage({
     focusRunId == null ? -1 : groups.findIndex((g) => g.runs.some((r) => r.id === focusRunId));
   const pagerInitial =
     focusGroupIndex >= 0 ? Math.max(8, focusGroupIndex + 1) : 8;
-  const initialTargetId = focusRunId ?? allRunsDescending[0]?.id ?? null;
-  const initialCompareId =
-    allRunsDescending.find((r) => r.id !== initialTargetId)?.id ?? null;
-  const runLabels: Record<string, string> = {};
-  for (const r of runs) {
-    const car = r.car?.name ?? r.carNameSnapshot ?? "Car";
-    const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(r), displayTimeZone);
-    const ownerBit =
-      teamId && r.userId && memberDisplayByUserId[r.userId]
-        ? `${memberDisplayByUserId[r.userId]} · `
-        : "";
-    runLabels[r.id] = `${ownerBit}${car} · ${when}`;
-  }
 
   const teamMode = Boolean(teamId && !teamAccessDenied);
   const pageTitle = teamAccessDenied ? "Sessions" : teamMode ? `Team — ${teamTitle}` : "Sessions";
@@ -307,7 +288,7 @@ export default async function RunHistoryPage({
             href="/runs/new"
             className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition"
           >
-            Log new run
+            New Run
           </Link>
           <span className="text-[11px] text-muted-foreground">
             {groups.length === 0

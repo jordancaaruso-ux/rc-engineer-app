@@ -6,6 +6,7 @@ import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompare
 import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/engineer/EngineerChatPanel";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
 import { getEngineerQuickPromptById } from "@/lib/engineerQuickPrompts";
+import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 
 export function EngineerPageClient() {
   const [patternDigest, setPatternDigest] = useState<PatternDigestV1 | null>(null);
@@ -42,6 +43,11 @@ export function EngineerPageClient() {
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [searchParams, pathname, router, queueEngineerPrompt]);
+
+  useEffect(() => {
+    const runId = searchParams.get("runId")?.trim();
+    if (runId) persistEngineerSessionsTargetRunId(runId);
+  }, [searchParams]);
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6">

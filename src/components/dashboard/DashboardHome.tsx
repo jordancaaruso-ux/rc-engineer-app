@@ -179,7 +179,7 @@ function EventContextCard({
 }) {
   return (
     <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="text-xs font-medium text-muted-foreground">
         Active race meeting
       </div>
       <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -248,7 +248,7 @@ function PreviousRunCard({
   return (
     <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="text-xs font-medium text-muted-foreground">
           Last Run
         </div>
       </div>
