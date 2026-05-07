@@ -717,6 +717,7 @@ function RunDetail({
         ? "1 driver lap set uploaded"
         : `${uploadedLapSetCount} driver lap sets uploaded`;
 
+  const engineerThisRunHref = `/engineer?runId=${encodeURIComponent(run.id)}`;
   const engineerVsPreviousHref =
     previousRunOnCar &&
     `/engineer?runId=${encodeURIComponent(run.id)}&compareRunId=${encodeURIComponent(previousRunOnCar.id)}`;
