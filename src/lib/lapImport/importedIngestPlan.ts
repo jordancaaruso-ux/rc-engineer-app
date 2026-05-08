@@ -12,23 +12,10 @@ function lapRowsFromNums(nums: number[]): LapRow[] {
 }
 
 /**
- * Build URL-import driver list + selection for Log your run from stored `parsedPayload`.
- * Practice: optionally restrict to the user’s LiveRC driver. Race: full field, preselect user row.
+ * All drivers with lap arrays from a stored `parsedPayload` (no practice filter).
+ * Used for field-level lap stats vs `buildImportedIngestPlanFromPayload` which may narrow to one row.
  */
-export function buildImportedIngestPlanFromPayload(
-  parsed: unknown,
-  opts: {
-    mode: "practice_user_only" | "race_full_field";
-    liveRcDriverName: string | null;
-    /** When stored payload uses LiveRC driver ids (race imports); optional for legacy rows. */
-    liveRcDriverId?: string | null;
-  }
-): {
-  sessionDrivers: LapUrlSessionDriver[];
-  selectedDriverIds: string[];
-  primaryDriverName: string;
-  primaryRows: LapRow[];
-} | null {
+export function rawSessionDriversFromImportedPayload(parsed: unknown): LapUrlSessionDriver[] | null {
   if (!parsed || typeof parsed !== "object") return null;
   const o = parsed as Record<string, unknown>;
   const sessionDriversRaw = o.sessionDrivers;
@@ -71,7 +58,29 @@ export function buildImportedIngestPlanFromPayload(
     }
   }
 
-  if (outDrivers.length === 0) return null;
+  return outDrivers.length > 0 ? outDrivers : null;
+}
+
+/**
+ * Build URL-import driver list + selection for Log your run from stored `parsedPayload`.
+ * Practice: optionally restrict to the user’s LiveRC driver. Race: full field, preselect user row.
+ */
+export function buildImportedIngestPlanFromPayload(
+  parsed: unknown,
+  opts: {
+    mode: "practice_user_only" | "race_full_field";
+    liveRcDriverName: string | null;
+    /** When stored payload uses LiveRC driver ids (race imports); optional for legacy rows. */
+    liveRcDriverId?: string | null;
+  }
+): {
+  sessionDrivers: LapUrlSessionDriver[];
+  selectedDriverIds: string[];
+  primaryDriverName: string;
+  primaryRows: LapRow[];
+} | null {
+  const outDrivers = rawSessionDriversFromImportedPayload(parsed);
+  if (!outDrivers || outDrivers.length === 0) return null;
 
   const wantNorm = opts.liveRcDriverName?.trim()
     ? normalizeLiveRcDriverNameForMatch(opts.liveRcDriverName.trim())

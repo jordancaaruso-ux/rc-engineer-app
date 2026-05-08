@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
+import { importedSessionFieldStatsPreviewFromJson } from "@/lib/lapImport/computeImportedSessionFieldStats";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 
 export async function GET() {
@@ -24,14 +25,22 @@ export async function GET() {
       linkedRunId: true,
       linkedEventId: true,
       parsedPayload: true,
+      fieldStatsJson: true,
     },
   });
 
   const sessions = rows
     .map((r) => ({
-      ...r,
+      id: r.id,
       createdAt: r.createdAt.toISOString(),
       sessionCompletedAt: r.sessionCompletedAt ? r.sessionCompletedAt.toISOString() : null,
+      sourceUrl: r.sourceUrl,
+      parserId: r.parserId,
+      sourceType: r.sourceType,
+      linkedRunId: r.linkedRunId,
+      linkedEventId: r.linkedEventId,
+      parsedPayload: r.parsedPayload,
+      fieldStatsPreview: importedSessionFieldStatsPreviewFromJson(r.fieldStatsJson),
     }))
     .sort((a, b) => {
       const ta = resolveImportedSessionDisplayTimeIso({

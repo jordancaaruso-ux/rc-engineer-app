@@ -1,7 +1,8 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { LapUrlParseResult } from "@/lib/lapUrlParsers/types";
 import { parseTimingUrl } from "@/lib/lapUrlParsers/registry";
+import { computeImportedSessionFieldStatsFromParse } from "@/lib/lapImport/computeImportedSessionFieldStats";
 
 export function validateTimingHttpUrl(
   url: string
@@ -111,6 +112,10 @@ export async function importOneTimingUrl(
   }
 
   const payload = serializeParsePayload(parsed) as Prisma.InputJsonValue;
+  const fieldStats = computeImportedSessionFieldStatsFromParse(parsed);
+  const fieldStatsJson: Prisma.InputJsonValue | typeof Prisma.DbNull =
+    fieldStats === null ? Prisma.DbNull : (fieldStats as Prisma.InputJsonValue);
+
   const existing = await prisma.importedLapTimeSession.findFirst({
     where: { userId, sourceUrl: normalized },
     select: { id: true, createdAt: true, sessionCompletedAt: true },
@@ -123,6 +128,7 @@ export async function importOneTimingUrl(
           parserId: parsed.parserId,
           parsedPayload: payload,
           sessionCompletedAt,
+          fieldStatsJson,
         },
         select: { id: true, createdAt: true, sessionCompletedAt: true },
       })
@@ -134,6 +140,7 @@ export async function importOneTimingUrl(
           sourceType: inferSourceType(normalized),
           parsedPayload: payload,
           sessionCompletedAt,
+          fieldStatsJson,
         },
         select: { id: true, createdAt: true, sessionCompletedAt: true },
       });

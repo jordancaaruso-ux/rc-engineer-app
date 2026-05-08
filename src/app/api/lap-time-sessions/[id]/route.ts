@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
+import { computeImportedSessionFieldStatsFromPayload } from "@/lib/lapImport/computeImportedSessionFieldStats";
 
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   if (!hasDatabaseUrl()) {
@@ -18,6 +19,21 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  let fieldStatsJson = row.fieldStatsJson;
+  if (
+    (fieldStatsJson == null || typeof fieldStatsJson !== "object") &&
+    row.parsedPayload != null
+  ) {
+    const computed = computeImportedSessionFieldStatsFromPayload(row.parsedPayload);
+    if (computed != null) {
+      await prisma.importedLapTimeSession.update({
+        where: { id: row.id },
+        data: { fieldStatsJson: computed as object },
+      });
+      fieldStatsJson = computed;
+    }
+  }
+
   return NextResponse.json({
     session: {
       id: row.id,
@@ -30,6 +46,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       parsedPayload: row.parsedPayload,
       linkedRunId: row.linkedRunId,
       linkedEventId: row.linkedEventId,
+      fieldStatsJson,
     },
   });
 }

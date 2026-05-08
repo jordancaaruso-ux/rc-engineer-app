@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
+import type { ImportedSessionFieldStatsPreviewV1 } from "@/lib/lapImport/computeImportedSessionFieldStats";
+import { formatLap } from "@/lib/runLaps";
 
 type SessionRow = {
   id: string;
@@ -16,6 +18,7 @@ type SessionRow = {
   linkedRunId: string | null;
   linkedEventId: string | null;
   parsedPayload?: unknown;
+  fieldStatsPreview?: ImportedSessionFieldStatsPreviewV1 | null;
 };
 
 type ImportResultRow =
@@ -227,6 +230,9 @@ export function LapImportWorkspace() {
                 <span className="text-[10px] text-muted-foreground">
                   {s.parserId} · {s.sourceType}
                   {s.linkedRunId ? ` · linked run` : ""}
+                  {s.fieldStatsPreview && s.fieldStatsPreview.driverCount > 0
+                    ? ` · ${s.fieldStatsPreview.driverCount} driver${s.fieldStatsPreview.driverCount === 1 ? "" : "s"} · median best ${formatLap(s.fieldStatsPreview.medianBestSeconds)}`
+                    : ""}
                 </span>
               </button>
               {expandedId === s.id ? (

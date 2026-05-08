@@ -741,6 +741,12 @@ model ImportedLapTimeSession {
   parsedPayload Json
 
   /**
+   * Per-driver + field aggregates from `parsedPayload` (every entrant when present): best / avgTop5 / avgTop10,
+   * median field pace, ranks. Written on import/backfill — see ImportedSessionFieldStatsV1 (version 1).
+   */
+  fieldStatsJson Json?
+
+  /**
    * When the timing provider exposes session/run wall time (e.g. LiveRC HTML), stored as UTC.
    * Distinct from createdAt (when this row was imported). Null for legacy rows or unparseable pages.
    */
