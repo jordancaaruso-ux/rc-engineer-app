@@ -48,6 +48,12 @@ For a **physics-first KB expansion checklist** (draft topics only—not retrieve
 
 Commit trailers like `Made-with: Cursor` are welcome — they make it easy to audit which commits were agent-authored later.
 
+## Production PostgreSQL (Prisma)
+
+- **Never run `prisma db push`** (or `npm run db:push`) against **production** `DATABASE_URL`. That updates the schema without updating `_prisma_migrations` and causes Vercel `prisma migrate deploy` to fail in a loop (`already exists`, `P3009`, etc.). **Production schema changes = committed migrations + `migrate deploy` only.**
+- **Prefer a separate Neon branch / database for local dev** so `.env.local` does not point at prod during experimentation.
+- **Repair drift** (prod URL in `.env.local`): `npm run db:migrate:reconcile` — runs `scripts/reconcile-prisma-migrations.cjs`, which applies `prisma/manual-recovery/<migration_name>.sql` via `prisma db execute` when a matching file exists, then `migrate resolve --applied` and retries `migrate deploy` until clean.
+
 ## Auth
 
 - **Magic link + optional Google OAuth** via Auth.js (`src/auth.ts`): allowlist in `AuthAllowedEmail` + env `AUTH_ALLOWED_EMAILS` (see `src/lib/authAllowlist.ts`). Google: `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, callback `{AUTH_URL}/api/auth/callback/google`. Admins: `AUTH_ADMIN_EMAILS`, `src/lib/authAdmin.ts`. Session bridge: `src/lib/currentUser.ts` (`requireCurrentUser`, `getAuthenticatedApiUser`).

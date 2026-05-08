@@ -1,31 +1,31 @@
 /**
- * Reconciles _prisma_migrations with a database whose objects were often created
- * earlier (db push, partial deploys, manual SQL) so `migrate deploy` hits
- * duplicate-table style failures (42P07). For each such failure, runs
- * `prisma migrate resolve --applied <name>` and retries deploy until clean exit.
+ * Heals drift between Neon and prisma/migrations: loops `migrate deploy` and
+ * - P3009 failed migration: runs prisma/manual-recovery/<name>.sql if present (db execute), then resolve --applied
+ * - P3018 duplicate table (42P07): optional recovery SQL, then resolve --applied
+ * - P3018 duplicate enum (42710): runs matching manual-recovery SQL if present, then resolve --applied
  *
- * Does NOT fix P3009 "failed migration" rows — those need Neon repair + one manual
- * resolve first (see prisma/manual-recovery/).
- *
- * Usage (production URL in env):
+ * Usage:
  *   npx dotenv-cli -e .env.local -- node scripts/reconcile-prisma-migrations.cjs
- *
- * Or:
- *   $env:DATABASE_URL="postgresql://..."   # PowerShell
- *   node scripts/reconcile-prisma-migrations.cjs
  */
 /* eslint-disable no-console */
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
 
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is not set. Load .env.local via dotenv-cli or export it.");
   process.exit(1);
 }
 
-const MAX_ROUNDS = 80;
-const ACTION_ITEM_PRERUN =
-  "20260427120000_action_item_list_kind_and_suggested_prerun";
-const RUN_SHARE_WITH_TEAM = "20260428120000_run_share_with_team";
+const repoRoot = path.join(__dirname, "..");
+process.chdir(repoRoot);
+
+const MAX_ROUNDS = 100;
+
+function recoverySqlRelPosix(name) {
+  const full = path.join(repoRoot, "prisma", "manual-recovery", `${name}.sql`);
+  return fs.existsSync(full) ? `prisma/manual-recovery/${name}.sql` : null;
+}
 
 function runShell(cmd) {
   return spawnSync(cmd, {
@@ -34,6 +34,7 @@ function runShell(cmd) {
     env: process.env,
     shell: true,
     windowsHide: true,
+    cwd: repoRoot,
   });
 }
 
@@ -43,6 +44,7 @@ function runShellInherited(cmd) {
     shell: true,
     stdio: "inherit",
     windowsHide: true,
+    cwd: repoRoot,
   });
 }
 
@@ -52,6 +54,10 @@ function runMigrateDeploy() {
 
 function runResolveApplied(name) {
   return runShell(`npx prisma migrate resolve --applied ${JSON.stringify(name)}`);
+}
+
+function runDbExecute(relPosixPath) {
+  return runShell(`npx prisma db execute --file ${JSON.stringify(relPosixPath)}`);
 }
 
 function extractP3018MigrationName(output) {
@@ -70,9 +76,17 @@ function looksLikeSafeAlreadyExistsConflict(output) {
   return false;
 }
 
-/** Enum / duplicate_object: may be only partially applied — require manual SQL + resolve. */
 function looksLikeDuplicateObjectNeedsManualReview(output) {
   return /\b42710\b/.test(output) || /type\s+"[^"]+"\s+already\s+exists/i.test(output);
+}
+
+function handleResolveOutput(rr, rout) {
+  if (rout) console.log(rout);
+  if (/\bP3008\b/.test(rout) && /already recorded as applied/i.test(rout)) {
+    console.log("(already recorded as applied — continuing)");
+    return true;
+  }
+  return rr.status === 0;
 }
 
 for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -84,82 +98,103 @@ for (let round = 0; round < MAX_ROUNDS; round++) {
     console.log(out);
     console.log("\n✓ prisma migrate deploy completed successfully.");
     const st = runShellInherited("npx prisma migrate status");
-    if (st.status !== 0) {
-      process.exit(st.status ?? 1);
-    }
-    process.exit(0);
+    process.exit(st.status ?? 0);
   }
 
   console.log(out);
 
   if (/\bP3009\b/.test(out)) {
     const name = extractP3009MigrationName(out);
-    if (name === ACTION_ITEM_PRERUN) {
-      console.error(
-        "\n✗ P3009: this migration is stuck FAILED (blocks Vercel build).\n" +
-          "\n  A) Neon → SQL Editor → run the full file:\n" +
-          "     prisma/manual-recovery/20260427120000_action_item_list_kind_and_suggested_prerun.sql\n" +
-          "\n  B) With DATABASE_URL = Production (same as Vercel):\n" +
-          `     npx prisma migrate resolve --applied ${ACTION_ITEM_PRERUN}\n` +
-          "\n  C) Run again: npm run db:migrate:reconcile\n" +
-          "     Then redeploy Vercel."
-      );
-    } else if (name === RUN_SHARE_WITH_TEAM) {
-      console.error(
-        "\n✗ P3009: run_share_with_team stuck FAILED.\n" +
-          "\n  A) Neon → SQL Editor → run:\n" +
-          "     prisma/manual-recovery/20260428120000_run_share_with_team.sql\n" +
-          "\n  B) Then:\n" +
-          "     npm run db:migrate:resolve:run-share-with-team\n" +
-          "     npx dotenv-cli -e .env.local -- npx prisma migrate deploy\n" +
-          "\n  C) Redeploy Vercel."
-      );
-    } else {
-      console.error(
-        "\n✗ P3009: a migration is marked FAILED in _prisma_migrations. Auto-reconcile stops here.\n" +
-          "Fix the database for that migration (Neon SQL / prisma/manual-recovery/), then run:\n" +
-          `  npx prisma migrate resolve --applied ${name || "<migration_name>"}\n` +
-          "or --rolled-back if nothing from that migration applied.\n" +
-          "Then re-run: npm run db:migrate:reconcile"
-      );
-    }
-    process.exit(1);
-  }
-
-  if (/\bP3018\b/.test(out) && looksLikeDuplicateObjectNeedsManualReview(out)) {
-    console.error(
-      "\n✗ P3018: duplicate type/object (e.g. 42710). Do not auto-resolve — the rest of this migration may not have run.\n" +
-        "Verify columns/indexes from that migration in Neon, run any missing SQL from prisma/migrations/<name>/migration.sql,\n" +
-        "then: npx prisma migrate resolve --applied <that_migration_folder_name>\n" +
-        "Re-run this script after."
-    );
-    const name = extractP3018MigrationName(out);
-    if (name) console.error(`Migration: ${name}`);
-    process.exit(1);
-  }
-
-  if (/\bP3018\b/.test(out) && looksLikeSafeAlreadyExistsConflict(out)) {
-    const name = extractP3018MigrationName(out);
     if (!name) {
-      console.error("\n✗ P3018 but could not parse migration name. Fix manually.");
+      console.error("\n✗ P3009: could not parse migration name.");
       process.exit(1);
     }
-    console.log(`\n→ Marking already-present schema as applied: ${name}`);
+    const rel = recoverySqlRelPosix(name);
+    if (!rel) {
+      console.error(
+        `\n✗ P3009 on "${name}": no prisma/manual-recovery/${name}.sql\n` +
+          "Add that file (idempotent SQL for this migration) or fix Neon manually, then re-run.\n" +
+          `Try: npx prisma migrate resolve --applied ${name}  (only if DB already matches the migration.)`
+      );
+      process.exit(1);
+    }
+    console.log(`\n→ P3009: executing ${rel} …`);
+    const ex = runDbExecute(rel);
+    const exOut = `${ex.stdout || ""}${ex.stderr || ""}`;
+    if (exOut) console.log(exOut);
+    if (ex.status !== 0) {
+      console.error("\n✗ prisma db execute failed (fix SQL or Neon state).");
+      process.exit(ex.status ?? 1);
+    }
+    console.log(`→ P3009: marking applied: ${name}`);
     const rr = runResolveApplied(name);
     const rout = `${rr.stdout || ""}${rr.stderr || ""}`;
-    if (rout) console.log(rout);
-    if (/\bP3008\b/.test(rout) && /already recorded as applied/i.test(rout)) {
-      console.log("(already applied in history — continuing)");
-      continue;
-    }
-    if (rr.status !== 0) {
-      console.error("\n✗ migrate resolve failed.");
+    if (!handleResolveOutput(rr, rout)) {
+      console.error("\n✗ migrate resolve --applied failed after db execute.");
       process.exit(rr.status ?? 1);
     }
     continue;
   }
 
-  console.error("\n✗ migrate deploy failed (not a handled already-exists P3018). Fix manually.");
+  if (/\bP3018\b/.test(out) && looksLikeDuplicateObjectNeedsManualReview(out)) {
+    const name = extractP3018MigrationName(out);
+    if (!name) {
+      console.error("\n✗ P3018 (duplicate type): could not parse migration name.");
+      process.exit(1);
+    }
+    const rel = recoverySqlRelPosix(name);
+    if (!rel) {
+      console.error(
+        "\n✗ P3018: duplicate type/object — need prisma/manual-recovery/" +
+          name +
+          ".sql with idempotent ALTER/CREATE, then re-run this script."
+      );
+      process.exit(1);
+    }
+    console.log(`\n→ P3018 (42710): executing ${rel} …`);
+    const ex = runDbExecute(rel);
+    const exOut = `${ex.stdout || ""}${ex.stderr || ""}`;
+    if (exOut) console.log(exOut);
+    if (ex.status !== 0) {
+      console.error("\n✗ prisma db execute failed.");
+      process.exit(ex.status ?? 1);
+    }
+    console.log(`→ marking applied: ${name}`);
+    const rr = runResolveApplied(name);
+    const rout = `${rr.stdout || ""}${rr.stderr || ""}`;
+    if (!handleResolveOutput(rr, rout)) {
+      process.exit(rr.status ?? 1);
+    }
+    continue;
+  }
+
+  if (/\bP3018\b/.test(out) && looksLikeSafeAlreadyExistsConflict(out)) {
+    const name = extractP3018MigrationName(out);
+    if (!name) {
+      console.error("\n✗ P3018 but could not parse migration name.");
+      process.exit(1);
+    }
+    const rel = recoverySqlRelPosix(name);
+    if (rel) {
+      console.log(`\n→ P3018 (42P07): running recovery file ${rel} …`);
+      const ex = runDbExecute(rel);
+      const exOut = `${ex.stdout || ""}${ex.stderr || ""}`;
+      if (exOut) console.log(exOut);
+      if (ex.status !== 0) {
+        console.error("\n✗ db execute failed; fix SQL or DB state.");
+        process.exit(ex.status ?? 1);
+      }
+    }
+    console.log(`\n→ P3018: marking applied: ${name}`);
+    const rr = runResolveApplied(name);
+    const rout = `${rr.stdout || ""}${rr.stderr || ""}`;
+    if (!handleResolveOutput(rr, rout)) {
+      process.exit(rr.status ?? 1);
+    }
+    continue;
+  }
+
+  console.error("\n✗ migrate deploy failed (unhandled error). See output above.");
   process.exit(r.status ?? 1);
 }
 
