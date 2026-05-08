@@ -10,6 +10,9 @@ import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapS
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
+import type { BetweenRunHintPayloadV1 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
+import { peekBetweenRunHint } from "@/lib/engineerPhase5/betweenRunHints/getOrComputeBetweenRunHints";
+import { scheduleBetweenRunHintsRecompute } from "@/lib/engineerPhase5/betweenRunHints/scheduleBetweenRunHints";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
@@ -268,6 +271,8 @@ export type DashboardHomeModel = {
     bestLap: number | null;
     avgTop5: number | null;
   };
+  /** Cached proactive Engineer hints for the latest run (peek only; no LLM on this path). */
+  betweenRunHint: BetweenRunHintPayloadV1 | null;
 };
 
 const recentRunSelect = {
@@ -592,6 +597,14 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
 
   const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
 
+  let betweenRunHint: BetweenRunHintPayloadV1 | null = null;
+  if (recentRun?.car?.id) {
+    betweenRunHint = await peekBetweenRunHint(userId, recentRun.id);
+    if (!betweenRunHint) {
+      void scheduleBetweenRunHintsRecompute(userId, recentRun.id);
+    }
+  }
+
   return {
     incompleteRuns,
     thingsToTry: thingsToTryRows.map((i) => ({
@@ -625,5 +638,6 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
         .find((r) => r.loggingComplete === false)?.createdAt.toISOString() ?? null,
     todaysChanges,
     recentRun: recent,
+    betweenRunHint,
   };
 }

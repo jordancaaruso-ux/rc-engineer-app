@@ -8,6 +8,8 @@ import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
 import { getEngineerQuickPromptById } from "@/lib/engineerQuickPrompts";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 
+import { EngineerBetweenRunHintsStrip } from "@/components/engineer/EngineerBetweenRunHintsStrip";
+
 export function EngineerPageClient() {
   const [patternDigest, setPatternDigest] = useState<PatternDigestV1 | null>(null);
   const [queuedPrompt, setQueuedPrompt] = useState<EngineerQueuedChatPrompt | null>(null);
@@ -51,6 +53,8 @@ export function EngineerPageClient() {
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6">
+      <EngineerBetweenRunHintsStrip />
+
       <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
           <h2 className="text-lg font-semibold text-foreground tracking-tight">Ask the Engineer</h2>

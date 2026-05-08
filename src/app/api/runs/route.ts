@@ -18,6 +18,7 @@ import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
 import { parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
+import { scheduleBetweenRunHintsRecompute } from "@/lib/engineerPhase5/betweenRunHints/scheduleBetweenRunHints";
 
 type RunUpsertBody = {
   runId?: string;
@@ -329,6 +330,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     if (!existing) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
+    await prisma.engineerBetweenRunHint.deleteMany({
+      where: { primaryRunId: existing.id },
+    });
     const updateData: PrismaTypes.RunUncheckedUpdateInput = {
       carId,
       carNameSnapshot: car.name,
@@ -463,6 +467,10 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   revalidatePath("/");
   revalidatePath("/engineer");
   revalidatePath("/laps/import");
+
+  if (loggingComplete) {
+    scheduleBetweenRunHintsRecompute(params.userId, run.id);
+  }
 
   return NextResponse.json({ run }, { status: params.mode === "create" ? 201 : 200 });
 }
