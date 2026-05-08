@@ -17,6 +17,7 @@
     "db:migrate:deploy": "npx dotenv-cli -e .env.local -- prisma migrate deploy",
     "db:migrate:resolve:rolled-back": "npx dotenv-cli -e .env.local -- prisma migrate resolve --rolled-back",
     "db:migrate:resolve:applied": "npx dotenv-cli -e .env.local -- prisma migrate resolve --applied",
+    "db:migrate:reconcile": "npx dotenv-cli -e .env.local -- node scripts/reconcile-prisma-migrations.cjs",
     "test:grip-spread": "npx tsx src/lib/engineerPhase5/gripSpreadContrast.test.ts",
     "test:between-hints": "npx tsx src/lib/engineerPhase5/betweenRunHints/betweenRunHints.test.ts",
     "check:legacy-local-user": "npx tsx scripts/check-legacy-local-user.ts",
