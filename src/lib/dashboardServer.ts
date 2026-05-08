@@ -1,4 +1,5 @@
 import type { ActionItemSourceType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
@@ -367,23 +368,6 @@ export async function loadIncompleteRunsForImportChooser(
 }
 
 export async function loadDashboardHomeModel(userId: string): Promise<DashboardHomeModel> {
-  // #region agent log
-  fetch("http://127.0.0.1:7907/ingest/111541b0-cc95-4db2-9bba-e017c776757b", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "f60b14",
-    },
-    body: JSON.stringify({
-      sessionId: "f60b14",
-      hypothesisId: "H4",
-      location: "dashboardServer.ts:loadDashboardHomeModel:entry",
-      message: "loadDashboardHomeModel start",
-      data: { userIdLen: userId?.length ?? 0 },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   const { start: todayStart, end: todayEnd } = localTodayBounds();
 
   // Fire-and-forget: LiveRC fetches + Prisma writes; can take 1–2s. Dashboard no
@@ -616,25 +600,16 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
 
   let betweenRunHint: BetweenRunHintPayloadV1 | null = null;
   if (recentRun?.car?.id) {
-    // #region agent log
-    fetch("http://127.0.0.1:7907/ingest/111541b0-cc95-4db2-9bba-e017c776757b", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "f60b14",
-      },
-      body: JSON.stringify({
-        sessionId: "f60b14",
-        hypothesisId: "H4",
-        location: "dashboardServer.ts:loadDashboardHomeModel:beforePeek",
-        message: "calling peekBetweenRunHint",
-        data: { recentRunId: recentRun.id, carId: recentRun.car?.id },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    betweenRunHint = await peekBetweenRunHint(userId, recentRun.id);
-    if (!betweenRunHint) {
+    let skipHintRecompute = false;
+    try {
+      betweenRunHint = await peekBetweenRunHint(userId, recentRun.id);
+    } catch (e) {
+      betweenRunHint = null;
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2021") {
+        skipHintRecompute = true;
+      }
+    }
+    if (!betweenRunHint && !skipHintRecompute) {
       void scheduleBetweenRunHintsRecompute(userId, recentRun.id);
     }
   }
