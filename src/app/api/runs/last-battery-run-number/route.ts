@@ -18,20 +18,19 @@ export async function GET(request: Request) {
   }
 
   // Drafts do not claim a battery-run slot — only completed runs do. See
-  // the last-tire-run-number route for the full rationale.
-  const last = await prisma.run.findFirst({
+  // the last-tire-run-number route for rationale — max index, not latest createdAt.
+  const agg = await prisma.run.aggregate({
     where: {
       userId: user.id,
       batteryId,
       loggingComplete: true,
       ...(excludeRunId ? { id: { not: excludeRunId } } : {}),
     },
-    orderBy: { createdAt: "desc" },
-    select: { batteryRunNumber: true },
+    _max: { batteryRunNumber: true },
   });
 
-  if (last?.batteryRunNumber != null) {
-    return NextResponse.json({ lastBatteryRunNumber: last.batteryRunNumber });
+  if (agg._max.batteryRunNumber != null) {
+    return NextResponse.json({ lastBatteryRunNumber: agg._max.batteryRunNumber });
   }
 
   const battery = await prisma.battery.findFirst({

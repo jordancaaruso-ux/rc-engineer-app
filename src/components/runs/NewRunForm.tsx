@@ -359,6 +359,8 @@ export function NewRunForm(props: {
   batteryIdRef.current = batteryId;
   const tireRunUserTouchedRef = useRef(false);
   const batteryRunUserTouchedRef = useRef(false);
+  /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
+  const pendingCompleteNavigationRef = useRef(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
   /** LiveRC index page for Lap times → URL scan: practice `session_list` or any `/results/` session index. */
@@ -1395,9 +1397,15 @@ export function NewRunForm(props: {
     if (!tireSetId) return;
     const id = tireSetId;
     let alive = true;
-    // When editing, exclude this run from the "most recent slot" query.
-    // Otherwise, a run being re-saved would see itself as the latest,
-    // adding +1 to its own tireRunNumber every time.
+
+    if (isEditing && editRun && id === (editRun.tireSetId ?? "")) {
+      if (!tireRunUserTouchedRef.current) {
+        setRunsCompleted(Math.max(0, (editRun.tireRunNumber ?? 1) - 1));
+      }
+      return;
+    }
+
+    // New run or edit with a different tire set than the saved run: next slot from completed history.
     const excludeParam = editRun?.id
       ? `&excludeRunId=${encodeURIComponent(editRun.id)}`
       : "";
@@ -1417,7 +1425,7 @@ export function NewRunForm(props: {
     return () => {
       alive = false;
     };
-  }, [tireSetId, editRun?.id]);
+  }, [tireSetId, editRun?.id, isEditing, editRun?.tireSetId, editRun?.tireRunNumber]);
 
   useEffect(() => {
     batteryRunUserTouchedRef.current = false;
@@ -1427,6 +1435,14 @@ export function NewRunForm(props: {
     if (!batteryId) return;
     const id = batteryId;
     let alive = true;
+
+    if (isEditing && editRun && id === (editRun.batteryId ?? "")) {
+      if (!batteryRunUserTouchedRef.current) {
+        setBatteryRunsCompleted(Math.max(0, (editRun.batteryRunNumber ?? 1) - 1));
+      }
+      return;
+    }
+
     const excludeParam = editRun?.id
       ? `&excludeRunId=${encodeURIComponent(editRun.id)}`
       : "";
@@ -1446,7 +1462,7 @@ export function NewRunForm(props: {
     return () => {
       alive = false;
     };
-  }, [batteryId, editRun?.id]);
+  }, [batteryId, editRun?.id, isEditing, editRun?.batteryId, editRun?.batteryRunNumber]);
 
   async function createEvent(e?: React.MouseEvent) {
     e?.preventDefault();
@@ -1820,6 +1836,7 @@ export function NewRunForm(props: {
     opts: { bypassUnsavedSetupCheck?: boolean } = {}
   ) {
     e?.preventDefault();
+    if (pendingCompleteNavigationRef.current) return;
     setInlineError(null);
     setStatus(null);
     if (!carId) {
@@ -1949,6 +1966,9 @@ export function NewRunForm(props: {
         })
       });
 
+      if (intent === "completed") {
+        pendingCompleteNavigationRef.current = true;
+      }
       setSaveSuccess(true);
       setStatus(isEditing ? "Changes saved." : "Run saved.");
 
@@ -2018,7 +2038,9 @@ export function NewRunForm(props: {
       setStatus(msg);
       setInlineError(msg);
     } finally {
-      setSaving(false);
+      if (!(intent === "completed" && pendingCompleteNavigationRef.current)) {
+        setSaving(false);
+      }
     }
   }
 

@@ -29,19 +29,22 @@ export async function GET(request: Request) {
   // back into this counter and inflating the next run's number by +1.
   // `excludeRunId` lets an edit-in-progress exclude itself so re-saving
   // a completed run doesn't bump its own slot either.
-  const last = await prisma.run.findFirst({
+  //
+  // Use max(tireRunNumber), not "latest by createdAt": logging order can
+  // diverge from creation order (backfills / duplicates), and the next
+  // slot must follow the highest index actually stored.
+  const agg = await prisma.run.aggregate({
     where: {
       userId: user.id,
       tireSetId,
       loggingComplete: true,
       ...(excludeRunId ? { id: { not: excludeRunId } } : {}),
     },
-    orderBy: { createdAt: "desc" },
-    select: { tireRunNumber: true },
+    _max: { tireRunNumber: true },
   });
 
-  if (last?.tireRunNumber != null) {
-    return NextResponse.json({ lastTireRunNumber: last.tireRunNumber });
+  if (agg._max.tireRunNumber != null) {
+    return NextResponse.json({ lastTireRunNumber: agg._max.tireRunNumber });
   }
 
   const tireSet = await prisma.tireSet.findFirst({
