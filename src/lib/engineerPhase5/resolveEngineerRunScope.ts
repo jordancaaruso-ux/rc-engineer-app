@@ -18,6 +18,11 @@ export type ResolvedRunScopeV1 = {
   truncated: boolean;
   /** When true, system prompt tells the model not to treat defaultDashboardContext as the full story. */
   preferOverDefaultPair: boolean;
+  /**
+   * Track/event filter without explicit dates and multiple distinct days or events in results —
+   * ask the user which meeting or date range they mean before asserting a whole-meeting story.
+   */
+  ambiguousMeetingScope: boolean;
 };
 
 type ExtractionJson = {
@@ -53,6 +58,23 @@ export function shouldAttemptResolveRunScope(lastUserMessage: string): boolean {
   }
   if (t.length > 40) return true;
   return false;
+}
+
+function ambiguousMeetingScopeFromRuns(
+  dateFrom: string | null,
+  dateTo: string | null,
+  textContains: string | null,
+  runs: SearchRunsForEngineerResultRow[],
+  timeZone: string
+): boolean {
+  if (!textContains || runs.length < 2) return false;
+  if (dateFrom || dateTo) return false;
+  const tz = timeZone.trim() || "UTC";
+  const days = new Set(runs.map((r) => formatLocalCalendarDate(new Date(r.sortIso), tz)));
+  const events = new Set(
+    runs.map((r) => r.eventName).filter((e): e is string => Boolean(e?.trim()))
+  );
+  return days.size > 1 || events.size > 1;
 }
 
 async function extractSearchIntent(params: {
@@ -174,10 +196,18 @@ export async function resolveRunScopeForEngineerChat(input: {
       runs: [],
       truncated: false,
       preferOverDefaultPair: true,
+      ambiguousMeetingScope: false,
     };
   }
 
   const preferOverDefaultPair = chronological.length >= 2 || Boolean(dateFrom || dateTo);
+  const ambiguousMeetingScope = ambiguousMeetingScopeFromRuns(
+    dateFrom,
+    dateTo,
+    textContains,
+    chronological,
+    tz
+  );
 
   return {
     version: 1,
@@ -188,5 +218,6 @@ export async function resolveRunScopeForEngineerChat(input: {
     runs: chronological,
     truncated: result.truncated,
     preferOverDefaultPair,
+    ambiguousMeetingScope,
   };
 }

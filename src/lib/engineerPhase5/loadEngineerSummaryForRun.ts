@@ -3,10 +3,15 @@ import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSumma
 import { buildEngineerRunSummary, type RunShapeForEngineer } from "@/lib/engineerPhase5/buildEngineerRunSummary";
 import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
 import { canViewPeerRuns, isRunSharedWithTeam, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
+import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
 
 const runSelect = {
   id: true,
   createdAt: true,
+  sessionCompletedAt: true,
+  trackId: true,
+  tireSetId: true,
+  tireRunNumber: true,
   lapTimes: true,
   lapSession: true,
   notes: true,
@@ -103,13 +108,24 @@ export async function getOrComputeEngineerSummaryForRun(
   });
   if (!run) return null;
 
-  const reference = run.carId
-    ? await prisma.run.findFirst({
-        where: { userId, carId: run.carId, id: { not: run.id } },
-        orderBy: { createdAt: "desc" },
+  let reference: (typeof run) | null = null;
+  if (run.carId) {
+    const refId = await pickEngineerReferenceRunId(userId, {
+      id: run.id,
+      carId: run.carId,
+      trackId: run.trackId,
+      tireSetId: run.tireSetId,
+      tireRunNumber: run.tireRunNumber,
+      createdAt: run.createdAt,
+      sessionCompletedAt: run.sessionCompletedAt,
+    });
+    if (refId) {
+      reference = await prisma.run.findFirst({
+        where: { id: refId, userId },
         select: runSelect,
-      })
-    : null;
+      });
+    }
+  }
 
   const refId = reference?.id ?? null;
   const fp = fieldFingerprint(run.importedLapSets ?? []);

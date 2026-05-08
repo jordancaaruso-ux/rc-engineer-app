@@ -36,6 +36,7 @@ import {
   buildLowerArmAntiGeometryNotes,
   buildUpperInnerBulkheadSplitNotes,
 } from "@/lib/engineerPhase5/setupCompareAxleNet";
+import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
 
 export type EngineerContextPacketV1 = {
   version: 1;
@@ -62,6 +63,10 @@ export type EngineerContextPacketV1 = {
     };
     notesPreview: string | null;
     handlingPreview: string | null;
+    trackId: string | null;
+    eventId: string | null;
+    tireRunNumber: number | null;
+    tireSetLabel: string | null;
   };
   previousRun: null | {
     id: string;
@@ -75,6 +80,10 @@ export type EngineerContextPacketV1 = {
       bestLapSeconds: number | null;
       avgTop5Seconds: number | null;
     } | null;
+    trackId: string | null;
+    eventId: string | null;
+    tireRunNumber: number | null;
+    tireSetLabel: string | null;
   };
   comparison: null | {
     lapDeltaSummary: {
@@ -86,6 +95,11 @@ export type EngineerContextPacketV1 = {
       changedKeyCount: number;
       changedKeysSample: string[];
     };
+    /** Same track/event/tire run on both runs when all true — otherwise lap delta is easier to misread. */
+    sameTrack: boolean;
+    sameEvent: boolean;
+    sameTireRunIndex: boolean;
+    sameTireSet: boolean;
   };
   thingsToTry: Array<{ id: string; text: string }>;
   thingsToDo: Array<{ id: string; text: string }>;
@@ -150,6 +164,7 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
     select: {
       id: true,
       createdAt: true,
+      sessionCompletedAt: true,
       sessionType: true,
       meetingSessionType: true,
       meetingSessionCode: true,
@@ -164,9 +179,14 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
       trackNameSnapshot: true,
       car: { select: { name: true } },
       track: { select: { name: true } },
-      event: { select: { name: true } },
+      event: { select: { id: true, name: true } },
+      tireSet: { select: { label: true } },
       setupSnapshot: { select: { id: true, data: true } },
       carId: true,
+      trackId: true,
+      eventId: true,
+      tireSetId: true,
+      tireRunNumber: true,
     },
   });
 
@@ -183,27 +203,53 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
     };
   }
 
-  const prev = latest.carId
-    ? await prisma.run.findFirst({
-        where: { userId, carId: latest.carId, id: { not: latest.id } },
-        orderBy: { createdAt: "desc" },
+  const prevSelect = {
+    id: true,
+    createdAt: true,
+    sessionCompletedAt: true,
+    sessionType: true,
+    meetingSessionType: true,
+    meetingSessionCode: true,
+    sessionLabel: true,
+    lapTimes: true,
+    lapSession: true,
+    carNameSnapshot: true,
+    trackNameSnapshot: true,
+    car: { select: { name: true } },
+    track: { select: { name: true } },
+    event: { select: { id: true, name: true } },
+    tireSet: { select: { label: true } },
+    setupSnapshot: { select: { id: true, data: true } },
+    trackId: true,
+    eventId: true,
+    tireSetId: true,
+    tireRunNumber: true,
+  } as const;
+
+  let prev = null;
+  if (latest.carId) {
+    const prevId = await pickEngineerReferenceRunId(userId, {
+      id: latest.id,
+      carId: latest.carId,
+      trackId: latest.trackId,
+      tireSetId: latest.tireSetId,
+      tireRunNumber: latest.tireRunNumber,
+      createdAt: latest.createdAt,
+      sessionCompletedAt: latest.sessionCompletedAt,
+    });
+    if (prevId) {
+      prev = await prisma.run.findFirst({
+        where: { id: prevId, userId },
         select: {
-          id: true,
-          createdAt: true,
-          sessionType: true,
-          meetingSessionType: true,
-          meetingSessionCode: true,
-          sessionLabel: true,
-          lapTimes: true,
-          lapSession: true,
-          carNameSnapshot: true,
-          trackNameSnapshot: true,
-          car: { select: { name: true } },
-          track: { select: { name: true } },
-          setupSnapshot: { select: { id: true, data: true } },
+          ...prevSelect,
+          notes: true,
+          driverNotes: true,
+          handlingProblems: true,
+          handlingAssessmentJson: true,
         },
-      })
-    : null;
+      });
+    }
+  }
 
   const latestCarName = latest.car?.name ?? latest.carNameSnapshot ?? "—";
   const latestTrackName = latest.track?.name ?? latest.trackNameSnapshot ?? "—";
@@ -265,6 +311,10 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
       handlingPreview: clampHandlingPreview(
         formatHandlingAssessmentForEngineer(latest.handlingAssessmentJson)
       ),
+      trackId: latest.trackId,
+      eventId: latest.eventId,
+      tireRunNumber: latest.tireRunNumber,
+      tireSetLabel: latest.tireSet?.label ?? null,
     },
     previousRun: prev
       ? {
@@ -275,6 +325,10 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
           carName: prevCarName,
           trackName: prevTrackName,
           lapSummary: prevLap,
+          trackId: prev.trackId,
+          eventId: prev.eventId,
+          tireRunNumber: prev.tireRunNumber,
+          tireSetLabel: prev.tireSet?.label ?? null,
         }
       : null,
     comparison: prev
@@ -288,6 +342,16 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
             changedKeyCount: keysChangedFromPreviousRun.length,
             changedKeysSample: keysChangedFromPreviousRun.slice(0, 12),
           },
+          sameTrack: Boolean(
+            latest.trackId && prev.trackId && latest.trackId === prev.trackId
+          ),
+          sameEvent: Boolean(
+            latest.eventId && prev.eventId && latest.eventId === prev.eventId
+          ),
+          sameTireRunIndex: latest.tireRunNumber === prev.tireRunNumber,
+          sameTireSet: Boolean(
+            latest.tireSetId && prev.tireSetId && latest.tireSetId === prev.tireSetId
+          ),
         }
       : null,
     thingsToTry: thingsToTry.map((t) => ({ id: t.id, text: t.text })),
@@ -308,6 +372,13 @@ const SETUP_COMPARE_COLUMN_NOTE =
 export type EngineerFocusedRunPairContext = {
   primaryRunId: string;
   compareRunId: string | null;
+  /** Lap / setup compare is most apples-to-apples when all true; otherwise hedge tire-life / venue caveats. */
+  pairingParity: null | {
+    sameTrack: boolean;
+    sameEvent: boolean;
+    sameTireRunNumber: boolean;
+    sameTireSet: boolean;
+  };
   primary: {
     id: string;
     whenLabel: string;
@@ -316,6 +387,10 @@ export type EngineerFocusedRunPairContext = {
     trackName: string;
     eventName: string | null;
     carId: string | null;
+    trackId: string | null;
+    eventId: string | null;
+    tireRunNumber: number;
+    tireSetLabel: string | null;
     lapSummary: {
       lapCount: number;
       bestLapSeconds: number | null;
@@ -445,11 +520,15 @@ const focusedRunSelect = {
   handlingAssessmentJson: true,
   carId: true,
   trackId: true,
+  eventId: true,
+  tireSetId: true,
+  tireRunNumber: true,
   carNameSnapshot: true,
   trackNameSnapshot: true,
   car: { select: { id: true, name: true } },
   track: { select: { name: true } },
-  event: { select: { name: true } },
+  event: { select: { id: true, name: true } },
+  tireSet: { select: { label: true } },
   setupSnapshot: { select: { data: true } },
   importedLapSets: {
     select: {
@@ -480,8 +559,12 @@ function runSliceFromRow(
     trackNameSnapshot: string | null;
     car: { name: string } | null;
     track: { name: string } | null;
-    event: { name: string } | null;
+    event: { id: string; name: string } | null;
     carId: string | null;
+    trackId: string | null;
+    eventId: string | null;
+    tireRunNumber: number;
+    tireSet: { label: string } | null;
   }
 ): EngineerFocusedRunPairContext["primary"] {
   const when = resolveRunDisplayInstant({
@@ -502,6 +585,10 @@ function runSliceFromRow(
     trackName: row.track?.name ?? row.trackNameSnapshot ?? "—",
     eventName: row.event?.name ?? null,
     carId: row.carId,
+    trackId: row.trackId,
+    eventId: row.eventId,
+    tireRunNumber: row.tireRunNumber,
+    tireSetLabel: row.tireSet?.label ?? null,
     lapSummary: {
       lapCount: lap.lapCount,
       bestLapSeconds: lap.bestLap,
@@ -579,6 +666,26 @@ export async function buildFocusedRunPairContext(
 
   const primarySlice = runSliceFromRow(primary);
   const compareSlice = compare ? runSliceFromRow(compare) : null;
+
+  const pairingParity: EngineerFocusedRunPairContext["pairingParity"] =
+    compareSlice == null || !compare
+      ? null
+      : {
+          sameTrack: Boolean(
+            primarySlice.trackId &&
+              compareSlice.trackId &&
+              primarySlice.trackId === compareSlice.trackId
+          ),
+          sameEvent: Boolean(
+            primarySlice.eventId &&
+              compareSlice.eventId &&
+              primarySlice.eventId === compareSlice.eventId
+          ),
+          sameTireRunNumber: primarySlice.tireRunNumber === compareSlice.tireRunNumber,
+          sameTireSet: Boolean(
+            primary.tireSetId && compare.tireSetId && primary.tireSetId === compare.tireSetId
+          ),
+        };
 
   let lapComparison: EngineerFocusedRunPairContext["lapComparison"] = null;
   if (compareSlice) {
@@ -716,6 +823,7 @@ export async function buildFocusedRunPairContext(
   return {
     primaryRunId: primary.id,
     compareRunId: compareSlice?.id ?? null,
+    pairingParity,
     primary: primarySlice,
     compare: compareSlice,
     lapComparison,

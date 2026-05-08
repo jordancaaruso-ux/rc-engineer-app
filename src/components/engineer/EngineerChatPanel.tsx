@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
+import type { RunCatalogV1 } from "@/lib/engineerPhase5/runCatalogTypes";
 import { engineerQuickPromptDisabled, engineerQuickPromptsForSurface } from "@/lib/engineerQuickPrompts";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -17,6 +18,8 @@ export function EngineerChatPanel({
   patternDigest = null,
   includeRunCatalog = true,
   onIncludeRunCatalogChange,
+  includePatternDigestInChat = false,
+  onIncludePatternDigestInChatChange,
   queuedPrompt = null,
   onQueuedPromptConsumed,
   onQuickPrompt,
@@ -24,6 +27,9 @@ export function EngineerChatPanel({
   patternDigest?: PatternDigestV1 | null;
   includeRunCatalog?: boolean;
   onIncludeRunCatalogChange?: (next: boolean) => void;
+  /** When true, POST /api/engineer/chat sends patternDigest (Compare & trend must have loaded one). */
+  includePatternDigestInChat?: boolean;
+  onIncludePatternDigestInChatChange?: (next: boolean) => void;
   /** When set, appends this user message and posts to the API once (use a new `id` per enqueue). */
   queuedPrompt?: EngineerQueuedChatPrompt | null;
   onQueuedPromptConsumed?: () => void;
@@ -41,6 +47,8 @@ export function EngineerChatPanel({
   const [chatErr, setChatErr] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [catalogBanner, setCatalogBanner] = useState<RunCatalogV1 | null>(null);
+  const [catalogBannerErr, setCatalogBannerErr] = useState<string | null>(null);
 
   const messagesRef = useRef<ChatMessage[]>([]);
   const lastQueuedId = useRef<number | null>(null);
@@ -53,6 +61,35 @@ export function EngineerChatPanel({
     messagesRef.current = messages;
   }, [messages]);
 
+  useEffect(() => {
+    if (!includeRunCatalog) {
+      setCatalogBanner(null);
+      setCatalogBannerErr(null);
+      return;
+    }
+    let alive = true;
+    fetch("/api/runs/catalog", { cache: "no-store" })
+      .then((r) => r.json().catch(() => ({})))
+      .then((data: { catalog?: RunCatalogV1; error?: string }) => {
+        if (!alive) return;
+        if (data.catalog) {
+          setCatalogBanner(data.catalog);
+          setCatalogBannerErr(null);
+        } else {
+          setCatalogBanner(null);
+          setCatalogBannerErr(data.error ?? null);
+        }
+      })
+      .catch(() => {
+        if (!alive) return;
+        setCatalogBanner(null);
+        setCatalogBannerErr("Could not load catalog");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [includeRunCatalog]);
+
   async function submitConversation(next: ChatMessage[]) {
     setChatBusy(true);
     setChatErr(null);
@@ -64,7 +101,8 @@ export function EngineerChatPanel({
           messages: next,
           ...(runIdFromUrl ? { runId: runIdFromUrl } : {}),
           ...(compareRunIdFromUrl ? { compareRunId: compareRunIdFromUrl } : {}),
-          ...(patternDigest ? { patternDigest } : {}),
+          includePatternDigest: Boolean(patternDigest && includePatternDigestInChat),
+          ...(patternDigest && includePatternDigestInChat ? { patternDigest } : {}),
           includeRunCatalog,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
@@ -138,8 +176,7 @@ export function EngineerChatPanel({
         <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-[220px] sm:min-h-[280px] max-h-[min(52vh,420px)]">
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Ask anything—one run or a compare—like a normal engineer. Replies use your context (summary, catalog when
-              on, runs from the URL or tools).
+            Ask anything—general setup and KB, or a compare from the URL. Trend/series context is **optional** (see below).
             </p>
           ) : (
             messages.map((m, idx) => (
@@ -230,7 +267,92 @@ export function EngineerChatPanel({
         </button>
       </div>
 
-      {/* Keep the chat area minimal; compare/trend controls above drive context. */}
+      <div className="space-y-2 pt-1 text-[10px] text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <label
+            className={cn(
+              "flex items-center gap-2 text-[11px] text-foreground cursor-pointer",
+              !patternDigest && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary shrink-0"
+              checked={includePatternDigestInChat && Boolean(patternDigest)}
+              disabled={!patternDigest}
+              onChange={(e) => onIncludePatternDigestInChatChange?.(e.target.checked)}
+            />
+            <span>Attach Compare &amp; trend digest to chat</span>
+          </label>
+          <span className="sm:text-right">
+            Off by default—keeps chat separate from the series tool until you opt in.
+          </span>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <label className="flex items-center gap-2 text-[11px] text-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary shrink-0"
+              checked={includeRunCatalog}
+              onChange={(e) => onIncludeRunCatalogChange?.(e.target.checked)}
+            />
+            <span>Include account run catalog in answers</span>
+          </label>
+          <span className="sm:text-right">Grounds replies in real run ids and dates when enabled.</span>
+        </div>
+
+        {(runIdFromUrl && compareRunIdFromUrl) || runIdFromUrl || patternDigest ? (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 rounded-md bg-muted/40 px-2.5 py-2 border border-border/60">
+            {runIdFromUrl && compareRunIdFromUrl ? (
+              <span>
+                <span className="text-foreground font-medium">Two runs</span> in URL — Engineer has lap + setup context.
+                Structured summary is in Compare &amp; trend below; chat is conversational.
+              </span>
+            ) : runIdFromUrl ? (
+              <span>
+                <span className="text-foreground font-medium">Focused run</span> from URL.
+              </span>
+            ) : null}
+            {patternDigest ? (
+              <span>
+                Trend digest loaded:{" "}
+                <span className="text-foreground font-medium">{patternDigest.runs.length}</span> runs
+                {includePatternDigestInChat ? (
+                  <> — included in chat requests.</>
+                ) : (
+                  <> — not sent to chat (enable checkbox above).</>
+                )}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {includeRunCatalog && catalogBanner ? (
+          <div className="rounded-md border border-border/80 bg-muted/25 px-2.5 py-2">
+            Catalog in context:{" "}
+            <span className="text-foreground font-medium">{catalogBanner.includedRunCount}</span> of{" "}
+            <span className="text-foreground font-medium">{catalogBanner.totalRunCount}</span> runs
+            {catalogBanner.truncated ? (
+              <span className="text-amber-600 dark:text-amber-500">
+                {" "}
+                ({catalogBanner.omittedCount} not listed — narrow filters in Compare &amp; trend below or name a run id)
+              </span>
+            ) : null}
+            .
+          </div>
+        ) : null}
+        {includeRunCatalog && catalogBannerErr ? (
+          <div className="text-destructive">{catalogBannerErr}</div>
+        ) : null}
+        {!includeRunCatalog ? (
+          <div>Catalog off — chat uses summary, URL runs, and tools.</div>
+        ) : null}
+        <p className="leading-snug">
+          You can ask for runs by time (&quot;last weekend&quot;) or teammate name — the Engineer can search and set the
+          focused run in the page URL when it finds a match.
+        </p>
+      </div>
     </div>
   );
 }

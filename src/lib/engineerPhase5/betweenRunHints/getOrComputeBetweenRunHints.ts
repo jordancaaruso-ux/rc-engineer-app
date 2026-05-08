@@ -49,12 +49,98 @@ export async function peekBetweenRunHint(
   userId: string,
   primaryRunId: string
 ): Promise<BetweenRunHintPayloadV1 | null> {
-  const row = await prisma.engineerBetweenRunHint.findUnique({
-    where: { primaryRunId },
-  });
+  // #region agent log
+  fetch("http://127.0.0.1:7907/ingest/111541b0-cc95-4db2-9bba-e017c776757b", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "f60b14",
+    },
+    body: JSON.stringify({
+      sessionId: "f60b14",
+      hypothesisId: "H1",
+      location: "getOrComputeBetweenRunHints.ts:peekBetweenRunHint:entry",
+      message: "peekBetweenRunHint start",
+      data: { primaryRunId, userIdLen: userId?.length ?? 0 },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+  let row: Awaited<ReturnType<typeof prisma.engineerBetweenRunHint.findUnique>>;
+  try {
+    row = await prisma.engineerBetweenRunHint.findUnique({
+      where: { primaryRunId },
+    });
+  } catch (prismaErr: unknown) {
+    // #region agent log
+    const msg = prismaErr instanceof Error ? prismaErr.message : String(prismaErr);
+    const code =
+      prismaErr && typeof prismaErr === "object" && "code" in prismaErr
+        ? String((prismaErr as { code?: string }).code)
+        : "";
+    fetch("http://127.0.0.1:7907/ingest/111541b0-cc95-4db2-9bba-e017c776757b", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "f60b14",
+      },
+      body: JSON.stringify({
+        sessionId: "f60b14",
+        hypothesisId: "H1",
+        location: "getOrComputeBetweenRunHints.ts:peekBetweenRunHint:findUnique.catch",
+        message: "engineerBetweenRunHint.findUnique failed",
+        data: { errMsg: msg.slice(0, 500), prismaCode: code },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    throw prismaErr;
+  }
+  // #region agent log
+  fetch("http://127.0.0.1:7907/ingest/111541b0-cc95-4db2-9bba-e017c776757b", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "f60b14",
+    },
+    body: JSON.stringify({
+      sessionId: "f60b14",
+      hypothesisId: "H2",
+      location: "getOrComputeBetweenRunHints.ts:peekBetweenRunHint:afterFind",
+      message: "findUnique ok",
+      data: { hasRow: Boolean(row), rowUserMatch: row ? row.userId === userId : false },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   if (!row || row.userId !== userId) return null;
 
-  const summaryResult = await getOrComputeEngineerSummaryForRun(userId, primaryRunId);
+  let summaryResult: Awaited<ReturnType<typeof getOrComputeEngineerSummaryForRun>>;
+  try {
+    summaryResult = await getOrComputeEngineerSummaryForRun(userId, primaryRunId);
+  } catch (summaryErr: unknown) {
+    // #region agent log
+    fetch("http://127.0.0.1:7907/ingest/111541b0-cc95-4db2-9bba-e017c776757b", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "f60b14",
+      },
+      body: JSON.stringify({
+        sessionId: "f60b14",
+        hypothesisId: "H3",
+        location: "getOrComputeBetweenRunHints.ts:peekBetweenRunHint:getSummary.catch",
+        message: "getOrComputeEngineerSummaryForRun failed in peek",
+        data: {
+          errMsg:
+            summaryErr instanceof Error ? summaryErr.message.slice(0, 500) : String(summaryErr),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    throw summaryErr;
+  }
   if (!summaryResult?.summary.referenceRunId) return null;
 
   const run = await prisma.run.findFirst({

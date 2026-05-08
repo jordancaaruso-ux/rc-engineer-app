@@ -16,8 +16,33 @@ import {
 } from "@/lib/engineerPhase5/openaiEngineer";
 import { buildRunCatalogV1 } from "@/lib/engineerPhase5/runCatalog";
 import { resolveRunScopeForEngineerChat } from "@/lib/engineerPhase5/resolveEngineerRunScope";
+import {
+  buildTireLifePriorsForChatContext,
+} from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
 
 export const dynamic = "force-dynamic";
+
+function focusedPairForTirePriors(
+  focused: null | Awaited<ReturnType<typeof buildFocusedRunPairContext>>
+): null | {
+  primaryTireRun: number;
+  compareTireRun: number | null;
+  sameTireSet: boolean;
+} {
+  if (!focused) return null;
+  if (!focused.compare) {
+    return {
+      primaryTireRun: focused.primary.tireRunNumber,
+      compareTireRun: null,
+      sameTireSet: true,
+    };
+  }
+  return {
+    primaryTireRun: focused.primary.tireRunNumber,
+    compareTireRun: focused.compare.tireRunNumber,
+    sameTireSet: focused.pairingParity?.sameTireSet ?? false,
+  };
+}
 
 function jsonError(status: number, message: string, debug?: string) {
   const payload: { error: string; debug?: string } = { error: message };
@@ -61,6 +86,8 @@ export async function POST(request: Request) {
         messages?: Array<{ role?: unknown; content?: unknown }>;
         runId?: unknown;
         compareRunId?: unknown;
+        /** When true, server attaches patternDigest from the client (Compare & trend). Default off so chat stays independent. */
+        includePatternDigest?: unknown;
         patternDigest?: unknown;
         /** When false, omit account run catalog from context (default: include). */
         includeRunCatalog?: unknown;
@@ -128,40 +155,36 @@ export async function POST(request: Request) {
     }
   }
 
-  let engineerSummary: EngineerRunSummaryV2 | null = null;
-  /** Omit latest-vs-reference summary whenever auto scope is active (including zero matching runs). */
-  const omitPairwiseSummary = Boolean(resolvedRunScope?.preferOverDefaultPair);
   // #region agent log
   const __dbgT_summary0 = Date.now();
   let __dbgSummaryCached: boolean | null = null;
   let __dbgSummaryPath: string = "none";
   // #endregion
-  if (!focusedRunPair && !omitPairwiseSummary) {
+
+  let engineerSummary: EngineerRunSummaryV2 | null = null;
+  if (!focusedRunPair) {
     const summaryResult = await getOrComputeEngineerSummaryForLatestRun(user.id);
     engineerSummary = summaryResult?.summary ?? null;
-    // #region agent log
     __dbgSummaryPath = "latest";
     __dbgSummaryCached = summaryResult?.cached ?? null;
-    // #endregion
-  } else if (!focusedRunPair && omitPairwiseSummary) {
-    engineerSummary = null;
-    // #region agent log
-    __dbgSummaryPath = "omit";
-    // #endregion
   } else if (focusedRunPair && !compareRunId) {
     const summaryResult = await getOrComputeEngineerSummaryForRun(user.id, focusedRunPair.primaryRunId);
     engineerSummary = summaryResult?.summary ?? null;
-    // #region agent log
     __dbgSummaryPath = "focused";
     __dbgSummaryCached = summaryResult?.cached ?? null;
-    // #endregion
+  } else if (focusedRunPair && compareRunId) {
+    __dbgSummaryPath = "pair_explicit_compare";
   }
+
   // #region agent log
   const __dbgT_summary = Date.now() - __dbgT_summary0;
   // #endregion
 
   const patternDigest =
-    body?.patternDigest && typeof body.patternDigest === "object" && body.patternDigest !== null
+    body?.includePatternDigest === true &&
+    body?.patternDigest &&
+    typeof body.patternDigest === "object" &&
+    body.patternDigest !== null
       ? body.patternDigest
       : null;
 
@@ -173,6 +196,12 @@ export async function POST(request: Request) {
   // #region agent log
   const __dbgT_catalog = Date.now() - __dbgT_catalog0;
   // #endregion
+
+  const tireLifePriors = await buildTireLifePriorsForChatContext({
+    userId: user.id,
+    anchorRunId: anchorForRichContext,
+    focusedPair: focusedPairForTirePriors(focusedRunPair),
+  });
 
   const contextJson = {
     defaultDashboardContext: basePacket,
@@ -187,6 +216,8 @@ export async function POST(request: Request) {
     patternDigest,
     /** Account-wide run inventory (compact rows); null when client disables to save tokens. */
     runCatalog,
+    /** Learned k→k+1 tire-run pace medians (best, avg top 5/10/15) on this tire set. */
+    tireLifePriors,
     thingsToTry: basePacket.thingsToTry,
     thingsToDo: basePacket.thingsToDo,
   };
@@ -196,6 +227,7 @@ export async function POST(request: Request) {
     resolvedRunScope,
     patternDigest,
     runCatalog,
+    tireLifePriors,
     thingsToTry: basePacket.thingsToTry,
     thingsToDo: basePacket.thingsToDo,
   };
@@ -247,11 +279,17 @@ export async function POST(request: Request) {
               lastUserMessage: lastUser.content,
             })
           : null;
+      const reTire = await buildTireLifePriorsForChatContext({
+        userId: user.id,
+        anchorRunId: focused.primaryRunId,
+        focusedPair: focusedPairForTirePriors(focused),
+      });
       return {
         ...baseForMerge,
         engineerSummary: summary,
         focusedRunPair: focused,
         richEngineerContext: rich,
+        tireLifePriors: reTire,
       };
     },
   });

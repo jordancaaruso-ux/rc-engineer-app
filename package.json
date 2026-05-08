@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "prisma": {
-    "seed": "npx tsx prisma/seed.ts"
+    "seed": "npx dotenv-cli -e .env.local -- npx tsx prisma/seed.ts"
   },
   "scripts": {
     "postinstall": "prisma generate",
@@ -12,9 +12,11 @@
     "start": "next start",
     "lint": "eslint .",
     "prisma": "prisma",
-    "db:push": "prisma db push",
-    "db:seed": "prisma db seed",
-    "db:migrate:deploy": "prisma migrate deploy",
+    "db:push": "npx dotenv-cli -e .env.local -- prisma db push",
+    "db:seed": "npx dotenv-cli -e .env.local -- prisma db seed",
+    "db:migrate:deploy": "npx dotenv-cli -e .env.local -- prisma migrate deploy",
+    "db:migrate:resolve:rolled-back": "npx dotenv-cli -e .env.local -- prisma migrate resolve --rolled-back",
+    "db:migrate:resolve:applied": "npx dotenv-cli -e .env.local -- prisma migrate resolve --applied",
     "test:grip-spread": "npx tsx src/lib/engineerPhase5/gripSpreadContrast.test.ts",
     "test:between-hints": "npx tsx src/lib/engineerPhase5/betweenRunHints/betweenRunHints.test.ts",
     "check:legacy-local-user": "npx tsx scripts/check-legacy-local-user.ts",
@@ -57,6 +59,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "autoprefixer": "latest",
+    "dotenv-cli": "^11.0.0",
     "eslint": "latest",
     "eslint-config-next": "latest",
     "postcss": "^8.5.8",

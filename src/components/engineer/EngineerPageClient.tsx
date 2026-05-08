@@ -12,7 +12,15 @@ import { EngineerBetweenRunHintsStrip } from "@/components/engineer/EngineerBetw
 
 export function EngineerPageClient() {
   const [patternDigest, setPatternDigest] = useState<PatternDigestV1 | null>(null);
+  const [includeRunCatalog, setIncludeRunCatalog] = useState(true);
+  const [includePatternDigestInChat, setIncludePatternDigestInChat] = useState(false);
   const [queuedPrompt, setQueuedPrompt] = useState<EngineerQueuedChatPrompt | null>(null);
+
+  useEffect(() => {
+    if (!patternDigest) {
+      setIncludePatternDigestInChat(false);
+    }
+  }, [patternDigest]);
 
   const queueEngineerPrompt = useCallback((text: string) => {
     setQueuedPrompt((prev) => ({ id: (prev?.id ?? 0) + 1, text }));
@@ -62,7 +70,10 @@ export function EngineerPageClient() {
         <div className="p-4 md:p-5">
           <EngineerChatPanel
             patternDigest={patternDigest}
-            includeRunCatalog
+            includeRunCatalog={includeRunCatalog}
+            onIncludeRunCatalogChange={setIncludeRunCatalog}
+            includePatternDigestInChat={includePatternDigestInChat}
+            onIncludePatternDigestInChatChange={setIncludePatternDigestInChat}
             queuedPrompt={queuedPrompt}
             onQueuedPromptConsumed={clearQueuedPrompt}
             onQuickPrompt={queueEngineerPrompt}
@@ -73,6 +84,12 @@ export function EngineerPageClient() {
       <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
           <h2 className="text-lg font-semibold text-foreground tracking-tight">Compare &amp; trend</h2>
+          <p className="text-xs text-muted-foreground mt-1 leading-snug">
+            Choose target (primary) and comparison runs — same URL as Analysis &quot;Compare with Engineer&quot; (
+            <span className="font-mono">runId</span> / <span className="font-mono">compareRunId</span>). Optional trend
+            digest loads here; enable &quot;Attach Compare &amp; trend digest to chat&quot; above only when you want the
+            series in the conversation.
+          </p>
         </div>
         <div className="p-4 md:p-5">
           <EngineerCompareAndPattern
