@@ -23,6 +23,8 @@ if (!process.env.DATABASE_URL) {
 }
 
 const MAX_ROUNDS = 80;
+const ACTION_ITEM_PRERUN =
+  "20260427120000_action_item_list_kind_and_suggested_prerun";
 
 function runShell(cmd) {
   return spawnSync(cmd, {
@@ -91,13 +93,25 @@ for (let round = 0; round < MAX_ROUNDS; round++) {
 
   if (/\bP3009\b/.test(out)) {
     const name = extractP3009MigrationName(out);
-    console.error(
-      "\n✗ P3009: a migration is marked FAILED in _prisma_migrations. Auto-reconcile stops here.\n" +
-        "Fix the database for that migration (Neon SQL / manual-recovery), then run:\n" +
-        `  npx prisma migrate resolve --applied ${name || "<migration_name>"}\n` +
-        "or --rolled-back if nothing from that migration applied.\n" +
-        "Then re-run: node scripts/reconcile-prisma-migrations.cjs"
-    );
+    if (name === ACTION_ITEM_PRERUN) {
+      console.error(
+        "\n✗ P3009: this migration is stuck FAILED (blocks Vercel build).\n" +
+          "\n  A) Neon → SQL Editor → run the full file:\n" +
+          "     prisma/manual-recovery/20260427120000_action_item_list_kind_and_suggested_prerun.sql\n" +
+          "\n  B) With DATABASE_URL = Production (same as Vercel):\n" +
+          `     npx prisma migrate resolve --applied ${ACTION_ITEM_PRERUN}\n` +
+          "\n  C) Run again: npm run db:migrate:reconcile\n" +
+          "     Then redeploy Vercel."
+      );
+    } else {
+      console.error(
+        "\n✗ P3009: a migration is marked FAILED in _prisma_migrations. Auto-reconcile stops here.\n" +
+          "Fix the database for that migration (Neon SQL / prisma/manual-recovery/), then run:\n" +
+          `  npx prisma migrate resolve --applied ${name || "<migration_name>"}\n` +
+          "or --rolled-back if nothing from that migration applied.\n" +
+          "Then re-run: npm run db:migrate:reconcile"
+      );
+    }
     process.exit(1);
   }
 
