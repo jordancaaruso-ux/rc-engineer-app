@@ -25,6 +25,7 @@ if (!process.env.DATABASE_URL) {
 const MAX_ROUNDS = 80;
 const ACTION_ITEM_PRERUN =
   "20260427120000_action_item_list_kind_and_suggested_prerun";
+const RUN_SHARE_WITH_TEAM = "20260428120000_run_share_with_team";
 
 function runShell(cmd) {
   return spawnSync(cmd, {
@@ -102,6 +103,16 @@ for (let round = 0; round < MAX_ROUNDS; round++) {
           `     npx prisma migrate resolve --applied ${ACTION_ITEM_PRERUN}\n` +
           "\n  C) Run again: npm run db:migrate:reconcile\n" +
           "     Then redeploy Vercel."
+      );
+    } else if (name === RUN_SHARE_WITH_TEAM) {
+      console.error(
+        "\n✗ P3009: run_share_with_team stuck FAILED.\n" +
+          "\n  A) Neon → SQL Editor → run:\n" +
+          "     prisma/manual-recovery/20260428120000_run_share_with_team.sql\n" +
+          "\n  B) Then:\n" +
+          "     npm run db:migrate:resolve:run-share-with-team\n" +
+          "     npx dotenv-cli -e .env.local -- npx prisma migrate deploy\n" +
+          "\n  C) Redeploy Vercel."
       );
     } else {
       console.error(
