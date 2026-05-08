@@ -57,7 +57,9 @@ function runResolveApplied(name) {
 }
 
 function runDbExecute(relPosixPath) {
-  return runShell(`npx prisma db execute --file ${JSON.stringify(relPosixPath)}`);
+  return runShell(
+    `npx prisma db execute --schema prisma/schema.prisma --file ${JSON.stringify(relPosixPath)}`
+  );
 }
 
 function extractP3018MigrationName(output) {
