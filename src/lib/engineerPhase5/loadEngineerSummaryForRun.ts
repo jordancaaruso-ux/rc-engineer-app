@@ -2,6 +2,10 @@ import { prisma } from "@/lib/prisma";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { buildEngineerRunSummary, type RunShapeForEngineer } from "@/lib/engineerPhase5/buildEngineerRunSummary";
 import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
+import {
+  combinedEngineerFieldFingerprint,
+  resolveImportedTimingFieldStatsForEngineer,
+} from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
 import { canViewPeerRuns, isRunSharedWithTeam, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
 import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
 
@@ -97,6 +101,13 @@ function toShape(
   };
 }
 
+function normalizeCachedSummaryJson(raw: EngineerRunSummaryV2): EngineerRunSummaryV2 {
+  return {
+    ...raw,
+    importedSessionFieldStats: raw.importedSessionFieldStats ?? null,
+  };
+}
+
 export async function getOrComputeEngineerSummaryForRun(
   userId: string,
   runId: string,
@@ -128,7 +139,23 @@ export async function getOrComputeEngineerSummaryForRun(
   }
 
   const refId = reference?.id ?? null;
-  const fp = fieldFingerprint(run.importedLapSets ?? []);
+  const lapSetFp = fieldFingerprint(run.importedLapSets ?? []);
+  const lapsForImportedFieldMatch = (run.importedLapSets ?? []).map((s) => ({
+    driverName: s.driverName,
+    isPrimaryUser: s.isPrimaryUser,
+  }));
+  let importedSessionFieldCompact: EngineerRunSummaryV2["importedSessionFieldStats"] = null;
+  let sessionFingerToken = "";
+  if (run.importedLapTimeSessionId) {
+    const r = await resolveImportedTimingFieldStatsForEngineer({
+      userId,
+      importedLapTimeSessionId: run.importedLapTimeSessionId,
+      importedLapSetsForMatch: lapsForImportedFieldMatch,
+    });
+    importedSessionFieldCompact = r.compact;
+    sessionFingerToken = r.fingerprintToken;
+  }
+  const fp = combinedEngineerFieldFingerprint(lapSetFp, sessionFingerToken);
   if (
     !opts?.force &&
     run.engineerSummaryJson &&
@@ -137,7 +164,7 @@ export async function getOrComputeEngineerSummaryForRun(
   ) {
     const cached = run.engineerSummaryJson as EngineerRunSummaryV2;
     if (cached.fieldFingerprint === fp) {
-      return { summary: cached, cached: true };
+      return { summary: normalizeCachedSummaryJson(cached), cached: true };
     }
   }
 
@@ -167,6 +194,7 @@ export async function getOrComputeEngineerSummaryForRun(
     reference: reference ? toShape(reference) : null,
     importedSession: importedSession,
     fieldImportSession,
+    importedSessionFieldStats: importedSessionFieldCompact,
     fieldFingerprint: fp,
   });
 
@@ -231,7 +259,22 @@ export async function getOrComputeEngineerSummaryForRunPair(
       })
     : null;
 
-  const fp = fieldFingerprint(primary.importedLapSets ?? []);
+  let importedSessionFieldCompact: EngineerRunSummaryV2["importedSessionFieldStats"] = null;
+  let sessionFingerToken = "";
+  if (primary.importedLapTimeSessionId) {
+    const r = await resolveImportedTimingFieldStatsForEngineer({
+      userId: viewerUserId,
+      importedLapTimeSessionId: primary.importedLapTimeSessionId,
+      importedLapSetsForMatch: (primary.importedLapSets ?? []).map((s) => ({
+        driverName: s.driverName,
+        isPrimaryUser: s.isPrimaryUser,
+      })),
+    });
+    importedSessionFieldCompact = r.compact;
+    sessionFingerToken = r.fingerprintToken;
+  }
+  const lapSetFp = fieldFingerprint(primary.importedLapSets ?? []);
+  const fp = combinedEngineerFieldFingerprint(lapSetFp, sessionFingerToken);
   const fieldImportSession =
     computeFieldImportSessionFromSets(
       (primary.importedLapSets ?? []).map((s) => ({
@@ -251,6 +294,7 @@ export async function getOrComputeEngineerSummaryForRunPair(
     reference: toShape(compareForShape),
     importedSession: importedSession,
     fieldImportSession,
+    importedSessionFieldStats: importedSessionFieldCompact,
     fieldFingerprint: fp,
   });
 

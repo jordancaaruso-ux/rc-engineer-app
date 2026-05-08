@@ -19,6 +19,8 @@ import {
   buildConditionalSetupEmpiricalV1,
   type ConditionalSetupEmpiricalV1,
 } from "@/lib/engineerPhase5/conditionalSetupForEngineer";
+import type { ImportedSessionFieldStatsEngineerCompactV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import { resolveImportedTimingFieldStatsForEngineer } from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
 
 export type EngineerRichContextV1 = {
   version: 1;
@@ -50,6 +52,10 @@ export type EngineerRichContextV1 = {
     gripSummary: string;
     layoutSummary: string;
   };
+  /**
+   * Linked `ImportedLapTimeSession.fieldStatsJson` on this run (full parsed field); null when unlinked or empty.
+   */
+  importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null;
   setupVsSpread: {
     note: string;
     siblingCarCount: number;
@@ -124,6 +130,7 @@ const runSelectRich = {
   trackId: true,
   eventId: true,
   tireSetId: true,
+  importedLapTimeSessionId: true,
   setupSnapshot: { select: { data: true } },
   car: {
     select: { id: true, name: true, chassis: true, setupSheetTemplate: true },
@@ -133,6 +140,12 @@ const runSelectRich = {
   },
   event: { select: { id: true, raceClass: true } },
   tireSet: { select: { id: true, label: true, setNumber: true } },
+  importedLapSets: {
+    select: {
+      driverName: true,
+      isPrimaryUser: true,
+    },
+  },
 } as const;
 
 function kbSearchQueryForMessage(
@@ -179,7 +192,7 @@ export async function buildEngineerRichContextV1(params: {
       sessionClass: { label: null, source: "none" },
       tires: null,
       track: null,
-      manufacturerBaseline: null,
+      importedSessionFieldStats: null,
       setupVsSpread: {
         note: "No run anchored — add ?runId= on the Engineer page or log a run for car/setup/track context.",
         siblingCarCount: 0,
@@ -200,6 +213,7 @@ export async function buildEngineerRichContextV1(params: {
         sourcePath: k.sourcePath,
       })),
       parameterIntentMatches,
+      manufacturerBaseline: null,
       bulkheadInnerSplits: null,
     };
   }
@@ -306,6 +320,19 @@ export async function buildEngineerRichContextV1(params: {
     underLowerFrontAvgMinusRearAvgMm: splitMm.underLowerFrontAvgMinusRearAvgMm,
   };
 
+  let importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null = null;
+  if (run.importedLapTimeSessionId) {
+    const r = await resolveImportedTimingFieldStatsForEngineer({
+      userId: params.userId,
+      importedLapTimeSessionId: run.importedLapTimeSessionId,
+      importedLapSetsForMatch: (run.importedLapSets ?? []).map((s) => ({
+        driverName: s.driverName,
+        isPrimaryUser: s.isPrimaryUser,
+      })),
+    });
+    importedSessionFieldStats = r.compact;
+  }
+
   return {
     version: 1,
     generatedAtIso: new Date().toISOString(),
@@ -338,7 +365,7 @@ export async function buildEngineerRichContextV1(params: {
           layoutSummary: formatLayoutTagsForDisplay(run.track.layoutTags ?? []),
         }
       : null,
-    manufacturerBaseline,
+    importedSessionFieldStats,
     setupVsSpread: {
       note,
       siblingCarCount: spread.siblingCarIds.length,
@@ -354,6 +381,7 @@ export async function buildEngineerRichContextV1(params: {
       sourcePath: k.sourcePath,
     })),
     parameterIntentMatches,
+    manufacturerBaseline,
     bulkheadInnerSplits,
   };
 }

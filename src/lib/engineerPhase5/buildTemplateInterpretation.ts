@@ -20,20 +20,59 @@ function pacePhrase(summary: EngineerRunSummaryV2): string {
   return `Compared to the reference run: ${parts.join("; ")}.`;
 }
 
+function importedSessionFieldPhrase(summary: EngineerRunSummaryV2): string {
+  const s = summary.importedSessionFieldStats;
+  if (!s || s.driverCount < 2) return "";
+  const y = s.matchedYou;
+  const parts: string[] = [];
+  if (y) {
+    if (y.rankByBest != null) parts.push(`rank by best lap ${y.rankByBest} of ${s.driverCount}`);
+    const gBest =
+      y.gapBestToSessionBestSeconds != null && Number.isFinite(y.gapBestToSessionBestSeconds)
+        ? `${y.gapBestToSessionBestSeconds.toFixed(3)}s slower than session best lap`
+        : null;
+    const g5 =
+      y.gapAvgTop5ToSessionBestAvg5Seconds != null &&
+      Number.isFinite(y.gapAvgTop5ToSessionBestAvg5Seconds)
+        ? `${y.gapAvgTop5ToSessionBestAvg5Seconds.toFixed(3)}s slower than best avg-top-5 in session`
+        : null;
+    const g10 =
+      y.gapAvgTop10ToSessionBestAvg10Seconds != null &&
+      Number.isFinite(y.gapAvgTop10ToSessionBestAvg10Seconds)
+        ? `${y.gapAvgTop10ToSessionBestAvg10Seconds.toFixed(3)}s slower than best avg-top-10 in session`
+        : null;
+    if (gBest) parts.push(`best lap gap ${gBest}`);
+    if (g5) parts.push(`avg top-5 gap ${g5}`);
+    if (g10) parts.push(`avg top-10 gap ${g10}`);
+  } else {
+    parts.push(`field has ${s.driverCount} drivers; your row was not matched to a primary imported driver name`);
+  }
+  if (s.fieldMedianBestSeconds != null && Number.isFinite(s.fieldMedianBestSeconds)) {
+    parts.push(`field median best ${s.fieldMedianBestSeconds.toFixed(3)}s`);
+  }
+  return `Imported timing session (aggregated field): ${parts.join("; ")}.`;
+}
+
 function fieldPhrase(summary: EngineerRunSummaryV2): string {
   const f = summary.fieldImportSession;
-  if (!f || f.ranked.length < 2) return "";
-  const you = f.ranked.find((r) => r.isPrimaryUser) ?? f.ranked[0];
-  if (!you) return "";
-  const gap =
-    you.gapToSessionBestSeconds != null && Number.isFinite(you.gapToSessionBestSeconds)
-      ? `${you.gapToSessionBestSeconds.toFixed(3)}s`
-      : "—";
-  const fade =
-    you.fadeSeconds != null && Number.isFinite(you.fadeSeconds)
-      ? `${you.fadeSeconds >= 0 ? "+" : ""}${you.fadeSeconds.toFixed(3)}s`
-      : "n/a";
-  return `Imported timing field (by best lap): your row ranked ${you.rank} of ${f.ranked.length}; gap to session best ${gap}; stint fade ${fade} (second half vs first half of included laps, when computable).`;
+  const fromSets =
+    f && f.ranked.length >= 2
+      ? (() => {
+          const you = f.ranked.find((r) => r.isPrimaryUser) ?? f.ranked[0];
+          if (!you) return "";
+          const gap =
+            you.gapToSessionBestSeconds != null && Number.isFinite(you.gapToSessionBestSeconds)
+              ? `${you.gapToSessionBestSeconds.toFixed(3)}s`
+              : "—";
+          const fade =
+            you.fadeSeconds != null && Number.isFinite(you.fadeSeconds)
+              ? `${you.fadeSeconds >= 0 ? "+" : ""}${you.fadeSeconds.toFixed(3)}s`
+              : "n/a";
+          return `Imported lap-set field (≥2 persisted drivers, best lap + stint fade): your row ranked ${you.rank} of ${f.ranked.length}; gap to session best lap ${gap}; stint fade ${fade} (second half vs first half of included laps, when computable).`;
+        })()
+      : "";
+  const agg = importedSessionFieldPhrase(summary);
+  return [fromSets, agg].filter(Boolean).join(" ");
 }
 
 function setupPhrase(summary: EngineerRunSummaryV2): string {

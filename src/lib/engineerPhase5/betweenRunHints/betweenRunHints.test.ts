@@ -36,6 +36,7 @@ function baseSummary(): EngineerRunSummaryV2 {
     notesUsed: { verbatimSnippet: null, role: "none" },
     importedProvenance: null,
     fieldImportSession: null,
+    importedSessionFieldStats: null,
     fieldFingerprint: "fp1",
     deepDiveOffered: false,
     softPriors: [],

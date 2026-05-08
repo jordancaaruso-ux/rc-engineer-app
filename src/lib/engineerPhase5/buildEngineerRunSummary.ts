@@ -1,4 +1,6 @@
-import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import type {
+  EngineerRunSummaryV2,
+} from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { computeLapOutcomesForEngineer } from "@/lib/engineerPhase5/computeLapOutcomesForEngineer";
 import { rankSetupChangesForEngineer } from "@/lib/engineerPhase5/rankSetupChangesForEngineer";
 import { buildTemplateInterpretation } from "@/lib/engineerPhase5/buildTemplateInterpretation";
@@ -63,6 +65,7 @@ export async function buildEngineerRunSummary(params: {
   reference: RunShapeForEngineer | null;
   importedSession: { sourceUrl: string; eventDetectionSessionLabel: string | null } | null;
   fieldImportSession: FieldImportSession | null;
+  importedSessionFieldStats: EngineerRunSummaryV2["importedSessionFieldStats"];
   fieldFingerprint: string;
 }): Promise<EngineerRunSummaryV2> {
   const { lapOutcome, lapCountIncluded } = computeLapOutcomesForEngineer(
@@ -120,6 +123,7 @@ export async function buildEngineerRunSummary(params: {
           })),
         }
       : null,
+    importedSessionFieldStats: params.importedSessionFieldStats,
     fieldFingerprint: params.fieldFingerprint,
     deepDiveOffered: false,
     softPriors,

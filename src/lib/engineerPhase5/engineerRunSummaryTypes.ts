@@ -20,6 +20,33 @@ export type EngineerSetupChangeRow = {
   severity: string;
 };
 
+/** Session-level aggregates from linked `ImportedLapTimeSession.fieldStatsJson` (full parsed field). */
+export type ImportedSessionFieldStatsEngineerCompactV1 = {
+  version: 1;
+  driverCount: number;
+  /** Min best lap among entrants with a valid best (session “pole”). */
+  sessionBestBestLapSeconds: number | null;
+  /** Min avg-top-5 among entrants with a valid average (pseudo session best sustained). */
+  sessionBestAvgTop5Seconds: number | null;
+  sessionBestAvgTop10Seconds: number | null;
+  fieldMedianBestSeconds: number | null;
+  fieldMedianAvgTop5Seconds: number | null;
+  /**
+   * Your row inferred from imported lap sets flagged `isPrimaryUser`, or lone driver fallback.
+   * Gaps vs session-best columns (**positive ⇒ you slower**) when both sides finite.
+   */
+  matchedYou: null | {
+    label: string;
+    rankByBest: number | null;
+    bestLapSeconds: number | null;
+    avgTop5Seconds: number | null;
+    avgTop10Seconds: number | null;
+    gapBestToSessionBestSeconds: number | null;
+    gapAvgTop5ToSessionBestAvg5Seconds: number | null;
+    gapAvgTop10ToSessionBestAvg10Seconds: number | null;
+  };
+};
+
 export type EngineerRunSummaryV2 = {
   version: 2;
   currentRunId: string;
@@ -55,6 +82,11 @@ export type EngineerRunSummaryV2 = {
       fadeSeconds: number | null;
     }>;
   };
+  /**
+   * When the run links an `ImportedLapTimeSession` with stored aggregates: best / avgTop5 / avgTop10
+   * vs session-best columns for the matched driver. Complements `fieldImportSession` (lap-set rows + fade).
+   */
+  importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null;
   fieldFingerprint: string;
   deepDiveOffered: boolean;
   /** Soft historical context (Phase 4); never strong claims */

@@ -37,6 +37,8 @@ import {
   buildUpperInnerBulkheadSplitNotes,
 } from "@/lib/engineerPhase5/setupCompareAxleNet";
 import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
+import { resolveImportedTimingFieldStatsForEngineer } from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
+import type { ImportedSessionFieldStatsEngineerCompactV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 
 export type EngineerContextPacketV1 = {
   version: 1;
@@ -459,6 +461,10 @@ export type EngineerFocusedRunPairContext = {
     }>;
   };
   /**
+   * When the primary links `ImportedLapTimeSession` with aggregates: gaps vs session-best best / avg top 5 / 10.
+   */
+  importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null;
+  /**
    * vehicle-dynamics KB sections chosen by keyword overlap with changed setup keys—use for handling
    * text alongside rcEffectHints (compare→primary direction is authoritative).
    */
@@ -530,6 +536,7 @@ const focusedRunSelect = {
   event: { select: { id: true, name: true } },
   tireSet: { select: { label: true } },
   setupSnapshot: { select: { data: true } },
+  importedLapTimeSessionId: true,
   importedLapSets: {
     select: {
       driverName: true,
@@ -820,6 +827,19 @@ export async function buildFocusedRunPairContext(
       }))
     ) ?? null;
 
+  let importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null = null;
+  if (primary.importedLapTimeSessionId) {
+    const r = await resolveImportedTimingFieldStatsForEngineer({
+      userId,
+      importedLapTimeSessionId: primary.importedLapTimeSessionId,
+      importedLapSetsForMatch: (primary.importedLapSets ?? []).map((s) => ({
+        driverName: s.driverName,
+        isPrimaryUser: s.isPrimaryUser,
+      })),
+    });
+    importedSessionFieldStats = r.compact;
+  }
+
   return {
     primaryRunId: primary.id,
     compareRunId: compareSlice?.id ?? null,
@@ -831,5 +851,6 @@ export async function buildFocusedRunPairContext(
     setupCompareKbSnippets,
     importedDriversOnPrimary,
     fieldImportSession,
+    importedSessionFieldStats,
   };
 }
