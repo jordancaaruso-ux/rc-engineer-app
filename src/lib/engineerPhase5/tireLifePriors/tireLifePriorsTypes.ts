@@ -48,3 +48,31 @@ export type TireLifePriorsV1 = {
    */
   focusedCompareNudge: TireLifeFocusedCompareNudgeV1 | null;
 };
+
+/** One event×track bucket: pooled 1→2 tire-run pace deltas across several tire sets (resolved search scope). */
+export type ResolvedScopeTireStepBucketV1 = {
+  eventId: string | null;
+  eventName: string | null;
+  trackId: string | null;
+  trackName: string | null;
+  pairCount: number;
+  distinctTireSetCount: number;
+  confidence: TireLifeConfidence;
+  bestLapDeltaMedianSeconds: number | null;
+  avgTop5DeltaMedianSeconds: number | null;
+  avgTop10DeltaMedianSeconds: number | null;
+  avgTop15DeltaMedianSeconds: number | null;
+  examplePairs: Array<{
+    fromRunId: string;
+    toRunId: string;
+    tireSetId: string;
+    tireSetLabel: string | null;
+  }>;
+};
+
+export type ResolvedScopeTireStepsV1 = {
+  version: 1;
+  /** Substring filter on tire set label when used; else null. */
+  tireLabelFilter: string | null;
+  buckets: ResolvedScopeTireStepBucketV1[];
+};
