@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BetweenRunRecentSessionsThings } from "@/components/betweenRunHints/BetweenRunRecentSessionsThings";
 import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import { cn } from "@/lib/utils";
 
@@ -30,20 +31,7 @@ export function DashboardBetweenRunHintsCard({
           <h2 className="text-sm font-semibold text-foreground">Things to consider — Engineer</h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground leading-snug">{scopeLine(hint)}</p>
         </div>
-        <p className="text-sm font-medium text-foreground leading-snug">{hint.headline}</p>
-        <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-          {hint.bullets.slice(0, 4).map((b, i) => (
-            <li key={i} className="leading-snug">
-              {b}
-            </li>
-          ))}
-        </ul>
-        {hint.avoidRepeating ? (
-          <p className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2 py-1.5 text-xs text-foreground leading-snug">
-            {hint.avoidRepeating}
-          </p>
-        ) : null}
-        <p className="text-[11px] text-muted-foreground leading-snug">{hint.sourcesNote}</p>
+        <BetweenRunRecentSessionsThings sessions={hint.recentSessions ?? []} className="mt-2" />
         <div>
           <Link
             href={hint.engineerHref}

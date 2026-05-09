@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { BetweenRunRecentSessionsThings } from "@/components/betweenRunHints/BetweenRunRecentSessionsThings";
 import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
-import type { EngineerLapMetricFlag, PaceVsFieldMetricSnapshotV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { cn } from "@/lib/utils";
 
 function scopeLine(h: BetweenRunHintPayload): string {
@@ -12,119 +12,6 @@ function scopeLine(h: BetweenRunHintPayload): string {
   if (h.scope.trackLabel) bits.push(h.scope.trackLabel);
   if (h.scope.eventLabel) bits.push(h.scope.eventLabel);
   return bits.join(" · ");
-}
-
-function fmtSec(v: number | null): string {
-  if (v == null || !Number.isFinite(v)) return "—";
-  return v.toFixed(3);
-}
-
-function lapVsPriorLabel(flag: EngineerLapMetricFlag | null): string {
-  if (!flag) return "—";
-  if (flag === "improved") return "Best lap vs prior: faster";
-  if (flag === "regressed") return "Best lap vs prior: slower";
-  if (flag === "flat") return "Best lap vs prior: similar";
-  return "Best lap vs prior: unclear";
-}
-
-function lapVsPriorClass(flag: EngineerLapMetricFlag | null): string {
-  if (flag === "improved") return "text-emerald-600 dark:text-emerald-400";
-  if (flag === "regressed") return "text-rose-600 dark:text-rose-400";
-  if (flag === "flat") return "text-muted-foreground";
-  return "text-muted-foreground";
-}
-
-function fmtDeltaSec(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(v)) return "—";
-  const sign = v >= 0 ? "+" : "";
-  return `${sign}${v.toFixed(3)}s`;
-}
-
-function PaceVsFieldBlock({
-  metrics,
-  summaryText,
-}: {
-  metrics: PaceVsFieldMetricSnapshotV1[] | null | undefined;
-  summaryText: string | null | undefined;
-}) {
-  if (metrics && metrics.length > 0) {
-    return (
-      <div className="mt-1.5 space-y-1">
-        <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-          Pace vs field (session average)
-        </div>
-        <p className="text-[9px] text-muted-foreground leading-snug">
-          Field avg = mean across entrants with a valid value for that row. Gap = you minus field avg (positive ⇒ slower
-          than average). Rank uses only drivers with a finite value for that metric.
-        </p>
-        <div className="hidden sm:block overflow-x-auto rounded-md border border-border bg-muted/40">
-          <table className="w-full text-left text-[9px]">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground">
-                <th className="px-1.5 py-1 font-medium">Metric</th>
-                <th className="px-1.5 py-1 font-medium">Field avg</th>
-                <th className="px-1.5 py-1 font-medium">You</th>
-                <th className="px-1.5 py-1 font-medium">vs avg</th>
-                <th className="px-1.5 py-1 font-medium">Rank</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono text-foreground/90">
-              {metrics.map((m) => (
-                <tr
-                  key={m.metric}
-                  className={cn("border-b border-border/50 last:border-0", !m.meaningful && "opacity-75")}
-                >
-                  <td className="px-1.5 py-0.5 font-sans text-[9px] text-foreground/85">
-                    {m.label}
-                    {!m.meaningful ? <span className="text-muted-foreground"> *</span> : null}
-                  </td>
-                  <td className="px-1.5 py-0.5 tabular-nums">{fmtSec(m.fieldMeanSeconds)}</td>
-                  <td className="px-1.5 py-0.5 tabular-nums">{fmtSec(m.userSeconds)}</td>
-                  <td className="px-1.5 py-0.5 tabular-nums">{fmtDeltaSec(m.gapUserMinusFieldMeanSeconds)}</td>
-                  <td className="px-1.5 py-0.5 tabular-nums font-sans text-[8px]">
-                    {m.rankInField != null && m.fieldEntrantCountForMetric >= 2
-                      ? `${m.rankInField}/${m.fieldEntrantCountForMetric}`
-                      : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="sm:hidden space-y-1">
-          {metrics.map((m) => (
-            <div key={`${m.metric}-m`} className="rounded border border-border/60 bg-muted/30 px-2 py-1 font-mono text-[9px]">
-              <div className="font-sans font-medium text-foreground/85">{m.label}</div>
-              <div className="mt-0.5 grid grid-cols-2 gap-x-2 gap-y-0.5 text-muted-foreground">
-                <span>Field avg {fmtSec(m.fieldMeanSeconds)}</span>
-                <span>You {fmtSec(m.userSeconds)}</span>
-                <span>vs avg {fmtDeltaSec(m.gapUserMinusFieldMeanSeconds)}</span>
-                <span>
-                  Rank{" "}
-                  {m.rankInField != null && m.fieldEntrantCountForMetric >= 2
-                    ? `${m.rankInField}/${m.fieldEntrantCountForMetric}`
-                    : "—"}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-[8px] text-muted-foreground">* Avg top N needs at least N included laps on your row (same rule as session summaries).</p>
-      </div>
-    );
-  }
-  if (summaryText?.trim()) {
-    return (
-      <p className="mt-1.5 text-[10px] text-muted-foreground leading-snug whitespace-pre-wrap">
-        <span className="font-medium text-foreground/80">Pace vs field:</span> {summaryText.trim()}
-      </p>
-    );
-  }
-  return (
-    <p className="mt-1.5 text-[10px] text-muted-foreground leading-snug">
-      Pace vs field: not available (needs multi-driver imported timing for this session).
-    </p>
-  );
 }
 
 export function EngineerBetweenRunHintsStrip({ className }: { className?: string }) {
@@ -184,7 +71,6 @@ export function EngineerBetweenRunHintsStrip({ className }: { className?: string
   }
 
   const sessions = hint.recentSessions ?? [];
-  const ctx = hint.driverContextPack;
 
   return (
     <div
@@ -200,102 +86,7 @@ export function EngineerBetweenRunHintsStrip({ className }: { className?: string
             <span className="text-[11px] text-muted-foreground">{scopeLine(hint)}</span>
           </div>
 
-          {sessions.length > 0 ? (
-            <div className="space-y-2">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Recent sessions (newest first)
-              </div>
-              <div className="grid gap-2 sm:grid-cols-1">
-                {sessions.map((s, idx) => (
-                  <div
-                    key={s.runId}
-                    className={cn(
-                      "rounded-lg border border-border bg-card/70 px-3 py-2 text-[11px] leading-snug",
-                      idx === 0 && "ring-1 ring-primary/25"
-                    )}
-                  >
-                    <div className="font-medium text-foreground/95">{s.displayLabel}</div>
-                    <div className="mt-1.5 grid gap-1 font-mono text-[10px] text-foreground/90 tabular-nums sm:grid-cols-2">
-                      <div>
-                        <span className="text-muted-foreground font-sans">Best lap</span>{" "}
-                        <span>{fmtSec(s.bestLapSeconds)}s</span>
-                      </div>
-                      <div className={cn("font-sans text-[10px]", lapVsPriorClass(s.bestLapVsPreviousFlag))}>
-                        {lapVsPriorLabel(s.bestLapVsPreviousFlag)}
-                      </div>
-                    </div>
-                    <PaceVsFieldBlock metrics={s.paceVsFieldMetrics} summaryText={s.paceVsFieldSummary} />
-                    {s.setupChangesFromPrevious.length > 0 ? (
-                      <div className="mt-1.5">
-                        <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Setup vs prior session
-                        </div>
-                        <ul className="mt-0.5 list-disc space-y-0.5 pl-3.5 text-muted-foreground">
-                          {s.setupChangesFromPrevious.map((line, i) => (
-                            <li key={i}>{line}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <p className="mt-1.5 text-[10px] text-muted-foreground">No setup deltas vs prior on record.</p>
-                    )}
-                    {(s.notesPreview || s.handlingPreview) && (
-                      <div className="mt-1.5 space-y-0.5 border-t border-border/60 pt-1.5 text-[10px] text-muted-foreground">
-                        {s.notesPreview ? (
-                          <p>
-                            <span className="font-medium text-foreground/80">Notes:</span> {s.notesPreview}
-                          </p>
-                        ) : null}
-                        {s.handlingPreview ? (
-                          <p>
-                            <span className="font-medium text-foreground/80">Handling:</span> {s.handlingPreview}
-                          </p>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {(ctx?.combinedNotesAndHandling?.trim() || (ctx?.currentSetupLines?.length ?? 0) > 0) && (
-            <div className="rounded-md border border-border bg-muted/25 px-3 py-2 text-[11px] leading-snug space-y-1.5">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Context for suggestions
-              </div>
-              {ctx.combinedNotesAndHandling?.trim() ? (
-                <p className="text-muted-foreground whitespace-pre-wrap">{ctx.combinedNotesAndHandling.trim()}</p>
-              ) : null}
-              {ctx.currentSetupLines?.length ? (
-                <div>
-                  <div className="text-[10px] font-medium text-muted-foreground mb-0.5">Current setup (tuning keys)</div>
-                  <ul className="list-disc space-y-0.5 pl-3.5 text-muted-foreground">
-                    {ctx.currentSetupLines.slice(0, 18).map((line, i) => (
-                      <li key={i}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          <div className="space-y-1 border-t border-border/60 pt-2">
-            <p className="text-sm font-medium text-foreground leading-snug">{hint.headline}</p>
-            <ul className="list-disc space-y-0.5 pl-4 text-sm text-muted-foreground">
-              {hint.bullets.slice(0, 4).map((b, i) => (
-                <li key={i} className="leading-snug">
-                  {b}
-                </li>
-              ))}
-            </ul>
-          </div>
-          {hint.avoidRepeating ? (
-            <p className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2 py-1.5 text-xs text-foreground leading-snug">
-              {hint.avoidRepeating}
-            </p>
-          ) : null}
-          <p className="text-[11px] text-muted-foreground leading-snug">{hint.sourcesNote}</p>
+          <BetweenRunRecentSessionsThings sessions={sessions} />
         </div>
         <Link
           href={hint.engineerHref}
