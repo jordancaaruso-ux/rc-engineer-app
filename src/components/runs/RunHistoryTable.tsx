@@ -29,6 +29,8 @@ import type { LapRow } from "@/lib/lapAnalysis";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
+import { EngineerPaceVsFieldPanel } from "@/components/engineer/EngineerPaceVsFieldPanel";
+import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { SessionsEngineerPairLinks } from "@/components/runs/SessionsEngineerPairLinks";
 import { RelativeTime } from "@/components/ui/RelativeTime";
@@ -541,6 +543,10 @@ function RunDetail({
 }) {
   const router = useRouter();
   const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
+  const [lapPaceSummary, setLapPaceSummary] = useState<EngineerRunSummaryV2 | null>(null);
+  const [lapPaceSummaryLoading, setLapPaceSummaryLoading] = useState(false);
+  const [lapPaceSummaryErr, setLapPaceSummaryErr] = useState<string | null>(null);
+  const lapPaceSummaryCacheRef = React.useRef<{ runId: string; summary: EngineerRunSummaryV2 | null } | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [importedLapSetsFull, setImportedLapSetsFull] = useState<Run["importedLapSets"] | null>(
@@ -562,6 +568,56 @@ function RunDetail({
     }
     return run;
   }, [run, importedLapSetsFull]);
+
+  useEffect(() => {
+    lapPaceSummaryCacheRef.current = null;
+    setLapPaceSummary(null);
+    setLapPaceSummaryErr(null);
+    setLapPaceSummaryLoading(false);
+    setShowLapAnalysis(false);
+    setImportedLapSetsFull(null);
+    setImportedLapsError(null);
+    setImportedLapsLoading(false);
+  }, [run.id]);
+
+  useEffect(() => {
+    if (!showLapAnalysis) return;
+    const rid = run.id;
+    const hit = lapPaceSummaryCacheRef.current;
+    if (hit && hit.runId === rid) {
+      setLapPaceSummary(hit.summary);
+      setLapPaceSummaryErr(null);
+      setLapPaceSummaryLoading(false);
+      return;
+    }
+    let alive = true;
+    setLapPaceSummaryLoading(true);
+    setLapPaceSummaryErr(null);
+    fetch(`/api/runs/${encodeURIComponent(rid)}/engineer-summary`, { cache: "no-store" })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          summary?: EngineerRunSummaryV2;
+        };
+        if (!res.ok) throw new Error(data.error ?? `Failed (${res.status})`);
+        return data.summary ?? null;
+      })
+      .then((summary) => {
+        if (!alive) return;
+        lapPaceSummaryCacheRef.current = { runId: rid, summary };
+        setLapPaceSummary(summary);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setLapPaceSummaryErr(err instanceof Error ? err.message : "Could not load lap analysis.");
+      })
+      .finally(() => {
+        if (alive) setLapPaceSummaryLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [showLapAnalysis, run.id]);
 
   useEffect(() => {
     if (!showLapAnalysis) return;
@@ -724,21 +780,6 @@ function RunDetail({
 
   return (
     <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-5 text-sm">
-      <EngineerRunSummaryPanel runId={run.id} defaultExpanded={false} sessionsFieldSummaryPinned />
-
-      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Engineer</div>
-        <SessionsEngineerPairLinks runId={run.id} />
-        {engineerVsPreviousHref ? (
-          <Link
-            href={engineerVsPreviousHref}
-            className="inline-flex items-center rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
-          >
-            Quick: vs previous on same car
-          </Link>
-        ) : null}
-      </div>
-
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
         <div className="min-w-0 space-y-3 xl:max-w-[min(100%,28rem)]">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Run details</h3>
@@ -854,55 +895,76 @@ function RunDetail({
               ) : null}
             </div>
           </div>
+
+          <div className="space-y-2 pt-2 border-t border-border/60" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground min-w-0 flex-1">{uploadedLapSetsLine}</p>
+              <div className="flex flex-wrap shrink-0 gap-2">
+                {allowRunMutations ? (
+                  <Link
+                    href={`/runs/${encodeURIComponent(run.id)}/edit`}
+                    className={cn(analyseActionButtonClass, "no-underline")}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Edit run
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowLapAnalysis((v) => !v)}
+                  className={cn("shrink-0", analyseActionButtonClass)}
+                >
+                  Analyse lap times
+                </button>
+              </div>
+            </div>
+            {showLapAnalysis ? (
+              <div className="rounded-md border border-border bg-muted/60 p-3 space-y-3">
+                {lapPaceSummaryLoading && !lapPaceSummary && !lapPaceSummaryErr ? (
+                  <p className="text-xs text-muted-foreground">Loading pace vs field…</p>
+                ) : null}
+                {lapPaceSummaryErr ? (
+                  <p className="text-xs text-red-600 dark:text-red-400">{lapPaceSummaryErr}</p>
+                ) : null}
+                {lapPaceSummary ? <EngineerPaceVsFieldPanel summary={lapPaceSummary} /> : null}
+                <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Column comparison
+                </div>
+                {importedLapsError ? (
+                  <p className="text-xs text-red-600 dark:text-red-400">{importedLapsError}</p>
+                ) : null}
+                {missingImportedLapRows && importedLapsLoading && !importedLapSetsFull ? (
+                  <p className="text-xs text-muted-foreground py-1">Loading imported lap sets…</p>
+                ) : (
+                  <LapComparisonColumnGrid
+                    myDisplayName={userDisplayName}
+                    run={runForLapCompare}
+                    currentRunId={run.id}
+                    otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
+                    compareAnchorRun={toCompareRunShape(run)}
+                    pickerRunsForModal={pickerRunsSameCar}
+                    runListSource={runListSource}
+                    librarySessions={libraryLapSessions}
+                  />
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div className="space-y-0.5 min-w-0">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lap analysis</h3>
-            <p className="text-[11px] text-muted-foreground">{uploadedLapSetsLine}</p>
-          </div>
-          {allowRunMutations ? (
-            <Link
-              href={`/runs/${encodeURIComponent(run.id)}/edit`}
-              className={cn(analyseActionButtonClass, "no-underline")}
-              onClick={(e) => e.stopPropagation()}
-            >
-              Edit run
-            </Link>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setShowLapAnalysis((v) => !v)}
-            className={cn("shrink-0", analyseActionButtonClass)}
+      <EngineerRunSummaryPanel runId={run.id} defaultExpanded={false} />
+
+      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Engineer</div>
+        <SessionsEngineerPairLinks runId={run.id} />
+        {engineerVsPreviousHref ? (
+          <Link
+            href={engineerVsPreviousHref}
+            className="inline-flex items-center rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
           >
-            Analyse lap times
-          </button>
-        </div>
-        {showLapAnalysis ? (
-          <div className="rounded-md border border-border bg-muted/60 p-3">
-            <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
-              Column comparison
-            </div>
-            {importedLapsError ? (
-              <p className="text-xs text-red-600 dark:text-red-400 mb-2">{importedLapsError}</p>
-            ) : null}
-            {missingImportedLapRows && importedLapsLoading && !importedLapSetsFull ? (
-              <p className="text-xs text-muted-foreground py-3">Loading imported lap sets…</p>
-            ) : (
-              <LapComparisonColumnGrid
-                myDisplayName={userDisplayName}
-                run={runForLapCompare}
-                currentRunId={run.id}
-                otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
-                compareAnchorRun={toCompareRunShape(run)}
-                pickerRunsForModal={pickerRunsSameCar}
-                runListSource={runListSource}
-                librarySessions={libraryLapSessions}
-              />
-            )}
-          </div>
+            Quick: vs previous on same car
+          </Link>
         ) : null}
       </div>
 

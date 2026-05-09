@@ -108,6 +108,7 @@ function normalizeCachedSummaryJson(raw: EngineerRunSummaryV2): EngineerRunSumma
       ? {
           ...fs,
           paceVsFieldMeanAnalysis: fs.paceVsFieldMeanAnalysis ?? null,
+          fieldMedianAvgTop10Seconds: fs.fieldMedianAvgTop10Seconds ?? null,
         }
       : null;
   return {

@@ -12,8 +12,8 @@ function fmtDeltaSec(v: number | null | undefined): string {
 }
 
 /**
- * Multi-line summary for LLM / compact copy: you vs **session field mean** when aggregates exist,
- * else fall back to rank + gap vs session best from lap-set rows.
+ * Multi-line summary for LLM / compact copy: **avg top 10 vs session field mean** first,
+ * optional median avg-top-10 benchmark, then other metrics vs field mean; lap-set fallback uses pole gap + rank.
  */
 export function paceVsFieldSummaryFromEngineerSummary(summary: EngineerRunSummaryV2): string | null {
   const fs = summary.importedSessionFieldStats;
@@ -22,9 +22,37 @@ export function paceVsFieldSummaryFromEngineerSummary(summary: EngineerRunSummar
 
   if (fs && fs.driverCount >= 2 && fs.paceVsFieldMeanAnalysis && fs.paceVsFieldMeanAnalysis.length > 0) {
     const lines: string[] = [
-      `Imported timing: ${fs.driverCount} drivers; gaps vs **session field average** (positive ⇒ slower than that average).`,
+      `Imported timing: ${fs.driverCount} drivers. Primary sustained pace = avg top 10 vs **session field average** (positive ⇒ slower than that average).`,
     ];
+    const avg10 = fs.paceVsFieldMeanAnalysis.find((m) => m.metric === "avg_top_10");
+    if (avg10) {
+      const rank =
+        avg10.rankInField != null && avg10.fieldEntrantCountForMetric >= 2
+          ? `rank ${avg10.rankInField}/${avg10.fieldEntrantCountForMetric}`
+          : "rank n/a";
+      const gap = fmtDeltaSec(avg10.gapUserMinusFieldMeanSeconds);
+      const mean =
+        avg10.fieldMeanSeconds != null && Number.isFinite(avg10.fieldMeanSeconds)
+          ? avg10.fieldMeanSeconds.toFixed(3)
+          : "—";
+      const you =
+        avg10.userSeconds != null && Number.isFinite(avg10.userSeconds) ? avg10.userSeconds.toFixed(3) : "—";
+      const tag = avg10.meaningful ? "" : " (need ≥10 laps on your row for full avg top 10)";
+      lines.push(`Avg top 10: you ${you}s vs field avg ${mean}s (${gap} vs avg; ${rank})${tag}`);
+    }
+    const my = fs.matchedYou;
+    if (
+      my?.avgTop10Seconds != null &&
+      fs.fieldMedianAvgTop10Seconds != null &&
+      Number.isFinite(fs.fieldMedianAvgTop10Seconds)
+    ) {
+      const gapMed = my.avgTop10Seconds - fs.fieldMedianAvgTop10Seconds;
+      lines.push(
+        `Median benchmark: ${fmtDeltaSec(gapMed)} (your avg top 10 minus field median avg top 10)`
+      );
+    }
     for (const row of fs.paceVsFieldMeanAnalysis) {
+      if (row.metric === "avg_top_10") continue;
       const rank =
         row.rankInField != null && row.fieldEntrantCountForMetric >= 2
           ? `rank ${row.rankInField}/${row.fieldEntrantCountForMetric}`
@@ -52,7 +80,7 @@ export function paceVsFieldSummaryFromEngineerSummary(summary: EngineerRunSummar
 
   const parts: string[] = [];
   if (rank != null && nDrivers != null && nDrivers >= 2) {
-    parts.push(`${rank} of ${nDrivers} by best lap`);
+    parts.push(`${rank} of ${nDrivers} by best lap (lap-set only — link timing session for field-average sustained pace)`);
   }
   if (gapBest != null) {
     const sign = gapBest >= 0 ? "+" : "";

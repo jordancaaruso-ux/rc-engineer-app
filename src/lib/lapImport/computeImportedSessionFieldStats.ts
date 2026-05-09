@@ -26,6 +26,8 @@ export type ImportedSessionFieldStatsV1 = {
   field: {
     medianBestSeconds: number | null;
     medianAvgTop5Seconds: number | null;
+    /** Median of each entrant's avg-top-10 time (robust “typical” sustained pace in session). */
+    medianAvgTop10Seconds: number | null;
     minBestSeconds: number | null;
     /** Arithmetic mean of each metric across drivers with a finite value (session “field average”). */
     meanBestSeconds: number | null;
@@ -43,7 +45,8 @@ function lapRowsFromDriverLaps(nums: number[]): LapRow[] {
   }));
 }
 
-function medianSorted(sorted: number[]): number | null {
+/** Median of a sorted finite numeric array (ascending). Exported for normalizing older stored field stats. */
+export function medianSorted(sorted: number[]): number | null {
   if (sorted.length === 0) return null;
   const mid = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 1) return sorted[mid]!;
@@ -118,6 +121,7 @@ function buildImportedSessionStatsFromDriversArray(
     field: {
       medianBestSeconds: medianSorted(bestValues),
       medianAvgTop5Seconds: medianSorted(avg5Values),
+      medianAvgTop10Seconds: medianSorted(avg10Values),
       minBestSeconds: bestValues.length > 0 ? bestValues[0]! : null,
       meanBestSeconds: meanFiniteValues(bestValues),
       meanAvgTop5Seconds: meanFiniteValues(avg5Values),

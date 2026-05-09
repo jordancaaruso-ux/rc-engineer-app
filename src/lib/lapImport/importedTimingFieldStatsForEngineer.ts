@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import {
   IMPORTED_SESSION_FIELD_STATS_VERSION,
   computeImportedSessionFieldStatsFromPayload,
+  medianSorted,
   type ImportedSessionFieldDriverStatV1,
   type ImportedSessionFieldStatsV1,
 } from "@/lib/lapImport/computeImportedSessionFieldStats";
@@ -32,12 +33,17 @@ export function normalizeImportedSessionFieldStatsV1(stats: ImportedSessionField
     avgTop15Seconds: d.avgTop15Seconds ?? null,
   }));
   const f = stats.field;
+  const avg10SortedAsc = drivers
+    .map((x) => x.avgTop10Seconds)
+    .filter((v): v is number => v != null && Number.isFinite(v))
+    .sort((a, b) => a - b);
   return {
     ...stats,
     drivers,
     field: {
       medianBestSeconds: f.medianBestSeconds ?? null,
       medianAvgTop5Seconds: f.medianAvgTop5Seconds ?? null,
+      medianAvgTop10Seconds: f.medianAvgTop10Seconds ?? medianSorted(avg10SortedAsc),
       minBestSeconds: f.minBestSeconds ?? null,
       meanBestSeconds: f.meanBestSeconds ?? meanFromDrivers(drivers, (x) => x.bestLapSeconds),
       meanAvgTop5Seconds: f.meanAvgTop5Seconds ?? meanFromDrivers(drivers, (x) => x.avgTop5Seconds),
@@ -239,6 +245,7 @@ export function buildImportedSessionFieldStatsEngineerCompact(
     sessionBestAvgTop10Seconds: sessionBestAvg10,
     fieldMedianBestSeconds: stats.field.medianBestSeconds,
     fieldMedianAvgTop5Seconds: stats.field.medianAvgTop5Seconds,
+    fieldMedianAvgTop10Seconds: stats.field.medianAvgTop10Seconds ?? null,
     paceVsFieldMeanAnalysis,
     matchedYou,
   };

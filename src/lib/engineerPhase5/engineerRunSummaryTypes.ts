@@ -48,6 +48,8 @@ export type ImportedSessionFieldStatsEngineerCompactV1 = {
   sessionBestAvgTop10Seconds: number | null;
   fieldMedianBestSeconds: number | null;
   fieldMedianAvgTop5Seconds: number | null;
+  /** Median avg-top-10 across entrants (typical sustained pace). */
+  fieldMedianAvgTop10Seconds: number | null;
   /**
    * Per-metric: session field **mean** vs your value, gap, and rank (when multi-driver aggregates exist).
    * Null when fewer than two drivers or your row is unmatched.

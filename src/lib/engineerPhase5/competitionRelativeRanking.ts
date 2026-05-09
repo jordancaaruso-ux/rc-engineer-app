@@ -13,6 +13,10 @@ import {
   primaryNormsFromImportedLapSets,
 } from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
 import { prisma } from "@/lib/prisma";
+import type {
+  ImportedSessionFieldStatsEngineerCompactV1,
+  PaceVsFieldMetricId,
+} from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import type { SearchRunsForEngineerResultRow } from "@/lib/engineerPhase5/engineerRunSearchTools";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 
@@ -34,15 +38,19 @@ export type CompetitionRelativeRunRowV1 = {
   gapAvgTop5ToSessionBestAvg5Seconds: number | null;
   /** Gap vs fastest avg-top‑10 among competitors. */
   gapAvgTop10ToSessionBestAvg10Seconds: number | null;
+  /**
+   * User minus session **mean** for each metric (positive ⇒ slower than field average).
+   * Preferred for ranking “pace vs field”; falls back to session-best gaps above when null.
+   */
+  gapBestVsFieldMeanSeconds: number | null;
+  gapAvgTop5VsFieldMeanSeconds: number | null;
+  gapAvgTop10VsFieldMeanSeconds: number | null;
 };
 
 export type CompetitionRelativeRankingV1 = {
   version: typeof COMPETITION_RELATIVE_RANKING_VERSION;
   generatedAtIso: string;
-  /**
-   * How to interpret rows: positive gaps ⇒ slower than session-best competitor;
-   * `bestRelativeRunIds` lists runs tied for closest overall (best lap then avg‑5 then avg‑10 lexicographically).
-   */
+  /** Machine-readable guidance string (see `defaultNote`). */
   note: string;
   rows: CompetitionRelativeRunRowV1[];
   /** Run IDs tied for strongest relative pace (null if none eligible). */
@@ -50,7 +58,7 @@ export type CompetitionRelativeRankingV1 = {
 };
 
 const defaultNote =
-  "competition-relative summary for runs in scope. **Positive gaps ⇒ you were slower than the session-best competitor** for best lap / avg top 5 / avg top 10. “Best relative pace” prefers **smallest** gap on best lap, then avg top 5, then avg top 10. Only rows with **eligible:true** counted for bestRelativeRunIds.";
+  "competition-relative summary for runs in scope. **Positive gaps ⇒ slower.** Prefer **gapAvgTop10VsFieldMeanSeconds** (avg top 10 vs session **field average**) when present — it is the primary sustained-pace read; otherwise use gaps vs the session-best competitor on each metric. **bestRelativeRunIds** ties smallest avg-top‑10 vs field mean first, then avg‑5 vs field mean, then best vs field mean, finally legacy session-best gaps. Only **eligible:true** rows count.";
 
 function derivedStatsFromImportedSessionRow(row: {
   id: string;
@@ -105,16 +113,33 @@ function driverInputsFromPersistedImportedSets(
   return out.length >= 2 ? out : null;
 }
 
+function gapVsFieldMeanFromCompact(
+  compact: ImportedSessionFieldStatsEngineerCompactV1,
+  metric: PaceVsFieldMetricId
+): number | null {
+  const row = compact.paceVsFieldMeanAnalysis?.find((m) => m.metric === metric);
+  const g = row?.gapUserMinusFieldMeanSeconds;
+  return g != null && Number.isFinite(g) ? g : null;
+}
+
 function sortTriple(
   row: CompetitionRelativeRunRowV1
 ): [number, number, number] {
   if (!row.eligible)
     return [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
-  return [
-    row.gapBestToSessionBestSeconds ?? Number.POSITIVE_INFINITY,
-    row.gapAvgTop5ToSessionBestAvg5Seconds ?? Number.POSITIVE_INFINITY,
-    row.gapAvgTop10ToSessionBestAvg10Seconds ?? Number.POSITIVE_INFINITY,
-  ];
+  const g10 =
+    row.gapAvgTop10VsFieldMeanSeconds ??
+    row.gapAvgTop10ToSessionBestAvg10Seconds ??
+    Number.POSITIVE_INFINITY;
+  const g5 =
+    row.gapAvgTop5VsFieldMeanSeconds ??
+    row.gapAvgTop5ToSessionBestAvg5Seconds ??
+    Number.POSITIVE_INFINITY;
+  const gb =
+    row.gapBestVsFieldMeanSeconds ??
+    row.gapBestToSessionBestSeconds ??
+    Number.POSITIVE_INFINITY;
+  return [g10, g5, gb];
 }
 
 function cmpTriple(a: CompetitionRelativeRunRowV1, b: CompetitionRelativeRunRowV1): number {
@@ -204,6 +229,9 @@ export async function buildCompetitionRelativeRankingForRunScope(opts: {
         gapBestToSessionBestSeconds: null,
         gapAvgTop5ToSessionBestAvg5Seconds: null,
         gapAvgTop10ToSessionBestAvg10Seconds: null,
+        gapBestVsFieldMeanSeconds: null,
+        gapAvgTop5VsFieldMeanSeconds: null,
+        gapAvgTop10VsFieldMeanSeconds: null,
       });
       continue;
     }
@@ -221,26 +249,34 @@ export async function buildCompetitionRelativeRankingForRunScope(opts: {
         gapBestToSessionBestSeconds: null,
         gapAvgTop5ToSessionBestAvg5Seconds: null,
         gapAvgTop10ToSessionBestAvg10Seconds: null,
+        gapBestVsFieldMeanSeconds: null,
+        gapAvgTop5VsFieldMeanSeconds: null,
+        gapAvgTop10VsFieldMeanSeconds: null,
       });
       continue;
     }
 
     const compact = buildImportedSessionFieldStatsEngineerCompact(stats, norms);
     const you = compact.matchedYou;
-    const hasAnyGap =
+    const gMeanBest = gapVsFieldMeanFromCompact(compact, "best");
+    const gMean5 = gapVsFieldMeanFromCompact(compact, "avg_top_5");
+    const gMean10 = gapVsFieldMeanFromCompact(compact, "avg_top_10");
+    const hasMeanGap = gMeanBest != null || gMean5 != null || gMean10 != null;
+    const hasLegacyGap =
       you != null &&
       ((you.gapBestToSessionBestSeconds != null && Number.isFinite(you.gapBestToSessionBestSeconds)) ||
         (you.gapAvgTop5ToSessionBestAvg5Seconds != null &&
           Number.isFinite(you.gapAvgTop5ToSessionBestAvg5Seconds)) ||
         (you.gapAvgTop10ToSessionBestAvg10Seconds != null &&
           Number.isFinite(you.gapAvgTop10ToSessionBestAvg10Seconds)));
+    const hasAnyGap = hasMeanGap || hasLegacyGap;
 
     let ineligibleReason: string | null = null;
     if (!you) {
       ineligibleReason =
         "Multi-driver lap data exists but your row was not matched — mark your laps as primary when importing competitors or ensure LiveRC/driver naming aligns.";
     } else if (!hasAnyGap) {
-      ineligibleReason = "Insufficient laps to derive best vs session best or averages.";
+      ineligibleReason = "Insufficient laps to derive pace vs session field or vs session-best competitor.";
     }
 
     const eligible = compact.driverCount >= 2 && hasAnyGap && you != null;
@@ -256,14 +292,16 @@ export async function buildCompetitionRelativeRankingForRunScope(opts: {
       gapBestToSessionBestSeconds: you?.gapBestToSessionBestSeconds ?? null,
       gapAvgTop5ToSessionBestAvg5Seconds: you?.gapAvgTop5ToSessionBestAvg5Seconds ?? null,
       gapAvgTop10ToSessionBestAvg10Seconds: you?.gapAvgTop10ToSessionBestAvg10Seconds ?? null,
+      gapBestVsFieldMeanSeconds: gMeanBest,
+      gapAvgTop5VsFieldMeanSeconds: gMean5,
+      gapAvgTop10VsFieldMeanSeconds: gMean10,
     });
   }
 
   const eligibleSorted = [...rows.filter((r) => r.eligible)].sort(cmpTriple);
   const tieKey = eligibleSorted.length > 0 ? sortTriple(eligibleSorted[0]!) : null;
   const tieIds =
-    tieKey &&
-    !(tieKey[0] === Number.POSITIVE_INFINITY && tieKey[1] === Number.POSITIVE_INFINITY)
+    tieKey && tieKey[0] !== Number.POSITIVE_INFINITY
       ? eligibleSorted.filter((r) => {
           const [b1, b2, b3] = tieKey;
           const [r1, r2, r3] = sortTriple(r);
