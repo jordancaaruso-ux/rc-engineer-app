@@ -21,6 +21,7 @@ import {
 } from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
 import { computeResolvedScopeTireStepsV1 } from "@/lib/engineerPhase5/tireLifePriors/computeResolvedScopeTireSteps";
 import { buildSetupHandlingPaceBundle } from "@/lib/engineerPhase5/setupHandlingPaceBundle";
+import { parsePaceVsFieldRunDigestPayload } from "@/lib/engineerPhase5/buildPaceVsFieldRunDigestForUser";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,8 @@ export async function POST(request: Request) {
         includeRunCatalog?: unknown;
         /** IANA timezone for local-calendar run resolution (e.g. from Intl). */
         timeZone?: unknown;
+        /** Client-built digest from GET /api/engineer/pace-vs-field-digest (optional). */
+        paceVsFieldRunDigest?: unknown;
       }
     | null;
     const raw = Array.isArray(body?.messages) ? body!.messages : [];
@@ -151,6 +154,8 @@ export async function POST(request: Request) {
     const includeRunCatalog = body?.includeRunCatalog !== false;
     const runCatalog = includeRunCatalog ? await buildRunCatalogV1({ userId: user.id }) : null;
 
+    const paceVsFieldRunDigest = parsePaceVsFieldRunDigestPayload(body?.paceVsFieldRunDigest);
+
     const tireLifePriors = await buildTireLifePriorsForChatContext({
       userId: user.id,
       anchorRunId: anchorForRichContext,
@@ -193,6 +198,8 @@ export async function POST(request: Request) {
       resolvedScopeTireSteps,
       thingsToTry: basePacket.thingsToTry,
       thingsToDo: basePacket.thingsToDo,
+      /** Pre-scanned runs with meaningful avg top 10 vs session field mean (optional). */
+      paceVsFieldRunDigest,
     };
 
     const baseForMerge = {
@@ -205,6 +212,7 @@ export async function POST(request: Request) {
       setupHandlingPaceBundle,
       thingsToTry: basePacket.thingsToTry,
       thingsToDo: basePacket.thingsToDo,
+      paceVsFieldRunDigest,
     };
 
     const out = await generateEngineerChatReplyWithTools({

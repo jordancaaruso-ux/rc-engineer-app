@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
+import type { PaceVsFieldRunDigestV1 } from "@/lib/engineerPhase5/paceVsFieldRunDigestTypes";
 import type { RunCatalogV1 } from "@/lib/engineerPhase5/runCatalogTypes";
 import { engineerQuickPromptDisabled, engineerQuickPromptsForSurface } from "@/lib/engineerQuickPrompts";
 
@@ -49,9 +50,16 @@ export function EngineerChatPanel({
   const [input, setInput] = useState("");
   const [catalogBanner, setCatalogBanner] = useState<RunCatalogV1 | null>(null);
   const [catalogBannerErr, setCatalogBannerErr] = useState<string | null>(null);
+  const [paceDigest, setPaceDigest] = useState<PaceVsFieldRunDigestV1 | null>(null);
+  const [paceDigestLoading, setPaceDigestLoading] = useState(false);
+  const [paceDigestErr, setPaceDigestErr] = useState<string | null>(null);
+  const [includePaceDigestInChat, setIncludePaceDigestInChat] = useState(true);
+  const [paceScopeCarOnly, setPaceScopeCarOnly] = useState(Boolean(runIdFromUrl));
 
   const messagesRef = useRef<ChatMessage[]>([]);
   const lastQueuedId = useRef<number | null>(null);
+  const paceDigestRef = useRef<PaceVsFieldRunDigestV1 | null>(null);
+  const includePaceDigestRef = useRef(true);
   const onQueuedConsumedRef = useRef(onQueuedPromptConsumed);
   useEffect(() => {
     onQueuedConsumedRef.current = onQueuedPromptConsumed;
@@ -90,6 +98,49 @@ export function EngineerChatPanel({
     };
   }, [includeRunCatalog]);
 
+  useEffect(() => {
+    paceDigestRef.current = paceDigest;
+  }, [paceDigest]);
+
+  useEffect(() => {
+    includePaceDigestRef.current = includePaceDigestInChat;
+  }, [includePaceDigestInChat]);
+
+  async function loadPaceDigest() {
+    setPaceDigestLoading(true);
+    setPaceDigestErr(null);
+    try {
+      const qs = new URLSearchParams();
+      if (runIdFromUrl && paceScopeCarOnly) {
+        qs.set("scope", "car");
+        qs.set("anchorRunId", runIdFromUrl);
+      } else {
+        qs.set("scope", "account");
+        if (runIdFromUrl) qs.set("anchorRunId", runIdFromUrl);
+      }
+      const res = await fetch(`/api/engineer/pace-vs-field-digest?${qs}`, { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPaceDigestErr((data as { error?: string }).error ?? "Could not load digest");
+        setPaceDigest(null);
+        return;
+      }
+      const d = (data as { digest?: PaceVsFieldRunDigestV1 }).digest;
+      if (!d || d.version !== 1) {
+        setPaceDigestErr("Invalid digest response");
+        setPaceDigest(null);
+        return;
+      }
+      setPaceDigest(d);
+      setIncludePaceDigestInChat(true);
+    } catch {
+      setPaceDigestErr("Could not load digest");
+      setPaceDigest(null);
+    } finally {
+      setPaceDigestLoading(false);
+    }
+  }
+
   async function submitConversation(next: ChatMessage[]) {
     setChatBusy(true);
     setChatErr(null);
@@ -105,6 +156,9 @@ export function EngineerChatPanel({
           ...(patternDigest && includePatternDigestInChat ? { patternDigest } : {}),
           includeRunCatalog,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          ...(paceDigestRef.current && includePaceDigestRef.current
+            ? { paceVsFieldRunDigest: paceDigestRef.current }
+            : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -214,6 +268,7 @@ export function EngineerChatPanel({
                 hasRunId: Boolean(runIdFromUrl),
                 hasCompareRunId: Boolean(compareRunIdFromUrl),
                 hasPatternDigest: patternDigest != null,
+                hasPaceVsFieldDigest: paceDigest != null,
               });
               let hint = def.label;
               if (dis) {
@@ -221,6 +276,8 @@ export function EngineerChatPanel({
                 else if (def.requiresCompare && !compareRunIdFromUrl) hint = "Pick a compare run in Compare & trend below first";
                 else if (def.requiresPatternDigest && !patternDigest)
                   hint = "Load trend digest in Compare & trend below first";
+                else if (def.requiresPaceVsFieldDigest && !paceDigest)
+                  hint = "Load pace vs field digest below first";
               }
               return (
                 <button
@@ -289,6 +346,75 @@ export function EngineerChatPanel({
           </span>
         </div>
 
+        <div className="rounded-md border border-border/80 bg-muted/25 px-2.5 py-2 space-y-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Pace vs field (linked timing)
+          </div>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Lists runs where avg top 10 vs the <span className="text-foreground/90">session field mean</span> is
+            meaningful (multi-driver import, matched row, ≥10 laps). Gap = your avg10 − mean (negative = faster than
+            average).
+          </p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              onClick={() => void loadPaceDigest()}
+              disabled={paceDigestLoading || chatBusy}
+              className={chatQuickBtnClass}
+            >
+              {paceDigestLoading ? "Loading…" : "Load pace vs field digest"}
+            </button>
+            {runIdFromUrl ? (
+              <label className="flex items-center gap-2 text-[11px] text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-primary shrink-0"
+                  checked={paceScopeCarOnly}
+                  onChange={(e) => setPaceScopeCarOnly(e.target.checked)}
+                />
+                <span>Limit to this car</span>
+              </label>
+            ) : null}
+          </div>
+          <label
+            className={cn(
+              "flex items-center gap-2 text-[11px] text-foreground cursor-pointer",
+              !paceDigest && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary shrink-0"
+              checked={includePaceDigestInChat && Boolean(paceDigest)}
+              disabled={!paceDigest}
+              onChange={(e) => setIncludePaceDigestInChat(e.target.checked)}
+            />
+            <span>Attach pace vs field digest to chat</span>
+          </label>
+          {paceDigestErr ? <div className="text-destructive text-[11px]">{paceDigestErr}</div> : null}
+          {paceDigest ? (
+            <div className="text-[11px] text-muted-foreground leading-snug">
+              <span className="text-foreground font-medium">{paceDigest.includedRunCount}</span> run(s) with valid avg
+              top 10 vs field mean (scanned {paceDigest.scannedRunCount} with linked timing
+              {paceDigest.scope === "car" ? ", this car only" : ""}).
+              {paceDigest.omittedAfterCap > 0 ? (
+                <span className="text-amber-600 dark:text-amber-500">
+                  {" "}
+                  {paceDigest.omittedAfterCap} more qualifying run(s) not included (table capped at 48 rows,
+                  best-vs-field first).
+                </span>
+              ) : null}
+              {paceDigest.truncatedScan ? (
+                <span className="text-amber-600 dark:text-amber-500">
+                  {" "}
+                  More linked-timing runs exist than were scanned.
+                </span>
+              ) : null}
+              {includePaceDigestInChat ? <> Sent with each chat request while enabled.</> : <> Not sent — enable checkbox to attach.</>}
+            </div>
+          ) : null}
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <label className="flex items-center gap-2 text-[11px] text-foreground cursor-pointer">
             <input
@@ -302,7 +428,7 @@ export function EngineerChatPanel({
           <span className="sm:text-right">Grounds replies in real run ids and dates when enabled.</span>
         </div>
 
-        {(runIdFromUrl && compareRunIdFromUrl) || runIdFromUrl || patternDigest ? (
+        {(runIdFromUrl && compareRunIdFromUrl) || runIdFromUrl || patternDigest || paceDigest ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1 rounded-md bg-muted/40 px-2.5 py-2 border border-border/60">
             {runIdFromUrl && compareRunIdFromUrl ? (
               <span>
@@ -323,6 +449,13 @@ export function EngineerChatPanel({
                 ) : (
                   <> — not sent to chat (enable checkbox above).</>
                 )}
+              </span>
+            ) : null}
+            {paceDigest ? (
+              <span>
+                Pace vs field digest:{" "}
+                <span className="text-foreground font-medium">{paceDigest.includedRunCount}</span> row(s)
+                {includePaceDigestInChat ? <> — included in chat.</> : <> — not sent (enable attach above).</>}
               </span>
             ) : null}
           </div>

@@ -19,7 +19,7 @@ export const ENGINEER_PROMPT_SANITY_CHECK =
   "Scan the anchored run context for anything inconsistent or worth double-checking (setup vs car template, tires vs session, missing track, thin lap data). List issues briefly; if nothing stands out, say so.";
 
 export const ENGINEER_PROMPT_WHAT_CONTEXT =
-  "Briefly list what structured context you have for this chat (focused runs, setupVsSpread, conditionalSetupEmpirical, patternDigest if any, run catalog if enabled). Do not invent data—only what is actually in context.";
+  "Briefly list what structured context you have for this chat (focused runs, setupVsSpread, conditionalSetupEmpirical, patternDigest if any, paceVsFieldRunDigest if attached, run catalog if enabled). Do not invent data—only what is actually in context.";
 
 export const ENGINEER_PROMPT_EXPLAIN_LAP_DELTA_SETUP =
   "The URL has both primary and compare runs. Using focusedRunPair.lapComparison and setupComparison together, discuss which setup differences might plausibly relate to the lap-time delta—use cautious language (correlation not proof). If lap or setup data is missing, say what is absent.";
@@ -29,6 +29,9 @@ export const ENGINEER_PROMPT_PRIORITIES_BEFORE_NEXT_OUTING =
 
 export const ENGINEER_PROMPT_TREND_ACROSS_RUNS =
   "patternDigest is in context: describe trends across those runs (pace vs setup keys that changed). Reference run order oldest→newest. If digest is thin, say so and what extra runs would help.";
+
+export const ENGINEER_PROMPT_PACE_VS_FIELD_INDEX =
+  "paceVsFieldRunDigest is attached. Summarize it for me: every row with runId, car, track, event/session label, my avg top 10, field mean, gap (avg10 minus session field mean — negative = faster than average), and rank when present. Sort order in JSON is already best-vs-field first. Explicitly name the single best (most negative gap) and worst (most positive gap) runIds. If omittedAfterCap > 0 or truncatedScan is true, say more runs existed than listed. If rows is empty, say no runs qualified (need linked multi-driver timing import and ≥10 included laps for avg top 10). Do not invent gaps for runs not in rows.";
 
 export const ENGINEER_PROMPT_LEARN_PARAMETERS =
   "Using richEngineerContext.setupVsSpread and vehicleDynamicsKb, pick up to 4 chassis tuning parameters from the anchored run where I have values but weak or missing spread bands (no_spread_data / not_numeric) or where positionBand is below_typical or above_typical. For each: what the adjustment does in plain RC terms, typical tradeoffs, and what to verify on track. If setupVsSpread is empty, say that a focused run with setup data is needed. Do not discuss motor, pinion, wing, or ESC.";
@@ -44,6 +47,8 @@ export type EngineerQuickPromptDefinition = {
   requiresCompare?: boolean;
   /** If true, disable unless pattern digest was loaded into chat */
   requiresPatternDigest?: boolean;
+  /** If true, disable unless client attached pace-vs-field digest to chat. */
+  requiresPaceVsFieldDigest?: boolean;
   /**
    * If false, button stays enabled without `runId` in the URL.
    * Omitted means a focused run is required for a useful answer.
@@ -126,6 +131,14 @@ const DEFS: EngineerQuickPromptDefinition[] = [
     requiresRunId: false,
     surfaces: ["chat_panel"],
   },
+  {
+    id: "pace_vs_field_index",
+    label: "Pace vs field index",
+    prompt: ENGINEER_PROMPT_PACE_VS_FIELD_INDEX,
+    requiresPaceVsFieldDigest: true,
+    requiresRunId: false,
+    surfaces: ["chat_panel"],
+  },
 ];
 
 export function engineerQuickPromptsForSurface(surface: EngineerQuickPromptSurface): EngineerQuickPromptDefinition[] {
@@ -138,10 +151,16 @@ export function getEngineerQuickPromptById(id: string): EngineerQuickPromptDefin
 
 export function engineerQuickPromptDisabled(
   def: EngineerQuickPromptDefinition,
-  ctx: { hasRunId: boolean; hasCompareRunId: boolean; hasPatternDigest: boolean }
+  ctx: {
+    hasRunId: boolean;
+    hasCompareRunId: boolean;
+    hasPatternDigest: boolean;
+    hasPaceVsFieldDigest?: boolean;
+  }
 ): boolean {
   if (def.requiresRunId !== false && !ctx.hasRunId) return true;
   if (def.requiresCompare && !ctx.hasCompareRunId) return true;
   if (def.requiresPatternDigest && !ctx.hasPatternDigest) return true;
+  if (def.requiresPaceVsFieldDigest && !ctx.hasPaceVsFieldDigest) return true;
   return false;
 }
