@@ -5,6 +5,7 @@ import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { formatEventDate } from "@/lib/formatDate";
 
 type TrackOption = { id: string; name: string; location?: string | null };
@@ -317,7 +318,7 @@ export function EventList({
             type="submit"
             disabled={adding || !trackId.trim() || dateRangeInvalid}
             className={cn(
-              "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+              buttonLinkClassName("primary"),
               (adding || !trackId.trim() || dateRangeInvalid) && "opacity-70 pointer-events-none"
             )}
           >

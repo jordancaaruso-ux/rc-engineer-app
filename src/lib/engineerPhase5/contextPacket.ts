@@ -39,6 +39,13 @@ import {
 import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
 import { resolveImportedTimingFieldStatsForEngineer } from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
 import type { ImportedSessionFieldStatsEngineerCompactV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import type { TireLifeFocusedCompareNudgeV1 } from "@/lib/engineerPhase5/tireLifePriors/tireLifePriorsTypes";
+import { loadTireStepAggregatesAllTracks } from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
+import { buildExpectedWearChainNudge } from "@/lib/engineerPhase5/tireLifePriors/tireWearChainMath";
+import {
+  buildRunPacingContextV1,
+  type RunPacingContextV1,
+} from "@/lib/engineerPhase5/runPacingContext";
 
 export type EngineerContextPacketV1 = {
   version: 1;
@@ -464,6 +471,29 @@ export type EngineerFocusedRunPairContext = {
    * When the primary links `ImportedLapTimeSession` with aggregates: gaps vs session-best best / avg top 5 / 10.
    */
   importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null;
+  /** Tire wear slot + field pace snapshot for the focused primary run. */
+  primaryRunPacingContext: RunPacingContextV1;
+  /** Same for compare when present (may lack timing aggregates). */
+  compareRunPacingContext: RunPacingContextV1 | null;
+  /**
+   * Pair-level tire index / historic wear expectation when two runs are selected.
+   * Delta convention: primary − compare on tire run index when both share the same tire set.
+   */
+  pairPacingContext: null | {
+    sameTireWearSlot: boolean;
+    tireRunDeltaPrimaryMinusCompare: number | null;
+    expectedWearVsHistoricSteps: TireLifeFocusedCompareNudgeV1 | null;
+    /**
+     * When primary tire index < compare (primary fresher), chain sums are not produced here
+     * (historic steps are defined for wearing forward along indices).
+     */
+    expectedWearDirectionNote: string | null;
+  };
+  /** Raw structured handling logs for deterministic bundles (primary vs compare). */
+  handlingAssessmentJsonByRun: {
+    primary: unknown;
+    compare: unknown | null;
+  };
   /**
    * vehicle-dynamics KB sections chosen by keyword overlap with changed setup keys—use for handling
    * text alongside rcEffectHints (compare→primary direction is authoritative).
@@ -534,7 +564,7 @@ const focusedRunSelect = {
   car: { select: { id: true, name: true } },
   track: { select: { name: true } },
   event: { select: { id: true, name: true } },
-  tireSet: { select: { label: true } },
+  tireSet: { select: { label: true, initialRunCount: true } },
   setupSnapshot: { select: { data: true } },
   importedLapTimeSessionId: true,
   importedLapSets: {
@@ -840,6 +870,82 @@ export async function buildFocusedRunPairContext(
     importedSessionFieldStats = r.compact;
   }
 
+  let compareImportedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null = null;
+  if (compare?.importedLapTimeSessionId) {
+    const r = await resolveImportedTimingFieldStatsForEngineer({
+      userId,
+      importedLapTimeSessionId: compare.importedLapTimeSessionId,
+      importedLapSetsForMatch: (compare.importedLapSets ?? []).map((s) => ({
+        driverName: s.driverName,
+        isPrimaryUser: s.isPrimaryUser,
+      })),
+    });
+    compareImportedSessionFieldStats = r.compact;
+  }
+
+  const primaryRunPacingContext = buildRunPacingContextV1({
+    tireSetId: primary.tireSetId,
+    tireSetLabel: primary.tireSet?.label ?? null,
+    initialRunCount: primary.tireSet?.initialRunCount ?? 0,
+    tireRunNumber: primary.tireRunNumber,
+    importedSessionFieldStats,
+  });
+
+  const compareRunPacingContext = compare
+    ? buildRunPacingContextV1({
+        tireSetId: compare.tireSetId,
+        tireSetLabel: compare.tireSet?.label ?? null,
+        initialRunCount: compare.tireSet?.initialRunCount ?? 0,
+        tireRunNumber: compare.tireRunNumber,
+        importedSessionFieldStats: compareImportedSessionFieldStats,
+      })
+    : null;
+
+  let pairPacingContext: EngineerFocusedRunPairContext["pairPacingContext"] = null;
+  if (compare && compareSlice) {
+    const sameSet = Boolean(
+      primary.tireSetId && compare.tireSetId && primary.tireSetId === compare.tireSetId
+    );
+    const sameTireWearSlot =
+      sameSet && primarySlice.tireRunNumber === compareSlice.tireRunNumber;
+    const tireRunDeltaPrimaryMinusCompare = sameSet
+      ? primarySlice.tireRunNumber - compareSlice.tireRunNumber
+      : null;
+
+    let expectedWearVsHistoricSteps: TireLifeFocusedCompareNudgeV1 | null = null;
+    let expectedWearDirectionNote: string | null = null;
+
+    if (sameSet && primary.tireSetId) {
+      if (primarySlice.tireRunNumber > compareSlice.tireRunNumber) {
+        const steps = await loadTireStepAggregatesAllTracks(userId, primary.tireSetId);
+        if (steps) {
+          const nudge = buildExpectedWearChainNudge(
+            steps,
+            compareSlice.tireRunNumber,
+            primarySlice.tireRunNumber
+          );
+          const anyData =
+            nudge &&
+            (nudge.stepsWithDataBest > 0 ||
+              nudge.stepsWithDataAvgTop5 > 0 ||
+              nudge.stepsWithDataAvgTop10 > 0 ||
+              nudge.stepsWithDataAvgTop15 > 0);
+          if (anyData) expectedWearVsHistoricSteps = nudge;
+        }
+      } else if (primarySlice.tireRunNumber < compareSlice.tireRunNumber) {
+        expectedWearDirectionNote =
+          "Primary tire run index is lower than compare (fresher tires on primary vs compare). Historic step medians are accumulated for wearing forward (compare index → higher index on the same set); reverse direction is not summarized here.";
+      }
+    }
+
+    pairPacingContext = {
+      sameTireWearSlot,
+      tireRunDeltaPrimaryMinusCompare,
+      expectedWearVsHistoricSteps,
+      expectedWearDirectionNote,
+    };
+  }
+
   return {
     primaryRunId: primary.id,
     compareRunId: compareSlice?.id ?? null,
@@ -852,5 +958,12 @@ export async function buildFocusedRunPairContext(
     importedDriversOnPrimary,
     fieldImportSession,
     importedSessionFieldStats,
+    primaryRunPacingContext,
+    compareRunPacingContext,
+    pairPacingContext,
+    handlingAssessmentJsonByRun: {
+      primary: primary.handlingAssessmentJson ?? null,
+      compare: compare?.handlingAssessmentJson ?? null,
+    },
   };
 }

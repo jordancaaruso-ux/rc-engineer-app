@@ -20,6 +20,10 @@ import {
   type ConditionalSetupEmpiricalV1,
 } from "@/lib/engineerPhase5/conditionalSetupForEngineer";
 import type { ImportedSessionFieldStatsEngineerCompactV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import {
+  buildRunPacingContextV1,
+  type RunPacingContextV1,
+} from "@/lib/engineerPhase5/runPacingContext";
 import { resolveImportedTimingFieldStatsForEngineer } from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
 
 export type EngineerRichContextV1 = {
@@ -56,6 +60,8 @@ export type EngineerRichContextV1 = {
    * Linked `ImportedLapTimeSession.fieldStatsJson` on this run (full parsed field); null when unlinked or empty.
    */
   importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null;
+  /** Tire wear slot + competition-relative avg-top-10 headline for the anchor run. */
+  runPacingContext: RunPacingContextV1 | null;
   setupVsSpread: {
     note: string;
     siblingCarCount: number;
@@ -139,7 +145,7 @@ const runSelectRich = {
     select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
   },
   event: { select: { id: true, raceClass: true } },
-  tireSet: { select: { id: true, label: true, setNumber: true } },
+  tireSet: { select: { id: true, label: true, setNumber: true, initialRunCount: true } },
   importedLapSets: {
     select: {
       driverName: true,
@@ -193,6 +199,7 @@ export async function buildEngineerRichContextV1(params: {
       tires: null,
       track: null,
       importedSessionFieldStats: null,
+      runPacingContext: null,
       setupVsSpread: {
         note: "No run anchored — add ?runId= on the Engineer page or log a run for car/setup/track context.",
         siblingCarCount: 0,
@@ -333,6 +340,14 @@ export async function buildEngineerRichContextV1(params: {
     importedSessionFieldStats = r.compact;
   }
 
+  const runPacingContext = buildRunPacingContextV1({
+    tireSetId: run.tireSetId,
+    tireSetLabel: run.tireSet?.label ?? null,
+    initialRunCount: run.tireSet?.initialRunCount ?? 0,
+    tireRunNumber: run.tireRunNumber,
+    importedSessionFieldStats,
+  });
+
   return {
     version: 1,
     generatedAtIso: new Date().toISOString(),
@@ -366,6 +381,7 @@ export async function buildEngineerRichContextV1(params: {
         }
       : null,
     importedSessionFieldStats,
+    runPacingContext,
     setupVsSpread: {
       note,
       siblingCarCount: spread.siblingCarIds.length,

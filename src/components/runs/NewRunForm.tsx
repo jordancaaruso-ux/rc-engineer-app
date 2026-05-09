@@ -5,6 +5,7 @@ import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
@@ -2511,7 +2512,7 @@ export function NewRunForm(props: {
                   isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate)
                 }
                 className={cn(
-                  "rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+                  buttonLinkClassName("primary"),
                   (creatingEvent ||
                     !newEventName.trim() ||
                     !newEventTrackId ||
@@ -2902,7 +2903,7 @@ export function NewRunForm(props: {
                 <button
                   type="button"
                   className={cn(
-                    "rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+                    buttonLinkClassName("primary"),
                     (!newTireLabel.trim() || creatingTireSet) && "opacity-60 pointer-events-none"
                   )}
                   onClick={(e) => createTireSet(e)}
@@ -3021,7 +3022,7 @@ export function NewRunForm(props: {
                 <button
                   type="button"
                   className={cn(
-                    "rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+                    buttonLinkClassName("primary"),
                     (!newBatteryLabel.trim() || creatingBattery) && "opacity-60 pointer-events-none"
                   )}
                   onClick={(e) => createBattery(e)}
@@ -3702,7 +3703,8 @@ export function NewRunForm(props: {
               <button
                 type="button"
                 className={cn(
-                  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+                  buttonLinkClassName("primary"),
+                  "gap-1.5",
                   (!canSave || saving) && "opacity-70 pointer-events-none"
                 )}
                 onClick={(e) => saveRun(e, "completed")}
@@ -3725,7 +3727,8 @@ export function NewRunForm(props: {
               <button
                 type="button"
                 className={cn(
-                  "inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted/60",
+                  buttonLinkClassName("outline"),
+                  "gap-1.5 shadow-sm",
                   (!canSave || saving) && "opacity-70 pointer-events-none"
                 )}
                 onClick={(e) => saveRun(e, "draft")}
@@ -3738,7 +3741,8 @@ export function NewRunForm(props: {
               <button
                 type="button"
                 className={cn(
-                  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+                  buttonLinkClassName("primary"),
+                  "gap-1.5",
                   (!canSave || saving) && "opacity-70 pointer-events-none"
                 )}
                 onClick={(e) => saveRun(e, "completed")}

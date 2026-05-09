@@ -310,8 +310,8 @@ body {
   @apply text-base tracking-tight text-foreground;
 }
 
-/* Central heading/title standard: bold + italic + uppercase. */
-:where(h1, h2, h3, h4, h5, h6, .page-title, .ui-title) {
+/* Page chrome + form section labels: bold + italic + uppercase (Montserrat). */
+:where(.page-title, .ui-title) {
   font-family: var(--font-sans), system-ui, sans-serif;
   font-weight: 700;
   font-style: italic;

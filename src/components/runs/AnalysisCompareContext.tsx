@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 
 export type AnalysisCompareContextValue = {
   targetRunId: string | null;
@@ -168,10 +169,7 @@ export function AnalysisCompareBar() {
         </div>
         <div className="shrink-0 flex flex-col gap-1">
           {engineerCompareHref ? (
-            <Link
-              href={engineerCompareHref}
-              className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition"
-            >
+            <Link href={engineerCompareHref} className={buttonLinkClassName("primary")}>
               Compare with Engineer
             </Link>
           ) : (

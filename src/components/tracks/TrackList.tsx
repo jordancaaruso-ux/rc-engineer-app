@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type Track = { id: string; name: string; location?: string | null };
 
@@ -91,7 +93,7 @@ export function TrackList({
             type="submit"
             disabled={adding}
             className={cn(
-              "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+              buttonLinkClassName("primary"),
               adding && "opacity-70 pointer-events-none"
             )}
           >
@@ -108,9 +110,9 @@ export function TrackList({
       <div>
         <div className="ui-title text-sm text-muted-foreground mb-2">Tracks</div>
         {tracks.length === 0 ? (
-          <div className="rounded-lg border border-border bg-muted/70 p-4 text-sm text-muted-foreground">
+          <CardPanel className="bg-muted/70 text-sm text-muted-foreground">
             No tracks yet. Add one above or from Log your run.
-          </div>
+          </CardPanel>
         ) : (
           <ul className="rounded-lg border border-border divide-y divide-border">
             {tracks.map((t) => (

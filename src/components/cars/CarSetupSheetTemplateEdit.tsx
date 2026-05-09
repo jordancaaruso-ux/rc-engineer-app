@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { labelForSetupSheetTemplate, SETUP_SHEET_TEMPLATE_OPTIONS } from "@/lib/setupSheetTemplateId";
 
 export function CarSetupSheetTemplateEdit({
@@ -71,7 +72,7 @@ export function CarSetupSheetTemplateEdit({
             disabled={saving}
             onClick={handleSave}
             className={cn(
-              "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+              buttonLinkClassName("primary"),
               saving && "opacity-70 pointer-events-none"
             )}
           >

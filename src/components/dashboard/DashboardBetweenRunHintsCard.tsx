@@ -1,6 +1,8 @@
-import Link from "next/link";
 import { BetweenRunRecentSessionsThings } from "@/components/betweenRunHints/BetweenRunRecentSessionsThings";
 import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { HeroPanel } from "@/components/ui/HeroPanel";
+import { SectionMetaInline, SectionTitle } from "@/components/ui/SectionTitle";
 import { cn } from "@/lib/utils";
 
 function scopeLine(h: BetweenRunHintPayload): string {
@@ -20,27 +22,19 @@ export function DashboardBetweenRunHintsCard({
   if (!hint) return null;
 
   return (
-    <div
-      className={cn(
-        "rounded-xl border border-border bg-card/80 p-4 shadow-sm",
-        className
-      )}
-    >
+    <HeroPanel className={cn(className)}>
       <div className="flex flex-col gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Things to consider — Engineer</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground leading-snug">{scopeLine(hint)}</p>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <SectionTitle>Things to consider — Engineer</SectionTitle>
+          <SectionMetaInline>{scopeLine(hint)}</SectionMetaInline>
         </div>
         <BetweenRunRecentSessionsThings sessions={hint.recentSessions ?? []} className="mt-2" />
         <div>
-          <Link
-            href={hint.engineerHref}
-            className="inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105"
-          >
+          <ButtonLink href={hint.engineerHref} variant="primary">
             Open Engineer
-          </Link>
+          </ButtonLink>
         </div>
       </div>
-    </div>
+    </HeroPanel>
   );
 }

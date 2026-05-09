@@ -20,6 +20,7 @@ import {
   buildTireLifePriorsForChatContext,
 } from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
 import { computeResolvedScopeTireStepsV1 } from "@/lib/engineerPhase5/tireLifePriors/computeResolvedScopeTireSteps";
+import { buildSetupHandlingPaceBundle } from "@/lib/engineerPhase5/setupHandlingPaceBundle";
 
 export const dynamic = "force-dynamic";
 
@@ -156,6 +157,8 @@ export async function POST(request: Request) {
       focusedPair: focusedPairForTirePriors(focusedRunPair),
     });
 
+    const setupHandlingPaceBundle = buildSetupHandlingPaceBundle(focusedRunPair);
+
     const resolvedScopeTireSteps =
       resolvedRunScope &&
       !resolvedRunScope.ambiguousMeetingScope &&
@@ -181,6 +184,8 @@ export async function POST(request: Request) {
       runCatalog,
       /** Learned k→k+1 tire-run pace medians (best, avg top 5/10/15) on this tire set. */
       tireLifePriors,
+      /** Deterministic setup vs lap vs feel correlation facts for focused pair chat (null without focused pair). */
+      setupHandlingPaceBundle,
       /**
        * Pooled tire run **1→2** pace medians across multiple sets in resolvedRunScope, by event×track.
        * Null when scope missing, ambiguous, or too few valid pairs.
@@ -197,6 +202,7 @@ export async function POST(request: Request) {
       runCatalog,
       tireLifePriors,
       resolvedScopeTireSteps,
+      setupHandlingPaceBundle,
       thingsToTry: basePacket.thingsToTry,
       thingsToDo: basePacket.thingsToDo,
     };
@@ -230,6 +236,7 @@ export async function POST(request: Request) {
           focusedRunPair: focused,
           richEngineerContext: rich,
           tireLifePriors: reTire,
+          setupHandlingPaceBundle: buildSetupHandlingPaceBundle(focused),
         };
       },
     });

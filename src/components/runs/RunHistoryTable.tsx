@@ -28,6 +28,7 @@ import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "
 import type { LapRow } from "@/lib/lapAnalysis";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 import { EngineerPaceVsFieldPanel } from "@/components/engineer/EngineerPaceVsFieldPanel";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
@@ -138,10 +139,6 @@ function LapStatChip({ label, value, title }: { label: string; value: string; ti
 
 /** Main sessions grid columns (excluding drag handle, member, compare pair). */
 const SESSION_TABLE_BODY_COLS = 9;
-
-/** Primary action buttons (analyse setup / lap times) — identical styling */
-const analyseActionButtonClass =
-  "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition";
 
 function setupFieldLabel(key: string): string {
   const f = DEFAULT_SETUP_FIELDS.find((d) => d.key === key);
@@ -903,7 +900,7 @@ function RunDetail({
                 {allowRunMutations ? (
                   <Link
                     href={`/runs/${encodeURIComponent(run.id)}/edit`}
-                    className={cn(analyseActionButtonClass, "no-underline")}
+                    className={cn(buttonLinkClassName("primary"), "no-underline")}
                     onClick={(e) => e.stopPropagation()}
                   >
                     Edit run
@@ -912,7 +909,7 @@ function RunDetail({
                 <button
                   type="button"
                   onClick={() => setShowLapAnalysis((v) => !v)}
-                  className={cn("shrink-0", analyseActionButtonClass)}
+                  className={cn("shrink-0", buttonLinkClassName("primary"))}
                 >
                   Analyse lap times
                 </button>
@@ -989,7 +986,7 @@ function RunDetail({
         <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <Link
             href={engineerVsPreviousHref ?? engineerThisRunHref}
-            className={cn(analyseActionButtonClass, "no-underline")}
+            className={cn(buttonLinkClassName("primary"), "no-underline")}
             title="Open this run in the Engineer tab for full setup + lap analysis"
           >
             Analyse setup

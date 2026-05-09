@@ -8,10 +8,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
-
-function btnPrimary(className = "") {
-  return `inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
-}
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 
 function promptHref(p: DetectedRunPrompt): string {
   if (p.promptKind === "finish" && p.runId) {
@@ -123,7 +120,10 @@ export function DetectedRunPromptsBanner({
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-col gap-1.5 self-start sm:mt-0.5 sm:items-end">
-                <Link href={promptHref(p)} className={`${btnPrimary()} w-full sm:w-auto text-center`}>
+                <Link
+                  href={promptHref(p)}
+                  className={cn(buttonLinkClassName("primary"), "w-full sm:w-auto text-center")}
+                >
                   {title}
                 </Link>
                 <button

@@ -13,6 +13,7 @@ import type {
   TireLifePriorsV1,
   TireLifeStepAggV1,
 } from "@/lib/engineerPhase5/tireLifePriors/tireLifePriorsTypes";
+import { buildExpectedWearChainNudge } from "@/lib/engineerPhase5/tireLifePriors/tireWearChainMath";
 
 const MAX_RUNS = 420;
 const MIN_PAIRS_PUBLISH = 2;
@@ -165,61 +166,6 @@ function buildStepsFromPairs(
   return aggregateSteps(pairObjs);
 }
 
-function sumChainMedians(
-  steps: TireLifeStepAggV1[],
-  fromRun: number,
-  toRun: number,
-  metric: "best" | "avg5" | "avg10" | "avg15"
-): { sum: number | null; withData: number; total: number } {
-  if (toRun <= fromRun) return { sum: null, withData: 0, total: 0 };
-  let total = 0;
-  let withData = 0;
-  let sum = 0;
-  for (let k = fromRun; k < toRun; k++) {
-    total++;
-    const row = steps.find((s) => s.fromTireRun === k && s.toTireRun === k + 1);
-    let med: number | null = null;
-    if (row) {
-      if (metric === "best") med = row.bestLapDeltaMedianSeconds;
-      else if (metric === "avg5") med = row.avgTop5DeltaMedianSeconds;
-      else if (metric === "avg10") med = row.avgTop10DeltaMedianSeconds;
-      else med = row.avgTop15DeltaMedianSeconds;
-    }
-    if (med != null && Number.isFinite(med)) {
-      sum += med;
-      withData++;
-    }
-  }
-  if (withData === 0) return { sum: null, withData: 0, total };
-  return { sum, withData, total };
-}
-
-function buildFocusedNudge(
-  stepsAllTracks: TireLifeStepAggV1[],
-  compareTn: number,
-  primaryTn: number
-): TireLifeFocusedCompareNudgeV1 | null {
-  if (primaryTn <= compareTn) return null;
-  const totalSteps = primaryTn - compareTn;
-  const b = sumChainMedians(stepsAllTracks, compareTn, primaryTn, "best");
-  const f5 = sumChainMedians(stepsAllTracks, compareTn, primaryTn, "avg5");
-  const f10 = sumChainMedians(stepsAllTracks, compareTn, primaryTn, "avg10");
-  const f15 = sumChainMedians(stepsAllTracks, compareTn, primaryTn, "avg15");
-  return {
-    compareTireRun: compareTn,
-    primaryTireRun: primaryTn,
-    totalSteps,
-    stepsWithDataBest: b.withData,
-    stepsWithDataAvgTop5: f5.withData,
-    stepsWithDataAvgTop10: f10.withData,
-    stepsWithDataAvgTop15: f15.withData,
-    summedBestDeltaMedianSeconds: b.sum,
-    summedAvgTop5DeltaMedianSeconds: f5.sum,
-    summedAvgTop10DeltaMedianSeconds: f10.sum,
-    summedAvgTop15DeltaMedianSeconds: f15.sum,
-  };
-}
-
 export async function computeTireLifePriorsV1(params: {
   userId: string;
   tireSetId: string;
@@ -263,7 +209,7 @@ export async function computeTireLifePriorsV1(params: {
   if (params.focusedCompareTireRuns) {
     const { compare, primary } = params.focusedCompareTireRuns;
     if (primary > compare) {
-      const nudge = buildFocusedNudge(allYourTracksOnSet, compare, primary);
+      const nudge = buildExpectedWearChainNudge(allYourTracksOnSet, compare, primary);
       const anyData =
         nudge &&
         (nudge.stepsWithDataBest > 0 ||
@@ -338,4 +284,35 @@ export async function buildTireLifePriorsForChatContext(params: {
     tireSetLabel: run.tireSet?.label ?? null,
     focusedCompareTireRuns,
   });
+}
+
+/** Tire-run step medians on one set, pooled across all tracks (same query shape as tire-life priors). */
+export async function loadTireStepAggregatesAllTracks(
+  userId: string,
+  tireSetId: string
+): Promise<TireLifeStepAggV1[] | null> {
+  const tid = tireSetId.trim();
+  if (!tid) return null;
+
+  const runs = await prisma.run.findMany({
+    where: {
+      userId,
+      tireSetId: tid,
+      loggingComplete: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: MAX_RUNS,
+    select: {
+      id: true,
+      createdAt: true,
+      sessionCompletedAt: true,
+      trackId: true,
+      tireRunNumber: true,
+      lapTimes: true,
+      lapSession: true,
+    },
+  });
+
+  if (runs.length < MIN_PAIRS_PUBLISH) return null;
+  return buildStepsFromPairs(runs, null);
 }

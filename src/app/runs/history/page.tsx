@@ -10,6 +10,8 @@ import { compareRunTimestamp } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import Link from "next/link";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { assertUserInTeam, listTeamMemberUserIds, listTeamsForUser } from "@/lib/teamAccess";
 import type { Prisma } from "@prisma/client";
 
@@ -284,12 +286,9 @@ export default async function RunHistoryPage({
           </div>
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            href="/runs/new"
-            className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition"
-          >
-            New Run
-          </Link>
+          <ButtonLink href="/runs/new" variant="primary">
+            New run
+          </ButtonLink>
           <span className="text-[11px] text-muted-foreground">
             {groups.length === 0
               ? "No runs yet."
@@ -297,7 +296,7 @@ export default async function RunHistoryPage({
           </span>
         </div>
         {groups.length === 0 ? (
-          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="text-sm text-muted-foreground">
             {teamMode ? (
               <>No runs from team members yet.</>
             ) : (
@@ -305,7 +304,7 @@ export default async function RunHistoryPage({
                 No runs yet. <Link href="/runs/new" className="text-accent underline">Create your first run</Link>.
               </>
             )}
-          </div>
+          </CardPanel>
         ) : (
           <div className="space-y-2">
             <SessionGroupsPager initial={pagerInitial} step={12}>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
@@ -61,10 +62,7 @@ export function TrackFavouriteClient(props: {
       ) : (
         <button
           type="button"
-          className={cn(
-            "rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
-            busy && "opacity-60 pointer-events-none"
-          )}
+          className={cn(buttonLinkClassName("primary"), busy && "opacity-60 pointer-events-none")}
           onClick={toggleFavourite}
           disabled={busy}
         >

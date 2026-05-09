@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import { DashboardBetweenRunHintsCard } from "@/components/dashboard/DashboardBetweenRunHintsCard";
+import { HeroPanel } from "@/components/ui/HeroPanel";
 import { cn } from "@/lib/utils";
 
 /**
@@ -65,14 +66,9 @@ export function DashboardBetweenRunHintsSection({
 
   if (loading) {
     return (
-      <div
-        className={cn(
-          "rounded-xl border border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground",
-          className
-        )}
-      >
+      <HeroPanel variant="muted" className={cn("text-xs text-muted-foreground", className)}>
         Loading things to consider…
-      </div>
+      </HeroPanel>
     );
   }
 

@@ -33,7 +33,7 @@ export function TodaySummaryCard({
   const totalChanges = todaysChanges.reduce((acc, block) => acc + block.rows.length, 0);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm shadow-black/25">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm shadow-black/25">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
         <div className="text-xs font-medium text-muted-foreground">
           {hasActiveEvent ? "This event" : "Today"}

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { formatRunCreatedAtDateTime, formatAppTimestampUtc } from "@/lib/formatDate";
@@ -8,14 +7,10 @@ import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel"
 import { TodaySummaryCard } from "@/components/dashboard/TodaySummaryCard";
 import { DashboardBetweenRunHintsSection } from "@/components/dashboard/DashboardBetweenRunHintsSection";
 import { RelativeTime } from "@/components/ui/RelativeTime";
-
-function btnPrimary(className = "") {
-  return `inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
-}
-
-function btnGhost(className = "") {
-  return `inline-flex items-center justify-center rounded-lg border border-border bg-card/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-border hover:bg-muted/60 hover:text-foreground ${className}`;
-}
+import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { HeroPanel } from "@/components/ui/HeroPanel";
+import { SectionMeta, SectionTitle } from "@/components/ui/SectionTitle";
 
 export function DashboardHome({
   model,
@@ -54,7 +49,8 @@ export function DashboardHome({
       }
     : {
         href: "/runs/new",
-        label: "New Run",
+        label: "New run",
+        meta: "Log a session on your car and track.",
       };
 
   return (
@@ -66,51 +62,48 @@ export function DashboardHome({
       </header>
 
       <section className="page-body flex max-w-3xl flex-col gap-3">
-        <Link
-          href={primaryAction.href}
-          className={cn(
-            "group flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 shadow-sm shadow-black/20 transition",
-            todayDraftRunId
-              ? "border-emerald-500/40 bg-emerald-500/10 hover:border-emerald-500/60 hover:bg-emerald-500/15"
-              : "border-border bg-card/70 hover:border-accent/50 hover:bg-card"
-          )}
-        >
-          <div className="min-w-0">
-            {todayDraftRunId ? (
-              <div className="text-[11px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                Unfinished run
-              </div>
-            ) : null}
-            <div className="mt-0.5 text-sm font-medium leading-tight text-foreground">
-              {primaryAction.label}
-            </div>
-            {"blurb" in primaryAction && primaryAction.blurb ? (
-              <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                {primaryAction.blurb}
-              </div>
-            ) : null}
-            {todayDraftRunId && todayDraftSavedAt ? (
-              <div className="mt-0.5 text-[10px] font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
-                Saved{" "}
-                <RelativeTime
-                  iso={todayDraftSavedAt}
-                  fallback={formatAppTimestampUtc(todayDraftSavedAt)}
-                />
-              </div>
-            ) : null}
-          </div>
-          <span
-            aria-hidden
-            className={cn(
-              "shrink-0 rounded-md border px-2 py-1 text-[11px] font-medium transition",
-              todayDraftRunId
-                ? "border-emerald-500/40 bg-background/60 text-emerald-700 group-hover:border-emerald-500/60 dark:text-emerald-300"
-                : "border-border bg-background/60 text-muted-foreground group-hover:border-accent/50 group-hover:text-foreground"
-            )}
+        <HeroPanel>
+          <Link
+            href={primaryAction.href}
+            className="group flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-1 py-0.5 text-left outline-offset-2 transition hover:bg-emerald-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/40"
           >
-            {todayDraftRunId ? "Finish →" : "Start →"}
-          </span>
-        </Link>
+            <div className="min-w-0 flex-1 space-y-1">
+              {todayDraftRunId ? (
+                <div className="text-[11px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  Unfinished run
+                </div>
+              ) : null}
+              <SectionTitle as="div" className="leading-tight">
+                {primaryAction.label}
+              </SectionTitle>
+              {"meta" in primaryAction && primaryAction.meta ? (
+                <SectionMeta as="div" className="mt-0">
+                  {primaryAction.meta}
+                </SectionMeta>
+              ) : null}
+              {"blurb" in primaryAction && primaryAction.blurb ? (
+                <SectionMeta as="div" className="mt-0">
+                  {primaryAction.blurb}
+                </SectionMeta>
+              ) : null}
+              {todayDraftRunId && todayDraftSavedAt ? (
+                <div className="text-[10px] font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
+                  Saved{" "}
+                  <RelativeTime
+                    iso={todayDraftSavedAt}
+                    fallback={formatAppTimestampUtc(todayDraftSavedAt)}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <span
+              aria-hidden
+              className="shrink-0 rounded-md border border-emerald-500/40 bg-background/60 px-2 py-1 text-[11px] font-medium text-emerald-800 transition group-hover:border-emerald-500/55 dark:text-emerald-200"
+            >
+              {todayDraftRunId ? "Finish →" : "Start →"}
+            </span>
+          </Link>
+        </HeroPanel>
 
         <DashboardBetweenRunHintsSection
           initialHint={betweenRunHint}
@@ -124,13 +117,22 @@ export function DashboardHome({
         <PreviousRunCard recentRun={recentRun} displayTimeZone={displayTimeZone} />
 
         <div className="flex flex-wrap gap-1.5">
-          <Link href="/engineer" className={btnGhost()}>
+          <Link
+            href="/engineer"
+            className={buttonLinkClassName("outline", "text-muted-foreground hover:text-foreground")}
+          >
             Chat with engineer
           </Link>
-          <Link href="/setup" className={btnGhost()}>
+          <Link
+            href="/setup"
+            className={buttonLinkClassName("outline", "text-muted-foreground hover:text-foreground")}
+          >
             Analyze recent setups
           </Link>
-          <Link href="/runs/history" className={btnGhost()}>
+          <Link
+            href="/runs/history"
+            className={buttonLinkClassName("outline", "text-muted-foreground hover:text-foreground")}
+          >
             View runs
           </Link>
         </div>
@@ -175,7 +177,7 @@ function EventContextCard({
   activeEvent: NonNullable<DashboardHomeModel["activeEvent"]>;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
+    <CardPanel className="shadow-black/30 p-3 sm:p-4">
       <div className="text-xs font-medium text-muted-foreground">
         Active race meeting
       </div>
@@ -190,14 +192,14 @@ function EventContextCard({
           {activeEvent.runCount > 0 ? (
             <Link
               href={`/runs/new?fromDashboard=continue&eventId=${encodeURIComponent(activeEvent.id)}`}
-              className={btnPrimary()}
+              className={buttonLinkClassName("primary")}
             >
               Log next run
             </Link>
           ) : (
             <Link
               href={`/runs/new?fromDashboard=first&eventId=${encodeURIComponent(activeEvent.id)}`}
-              className={btnPrimary()}
+              className={buttonLinkClassName("primary")}
             >
               Log first run today
             </Link>
@@ -231,7 +233,7 @@ function EventContextCard({
           No runs logged for this event yet.
         </p>
       )}
-    </div>
+    </CardPanel>
   );
 }
 
@@ -243,7 +245,7 @@ function PreviousRunCard({
   displayTimeZone: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
+    <CardPanel className="shadow-black/30 p-3 sm:p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-medium text-muted-foreground">
           Last Run
@@ -289,13 +291,13 @@ function PreviousRunCard({
           <div className="flex flex-wrap gap-1.5">
             <Link
               href={`/runs/history?focusRun=${encodeURIComponent(recentRun.id)}`}
-              className={btnGhost()}
+              className={buttonLinkClassName("outline", "text-muted-foreground hover:text-foreground")}
             >
               View run
             </Link>
             <Link
               href={`/runs/${encodeURIComponent(recentRun.id)}/edit`}
-              className={btnGhost()}
+              className={buttonLinkClassName("outline", "text-muted-foreground hover:text-foreground")}
             >
               Edit run
             </Link>
@@ -304,6 +306,6 @@ function PreviousRunCard({
       ) : (
         <p className="mt-2 text-[11px] text-muted-foreground">No runs yet — log one to populate this.</p>
       )}
-    </div>
+    </CardPanel>
   );
 }
