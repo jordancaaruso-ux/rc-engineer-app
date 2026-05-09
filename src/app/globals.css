@@ -318,12 +318,26 @@ body {
   text-transform: uppercase;
 }
 
-/* Shared strong interactive typography (nav tabs + all buttons). */
-:where(.ui-strong, .sidebar-nav a, button) {
+/* Strong brand voice: sidebar nav + explicit .ui-strong / .btn-brand.
+   Native <button> is not forced to italic uppercase — use Button + primaryButtonClassName or .btn-brand when needed. */
+:where(.ui-strong, .sidebar-nav a, .btn-brand) {
   font-family: var(--font-sans), system-ui, sans-serif;
   font-weight: 700;
   font-style: italic;
   text-transform: uppercase;
+}
+
+/* Dense UI labels (tables, chips) — not .ui-title */
+.ui-label-caps {
+  @apply text-[10px] font-medium uppercase tracking-wide text-muted-foreground;
+}
+
+.ui-label-meta {
+  @apply text-[11px] text-muted-foreground leading-snug;
+}
+
+.ui-body-tight {
+  @apply text-xs leading-snug text-foreground;
 }
 
 .page-subtitle {

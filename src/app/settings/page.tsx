@@ -18,7 +18,7 @@ export default async function SettingsPage() {
   if (!hasDatabaseUrl()) {
     return (
       <div className="container mx-auto max-w-2xl py-8">
-        <h1 className="text-lg font-semibold">Settings</h1>
+        <h1 className="page-title text-base">Settings</h1>
         <p className="mt-2 text-sm text-destructive">DATABASE_URL is not set.</p>
       </div>
     );
@@ -33,7 +33,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="container mx-auto max-w-2xl py-8">
-      <h1 className="text-lg font-semibold">Settings</h1>
+      <h1 className="page-title text-base">Settings</h1>
       <p className="mt-1 text-xs text-muted-foreground">
         Per-user preferences. These persist across Log Your Run forms and lap imports.
       </p>

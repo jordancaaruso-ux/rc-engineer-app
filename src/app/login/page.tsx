@@ -84,7 +84,7 @@ function LoginForm() {
     <main className="mx-auto max-w-sm px-4 py-16">
       <div className="flex flex-col items-center text-center sm:items-stretch sm:text-left">
         <JrcRaceEngineerLogo className="h-12 w-auto sm:h-14" priority />
-        <h1 className="mt-4 text-lg font-semibold text-foreground not-italic normal-case">Sign in</h1>
+        <h1 className="page-title mt-4 text-base not-italic normal-case text-foreground">Sign in</h1>
       </div>
       <p className="mt-4 text-sm text-muted-foreground">
         Only invited email addresses can sign in. Ask the app owner to add yours to the allowlist.

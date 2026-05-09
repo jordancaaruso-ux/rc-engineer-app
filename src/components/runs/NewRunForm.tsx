@@ -2469,7 +2469,7 @@ export function NewRunForm(props: {
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-[11px] text-muted-foreground">Practice timing URL (optional)</label>
+                <label className="block ui-label-meta">Practice timing URL (optional)</label>
                 <input
                   type="url"
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
@@ -2479,7 +2479,7 @@ export function NewRunForm(props: {
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-[11px] text-muted-foreground">Race timing URL (optional)</label>
+                <label className="block ui-label-meta">Race timing URL (optional)</label>
                 <input
                   type="url"
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
@@ -2489,7 +2489,7 @@ export function NewRunForm(props: {
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-[11px] text-muted-foreground">Controlled / spec tire (optional)</label>
+                <label className="block ui-label-meta">Controlled / spec tire (optional)</label>
                 <input
                   type="text"
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
@@ -2530,7 +2530,7 @@ export function NewRunForm(props: {
             <div className="ui-title text-sm text-muted-foreground">Session</div>
             <div className="flex flex-wrap gap-3 items-end">
               <div className="space-y-1">
-                <label className="block text-[11px] text-muted-foreground">Type</label>
+                <label className="block ui-label-meta">Type</label>
                 <select
                   className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                   value={meetingSessionType}
@@ -2549,7 +2549,7 @@ export function NewRunForm(props: {
               </div>
               {meetingSessionType === "OTHER" && (
                 <div className="space-y-1">
-                  <label className="block text-[11px] text-muted-foreground">Custom session type</label>
+                  <label className="block ui-label-meta">Custom session type</label>
                   <input
                     type="text"
                     className="rounded-md border border-border bg-card px-3 py-2 text-sm outline-none min-w-[140px]"
@@ -2866,7 +2866,7 @@ export function NewRunForm(props: {
                   </>
                 )}
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-medium text-muted-foreground">Set number</label>
+                  <label className="block ui-label-meta font-medium">Set number</label>
                   <input
                     type="number"
                     min={1}

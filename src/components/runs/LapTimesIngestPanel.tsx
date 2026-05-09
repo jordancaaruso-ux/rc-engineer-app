@@ -632,7 +632,7 @@ export function LapTimesIngestPanel({
       </div>
 
       {tab === "manual" ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="ui-label-meta">
           Paste or type laps — separated by <span className="text-foreground/80">new lines</span>,{" "}
           <span className="text-foreground/80">commas</span>, or <span className="text-foreground/80">spaces</span>.
         </p>
@@ -640,7 +640,7 @@ export function LapTimesIngestPanel({
 
       {tab === "photo" ? (
         <div className="space-y-2 text-sm">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="ui-label-meta">
             Upload a screenshot or photo of a lap list / timing app. The server uses{" "}
             <span className="text-foreground/90">OpenAI vision</span> (JSON output) to fill laps below — always review
             and edit before saving. Requires <code className="text-foreground/80">OPENAI_API_KEY</code> in{" "}
@@ -653,9 +653,9 @@ export function LapTimesIngestPanel({
             className="block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-surface-runna file:px-2 file:py-1"
             onChange={(e) => onPhotoSelected(e.target.files?.[0] ?? null)}
           />
-          {photoBusy ? <p className="text-[11px] text-muted-foreground">Processing…</p> : null}
+          {photoBusy ? <p className="ui-label-meta">Processing…</p> : null}
           {photoConfidence ? (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="ui-label-meta">
               Model confidence: <span className="font-mono text-foreground/90">{photoConfidence}</span>
             </p>
           ) : null}
@@ -672,7 +672,7 @@ export function LapTimesIngestPanel({
                   <div className="ui-title text-[11px] uppercase tracking-wide text-muted-foreground">
                     Your sessions at this event
                   </div>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground leading-snug">
+                  <p className="mt-0.5 ui-label-meta">
                     Uses your LiveRC <span className="text-foreground/90">driver ID</span> from each result table (not
                     just name), so you are not mixed up with someone else on another main. IDs are saved automatically in
                     Settings when unambiguous; clear there if wrong.
@@ -690,7 +690,7 @@ export function LapTimesIngestPanel({
                   {eventRaceBusy ? "Refreshing…" : "Refresh"}
                 </button>
               </div>
-              {eventRaceBusy ? <p className="text-[11px] text-muted-foreground">Loading sessions…</p> : null}
+              {eventRaceBusy ? <p className="ui-label-meta">Loading sessions…</p> : null}
               {eventRaceSessions && eventRaceSessions.length > 0 ? (
                 <ul className="space-y-1">
                   {eventRaceSessions.map((c) => {
@@ -735,7 +735,7 @@ export function LapTimesIngestPanel({
                 </p>
               ) : null}
               {!eventRaceBusy && eventRaceHint && eventRaceSessions && eventRaceSessions.length > 0 ? (
-                <p className="text-[11px] text-muted-foreground">{eventRaceHint}</p>
+                <p className="ui-label-meta">{eventRaceHint}</p>
               ) : null}
             </div>
           ) : null}
@@ -776,7 +776,7 @@ export function LapTimesIngestPanel({
                 </p>
               ) : null}
               {dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl) ? (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="ui-label-meta">
                   Results pages list races by class or round — pick your session, then confirm your row on the
                   timing page (your LiveRC driver name still applies there).
                 </p>
@@ -995,7 +995,7 @@ export function LapTimesIngestPanel({
       ) : null}
 
       {tab === "csv" ? (
-        <p className="text-[11px] text-muted-foreground">CSV import will use the same confirmation step as manual entry.</p>
+        <p className="ui-label-meta">CSV import will use the same confirmation step as manual entry.</p>
       ) : null}
 
       {tab !== "url" ? (

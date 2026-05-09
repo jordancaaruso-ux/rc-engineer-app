@@ -11,7 +11,7 @@ export default async function VerifyRequestPage({
 
   return (
     <main className="mx-auto max-w-md px-4 py-16 text-center">
-      <h1 className="text-lg font-semibold text-foreground">Check your email</h1>
+      <h1 className="page-title text-base not-italic normal-case text-foreground">Check your email</h1>
       {consoleOnly ? (
         <div
           className="mt-4 rounded-lg border border-accent/40 bg-accent/10 px-4 py-3 text-left text-sm text-foreground"

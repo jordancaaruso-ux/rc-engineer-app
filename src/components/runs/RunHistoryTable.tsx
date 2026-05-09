@@ -29,12 +29,14 @@ import type { LapRow } from "@/lib/lapAnalysis";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { Button } from "@/components/ui/Button";
 import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 import { EngineerPaceVsFieldPanel } from "@/components/engineer/EngineerPaceVsFieldPanel";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { SessionsEngineerPairLinks } from "@/components/runs/SessionsEngineerPairLinks";
 import { RelativeTime } from "@/components/ui/RelativeTime";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type Run = {
   id: string;
@@ -119,8 +121,8 @@ function CompactField({
 }) {
   return (
     <div className="min-w-0 max-w-[min(100%,220px)] sm:min-w-[5.5rem] sm:max-w-[220px] shrink">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-xs text-foreground break-words">{children ?? value ?? "—"}</div>
+      <div className="ui-label-caps">{label}</div>
+      <div className="ui-body-tight break-words">{children ?? value ?? "—"}</div>
     </div>
   );
 }
@@ -131,8 +133,8 @@ function LapStatChip({ label, value, title }: { label: string; value: string; ti
       className="rounded border border-border bg-muted/80 px-1.5 py-0.5 md:px-2 md:py-1 min-w-0 md:min-w-[4.5rem]"
       title={title}
     >
-      <div className="text-[9px] font-medium text-muted-foreground leading-none mb-0.5">{label}</div>
-      <div className="text-[11px] tabular-nums tracking-tight text-foreground leading-tight">{value}</div>
+      <div className="ui-label-meta text-[9px] leading-none mb-0.5 font-medium">{label}</div>
+      <div className="ui-body-tight tabular-nums tracking-tight leading-tight">{value}</div>
     </div>
   );
 }
@@ -776,10 +778,10 @@ function RunDetail({
     `/engineer?runId=${encodeURIComponent(run.id)}&compareRunId=${encodeURIComponent(previousRunOnCar.id)}`;
 
   return (
-    <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-5 text-sm">
+    <CardPanel className="bg-muted/40 space-y-5 text-sm">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
         <div className="min-w-0 space-y-3 xl:max-w-[min(100%,28rem)]">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Run details</h3>
+          <h3 className="ui-label-caps">Run details</h3>
           <div className="flex flex-wrap gap-x-4 gap-y-3 max-md:gap-x-3">
             <CompactField label="Date / time">
               <RelativeTime
@@ -808,10 +810,10 @@ function RunDetail({
         </div>
 
         <div className="min-w-0 flex-1 space-y-2 border-t border-border pt-4 xl:border-t-0 xl:border-l xl:border-border xl:pt-0 xl:pl-6">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lap times</h3>
+          <h3 className="ui-label-caps">Lap times</h3>
 
           <div className="space-y-1">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="ui-label-caps">
               Included-lap metrics
             </div>
             <div className="flex flex-wrap gap-1 md:gap-1.5">
@@ -840,7 +842,7 @@ function RunDetail({
           </div>
 
           <div className="space-y-1">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="ui-label-caps">
               All laps ({laps.length})
             </div>
             {laps.length > 0 ? (
@@ -876,8 +878,8 @@ function RunDetail({
           </div>
 
           <div className="space-y-1 pt-1 border-t border-border/60 border-dashed">
-            <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground/80">Lap source</div>
-            <div className="text-[11px] space-y-1 text-muted-foreground">
+            <div className="ui-label-caps text-[9px] text-muted-foreground/80">Lap source</div>
+            <div className="ui-label-meta space-y-1">
               <div className="text-muted-foreground/90">{sourceSummary ?? "—"}</div>
               {sourceUrl ? (
                 <a
@@ -906,13 +908,13 @@ function RunDetail({
                     Edit run
                   </Link>
                 ) : null}
-                <button
+                <Button
                   type="button"
                   onClick={() => setShowLapAnalysis((v) => !v)}
-                  className={cn("shrink-0", buttonLinkClassName("primary"))}
+                  className="shrink-0"
                 >
                   Analyse lap times
-                </button>
+                </Button>
               </div>
             </div>
             {showLapAnalysis ? (
@@ -924,7 +926,7 @@ function RunDetail({
                   <p className="text-xs text-red-600 dark:text-red-400">{lapPaceSummaryErr}</p>
                 ) : null}
                 {lapPaceSummary ? <EngineerPaceVsFieldPanel summary={lapPaceSummary} /> : null}
-                <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                <div className="ui-label-caps">
                   Column comparison
                 </div>
                 {importedLapsError ? (
@@ -953,7 +955,7 @@ function RunDetail({
       <EngineerRunSummaryPanel runId={run.id} defaultExpanded={false} />
 
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Engineer</div>
+        <div className="ui-label-caps">Engineer</div>
         <SessionsEngineerPairLinks runId={run.id} />
         {engineerVsPreviousHref ? (
           <Link
@@ -1006,7 +1008,7 @@ function RunDetail({
         {deleteError ? (
           <p className="text-[11px] text-destructive">{deleteError}</p>
         ) : null}
-        <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Setup vs previous run</div>
+        <div className="ui-label-caps">Setup vs previous run</div>
         {setupPreview.mode === "no_baseline" ? (
           <p className="text-muted-foreground text-xs">
             No earlier run on this car to diff against. Open <span className="font-medium text-foreground">Analyse setup</span> for the
@@ -1034,7 +1036,7 @@ function RunDetail({
         )}
       </div>
 
-    </div>
+    </CardPanel>
   );
 }
 
@@ -1052,7 +1054,7 @@ function DetailRow({
   const show = emptyAsDash && !value.trim() ? "—" : value;
   return (
     <div>
-      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+      <span className="ui-label-meta font-medium">{label}</span>
       <div className={multiline ? "mt-0.5 whitespace-pre-wrap text-foreground" : "mt-0.5 text-foreground"}>{show}</div>
     </div>
   );
