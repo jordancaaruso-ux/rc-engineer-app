@@ -430,7 +430,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
                 />
               </label>
               <div className="border-t border-border/50 pt-2">
-                <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground/90">Layout & ordering</div>
+                <div className="text-[9px] ui-title text-muted-foreground/90">Layout & ordering</div>
                 <div className="mt-1.5 space-y-2">
                   <label className="block text-[10px] text-muted-foreground">
                     Subsection (optional)

@@ -662,7 +662,7 @@ export function LapComparisonColumnGrid({
                     >
                       {tLap ? `${tLap.lapTimeSeconds.toFixed(3)}` : "—"}
                       {tLap && !tLap.isIncluded ? (
-                        <span className="ml-1 text-[9px] uppercase text-muted-foreground">Excluded</span>
+                        <span className="ml-1 ui-title text-[9px] text-muted-foreground">Excluded</span>
                       ) : null}
                     </td>
                   ) : null}
@@ -698,7 +698,7 @@ export function LapComparisonColumnGrid({
                           <span>
                             {lap.lapTimeSeconds.toFixed(3)}
                             {excluded ? (
-                              <span className="ml-1 text-[9px] uppercase text-muted-foreground not-italic">
+                              <span className="ml-1 ui-title text-[9px] text-muted-foreground not-italic">
                                 Excluded
                               </span>
                             ) : null}

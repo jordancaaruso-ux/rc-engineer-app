@@ -871,7 +871,7 @@ function EditableSingle({
         data-setup-field-key={fieldKey}
         className="flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0"
       >
-        <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
+        <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground flex items-center">
           {label}
           {unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({unit})</span> : null}
         </div>
@@ -949,7 +949,7 @@ function EditableSingle({
       data-setup-field-key={fieldKey}
       className="flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0"
     >
-      <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center">
+      <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground flex items-center">
         {label}
         {unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({unit})</span> : null}
       </div>
@@ -1368,7 +1368,7 @@ function PairRow({
         "flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch"
       )}
     >
-      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
         {row.unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({row.unit})</span> : null}
       </div>
@@ -1428,7 +1428,7 @@ function Corner4Row({
   ];
   return (
     <div className={cn("flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch")}>
-      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
         {row.unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({row.unit})</span> : null}
       </div>
@@ -1447,7 +1447,7 @@ function Corner4Row({
                   data-setup-field-key={k}
                   className="flex min-h-[1.9rem] min-w-0 items-center gap-1 px-2 py-0.5"
                 >
-                  <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="shrink-0 text-[9px] ui-title text-muted-foreground">
                     {lab}
                   </span>
                   <div
@@ -1601,7 +1601,7 @@ function ScrewStripRow({
         "flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch"
       )}
     >
-      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
         {row.label}
       </div>
       <div
@@ -1718,11 +1718,11 @@ function SectionCard({
 }) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-muted/40">
-      <div className="border-b border-border bg-card/80 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="border-b border-border bg-card/80 px-2 py-1 text-[11px] ui-title text-muted-foreground">
         {title}
       </div>
       {showFrontRearHeader ? (
-        <div className="hidden border-b border-border/70 bg-card/40 text-[10px] font-medium uppercase tracking-wide text-muted-foreground md:flex">
+        <div className="hidden border-b border-border/70 bg-card/40 text-[10px] ui-title text-muted-foreground md:flex">
           <div className="w-[38%] shrink-0 border-r border-border/60 px-2 py-1">Parameter</div>
           <div className="grid flex-1 grid-cols-2 divide-x divide-border/60">
             <div className="px-2 py-1">Front</div>

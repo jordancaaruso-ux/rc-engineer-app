@@ -40,7 +40,7 @@ export function AnalysisActiveThingsToTry() {
   return (
     <div className="rounded-md border border-border bg-muted/50 p-3 space-y-2" onClick={(e) => e.stopPropagation()}>
       <div>
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="ui-title text-[10px] text-muted-foreground">
           Active things to try (all sessions)
         </div>
         <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">

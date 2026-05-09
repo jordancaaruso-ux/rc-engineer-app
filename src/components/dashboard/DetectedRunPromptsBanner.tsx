@@ -55,7 +55,7 @@ export function DetectedRunPromptsBanner({
   return (
     <div className="rounded-lg border border-accent/40 bg-accent/5 p-3 shadow-sm shadow-black/20">
       <div className="space-y-0.5">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="text-[10px] ui-title text-muted-foreground">
           Detected sessions
         </div>
         <p className="text-[10px] leading-snug text-muted-foreground">
@@ -82,7 +82,7 @@ export function DetectedRunPromptsBanner({
             >
               <div className="min-w-0 flex-1 text-[11px] leading-snug">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground">
+                  <span className="rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] ui-title text-foreground">
                     {kindLabel}
                   </span>
                   <span className="font-medium text-foreground">{title}</span>
@@ -91,7 +91,7 @@ export function DetectedRunPromptsBanner({
                 <div className="mt-0.5 font-medium text-foreground break-words">{sessionTitle}</div>
                 <div className="mt-1 space-y-0.5 text-muted-foreground">
                   <div>
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/90">
+                    <span className="text-[10px] ui-title text-muted-foreground/90">
                       {p.sessionTimeIsImportFallback ? "Imported" : "Session time"}
                     </span>
                     <span className="ml-1.5 font-mono tabular-nums text-foreground/90">

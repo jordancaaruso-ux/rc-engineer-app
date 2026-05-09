@@ -187,7 +187,7 @@ export function EngineerChatPanel({
                   m.role === "user" ? "bg-muted/80 text-foreground ml-0 mr-4" : "bg-card border border-border/80 ml-4 mr-0 text-foreground/95"
                 )}
               >
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
+                <div className="text-[10px] ui-title text-muted-foreground mb-1">
                   {m.role === "user" ? "You" : "Engineer"}
                 </div>
                 <div className="whitespace-pre-wrap break-words">{m.content}</div>
@@ -197,7 +197,7 @@ export function EngineerChatPanel({
         </div>
         {chatErr ? (
           <div className="text-xs text-destructive px-3 pb-2 space-y-1 border-t border-border">
-            <div className="font-medium text-[11px] uppercase tracking-wide pt-2">Error</div>
+            <div className="ui-title text-[11px] pt-2">Error</div>
             <pre className="whitespace-pre-wrap break-words font-sans text-[11px] leading-snug opacity-95">
               {chatErr}
             </pre>
@@ -207,7 +207,7 @@ export function EngineerChatPanel({
 
       {onQuickPrompt ? (
         <div className="space-y-1.5 rounded-md border border-border/80 bg-muted/20 px-2.5 py-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Quick prompts</div>
+          <div className="text-[10px] ui-title text-muted-foreground">Quick prompts</div>
           <div className="flex flex-wrap gap-1.5">
             {chatPanelQuickPrompts.map((def) => {
               const dis = engineerQuickPromptDisabled(def, {

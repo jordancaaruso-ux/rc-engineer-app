@@ -719,7 +719,7 @@ export function LapTimesIngestPanel({
                             </span>
                             <span className="block truncate text-[10px] text-muted-foreground">{c.sessionUrl}</span>
                           </span>
-                          <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          <span className="shrink-0 ui-title text-[10px] text-muted-foreground">
                             {added ? "Added" : c.alreadyImported ? "Import again" : "Import"}
                           </span>
                         </button>
@@ -805,7 +805,7 @@ export function LapTimesIngestPanel({
                             {c.sessionUrl}
                           </span>
                         </span>
-                        <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <span className="shrink-0 ui-title text-[10px] text-muted-foreground">
                           {c.alreadyImported ? (c.linkedRunId ? "Saved" : "Imported") : "Import"}
                         </span>
                       </button>
@@ -851,7 +851,7 @@ export function LapTimesIngestPanel({
             <div key={block.blockId} className="space-y-2 rounded-lg border border-border bg-surface-runna p-2" data-import-index={blockIndex}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="ui-title text-[10px] text-muted-foreground">
                     Import {blockIndex + 1} · {formatRunCreatedAtDateTime(blockLabelTimeIso(block))}
                   </div>
                   <div className="text-[11px] text-muted-foreground break-all">{block.sourceUrl}</div>
@@ -904,7 +904,7 @@ export function LapTimesIngestPanel({
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                               <span className="text-xs font-medium truncate">{primaryLabel}</span>
                               {isPrimaryForRun ? (
-                                <span className="shrink-0 rounded border border-primary/35 bg-primary/10 px-1.5 py-0 text-[10px] font-medium uppercase tracking-wide text-foreground/90">
+                                <span className="shrink-0 rounded border border-primary/35 bg-primary/10 px-1.5 py-0 ui-title text-[10px] text-foreground/90">
                                   Your laps
                                 </span>
                               ) : null}
@@ -950,7 +950,7 @@ export function LapTimesIngestPanel({
                               <span className="text-muted-foreground w-8 shrink-0">{row.lapNumber}.</span>
                               <span className="min-w-[4.5rem]">{row.lapTimeSeconds.toFixed(3)}s</span>
                               {!row.isIncluded ? (
-                                <span className="text-[10px] uppercase text-muted-foreground">Excluded</span>
+                                <span className="ui-title text-[10px] text-muted-foreground">Excluded</span>
                               ) : null}
                               <button
                                 type="button"

@@ -255,7 +255,7 @@ export function WatchedLapSourcesCard() {
     <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Watched lap-time sources</div>
+          <div className="text-xs ui-title text-muted-foreground">Watched lap-time sources</div>
           <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
             Manual check (track-safe). When a session looks new, it is imported into your private lap-time library.
           </p>
@@ -274,7 +274,7 @@ export function WatchedLapSourcesCard() {
 
       {importedRows.length > 0 ? (
         <div className="rounded-md border border-border bg-muted/40 p-2 space-y-1">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">New sessions</div>
+          <div className="text-[10px] ui-title text-muted-foreground">New sessions</div>
           <ul className="space-y-1 text-[11px]">
             {importedRows.map((r) => (
               <li key={r.importedSessionId} className="flex flex-wrap items-center gap-2">
@@ -310,7 +310,7 @@ export function WatchedLapSourcesCard() {
       ) : null}
 
       <div className="rounded-md border border-border bg-muted/40 p-2 space-y-2">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">LiveRC identity</div>
+        <div className="text-[10px] ui-title text-muted-foreground">LiveRC identity</div>
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
           <input
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs outline-none"
@@ -325,7 +325,7 @@ export function WatchedLapSourcesCard() {
       </div>
 
       <div className="rounded-md border border-border bg-muted/40 p-2 space-y-2">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Add source</div>
+        <div className="text-[10px] ui-title text-muted-foreground">Add source</div>
         <div className="space-y-1">
           <input
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs outline-none"

@@ -288,7 +288,7 @@ export function TeamsClient() {
 
               {isAdmin ? (
                 <form onSubmit={handleAddMember} className="border-t border-border pt-3 space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <h3 className="text-xs ui-title text-muted-foreground">
                     Add member (existing account email, allowlisted)
                   </h3>
                   <div className="flex flex-wrap gap-2">
@@ -312,7 +312,7 @@ export function TeamsClient() {
               ) : null}
 
               <div className="border-t border-border pt-3">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Members</h3>
+                <h3 className="text-xs ui-title text-muted-foreground mb-2">Members</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>

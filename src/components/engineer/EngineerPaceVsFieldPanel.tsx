@@ -36,7 +36,7 @@ function ReferencePaceCallout({
   if (!v) return null;
   return (
     <div className="space-y-1 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="text-[10px] ui-title text-muted-foreground">
         {explicitPairCompare ? "vs comparison run" : "vs your reference run"}
       </div>
       <div className="text-base font-semibold text-foreground tabular-nums font-mono leading-tight">
@@ -123,7 +123,7 @@ function PaceVsFieldHero({
 
       return (
         <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 space-y-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace vs field</div>
+          <div className="text-[10px] ui-title text-muted-foreground">Pace vs field</div>
           {my ? (
             <div className="space-y-2 text-[12px] leading-snug">
               {headline.vsReference ? (
@@ -286,7 +286,7 @@ function PaceVsFieldHero({
           : null;
       return (
         <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 space-y-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace vs field</div>
+          <div className="text-[10px] ui-title text-muted-foreground">Pace vs field</div>
           {headline.vsReference ? (
             <ReferencePaceCallout headline={headline} explicitPairCompare={explicitPairCompare} />
           ) : null}
@@ -339,7 +339,7 @@ function FieldImportSessionFieldTable({ summary }: { summary: EngineerRunSummary
   if (!summary.fieldImportSession || summary.fieldImportSession.ranked.length < 2) return null;
   return (
     <div className="space-y-1.5">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="text-[10px] ui-title text-muted-foreground">
         Imported session — field
       </div>
       <p className="text-[10px] leading-snug text-muted-foreground">

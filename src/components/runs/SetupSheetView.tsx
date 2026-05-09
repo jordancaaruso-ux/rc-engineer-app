@@ -86,7 +86,7 @@ function SheetCell({
       className={cn("flex items-stretch border-b border-border last:border-b-0 min-h-[2.25rem]")}
       style={changedStyle}
     >
-      <div className="w-[38%] shrink-0 px-2 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wide border-r border-border/80 flex items-center">
+      <div className="w-[38%] shrink-0 px-2 py-1.5 text-[10px] ui-title text-muted-foreground border-r border-border/80 flex items-center">
         {field.label}
         {field.unit ? <span className="text-[9px] normal-case ml-0.5 opacity-70">({field.unit})</span> : null}
       </div>
@@ -181,7 +181,7 @@ function GroupBlock({
         className
       )}
     >
-      <div className="px-2 py-1.5 bg-card border-b border-border text-center text-[11px] font-medium tracking-wide uppercase">
+      <div className="px-2 py-1.5 bg-card border-b border-border text-center text-[11px] ui-title tracking-tight">
         {title}
       </div>
       <div className="flex-1 divide-y divide-border/30">{children}</div>

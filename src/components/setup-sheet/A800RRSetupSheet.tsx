@@ -61,7 +61,7 @@ function printCell(data: SetupSnapshotData, key: string, fieldKind?: SetupFieldK
 function MetadataRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex border-b border-black/20 last:border-b-0">
-      <div className="w-24 shrink-0 py-0.5 pr-2 text-[10px] text-black/70 uppercase">{label}</div>
+      <div className="w-24 shrink-0 py-0.5 pr-2 text-[10px] text-black/70">{label}</div>
       <div className="min-w-0 flex-1 py-0.5 text-[11px] font-mono">{value}</div>
     </div>
   );
@@ -78,7 +78,7 @@ function PrintFieldRow({
 }) {
   return (
     <div className="flex min-h-[1.75rem] items-stretch border-b border-black/15 last:border-b-0">
-      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono uppercase tracking-wide text-black/70">
+      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
         {label}
         {unit ? (
           <span className="normal-case ml-0.5 text-[9px] opacity-70">({unit})</span>
@@ -108,7 +108,7 @@ function PrintPairRow({
   const right = printCell(data, rightKey, fieldKind);
   return (
     <div className="flex min-h-[1.75rem] items-stretch border-b border-black/15 last:border-b-0">
-      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono uppercase tracking-wide text-black/70">
+      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
         {label}
         {unit ? (
           <span className="normal-case ml-0.5 text-[9px] opacity-70">({unit})</span>
@@ -116,11 +116,11 @@ function PrintPairRow({
       </div>
       <div className="grid min-w-0 flex-1 grid-cols-2 divide-x divide-black/15">
         <div className="px-2 py-1">
-          <div className="text-[9px] font-medium uppercase text-black/60">Front</div>
+          <div className="text-[9px] font-medium text-black/60">Front</div>
           <div className="text-[11px] font-mono">{left}</div>
         </div>
         <div className="px-2 py-1">
-          <div className="text-[9px] font-medium uppercase text-black/60">Rear</div>
+          <div className="text-[9px] font-medium text-black/60">Rear</div>
           <div className="text-[11px] font-mono">{right}</div>
         </div>
       </div>
@@ -155,7 +155,7 @@ function PrintCornerRow({
   ];
   return (
     <div className="border-b border-black/15 last:border-b-0">
-      <div className="border-b border-black/15 px-2 py-1 text-[10px] font-mono uppercase tracking-wide text-black/70">
+      <div className="border-b border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
         {label}
         {unit ? (
           <span className="normal-case ml-0.5 text-[9px] opacity-70">({unit})</span>
@@ -179,7 +179,7 @@ function PrintTopDeckBlock({ data }: { data: SetupSnapshotData }) {
     <div className="divide-y divide-black/15">
       <PrintPairRow label="Top deck" leftKey="top_deck_front" rightKey="top_deck_rear" data={data} />
       <div className="flex min-h-[2rem] items-stretch border-b border-black/15 last:border-b-0">
-        <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono uppercase tracking-wide text-black/70">
+        <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
           Top deck cuts
         </div>
         <div className="min-w-0 flex-1 px-2 py-1.5">
@@ -245,7 +245,7 @@ function StructuredRowView({ row, data }: { row: StructuredRow; data: SetupSnaps
     const sel = readSetupScrewSelection(data, row.key);
     return (
       <div className="flex min-h-[2rem] items-stretch border-b border-black/15 last:border-b-0">
-        <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono uppercase tracking-wide text-black/70">
+        <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
           {row.label}
         </div>
         <div className="min-w-0 flex-1 px-2 py-1.5">
@@ -282,7 +282,7 @@ export function A800RRSetupSheet({ run, className }: { run: A800RRSetupSheetRun;
       style={{ width: "210mm", minHeight: "297mm", boxSizing: "border-box" }}
     >
       <div className="mb-3 rounded-sm border border-black/30 bg-white p-2">
-        <div className="mb-1.5 text-[9px] font-medium uppercase tracking-wider text-black/60">
+        <div className="mb-1.5 text-[9px] font-medium text-black/60">
           Event / track / date
         </div>
         <div className="grid grid-cols-1 gap-x-4 text-[11px] sm:grid-cols-2">
@@ -300,7 +300,7 @@ export function A800RRSetupSheet({ run, className }: { run: A800RRSetupSheetRun;
       </div>
 
       <div className="mb-3 border-b-2 border-black/30 pb-1.5 text-center">
-        <div className="font-mono text-[10px] uppercase tracking-widest text-black/70">Setup sheet</div>
+        <div className="font-mono text-[10px] tracking-tight text-black/70">Setup sheet</div>
         <div className="text-sm font-medium">Awesomatix A800RR</div>
       </div>
 
@@ -310,7 +310,7 @@ export function A800RRSetupSheet({ run, className }: { run: A800RRSetupSheetRun;
             key={section.id}
             className="overflow-hidden rounded border-2 border-black/25 bg-white"
           >
-            <div className="border-b border-black/20 bg-black/5 px-2 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide">
+            <div className="border-b border-black/20 bg-black/5 px-2 py-1.5 text-center text-[10px] font-medium tracking-tight text-black/70">
               {section.title}
             </div>
             <div className="divide-y divide-black/10">

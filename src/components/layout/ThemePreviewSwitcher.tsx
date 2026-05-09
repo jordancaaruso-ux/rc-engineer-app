@@ -69,7 +69,7 @@ export function ThemePreviewSwitcher({ placement = "floating" }: ThemePreviewSwi
           role="dialog"
           aria-label="Theme preview"
         >
-          <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="px-2 py-1 text-[10px] ui-title text-muted-foreground">
             Theme preview (local only)
           </div>
           <ul className="mt-1 space-y-0.5">
@@ -116,11 +116,11 @@ export function ThemePreviewSwitcher({ placement = "floating" }: ThemePreviewSwi
           <>
             <span className="flex items-center gap-2 min-w-0">
               <Palette className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="truncate font-bold italic uppercase tracking-tight text-foreground/90">
+              <span className="truncate ui-title text-sm text-foreground/90">
                 Theme
               </span>
             </span>
-            <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="shrink-0 text-[10px] ui-title text-muted-foreground">
               {open ? "Close" : "Preview"}
             </span>
           </>

@@ -322,15 +322,15 @@ export default async function RunHistoryPage({
                     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                         <span className="page-title text-sm text-foreground">{group.title}</span>
-                        <span className="page-title-lower text-xs text-muted-foreground">{group.type}</span>
+                        <span className="ui-title text-xs text-muted-foreground">{group.type}</span>
                         {group.trackName && (
-                          <span className="page-title-lower text-xs text-muted-foreground">
+                          <span className="ui-title text-xs text-muted-foreground">
                             · {group.trackName}
                           </span>
                         )}
-                        <span className="page-title-lower text-xs text-muted-foreground">{group.dateLabel}</span>
+                        <span className="ui-title text-xs text-muted-foreground">{group.dateLabel}</span>
                       </div>
-                      <span className="page-title-lower text-sm text-muted-foreground tabular-nums">
+                      <span className="ui-title text-sm text-muted-foreground tabular-nums">
                         {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
                       </span>
                     </div>
@@ -339,7 +339,7 @@ export default async function RunHistoryPage({
                     <div className="max-md:overflow-x-visible md:overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-border bg-muted/70 text-left text-xs font-medium text-muted-foreground">
+                          <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
                             {!teamMode ? (
                               <th
                                 className="hidden md:table-cell w-6 px-1 py-2"

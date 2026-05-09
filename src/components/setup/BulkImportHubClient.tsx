@@ -239,7 +239,7 @@ export function BulkImportHubClient({
           </label>
         )}
         <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">PetitRC (optional)</div>
+          <div className="text-[10px] ui-title text-muted-foreground">PetitRC (optional)</div>
           <label className="block text-xs">
             <span className="text-muted-foreground">Car setup sheet URL</span>
             <input

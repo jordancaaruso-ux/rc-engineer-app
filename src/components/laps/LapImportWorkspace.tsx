@@ -159,7 +159,7 @@ export function LapImportWorkspace() {
   return (
     <div className="max-w-3xl space-y-4">
       <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Import from URLs</div>
+        <div className="text-xs ui-title text-muted-foreground">Import from URLs</div>
         <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
           Paste LiveRC (or other supported) timing links — one per line. LiveRC event hub URLs expand to each race result.
           Use <code className="text-[10px]">?eventId=…</code> on this page to filter by that event&apos;s race classes. Failed lines do not cancel the rest.
@@ -201,7 +201,7 @@ export function LapImportWorkspace() {
       </div>
 
       <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Imported sessions</div>
+        <div className="text-xs ui-title text-muted-foreground">Imported sessions</div>
         {listErr ? <p className="mt-2 text-[11px] text-destructive">{listErr}</p> : null}
         {!listErr && sessions.length === 0 ? (
           <p className="mt-2 text-[11px] text-muted-foreground">None yet — import URLs above.</p>

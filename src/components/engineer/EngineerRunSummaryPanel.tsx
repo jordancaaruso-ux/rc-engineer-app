@@ -138,7 +138,7 @@ export function EngineerRunSummaryPanel({
         <div className="border-t border-border px-3 py-3 space-y-3 text-[11px] leading-snug">
           {onQueueEngineerChatPrompt ? (
             <div className="space-y-1.5 pb-1 border-b border-border/60">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="text-[10px] ui-title text-muted-foreground">
                 Ask the Engineer
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -200,7 +200,7 @@ export function EngineerRunSummaryPanel({
           <EngineerPaceVsFieldPanel summary={summary} explicitPairCompare={hasCompareInUrl} />
 
           <div className="space-y-1">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="text-[10px] ui-title text-muted-foreground">
               Included lap metrics
             </div>
                 {fieldRel.showVsFieldColumn ? (
@@ -347,7 +347,7 @@ export function EngineerRunSummaryPanel({
 
           {summary.setupChanges.length > 0 ? (
             <div className="space-y-1">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Key setup changes</div>
+              <div className="text-[10px] ui-title text-muted-foreground">Key setup changes</div>
               <ul className="space-y-1 list-disc pl-4 text-foreground/90">
                 {summary.setupChanges.map((s) => (
                   <li key={s.key}>

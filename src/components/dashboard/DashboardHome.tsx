@@ -69,7 +69,7 @@ export function DashboardHome({
           >
             <div className="min-w-0 flex-1 space-y-1">
               {todayDraftRunId ? (
-                <div className="text-[11px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                <div className="text-[11px] ui-title text-emerald-700 dark:text-emerald-300">
                   Unfinished run
                 </div>
               ) : null}
@@ -210,19 +210,19 @@ function EventContextCard({
       {activeEvent.runCount > 0 ? (
         <div className="mt-2.5 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-2.5 text-[11px]">
           <div className="flex items-baseline gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Best</span>
+            <span className="text-[10px] ui-title text-muted-foreground">Best</span>
             <span className="font-mono tabular-nums text-foreground">
               {formatLap(activeEvent.latest?.bestLap ?? null)}
             </span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Avg 5</span>
+            <span className="text-[10px] ui-title text-muted-foreground">Avg 5</span>
             <span className="font-mono tabular-nums text-foreground">
               {formatLap(activeEvent.latest?.avgTop5 ?? null)}
             </span>
           </div>
           <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Notes</div>
+            <div className="text-[10px] ui-title text-muted-foreground">Notes</div>
             <div className="mt-0.5 line-clamp-2 break-words text-muted-foreground">
               {activeEvent.latest?.notesPreview ?? "—"}
             </div>

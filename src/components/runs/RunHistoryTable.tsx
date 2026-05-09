@@ -133,7 +133,7 @@ function LapStatChip({ label, value, title }: { label: string; value: string; ti
       className="rounded border border-border bg-muted/80 px-1.5 py-0.5 md:px-2 md:py-1 min-w-0 md:min-w-[4.5rem]"
       title={title}
     >
-      <div className="ui-label-meta text-[9px] leading-none mb-0.5 font-medium">{label}</div>
+      <div className={cn("ui-label-caps", "text-[9px] leading-none mb-0.5")}>{label}</div>
       <div className="ui-body-tight tabular-nums tracking-tight leading-tight">{value}</div>
     </div>
   );
@@ -450,7 +450,7 @@ export function RunHistoryTable({
                   </span>
                   {run.loggingComplete === false ? (
                     <span
-                      className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[8px] md:text-[9px] font-medium uppercase tracking-wide text-amber-900 dark:text-amber-100"
+                      className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[8px] md:text-[9px] ui-title text-amber-900 dark:text-amber-100"
                       title="Logging not marked complete"
                     >
                       Draft
@@ -865,7 +865,7 @@ function RunDetail({
                       {r.lapTimeSeconds.toFixed(3)}s
                     </span>
                     {!r.isIncluded ? (
-                      <span className="text-[9px] uppercase text-muted-foreground">Excluded</span>
+                      <span className="ui-title text-[9px] text-muted-foreground">Excluded</span>
                     ) : (
                       <span />
                     )}
@@ -1054,7 +1054,7 @@ function DetailRow({
   const show = emptyAsDash && !value.trim() ? "—" : value;
   return (
     <div>
-      <span className="ui-label-meta font-medium">{label}</span>
+      <span className="ui-title text-[11px] text-muted-foreground">{label}</span>
       <div className={multiline ? "mt-0.5 whitespace-pre-wrap text-foreground" : "mt-0.5 text-foreground"}>{show}</div>
     </div>
   );

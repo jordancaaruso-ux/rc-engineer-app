@@ -402,7 +402,7 @@ export function EngineerCompareAndPattern({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Target</div>
+            <div className="text-[10px] ui-title text-muted-foreground">Target</div>
             <div className="space-y-1">
               <label className="text-[10px] text-muted-foreground">Select car</label>
               <select
@@ -435,7 +435,7 @@ export function EngineerCompareAndPattern({
 
           <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Comparison</div>
+              <div className="text-[10px] ui-title text-muted-foreground">Comparison</div>
               <div className="flex rounded-md border border-border p-0.5 bg-muted/40">
                 <button
                   type="button"
@@ -582,7 +582,7 @@ export function EngineerCompareAndPattern({
       ) : null}
 
       <div className="border-t border-border pt-3 space-y-2">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pattern digest (one car)</div>
+        <div className="text-xs ui-title text-muted-foreground">Pattern digest (one car)</div>
         <p className="text-[11px] text-muted-foreground">
           Chronological series with lap metrics and setup keys changed vs the previous run in the list. Uses session time
           when known. Highlight shows best single lap in the series.

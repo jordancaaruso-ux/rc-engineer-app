@@ -201,7 +201,7 @@ export function RunComparePairCell({ runId }: { runId: string }) {
     >
       <div className="flex flex-col gap-1">
         {isTarget ? (
-          <span className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-foreground w-fit">
+          <span className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] ui-title text-foreground w-fit">
             Target
           </span>
         ) : (
@@ -212,7 +212,7 @@ export function RunComparePairCell({ runId }: { runId: string }) {
 
         {targetRunId && !isTarget ? (
           isCompare ? (
-            <span className="rounded border border-border bg-muted/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-foreground w-fit">
+            <span className="rounded border border-border bg-muted/80 px-1.5 py-0.5 text-[9px] ui-title text-foreground w-fit">
               Comparison
             </span>
           ) : (

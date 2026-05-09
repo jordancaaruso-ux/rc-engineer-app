@@ -39,7 +39,7 @@ export function SessionsEngineerPairLinks({ runId }: { runId: string }) {
     <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
       {isTarget ? (
         <span
-          className="rounded border border-primary/40 bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground"
+          className="rounded border border-primary/40 bg-primary/10 px-2 py-1 text-[10px] ui-title text-foreground"
           title="Primary run for Engineer compare"
         >
           Target

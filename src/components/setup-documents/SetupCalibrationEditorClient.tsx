@@ -2438,7 +2438,7 @@ export function SetupCalibrationEditorClient({
                 </div>
               ) : (
                 <label className="flex flex-col gap-1 text-muted-foreground">
-                  <span className="text-[10px] uppercase tracking-wide">Choose document</span>
+                  <span className="ui-title text-[10px]">Choose document</span>
                   <select
                     className="max-w-full rounded border border-border bg-card px-2 py-1.5 font-mono text-xs text-foreground"
                     disabled={attachLinking}
@@ -3551,7 +3551,7 @@ export function SetupCalibrationEditorClient({
 
               <div className="mb-3 rounded border border-sky-500/35 bg-sky-500/10 p-3 text-xs">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Selected setup field</div>
+                  <div className="text-[10px] ui-title text-muted-foreground">Selected setup field</div>
                   {activeSetupFieldKey ? (
                     <button
                       type="button"
@@ -3937,7 +3937,7 @@ export function SetupCalibrationEditorClient({
 
                   {selectedAcroAppKeys.length > 0 ? (
                     <div className="space-y-2 border-t border-border pt-2">
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">App mapping</div>
+                      <div className="text-[10px] ui-title text-muted-foreground">App mapping</div>
                       {selectedAcroAppKeys.map((k) => {
                         const rule = formFieldMappings[k];
                         const label = mergedLabelMap[k] ?? k;
@@ -3984,7 +3984,7 @@ export function SetupCalibrationEditorClient({
                     </div>
                   ) : (
                     <div className="space-y-2 border-t border-border pt-2">
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Map this PDF control</div>
+                      <div className="text-[10px] ui-title text-muted-foreground">Map this PDF control</div>
                       {!activeSetupFieldKey && !showAddMappingForm && !showCreateFieldForm ? (
                         <div className="flex flex-col gap-2">
                           <button
@@ -4142,7 +4142,7 @@ export function SetupCalibrationEditorClient({
                   <div className="max-h-[45vh] space-y-3 overflow-auto">
             {catalogByGroup.order.map((groupTitle) => (
               <div key={groupTitle} className="space-y-1">
-                <div className="sticky top-0 z-[1] bg-card/95 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
+                <div className="sticky top-0 z-[1] bg-card/95 py-1 text-[10px] ui-title text-muted-foreground backdrop-blur-sm">
                   {groupTitle}
                 </div>
                 <div className="space-y-1">
@@ -4236,7 +4236,7 @@ export function SetupCalibrationEditorClient({
               <div className="mt-2 max-h-[60vh] space-y-3 overflow-auto">
                 {catalogByGroup.order.map((groupTitle) => (
                   <div key={groupTitle} className="space-y-1">
-                    <div className="sticky top-0 z-[1] bg-card/95 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
+                    <div className="sticky top-0 z-[1] bg-card/95 py-1 text-[10px] ui-title text-muted-foreground backdrop-blur-sm">
                       {groupTitle}
                     </div>
                     <div className="space-y-1">

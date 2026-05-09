@@ -2101,7 +2101,7 @@ export function NewRunForm(props: {
           <button
             type="button"
             className={cn(
-              "page-title-lower rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-muted transition",
+              "ui-title rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-muted transition",
               !copyPreviewRun && "opacity-60 pointer-events-none"
             )}
             onClick={() => {
@@ -2840,7 +2840,7 @@ export function NewRunForm(props: {
                 {newTireCompoundFromEvent && newTireLabel.trim() ? (
                   <div className="space-y-2">
                     <div className="rounded-md border border-border bg-card px-3 py-2 text-sm">
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="ui-title text-[10px] text-muted-foreground">
                         Event spec compound
                       </div>
                       <div className="font-medium text-foreground mt-0.5">{newTireLabel.trim()}</div>
@@ -3640,7 +3640,7 @@ export function NewRunForm(props: {
 
       {pendingSaveIntent ? (
         <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+          <div className="ui-title text-[11px] text-amber-700 dark:text-amber-300">
             Unsaved changes to setup
           </div>
           <p className="mt-1 text-[11px] leading-snug text-foreground/90">

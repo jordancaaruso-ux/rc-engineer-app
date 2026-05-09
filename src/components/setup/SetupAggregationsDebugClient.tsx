@@ -201,7 +201,7 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
 
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead className="border-b border-border bg-muted/40 text-xs uppercase text-muted-foreground">
+          <thead className="border-b border-border bg-muted/40 text-xs ui-title text-muted-foreground">
             <tr>
               <th className="p-2">Car</th>
               <th className="p-2">Parameter</th>

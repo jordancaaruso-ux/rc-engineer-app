@@ -81,7 +81,7 @@ export function BetweenRunRecentSessionsThings({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="text-[10px] ui-title text-muted-foreground">
         Recent sessions (newest first)
       </div>
       <div className="grid gap-2 sm:grid-cols-1">
@@ -136,7 +136,7 @@ export function BetweenRunRecentSessionsThings({
               <AvgTop10VsFieldHero metrics={s.paceVsFieldMetrics} />
               {s.setupChangesFromPrevious.length > 0 ? (
                 <div className="mt-1.5">
-                  <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="text-[9px] ui-title text-muted-foreground">
                     Setup changes
                   </div>
                   <ul className="mt-0.5 list-disc space-y-0.5 pl-3.5 text-muted-foreground">

@@ -318,13 +318,12 @@ body {
   text-transform: uppercase;
 }
 
-/* In-form / in-card section headings: same brand font as page titles, lowercase. */
-.page-title-lower,
+/* In-form / in-card headings: Montserrat bold, normal case (write labels in Title case in JSX). */
 .ui-title {
   font-family: var(--font-sans), system-ui, sans-serif;
   font-weight: 700;
   font-style: normal;
-  text-transform: lowercase;
+  text-transform: none;
   @apply tracking-tight;
 }
 
@@ -337,9 +336,13 @@ body {
   text-transform: uppercase;
 }
 
-/* Dense UI labels (tables, chips) — not .ui-title */
+/* Dense field / table labels — same brand face as .ui-title, smaller. */
 .ui-label-caps {
-  @apply text-[10px] font-medium uppercase tracking-wide text-muted-foreground;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: none;
+  @apply text-[10px] tracking-tight text-muted-foreground;
 }
 
 .ui-label-meta {
