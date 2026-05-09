@@ -25,7 +25,8 @@ const runSelect = {
   car: { select: { name: true } },
   track: { select: { name: true } },
   trackNameSnapshot: true,
-  event: { select: { name: true } },
+  eventId: true,
+  event: { select: { id: true, name: true } },
   importedLapSets: { select: { driverName: true, isPrimaryUser: true } },
 } as const;
 
@@ -46,7 +47,8 @@ async function resolveRowForRun(
     car: { name: string } | null;
     track: { name: string } | null;
     trackNameSnapshot: string | null;
-    event: { name: string } | null;
+    eventId: string | null;
+    event: { id: string; name: string } | null;
   }
 ): Promise<PaceVsFieldRunDigestRowV1 | null> {
   const sid = run.importedLapTimeSessionId?.trim();
@@ -78,14 +80,18 @@ async function resolveRowForRun(
   const trackName = run.track?.name?.trim() || run.trackNameSnapshot?.trim() || "—";
   const carName = run.car?.name?.trim() || run.carNameSnapshot?.trim() || "—";
   const eventName = run.event?.name?.trim() || null;
+  const eventId = run.eventId?.trim() || null;
   const when = resolveRunDisplayInstant(run);
+  const displayDay = when.toISOString().slice(0, 10);
 
   return {
     runId: run.id,
     sortIso: when.toISOString(),
+    displayDay,
     carId: run.carId,
     carName,
     trackName,
+    eventId,
     eventName,
     sessionSummary: formatRunSessionDisplay({
       sessionType: run.sessionType,
@@ -93,6 +99,7 @@ async function resolveRowForRun(
       meetingSessionCode: run.meetingSessionCode,
       sessionLabel: run.sessionLabel,
     }),
+    importedLapTimeSessionId: sid,
     avgTop10UserSeconds: u,
     avgTop10FieldMeanSeconds: fMean,
     gapUserMinusFieldMeanSeconds: gap,
@@ -167,19 +174,3 @@ export async function buildPaceVsFieldRunDigestForUser(params: {
   };
 }
 
-/** Accept client-reattached digest in chat POST (same shape as GET). */
-export function parsePaceVsFieldRunDigestPayload(raw: unknown): PaceVsFieldRunDigestV1 | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  if (o.version !== 1) return null;
-  if (!Array.isArray(o.rows)) return null;
-  for (const row of o.rows) {
-    if (!row || typeof row !== "object") return null;
-    const r = row as Record<string, unknown>;
-    if (typeof r.runId !== "string" || !r.runId.trim()) return null;
-    if (typeof r.gapUserMinusFieldMeanSeconds !== "number" || !Number.isFinite(r.gapUserMinusFieldMeanSeconds)) {
-      return null;
-    }
-  }
-  return raw as PaceVsFieldRunDigestV1;
-}

@@ -31,8 +31,11 @@ import { useRouter } from "next/navigation";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { Button } from "@/components/ui/Button";
 import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
-import { EngineerPaceVsFieldPanel } from "@/components/engineer/EngineerPaceVsFieldPanel";
-import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import type {
+  EngineerRunSummaryV2,
+  ImportedSessionFieldStatsEngineerCompactV1,
+  PaceVsFieldMetricId,
+} from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { SessionsEngineerPairLinks } from "@/components/runs/SessionsEngineerPairLinks";
 import { RelativeTime } from "@/components/ui/RelativeTime";
@@ -98,6 +101,15 @@ type Run = {
     }>;
   }>;
 };
+
+function fieldMeanSecondsFromAnalysis(
+  fs: ImportedSessionFieldStatsEngineerCompactV1 | null | undefined,
+  metric: PaceVsFieldMetricId
+): number | null {
+  const row = fs?.paceVsFieldMeanAnalysis?.find((m) => m.metric === metric);
+  const v = row?.fieldMeanSeconds;
+  return v != null && Number.isFinite(v) ? v : null;
+}
 
 function formatLapSourceLinkText(url: string): string {
   try {
@@ -542,10 +554,9 @@ function RunDetail({
 }) {
   const router = useRouter();
   const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
-  const [lapPaceSummary, setLapPaceSummary] = useState<EngineerRunSummaryV2 | null>(null);
-  const [lapPaceSummaryLoading, setLapPaceSummaryLoading] = useState(false);
-  const [lapPaceSummaryErr, setLapPaceSummaryErr] = useState<string | null>(null);
-  const lapPaceSummaryCacheRef = React.useRef<{ runId: string; summary: EngineerRunSummaryV2 | null } | null>(null);
+  const [runSessionSummary, setRunSessionSummary] = useState<EngineerRunSummaryV2 | null>(null);
+  const [runSessionSummaryLoading, setRunSessionSummaryLoading] = useState(false);
+  const [runSessionSummaryErr, setRunSessionSummaryErr] = useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [importedLapSetsFull, setImportedLapSetsFull] = useState<Run["importedLapSets"] | null>(
@@ -569,10 +580,9 @@ function RunDetail({
   }, [run, importedLapSetsFull]);
 
   useEffect(() => {
-    lapPaceSummaryCacheRef.current = null;
-    setLapPaceSummary(null);
-    setLapPaceSummaryErr(null);
-    setLapPaceSummaryLoading(false);
+    setRunSessionSummary(null);
+    setRunSessionSummaryErr(null);
+    setRunSessionSummaryLoading(false);
     setShowLapAnalysis(false);
     setImportedLapSetsFull(null);
     setImportedLapsError(null);
@@ -580,18 +590,10 @@ function RunDetail({
   }, [run.id]);
 
   useEffect(() => {
-    if (!showLapAnalysis) return;
-    const rid = run.id;
-    const hit = lapPaceSummaryCacheRef.current;
-    if (hit && hit.runId === rid) {
-      setLapPaceSummary(hit.summary);
-      setLapPaceSummaryErr(null);
-      setLapPaceSummaryLoading(false);
-      return;
-    }
     let alive = true;
-    setLapPaceSummaryLoading(true);
-    setLapPaceSummaryErr(null);
+    const rid = run.id;
+    setRunSessionSummaryLoading(true);
+    setRunSessionSummaryErr(null);
     fetch(`/api/runs/${encodeURIComponent(rid)}/engineer-summary`, { cache: "no-store" })
       .then(async (res) => {
         const data = (await res.json().catch(() => ({}))) as {
@@ -603,20 +605,19 @@ function RunDetail({
       })
       .then((summary) => {
         if (!alive) return;
-        lapPaceSummaryCacheRef.current = { runId: rid, summary };
-        setLapPaceSummary(summary);
+        setRunSessionSummary(summary);
       })
       .catch((err) => {
         if (!alive) return;
-        setLapPaceSummaryErr(err instanceof Error ? err.message : "Could not load lap analysis.");
+        setRunSessionSummaryErr(err instanceof Error ? err.message : "Could not load session summary.");
       })
       .finally(() => {
-        if (alive) setLapPaceSummaryLoading(false);
+        if (alive) setRunSessionSummaryLoading(false);
       });
     return () => {
       alive = false;
     };
-  }, [showLapAnalysis, run.id]);
+  }, [run.id]);
 
   useEffect(() => {
     if (!showLapAnalysis) return;
@@ -762,6 +763,13 @@ function RunDetail({
   }, [run.setupSnapshot?.data, previousRunOnCar]);
   const ownRows = primaryLapRowsFromRun(run);
   const lapDash = getIncludedLapDashboardMetrics(ownRows);
+  const fieldStats = runSessionSummary?.importedSessionFieldStats;
+  const showFieldMetricRow = Boolean(
+    fieldStats &&
+      fieldStats.driverCount >= 2 &&
+      fieldStats.paceVsFieldMeanAnalysis != null &&
+      fieldStats.paceVsFieldMeanAnalysis.length > 0
+  );
   const sourceUrl = tryReadLapSourceUrl(run.lapSession);
   const sourceSummary = formatLapSourceSummary(run.lapSession);
   const uploadedLapSetCount = run.importedLapSets?.length ?? 0;
@@ -812,33 +820,70 @@ function RunDetail({
         <div className="min-w-0 flex-1 space-y-2 border-t border-border pt-4 xl:border-t-0 xl:border-l xl:border-border xl:pt-0 xl:pl-6">
           <h3 className="ui-label-caps">Lap times</h3>
 
-          <div className="space-y-1">
-            <div className="ui-label-caps">
-              Included-lap metrics
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <div className="ui-label-caps">You</div>
+              <div className="flex flex-wrap gap-1 md:gap-1.5">
+                <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
+                <LapStatChip
+                  label="Stint"
+                  title="Sum of included lap times"
+                  value={
+                    lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"
+                  }
+                />
+                <LapStatChip label="Best lap" value={formatLap(lapDash.bestLap)} />
+                <LapStatChip label="Avg top 5" value={formatLap(lapDash.avgTop5)} />
+                <LapStatChip label="Avg top 10" value={formatLap(lapDash.avgTop10)} />
+                <LapStatChip label="Median" value={formatLap(lapDash.median)} />
+                <LapStatChip
+                  label="Consistency"
+                  title="100 − CV; higher = more consistent laps"
+                  value={
+                    lapDash.consistencyScore != null
+                      ? formatConsistencyScorePercent(lapDash.consistencyScore)
+                      : "—"
+                  }
+                />
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1 md:gap-1.5">
-              <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
-              <LapStatChip
-                label="Stint"
-                title="Sum of included lap times"
-                value={
-                  lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"
-                }
-              />
-              <LapStatChip label="Best lap" value={formatLap(lapDash.bestLap)} />
-              <LapStatChip label="Avg top 5" value={formatLap(lapDash.avgTop5)} />
-              <LapStatChip label="Avg top 10" value={formatLap(lapDash.avgTop10)} />
-              <LapStatChip label="Median" value={formatLap(lapDash.median)} />
-              <LapStatChip
-                label="Consistency"
-                title="100 − CV; higher = more consistent laps"
-                value={
-                  lapDash.consistencyScore != null
-                    ? formatConsistencyScorePercent(lapDash.consistencyScore)
-                    : "—"
-                }
-              />
-            </div>
+
+            {runSessionSummaryLoading ? (
+              <p className="text-[10px] text-muted-foreground">Loading session field data…</p>
+            ) : null}
+            {runSessionSummaryErr ? (
+              <p className="text-[10px] text-muted-foreground">
+                Field averages unavailable ({runSessionSummaryErr}).
+              </p>
+            ) : null}
+
+            {showFieldMetricRow && fieldStats ? (
+              <div className="space-y-1">
+                <div className="ui-label-caps">Others (session average)</div>
+                <div className="flex flex-wrap gap-1 md:gap-1.5">
+                  <LapStatChip label="Laps" value="—" title="Not aggregated for the field" />
+                  <LapStatChip label="Stint" value="—" title="Not aggregated for the field" />
+                  <LapStatChip
+                    label="Best lap"
+                    value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "best"))}
+                  />
+                  <LapStatChip
+                    label="Avg top 5"
+                    value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "avg_top_5"))}
+                  />
+                  <LapStatChip
+                    label="Avg top 10"
+                    value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "avg_top_10"))}
+                  />
+                  <LapStatChip
+                    label="Median"
+                    title="Median of entrants’ avg top 10 (typical sustained pace in session)"
+                    value={formatLap(fieldStats.fieldMedianAvgTop10Seconds)}
+                  />
+                  <LapStatChip label="Consistency" value="—" title="Not aggregated for the field" />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-1">
@@ -919,32 +964,25 @@ function RunDetail({
             </div>
             {showLapAnalysis ? (
               <div className="rounded-md border border-border bg-muted/60 p-3 space-y-3">
-                {lapPaceSummaryLoading && !lapPaceSummary && !lapPaceSummaryErr ? (
-                  <p className="text-xs text-muted-foreground">Loading pace vs field…</p>
-                ) : null}
-                {lapPaceSummaryErr ? (
-                  <p className="text-xs text-red-600 dark:text-red-400">{lapPaceSummaryErr}</p>
-                ) : null}
-                {lapPaceSummary ? <EngineerPaceVsFieldPanel summary={lapPaceSummary} /> : null}
-                <div className="ui-label-caps">
-                  Column comparison
-                </div>
                 {importedLapsError ? (
                   <p className="text-xs text-red-600 dark:text-red-400">{importedLapsError}</p>
                 ) : null}
                 {missingImportedLapRows && importedLapsLoading && !importedLapSetsFull ? (
                   <p className="text-xs text-muted-foreground py-1">Loading imported lap sets…</p>
                 ) : (
-                  <LapComparisonColumnGrid
-                    myDisplayName={userDisplayName}
-                    run={runForLapCompare}
-                    currentRunId={run.id}
-                    otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
-                    compareAnchorRun={toCompareRunShape(run)}
-                    pickerRunsForModal={pickerRunsSameCar}
-                    runListSource={runListSource}
-                    librarySessions={libraryLapSessions}
-                  />
+                  <>
+                    <div className="ui-label-caps">Column comparison</div>
+                    <LapComparisonColumnGrid
+                      myDisplayName={userDisplayName}
+                      run={runForLapCompare}
+                      currentRunId={run.id}
+                      otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
+                      compareAnchorRun={toCompareRunShape(run)}
+                      pickerRunsForModal={pickerRunsSameCar}
+                      runListSource={runListSource}
+                      librarySessions={libraryLapSessions}
+                    />
+                  </>
                 )}
               </div>
             ) : null}

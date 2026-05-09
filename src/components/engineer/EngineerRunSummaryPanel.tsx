@@ -1,37 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
-import { EngineerPaceVsFieldPanel } from "@/components/engineer/EngineerPaceVsFieldPanel";
-import { fieldRelativityForSummary } from "@/lib/engineerPhase5/fieldRelativityForSummary";
 import { engineerQuickPromptDisabled, engineerQuickPromptsForSurface } from "@/lib/engineerQuickPrompts";
-import { formatConsistencyScorePercent } from "@/lib/lapAnalysis";
-
-function fmtSec(v: number | null | undefined, notMeaningful?: boolean): string {
-  if (notMeaningful) return "—";
-  if (v == null || !Number.isFinite(v)) return "—";
-  return v.toFixed(3);
-}
-
-function fmtDeltaSec(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(v)) return "—";
-  const sign = v >= 0 ? "+" : "";
-  return `${sign}${v.toFixed(3)}s`;
-}
-
-function fmtDeltaScore(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(v)) return "—";
-  const sign = v >= 0 ? "+" : "";
-  return `${sign}${v.toFixed(2)}`;
-}
-
-function flagClass(flag: string): string {
-  if (flag === "improved") return "text-emerald-600 dark:text-emerald-400";
-  if (flag === "regressed") return "text-rose-600 dark:text-rose-400";
-  if (flag === "flat") return "text-muted-foreground";
-  return "text-muted-foreground";
-}
 
 const quickAskBtnClass =
   "inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition disabled:opacity-40 disabled:cursor-not-allowed";
@@ -105,9 +76,6 @@ export function EngineerRunSummaryPanel({
   }
   if (!summary) return null;
 
-  const lo = summary.lapOutcome;
-  const fieldRel = fieldRelativityForSummary(summary);
-  const engineerChatHref = `/engineer?runId=${encodeURIComponent(runId)}`;
   const hasCompareInUrl = Boolean(compareRunId?.trim());
   const runSummaryQuickPrompts = engineerQuickPromptsForSurface("run_summary");
 
@@ -197,143 +165,6 @@ export function EngineerRunSummaryPanel({
             </div>
           ) : null}
 
-          <EngineerPaceVsFieldPanel summary={summary} explicitPairCompare={hasCompareInUrl} />
-
-          <div className="space-y-1">
-            <div className="text-[10px] ui-title text-muted-foreground">
-              Included lap metrics
-            </div>
-                {fieldRel.showVsFieldColumn ? (
-              <p className="text-[10px] text-muted-foreground leading-snug">
-                <span className="font-medium text-foreground/80">Vs field</span>{" "}
-                {fieldRel.vsFieldUsesSessionMeans ? (
-                  <>
-                    compares each metric to the <span className="font-medium text-foreground/80">session field average</span>{" "}
-                    (mean across entrants with data). Positive = slower than that average. The pace panel leads with{" "}
-                    <span className="font-medium text-foreground/80">
-                      {hasCompareInUrl ? "you vs the comparison run" : "you vs your reference run"}
-                    </span>{" "}
-                    when a reference exists; these columns stay vs field for context.
-                  </>
-                ) : (
-                  <>
-                    uses gaps vs the fastest competitor on each metric (positive = slower). Link a full timing session for
-                    field-average pacing.
-                  </>
-                )}
-              </p>
-            ) : null}
-          </div>
-          <div className="md:hidden space-y-1.5">
-            {(
-              [
-                ["Best", lo.best, "sec", fieldRel.gapBest] as const,
-                ["Avg top 5", lo.avgTop5, "sec", fieldRel.gapAvg5] as const,
-                ["Avg top 10", lo.avgTop10, "sec", fieldRel.gapAvg10] as const,
-                ["Avg top 15", lo.avgTop15, "sec", fieldRel.gapAvg15] as const,
-                ["Consistency", lo.consistencyScore, "score", null] as const,
-              ] as const
-            ).map(([label, m, kind, fieldGap]) => (
-              <div
-                key={`${label}-m`}
-                className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 rounded-md border border-border bg-muted/40 px-2 py-1.5 text-[10px]"
-              >
-                <span className="font-medium text-foreground/85">{label}</span>
-                <div className="ml-auto min-w-0 text-right font-mono text-[10px] space-y-0.5">
-                  <div className="flex justify-end gap-x-4">
-                    <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Value</span>
-                    <span className="tabular-nums">
-                      {kind === "sec"
-                        ? fmtSec(m.current, m.notMeaningful)
-                        : m.current != null
-                          ? formatConsistencyScorePercent(m.current)
-                          : "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-end gap-x-4">
-                    <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">
-                      {hasCompareInUrl ? "Δ cmp" : "Δ ref"}
-                    </span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}
-                    </span>
-                  </div>
-                  {fieldRel.showVsFieldColumn ? (
-                    <div className="flex justify-end gap-x-4">
-                      <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Vs field</span>
-                      <span className="tabular-nums text-muted-foreground">
-                        {fieldGap != null ? fmtDeltaSec(fieldGap) : "—"}
-                      </span>
-                    </div>
-                  ) : null}
-                  <div className="flex justify-end gap-x-4 items-center">
-                    <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Flag</span>
-                    <span className={cn(flagClass(m.flag))}>{m.flag}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="hidden md:block rounded-md border border-border bg-muted/40 overflow-x-auto">
-            <table className="w-full text-left text-[10px]">
-              <thead>
-                <tr className="border-b border-border text-muted-foreground">
-                  <th className="py-1.5 px-2 font-medium">Metric</th>
-                  <th className="py-1.5 px-2 font-medium">This run</th>
-                  <th
-                    className="py-1.5 px-2 font-medium"
-                    title={hasCompareInUrl ? "vs comparison run" : "vs your reference run"}
-                  >
-                    {hasCompareInUrl ? "Δ cmp" : "Δ ref"}
-                  </th>
-                  {fieldRel.showVsFieldColumn ? (
-                    <th
-                      className="py-1.5 px-2 font-medium"
-                      title={
-                        fieldRel.vsFieldUsesSessionMeans
-                          ? "Gap vs session field average (imported timing)"
-                          : "Gap vs session-best competitor (imported timing)"
-                      }
-                    >
-                      Vs field
-                    </th>
-                  ) : null}
-                  <th className="py-1.5 px-2 font-medium">Flag</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono text-foreground/90">
-                {(
-                  [
-                    ["Best", lo.best, "sec", fieldRel.gapBest] as const,
-                    ["Avg top 5", lo.avgTop5, "sec", fieldRel.gapAvg5] as const,
-                    ["Avg top 10", lo.avgTop10, "sec", fieldRel.gapAvg10] as const,
-                    ["Avg top 15", lo.avgTop15, "sec", fieldRel.gapAvg15] as const,
-                    ["Consistency", lo.consistencyScore, "score", null] as const,
-                  ] as const
-                ).map(([label, m, kind, fieldGap]) => (
-                  <tr key={label} className="border-b border-border/60 last:border-0">
-                    <td className="py-1 px-2 text-foreground/80">{label}</td>
-                    <td className="py-1 px-2">
-                      {kind === "sec"
-                        ? fmtSec(m.current, m.notMeaningful)
-                        : m.current != null
-                          ? formatConsistencyScorePercent(m.current)
-                          : "—"}
-                    </td>
-                    <td className="py-1 px-2">
-                      {kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}
-                    </td>
-                    {fieldRel.showVsFieldColumn ? (
-                      <td className="py-1 px-2 tabular-nums text-muted-foreground">
-                        {fieldGap != null ? fmtDeltaSec(fieldGap) : "—"}
-                      </td>
-                    ) : null}
-                    <td className={cn("py-1 px-2", flagClass(m.flag))}>{m.flag}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           <div className="text-muted-foreground">
             Included laps: <span className="text-foreground/90 font-mono">{summary.lapCountIncluded.current}</span>
             {summary.lapCountIncluded.reference != null ? (

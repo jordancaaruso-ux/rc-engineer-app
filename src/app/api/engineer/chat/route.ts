@@ -21,7 +21,10 @@ import {
 } from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
 import { computeResolvedScopeTireStepsV1 } from "@/lib/engineerPhase5/tireLifePriors/computeResolvedScopeTireSteps";
 import { buildSetupHandlingPaceBundle } from "@/lib/engineerPhase5/setupHandlingPaceBundle";
-import { parsePaceVsFieldRunDigestPayload } from "@/lib/engineerPhase5/buildPaceVsFieldRunDigestForUser";
+import {
+  parsePaceVsFieldRunDigestPayload,
+  parsePaceVsFieldRunDigestSubsetPayload,
+} from "@/lib/engineerPhase5/paceVsFieldRunDigestParse";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +91,8 @@ export async function POST(request: Request) {
         timeZone?: unknown;
         /** Client-built digest from GET /api/engineer/pace-vs-field-digest (optional). */
         paceVsFieldRunDigest?: unknown;
+        /** Client-built selected rows from that digest (optional). */
+        paceVsFieldRunDigestSubset?: unknown;
       }
     | null;
     const raw = Array.isArray(body?.messages) ? body!.messages : [];
@@ -155,6 +160,7 @@ export async function POST(request: Request) {
     const runCatalog = includeRunCatalog ? await buildRunCatalogV1({ userId: user.id }) : null;
 
     const paceVsFieldRunDigest = parsePaceVsFieldRunDigestPayload(body?.paceVsFieldRunDigest);
+    const paceVsFieldRunDigestSubset = parsePaceVsFieldRunDigestSubsetPayload(body?.paceVsFieldRunDigestSubset);
 
     const tireLifePriors = await buildTireLifePriorsForChatContext({
       userId: user.id,
@@ -200,6 +206,8 @@ export async function POST(request: Request) {
       thingsToDo: basePacket.thingsToDo,
       /** Pre-scanned runs with meaningful avg top 10 vs session field mean (optional). */
       paceVsFieldRunDigest,
+      /** User-selected slice of paceVsFieldRunDigest for focused answers (optional). */
+      paceVsFieldRunDigestSubset,
     };
 
     const baseForMerge = {
@@ -213,6 +221,7 @@ export async function POST(request: Request) {
       thingsToTry: basePacket.thingsToTry,
       thingsToDo: basePacket.thingsToDo,
       paceVsFieldRunDigest,
+      paceVsFieldRunDigestSubset,
     };
 
     const out = await generateEngineerChatReplyWithTools({

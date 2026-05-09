@@ -19,7 +19,7 @@ export const ENGINEER_PROMPT_SANITY_CHECK =
   "Scan the anchored run context for anything inconsistent or worth double-checking (setup vs car template, tires vs session, missing track, thin lap data). List issues briefly; if nothing stands out, say so.";
 
 export const ENGINEER_PROMPT_WHAT_CONTEXT =
-  "Briefly list what structured context you have for this chat (focused runs, setupVsSpread, conditionalSetupEmpirical, patternDigest if any, paceVsFieldRunDigest if attached, run catalog if enabled). Do not invent data—only what is actually in context.";
+  "Briefly list what structured context you have for this chat (focused runs, setupVsSpread, conditionalSetupEmpirical, patternDigest if any, paceVsFieldRunDigest if attached, paceVsFieldRunDigestSubset if attached, run catalog if enabled). Do not invent data—only what is actually in context.";
 
 export const ENGINEER_PROMPT_EXPLAIN_LAP_DELTA_SETUP =
   "The URL has both primary and compare runs. Using focusedRunPair.lapComparison and setupComparison together, discuss which setup differences might plausibly relate to the lap-time delta—use cautious language (correlation not proof). If lap or setup data is missing, say what is absent.";
@@ -31,7 +31,10 @@ export const ENGINEER_PROMPT_TREND_ACROSS_RUNS =
   "patternDigest is in context: describe trends across those runs (pace vs setup keys that changed). Reference run order oldest→newest. If digest is thin, say so and what extra runs would help.";
 
 export const ENGINEER_PROMPT_PACE_VS_FIELD_INDEX =
-  "paceVsFieldRunDigest is attached. Summarize it for me: every row with runId, car, track, event/session label, my avg top 10, field mean, gap (avg10 minus session field mean — negative = faster than average), and rank when present. Sort order in JSON is already best-vs-field first. Explicitly name the single best (most negative gap) and worst (most positive gap) runIds. If omittedAfterCap > 0 or truncatedScan is true, say more runs existed than listed. If rows is empty, say no runs qualified (need linked multi-driver timing import and ≥10 included laps for avg top 10). Do not invent gaps for runs not in rows.";
+  "When paceVsFieldRunDigestSubset is attached, summarize **subset.rows** first (read filterSummary): each row with runId, displayDay, car, track, event/session label, my avg top 10, field mean, gap (avg10 minus session field mean — negative = faster than average), and rank when present. Sort order in subset.rows is already best-vs-field first. Name the best (most negative gap) and worst (most positive gap) runIds **within the subset only**. If paceVsFieldRunDigest is also attached, treat it as inventory only unless the user asks for the full list. When there is no subset, summarize paceVsFieldRunDigest.rows the same way. If omittedAfterCap > 0 or truncatedScan on the parent digest, note inventory limits. If applicable rows are empty, say none qualified. Do not invent gaps for runs not in the rows you summarize.";
+
+export const ENGINEER_PROMPT_PACE_VS_FIELD_SETUP_COMPARE =
+  "paceVsFieldRunDigestSubset is attached with at least two runs. Compare setup-relevant angles only using data you actually have: name the runIds in the subset, rank them by gap vs field mean, and suggest which **pair** of runIds would be the fairest head-to-head setup comparison (same event/track/day when possible) and why. If the user should use apply_engineer_focus to load a pair into URL context before a deep setup diff, say that plainly. Do not invent setup fields or lap times outside context.";
 
 export const ENGINEER_PROMPT_LEARN_PARAMETERS =
   "Using richEngineerContext.setupVsSpread and vehicleDynamicsKb, pick up to 4 chassis tuning parameters from the anchored run where I have values but weak or missing spread bands (no_spread_data / not_numeric) or where positionBand is below_typical or above_typical. For each: what the adjustment does in plain RC terms, typical tradeoffs, and what to verify on track. If setupVsSpread is empty, say that a focused run with setup data is needed. Do not discuss motor, pinion, wing, or ESC.";
@@ -49,6 +52,8 @@ export type EngineerQuickPromptDefinition = {
   requiresPatternDigest?: boolean;
   /** If true, disable unless client attached pace-vs-field digest to chat. */
   requiresPaceVsFieldDigest?: boolean;
+  /** If set, disable unless paceVsFieldRunDigestSubset has at least this many rows (chat panel only). */
+  requiresPaceVsFieldSubsetMinRuns?: number;
   /**
    * If false, button stays enabled without `runId` in the URL.
    * Omitted means a focused run is required for a useful answer.
@@ -139,6 +144,15 @@ const DEFS: EngineerQuickPromptDefinition[] = [
     requiresRunId: false,
     surfaces: ["chat_panel"],
   },
+  {
+    id: "pace_vs_field_setup_compare",
+    label: "Compare selected runs' setup",
+    prompt: ENGINEER_PROMPT_PACE_VS_FIELD_SETUP_COMPARE,
+    requiresPaceVsFieldDigest: true,
+    requiresPaceVsFieldSubsetMinRuns: 2,
+    requiresRunId: false,
+    surfaces: ["chat_panel"],
+  },
 ];
 
 export function engineerQuickPromptsForSurface(surface: EngineerQuickPromptSurface): EngineerQuickPromptDefinition[] {
@@ -156,11 +170,18 @@ export function engineerQuickPromptDisabled(
     hasCompareRunId: boolean;
     hasPatternDigest: boolean;
     hasPaceVsFieldDigest?: boolean;
+    paceSubsetRowCount?: number;
   }
 ): boolean {
   if (def.requiresRunId !== false && !ctx.hasRunId) return true;
   if (def.requiresCompare && !ctx.hasCompareRunId) return true;
   if (def.requiresPatternDigest && !ctx.hasPatternDigest) return true;
   if (def.requiresPaceVsFieldDigest && !ctx.hasPaceVsFieldDigest) return true;
+  if (
+    def.requiresPaceVsFieldSubsetMinRuns != null &&
+    (ctx.paceSubsetRowCount ?? 0) < def.requiresPaceVsFieldSubsetMinRuns
+  ) {
+    return true;
+  }
   return false;
 }
