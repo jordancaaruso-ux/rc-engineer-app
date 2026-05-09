@@ -2096,12 +2096,12 @@ export function NewRunForm(props: {
       {/* Copy last run shortcut (optional) — hidden when finishing a draft,
           since the run already has its own baseline nailed down. */}
       {!isDraft ? (
-      <div className="rounded-lg border border-border bg-muted/50 px-4 py-3">
+      <div className="rounded-lg border border-border bg-muted/70 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
             className={cn(
-              "rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted transition",
+              "page-title-lower rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-muted transition",
               !copyPreviewRun && "opacity-60 pointer-events-none"
             )}
             onClick={() => {
@@ -2147,7 +2147,7 @@ export function NewRunForm(props: {
       <div className="flex items-center gap-3 pt-2">
         <div className="h-px flex-1 bg-border/60" />
         <div className="flex flex-col items-center">
-          <div className="ui-title text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="ui-title text-[11px] text-muted-foreground">
             Before the run
           </div>
           <div className="text-[11px] text-muted-foreground/80">
@@ -2771,7 +2771,7 @@ export function NewRunForm(props: {
 
             {trackId ? (
               <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
-                <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">
+                <div className="ui-title text-xs text-muted-foreground">
                   Track details (saved on track)
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
@@ -3452,7 +3452,7 @@ export function NewRunForm(props: {
         <div className="flex flex-col items-center">
           <div
             className={cn(
-              "ui-title text-[11px] uppercase tracking-[0.18em]",
+              "ui-title text-[11px]",
               isDraft ? "text-amber-600 dark:text-amber-300" : "text-muted-foreground"
             )}
           >

@@ -176,7 +176,7 @@ export function SetupSheetModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="setup-sheet-modal-close sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-background/95">
-          <div className="ui-title text-sm text-muted-foreground truncate min-w-0">
+          <div className="ui-title text-sm text-muted-foreground truncate min-w-0 normal-case">
             {run ? formatRunPickerLine(run) : "Setup"}
           </div>
           <button
@@ -195,7 +195,7 @@ export function SetupSheetModal({
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1 space-y-2">
-                  <span className="ui-title text-xs text-muted-foreground uppercase tracking-wide">
+                  <span className="ui-title text-xs text-muted-foreground">
                     Compare to
                   </span>
                   <div className="flex flex-wrap items-center gap-2">

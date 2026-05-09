@@ -168,7 +168,7 @@ export function VideoOverlayClient() {
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-        <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">Overlay player</div>
+        <div className="ui-title text-xs text-muted-foreground">Overlay player</div>
 
         <div
           className="rounded-md border border-border bg-black overflow-hidden"

@@ -195,7 +195,7 @@ export default async function SetupPage({
 
         <div className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-4 py-2">
-            <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">Downloaded setups</div>
+            <div className="ui-title text-xs text-muted-foreground">Downloaded setups</div>
             <div className="flex items-center gap-2">
               <NewSetupUploadButton cars={cars} />
               <Link href="/setup-documents" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
@@ -238,7 +238,7 @@ export default async function SetupPage({
 
         <div className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-4 py-2">
-            <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">Setups from runs</div>
+            <div className="ui-title text-xs text-muted-foreground">Setups from runs</div>
             <Link href="/runs/history" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
               View runs
             </Link>
@@ -270,7 +270,7 @@ export default async function SetupPage({
 
         <div className="rounded-lg border border-border/70 bg-muted/30">
           <div className="flex items-center justify-between border-b border-border/70 px-4 py-2">
-            <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="ui-title text-xs text-muted-foreground">
               Setup calibrations <span className="normal-case opacity-80">(advanced)</span>
             </div>
             <Link href="/setup-calibrations" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">

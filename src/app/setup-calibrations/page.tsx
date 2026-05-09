@@ -55,7 +55,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
               return (
                 <div key={c.id} className="px-4 py-3 flex items-center justify-between gap-2">
                   <div>
-                    <div className="ui-title text-sm text-foreground">{c.name}</div>
+                    <div className="ui-title text-sm text-foreground normal-case">{c.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {c.sourceType} · {formFields} form · {textFields} text · {regionFields} region ·{" "}
                       {new Date(c.createdAt).toLocaleDateString()}

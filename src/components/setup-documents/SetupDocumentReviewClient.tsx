@@ -550,7 +550,7 @@ export function SetupDocumentReviewClient({
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="ui-title text-sm">{doc.originalFilename}</h2>
+            <h2 className="ui-title text-sm normal-case">{doc.originalFilename}</h2>
             <p className="text-xs text-muted-foreground">
               {liveDoc.sourceType} · {parseStatusLabel} · {liveDoc.parserType ?? "no parser"}
             </p>
@@ -869,7 +869,7 @@ export function SetupDocumentReviewClient({
         <div className={mode === "manual" ? "xl:sticky xl:top-4 xl:self-start" : ""}>
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">Original sheet</div>
+              <div className="ui-title text-xs text-muted-foreground">Original sheet</div>
               <button
                 type="button"
                 className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted"
@@ -887,7 +887,7 @@ export function SetupDocumentReviewClient({
         <div className="space-y-3">
           <div className={mode === "manual" ? "xl:sticky xl:top-4 xl:z-10" : ""}>
             <div className="rounded-lg border border-border bg-card p-3">
-              <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">
+              <div className="ui-title text-xs text-muted-foreground">
                 {mode === "manual" ? "Edit structured setup" : "Review parsed setup"}
               </div>
               {liveDoc.parsedSetupManuallyEdited ? (
@@ -982,7 +982,7 @@ export function SetupDocumentReviewClient({
           )}
 
           <div className="rounded-lg border border-border bg-card p-3">
-            <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">Extracted text</div>
+            <div className="ui-title text-xs text-muted-foreground">Extracted text</div>
             <div className="mt-1 rounded border border-border/70 bg-muted/40 p-2 text-[11px] text-muted-foreground">
               <div>Text length: {(liveDoc.extractedText ?? "").length}</div>
               <div>Mapped field count: {mappedKeys.length}</div>

@@ -116,7 +116,7 @@ export function EngineerRunSummaryPanel({
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
-        <div className="ui-title text-[10px] uppercase tracking-wide text-muted-foreground">Engineer summary</div>
+        <div className="ui-title text-[10px] text-muted-foreground">Engineer summary</div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           {cached && !compareRunId?.trim() ? <span>cached</span> : null}
         </div>

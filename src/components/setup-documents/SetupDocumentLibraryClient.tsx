@@ -140,7 +140,7 @@ export function SetupDocumentLibraryClient({
       </div>
 
       <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-2 ui-title text-xs uppercase tracking-wide text-muted-foreground">
+        <div className="border-b border-border px-4 py-2 ui-title text-xs text-muted-foreground">
           Setup documents
         </div>
         {initialDocuments.length === 0 ? (
@@ -150,7 +150,7 @@ export function SetupDocumentLibraryClient({
             {initialDocuments.map((doc) => (
               <div key={doc.id} className="flex items-center justify-between gap-4 px-4 py-3">
                 <div className="min-w-0">
-                  <div className="truncate ui-title text-sm">{doc.originalFilename}</div>
+                  <div className="truncate ui-title text-sm normal-case">{doc.originalFilename}</div>
                   <div className="mt-0.5 text-[11px] text-muted-foreground">
                     {doc.createdAtLabel ?? doc.createdAt} · {doc.sourceType} ·{" "}
                     <span className={cn(statusClass(doc.parseStatus))}>{doc.parseStatus}</span>

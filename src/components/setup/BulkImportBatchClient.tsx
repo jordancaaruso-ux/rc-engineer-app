@@ -201,7 +201,7 @@ export function BulkImportBatchClient({
           </p>
         ) : (
           <label className="text-xs">
-            <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground mb-1">Car for new PDFs</div>
+            <div className="ui-title text-xs text-muted-foreground mb-1">Car for new PDFs</div>
             <select
               className="mt-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
               value={uploadCarId}
@@ -218,7 +218,7 @@ export function BulkImportBatchClient({
           </label>
         )}
         <div>
-          <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground mb-1">Add PDFs</div>
+          <div className="ui-title text-xs text-muted-foreground mb-1">Add PDFs</div>
           <input
             type="file"
             accept="application/pdf"

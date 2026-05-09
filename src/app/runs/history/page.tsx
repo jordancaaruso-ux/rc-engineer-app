@@ -286,7 +286,7 @@ export default async function RunHistoryPage({
           </div>
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <ButtonLink href="/runs/new" variant="primary">
+          <ButtonLink href="/runs/new" variant="primary" className="btn-brand">
             New run
           </ButtonLink>
           <span className="text-[11px] text-muted-foreground">
@@ -311,7 +311,7 @@ export default async function RunHistoryPage({
               {groups.map((group, idx) => (
                 <details
                   key={group.id}
-                  className="rounded-lg border border-border bg-muted/50 overflow-hidden group/details"
+                  className="rounded-xl border border-border bg-muted/70 overflow-hidden group/details"
                   open={
                     focusRunId
                       ? group.runs.some((r) => r.id === focusRunId)
@@ -321,14 +321,16 @@ export default async function RunHistoryPage({
                   <summary className="list-none cursor-pointer">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="font-medium text-sm">{group.title}</span>
-                        <span className="text-xs text-muted-foreground">{group.type}</span>
+                        <span className="page-title text-sm text-foreground">{group.title}</span>
+                        <span className="page-title-lower text-xs text-muted-foreground">{group.type}</span>
                         {group.trackName && (
-                          <span className="text-xs text-muted-foreground">· {group.trackName}</span>
+                          <span className="page-title-lower text-xs text-muted-foreground">
+                            · {group.trackName}
+                          </span>
                         )}
-                        <span className="text-xs text-muted-foreground">{group.dateLabel}</span>
+                        <span className="page-title-lower text-xs text-muted-foreground">{group.dateLabel}</span>
                       </div>
-                      <span className="text-sm font-medium text-muted-foreground tabular-nums">
+                      <span className="page-title-lower text-sm text-muted-foreground tabular-nums">
                         {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
                       </span>
                     </div>

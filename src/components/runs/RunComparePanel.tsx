@@ -165,7 +165,7 @@ export function RunComparePanel({
       onClick={(e) => e.stopPropagation()}
     >
       <div>
-        <h3 className="ui-title text-xs text-muted-foreground uppercase tracking-wide">
+        <h3 className="ui-title text-xs text-muted-foreground">
           Compare setup
         </h3>
         <p className="text-xs text-muted-foreground mt-1">{sourceNote}</p>
@@ -223,7 +223,7 @@ export function RunComparePanel({
               <div className="font-mono text-[11px] break-words">{formatRunPickerLine(baseRun)}</div>
             </div>
             <div className="rounded-md border border-border bg-muted/70 p-3 space-y-1">
-              <div className="ui-title text-sm text-muted-foreground">{rightLabel}</div>
+              <div className="ui-title text-sm text-muted-foreground normal-case">{rightLabel}</div>
               {mode === "current_setup" ? (
                 <p className="text-muted-foreground text-[11px]">
                   Values from Log your run (last saved locally).
@@ -267,14 +267,14 @@ export function RunComparePanel({
               </p>
             </div>
             <div>
-              <span className="ui-title text-sm text-muted-foreground">Tires · {rightLabel.toLowerCase()}</span>
+              <span className="ui-title text-sm text-muted-foreground">Tires · {rightLabel}</span>
               <p className="mt-1">{tiresRight}</p>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="ui-title text-xs text-muted-foreground uppercase tracking-wide">
+              <h4 className="ui-title text-xs text-muted-foreground">
                 Setup values
               </h4>
               <label className="flex items-center gap-2 text-xs cursor-pointer select-none">

@@ -310,12 +310,22 @@ body {
   @apply text-base tracking-tight text-foreground;
 }
 
-/* Page chrome + form section labels: bold + italic + uppercase (Montserrat). */
-:where(.page-title, .ui-title) {
+/* Page chrome only: italic uppercase Montserrat (matches sidebar brand). */
+:where(.page-title) {
   font-family: var(--font-sans), system-ui, sans-serif;
   font-weight: 700;
   font-style: italic;
   text-transform: uppercase;
+}
+
+/* In-form / in-card section headings: same brand font as page titles, lowercase. */
+.page-title-lower,
+.ui-title {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: lowercase;
+  @apply tracking-tight;
 }
 
 /* Strong brand voice: sidebar nav + explicit .ui-strong / .btn-brand.

@@ -69,7 +69,7 @@ export function VideoLibraryClient({ initialVideos }: { initialVideos: VideoRow[
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-border bg-card p-4 space-y-3 max-w-2xl">
-        <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">Upload video</div>
+        <div className="ui-title text-xs text-muted-foreground">Upload video</div>
         <p className="text-[11px] text-muted-foreground">
           Server uploads are capped on Vercel (roughly 4–4.5MB). For now, keep clips short/small.
         </p>
@@ -114,7 +114,7 @@ export function VideoLibraryClient({ initialVideos }: { initialVideos: VideoRow[
       </div>
 
       <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-2 ui-title text-xs uppercase tracking-wide text-muted-foreground">
+        <div className="border-b border-border px-4 py-2 ui-title text-xs text-muted-foreground">
           Your videos
         </div>
         {videos.length === 0 ? (

@@ -197,7 +197,7 @@ export function BulkImportHubClient({
         onSubmit={createBatch}
         className="rounded-lg border border-border bg-card p-4 space-y-3 max-w-2xl"
       >
-        <div className="ui-title text-xs uppercase tracking-wide text-muted-foreground">New import batch</div>
+        <div className="ui-title text-xs text-muted-foreground">New import batch</div>
         <p className="text-xs text-muted-foreground">
           Name the batch, choose a car, then add PDFs from disk, or paste a PetitRC URL (e.g. Awesomatix hub), or both.
           Open each file later to pick a calibration and parse.
@@ -344,7 +344,7 @@ export function BulkImportHubClient({
       </form>
 
       <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-2 ui-title text-xs uppercase tracking-wide text-muted-foreground">
+        <div className="border-b border-border px-4 py-2 ui-title text-xs text-muted-foreground">
           Recent batches
         </div>
         {initialBatches.length === 0 ? (

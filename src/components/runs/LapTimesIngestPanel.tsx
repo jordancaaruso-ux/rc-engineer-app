@@ -669,7 +669,7 @@ export function LapTimesIngestPanel({
             <div className="space-y-2 rounded-md border border-accent/35 bg-accent/5 p-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="ui-title text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <div className="ui-title text-[11px] text-muted-foreground">
                     Your sessions at this event
                   </div>
                   <p className="mt-0.5 ui-label-meta">
@@ -743,7 +743,7 @@ export function LapTimesIngestPanel({
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="ui-title text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <div className="ui-title text-[11px] text-muted-foreground">
                     {dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl)
                       ? "Race / results index URL"
                       : "Practice day URL"}
