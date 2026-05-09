@@ -164,6 +164,16 @@ export async function buildRecentSessionsForBetweenHints(params: {
     const meta = metaById.get(runId);
     const label = meta ? runDisplayLabel(meta) : runId;
     const pace = summary ? paceVsFieldSummaryFromEngineerSummary(summary) : null;
+    const paceMetrics = summary?.importedSessionFieldStats?.paceVsFieldMeanAnalysis ?? null;
+    const paceMetricsSig =
+      paceMetrics && paceMetrics.length > 0
+        ? paceMetrics
+            .map(
+              (m) =>
+                `${m.metric}:${m.fieldMeanSeconds ?? ""}:${m.userSeconds ?? ""}:${m.gapUserMinusFieldMeanSeconds ?? ""}:${m.rankInField ?? ""}:${m.meaningful ? 1 : 0}`
+            )
+            .join("|")
+        : null;
     const setupLines =
       summary?.setupChanges.map((c) => `${c.label}: ${c.before} → ${c.after}`) ?? [];
     const bestFlag = summary?.lapOutcome.best.flag ?? null;
@@ -174,6 +184,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
       bestLapSeconds: summary?.lapOutcome.best.current ?? null,
       bestLapVsPreviousFlag: summary?.referenceRunId ? bestFlag : null,
       paceVsFieldSummary: pace,
+      paceVsFieldMetrics: paceMetrics && paceMetrics.length > 0 ? paceMetrics : null,
       setupChangesFromPrevious: setupLines,
       notesPreview: meta ? notesPreviewFromRun(meta.notes, meta.driverNotes) : null,
       handlingPreview: meta ? handlingPreviewFromRun(meta.handlingProblems, meta.handlingAssessmentJson) : null,
@@ -185,6 +196,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
       bestFlag,
       setupSig: (summary?.setupChanges ?? []).map((c) => `${c.key}:${c.before}>${c.after}`),
       paceLine: pace,
+      paceMetricsSig,
     });
   }
 

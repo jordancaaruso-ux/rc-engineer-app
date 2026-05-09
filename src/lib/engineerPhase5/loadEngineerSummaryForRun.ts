@@ -102,9 +102,17 @@ function toShape(
 }
 
 function normalizeCachedSummaryJson(raw: EngineerRunSummaryV2): EngineerRunSummaryV2 {
+  const fs = raw.importedSessionFieldStats;
+  const patched =
+    fs != null
+      ? {
+          ...fs,
+          paceVsFieldMeanAnalysis: fs.paceVsFieldMeanAnalysis ?? null,
+        }
+      : null;
   return {
     ...raw,
-    importedSessionFieldStats: raw.importedSessionFieldStats ?? null,
+    importedSessionFieldStats: patched,
   };
 }
 

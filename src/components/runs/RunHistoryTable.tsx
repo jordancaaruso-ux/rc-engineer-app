@@ -724,7 +724,7 @@ function RunDetail({
 
   return (
     <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-5 text-sm">
-      <EngineerRunSummaryPanel runId={run.id} defaultExpanded={false} />
+      <EngineerRunSummaryPanel runId={run.id} defaultExpanded={false} sessionsFieldSummaryPinned />
 
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
         <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Engineer</div>

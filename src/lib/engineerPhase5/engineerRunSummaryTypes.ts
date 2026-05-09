@@ -20,6 +20,23 @@ export type EngineerSetupChangeRow = {
   severity: string;
 };
 
+/** One row of “you vs session field average” for a single lap metric. */
+export type PaceVsFieldMetricId = "best" | "avg_top_5" | "avg_top_10" | "avg_top_15";
+
+export type PaceVsFieldMetricSnapshotV1 = {
+  metric: PaceVsFieldMetricId;
+  label: string;
+  /** Arithmetic mean of this metric across entrants with a finite value. */
+  fieldMeanSeconds: number | null;
+  userSeconds: number | null;
+  /** User minus field mean; positive ⇒ slower than the session average. */
+  gapUserMinusFieldMeanSeconds: number | null;
+  /** 1 = best (lowest time) among entrants with a finite value for this metric. */
+  rankInField: number | null;
+  fieldEntrantCountForMetric: number;
+  meaningful: boolean;
+};
+
 /** Session-level aggregates from linked `ImportedLapTimeSession.fieldStatsJson` (full parsed field). */
 export type ImportedSessionFieldStatsEngineerCompactV1 = {
   version: 1;
@@ -31,6 +48,11 @@ export type ImportedSessionFieldStatsEngineerCompactV1 = {
   sessionBestAvgTop10Seconds: number | null;
   fieldMedianBestSeconds: number | null;
   fieldMedianAvgTop5Seconds: number | null;
+  /**
+   * Per-metric: session field **mean** vs your value, gap, and rank (when multi-driver aggregates exist).
+   * Null when fewer than two drivers or your row is unmatched.
+   */
+  paceVsFieldMeanAnalysis: PaceVsFieldMetricSnapshotV1[] | null;
   /**
    * Your row inferred from imported lap sets flagged `isPrimaryUser`, or lone driver fallback.
    * Gaps vs session-best columns (**positive ⇒ you slower**) when both sides finite.

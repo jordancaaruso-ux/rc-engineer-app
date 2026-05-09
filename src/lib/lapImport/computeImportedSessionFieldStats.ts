@@ -13,6 +13,8 @@ export type ImportedSessionFieldDriverStatV1 = {
   bestLapSeconds: number | null;
   avgTop5Seconds: number | null;
   avgTop10Seconds: number | null;
+  /** Mean of fastest 15 included laps when computable (same rule as {@link getAverageTopN}). */
+  avgTop15Seconds: number | null;
   rankByBest: number | null;
 };
 
@@ -25,6 +27,11 @@ export type ImportedSessionFieldStatsV1 = {
     medianBestSeconds: number | null;
     medianAvgTop5Seconds: number | null;
     minBestSeconds: number | null;
+    /** Arithmetic mean of each metric across drivers with a finite value (session “field average”). */
+    meanBestSeconds: number | null;
+    meanAvgTop5Seconds: number | null;
+    meanAvgTop10Seconds: number | null;
+    meanAvgTop15Seconds: number | null;
   };
 };
 
@@ -41,6 +48,12 @@ function medianSorted(sorted: number[]): number | null {
   const mid = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 1) return sorted[mid]!;
   return (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+function meanFiniteValues(values: number[]): number | null {
+  const xs = values.filter((v) => typeof v === "number" && Number.isFinite(v));
+  if (xs.length === 0) return null;
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
 
 /**
@@ -69,6 +82,7 @@ function buildImportedSessionStatsFromDriversArray(
       bestLapSeconds: best,
       avgTop5Seconds: getAverageTopN(rows, 5),
       avgTop10Seconds: getAverageTopN(rows, 10),
+      avgTop15Seconds: getAverageTopN(rows, 15),
       rankByBest: null,
     };
   });
@@ -87,6 +101,14 @@ function buildImportedSessionStatsFromDriversArray(
     .map((x) => x.avgTop5Seconds)
     .filter((v): v is number => v != null && Number.isFinite(v))
     .sort((a, b) => a - b);
+  const avg10Values = drivers
+    .map((x) => x.avgTop10Seconds)
+    .filter((v): v is number => v != null && Number.isFinite(v))
+    .sort((a, b) => a - b);
+  const avg15Values = drivers
+    .map((x) => x.avgTop15Seconds)
+    .filter((v): v is number => v != null && Number.isFinite(v))
+    .sort((a, b) => a - b);
 
   return {
     version: IMPORTED_SESSION_FIELD_STATS_VERSION,
@@ -97,6 +119,10 @@ function buildImportedSessionStatsFromDriversArray(
       medianBestSeconds: medianSorted(bestValues),
       medianAvgTop5Seconds: medianSorted(avg5Values),
       minBestSeconds: bestValues.length > 0 ? bestValues[0]! : null,
+      meanBestSeconds: meanFiniteValues(bestValues),
+      meanAvgTop5Seconds: meanFiniteValues(avg5Values),
+      meanAvgTop10Seconds: meanFiniteValues(avg10Values),
+      meanAvgTop15Seconds: meanFiniteValues(avg15Values),
     },
   };
 }

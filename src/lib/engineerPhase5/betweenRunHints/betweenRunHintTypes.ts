@@ -1,6 +1,6 @@
 /** Payload stored in `EngineerBetweenRunHint.payloadJson` and returned to clients. */
 
-import type { EngineerLapMetricFlag } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import type { EngineerLapMetricFlag, PaceVsFieldMetricSnapshotV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 
 export type BetweenRunHintSignal =
   | "lap_regressed"
@@ -41,7 +41,10 @@ export type BetweenRunRecentSessionSnapshotV1 = {
   bestLapSeconds: number | null;
   /** vs your prior session on this car when a reference exists for that run. */
   bestLapVsPreviousFlag: EngineerLapMetricFlag | null;
+  /** Multi-line text for LLM (includes vs field mean when available). */
   paceVsFieldSummary: string | null;
+  /** Structured pace vs session field average; absent on older cached hint payloads. */
+  paceVsFieldMetrics?: PaceVsFieldMetricSnapshotV1[] | null;
   setupChangesFromPrevious: string[];
   notesPreview: string | null;
   handlingPreview: string | null;
@@ -76,5 +79,7 @@ export type RecentSessionsFingerprintMaterial = {
     bestFlag: string | null;
     setupSig: string[];
     paceLine: string | null;
+    /** Stable digest of pace-vs-field mean rows for cache invalidation. */
+    paceMetricsSig: string | null;
   }>;
 };

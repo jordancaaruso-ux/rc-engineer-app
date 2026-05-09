@@ -9,6 +9,7 @@ import {
 import {
   buildImportedSessionFieldStatsEngineerCompact,
   importedSessionFieldStatsV1FromJson,
+  normalizeImportedSessionFieldStatsV1,
   primaryNormsFromImportedLapSets,
 } from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
 import { prisma } from "@/lib/prisma";
@@ -60,6 +61,7 @@ function derivedStatsFromImportedSessionRow(row: {
   if (!stats && row.parsedPayload != null) {
     stats = computeImportedSessionFieldStatsFromPayload(row.parsedPayload);
     if (stats) {
+      stats = normalizeImportedSessionFieldStatsV1(stats);
       void prisma.importedLapTimeSession
         .update({
           where: { id: row.id },

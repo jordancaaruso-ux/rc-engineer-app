@@ -27,6 +27,22 @@ function importedSessionFieldPhrase(summary: EngineerRunSummaryV2): string {
   const parts: string[] = [];
   if (y) {
     if (y.rankByBest != null) parts.push(`rank by best lap ${y.rankByBest} of ${s.driverCount}`);
+    const analysis = s.paceVsFieldMeanAnalysis;
+    if (analysis && analysis.length > 0) {
+      for (const row of analysis) {
+        if (!row.meaningful && row.userSeconds == null) continue;
+        const gap =
+          row.gapUserMinusFieldMeanSeconds != null && Number.isFinite(row.gapUserMinusFieldMeanSeconds)
+            ? `${row.gapUserMinusFieldMeanSeconds >= 0 ? "+" : ""}${row.gapUserMinusFieldMeanSeconds.toFixed(3)}s vs field avg`
+            : null;
+        const rk =
+          row.rankInField != null && row.fieldEntrantCountForMetric >= 2
+            ? `rank ${row.rankInField}/${row.fieldEntrantCountForMetric} on ${row.label}`
+            : null;
+        const bits = [gap, rk].filter(Boolean);
+        if (bits.length) parts.push(`${row.label}: ${bits.join("; ")}`);
+      }
+    }
     const gBest =
       y.gapBestToSessionBestSeconds != null && Number.isFinite(y.gapBestToSessionBestSeconds)
         ? `${y.gapBestToSessionBestSeconds.toFixed(3)}s slower than session best lap`
@@ -41,9 +57,11 @@ function importedSessionFieldPhrase(summary: EngineerRunSummaryV2): string {
       Number.isFinite(y.gapAvgTop10ToSessionBestAvg10Seconds)
         ? `${y.gapAvgTop10ToSessionBestAvg10Seconds.toFixed(3)}s slower than best avg-top-10 in session`
         : null;
-    if (gBest) parts.push(`best lap gap ${gBest}`);
-    if (g5) parts.push(`avg top-5 gap ${g5}`);
-    if (g10) parts.push(`avg top-10 gap ${g10}`);
+    if (!analysis?.length) {
+      if (gBest) parts.push(`best lap gap ${gBest}`);
+      if (g5) parts.push(`avg top-5 gap ${g5}`);
+      if (g10) parts.push(`avg top-10 gap ${g10}`);
+    }
   } else {
     parts.push(`field has ${s.driverCount} drivers; your row was not matched to a primary imported driver name`);
   }
