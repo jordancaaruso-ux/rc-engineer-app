@@ -163,41 +163,53 @@ export async function importOneTimingUrl(
   };
 }
 
-export async function linkImportedSessionToRun(params: {
-  userId: string;
-  importedLapTimeSessionId: string;
-  runId: string;
-}): Promise<boolean> {
-  const sess = await prisma.importedLapTimeSession.findFirst({
-    where: { id: params.importedLapTimeSessionId, userId: params.userId },
-    select: { id: true, linkedRunId: true },
-  });
-  if (!sess) return false;
-  if (sess.linkedRunId != null && sess.linkedRunId !== params.runId) return false;
-  await prisma.importedLapTimeSession.update({
-    where: { id: sess.id },
-    data: { linkedRunId: params.runId },
-  });
-  return true;
-}
-
+/**
+ * Attach imported timing session(s) to a run. `Run.importedLapTimeSessionId` is @unique — only one
+ * run may reference a given session. We clear that FK on any *other* run for each session id, then
+ * set `linkedRunId` on the session and the primary pointer on this run, in one transaction.
+ */
 export async function linkImportedSessionsToRun(params: {
   userId: string;
   importedLapTimeSessionIds: string[];
   runId: string;
 }): Promise<void> {
   const ids = [...new Set(params.importedLapTimeSessionIds.map((id) => id.trim()).filter(Boolean))];
-  for (const id of ids) {
-    await linkImportedSessionToRun({
-      userId: params.userId,
-      importedLapTimeSessionId: id,
-      runId: params.runId,
-    });
-  }
-  if (ids.length > 0) {
-    await prisma.run.update({
-      where: { id: params.runId, userId: params.userId },
-      data: { importedLapTimeSessionId: ids[0]! },
-    });
-  }
+  if (ids.length === 0) return;
+
+  await prisma.$transaction(async (tx) => {
+    let primaryIdForRun: string | null = null;
+
+    for (const id of ids) {
+      await tx.run.updateMany({
+        where: {
+          userId: params.userId,
+          importedLapTimeSessionId: id,
+          id: { not: params.runId },
+        },
+        data: { importedLapTimeSessionId: null },
+      });
+
+      const sess = await tx.importedLapTimeSession.findFirst({
+        where: { id, userId: params.userId },
+        select: { id: true },
+      });
+      if (!sess) continue;
+
+      await tx.importedLapTimeSession.update({
+        where: { id: sess.id },
+        data: { linkedRunId: params.runId },
+      });
+
+      if (primaryIdForRun == null) {
+        primaryIdForRun = id;
+      }
+    }
+
+    if (primaryIdForRun != null) {
+      await tx.run.update({
+        where: { id: params.runId, userId: params.userId },
+        data: { importedLapTimeSessionId: primaryIdForRun },
+      });
+    }
+  });
 }
