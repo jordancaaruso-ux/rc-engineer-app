@@ -80,6 +80,8 @@ type RunUpsertBody = {
   /**
    * `draft` = save progress without marking logging complete.
    * Omitted or `completed` = treat as logging complete (backward compatible).
+   * On PUT, if the run was already `loggingComplete`, `draft` is ignored: logging stays complete
+   * and stored tire/battery run numbers are not overwritten from the body.
    */
   loggingIntent?: "draft" | "completed";
   /** True when opening Log your run from dashboard detected-session prefill (metadata only; does not affect completion). */
@@ -106,19 +108,60 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   }
 
   const sessionCompletedAtResolved = await resolveRunSessionCompletedAtFromUpsertBody(params.userId, body);
-  const loggingComplete = body.loggingIntent !== "draft";
+
+  let existingUpdate: {
+    id: string;
+    createdAt: Date;
+    loggingComplete: boolean;
+    loggingCompletedAt: Date | null;
+    tireRunNumber: number;
+    batteryRunNumber: number;
+  } | null = null;
+  if (params.mode === "update") {
+    const runId = typeof body.runId === "string" ? body.runId.trim() : "";
+    if (!runId) {
+      return NextResponse.json({ error: "runId is required" }, { status: 400 });
+    }
+    const ex = await prisma.run.findFirst({
+      where: { id: runId, userId: params.userId },
+      select: {
+        id: true,
+        createdAt: true,
+        loggingComplete: true,
+        loggingCompletedAt: true,
+        tireRunNumber: true,
+        batteryRunNumber: true,
+      },
+    });
+    if (!ex) {
+      return NextResponse.json({ error: "Run not found" }, { status: 404 });
+    }
+    existingUpdate = ex;
+  }
+
+  /** Editing a run already marked complete: never revert to draft or rewrite tire/battery run # from the client. */
+  const loggingWasAlreadyComplete = existingUpdate?.loggingComplete === true;
+  const loggingComplete = loggingWasAlreadyComplete ? true : body.loggingIntent !== "draft";
 
   const shareWithTeam = body.shareWithTeam === false ? false : true;
 
-  const tireRunNumber =
+  const tireRunNumberFromBody =
     typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
       ? Math.max(1, Math.floor(body.tireRunNumber))
       : 1;
-
-  const batteryRunNumber =
+  const batteryRunNumberFromBody =
     typeof body.batteryRunNumber === "number" && Number.isFinite(body.batteryRunNumber)
       ? Math.max(1, Math.floor(body.batteryRunNumber))
       : 1;
+
+  const tireRunNumber =
+    loggingWasAlreadyComplete && existingUpdate
+      ? Math.max(1, Math.floor(Number(existingUpdate.tireRunNumber) || 1))
+      : tireRunNumberFromBody;
+  const batteryRunNumber =
+    loggingWasAlreadyComplete && existingUpdate
+      ? Math.max(1, Math.floor(Number(existingUpdate.batteryRunNumber) || 1))
+      : batteryRunNumberFromBody;
 
   const lapTimes = Array.isArray(body.lapTimes)
     ? body.lapTimes.filter((n) => typeof n === "number" && Number.isFinite(n))
@@ -314,22 +357,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       select: { id: true, createdAt: true },
     });
   } else {
-    const runId = typeof body.runId === "string" ? body.runId.trim() : "";
-    if (!runId) {
-      return NextResponse.json({ error: "runId is required" }, { status: 400 });
-    }
-    const existing = await prisma.run.findFirst({
-      where: { id: runId, userId: params.userId },
-      select: {
-        id: true,
-        createdAt: true,
-        loggingComplete: true,
-        loggingCompletedAt: true,
-      },
-    });
-    if (!existing) {
-      return NextResponse.json({ error: "Run not found" }, { status: 404 });
-    }
+    const existing = existingUpdate!;
     await prisma.engineerBetweenRunHint.deleteMany({
       where: { primaryRunId: existing.id },
     });

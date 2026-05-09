@@ -390,6 +390,8 @@ export function NewRunForm(props: {
    * drivers can see what's still expected before clicking "Run complete".
    */
   const isDraft = isEditing && editRun?.loggingComplete === false;
+  /** Run was already marked complete — edits must not flip back to draft or bump tire/battery run # (server enforces too). */
+  const editingCompletedRun = isEditing && editRun?.loggingComplete === true;
   /**
    * Two-step save confirmation when the user has edited the setup sheet but
    * never hit "Save setup snapshot". Null = no confirmation pending, otherwise
@@ -3681,49 +3683,77 @@ export function NewRunForm(props: {
             >
               {pendingSaveIntent === "draft"
                 ? "Save changes + save draft"
-                : "Save changes + run complete"}
+                : editingCompletedRun
+                  ? "Save edits"
+                  : "Save changes + run complete"}
             </button>
           </div>
         </div>
       ) : null}
 
       <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-sm">
-          <span className="font-medium text-foreground">Save draft</span> to come back and finish after the run.
-          <span className="mx-1 text-muted-foreground/60">·</span>
-          <span className="font-medium text-foreground">Run complete</span> when nothing else is left to add.
-        </p>
-        <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            className={cn(
-              "inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted/60",
-              (!canSave || saving) && "opacity-70 pointer-events-none"
-            )}
-            onClick={(e) => saveRun(e, "draft")}
-            disabled={!canSave || saving}
-            aria-busy={saving}
-            title="Save what you have so far and finish logging after the run."
-          >
-            {saving ? "Saving…" : saveSuccess ? "Saved" : "Save draft"}
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
-              (!canSave || saving) && "opacity-70 pointer-events-none"
-            )}
-            onClick={(e) => saveRun(e, "completed")}
-            disabled={!canSave || saving}
-            aria-busy={saving}
-            title="Mark this run finished. It will stop showing up in the incomplete-runs banner."
-          >
-            {saving ? "Saving…" : saveSuccess ? "Saved" : "Run complete"}
-            <span className="text-sm leading-none" aria-hidden>
-              🏁
-            </span>
-          </button>
-        </div>
+        {editingCompletedRun ? (
+          <>
+            <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-md">
+              Saves your changes to this run only. It stays marked complete; tire and battery run numbers are not
+              updated (they were set when you first clicked Run complete).
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+                  (!canSave || saving) && "opacity-70 pointer-events-none"
+                )}
+                onClick={(e) => saveRun(e, "completed")}
+                disabled={!canSave || saving}
+                aria-busy={saving}
+                title="Save changes without affecting completion or tire/battery run counts."
+              >
+                {saving ? "Saving…" : saveSuccess ? "Saved" : "Save edits"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-sm">
+              <span className="font-medium text-foreground">Save draft</span> to come back and finish after the run.
+              <span className="mx-1 text-muted-foreground/60">·</span>
+              <span className="font-medium text-foreground">Run complete</span> when nothing else is left to add.
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted/60",
+                  (!canSave || saving) && "opacity-70 pointer-events-none"
+                )}
+                onClick={(e) => saveRun(e, "draft")}
+                disabled={!canSave || saving}
+                aria-busy={saving}
+                title="Save what you have so far and finish logging after the run."
+              >
+                {saving ? "Saving…" : saveSuccess ? "Saved" : "Save draft"}
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-glow-sm hover:brightness-105 transition",
+                  (!canSave || saving) && "opacity-70 pointer-events-none"
+                )}
+                onClick={(e) => saveRun(e, "completed")}
+                disabled={!canSave || saving}
+                aria-busy={saving}
+                title="Mark this run finished. It will stop showing up in the incomplete-runs banner."
+              >
+                {saving ? "Saving…" : saveSuccess ? "Saved" : "Run complete"}
+                <span className="text-sm leading-none" aria-hidden>
+                  🏁
+                </span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </form>
   );
