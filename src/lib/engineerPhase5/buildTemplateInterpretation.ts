@@ -68,7 +68,7 @@ function importedSessionFieldPhrase(summary: EngineerRunSummaryV2): string {
           ? `rank ${a10.rankInField}/${a10.fieldEntrantCountForMetric} on avg top 10`
           : null;
       const bits = [`you ${you10}s vs field avg ${mean10}s`, gapS, rk10].filter(Boolean);
-      parts.push(`primary sustained pace (avg top 10 vs session mean): ${bits.join("; ")}`);
+      parts.push(`avg top 10 vs session field mean: ${bits.join("; ")}`);
     }
     if (y.avgTop10Seconds != null && s.fieldMedianAvgTop10Seconds != null && Number.isFinite(s.fieldMedianAvgTop10Seconds)) {
       const gapMed = y.avgTop10Seconds - s.fieldMedianAvgTop10Seconds;

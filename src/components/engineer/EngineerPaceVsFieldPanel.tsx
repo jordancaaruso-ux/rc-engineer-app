@@ -1,7 +1,16 @@
 "use client";
 
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import type { EngineerRunSummaryV2, PaceVsFieldMetricId } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import {
+  computePaceComparisonHeadline,
+  PACE_MULTI_LAP_SECTION_TITLE,
+  type PaceComparisonHeadline,
+} from "@/lib/engineerPhase5/paceComparisonHeadline";
+import { fieldRelativityForSummary } from "@/lib/engineerPhase5/fieldRelativityForSummary";
+
+export { fieldRelativityForSummary } from "@/lib/engineerPhase5/fieldRelativityForSummary";
 
 function fmtSec(v: number | null | undefined, notMeaningful?: boolean): string {
   if (notMeaningful) return "—";
@@ -15,111 +24,71 @@ function fmtDeltaSec(v: number | null | undefined): string {
   return `${sign}${v.toFixed(3)}s`;
 }
 
-function finiteGap(v: number | null | undefined): number | null {
-  if (v == null || !Number.isFinite(v)) return null;
-  return v;
+function ReferencePaceCallout({ headline }: { headline: PaceComparisonHeadline }) {
+  const v = headline.vsReference;
+  if (!v) return null;
+  return (
+    <div className="space-y-1 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        vs your reference run
+      </div>
+      <div className="text-base font-semibold text-foreground tabular-nums font-mono leading-tight">
+        {fmtDeltaSec(v.deltaSeconds)}
+      </div>
+      <p className="text-[11px] text-foreground/90 leading-snug">
+        <span className="font-medium">{v.metricLabel}</span> on this run compared to{" "}
+        <span className="font-medium">{v.referenceLabel}</span>
+        <span className="text-muted-foreground"> (positive = slower than that run).</span>
+      </p>
+    </div>
+  );
 }
 
-function gapFromPaceVsFieldMean(summary: EngineerRunSummaryV2, metric: PaceVsFieldMetricId): number | null {
-  const rows = summary.importedSessionFieldStats?.paceVsFieldMeanAnalysis;
-  const row = rows?.find((m) => m.metric === metric);
-  return finiteGap(row?.gapUserMinusFieldMeanSeconds);
-}
-
-/**
- * Multi-driver imported timing: **Vs field** prefers session **field mean** per metric when aggregates exist
- * (positive ⇒ slower than session average). Falls back to gaps vs session-best competitor when only lap-set rows exist.
- */
-export function fieldRelativityForSummary(summary: EngineerRunSummaryV2): {
-  multiDriverField: boolean;
-  showVsFieldColumn: boolean;
-  /** Lap-table gaps come from paceVsFieldMeanAnalysis (field mean), not pole/session-best. */
-  vsFieldUsesSessionMeans: boolean;
-  gapBest: number | null;
-  gapAvg5: number | null;
-  gapAvg10: number | null;
-  gapAvg15: number | null;
-  rank: number | null;
-  nDrivers: number | null;
-} {
-  const fs = summary.importedSessionFieldStats;
-  const ranked = summary.fieldImportSession?.ranked ?? [];
-  const youRow = ranked.find((r) => r.isPrimaryUser) ?? null;
-  const multiFromStats = fs != null && fs.driverCount >= 2;
-  const multiFromSets = ranked.length >= 2;
-  const multiDriverField = multiFromStats || multiFromSets;
-
-  if (!multiDriverField) {
-    return {
-      multiDriverField: false,
-      showVsFieldColumn: false,
-      vsFieldUsesSessionMeans: false,
-      gapBest: null,
-      gapAvg5: null,
-      gapAvg10: null,
-      gapAvg15: null,
-      rank: null,
-      nDrivers: null,
-    };
+function FieldAvg10SessionContext({
+  headline,
+  hasVsReference,
+}: {
+  headline: PaceComparisonHeadline;
+  hasVsReference: boolean;
+}) {
+  const gap = headline.fieldAvg10GapVsMeanSeconds;
+  if (gap == null || !Number.isFinite(gap)) return null;
+  if (!headline.fieldAvg10Meaningful) {
+    return (
+      <p className="text-[11px] text-muted-foreground leading-snug">
+        Session field (avg top 10 vs field average) needs ≥10 included laps on your row for a stable read.
+      </p>
+    );
   }
-
-  const meanRows = fs?.paceVsFieldMeanAnalysis;
-  const useMeans = Boolean(meanRows?.length);
-  const my = fs?.matchedYou;
-
-  let gapBest: number | null = null;
-  let gapAvg5: number | null = null;
-  let gapAvg10: number | null = null;
-  let gapAvg15: number | null = null;
-
-  if (useMeans) {
-    gapBest = gapFromPaceVsFieldMean(summary, "best");
-    gapAvg5 = gapFromPaceVsFieldMean(summary, "avg_top_5");
-    gapAvg10 = gapFromPaceVsFieldMean(summary, "avg_top_10");
-    gapAvg15 = gapFromPaceVsFieldMean(summary, "avg_top_15");
-  } else {
-    gapBest = finiteGap(my?.gapBestToSessionBestSeconds ?? youRow?.gapToSessionBestSeconds);
-    gapAvg5 = finiteGap(my?.gapAvgTop5ToSessionBestAvg5Seconds);
-    gapAvg10 = finiteGap(my?.gapAvgTop10ToSessionBestAvg10Seconds);
-    gapAvg15 = null;
-  }
-
-  const avg10RankRow = meanRows?.find((m) => m.metric === "avg_top_10");
-  const rank =
-    avg10RankRow?.rankInField != null && avg10RankRow.fieldEntrantCountForMetric >= 2
-      ? avg10RankRow.rankInField
-      : my?.rankByBest ?? youRow?.rank ?? null;
-  const nDrivers =
-    avg10RankRow?.fieldEntrantCountForMetric != null && avg10RankRow.fieldEntrantCountForMetric >= 2
-      ? avg10RankRow.fieldEntrantCountForMetric
-      : fs && fs.driverCount >= 2
-        ? fs.driverCount
-        : ranked.length >= 2
-          ? ranked.length
-          : null;
-
-  const hasActionableGap =
-    gapBest != null || gapAvg5 != null || gapAvg10 != null || gapAvg15 != null;
-
-  return {
-    multiDriverField: true,
-    showVsFieldColumn: hasActionableGap,
-    vsFieldUsesSessionMeans: useMeans,
-    gapBest,
-    gapAvg5,
-    gapAvg10,
-    gapAvg15,
-    rank,
-    nDrivers,
-  };
+  return (
+    <div className={cn("space-y-0.5", hasVsReference && "rounded-md border border-border/40 bg-background/50 px-2 py-1.5")}>
+      <div className="text-[10px] font-medium text-muted-foreground">vs session field (avg top 10)</div>
+      <div
+        className={cn(
+          "font-semibold text-foreground tabular-nums font-mono leading-tight",
+          hasVsReference ? "text-sm" : "text-base"
+        )}
+      >
+        {fmtDeltaSec(gap)}
+      </div>
+      <p className="text-[11px] text-muted-foreground leading-snug">
+        Your avg top 10 minus the session average across entrants (positive = slower than that average).
+        {headline.fieldAvg10RankLine ? (
+          <span className="block mt-0.5 font-mono text-[11px] tabular-nums">{headline.fieldAvg10RankLine}</span>
+        ) : null}
+      </p>
+    </div>
+  );
 }
 
 function PaceVsFieldHero({
   summary,
   fieldRel,
+  headline,
 }: {
   summary: EngineerRunSummaryV2;
   fieldRel: ReturnType<typeof fieldRelativityForSummary>;
+  headline: PaceComparisonHeadline;
 }) {
   const fs = summary.importedSessionFieldStats;
   const f = summary.fieldImportSession;
@@ -136,32 +105,43 @@ function PaceVsFieldHero({
         Number.isFinite(fs.fieldMedianAvgTop10Seconds)
           ? my.avgTop10Seconds - fs.fieldMedianAvgTop10Seconds
           : null;
-      const rankSustained =
-        fieldRel.rank != null && fieldRel.nDrivers != null && fieldRel.nDrivers >= 2
-          ? `${fieldRel.rank} of ${fieldRel.nDrivers} on avg top 10`
-          : null;
 
       return (
         <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 space-y-2">
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace vs field</div>
           {my ? (
             <div className="space-y-2 text-[12px] leading-snug">
+              {headline.vsReference ? <ReferencePaceCallout headline={headline} /> : null}
+              {!headline.vsReference && summary.referenceRunId == null ? (
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  No earlier run on this car to compare — only imported timing vs the rest of the field below.
+                </p>
+              ) : null}
+              {!headline.vsReference && summary.referenceRunId != null ? (
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  Could not form a clean lap delta vs your reference run (lap counts or missing laps) — session field
+                  below.
+                </p>
+              ) : null}
+
               {avg10 ? (
-                <div className="space-y-1.5">
-                  <div className="text-[10px] font-medium text-muted-foreground">Sustained pace</div>
-                  {avg10.meaningful && avg10.gapUserMinusFieldMeanSeconds != null ? (
+                <div className="space-y-1.5 border-t border-border/50 pt-2">
+                  <div className="text-[10px] font-medium text-muted-foreground">{PACE_MULTI_LAP_SECTION_TITLE}</div>
+                  {headline.vsReference ? (
+                    <FieldAvg10SessionContext headline={headline} hasVsReference={Boolean(headline.vsReference)} />
+                  ) : headline.fieldAvg10Meaningful && headline.fieldAvg10GapVsMeanSeconds != null ? (
                     <>
                       <div className="text-base font-semibold text-foreground tabular-nums font-mono leading-tight">
-                        {fmtDeltaSec(avg10.gapUserMinusFieldMeanSeconds)}
+                        {fmtDeltaSec(headline.fieldAvg10GapVsMeanSeconds)}
                       </div>
-                      <div className="text-[11px] font-medium text-foreground/90">
+                      <p className="text-[11px] font-medium text-foreground/90">
                         Avg top 10 vs session field average
-                        {rankSustained ? (
+                        {headline.fieldAvg10RankLine ? (
                           <span className="block mt-0.5 text-[11px] font-mono tabular-nums text-muted-foreground font-normal">
-                            {rankSustained}
+                            {headline.fieldAvg10RankLine}
                           </span>
                         ) : null}
-                      </div>
+                      </p>
                     </>
                   ) : (
                     <p className="text-[11px] text-muted-foreground leading-snug">
@@ -283,6 +263,12 @@ function PaceVsFieldHero({
       return (
         <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 space-y-2">
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace vs field</div>
+          {headline.vsReference ? <ReferencePaceCallout headline={headline} /> : null}
+          {!headline.vsReference && summary.referenceRunId == null ? (
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              No earlier run on this car to compare — lap-set ranking vs session best below.
+            </p>
+          ) : null}
           {rankLine ? <div className="text-sm font-semibold text-foreground tabular-nums">{rankLine}</div> : null}
           <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 font-mono text-[12px] tabular-nums text-foreground/90">
             <span className="text-muted-foreground font-sans text-[11px]">Pole (session best lap)</span>
@@ -406,10 +392,11 @@ function FieldImportSessionFieldTable({ summary }: { summary: EngineerRunSummary
  * Pace vs imported field (session best, mean analysis, driver table). Used in Engineer run summary and Sessions lap analysis.
  */
 export function EngineerPaceVsFieldPanel({ summary }: { summary: EngineerRunSummaryV2 }) {
-  const fieldRel = fieldRelativityForSummary(summary);
+  const fieldRel = useMemo(() => fieldRelativityForSummary(summary), [summary]);
+  const headline = useMemo(() => computePaceComparisonHeadline(summary), [summary]);
   return (
     <div className="space-y-3">
-      <PaceVsFieldHero summary={summary} fieldRel={fieldRel} />
+      <PaceVsFieldHero summary={summary} fieldRel={fieldRel} headline={headline} />
       <FieldImportSessionFieldTable summary={summary} />
     </div>
   );

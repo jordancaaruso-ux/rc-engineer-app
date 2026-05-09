@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
-import {
-  EngineerPaceVsFieldPanel,
-  fieldRelativityForSummary,
-} from "@/components/engineer/EngineerPaceVsFieldPanel";
+import { EngineerPaceVsFieldPanel } from "@/components/engineer/EngineerPaceVsFieldPanel";
+import { fieldRelativityForSummary } from "@/lib/engineerPhase5/fieldRelativityForSummary";
 import { engineerQuickPromptDisabled, engineerQuickPromptsForSurface } from "@/lib/engineerQuickPrompts";
 import { formatConsistencyScorePercent } from "@/lib/lapAnalysis";
 
@@ -211,8 +209,9 @@ export function EngineerRunSummaryPanel({
                 {fieldRel.vsFieldUsesSessionMeans ? (
                   <>
                     compares each metric to the <span className="font-medium text-foreground/80">session field average</span>{" "}
-                    (mean across entrants with data). Positive = slower than that average. Primary pace read is avg top 10;
-                    rank in the pace panel uses avg top 10 when available.
+                    (mean across entrants with data). Positive = slower than that average. The pace panel leads with{" "}
+                    <span className="font-medium text-foreground/80">you vs your reference run</span> when a reference exists;
+                    these columns stay vs field for context.
                   </>
                 ) : (
                   <>

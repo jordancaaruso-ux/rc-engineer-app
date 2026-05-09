@@ -1,4 +1,5 @@
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import { computePaceComparisonHeadline } from "@/lib/engineerPhase5/paceComparisonHeadline";
 
 function finiteGap(v: number | null | undefined): number | null {
   if (v == null || !Number.isFinite(v)) return null;
@@ -12,18 +13,35 @@ function fmtDeltaSec(v: number | null | undefined): string {
 }
 
 /**
- * Multi-line summary for LLM / compact copy: **avg top 10 vs session field mean** first,
- * optional median avg-top-10 benchmark, then other metrics vs field mean; lap-set fallback uses pole gap + rank.
+ * Multi-line summary for LLM / compact copy: **this run vs your engineer reference run** first (same metric ladder as
+ * lapOutcome), then session field (avg top 10 vs mean + rank, median benchmark, other metrics); lap-set fallback uses pole gap + rank.
  */
 export function paceVsFieldSummaryFromEngineerSummary(summary: EngineerRunSummaryV2): string | null {
+  const headline = computePaceComparisonHeadline(summary);
   const fs = summary.importedSessionFieldStats;
   const ranked = summary.fieldImportSession?.ranked ?? [];
   const youRow = ranked.find((r) => r.isPrimaryUser) ?? null;
 
+  const lines: string[] = [];
+
+  if (headline.vsReference) {
+    const v = headline.vsReference;
+    const sign = v.deltaSeconds >= 0 ? "+" : "";
+    lines.push(
+      `Primary pace read vs your own reference (${v.referenceLabel}): ${v.metricLabel} delta ${sign}${v.deltaSeconds.toFixed(3)}s on this run (positive = slower than that reference run).`
+    );
+  } else if (summary.referenceRunId) {
+    lines.push(
+      "No clean lap delta vs your reference run (lap counts or missing laps) — use session field lines below when present."
+    );
+  } else {
+    lines.push("No earlier run on this car in the summary pair — session field comparison only below when timing supports it.");
+  }
+
   if (fs && fs.driverCount >= 2 && fs.paceVsFieldMeanAnalysis && fs.paceVsFieldMeanAnalysis.length > 0) {
-    const lines: string[] = [
-      `Imported timing: ${fs.driverCount} drivers. Primary sustained pace = avg top 10 vs **session field average** (positive ⇒ slower than that average).`,
-    ];
+    lines.push(
+      `Imported timing: ${fs.driverCount} drivers. Session field context = each metric vs **arithmetic mean** across entrants (positive ⇒ slower than that average).`
+    );
     const avg10 = fs.paceVsFieldMeanAnalysis.find((m) => m.metric === "avg_top_10");
     if (avg10) {
       const rank =
@@ -38,7 +56,7 @@ export function paceVsFieldSummaryFromEngineerSummary(summary: EngineerRunSummar
       const you =
         avg10.userSeconds != null && Number.isFinite(avg10.userSeconds) ? avg10.userSeconds.toFixed(3) : "—";
       const tag = avg10.meaningful ? "" : " (need ≥10 laps on your row for full avg top 10)";
-      lines.push(`Avg top 10: you ${you}s vs field avg ${mean}s (${gap} vs avg; ${rank})${tag}`);
+      lines.push(`Avg top 10 vs field mean: you ${you}s vs field avg ${mean}s (${gap} vs mean; ${rank})${tag}`);
     }
     const my = fs.matchedYou;
     if (
@@ -70,7 +88,7 @@ export function paceVsFieldSummaryFromEngineerSummary(summary: EngineerRunSummar
   const multiFromSets = ranked.length >= 2;
   const multiDriverField = multiFromStats || multiFromSets;
 
-  if (!multiDriverField) return null;
+  if (!multiDriverField) return lines.length > 0 ? lines.join("\n") : null;
 
   const my = fs?.matchedYou;
   const gapBest = finiteGap(my?.gapBestToSessionBestSeconds ?? youRow?.gapToSessionBestSeconds);
@@ -78,9 +96,9 @@ export function paceVsFieldSummaryFromEngineerSummary(summary: EngineerRunSummar
   const nDrivers =
     multiFromStats && fs ? fs.driverCount : ranked.length >= 2 ? ranked.length : null;
 
-  const parts: string[] = [];
+  const parts: string[] = [...lines];
   if (rank != null && nDrivers != null && nDrivers >= 2) {
-    parts.push(`${rank} of ${nDrivers} by best lap (lap-set only — link timing session for field-average sustained pace)`);
+    parts.push(`${rank} of ${nDrivers} by best lap (lap-set only — link timing session for field-average context)`);
   }
   if (gapBest != null) {
     const sign = gapBest >= 0 ? "+" : "";
