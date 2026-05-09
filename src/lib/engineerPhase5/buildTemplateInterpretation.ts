@@ -53,7 +53,7 @@ function importedSessionFieldPhrase(summary: EngineerRunSummaryV2): string {
   return `Imported timing session (aggregated field): ${parts.join("; ")}.`;
 }
 
-function fieldPhrase(summary: EngineerRunSummaryV2): string {
+export function fieldPhrase(summary: EngineerRunSummaryV2): string {
   const f = summary.fieldImportSession;
   const fromSets =
     f && f.ranked.length >= 2
@@ -128,10 +128,13 @@ export function buildTemplateInterpretation(
   summary: EngineerRunSummaryV2,
   run: { notes?: string | null; driverNotes?: string | null; handlingProblems?: string | null }
 ): string {
+  const field = fieldPhrase(summary);
+  const pace = pacePhrase(summary);
+  const setup = setupPhrase(summary);
+  const mid = field.trim() ? [field, setup] : [setup];
   const chunks = [
-    pacePhrase(summary),
-    setupPhrase(summary),
-    fieldPhrase(summary),
+    pace,
+    ...mid.filter(Boolean),
     notesPhrase(summary, run),
     conflictPhrase(summary, run),
   ].filter(Boolean);

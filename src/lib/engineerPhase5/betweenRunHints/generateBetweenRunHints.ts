@@ -3,9 +3,10 @@ import "server-only";
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import type {
-  BetweenRunHintPayloadV1,
+  BetweenRunHintPayloadV2,
   BetweenRunHintScopeV1,
   BetweenRunHintSignal,
+  BetweenRunRecentSessionSnapshotV1,
 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import type { VehicleDynamicsKbSnippet } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
@@ -106,6 +107,8 @@ async function callLlmBetweenRunHints(params: {
   summary: EngineerRunSummaryV2;
   patternDigest: PatternDigestV1 | null;
   kbSnippets: VehicleDynamicsKbSnippet[];
+  recentSessions: BetweenRunRecentSessionSnapshotV1[];
+  driverContextPack: { combinedNotesAndHandling: string; currentSetupLines: string[] };
 }): Promise<LlmShape | null> {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) return null;
@@ -136,20 +139,28 @@ async function callLlmBetweenRunHints(params: {
     referenceLabel: params.summary.referenceLabel,
   }).slice(0, 6000);
 
+  const recentJson = JSON.stringify(params.recentSessions).slice(0, 8000);
+  const driverCtxJson = JSON.stringify({
+    combinedNotesAndHandling: params.driverContextPack.combinedNotesAndHandling,
+    currentSetupLines: params.driverContextPack.currentSetupLines.slice(0, 30),
+  }).slice(0, 4000);
+
   const system = `You are an RC touring car engineer assistant. Output ONLY valid JSON (no markdown).
 The JSON object must have exactly these keys:
-- "headline": string, under 120 chars, actionable for the NEXT session
-- "bullets": array of 2 to 4 short strings (each under 220 chars), concrete suggestions
-- "avoidRepeating": string or null — when lap metrics regressed OR driver feel worsened AND there were setup changes since the reference run, give ONE short line about not repeating the same direction of changes until verified; otherwise null
+- "headline": string, under 120 chars, actionable setup guidance (not generic motivation)
+- "bullets": array of 2 to 4 short strings (each under 220 chars), concrete suggestions or test plans
+- "avoidRepeating": string or null — when lap metrics regressed OR driver feel worsened AND there were setup changes since the reference run, give ONE short line about not repeating the same direction of changes until verified; when a regression lines up with a specific documented setup move across recentSessions, you may name reverting that move; otherwise null
 
 Rules:
-- Ground technical claims ONLY in the provided KB excerpts and the summary JSON. If unsure, hedge with "test" / "verify".
-- Do not invent exact setup numbers not present in the summary JSON.
+- You receive up to three recentSessions objects in chronological order **newest first** (index 0 = latest run). Each includes best lap vs prior session flag, optional paceVsFieldSummary from imported timing, setupChangesFromPrevious, notesPreview, handlingPreview.
+- Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **explicit revert** ideas when bestLapVsPreviousFlag is regressed and setupChangesFromPrevious plausibly correlate.
+- Ground technical claims ONLY in the provided KB excerpts and the structured JSON (summary, recentSessions, driverContextPack). If unsure, hedge with "test" / "verify".
+- Do not invent exact setup numbers not present in the JSON.
 - Prefer one-change-at-a-time discipline when recommending reversals.
 - Scope context: ${params.scopeLine}
 - Signals (machine tags): ${params.signals.join(", ")}`;
 
-  const user = `KB excerpts:\n${kbText || "(none)"}\n\nPattern digest tail:\n${digestNote}\n\nEngineer summary JSON:\n${summaryJson}`;
+  const user = `KB excerpts:\n${kbText || "(none)"}\n\nPattern digest tail:\n${digestNote}\n\nEngineer summary JSON (latest vs its immediate reference):\n${summaryJson}\n\nRecent sessions (newest first, up to 3):\n${recentJson}\n\nDriver context pack:\n${driverCtxJson}`;
 
   const body: Record<string, unknown> = {
     model,
@@ -207,7 +218,9 @@ export async function assembleBetweenRunHintPayload(params: {
   patternDigest: PatternDigestV1 | null;
   kbSnippets: VehicleDynamicsKbSnippet[];
   referenceLabel: string | null;
-}): Promise<BetweenRunHintPayloadV1> {
+  recentSessions: BetweenRunRecentSessionSnapshotV1[];
+  driverContextPack: { combinedNotesAndHandling: string; currentSetupLines: string[] };
+}): Promise<BetweenRunHintPayloadV2> {
   const engineerHref =
     params.summary.referenceRunId != null
       ? `/engineer?${new URLSearchParams({
@@ -223,6 +236,8 @@ export async function assembleBetweenRunHintPayload(params: {
     summary: params.summary,
     patternDigest: params.patternDigest,
     kbSnippets: params.kbSnippets,
+    recentSessions: params.recentSessions,
+    driverContextPack: params.driverContextPack,
   });
   const fb = buildFallbackCopy({ summary: params.summary, signals: params.signals });
   const llm = fromLlm ?? fb;
@@ -249,7 +264,7 @@ export async function assembleBetweenRunHintPayload(params: {
   if (!avoidRepeating && fb.avoidRepeating) avoidRepeating = fb.avoidRepeating;
 
   return {
-    version: 1,
+    version: 2,
     scope: params.scope,
     basedOnRunIds: {
       primary: params.summary.currentRunId,
@@ -261,5 +276,7 @@ export async function assembleBetweenRunHintPayload(params: {
     avoidRepeating,
     sourcesNote: buildSourcesNote({ scope: params.scope, referenceLabel: params.referenceLabel }),
     engineerHref,
+    recentSessions: params.recentSessions,
+    driverContextPack: params.driverContextPack,
   };
 }

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { buildBetweenRunHintFingerprint } from "@/lib/engineerPhase5/betweenRunHints/buildBetweenRunHintFingerprint";
 import { computeBetweenRunSignals } from "@/lib/engineerPhase5/betweenRunHints/computeBetweenRunSignals";
-import type { BetweenRunHintPayloadV1 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
+import type { BetweenRunHintPayloadV1, BetweenRunHintPayloadV2 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 
 function baseSummary(): EngineerRunSummaryV2 {
   return {
@@ -71,8 +71,45 @@ test("signals: regression + setup + feel", () => {
   assert.ok(sig.includes("feel_worse"));
 });
 
-test("BetweenRunHintPayloadV1 shape for notifications compatibility", () => {
-  const sample: BetweenRunHintPayloadV1 = {
+test("BetweenRunHintPayloadV2 shape for API / dashboard compatibility", () => {
+  const sample: BetweenRunHintPayloadV2 = {
+    version: 2,
+    scope: {
+      eventId: "e1",
+      eventLabel: "Club day",
+      carId: "c1",
+      carLabel: "Car",
+      trackId: "t1",
+      trackLabel: "Track",
+    },
+    basedOnRunIds: { primary: "p", reference: "q" },
+    signals: ["lap_regressed"],
+    headline: "H",
+    bullets: ["a", "b"],
+    avoidRepeating: null,
+    sourcesNote: "sources",
+    engineerHref: "/engineer?runId=p&compareRunId=q",
+    recentSessions: [],
+    driverContextPack: { combinedNotesAndHandling: "", currentSetupLines: [] },
+  };
+  const keys = Object.keys(sample).sort();
+  assert.deepEqual(keys, [
+    "avoidRepeating",
+    "basedOnRunIds",
+    "bullets",
+    "driverContextPack",
+    "engineerHref",
+    "headline",
+    "recentSessions",
+    "scope",
+    "signals",
+    "sourcesNote",
+    "version",
+  ]);
+});
+
+test("BetweenRunHintPayloadV1 remains defined for legacy rows", () => {
+  const legacy: BetweenRunHintPayloadV1 = {
     version: 1,
     scope: {
       eventId: "e1",
@@ -90,7 +127,7 @@ test("BetweenRunHintPayloadV1 shape for notifications compatibility", () => {
     sourcesNote: "sources",
     engineerHref: "/engineer?runId=p&compareRunId=q",
   };
-  const keys = Object.keys(sample).sort();
+  const keys = Object.keys(legacy).sort();
   assert.deepEqual(keys, [
     "avoidRepeating",
     "basedOnRunIds",

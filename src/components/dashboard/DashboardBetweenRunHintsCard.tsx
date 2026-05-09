@@ -1,8 +1,8 @@
 import Link from "next/link";
-import type { BetweenRunHintPayloadV1 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
+import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import { cn } from "@/lib/utils";
 
-function scopeLine(h: BetweenRunHintPayloadV1): string {
+function scopeLine(h: BetweenRunHintPayload): string {
   const bits = [h.scope.carLabel];
   if (h.scope.trackLabel) bits.push(h.scope.trackLabel);
   if (h.scope.eventLabel) bits.push(h.scope.eventLabel);
@@ -13,7 +13,7 @@ export function DashboardBetweenRunHintsCard({
   hint,
   className,
 }: {
-  hint: BetweenRunHintPayloadV1 | null;
+  hint: BetweenRunHintPayload | null;
   className?: string;
 }) {
   if (!hint) return null;
@@ -27,7 +27,7 @@ export function DashboardBetweenRunHintsCard({
     >
       <div className="flex flex-col gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Next session — Engineer</h2>
+          <h2 className="text-sm font-semibold text-foreground">Things to consider — Engineer</h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground leading-snug">{scopeLine(hint)}</p>
         </div>
         <p className="text-sm font-medium text-foreground leading-snug">{hint.headline}</p>

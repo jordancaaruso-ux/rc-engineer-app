@@ -1,5 +1,7 @@
 /** Payload stored in `EngineerBetweenRunHint.payloadJson` and returned to clients. */
 
+import type { EngineerLapMetricFlag } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+
 export type BetweenRunHintSignal =
   | "lap_regressed"
   | "lap_improved"
@@ -17,6 +19,7 @@ export type BetweenRunHintScopeV1 = {
   trackLabel: string | null;
 };
 
+/** @deprecated Stored rows may still be v1; server migrates reads to v2. */
 export type BetweenRunHintPayloadV1 = {
   version: 1;
   scope: BetweenRunHintScopeV1;
@@ -29,4 +32,49 @@ export type BetweenRunHintPayloadV1 = {
   sourcesNote: string;
   /** Deep link to Engineer with this pair pre-selected. */
   engineerHref: string;
+};
+
+/** Newest session first (up to three on the same car reference chain). */
+export type BetweenRunRecentSessionSnapshotV1 = {
+  runId: string;
+  displayLabel: string;
+  bestLapSeconds: number | null;
+  /** vs your prior session on this car when a reference exists for that run. */
+  bestLapVsPreviousFlag: EngineerLapMetricFlag | null;
+  paceVsFieldSummary: string | null;
+  setupChangesFromPrevious: string[];
+  notesPreview: string | null;
+  handlingPreview: string | null;
+};
+
+export type BetweenRunHintPayloadV2 = {
+  version: 2;
+  scope: BetweenRunHintScopeV1;
+  basedOnRunIds: { primary: string; reference: string | null };
+  signals: BetweenRunHintSignal[];
+  headline: string;
+  bullets: string[];
+  avoidRepeating: string | null;
+  sourcesNote: string;
+  engineerHref: string;
+  recentSessions: BetweenRunRecentSessionSnapshotV1[];
+  driverContextPack: {
+    combinedNotesAndHandling: string;
+    currentSetupLines: string[];
+  };
+};
+
+/** Normalized payload returned by API / peek after migration from v1. */
+export type BetweenRunHintPayload = BetweenRunHintPayloadV2;
+
+/** Fingerprint slice for recent-session rows (stable JSON via buildBetweenRunHintFingerprint). */
+export type RecentSessionsFingerprintMaterial = {
+  runIds: string[];
+  perRun: Array<{
+    runId: string;
+    fieldFingerprint: string;
+    bestFlag: string | null;
+    setupSig: string[];
+    paceLine: string | null;
+  }>;
 };

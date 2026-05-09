@@ -8,14 +8,20 @@ import { computeBetweenRunSignals } from "@/lib/engineerPhase5/betweenRunHints/c
 import { buildBetweenRunHintFingerprint } from "@/lib/engineerPhase5/betweenRunHints/buildBetweenRunHintFingerprint";
 import { assembleBetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/generateBetweenRunHints";
 import { buildKbQueryForBetweenRunHints } from "@/lib/engineerPhase5/betweenRunHints/generateBetweenRunHints";
-import type { BetweenRunHintPayloadV1, BetweenRunHintScopeV1 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
+import { buildRecentSessionsForBetweenHints } from "@/lib/engineerPhase5/betweenRunHints/buildRecentSessionsForBetweenHints";
+import type { BetweenRunHintPayloadV2, BetweenRunHintScopeV1 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 
-function parseHintPayload(raw: unknown): BetweenRunHintPayloadV1 | null {
+function parseHintPayload(raw: unknown): BetweenRunHintPayloadV2 | null {
   if (!raw || typeof raw !== "object") return null;
-  const o = raw as BetweenRunHintPayloadV1;
-  if (o.version !== 1) return null;
+  const o = raw as Record<string, unknown>;
+  if (o.version !== 2) return null;
   if (typeof o.headline !== "string" || !Array.isArray(o.bullets)) return null;
-  return o;
+  if (!Array.isArray(o.recentSessions)) return null;
+  const pack = o.driverContextPack;
+  if (!pack || typeof pack !== "object") return null;
+  const p = pack as Record<string, unknown>;
+  if (typeof p.combinedNotesAndHandling !== "string" || !Array.isArray(p.currentSetupLines)) return null;
+  return o as BetweenRunHintPayloadV2;
 }
 
 async function loadScopeForPrimaryRun(
@@ -48,7 +54,7 @@ async function loadScopeForPrimaryRun(
 export async function peekBetweenRunHint(
   userId: string,
   primaryRunId: string
-): Promise<BetweenRunHintPayloadV1 | null> {
+): Promise<BetweenRunHintPayloadV2 | null> {
   const row = await prisma.engineerBetweenRunHint.findUnique({
     where: { primaryRunId },
   });
@@ -61,9 +67,16 @@ export async function peekBetweenRunHint(
     where: { id: primaryRunId, userId },
     select: { handlingAssessmentJson: true },
   });
+
+  const { fingerprintMaterial } = await buildRecentSessionsForBetweenHints({
+    userId,
+    primaryRunId,
+  });
+
   const fp = buildBetweenRunHintFingerprint({
     summary: summaryResult.summary,
     handlingAssessmentJson: run?.handlingAssessmentJson ?? null,
+    recentSessionsMaterial: fingerprintMaterial,
   });
   if (fp !== row.inputFingerprint) return null;
 
@@ -74,7 +87,7 @@ export async function getOrComputeBetweenRunHint(
   userId: string,
   primaryRunId: string,
   opts?: { force?: boolean }
-): Promise<{ hint: BetweenRunHintPayloadV1 | null; cached: boolean }> {
+): Promise<{ hint: BetweenRunHintPayloadV2 | null; cached: boolean }> {
   const scope = await loadScopeForPrimaryRun(userId, primaryRunId);
   if (!scope) return { hint: null, cached: false };
 
@@ -91,9 +104,16 @@ export async function getOrComputeBetweenRunHint(
     },
   });
 
+  const { recentSessions, fingerprintMaterial, driverContextPack } =
+    await buildRecentSessionsForBetweenHints({
+      userId,
+      primaryRunId,
+    });
+
   const fp = buildBetweenRunHintFingerprint({
     summary: summaryResult.summary,
     handlingAssessmentJson: runMeta?.handlingAssessmentJson ?? null,
+    recentSessionsMaterial: fingerprintMaterial,
   });
 
   const existing = await prisma.engineerBetweenRunHint.findUnique({
@@ -136,6 +156,8 @@ export async function getOrComputeBetweenRunHint(
     patternDigest: digest,
     kbSnippets,
     referenceLabel: summaryResult.summary.referenceLabel,
+    recentSessions,
+    driverContextPack,
   });
 
   await prisma.engineerBetweenRunHint.upsert({

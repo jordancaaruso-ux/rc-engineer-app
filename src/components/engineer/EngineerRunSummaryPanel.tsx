@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
@@ -39,30 +38,156 @@ function finiteGap(v: number | null | undefined): number | null {
 
 /** Multi-driver imported timing: gaps vs session-best columns (positive = slower than field best). */
 function fieldRelativityForSummary(summary: EngineerRunSummaryV2): {
-  show: boolean;
-  sessionRankLabel: string | null;
+  /** ≥2 drivers in session aggregates or ≥2 persisted lap-set rows */
+  multiDriverField: boolean;
+  /** Lap metrics table: only when at least one finite gap (avoids a column of dashes). */
+  showVsFieldColumn: boolean;
   gapBest: number | null;
   gapAvg5: number | null;
   gapAvg10: number | null;
+  rank: number | null;
+  nDrivers: number | null;
 } {
   const fs = summary.importedSessionFieldStats;
   const ranked = summary.fieldImportSession?.ranked ?? [];
   const youRow = ranked.find((r) => r.isPrimaryUser) ?? null;
   const multiFromStats = fs != null && fs.driverCount >= 2;
   const multiFromSets = ranked.length >= 2;
-  const show = multiFromStats || multiFromSets;
-  if (!show) {
-    return { show: false, sessionRankLabel: null, gapBest: null, gapAvg5: null, gapAvg10: null };
+  const multiDriverField = multiFromStats || multiFromSets;
+  if (!multiDriverField) {
+    return {
+      multiDriverField: false,
+      showVsFieldColumn: false,
+      gapBest: null,
+      gapAvg5: null,
+      gapAvg10: null,
+      rank: null,
+      nDrivers: null,
+    };
   }
   const my = fs?.matchedYou;
   const gapBest = finiteGap(my?.gapBestToSessionBestSeconds ?? youRow?.gapToSessionBestSeconds);
   const gapAvg5 = finiteGap(my?.gapAvgTop5ToSessionBestAvg5Seconds);
   const gapAvg10 = finiteGap(my?.gapAvgTop10ToSessionBestAvg10Seconds);
-  const rank = my?.rankByBest ?? youRow?.rank;
-  const nDrivers = fs?.driverCount ?? ranked.length;
-  const sessionRankLabel =
-    rank != null && nDrivers >= 2 ? `Session position (by best lap): ${rank} of ${nDrivers}` : null;
-  return { show, sessionRankLabel, gapBest, gapAvg5, gapAvg10 };
+  const rank = my?.rankByBest ?? youRow?.rank ?? null;
+  const nDrivers =
+    multiFromStats && fs ? fs.driverCount : ranked.length >= 2 ? ranked.length : null;
+  const hasActionableGap = gapBest != null || gapAvg5 != null || gapAvg10 != null;
+  return {
+    multiDriverField: true,
+    showVsFieldColumn: hasActionableGap,
+    gapBest,
+    gapAvg5,
+    gapAvg10,
+    rank,
+    nDrivers,
+  };
+}
+
+function PaceVsFieldHero({
+  summary,
+  fieldRel,
+}: {
+  summary: EngineerRunSummaryV2;
+  fieldRel: ReturnType<typeof fieldRelativityForSummary>;
+}) {
+  const fs = summary.importedSessionFieldStats;
+  const f = summary.fieldImportSession;
+  const ranked = f?.ranked ?? [];
+
+  if (fieldRel.multiDriverField) {
+    if (fs && fs.driverCount >= 2) {
+      const my = fs.matchedYou;
+      const rankLine =
+        fieldRel.rank != null && fieldRel.nDrivers != null && fieldRel.nDrivers >= 2
+          ? `${fieldRel.rank} of ${fieldRel.nDrivers} by best lap`
+          : null;
+      return (
+        <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 space-y-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace vs field</div>
+          {rankLine ? <div className="text-sm font-semibold text-foreground tabular-nums">{rankLine}</div> : null}
+          {my ? (
+            <div className="space-y-1.5 text-[12px] leading-snug">
+              <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 font-mono tabular-nums text-foreground/90">
+                <span className="text-muted-foreground font-sans text-[11px]">Pole (session best lap)</span>
+                <span>{fmtSec(fs.sessionBestBestLapSeconds)}</span>
+                <span className="text-muted-foreground font-sans text-[11px]">Your best</span>
+                <span>{fmtSec(my.bestLapSeconds)}</span>
+                {fieldRel.gapBest != null ? (
+                  <>
+                    <span className="text-muted-foreground font-sans text-[11px]">Gap vs pole</span>
+                    <span>{fmtDeltaSec(fieldRel.gapBest)}</span>
+                  </>
+                ) : null}
+              </div>
+              {fieldRel.gapAvg5 != null ? (
+                <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 font-mono text-[11px] tabular-nums text-foreground/85 border-t border-border/50 pt-1.5">
+                  <span className="text-muted-foreground font-sans">Avg top 5 vs field best avg 5</span>
+                  <span>{fmtDeltaSec(fieldRel.gapAvg5)}</span>
+                </div>
+              ) : null}
+              {fieldRel.gapAvg10 != null ? (
+                <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 font-mono text-[11px] tabular-nums text-foreground/85">
+                  <span className="text-muted-foreground font-sans">Avg top 10 vs field best avg 10</span>
+                  <span>{fmtDeltaSec(fieldRel.gapAvg10)}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-[11px] text-foreground/90 leading-snug">
+              Field has {fs.driverCount} drivers in this imported timing session, but your row was not matched to a
+              primary imported driver name. Use the field table below to confirm how you appear in timing.
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    if (ranked.length >= 2 && f) {
+      const you = ranked.find((r) => r.isPrimaryUser) ?? ranked[0];
+      if (!you) return null;
+      const rankLine =
+        you.rank != null && ranked.length >= 2 ? `${you.rank} of ${ranked.length} by best lap` : null;
+      const fadeNote =
+        you.fadeSeconds != null && Number.isFinite(you.fadeSeconds)
+          ? `${you.fadeSeconds >= 0 ? "+" : ""}${you.fadeSeconds.toFixed(3)}s (2nd half mean − 1st half mean of included laps)`
+          : null;
+      return (
+        <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 space-y-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace vs field</div>
+          {rankLine ? <div className="text-sm font-semibold text-foreground tabular-nums">{rankLine}</div> : null}
+          <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 font-mono text-[12px] tabular-nums text-foreground/90">
+            <span className="text-muted-foreground font-sans text-[11px]">Pole (session best lap)</span>
+            <span>{fmtSec(f.sessionBestLapSeconds)}</span>
+            <span className="text-muted-foreground font-sans text-[11px]">Your best</span>
+            <span>{fmtSec(you.bestLapSeconds)}</span>
+            {fieldRel.gapBest != null ? (
+              <>
+                <span className="text-muted-foreground font-sans text-[11px]">Gap vs pole</span>
+                <span>{fmtDeltaSec(fieldRel.gapBest)}</span>
+              </>
+            ) : null}
+          </div>
+          {fadeNote ? (
+            <p className="text-[10px] text-muted-foreground leading-snug border-t border-border/50 pt-1.5">
+              Stint fade: {fadeNote}
+            </p>
+          ) : null}
+        </div>
+      );
+    }
+  }
+
+  if (summary.importedProvenance && !fieldRel.multiDriverField) {
+    return (
+      <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground leading-snug">
+        Pace vs field needs at least two drivers in this imported timing session. When the timing source lists more
+        entrants, rank and gaps will appear here.
+      </div>
+    );
+  }
+
+  return null;
 }
 
 const quickAskBtnClass =
@@ -211,6 +336,8 @@ export function EngineerRunSummaryPanel({
             </div>
           ) : null}
 
+          <PaceVsFieldHero summary={summary} fieldRel={fieldRel} />
+
           {summary.fieldImportSession && summary.fieldImportSession.ranked.length >= 2 ? (
             <div className="space-y-1.5">
               <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -298,7 +425,7 @@ export function EngineerRunSummaryPanel({
             <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Included lap metrics
             </div>
-            {fieldRel.show ? (
+            {fieldRel.showVsFieldColumn ? (
               <p className="text-[10px] text-muted-foreground leading-snug">
                 <span className="font-medium text-foreground/80">Vs field</span> uses the same imported timing session:
                 gap to the fastest competitor on each metric (positive = slower). Rank is by best lap only.
@@ -337,7 +464,7 @@ export function EngineerRunSummaryPanel({
                       {kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}
                     </span>
                   </div>
-                  {fieldRel.show ? (
+                  {fieldRel.showVsFieldColumn ? (
                     <div className="flex justify-end gap-x-4">
                       <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Vs field</span>
                       <span className="tabular-nums text-muted-foreground">
@@ -362,7 +489,7 @@ export function EngineerRunSummaryPanel({
                   <th className="py-1.5 px-2 font-medium" title="vs your reference run">
                     Δ ref
                   </th>
-                  {fieldRel.show ? (
+                  {fieldRel.showVsFieldColumn ? (
                     <th className="py-1.5 px-2 font-medium" title="Gap to session best (imported timing field)">
                       Vs field
                     </th>
@@ -392,7 +519,7 @@ export function EngineerRunSummaryPanel({
                     <td className="py-1 px-2">
                       {kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}
                     </td>
-                    {fieldRel.show ? (
+                    {fieldRel.showVsFieldColumn ? (
                       <td className="py-1 px-2 tabular-nums text-muted-foreground">
                         {fieldGap != null ? fmtDeltaSec(fieldGap) : "—"}
                       </td>
@@ -403,9 +530,6 @@ export function EngineerRunSummaryPanel({
               </tbody>
             </table>
           </div>
-          {fieldRel.sessionRankLabel ? (
-            <div className="text-[10px] text-muted-foreground">{fieldRel.sessionRankLabel}</div>
-          ) : null}
           <div className="text-muted-foreground">
             Included laps: <span className="text-foreground/90 font-mono">{summary.lapCountIncluded.current}</span>
             {summary.lapCountIncluded.reference != null ? (
