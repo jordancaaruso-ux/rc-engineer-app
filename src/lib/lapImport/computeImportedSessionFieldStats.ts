@@ -1,6 +1,6 @@
 import { getAverageTopN, getBestLap, type LapRow } from "@/lib/lapAnalysis";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
-import type { LapUrlParseResult } from "@/lib/lapUrlParsers/types";
+import type { LapUrlParseResult, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
 
 export const IMPORTED_SESSION_FIELD_STATS_VERSION = 1 as const;
 
@@ -44,13 +44,18 @@ function medianSorted(sorted: number[]): number | null {
 }
 
 /**
- * Stored JSON on `ImportedLapTimeSession` — summarizes every driver in `sessionDrivers`
- * (or single top-level laps) so Engineer / UI can compare user pace vs field without re-parsing payloads.
+ * Canonical multi-driver lap list for deriving `ImportedSessionFieldStatsV1` (same numeric rules as payloads).
  */
-export function computeImportedSessionFieldStatsFromPayload(
-  parsedPayload: unknown
+export type ImportedSessionDriverLapInputsV1 = {
+  driverId: string;
+  driverName: string;
+  normalizedName: string;
+  laps: number[];
+};
+
+function buildImportedSessionStatsFromDriversArray(
+  raw: ImportedSessionDriverLapInputsV1[]
 ): ImportedSessionFieldStatsV1 | null {
-  const raw = rawSessionDriversFromImportedPayload(parsedPayload);
   if (!raw || raw.length === 0) return null;
 
   const drivers: ImportedSessionFieldDriverStatV1[] = raw.map((d) => {
@@ -94,6 +99,30 @@ export function computeImportedSessionFieldStatsFromPayload(
       minBestSeconds: bestValues.length > 0 ? bestValues[0]! : null,
     },
   };
+}
+
+export function computeImportedSessionFieldStatsFromDrivers(
+  raw: ImportedSessionDriverLapInputsV1[]
+): ImportedSessionFieldStatsV1 | null {
+  const stats = buildImportedSessionStatsFromDriversArray(raw);
+  return stats != null && stats.driverCount >= 2 ? stats : null;
+}
+
+/**
+ * Stored JSON on `ImportedLapTimeSession` — summarizes every driver in `sessionDrivers`
+ * (or single top-level laps) so Engineer / UI can compare user pace vs field without re-parsing payloads.
+ */
+export function computeImportedSessionFieldStatsFromPayload(parsedPayload: unknown): ImportedSessionFieldStatsV1 | null {
+  const raw = rawSessionDriversFromImportedPayload(parsedPayload);
+  if (!raw || raw.length === 0) return null;
+
+  const inputs: ImportedSessionDriverLapInputsV1[] = raw.map((d: LapUrlSessionDriver) => ({
+    driverId: d.driverId,
+    driverName: d.driverName,
+    normalizedName: d.normalizedName,
+    laps: d.laps,
+  }));
+  return computeImportedSessionFieldStatsFromDrivers(inputs);
 }
 
 /** Narrow shape `{ sessionDrivers, laps }` matches persisted `parsedPayload`. */

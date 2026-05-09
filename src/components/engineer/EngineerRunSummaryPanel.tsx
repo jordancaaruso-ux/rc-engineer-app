@@ -32,6 +32,39 @@ function flagClass(flag: string): string {
   return "text-muted-foreground";
 }
 
+function finiteGap(v: number | null | undefined): number | null {
+  if (v == null || !Number.isFinite(v)) return null;
+  return v;
+}
+
+/** Multi-driver imported timing: gaps vs session-best columns (positive = slower than field best). */
+function fieldRelativityForSummary(summary: EngineerRunSummaryV2): {
+  show: boolean;
+  sessionRankLabel: string | null;
+  gapBest: number | null;
+  gapAvg5: number | null;
+  gapAvg10: number | null;
+} {
+  const fs = summary.importedSessionFieldStats;
+  const ranked = summary.fieldImportSession?.ranked ?? [];
+  const youRow = ranked.find((r) => r.isPrimaryUser) ?? null;
+  const multiFromStats = fs != null && fs.driverCount >= 2;
+  const multiFromSets = ranked.length >= 2;
+  const show = multiFromStats || multiFromSets;
+  if (!show) {
+    return { show: false, sessionRankLabel: null, gapBest: null, gapAvg5: null, gapAvg10: null };
+  }
+  const my = fs?.matchedYou;
+  const gapBest = finiteGap(my?.gapBestToSessionBestSeconds ?? youRow?.gapToSessionBestSeconds);
+  const gapAvg5 = finiteGap(my?.gapAvgTop5ToSessionBestAvg5Seconds);
+  const gapAvg10 = finiteGap(my?.gapAvgTop10ToSessionBestAvg10Seconds);
+  const rank = my?.rankByBest ?? youRow?.rank;
+  const nDrivers = fs?.driverCount ?? ranked.length;
+  const sessionRankLabel =
+    rank != null && nDrivers >= 2 ? `Session position (by best lap): ${rank} of ${nDrivers}` : null;
+  return { show, sessionRankLabel, gapBest, gapAvg5, gapAvg10 };
+}
+
 const quickAskBtnClass =
   "inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition disabled:opacity-40 disabled:cursor-not-allowed";
 
@@ -101,6 +134,7 @@ export function EngineerRunSummaryPanel({
   if (!summary) return null;
 
   const lo = summary.lapOutcome;
+  const fieldRel = fieldRelativityForSummary(summary);
   const engineerChatHref = `/engineer?runId=${encodeURIComponent(runId)}`;
   const hasCompareInUrl = Boolean(compareRunId?.trim());
   const runSummaryQuickPrompts = engineerQuickPromptsForSurface("run_summary");
@@ -260,31 +294,61 @@ export function EngineerRunSummaryPanel({
             </div>
           ) : null}
 
+          <div className="space-y-1">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Included lap metrics
+            </div>
+            {fieldRel.show ? (
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                <span className="font-medium text-foreground/80">Vs field</span> uses the same imported timing session:
+                gap to the fastest competitor on each metric (positive = slower). Rank is by best lap only.
+              </p>
+            ) : null}
+          </div>
           <div className="md:hidden space-y-1.5">
             {(
               [
-                ["Best", lo.best, "sec"],
-                ["Avg top 5", lo.avgTop5, "sec"],
-                ["Avg top 10", lo.avgTop10, "sec"],
-                ["Avg top 15", lo.avgTop15, "sec"],
-                ["Consistency", lo.consistencyScore, "score"],
+                ["Best", lo.best, "sec", fieldRel.gapBest] as const,
+                ["Avg top 5", lo.avgTop5, "sec", fieldRel.gapAvg5] as const,
+                ["Avg top 10", lo.avgTop10, "sec", fieldRel.gapAvg10] as const,
+                ["Avg top 15", lo.avgTop15, "sec", null] as const,
+                ["Consistency", lo.consistencyScore, "score", null] as const,
               ] as const
-            ).map(([label, m, kind]) => (
+            ).map(([label, m, kind, fieldGap]) => (
               <div
                 key={`${label}-m`}
-                className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded-md border border-border bg-muted/40 px-2 py-1.5 text-[10px]"
+                className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 rounded-md border border-border bg-muted/40 px-2 py-1.5 text-[10px]"
               >
                 <span className="font-medium text-foreground/85">{label}</span>
-                <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-right text-[10px]">
-                  <span>
-                    {kind === "sec"
-                      ? fmtSec(m.current, m.notMeaningful)
-                      : m.current != null
-                        ? formatConsistencyScorePercent(m.current)
-                        : "—"}
-                  </span>
-                  <span className="text-muted-foreground">{kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}</span>
-                  <span className={cn(flagClass(m.flag))}>{m.flag}</span>
+                <div className="ml-auto min-w-0 text-right font-mono text-[10px] space-y-0.5">
+                  <div className="flex justify-end gap-x-4">
+                    <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Value</span>
+                    <span className="tabular-nums">
+                      {kind === "sec"
+                        ? fmtSec(m.current, m.notMeaningful)
+                        : m.current != null
+                          ? formatConsistencyScorePercent(m.current)
+                          : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-end gap-x-4">
+                    <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Δ ref</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}
+                    </span>
+                  </div>
+                  {fieldRel.show ? (
+                    <div className="flex justify-end gap-x-4">
+                      <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Vs field</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {fieldGap != null ? fmtDeltaSec(fieldGap) : "—"}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-end gap-x-4 items-center">
+                    <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Flag</span>
+                    <span className={cn(flagClass(m.flag))}>{m.flag}</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -295,20 +359,27 @@ export function EngineerRunSummaryPanel({
                 <tr className="border-b border-border text-muted-foreground">
                   <th className="py-1.5 px-2 font-medium">Metric</th>
                   <th className="py-1.5 px-2 font-medium">This run</th>
-                  <th className="py-1.5 px-2 font-medium">Δ</th>
+                  <th className="py-1.5 px-2 font-medium" title="vs your reference run">
+                    Δ ref
+                  </th>
+                  {fieldRel.show ? (
+                    <th className="py-1.5 px-2 font-medium" title="Gap to session best (imported timing field)">
+                      Vs field
+                    </th>
+                  ) : null}
                   <th className="py-1.5 px-2 font-medium">Flag</th>
                 </tr>
               </thead>
               <tbody className="font-mono text-foreground/90">
                 {(
                   [
-                    ["Best", lo.best, "sec"],
-                    ["Avg top 5", lo.avgTop5, "sec"],
-                    ["Avg top 10", lo.avgTop10, "sec"],
-                    ["Avg top 15", lo.avgTop15, "sec"],
-                    ["Consistency", lo.consistencyScore, "score"],
+                    ["Best", lo.best, "sec", fieldRel.gapBest] as const,
+                    ["Avg top 5", lo.avgTop5, "sec", fieldRel.gapAvg5] as const,
+                    ["Avg top 10", lo.avgTop10, "sec", fieldRel.gapAvg10] as const,
+                    ["Avg top 15", lo.avgTop15, "sec", null] as const,
+                    ["Consistency", lo.consistencyScore, "score", null] as const,
                   ] as const
-                ).map(([label, m, kind]) => (
+                ).map(([label, m, kind, fieldGap]) => (
                   <tr key={label} className="border-b border-border/60 last:border-0">
                     <td className="py-1 px-2 text-foreground/80">{label}</td>
                     <td className="py-1 px-2">
@@ -321,12 +392,20 @@ export function EngineerRunSummaryPanel({
                     <td className="py-1 px-2">
                       {kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}
                     </td>
+                    {fieldRel.show ? (
+                      <td className="py-1 px-2 tabular-nums text-muted-foreground">
+                        {fieldGap != null ? fmtDeltaSec(fieldGap) : "—"}
+                      </td>
+                    ) : null}
                     <td className={cn("py-1 px-2", flagClass(m.flag))}>{m.flag}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {fieldRel.sessionRankLabel ? (
+            <div className="text-[10px] text-muted-foreground">{fieldRel.sessionRankLabel}</div>
+          ) : null}
           <div className="text-muted-foreground">
             Included laps: <span className="text-foreground/90 font-mono">{summary.lapCountIncluded.current}</span>
             {summary.lapCountIncluded.reference != null ? (

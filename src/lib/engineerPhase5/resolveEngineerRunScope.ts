@@ -3,6 +3,10 @@ import "server-only";
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { formatLocalCalendarDate } from "@/lib/engineerPhase5/localCalendarInTimeZone";
 import { searchRunsForEngineerTool, type SearchRunsForEngineerResultRow } from "@/lib/engineerPhase5/engineerRunSearchTools";
+import {
+  buildCompetitionRelativeRankingForRunScope,
+  type CompetitionRelativeRankingV1,
+} from "@/lib/engineerPhase5/competitionRelativeRanking";
 
 const MODEL = "gpt-4o-mini";
 
@@ -23,6 +27,8 @@ export type ResolvedRunScopeV1 = {
    * ask the user which meeting or date range they mean before asserting a whole-meeting story.
    */
   ambiguousMeetingScope: boolean;
+  /** When populated, pre-ranked gaps vs competitors for scoped runs — see Engineer prompt ("competitionRelativeRanking"). */
+  competitionRelativeRanking: CompetitionRelativeRankingV1 | null;
 };
 
 type ExtractionJson = {
@@ -197,6 +203,7 @@ export async function resolveRunScopeForEngineerChat(input: {
       truncated: false,
       preferOverDefaultPair: true,
       ambiguousMeetingScope: false,
+      competitionRelativeRanking: null,
     };
   }
 
@@ -209,6 +216,12 @@ export async function resolveRunScopeForEngineerChat(input: {
     tz
   );
 
+  const competitionRelativeRanking = await buildCompetitionRelativeRankingForRunScope({
+    userId: input.userId,
+    chronologicalRuns: chronological,
+    scopeLabel: extracted.label?.trim() ?? null,
+  });
+
   return {
     version: 1,
     label: extracted.label?.trim() || "Runs matching your question",
@@ -219,5 +232,6 @@ export async function resolveRunScopeForEngineerChat(input: {
     truncated: result.truncated,
     preferOverDefaultPair,
     ambiguousMeetingScope,
+    competitionRelativeRanking,
   };
 }

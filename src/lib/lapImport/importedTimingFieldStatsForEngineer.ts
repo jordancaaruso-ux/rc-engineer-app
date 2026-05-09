@@ -102,7 +102,7 @@ export function buildImportedSessionFieldStatsEngineerCompact(
   };
 }
 
-function primaryNormsFromImportedLapSets(
+export function primaryNormsFromImportedLapSets(
   sets: ReadonlyArray<{ driverName: string; isPrimaryUser: boolean }>
 ): string[] {
   const out: string[] = [];
