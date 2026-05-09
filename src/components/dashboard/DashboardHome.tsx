@@ -4,7 +4,6 @@ import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { formatRunCreatedAtDateTime, formatAppTimestampUtc } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { IncompleteLoggingRunsBanner } from "@/components/dashboard/IncompleteLoggingRunsBanner";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
 import { TodaySummaryCard } from "@/components/dashboard/TodaySummaryCard";
 import { DashboardBetweenRunHintsSection } from "@/components/dashboard/DashboardBetweenRunHintsSection";
@@ -31,7 +30,6 @@ export function DashboardHome({
     recentRun,
     thingsToTry,
     thingsToDo,
-    incompleteRuns,
     todayBestLap,
     todayBestAvgTop5,
     todayBestRunId,
@@ -43,13 +41,6 @@ export function DashboardHome({
     betweenRunHint,
     betweenRunHintsPrimaryRunId,
   } = model;
-
-  // The green "Unfinished run" card owns the representation of today's draft,
-  // so strip it from the amber catch-all banner. Otherwise the same run shows
-  // up twice: once as the green contextual CTA, once as an amber reminder.
-  const incompleteRunsFiltered = todayDraftRunId
-    ? incompleteRuns.filter((r) => r.id !== todayDraftRunId)
-    : incompleteRuns;
 
   // One prominent "what do I do next" entry point. Resolves to the
   // in-flight draft if there is one, otherwise the new-run form. Sits at
@@ -75,8 +66,6 @@ export function DashboardHome({
       </header>
 
       <section className="page-body flex max-w-3xl flex-col gap-3">
-        <IncompleteLoggingRunsBanner rows={incompleteRunsFiltered} displayTimeZone={displayTimeZone} />
-
         <Link
           href={primaryAction.href}
           className={cn(
