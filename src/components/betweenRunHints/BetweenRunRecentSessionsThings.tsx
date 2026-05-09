@@ -1,5 +1,4 @@
 import type { BetweenRunRecentSessionSnapshotV1 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
-import type { EngineerLapMetricFlag, PaceVsFieldMetricSnapshotV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { cn } from "@/lib/utils";
 
 function fmtSec(v: number | null | undefined): string {
@@ -7,59 +6,14 @@ function fmtSec(v: number | null | undefined): string {
   return v.toFixed(3);
 }
 
-function fmtDeltaSec(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(v)) return "—";
-  const sign = v >= 0 ? "+" : "";
-  return `${sign}${v.toFixed(3)}s`;
-}
-
-function flagClass(flag: EngineerLapMetricFlag): string {
-  if (flag === "improved") return "text-emerald-600 dark:text-emerald-400";
-  if (flag === "regressed") return "text-rose-600 dark:text-rose-400";
-  if (flag === "flat") return "text-muted-foreground";
-  return "text-muted-foreground";
-}
-
-function AvgTop10VsFieldHero({ metrics }: { metrics: PaceVsFieldMetricSnapshotV1[] | null | undefined }) {
+function competitorsAvgTop10Line(metrics: BetweenRunRecentSessionSnapshotV1["paceVsFieldMetrics"]) {
   const row = metrics?.find((m) => m.metric === "avg_top_10");
-  if (!row) {
-    return (
-      <p className="mt-1.5 text-[10px] text-muted-foreground leading-snug">
-        Avg top 10 vs competitors&apos; mean: not available (needs multi-driver imported timing and a matched driver
-        row).
-      </p>
-    );
-  }
-  const u = row.userSeconds;
-  const fMean = row.fieldMeanSeconds;
-  if (u == null || fMean == null || !Number.isFinite(u) || !Number.isFinite(fMean)) {
-    return (
-      <p className="mt-1.5 text-[10px] text-muted-foreground leading-snug">
-        Avg top 10 vs competitors&apos; mean: not available.
-      </p>
-    );
-  }
-  const gap = row.gapUserMinusFieldMeanSeconds;
+  const fMean = row?.fieldMeanSeconds;
+  const hasValue = fMean != null && Number.isFinite(fMean);
   return (
-    <div className="mt-1.5 space-y-0.5">
-      <div className="font-mono text-[10px] tabular-nums text-foreground/90 leading-snug">
-        <span className="font-sans font-medium text-foreground/85">Pace vs field</span>
-        {": "}
-        Your avg top 10 {fmtSec(u)}s vs competitors&apos; mean avg top 10 {fmtSec(fMean)}s
-        {gap != null && Number.isFinite(gap) ? (
-          <>
-            {" "}
-            — Δ {fmtDeltaSec(gap)}{" "}
-            <span className="font-sans text-[9px] text-muted-foreground">(positive = slower than mean)</span>
-          </>
-        ) : null}
-        {!row.meaningful ? <span className="text-muted-foreground"> *</span> : null}
-      </div>
-      {!row.meaningful ? (
-        <p className="text-[8px] text-muted-foreground leading-snug">
-          * Fair avg top 10 needs at least 10 included laps on your row (same rule as session summaries).
-        </p>
-      ) : null}
+    <div>
+      <span className="text-muted-foreground font-sans">Competitors avg top 10</span>{" "}
+      {hasValue ? <>{fmtSec(fMean)}s</> : <span className="text-muted-foreground">—</span>}
     </div>
   );
 }
@@ -86,9 +40,6 @@ export function BetweenRunRecentSessionsThings({
       </div>
       <div className="grid gap-2 sm:grid-cols-1">
         {sessions.map((s, idx) => {
-          const bestFlag = s.bestLapVsPreviousFlag;
-          const a5Flag = s.avgTop5VsPreviousFlag;
-          const a10Flag = s.avgTop10VsPreviousFlag;
           return (
             <div
               key={s.runId}
@@ -101,9 +52,6 @@ export function BetweenRunRecentSessionsThings({
               <div className="mt-1.5 space-y-0.5 font-mono text-[10px] text-foreground/90 tabular-nums">
                 <div>
                   <span className="text-muted-foreground font-sans">Best lap</span> {fmtSec(s.bestLapSeconds)}s
-                  {bestFlag ? (
-                    <span className={cn("ml-1 font-sans text-[9px]", flagClass(bestFlag))}>({bestFlag})</span>
-                  ) : null}
                 </div>
                 <div>
                   <span className="text-muted-foreground font-sans">Avg top 5</span>{" "}
@@ -112,9 +60,6 @@ export function BetweenRunRecentSessionsThings({
                   ) : (
                     <>{fmtSec(s.avgTop5LapSeconds ?? null)}s</>
                   )}
-                  {a5Flag ? (
-                    <span className={cn("ml-1 font-sans text-[9px]", flagClass(a5Flag))}>({a5Flag})</span>
-                  ) : null}
                 </div>
                 <div>
                   <span className="text-muted-foreground font-sans">Avg top 10</span>{" "}
@@ -123,17 +68,14 @@ export function BetweenRunRecentSessionsThings({
                   ) : (
                     <>{fmtSec(s.avgTop10LapSeconds ?? null)}s</>
                   )}
-                  {a10Flag ? (
-                    <span className={cn("ml-1 font-sans text-[9px]", flagClass(a10Flag))}>({a10Flag})</span>
-                  ) : null}
                 </div>
                 {(s.avgTop5NotMeaningful || s.avgTop10NotMeaningful) && (
                   <p className="font-sans text-[8px] text-muted-foreground leading-snug">
                     * Multi-lap averages need enough included laps on that run (same rule as Engineer summaries).
                   </p>
                 )}
+                {competitorsAvgTop10Line(s.paceVsFieldMetrics)}
               </div>
-              <AvgTop10VsFieldHero metrics={s.paceVsFieldMetrics} />
               {s.setupChangesFromPrevious.length > 0 ? (
                 <div className="mt-1.5">
                   <div className="text-[9px] ui-title text-muted-foreground">
