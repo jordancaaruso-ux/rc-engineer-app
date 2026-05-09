@@ -197,21 +197,23 @@ export function EngineerRunSummaryPanel({
             </div>
           ) : null}
 
-          <EngineerPaceVsFieldPanel summary={summary} />
+          <EngineerPaceVsFieldPanel summary={summary} explicitPairCompare={hasCompareInUrl} />
 
           <div className="space-y-1">
             <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Included lap metrics
             </div>
-            {fieldRel.showVsFieldColumn ? (
+                {fieldRel.showVsFieldColumn ? (
               <p className="text-[10px] text-muted-foreground leading-snug">
                 <span className="font-medium text-foreground/80">Vs field</span>{" "}
                 {fieldRel.vsFieldUsesSessionMeans ? (
                   <>
                     compares each metric to the <span className="font-medium text-foreground/80">session field average</span>{" "}
                     (mean across entrants with data). Positive = slower than that average. The pace panel leads with{" "}
-                    <span className="font-medium text-foreground/80">you vs your reference run</span> when a reference exists;
-                    these columns stay vs field for context.
+                    <span className="font-medium text-foreground/80">
+                      {hasCompareInUrl ? "you vs the comparison run" : "you vs your reference run"}
+                    </span>{" "}
+                    when a reference exists; these columns stay vs field for context.
                   </>
                 ) : (
                   <>
@@ -249,7 +251,9 @@ export function EngineerRunSummaryPanel({
                     </span>
                   </div>
                   <div className="flex justify-end gap-x-4">
-                    <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">Δ ref</span>
+                    <span className="text-muted-foreground font-sans text-[9px] w-12 text-left shrink-0">
+                      {hasCompareInUrl ? "Δ cmp" : "Δ ref"}
+                    </span>
                     <span className="tabular-nums text-muted-foreground">
                       {kind === "sec" ? fmtDeltaSec(m.delta) : fmtDeltaScore(m.delta)}
                     </span>
@@ -276,8 +280,11 @@ export function EngineerRunSummaryPanel({
                 <tr className="border-b border-border text-muted-foreground">
                   <th className="py-1.5 px-2 font-medium">Metric</th>
                   <th className="py-1.5 px-2 font-medium">This run</th>
-                  <th className="py-1.5 px-2 font-medium" title="vs your reference run">
-                    Δ ref
+                  <th
+                    className="py-1.5 px-2 font-medium"
+                    title={hasCompareInUrl ? "vs comparison run" : "vs your reference run"}
+                  >
+                    {hasCompareInUrl ? "Δ cmp" : "Δ ref"}
                   </th>
                   {fieldRel.showVsFieldColumn ? (
                     <th
@@ -332,7 +339,8 @@ export function EngineerRunSummaryPanel({
             {summary.lapCountIncluded.reference != null ? (
               <>
                 {" "}
-                vs ref <span className="text-foreground/90 font-mono">{summary.lapCountIncluded.reference}</span>
+                {hasCompareInUrl ? "vs cmp " : "vs ref "}
+                <span className="text-foreground/90 font-mono">{summary.lapCountIncluded.reference}</span>
               </>
             ) : null}
           </div>

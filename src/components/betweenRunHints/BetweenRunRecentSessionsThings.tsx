@@ -1,8 +1,8 @@
 import type { BetweenRunRecentSessionSnapshotV1 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
-import type { PaceVsFieldMetricSnapshotV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import type { EngineerLapMetricFlag, PaceVsFieldMetricSnapshotV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { cn } from "@/lib/utils";
 
-function fmtSec(v: number | null): string {
+function fmtSec(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   return v.toFixed(3);
 }
@@ -11,6 +11,13 @@ function fmtDeltaSec(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   const sign = v >= 0 ? "+" : "";
   return `${sign}${v.toFixed(3)}s`;
+}
+
+function flagClass(flag: EngineerLapMetricFlag): string {
+  if (flag === "improved") return "text-emerald-600 dark:text-emerald-400";
+  if (flag === "regressed") return "text-rose-600 dark:text-rose-400";
+  if (flag === "flat") return "text-muted-foreground";
+  return "text-muted-foreground";
 }
 
 function AvgTop10VsFieldHero({ metrics }: { metrics: PaceVsFieldMetricSnapshotV1[] | null | undefined }) {
@@ -78,40 +85,77 @@ export function BetweenRunRecentSessionsThings({
         Recent sessions (newest first)
       </div>
       <div className="grid gap-2 sm:grid-cols-1">
-        {sessions.map((s, idx) => (
-          <div
-            key={s.runId}
-            className={cn(
-              "rounded-lg border border-border bg-card/70 px-3 py-2 text-[11px] leading-snug",
-              idx === 0 && "ring-1 ring-primary/25"
-            )}
-          >
-            <div className="font-medium text-foreground/95">{s.displayLabel}</div>
-            <div className="mt-1.5 font-mono text-[10px] text-foreground/90 tabular-nums">
-              <span className="text-muted-foreground font-sans">Best lap</span> {fmtSec(s.bestLapSeconds)}s
-            </div>
-            <AvgTop10VsFieldHero metrics={s.paceVsFieldMetrics} />
-            {s.setupChangesFromPrevious.length > 0 ? (
-              <div className="mt-1.5">
-                <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Setup changes
+        {sessions.map((s, idx) => {
+          const bestFlag = s.bestLapVsPreviousFlag;
+          const a5Flag = s.avgTop5VsPreviousFlag;
+          const a10Flag = s.avgTop10VsPreviousFlag;
+          return (
+            <div
+              key={s.runId}
+              className={cn(
+                "rounded-lg border border-border bg-card/70 px-3 py-2 text-[11px] leading-snug",
+                idx === 0 && "ring-1 ring-primary/25"
+              )}
+            >
+              <div className="font-medium text-foreground/95">{s.displayLabel}</div>
+              <div className="mt-1.5 space-y-0.5 font-mono text-[10px] text-foreground/90 tabular-nums">
+                <div>
+                  <span className="text-muted-foreground font-sans">Best lap</span> {fmtSec(s.bestLapSeconds)}s
+                  {bestFlag ? (
+                    <span className={cn("ml-1 font-sans text-[9px]", flagClass(bestFlag))}>({bestFlag})</span>
+                  ) : null}
                 </div>
-                <ul className="mt-0.5 list-disc space-y-0.5 pl-3.5 text-muted-foreground">
-                  {s.setupChangesFromPrevious.map((line, i) => (
-                    <li key={i}>{line}</li>
-                  ))}
-                </ul>
+                <div>
+                  <span className="text-muted-foreground font-sans">Avg top 5</span>{" "}
+                  {s.avgTop5NotMeaningful ? (
+                    <span className="text-muted-foreground">— *</span>
+                  ) : (
+                    <>{fmtSec(s.avgTop5LapSeconds ?? null)}s</>
+                  )}
+                  {a5Flag ? (
+                    <span className={cn("ml-1 font-sans text-[9px]", flagClass(a5Flag))}>({a5Flag})</span>
+                  ) : null}
+                </div>
+                <div>
+                  <span className="text-muted-foreground font-sans">Avg top 10</span>{" "}
+                  {s.avgTop10NotMeaningful ? (
+                    <span className="text-muted-foreground">— *</span>
+                  ) : (
+                    <>{fmtSec(s.avgTop10LapSeconds ?? null)}s</>
+                  )}
+                  {a10Flag ? (
+                    <span className={cn("ml-1 font-sans text-[9px]", flagClass(a10Flag))}>({a10Flag})</span>
+                  ) : null}
+                </div>
+                {(s.avgTop5NotMeaningful || s.avgTop10NotMeaningful) && (
+                  <p className="font-sans text-[8px] text-muted-foreground leading-snug">
+                    * Multi-lap averages need enough included laps on that run (same rule as Engineer summaries).
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="mt-1.5 text-[10px] text-muted-foreground">No setup changes vs prior on record.</p>
-            )}
-            {s.notesPreview?.trim() ? (
-              <div className="mt-1.5 border-t border-border/60 pt-1.5 text-[10px] text-muted-foreground">
-                <span className="font-medium text-foreground/80">Notes:</span> {s.notesPreview.trim()}
-              </div>
-            ) : null}
-          </div>
-        ))}
+              <AvgTop10VsFieldHero metrics={s.paceVsFieldMetrics} />
+              {s.setupChangesFromPrevious.length > 0 ? (
+                <div className="mt-1.5">
+                  <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Setup changes
+                  </div>
+                  <ul className="mt-0.5 list-disc space-y-0.5 pl-3.5 text-muted-foreground">
+                    {s.setupChangesFromPrevious.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="mt-1.5 text-[10px] text-muted-foreground">No setup changes vs prior on record.</p>
+              )}
+              {s.notesPreview?.trim() ? (
+                <div className="mt-1.5 border-t border-border/60 pt-1.5 text-[10px] text-muted-foreground">
+                  <span className="font-medium text-foreground/80">Notes:</span> {s.notesPreview.trim()}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

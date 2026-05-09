@@ -152,8 +152,8 @@ The JSON object must have exactly these keys:
 - "avoidRepeating": string or null — when lap metrics regressed OR driver feel worsened AND there were setup changes since the reference run, give ONE short line about not repeating the same direction of changes until verified; when a regression lines up with a specific documented setup move across recentSessions, you may name reverting that move; otherwise null
 
 Rules:
-- You receive up to three recentSessions objects in chronological order **newest first** (index 0 = latest run). Each includes best lap vs prior session flag, optional paceVsFieldSummary from imported timing, setupChangesFromPrevious, notesPreview, handlingPreview.
-- Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **explicit revert** ideas when bestLapVsPreviousFlag is regressed and setupChangesFromPrevious plausibly correlate.
+- You receive up to three recentSessions objects in chronological order **newest first** (index 0 = latest run). Each includes best lap, avg top 5, avg top 10 (when lap counts allow), vs-prior flags when a reference exists, optional paceVsFieldSummary / paceVsFieldMetrics from imported timing, setupChangesFromPrevious, notesPreview, handlingPreview.
+- Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **explicit revert** ideas when lap flags (best or multi-lap) are regressed and setupChangesFromPrevious plausibly correlate.
 - Ground technical claims ONLY in the provided KB excerpts and the structured JSON (summary, recentSessions, driverContextPack). If unsure, hedge with "test" / "verify".
 - Do not invent exact setup numbers not present in the JSON.
 - Prefer one-change-at-a-time discipline when recommending reversals.

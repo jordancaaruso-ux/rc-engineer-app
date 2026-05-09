@@ -41,6 +41,14 @@ export type BetweenRunRecentSessionSnapshotV1 = {
   bestLapSeconds: number | null;
   /** vs your prior session on this car when a reference exists for that run. */
   bestLapVsPreviousFlag: EngineerLapMetricFlag | null;
+  /** Present for payloads built after this panel shipped; older rows may omit. */
+  avgTop5LapSeconds?: number | null;
+  avgTop10LapSeconds?: number | null;
+  /** When the run lacks enough laps for that aggregate (same rule as lap summary). */
+  avgTop5NotMeaningful?: boolean;
+  avgTop10NotMeaningful?: boolean;
+  avgTop5VsPreviousFlag?: EngineerLapMetricFlag | null;
+  avgTop10VsPreviousFlag?: EngineerLapMetricFlag | null;
   /** Multi-line text for LLM (includes vs field mean when available). */
   paceVsFieldSummary: string | null;
   /** Structured pace vs session field average; absent on older cached hint payloads. */
@@ -81,5 +89,7 @@ export type RecentSessionsFingerprintMaterial = {
     paceLine: string | null;
     /** Stable digest of pace-vs-field mean rows for cache invalidation. */
     paceMetricsSig: string | null;
+    /** Avg-top-5/10 values + flags for cache invalidation when recent-session cards change. */
+    lapMultiSig: string | null;
   }>;
 };

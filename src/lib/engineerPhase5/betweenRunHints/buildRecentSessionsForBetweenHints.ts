@@ -177,18 +177,30 @@ export async function buildRecentSessionsForBetweenHints(params: {
     const setupLines =
       summary?.setupChanges.map((c) => `${c.label}: ${c.before} → ${c.after}`) ?? [];
     const bestFlag = summary?.lapOutcome.best.flag ?? null;
+    const hasRef = Boolean(summary?.referenceRunId);
+    const lo = summary?.lapOutcome;
 
     recentSessions.push({
       runId,
       displayLabel: label,
       bestLapSeconds: summary?.lapOutcome.best.current ?? null,
-      bestLapVsPreviousFlag: summary?.referenceRunId ? bestFlag : null,
+      bestLapVsPreviousFlag: hasRef ? bestFlag : null,
+      avgTop5LapSeconds: lo?.avgTop5.notMeaningful ? null : (lo?.avgTop5.current ?? null),
+      avgTop10LapSeconds: lo?.avgTop10.notMeaningful ? null : (lo?.avgTop10.current ?? null),
+      avgTop5NotMeaningful: lo?.avgTop5.notMeaningful,
+      avgTop10NotMeaningful: lo?.avgTop10.notMeaningful,
+      avgTop5VsPreviousFlag: hasRef ? (lo?.avgTop5.flag ?? null) : null,
+      avgTop10VsPreviousFlag: hasRef ? (lo?.avgTop10.flag ?? null) : null,
       paceVsFieldSummary: pace,
       paceVsFieldMetrics: paceMetrics && paceMetrics.length > 0 ? paceMetrics : null,
       setupChangesFromPrevious: setupLines,
       notesPreview: meta ? notesPreviewFromRun(meta.notes, meta.driverNotes) : null,
       handlingPreview: meta ? handlingPreviewFromRun(meta.handlingProblems, meta.handlingAssessmentJson) : null,
     });
+
+    const lapMultiSig = lo
+      ? `${lo.avgTop5.current ?? ""}:${lo.avgTop10.current ?? ""}:${lo.avgTop5.flag}:${lo.avgTop10.flag}:${lo.avgTop5.notMeaningful ? 1 : 0}:${lo.avgTop10.notMeaningful ? 1 : 0}`
+      : null;
 
     fpPerRun.push({
       runId,
@@ -197,6 +209,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
       setupSig: (summary?.setupChanges ?? []).map((c) => `${c.key}:${c.before}>${c.after}`),
       paceLine: pace,
       paceMetricsSig,
+      lapMultiSig,
     });
   }
 

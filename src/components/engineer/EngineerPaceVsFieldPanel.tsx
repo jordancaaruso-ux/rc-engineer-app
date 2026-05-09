@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import {
   computePaceComparisonHeadline,
+  computePairVsFieldCrossCheckLine,
   PACE_MULTI_LAP_SECTION_TITLE,
   type PaceComparisonHeadline,
 } from "@/lib/engineerPhase5/paceComparisonHeadline";
@@ -24,13 +25,19 @@ function fmtDeltaSec(v: number | null | undefined): string {
   return `${sign}${v.toFixed(3)}s`;
 }
 
-function ReferencePaceCallout({ headline }: { headline: PaceComparisonHeadline }) {
+function ReferencePaceCallout({
+  headline,
+  explicitPairCompare,
+}: {
+  headline: PaceComparisonHeadline;
+  explicitPairCompare: boolean;
+}) {
   const v = headline.vsReference;
   if (!v) return null;
   return (
     <div className="space-y-1 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2">
       <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        vs your reference run
+        {explicitPairCompare ? "vs comparison run" : "vs your reference run"}
       </div>
       <div className="text-base font-semibold text-foreground tabular-nums font-mono leading-tight">
         {fmtDeltaSec(v.deltaSeconds)}
@@ -38,7 +45,12 @@ function ReferencePaceCallout({ headline }: { headline: PaceComparisonHeadline }
       <p className="text-[11px] text-foreground/90 leading-snug">
         <span className="font-medium">{v.metricLabel}</span> on this run compared to{" "}
         <span className="font-medium">{v.referenceLabel}</span>
-        <span className="text-muted-foreground"> (positive = slower than that run).</span>
+        <span className="text-muted-foreground">
+          {" "}
+          {explicitPairCompare
+            ? "(positive = slower than the comparison run)."
+            : "(positive = slower than that run)."}
+        </span>
       </p>
     </div>
   );
@@ -85,11 +97,14 @@ function PaceVsFieldHero({
   summary,
   fieldRel,
   headline,
+  explicitPairCompare,
 }: {
   summary: EngineerRunSummaryV2;
   fieldRel: ReturnType<typeof fieldRelativityForSummary>;
   headline: PaceComparisonHeadline;
+  explicitPairCompare: boolean;
 }) {
+  const crossCheckLine = computePairVsFieldCrossCheckLine(summary, headline);
   const fs = summary.importedSessionFieldStats;
   const f = summary.fieldImportSession;
   const ranked = f?.ranked ?? [];
@@ -111,7 +126,9 @@ function PaceVsFieldHero({
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace vs field</div>
           {my ? (
             <div className="space-y-2 text-[12px] leading-snug">
-              {headline.vsReference ? <ReferencePaceCallout headline={headline} /> : null}
+              {headline.vsReference ? (
+                <ReferencePaceCallout headline={headline} explicitPairCompare={explicitPairCompare} />
+              ) : null}
               {!headline.vsReference && summary.referenceRunId == null ? (
                 <p className="text-[10px] text-muted-foreground leading-snug">
                   No earlier run on this car to compare — only imported timing vs the rest of the field below.
@@ -119,8 +136,9 @@ function PaceVsFieldHero({
               ) : null}
               {!headline.vsReference && summary.referenceRunId != null ? (
                 <p className="text-[10px] text-muted-foreground leading-snug">
-                  Could not form a clean lap delta vs your reference run (lap counts or missing laps) — session field
-                  below.
+                  Could not form a clean lap delta vs your{" "}
+                  {explicitPairCompare ? "comparison run" : "reference run"} (lap counts or missing laps) — session
+                  field below.
                 </p>
               ) : null}
 
@@ -161,6 +179,12 @@ function PaceVsFieldHero({
                   Linked timing session did not publish avg top 10 field averages for this import.
                 </p>
               )}
+
+              {crossCheckLine ? (
+                <p className="text-[10px] text-foreground/85 leading-snug border-l-2 border-border pl-2">
+                  {crossCheckLine}
+                </p>
+              ) : null}
 
               {medGap != null ? (
                 <div className="border-t border-border/50 pt-2 space-y-0.5">
@@ -263,7 +287,14 @@ function PaceVsFieldHero({
       return (
         <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 space-y-2">
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pace vs field</div>
-          {headline.vsReference ? <ReferencePaceCallout headline={headline} /> : null}
+          {headline.vsReference ? (
+            <ReferencePaceCallout headline={headline} explicitPairCompare={explicitPairCompare} />
+          ) : null}
+          {crossCheckLine ? (
+            <p className="text-[10px] text-foreground/85 leading-snug border-l-2 border-border pl-2">
+              {crossCheckLine}
+            </p>
+          ) : null}
           {!headline.vsReference && summary.referenceRunId == null ? (
             <p className="text-[10px] text-muted-foreground leading-snug">
               No earlier run on this car to compare — lap-set ranking vs session best below.
@@ -391,12 +422,24 @@ function FieldImportSessionFieldTable({ summary }: { summary: EngineerRunSummary
 /**
  * Pace vs imported field (session best, mean analysis, driver table). Used in Engineer run summary and Sessions lap analysis.
  */
-export function EngineerPaceVsFieldPanel({ summary }: { summary: EngineerRunSummaryV2 }) {
+export function EngineerPaceVsFieldPanel({
+  summary,
+  explicitPairCompare = false,
+}: {
+  summary: EngineerRunSummaryV2;
+  /** True when the summary was loaded with an explicit compare run (URL / bar), not the default prior-on-car reference. */
+  explicitPairCompare?: boolean;
+}) {
   const fieldRel = useMemo(() => fieldRelativityForSummary(summary), [summary]);
   const headline = useMemo(() => computePaceComparisonHeadline(summary), [summary]);
   return (
     <div className="space-y-3">
-      <PaceVsFieldHero summary={summary} fieldRel={fieldRel} headline={headline} />
+      <PaceVsFieldHero
+        summary={summary}
+        fieldRel={fieldRel}
+        headline={headline}
+        explicitPairCompare={explicitPairCompare}
+      />
       <FieldImportSessionFieldTable summary={summary} />
     </div>
   );

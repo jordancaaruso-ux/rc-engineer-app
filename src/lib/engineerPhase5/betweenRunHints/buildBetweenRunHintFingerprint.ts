@@ -35,6 +35,7 @@ export function buildBetweenRunHintFingerprint(params: {
     lap: {
       best: params.summary.lapOutcome.best,
       avgTop5: params.summary.lapOutcome.avgTop5,
+      avgTop10: params.summary.lapOutcome.avgTop10,
     },
     setup: sc,
     interpretation: params.summary.interpretation,

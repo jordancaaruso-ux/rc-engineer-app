@@ -91,3 +91,53 @@ export function computePaceComparisonHeadline(summary: EngineerRunSummaryV2): Pa
     fieldAvg10RankLine,
   };
 }
+
+/**
+ * When pairwise pace (vs reference run) and session-field gap disagree on the same multi-lap metric,
+ * return a short cross-check line for the pace panel. Otherwise null.
+ */
+export function computePairVsFieldCrossCheckLine(
+  summary: EngineerRunSummaryV2,
+  headline: PaceComparisonHeadline
+): string | null {
+  const v = headline.vsReference;
+  if (!v) return null;
+  if (v.metricKey === "best") return null;
+
+  const fs = summary.importedSessionFieldStats;
+  const analysis = fs?.paceVsFieldMeanAnalysis;
+  if (!analysis?.length) return null;
+
+  let fieldGap: number | null = null;
+  let meaningful = false;
+
+  if (v.metricKey === "avg_top_10") {
+    fieldGap = headline.fieldAvg10GapVsMeanSeconds;
+    meaningful = headline.fieldAvg10Meaningful;
+  } else {
+    const row = analysis.find((m) => m.metric === "avg_top_5");
+    if (row?.gapUserMinusFieldMeanSeconds != null && Number.isFinite(row.gapUserMinusFieldMeanSeconds)) {
+      fieldGap = row.gapUserMinusFieldMeanSeconds;
+      meaningful = Boolean(row.meaningful);
+    }
+  }
+
+  if (!meaningful || fieldGap == null || !Number.isFinite(fieldGap)) return null;
+
+  const delta = v.deltaSeconds;
+  if (!Number.isFinite(delta)) return null;
+
+  const eps = 1e-6;
+  if (Math.abs(delta) < eps || Math.abs(fieldGap) < eps) return null;
+
+  const ref = v.referenceLabel.trim() || "that run";
+  const metric = v.metricLabel.toLowerCase();
+
+  if (delta < 0 && fieldGap > 0) {
+    return `Cross-check: faster than ${ref} on ${metric}, but still slower than this session's field average on the same metric — treat the pairwise gain cautiously until the field gap moves.`;
+  }
+  if (delta > 0 && fieldGap < 0) {
+    return `Cross-check: slower than ${ref} on ${metric}, yet quicker than this session's field average on the same metric — the field context may still look fine despite the pairwise slip.`;
+  }
+  return null;
+}
