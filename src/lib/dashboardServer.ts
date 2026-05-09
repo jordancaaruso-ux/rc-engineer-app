@@ -1,5 +1,4 @@
 import type { ActionItemSourceType } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
@@ -13,7 +12,6 @@ import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import { peekBetweenRunHint } from "@/lib/engineerPhase5/betweenRunHints/getOrComputeBetweenRunHints";
-import { scheduleBetweenRunHintsRecompute } from "@/lib/engineerPhase5/betweenRunHints/scheduleBetweenRunHints";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
@@ -272,8 +270,10 @@ export type DashboardHomeModel = {
     bestLap: number | null;
     avgTop5: number | null;
   };
-  /** Cached proactive Engineer hints for the latest run (peek only; no LLM on this path). */
+  /** Cached proactive Engineer hints for the latest run (peek on SSR). Client may sync-fetch when null. */
   betweenRunHint: BetweenRunHintPayload | null;
+  /** Latest run id eligible for between-run hints (requires car); mirrors SSR peek gate. */
+  betweenRunHintsPrimaryRunId: string | null;
 };
 
 const recentRunSelect = {
@@ -598,19 +598,14 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
 
   const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
 
+  let betweenRunHintsPrimaryRunId: string | null = null;
   let betweenRunHint: BetweenRunHintPayload | null = null;
   if (recentRun?.car?.id) {
-    let skipHintRecompute = false;
+    betweenRunHintsPrimaryRunId = recentRun.id;
     try {
       betweenRunHint = await peekBetweenRunHint(userId, recentRun.id);
-    } catch (e) {
+    } catch {
       betweenRunHint = null;
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2021") {
-        skipHintRecompute = true;
-      }
-    }
-    if (!betweenRunHint && !skipHintRecompute) {
-      void scheduleBetweenRunHintsRecompute(userId, recentRun.id);
     }
   }
 
@@ -648,5 +643,6 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     todaysChanges,
     recentRun: recent,
     betweenRunHint,
+    betweenRunHintsPrimaryRunId,
   };
 }

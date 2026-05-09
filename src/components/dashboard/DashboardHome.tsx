@@ -7,7 +7,7 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { IncompleteLoggingRunsBanner } from "@/components/dashboard/IncompleteLoggingRunsBanner";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
 import { TodaySummaryCard } from "@/components/dashboard/TodaySummaryCard";
-import { DashboardBetweenRunHintsCard } from "@/components/dashboard/DashboardBetweenRunHintsCard";
+import { DashboardBetweenRunHintsSection } from "@/components/dashboard/DashboardBetweenRunHintsSection";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 
 function btnPrimary(className = "") {
@@ -41,6 +41,7 @@ export function DashboardHome({
     todayDraftSavedAt,
     todaysChanges,
     betweenRunHint,
+    betweenRunHintsPrimaryRunId,
   } = model;
 
   // The green "Unfinished run" card owns the representation of today's draft,
@@ -122,7 +123,10 @@ export function DashboardHome({
           </span>
         </Link>
 
-        <DashboardBetweenRunHintsCard hint={betweenRunHint} />
+        <DashboardBetweenRunHintsSection
+          initialHint={betweenRunHint}
+          primaryRunId={betweenRunHintsPrimaryRunId}
+        />
 
         {activeEvent ? (
           <EventContextCard activeEvent={activeEvent} />
