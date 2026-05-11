@@ -1,95 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
-import type {
-  PaceVsFieldRunDigestRowV1,
-  PaceVsFieldRunDigestSubsetV1,
-  PaceVsFieldRunDigestV1,
-} from "@/lib/engineerPhase5/paceVsFieldRunDigestTypes";
-import { PACE_VS_FIELD_DIGEST_SUBSET_MAX_ROWS } from "@/lib/engineerPhase5/paceVsFieldRunDigestTypes";
-import type { RunCatalogV1 } from "@/lib/engineerPhase5/runCatalogTypes";
-import { engineerQuickPromptDisabled, engineerQuickPromptsForSurface } from "@/lib/engineerQuickPrompts";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export type EngineerQueuedChatPrompt = { id: number; text: string };
 
-const chatQuickBtnClass =
-  "inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] font-medium text-foreground hover:bg-muted/70 transition disabled:opacity-40 disabled:cursor-not-allowed";
-
-function formatPaceGapForTable(seconds: number): string {
-  const sign = seconds > 0 ? "+" : "";
-  return `${sign}${seconds.toFixed(3)}s`;
-}
-
-function buildPaceSubsetFilterSummary(rows: PaceVsFieldRunDigestRowV1[]): string {
-  if (rows.length === 0) return "0 runs";
-  const first = rows[0];
-  if (first.eventId != null && rows.every((r) => r.eventId === first.eventId)) {
-    const tracks = [...new Set(rows.map((r) => r.trackName))];
-    const en = first.eventName ?? "Event";
-    return `${en} · ${tracks.join(" / ")} · ${rows.length} run(s)`;
-  }
-  return `${rows.length} run(s) selected`;
-}
-
-type PaceDigestGroupMode = "event" | "day";
-
 export function EngineerChatPanel({
-  patternDigest = null,
-  includeRunCatalog = true,
-  onIncludeRunCatalogChange,
-  includePatternDigestInChat = false,
-  onIncludePatternDigestInChatChange,
   queuedPrompt = null,
   onQueuedPromptConsumed,
-  onQuickPrompt,
 }: {
-  patternDigest?: PatternDigestV1 | null;
-  includeRunCatalog?: boolean;
-  onIncludeRunCatalogChange?: (next: boolean) => void;
-  /** When true, POST /api/engineer/chat sends patternDigest (Compare & trend must have loaded one). */
-  includePatternDigestInChat?: boolean;
-  onIncludePatternDigestInChatChange?: (next: boolean) => void;
   /** When set, appends this user message and posts to the API once (use a new `id` per enqueue). */
   queuedPrompt?: EngineerQueuedChatPrompt | null;
   onQueuedPromptConsumed?: () => void;
-  /** Engineer page: enqueue a canned prompt (same as run-summary quick asks). */
-  onQuickPrompt?: (text: string) => void;
-}) {
+} = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const runIdFromUrl = searchParams.get("runId")?.trim() || null;
   const compareRunIdFromUrl = searchParams.get("compareRunId")?.trim() || null;
-  const chatPanelQuickPrompts = engineerQuickPromptsForSurface("chat_panel");
 
   const [chatBusy, setChatBusy] = useState(false);
   const [chatErr, setChatErr] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [catalogBanner, setCatalogBanner] = useState<RunCatalogV1 | null>(null);
-  const [catalogBannerErr, setCatalogBannerErr] = useState<string | null>(null);
-  const [paceDigest, setPaceDigest] = useState<PaceVsFieldRunDigestV1 | null>(null);
-  const [paceDigestLoading, setPaceDigestLoading] = useState(false);
-  const [paceDigestErr, setPaceDigestErr] = useState<string | null>(null);
-  const [includePaceDigestInChat, setIncludePaceDigestInChat] = useState(true);
-  const [paceScopeCarOnly, setPaceScopeCarOnly] = useState(Boolean(runIdFromUrl));
-  const [paceDigestGroupMode, setPaceDigestGroupMode] = useState<PaceDigestGroupMode>("event");
-  const [paceHideDuplicateImports, setPaceHideDuplicateImports] = useState(false);
-  const [paceSelectedRunIds, setPaceSelectedRunIds] = useState<string[]>([]);
-  const [paceDigestSubset, setPaceDigestSubset] = useState<PaceVsFieldRunDigestSubsetV1 | null>(null);
-  const [includePaceDigestSubsetInChat, setIncludePaceDigestSubsetInChat] = useState(false);
 
   const messagesRef = useRef<ChatMessage[]>([]);
   const lastQueuedId = useRef<number | null>(null);
-  const paceDigestRef = useRef<PaceVsFieldRunDigestV1 | null>(null);
-  const paceDigestSubsetRef = useRef<PaceVsFieldRunDigestSubsetV1 | null>(null);
-  const includePaceDigestRef = useRef(true);
-  const includePaceDigestSubsetRef = useRef(false);
   const onQueuedConsumedRef = useRef(onQueuedPromptConsumed);
   useEffect(() => {
     onQueuedConsumedRef.current = onQueuedPromptConsumed;
@@ -98,141 +37,6 @@ export function EngineerChatPanel({
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
-
-  useEffect(() => {
-    if (!includeRunCatalog) {
-      setCatalogBanner(null);
-      setCatalogBannerErr(null);
-      return;
-    }
-    let alive = true;
-    fetch("/api/runs/catalog", { cache: "no-store" })
-      .then((r) => r.json().catch(() => ({})))
-      .then((data: { catalog?: RunCatalogV1; error?: string }) => {
-        if (!alive) return;
-        if (data.catalog) {
-          setCatalogBanner(data.catalog);
-          setCatalogBannerErr(null);
-        } else {
-          setCatalogBanner(null);
-          setCatalogBannerErr(data.error ?? null);
-        }
-      })
-      .catch(() => {
-        if (!alive) return;
-        setCatalogBanner(null);
-        setCatalogBannerErr("Could not load catalog");
-      });
-    return () => {
-      alive = false;
-    };
-  }, [includeRunCatalog]);
-
-  useEffect(() => {
-    paceDigestRef.current = paceDigest;
-  }, [paceDigest]);
-
-  useEffect(() => {
-    includePaceDigestRef.current = includePaceDigestInChat;
-  }, [includePaceDigestInChat]);
-
-  useEffect(() => {
-    paceDigestSubsetRef.current = paceDigestSubset;
-  }, [paceDigestSubset]);
-
-  useEffect(() => {
-    includePaceDigestSubsetRef.current = includePaceDigestSubsetInChat;
-  }, [includePaceDigestSubsetInChat]);
-
-  const visiblePaceDigestRows = useMemo(() => {
-    if (!paceDigest) return [];
-    if (!paceHideDuplicateImports) return paceDigest.rows;
-    const seen = new Set<string>();
-    const out: PaceVsFieldRunDigestRowV1[] = [];
-    for (const r of paceDigest.rows) {
-      const sid = r.importedLapTimeSessionId;
-      if (sid) {
-        if (seen.has(sid)) continue;
-        seen.add(sid);
-      }
-      out.push(r);
-    }
-    return out;
-  }, [paceDigest, paceHideDuplicateImports]);
-
-  const visiblePaceRunIdSet = useMemo(() => new Set(visiblePaceDigestRows.map((r) => r.runId)), [visiblePaceDigestRows]);
-
-  useEffect(() => {
-    setPaceSelectedRunIds((prev) => prev.filter((id) => visiblePaceRunIdSet.has(id)));
-  }, [visiblePaceRunIdSet]);
-
-  const paceDigestGroups = useMemo(() => {
-    type G = { key: string; label: string; rows: PaceVsFieldRunDigestRowV1[] };
-    const groups: G[] = [];
-    const ix = new Map<string, number>();
-    for (const r of visiblePaceDigestRows) {
-      const key =
-        paceDigestGroupMode === "event" ? r.eventId ?? "__no_event__" : r.displayDay;
-      const label =
-        paceDigestGroupMode === "event"
-          ? r.eventId
-            ? `${r.eventName ?? "Event"} · ${r.trackName}`
-            : `No event · ${r.trackName}`
-          : r.displayDay;
-      let i = ix.get(key);
-      if (i === undefined) {
-        i = groups.length;
-        ix.set(key, i);
-        groups.push({ key, label, rows: [] });
-      }
-      groups[i].rows.push(r);
-    }
-    return groups;
-  }, [visiblePaceDigestRows, paceDigestGroupMode]);
-
-  const hasNswStateTitlesRows = useMemo(
-    () => visiblePaceDigestRows.some((r) => (r.eventName ?? "").includes("NSW State Titles")),
-    [visiblePaceDigestRows]
-  );
-
-  async function loadPaceDigest() {
-    setPaceDigestLoading(true);
-    setPaceDigestErr(null);
-    try {
-      const qs = new URLSearchParams();
-      if (runIdFromUrl && paceScopeCarOnly) {
-        qs.set("scope", "car");
-        qs.set("anchorRunId", runIdFromUrl);
-      } else {
-        qs.set("scope", "account");
-        if (runIdFromUrl) qs.set("anchorRunId", runIdFromUrl);
-      }
-      const res = await fetch(`/api/engineer/pace-vs-field-digest?${qs}`, { cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setPaceDigestErr((data as { error?: string }).error ?? "Could not load digest");
-        setPaceDigest(null);
-        return;
-      }
-      const d = (data as { digest?: PaceVsFieldRunDigestV1 }).digest;
-      if (!d || d.version !== 1) {
-        setPaceDigestErr("Invalid digest response");
-        setPaceDigest(null);
-        return;
-      }
-      setPaceDigest(d);
-      setIncludePaceDigestInChat(true);
-      setPaceDigestSubset(null);
-      setPaceSelectedRunIds([]);
-      setIncludePaceDigestSubsetInChat(false);
-      setPaceHideDuplicateImports(false);
-    } catch {
-      setPaceDigestErr("Could not load digest");
-      setPaceDigest(null);
-    } finally {
-      setPaceDigestLoading(false);
-    }
-  }
 
   async function submitConversation(next: ChatMessage[]) {
     setChatBusy(true);
@@ -245,16 +49,7 @@ export function EngineerChatPanel({
           messages: next,
           ...(runIdFromUrl ? { runId: runIdFromUrl } : {}),
           ...(compareRunIdFromUrl ? { compareRunId: compareRunIdFromUrl } : {}),
-          includePatternDigest: Boolean(patternDigest && includePatternDigestInChat),
-          ...(patternDigest && includePatternDigestInChat ? { patternDigest } : {}),
-          includeRunCatalog,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          ...(paceDigestRef.current && includePaceDigestRef.current
-            ? { paceVsFieldRunDigest: paceDigestRef.current }
-            : {}),
-          ...(paceDigestSubsetRef.current && includePaceDigestSubsetRef.current
-            ? { paceVsFieldRunDigestSubset: paceDigestSubsetRef.current }
-            : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -320,60 +115,15 @@ export function EngineerChatPanel({
     await submitConversation(next);
   }
 
-  const paceSelectedCount = paceSelectedRunIds.length;
-  const overPaceSubsetCap = paceSelectedCount > PACE_VS_FIELD_DIGEST_SUBSET_MAX_ROWS;
-
-  function togglePaceRunSelected(runId: string) {
-    setPaceSelectedRunIds((prev) =>
-      prev.includes(runId) ? prev.filter((id) => id !== runId) : [...prev, runId]
-    );
-  }
-
-  function togglePaceGroupSelection(runIds: string[]) {
-    setPaceSelectedRunIds((prev) => {
-      const allIn = runIds.length > 0 && runIds.every((id) => prev.includes(id));
-      if (allIn) return prev.filter((id) => !runIds.includes(id));
-      return [...new Set([...prev, ...runIds])];
-    });
-  }
-
-  function quickSelectNswStateTitles() {
-    const ids = visiblePaceDigestRows
-      .filter((r) => (r.eventName ?? "").includes("NSW State Titles"))
-      .map((r) => r.runId);
-    setPaceSelectedRunIds([...new Set(ids)]);
-  }
-
-  function applyPaceDigestSelection() {
-    if (!paceDigest || paceSelectedRunIds.length === 0 || overPaceSubsetCap) return;
-    const idSet = new Set(paceSelectedRunIds);
-    const rows = paceDigest.rows.filter((r) => idSet.has(r.runId));
-    const subset: PaceVsFieldRunDigestSubsetV1 = {
-      version: 1,
-      generatedAtIso: new Date().toISOString(),
-      parentDigestGeneratedAtIso: paceDigest.generatedAtIso,
-      filterSummary: buildPaceSubsetFilterSummary(rows),
-      metric: "avg_top_10_vs_field_mean",
-      gapMeaning: "user_seconds_minus_field_mean_positive_slower",
-      rows,
-    };
-    setPaceDigestSubset(subset);
-    setIncludePaceDigestSubsetInChat(true);
-  }
-
-  function clearPaceDigestSelection() {
-    setPaceSelectedRunIds([]);
-    setPaceDigestSubset(null);
-    setIncludePaceDigestSubsetInChat(false);
-  }
-
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-border bg-background flex flex-col">
         <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-[220px] sm:min-h-[280px] max-h-[min(52vh,420px)]">
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground leading-relaxed">
-            Ask anything—general setup and KB, or a compare from the URL. Trend/series context is **optional** (see below).
+              Ask about setup, handling, or laps. Optional: set a primary run (and compare run) in{" "}
+              <span className="font-medium text-foreground/90">Compare &amp; trend</span> so answers anchor to those
+              URLs.
             </p>
           ) : (
             messages.map((m, idx) => (
@@ -381,7 +131,9 @@ export function EngineerChatPanel({
                 key={idx}
                 className={cn(
                   "text-sm leading-relaxed rounded-md px-3 py-2",
-                  m.role === "user" ? "bg-muted/80 text-foreground ml-0 mr-4" : "bg-card border border-border/80 ml-4 mr-0 text-foreground/95"
+                  m.role === "user"
+                    ? "bg-muted/80 text-foreground ml-0 mr-4"
+                    : "bg-card border border-border/80 ml-4 mr-0 text-foreground/95"
                 )}
               >
                 <div className="text-[10px] ui-title text-muted-foreground mb-1">
@@ -402,80 +154,6 @@ export function EngineerChatPanel({
         ) : null}
       </div>
 
-      {onQuickPrompt ? (
-        <div className="space-y-1.5 rounded-md border border-border/80 bg-muted/20 px-2.5 py-2">
-          <div className="text-[10px] ui-title text-muted-foreground">Quick prompts</div>
-          <div className="flex flex-wrap gap-1.5">
-            {chatPanelQuickPrompts.map((def) => {
-              const dis = engineerQuickPromptDisabled(def, {
-                hasRunId: Boolean(runIdFromUrl),
-                hasCompareRunId: Boolean(compareRunIdFromUrl),
-                hasPatternDigest: patternDigest != null,
-                hasPaceVsFieldDigest: paceDigest != null,
-                paceSubsetRowCount: paceDigestSubset?.rows.length ?? 0,
-              });
-              let hint = def.label;
-              if (dis) {
-                if (def.requiresRunId !== false && !runIdFromUrl) hint = "Set a primary run in Compare & trend below first";
-                else if (def.requiresCompare && !compareRunIdFromUrl) hint = "Pick a compare run in Compare & trend below first";
-                else if (def.requiresPatternDigest && !patternDigest)
-                  hint = "Load trend digest in Compare & trend below first";
-                else if (def.requiresPaceVsFieldDigest && !paceDigest)
-                  hint = "Load pace vs field digest below first";
-                else if (
-                  def.requiresPaceVsFieldSubsetMinRuns != null &&
-                  (paceDigestSubset?.rows.length ?? 0) < def.requiresPaceVsFieldSubsetMinRuns
-                )
-                  hint = "Apply a pace subset with at least 2 runs below first";
-              }
-              return (
-                <button
-                  key={def.id}
-                  type="button"
-                  title={hint}
-                  disabled={dis}
-                  className={chatQuickBtnClass}
-                  onClick={() => onQuickPrompt(def.prompt)}
-                >
-                  {def.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {paceDigestSubset ? (
-        <div className="rounded-md border border-border bg-muted/30 px-2.5 py-2 text-[11px] overflow-x-auto">
-          <div className="font-medium text-foreground mb-1">Pace digest subset (preview)</div>
-          <div className="text-muted-foreground mb-2">{paceDigestSubset.filterSummary}</div>
-          <table className="w-full border-collapse text-left font-mono text-[10px]">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground">
-                <th className="py-1 pr-2 font-medium">runId</th>
-                <th className="py-1 pr-2 font-medium">day</th>
-                <th className="py-1 pr-2 font-medium">event</th>
-                <th className="py-1 pr-2 font-medium">session</th>
-                <th className="py-1 pr-2 font-medium">gap</th>
-                <th className="py-1 pr-2 font-medium">rank</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paceDigestSubset.rows.map((r) => (
-                <tr key={r.runId} className="border-t border-border/60 align-top">
-                  <td className="py-1 pr-2 whitespace-nowrap">{r.runId}</td>
-                  <td className="py-1 pr-2 whitespace-nowrap">{r.displayDay}</td>
-                  <td className="py-1 pr-2">{r.eventName ?? "—"}</td>
-                  <td className="py-1 pr-2">{r.sessionSummary}</td>
-                  <td className="py-1 pr-2 whitespace-nowrap">{formatPaceGapForTable(r.gapUserMinusFieldMeanSeconds)}</td>
-                  <td className="py-1 pr-2 whitespace-nowrap">{r.rankInField ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-
       <div className="rounded-lg border border-border bg-muted/20 p-3 flex flex-col sm:flex-row gap-2">
         <input
           value={input}
@@ -487,7 +165,7 @@ export function EngineerChatPanel({
             }
           }}
           className="flex-1 rounded-md border border-border bg-background px-3 py-2.5 text-sm outline-none min-h-[44px]"
-          placeholder="Custom text — ask the engineer…"
+          placeholder="Ask the Engineer…"
           disabled={chatBusy}
           aria-label="Message to engineer"
         />
@@ -502,310 +180,6 @@ export function EngineerChatPanel({
         >
           {chatBusy ? "…" : "Send"}
         </button>
-      </div>
-
-      <div className="space-y-2 pt-1 text-[10px] text-muted-foreground">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <label
-            className={cn(
-              "flex items-center gap-2 text-[11px] text-foreground cursor-pointer",
-              !patternDigest && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 accent-primary shrink-0"
-              checked={includePatternDigestInChat && Boolean(patternDigest)}
-              disabled={!patternDigest}
-              onChange={(e) => onIncludePatternDigestInChatChange?.(e.target.checked)}
-            />
-            <span>Attach Compare &amp; trend digest to chat</span>
-          </label>
-          <span className="sm:text-right">
-            Off by default—keeps chat separate from the series tool until you opt in.
-          </span>
-        </div>
-
-        <div className="rounded-md border border-border/80 bg-muted/25 px-2.5 py-2 space-y-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Pace vs field (linked timing)
-          </div>
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            Lists runs where avg top 10 vs the <span className="text-foreground/90">session field mean</span> is
-            meaningful (multi-driver import, matched row, ≥10 laps). Gap = your avg10 − mean (negative = faster than
-            average).
-          </p>
-          <div className="flex flex-wrap gap-2 items-center">
-            <button
-              type="button"
-              onClick={() => void loadPaceDigest()}
-              disabled={paceDigestLoading || chatBusy}
-              className={chatQuickBtnClass}
-            >
-              {paceDigestLoading ? "Loading…" : "Load pace vs field digest"}
-            </button>
-            {runIdFromUrl ? (
-              <label className="flex items-center gap-2 text-[11px] text-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 accent-primary shrink-0"
-                  checked={paceScopeCarOnly}
-                  onChange={(e) => setPaceScopeCarOnly(e.target.checked)}
-                />
-                <span>Limit to this car</span>
-              </label>
-            ) : null}
-          </div>
-          <label
-            className={cn(
-              "flex items-center gap-2 text-[11px] text-foreground cursor-pointer",
-              !paceDigest && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 accent-primary shrink-0"
-              checked={includePaceDigestInChat && Boolean(paceDigest)}
-              disabled={!paceDigest}
-              onChange={(e) => setIncludePaceDigestInChat(e.target.checked)}
-            />
-            <span>Attach pace vs field digest to chat</span>
-          </label>
-          <label
-            className={cn(
-              "flex items-center gap-2 text-[11px] text-foreground cursor-pointer",
-              !paceDigestSubset && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 accent-primary shrink-0"
-              checked={includePaceDigestSubsetInChat && Boolean(paceDigestSubset)}
-              disabled={!paceDigestSubset}
-              onChange={(e) => setIncludePaceDigestSubsetInChat(e.target.checked)}
-            />
-            <span>Attach pace digest subset to chat</span>
-          </label>
-          {paceDigestErr ? <div className="text-destructive text-[11px]">{paceDigestErr}</div> : null}
-          {paceDigest ? (
-            <>
-              <div className="text-[11px] text-muted-foreground leading-snug">
-                <span className="text-foreground font-medium">{paceDigest.includedRunCount}</span> run(s) with valid avg
-                top 10 vs field mean (scanned {paceDigest.scannedRunCount} with linked timing
-                {paceDigest.scope === "car" ? ", this car only" : ""}).
-                {paceDigest.omittedAfterCap > 0 ? (
-                  <span className="text-amber-600 dark:text-amber-500">
-                    {" "}
-                    {paceDigest.omittedAfterCap} more qualifying run(s) not included (table capped at 48 rows,
-                    best-vs-field first).
-                  </span>
-                ) : null}
-                {paceDigest.truncatedScan ? (
-                  <span className="text-amber-600 dark:text-amber-500">
-                    {" "}
-                    More linked-timing runs exist than were scanned.
-                  </span>
-                ) : null}
-                {includePaceDigestInChat ? (
-                  <> Sent with each chat request while enabled.</>
-                ) : (
-                  <> Not sent — enable checkbox to attach.</>
-                )}
-                {paceDigestSubset && includePaceDigestSubsetInChat ? (
-                  <span className="text-foreground">
-                    {" "}
-                    Subset ({paceDigestSubset.rows.length} run(s)) also sent when enabled.
-                  </span>
-                ) : paceDigestSubset ? (
-                  <span> Subset built — enable &quot;Attach subset&quot; to send it.</span>
-                ) : null}
-              </div>
-              <details className="rounded-md border border-border/70 bg-background/80 px-2 py-1.5">
-                <summary className="cursor-pointer text-[11px] font-medium text-foreground select-none">
-                  Choose runs for analysis
-                </summary>
-                <div className="mt-2 space-y-2 pt-1 border-t border-border/60">
-                  <div className="flex flex-wrap gap-2 items-center text-[11px]">
-                    <span className="text-muted-foreground">Group by</span>
-                    <button
-                      type="button"
-                      className={cn(chatQuickBtnClass, paceDigestGroupMode !== "event" && "opacity-70")}
-                      onClick={() => setPaceDigestGroupMode("event")}
-                    >
-                      Event
-                    </button>
-                    <button
-                      type="button"
-                      className={cn(chatQuickBtnClass, paceDigestGroupMode !== "day" && "opacity-70")}
-                      onClick={() => setPaceDigestGroupMode("day")}
-                    >
-                      Day (UTC)
-                    </button>
-                    <label className="flex items-center gap-2 text-foreground cursor-pointer ml-1">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 accent-primary shrink-0"
-                        checked={paceHideDuplicateImports}
-                        onChange={(e) => setPaceHideDuplicateImports(e.target.checked)}
-                      />
-                      <span>Hide duplicate timing sessions</span>
-                    </label>
-                  </div>
-                  {hasNswStateTitlesRows ? (
-                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                      <span className="text-muted-foreground">Quick select</span>
-                      <button type="button" className={chatQuickBtnClass} onClick={() => quickSelectNswStateTitles()}>
-                        NSW State Titles (all listed rows)
-                      </button>
-                    </div>
-                  ) : null}
-                  <div className="max-h-[min(40vh,320px)] overflow-y-auto space-y-2 pr-1">
-                    {paceDigestGroups.map((g) => {
-                      const gids = g.rows.map((r) => r.runId);
-                      const allIn =
-                        g.rows.length > 0 && g.rows.every((r) => paceSelectedRunIds.includes(r.runId));
-                      return (
-                        <div key={g.key} className="space-y-1">
-                          <div className="flex items-start gap-2 text-[11px] font-medium text-foreground sticky top-0 bg-background/95 py-0.5 z-[1]">
-                            <input
-                              type="checkbox"
-                              className="h-3.5 w-3.5 accent-primary shrink-0 mt-0.5"
-                              checked={allIn}
-                              onChange={() => togglePaceGroupSelection(gids)}
-                              aria-label={`Select all in ${g.label}`}
-                            />
-                            <span className="leading-snug">{g.label}</span>
-                          </div>
-                          <ul className="space-y-0.5 pl-6 border-l border-border/50 ml-1.5">
-                            {g.rows.map((r) => (
-                              <li key={r.runId} className="text-[10px] leading-snug">
-                                <label className="flex items-start gap-2 cursor-pointer text-muted-foreground">
-                                  <input
-                                    type="checkbox"
-                                    className="h-3 w-3 accent-primary shrink-0 mt-0.5"
-                                    checked={paceSelectedRunIds.includes(r.runId)}
-                                    onChange={() => togglePaceRunSelected(r.runId)}
-                                  />
-                                  <span className="flex-1">
-                                    <span className="text-foreground font-mono">{r.runId}</span>
-                                    {" · "}
-                                    {r.carName} · {r.sessionSummary} · gap{" "}
-                                    {formatPaceGapForTable(r.gapUserMinusFieldMeanSeconds)}
-                                    {r.rankInField != null ? ` · rank ${r.rankInField}` : null}
-                                  </span>
-                                </label>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex flex-wrap gap-2 items-center text-[11px]">
-                    <button
-                      type="button"
-                      className={chatQuickBtnClass}
-                      disabled={paceSelectedCount === 0 || overPaceSubsetCap}
-                      onClick={() => applyPaceDigestSelection()}
-                    >
-                      Apply selection
-                    </button>
-                    <button type="button" className={chatQuickBtnClass} onClick={() => clearPaceDigestSelection()}>
-                      Clear selection
-                    </button>
-                    <span className="text-muted-foreground">
-                      {paceSelectedCount} selected (max {PACE_VS_FIELD_DIGEST_SUBSET_MAX_ROWS} for chat)
-                    </span>
-                  </div>
-                  {overPaceSubsetCap ? (
-                    <div className="text-destructive text-[11px] leading-snug">
-                      Too many runs selected for chat payload — narrow to {PACE_VS_FIELD_DIGEST_SUBSET_MAX_ROWS} or fewer
-                      before Apply.
-                    </div>
-                  ) : null}
-                </div>
-              </details>
-            </>
-          ) : null}
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <label className="flex items-center gap-2 text-[11px] text-foreground cursor-pointer">
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 accent-primary shrink-0"
-              checked={includeRunCatalog}
-              onChange={(e) => onIncludeRunCatalogChange?.(e.target.checked)}
-            />
-            <span>Include account run catalog in answers</span>
-          </label>
-          <span className="sm:text-right">Grounds replies in real run ids and dates when enabled.</span>
-        </div>
-
-        {(runIdFromUrl && compareRunIdFromUrl) || runIdFromUrl || patternDigest || paceDigest || paceDigestSubset ? (
-          <div className="flex flex-wrap gap-x-3 gap-y-1 rounded-md bg-muted/40 px-2.5 py-2 border border-border/60">
-            {runIdFromUrl && compareRunIdFromUrl ? (
-              <span>
-                <span className="text-foreground font-medium">Two runs</span> in URL — Engineer has lap + setup context.
-                Structured summary is in Compare &amp; trend below; chat is conversational.
-              </span>
-            ) : runIdFromUrl ? (
-              <span>
-                <span className="text-foreground font-medium">Focused run</span> from URL.
-              </span>
-            ) : null}
-            {patternDigest ? (
-              <span>
-                Trend digest loaded:{" "}
-                <span className="text-foreground font-medium">{patternDigest.runs.length}</span> runs
-                {includePatternDigestInChat ? (
-                  <> — included in chat requests.</>
-                ) : (
-                  <> — not sent to chat (enable checkbox above).</>
-                )}
-              </span>
-            ) : null}
-            {paceDigest ? (
-              <span>
-                Pace vs field digest:{" "}
-                <span className="text-foreground font-medium">{paceDigest.includedRunCount}</span> row(s)
-                {includePaceDigestInChat ? <> — included in chat.</> : <> — not sent (enable attach above).</>}
-              </span>
-            ) : null}
-            {paceDigestSubset ? (
-              <span>
-                Pace subset:{" "}
-                <span className="text-foreground font-medium">{paceDigestSubset.rows.length}</span> run(s)
-                {includePaceDigestSubsetInChat ? <> — included in chat.</> : <> — not sent (enable attach subset).</>}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
-        {includeRunCatalog && catalogBanner ? (
-          <div className="rounded-md border border-border/80 bg-muted/25 px-2.5 py-2">
-            Catalog in context:{" "}
-            <span className="text-foreground font-medium">{catalogBanner.includedRunCount}</span> of{" "}
-            <span className="text-foreground font-medium">{catalogBanner.totalRunCount}</span> runs
-            {catalogBanner.truncated ? (
-              <span className="text-amber-600 dark:text-amber-500">
-                {" "}
-                ({catalogBanner.omittedCount} not listed — narrow filters in Compare &amp; trend below or name a run id)
-              </span>
-            ) : null}
-            .
-          </div>
-        ) : null}
-        {includeRunCatalog && catalogBannerErr ? (
-          <div className="text-destructive">{catalogBannerErr}</div>
-        ) : null}
-        {!includeRunCatalog ? (
-          <div>Catalog off — chat uses summary, URL runs, and tools.</div>
-        ) : null}
-        <p className="leading-snug">
-          You can ask for runs by time (&quot;last weekend&quot;) or teammate name — the Engineer can search and set the
-          focused run in the page URL when it finds a match.
-        </p>
       </div>
     </div>
   );

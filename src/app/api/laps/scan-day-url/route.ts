@@ -23,10 +23,8 @@ export type ScanDayUrlCandidateRow = {
   sessionTime: string | null;
   sessionCompletedAtIso: string | null;
   /**
-   * Matches the driver configured in Settings (LiveRC driver name). When the
-   * user hasn't set a driver name we surface every row and leave `matchesDriver`
-   * `null` so the UI can render a clear "set your driver name in Settings"
-   * hint instead of silently filtering.
+   * Practice: true when this row matches Settings → LiveRC driver name (exact normalized string,
+   * or multi-token relaxed match — see route). Results list rows always null (no per-row driver).
    */
   matchesDriver: boolean | null;
   /** True when an ImportedLapTimeSession already exists for this URL (so the
@@ -36,6 +34,21 @@ export type ScanDayUrlCandidateRow = {
    *  is already attached to a run (so the user knows it's been saved). */
   linkedRunId: string | null;
 };
+
+const RESULTS_SCAN_ROW_CAP = 80;
+
+/** True when every normalized token (length ≥2) from the setting appears in the row string (order-independent). */
+function practiceRowMatchesDriverRelaxed(normRow: string, driverNorm: string): boolean {
+  const tokens = driverNorm.split(/\s+/).filter((t) => t.length >= 2);
+  if (tokens.length < 2) return false;
+  return tokens.every((t) => normRow.includes(t));
+}
+
+function practiceRowMatchesDriver(normRow: string, driverNorm: string): boolean {
+  if (!driverNorm || !normRow) return false;
+  if (normRow === driverNorm) return true;
+  return practiceRowMatchesDriverRelaxed(normRow, driverNorm);
+}
 
 /**
  * Scan a LiveRC index page for timing session links:
@@ -115,7 +128,7 @@ export async function POST(request: Request) {
     candidates = rows.map((r) => {
       const normRow = normalizeLiveRcDriverNameForMatch(r.driverName);
       const matchesDriver =
-        driverNorm.length === 0 ? null : normRow.length > 0 && normRow === driverNorm;
+        driverNorm.length === 0 ? null : practiceRowMatchesDriver(normRow, driverNorm);
       const linkedRunId = importedMap.get(r.sessionUrl) ?? null;
       return {
         sessionId: r.sessionId,
@@ -169,14 +182,81 @@ export async function POST(request: Request) {
     });
   }
 
-  const mine = candidates.filter((c) => c.matchesDriver === true);
+  const totalCandidates = candidates.length;
+
+  if (isPractice && driverNorm.length > 0) {
+    const mine = candidates.filter((c) => c.matchesDriver === true);
+    if (mine.length > 0) {
+      return NextResponse.json({
+        ok: true,
+        dayUrl,
+        indexKind,
+        liveRcDriverName,
+        candidates: mine,
+        totalCandidates,
+        matchedCount: mine.length,
+        hasDriverNameSetting: true,
+        driverFilterApplied: true,
+        scanMessage: null,
+      });
+    }
+    const sampleLabels = [...new Set(candidates.map((c) => c.driverName).filter(Boolean))].slice(0, 8);
+    const sampleHint =
+      sampleLabels.length > 0
+        ? ` Example names on this page: ${sampleLabels.join(" · ")}.`
+        : "";
+    return NextResponse.json({
+      ok: true,
+      dayUrl,
+      indexKind,
+      liveRcDriverName,
+      candidates: [],
+      totalCandidates,
+      matchedCount: 0,
+      hasDriverNameSetting: true,
+      driverFilterApplied: true,
+      scanMessage: `No practice sessions matched your LiveRC driver name “${liveRcDriverName ?? ""}”. Check Settings → LiveRC driver name against how your name appears on LiveRC.${sampleHint}`,
+    });
+  }
+
+  if (isPractice && driverNorm.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      dayUrl,
+      indexKind,
+      liveRcDriverName: null,
+      candidates,
+      totalCandidates,
+      matchedCount: null,
+      hasDriverNameSetting: false,
+      driverFilterApplied: false,
+      scanMessage:
+        "Set your LiveRC driver name in Settings to list only your practice sessions. Until then, every session on this day page is shown.",
+    });
+  }
+
+  // Results index: no per-row driver filter; cap row count and explain.
+  const truncated = candidates.length > RESULTS_SCAN_ROW_CAP;
+  const capped = truncated ? candidates.slice(0, RESULTS_SCAN_ROW_CAP) : candidates;
+  let scanMessage: string | null = null;
+  if (indexKind === "results") {
+    scanMessage =
+      "Results pages list sessions by class or round — your LiveRC driver name does not filter this list. Pick your session, then confirm your row on the timing page.";
+    if (truncated) {
+      scanMessage += ` Showing first ${RESULTS_SCAN_ROW_CAP} of ${totalCandidates} rows — narrow with an event’s race class when linked.`;
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     dayUrl,
     indexKind,
     liveRcDriverName,
-    candidates: mine.length > 0 ? mine : candidates,
-    totalCandidates: candidates.length,
+    candidates: capped,
+    totalCandidates,
+    matchedCount: null,
     hasDriverNameSetting: Boolean(liveRcDriverName),
+    driverFilterApplied: false,
+    scanMessage,
   });
 }

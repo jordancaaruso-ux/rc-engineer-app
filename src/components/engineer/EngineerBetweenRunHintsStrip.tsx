@@ -58,7 +58,7 @@ export function EngineerBetweenRunHintsStrip({ className }: { className?: string
   if (hint === undefined && !error) {
     return (
       <HeroPanel variant="muted" className={cn("text-xs text-muted-foreground", className)}>
-        Loading things to consider…
+        Loading things to try…
       </HeroPanel>
     );
   }
@@ -74,7 +74,7 @@ export function EngineerBetweenRunHintsStrip({ className }: { className?: string
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <SectionTitle>Things to consider</SectionTitle>
+            <SectionTitle>Things to try</SectionTitle>
             <SectionMetaInline>{scopeLine(hint)}</SectionMetaInline>
           </div>
 

@@ -67,7 +67,7 @@ export function DashboardBetweenRunHintsSection({
   if (loading) {
     return (
       <HeroPanel variant="muted" className={cn("text-xs text-muted-foreground", className)}>
-        Loading things to consider…
+        Loading things to try…
       </HeroPanel>
     );
   }

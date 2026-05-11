@@ -10,6 +10,7 @@ import type { LapRow } from "@/lib/lapAnalysis";
 import { getAverageTopN, getBestLap } from "@/lib/lapAnalysis";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
+import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 
 export type UrlImportBlock = {
@@ -54,11 +55,12 @@ const DEFAULT_VALUE: LapIngestFormValue = {
 function initDriverLapRows(drivers: LapUrlSessionDriver[]): Record<string, LapRow[]> {
   const out: Record<string, LapRow[]> = {};
   for (const d of drivers) {
-    out[d.driverId] = d.laps.map((t, i) => ({
+    const raw = d.laps.map((t, i) => ({
       lapNumber: i + 1,
       lapTimeSeconds: t,
       isIncluded: true,
     }));
+    out[d.driverId] = applyMedianBandAutoExclude(raw);
   }
   return out;
 }
@@ -312,11 +314,17 @@ export function LapTimesIngestPanel({
         : [];
       const hasDriver = Boolean((data as { hasDriverNameSetting?: boolean }).hasDriverNameSetting);
       const ik = (data as { indexKind?: string }).indexKind;
+      const scanMessage =
+        typeof (data as { scanMessage?: unknown }).scanMessage === "string"
+          ? ((data as { scanMessage: string }).scanMessage.trim() || null)
+          : null;
       setDayScanIndexKind(ik === "results" || ik === "practice" ? ik : null);
       setDayScanHasDriverName(hasDriver);
       setDayScanCandidates(candidates);
       if (candidates.length === 0) {
-        setDayScanMessage("No sessions found on that day page.");
+        setDayScanMessage(scanMessage ?? "No sessions found on that day page.");
+      } else if (scanMessage) {
+        setDayScanMessage(scanMessage);
       }
     } catch {
       setDayScanMessage("Scan failed.");
@@ -765,7 +773,7 @@ export function LapTimesIngestPanel({
                       ? "Rescan"
                       : dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl)
                         ? "Scan for sessions"
-                        : "Scan for my sessions"}
+                        : "Scan practice list"}
                 </button>
               </div>
               {!dayScanHasDriverName &&
@@ -923,6 +931,10 @@ export function LapTimesIngestPanel({
 
                   <div className="space-y-1 rounded-md border border-border bg-surface-runna-inset p-2">
                     <div className="ui-title text-sm text-muted-foreground">Lap preview</div>
+                    <p className="text-[10px] leading-snug text-muted-foreground mb-1">
+                      Laps farther than ±50% from this driver&apos;s session median start excluded; use Include to
+                      restore a lap.
+                    </p>
                     {(() => {
                       const keys = activePreviewKey?.split(":");
                       const bId = keys?.[0];
@@ -932,11 +944,13 @@ export function LapTimesIngestPanel({
                       if (!blk || !active) return <div className="text-[11px] text-muted-foreground">—</div>;
                       const rows =
                         blk.driverLapRowsByDriverId?.[active.driverId] ??
-                        active.laps.map((t, i) => ({
-                          lapNumber: i + 1,
-                          lapTimeSeconds: t,
-                          isIncluded: true,
-                        }));
+                        applyMedianBandAutoExclude(
+                          active.laps.map((t, i) => ({
+                            lapNumber: i + 1,
+                            lapTimeSeconds: t,
+                            isIncluded: true,
+                          }))
+                        );
                       return (
                         <ul className="font-mono text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-surface-runna p-2 space-y-1">
                           {rows.map((row, i) => (

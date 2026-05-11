@@ -22,7 +22,6 @@ import {
 } from "@/lib/lapAnalysis";
 import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
 import { toCompareRunShape } from "@/lib/runCompareShape";
-import { AnalysisActiveThingsToTry } from "@/components/runs/AnalysisActiveThingsToTry";
 import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import type { LapRow } from "@/lib/lapAnalysis";
@@ -30,7 +29,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { Button } from "@/components/ui/Button";
-import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 import type {
   EngineerRunSummaryV2,
   ImportedSessionFieldStatsEngineerCompactV1,
@@ -922,22 +920,34 @@ function RunDetail({
             )}
           </div>
 
-          <div className="space-y-1 pt-1 border-t border-border/60 border-dashed">
-            <div className="ui-label-caps text-[9px] text-muted-foreground/80">Lap source</div>
-            <div className="ui-label-meta space-y-1">
-              <div className="text-muted-foreground/90">{sourceSummary ?? "—"}</div>
+          <div className="pt-1 border-t border-border/60 border-dashed">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] [&::-webkit-details-marker]:hidden">
+                <span className="ui-label-caps text-[9px] text-muted-foreground/80 shrink-0">Lap source</span>
+                <span className="text-muted-foreground/90 truncate min-w-0 max-w-[min(100%,320px)]">
+                  {sourceSummary ?? "—"}
+                </span>
+                {sourceUrl ? (
+                  <span className="shrink-0 text-[10px] font-medium text-accent underline underline-offset-2">
+                    Link
+                  </span>
+                ) : null}
+              </summary>
               {sourceUrl ? (
-                <a
-                  href={sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block max-w-full text-accent/90 underline underline-offset-2 break-all text-[11px]"
-                  title={sourceUrl}
-                >
-                  {formatLapSourceLinkText(sourceUrl)}
-                </a>
+                <div className="mt-1 pl-0.5">
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block break-all text-[10px] text-accent/90 underline underline-offset-2"
+                    title={sourceUrl}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {formatLapSourceLinkText(sourceUrl)}
+                  </a>
+                </div>
               ) : null}
-            </div>
+            </details>
           </div>
 
           <div className="space-y-2 pt-2 border-t border-border/60" onClick={(e) => e.stopPropagation()}>
@@ -990,9 +1000,7 @@ function RunDetail({
         </div>
       </div>
 
-      <EngineerRunSummaryPanel runId={run.id} defaultExpanded={false} />
-
-      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+      <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
         <div className="ui-label-caps">Engineer</div>
         <SessionsEngineerPairLinks runId={run.id} />
         {engineerVsPreviousHref ? (
@@ -1000,12 +1008,10 @@ function RunDetail({
             href={engineerVsPreviousHref}
             className="inline-flex items-center rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
           >
-            Quick: vs previous on same car
+            vs previous on same car
           </Link>
         ) : null}
       </div>
-
-      <AnalysisActiveThingsToTry />
 
       <div className="space-y-2">
         <DetailRow

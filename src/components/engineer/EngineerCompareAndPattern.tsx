@@ -6,7 +6,6 @@ import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLine } from "@/lib/runPickerFormat";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
-import { EngineerRunSummaryPanel } from "@/components/engineer/EngineerRunSummaryPanel";
 import { cn } from "@/lib/utils";
 
 type CarOpt = { id: string; name: string };
@@ -31,18 +30,12 @@ function toPickerRuns(raw: unknown[]): RunPickerRun[] {
 }
 
 export function EngineerCompareAndPattern({
-  onDigestLoaded,
+  onDigestLoaded = () => {},
   embedded = false,
-  showRunSummaryPanel = false,
-  onQueueEngineerChatPrompt,
 }: {
-  onDigestLoaded: (d: PatternDigestV1 | null) => void;
+  onDigestLoaded?: (d: PatternDigestV1 | null) => void;
   /** Omit outer card chrome when nested (e.g. collapsible section). */
   embedded?: boolean;
-  /** Show lap/setup summary for URL primary + compare (Engineer page). */
-  showRunSummaryPanel?: boolean;
-  /** Quick prompts from run summary → Ask the Engineer. */
-  onQueueEngineerChatPrompt?: (text: string) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -60,6 +53,7 @@ export function EngineerCompareAndPattern({
   const [digestErr, setDigestErr] = useState<string | null>(null);
   const [digest, setDigest] = useState<PatternDigestV1 | null>(null);
   const [digestCarId, setDigestCarId] = useState("");
+  const [digestSelectedRunIds, setDigestSelectedRunIds] = useState<string[]>([]);
   const defaultedRunId = useRef(false);
 
   const [compareMode, setCompareMode] = useState<"mine" | "teammate">("mine");
@@ -280,6 +274,17 @@ export function EngineerCompareAndPattern({
     setDigestCarId(primaryCarId);
   }, [primaryCarId, digestCarId]);
 
+  const digestPickerCarId = useMemo(() => digestCarId.trim() || primaryCarId, [digestCarId, primaryCarId]);
+
+  const digestPickerRuns = useMemo(() => {
+    if (!digestPickerCarId) return [];
+    return runs.filter((r) => r.carId === digestPickerCarId).slice(0, 120);
+  }, [runs, digestPickerCarId]);
+
+  useEffect(() => {
+    setDigestSelectedRunIds((prev) => prev.filter((id) => digestPickerRuns.some((r) => r.id === id)));
+  }, [digestPickerRuns]);
+
   async function addTeammateByEmail() {
     setTeammateAddErr(null);
     const email = teammateEmail.trim();
@@ -308,6 +313,12 @@ export function EngineerCompareAndPattern({
     }
   }
 
+  function toggleDigestRunSelected(runId: string) {
+    setDigestSelectedRunIds((prev) =>
+      prev.includes(runId) ? prev.filter((id) => id !== runId) : [...prev, runId]
+    );
+  }
+
   async function loadDigest() {
     const cid = digestCarId.trim() || primaryCarId;
     if (!cid) {
@@ -323,6 +334,10 @@ export function EngineerCompareAndPattern({
       if (dateFrom.trim()) sp.set("dateFrom", dateFrom.trim());
       if (dateTo.trim()) sp.set("dateTo", dateTo.trim());
       sp.set("limit", "40");
+      const picks = digestSelectedRunIds.filter((id) => digestPickerRuns.some((r) => r.id === id));
+      if (picks.length >= 2) {
+        sp.set("runIds", picks.slice(0, 40).join(","));
+      }
       const res = await fetch(`/api/runs/pattern-digest?${sp.toString()}`, { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -570,23 +585,58 @@ export function EngineerCompareAndPattern({
         </div>
       )}
 
-      {showRunSummaryPanel && runIdUrl ? (
-        <div className="border-t border-border pt-4 space-y-2">
-          <EngineerRunSummaryPanel
-            runId={runIdUrl}
-            compareRunId={compareRunIdUrl || null}
-            defaultExpanded
-            onQueueEngineerChatPrompt={onQueueEngineerChatPrompt}
-          />
-        </div>
-      ) : null}
-
       <div className="border-t border-border pt-3 space-y-2">
         <div className="text-xs ui-title text-muted-foreground">Pattern digest (one car)</div>
         <p className="text-[11px] text-muted-foreground">
           Chronological series with lap metrics and setup keys changed vs the previous run in the list. Uses session time
           when known. Highlight shows best single lap in the series.
         </p>
+        {digestPickerRuns.length > 0 ? (
+          <div className="rounded-md border border-border/70 bg-muted/25 p-2 space-y-2">
+            <div className="text-[10px] font-medium text-muted-foreground">Runs to include (optional)</div>
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              Check two or more runs, then load digest — only those sessions are used. Leave unchecked to use the
+              filtered time window (newest slice) as before.
+            </p>
+            <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+              {digestPickerRuns.map((r) => (
+                <label
+                  key={r.id}
+                  className="flex items-start gap-2 cursor-pointer text-[10px] text-muted-foreground leading-snug"
+                >
+                  <input
+                    type="checkbox"
+                    className="h-3 w-3 accent-primary shrink-0 mt-0.5"
+                    checked={digestSelectedRunIds.includes(r.id)}
+                    onChange={() => toggleDigestRunSelected(r.id)}
+                  />
+                  <span className="min-w-0">
+                    <span className="font-mono text-foreground/90">{r.id.slice(0, 8)}…</span>
+                    {" · "}
+                    {formatRunPickerLine(r)}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2 items-center text-[10px]">
+              <button
+                type="button"
+                className="rounded border border-border bg-background px-2 py-1 hover:bg-muted"
+                onClick={() => setDigestSelectedRunIds(digestPickerRuns.map((x) => x.id))}
+              >
+                Select all listed
+              </button>
+              <button
+                type="button"
+                className="rounded border border-border bg-background px-2 py-1 hover:bg-muted"
+                onClick={() => setDigestSelectedRunIds([])}
+              >
+                Clear selection
+              </button>
+              <span className="text-muted-foreground">{digestSelectedRunIds.length} selected</span>
+            </div>
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
             <label className="text-[10px] text-muted-foreground">Car for digest</label>
@@ -616,7 +666,7 @@ export function EngineerCompareAndPattern({
           </button>
           {digest ? (
             <button type="button" onClick={clearDigest} className="text-[11px] text-muted-foreground underline">
-              Clear digest from chat
+              Clear digest
             </button>
           ) : null}
         </div>
@@ -630,7 +680,7 @@ export function EngineerCompareAndPattern({
             </div>
             <pre className="whitespace-pre-wrap break-all">{JSON.stringify(digest.runs, null, 0).slice(0, 4000)}</pre>
             {JSON.stringify(digest.runs).length > 4000 ? (
-              <div className="text-muted-foreground mt-1">…truncated in preview; full payload sent to chat.</div>
+              <div className="text-muted-foreground mt-1">…truncated in preview.</div>
             ) : null}
           </div>
         ) : null}

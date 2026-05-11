@@ -24,6 +24,7 @@ import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import {
@@ -291,6 +292,7 @@ export function NewRunForm(props: {
   const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
   const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("tires");
+  const [trackSaveWarning, setTrackSaveWarning] = useState(false);
   const [trackGripTags, setTrackGripTags] = useState<string[]>([]);
   const [trackLayoutTags, setTrackLayoutTags] = useState<string[]>([]);
   const thingsTryRef = useRef<HTMLTextAreaElement>(null);
@@ -573,11 +575,12 @@ export function NewRunForm(props: {
       if (plan) {
         const driverLapRowsByDriverId: Record<string, LapRow[]> = {};
         for (const d of plan.sessionDrivers) {
-          driverLapRowsByDriverId[d.driverId] = d.laps.map((t, i) => ({
+          const raw = d.laps.map((t, i) => ({
             lapNumber: i + 1,
             lapTimeSeconds: t,
             isIncluded: true,
           }));
+          driverLapRowsByDriverId[d.driverId] = applyMedianBandAutoExclude(raw);
         }
         const primaryLaps = plan.primaryRows.map((r) => r.lapTimeSeconds);
         if (sess.linkedEventId) setEventId(sess.linkedEventId);
@@ -643,7 +646,7 @@ export function NewRunForm(props: {
               ],
               selectedDriverIds: ["prefill"],
               driverLapRowsByDriverId: {
-                prefill: parsed.rows,
+                prefill: applyMedianBandAutoExclude(parsed.rows.map((r) => ({ ...r }))),
               },
               urlLapRows: null,
             },
@@ -774,6 +777,10 @@ export function NewRunForm(props: {
   );
   /** Race meeting + event with a track: run track follows the event (picker disabled). */
   const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
+
+  useEffect(() => {
+    if (trackId.trim() || trackLockedToEvent) setTrackSaveWarning(false);
+  }, [trackId, trackLockedToEvent]);
 
   useEffect(() => {
     let alive = true;
@@ -1846,6 +1853,15 @@ export function NewRunForm(props: {
       setInlineError("Select a car.");
       return;
     }
+    const resolvedTrackId =
+      trackId.trim() ||
+      (trackLockedToEvent && selectedEventForRun?.trackId ? String(selectedEventForRun.trackId) : "");
+    if (!resolvedTrackId) {
+      setInlineError("Select a track — it’s used for comparisons and the Engineer.");
+      setTrackSaveWarning(true);
+      setRunDetailsTab("track");
+      return;
+    }
     // Surface unsaved setup edits before we write — the driver gets to review
     // exactly what they changed vs. the loaded baseline. Continuing from the
     // confirmation passes `bypassUnsavedSetupCheck: true` so we don't loop.
@@ -1899,7 +1915,7 @@ export function NewRunForm(props: {
           meetingSessionType: needsEvent ? meetingSessionType : null,
           meetingSessionCode: needsEvent && meetingSessionType === "OTHER" && meetingSessionCustom ? meetingSessionCustom.trim() : null,
           eventId: needsEvent ? (eventId || null) : null,
-          trackId: trackId || null,
+          trackId: resolvedTrackId || null,
           tireSetId: tireSetId || null,
           tireRunNumber: Math.max(1, runsCompleted + 1),
           batteryId: batteryId || null,
@@ -2666,10 +2682,11 @@ export function NewRunForm(props: {
             role="tab"
             aria-selected={runDetailsTab === "track"}
             className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px rounded-t-md",
               runDetailsTab === "track"
                 ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+              trackSaveWarning && runDetailsTab !== "track" && "ring-2 ring-amber-500/55 ring-offset-2 ring-offset-background"
             )}
             onClick={() => setRunDetailsTab("track")}
           >

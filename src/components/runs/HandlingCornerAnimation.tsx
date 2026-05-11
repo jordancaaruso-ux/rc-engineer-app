@@ -144,7 +144,7 @@ export function HandlingCornerAnimation({ phase, balance }: { phase: CornerPhase
 
   return (
     <div
-      className="relative w-full max-w-[220px] rounded-lg border border-border/50 overflow-hidden shadow-sm"
+      className="relative w-full max-w-[min(100%,360px)] rounded-lg border border-border/50 overflow-hidden shadow-sm"
       role="img"
       aria-label={label}
     >

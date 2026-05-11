@@ -156,7 +156,7 @@ export async function POST(request: Request) {
         ? body.patternDigest
         : null;
 
-    const includeRunCatalog = body?.includeRunCatalog !== false;
+    const includeRunCatalog = body?.includeRunCatalog === true;
     const runCatalog = includeRunCatalog ? await buildRunCatalogV1({ userId: user.id }) : null;
 
     const paceVsFieldRunDigest = parsePaceVsFieldRunDigestPayload(body?.paceVsFieldRunDigest);

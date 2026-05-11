@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
-import { engineerQuickPromptDisabled, engineerQuickPromptsForSurface } from "@/lib/engineerQuickPrompts";
 
 const quickAskBtnClass =
   "inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition disabled:opacity-40 disabled:cursor-not-allowed";
@@ -11,7 +10,6 @@ export function EngineerRunSummaryPanel({
   runId,
   compareRunId,
   defaultExpanded = true,
-  onQueueEngineerChatPrompt,
   onCompareSetupsWithEngineer,
   onCompareLaptimesWithEngineer,
 }: {
@@ -20,11 +18,9 @@ export function EngineerRunSummaryPanel({
   compareRunId?: string | null;
   /** Collapse details for dense layouts */
   defaultExpanded?: boolean;
-  /** Engineer page: send a canned prompt (preferred — shows full quick-ask bar). */
-  onQueueEngineerChatPrompt?: (text: string) => void;
-  /** Legacy: single “compare setups” action when `onQueueEngineerChatPrompt` is not used. */
+  /** Legacy: single “compare setups” action. */
   onCompareSetupsWithEngineer?: () => void;
-  /** Legacy: single “compare lap times” action when `onQueueEngineerChatPrompt` is not used. */
+  /** Legacy: single “compare lap times” action. */
   onCompareLaptimesWithEngineer?: () => void;
 }) {
   const [loading, setLoading] = useState(true);
@@ -77,7 +73,6 @@ export function EngineerRunSummaryPanel({
   if (!summary) return null;
 
   const hasCompareInUrl = Boolean(compareRunId?.trim());
-  const runSummaryQuickPrompts = engineerQuickPromptsForSurface("run_summary");
 
   const showFullBody = defaultExpanded || fullSummaryOpen;
 
@@ -104,39 +99,7 @@ export function EngineerRunSummaryPanel({
 
       {showFullBody ? (
         <div className="border-t border-border px-3 py-3 space-y-3 text-[11px] leading-snug">
-          {onQueueEngineerChatPrompt ? (
-            <div className="space-y-1.5 pb-1 border-b border-border/60">
-              <div className="text-[10px] ui-title text-muted-foreground">
-                Ask the Engineer
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {runSummaryQuickPrompts.map((def) => {
-                  const dis = engineerQuickPromptDisabled(def, {
-                    hasRunId: true,
-                    hasCompareRunId: hasCompareInUrl,
-                    hasPatternDigest: false,
-                  });
-                  const title = dis
-                    ? def.requiresCompare
-                      ? "Select a compare run in the bar above first"
-                      : "Unavailable"
-                    : def.label;
-                  return (
-                    <button
-                      key={def.id}
-                      type="button"
-                      title={title}
-                      disabled={dis}
-                      className={quickAskBtnClass}
-                      onClick={() => onQueueEngineerChatPrompt(def.prompt)}
-                    >
-                      {def.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : onCompareSetupsWithEngineer || onCompareLaptimesWithEngineer ? (
+          {onCompareSetupsWithEngineer || onCompareLaptimesWithEngineer ? (
             <div className="flex flex-wrap gap-2 pb-1 border-b border-border/60">
               {onCompareSetupsWithEngineer ? (
                 <button type="button" className={quickAskBtnClass} onClick={onCompareSetupsWithEngineer}>

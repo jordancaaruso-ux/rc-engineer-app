@@ -65,15 +65,14 @@ function buildFallbackCopy(params: {
 }): LlmShape {
   const interp = params.summary.interpretation.trim();
   const bullets: string[] = [];
-  if (interp) {
-    const parts = interp.split(/(?<=[.!?])\s+/).filter(Boolean);
-    for (const p of parts.slice(0, 3)) {
-      if (p.length > 12) bullets.push(p.trim());
-      if (bullets.length >= 3) break;
+  if (params.summary.setupChanges.length > 0) {
+    const top = params.summary.setupChanges.slice(0, 3);
+    for (const ch of top) {
+      bullets.push(`Re-check ${ch.label}: you moved ${ch.before} → ${ch.after} — confirm pace/feel before stacking more changes.`);
     }
   }
   if (bullets.length === 0) {
-    bullets.push("Compare this run to your previous session on the Engineer page for lap and setup detail.");
+    bullets.push("Pick one setup lever from your last change list to verify or walk back on the next outing.");
   }
   let avoid: string | null = null;
   if (
@@ -91,7 +90,7 @@ function buildFallbackCopy(params: {
     : "Review last session vs prior before stacking more changes.";
   if (interp) {
     const firstSentence = interp.split(/(?<=[.!?])\s+/)[0]?.trim();
-    if (firstSentence && firstSentence.length <= 140) headline = firstSentence;
+    if (firstSentence && firstSentence.length <= 140) headline = `Next: ${firstSentence}`;
   }
 
   return {
@@ -154,6 +153,7 @@ The JSON object must have exactly these keys:
 Rules:
 - You receive up to three recentSessions objects in chronological order **newest first** (index 0 = latest run). Each includes best lap, avg top 5, avg top 10 (when lap counts allow), vs-prior flags when a reference exists, optional paceVsFieldSummary / paceVsFieldMetrics from imported timing, setupChangesFromPrevious, notesPreview, handlingPreview.
 - Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **explicit revert** ideas when lap flags (best or multi-lap) are regressed and setupChangesFromPrevious plausibly correlate.
+- Do not paraphrase the engineer summary interpretation field as the headline or bullets; interpretation is context only. Bullets must be **new** concrete next-run actions (what to try, verify, or revert), grounded in setupChanges, handlingPreview, signals, or KB excerpts.
 - Ground technical claims ONLY in the provided KB excerpts and the structured JSON (summary, recentSessions, driverContextPack). If unsure, hedge with "test" / "verify".
 - Do not invent exact setup numbers not present in the JSON.
 - Prefer one-change-at-a-time discipline when recommending reversals.

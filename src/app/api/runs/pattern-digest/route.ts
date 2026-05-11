@@ -18,6 +18,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "carId is required" }, { status: 400 });
   }
 
+  const runIdsRaw = searchParams.get("runIds")?.trim();
+  const runIds =
+    runIdsRaw && runIdsRaw.length > 0
+      ? runIdsRaw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : null;
+
   const digest = await buildPatternDigestV1({
     userId: user.id,
     carId,
@@ -26,6 +35,7 @@ export async function GET(request: Request) {
     dateFrom: searchParams.get("dateFrom")?.trim() || null,
     dateTo: searchParams.get("dateTo")?.trim() || null,
     limit: Number(searchParams.get("limit")) || undefined,
+    runIds: runIds && runIds.length >= 2 ? runIds : null,
   });
 
   if (!digest) {

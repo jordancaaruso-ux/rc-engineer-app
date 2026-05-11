@@ -25,7 +25,7 @@ export function DashboardBetweenRunHintsCard({
     <HeroPanel className={cn(className)}>
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <SectionTitle>Things to consider — Engineer</SectionTitle>
+          <SectionTitle>Things to try — Engineer</SectionTitle>
           <SectionMetaInline>{scopeLine(hint)}</SectionMetaInline>
         </div>
         <BetweenRunRecentSessionsThings sessions={hint.recentSessions ?? []} className="mt-2" />

@@ -30,6 +30,8 @@ export async function buildPatternDigestV1(params: {
   dateFrom?: string | null;
   dateTo?: string | null;
   limit?: number;
+  /** When at least two ids are provided, digest is limited to this run set (chronological). */
+  runIds?: string[] | null;
 }): Promise<PatternDigestV1 | null> {
   const car = await prisma.car.findFirst({
     where: { id: params.carId.trim(), userId: params.userId },
@@ -86,6 +88,13 @@ export async function buildPatternDigestV1(params: {
   }
 
   rows.sort((a, b) => a.t - b.t);
+
+  if (params.runIds?.length) {
+    const want = new Set(params.runIds.map((id) => id.trim()).filter(Boolean));
+    rows = rows.filter(({ run }) => want.has(run.id));
+    if (rows.length === 0) return null;
+  }
+
   rows = rows.slice(-limit);
 
   const out: PatternDigestRunRow[] = [];

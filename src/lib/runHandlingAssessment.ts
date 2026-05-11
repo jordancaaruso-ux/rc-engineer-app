@@ -353,9 +353,6 @@ export function formatHandlingAssessmentForEngineer(raw: unknown): string {
   const parsed = parseHandlingAssessmentJson(raw);
   if (!parsed) return "";
   const lines: string[] = [];
-  if (parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun)) {
-    lines.push(`Feel vs last run on this car: ${formatFeelVsLastRun(parsed.feelVsLastRun)}`);
-  }
   const b = parsed.balanceByPhase;
   if (b && (b.entry != null || b.mid != null || b.exit != null)) {
     const parts: string[] = [];
@@ -365,7 +362,13 @@ export function formatHandlingAssessmentForEngineer(raw: unknown): string {
         parts.push(`${p} ${formatPhaseBalanceWord(v)}`);
       }
     }
-    if (parts.length) lines.push(`Corner balance: ${parts.join("; ")}`);
+    if (parts.length) lines.push(`Corner balance (−3 push … +3 oversteer): ${parts.join("; ")}`);
+  }
+  if (parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun)) {
+    lines.push(`Feel vs last run on this car: ${formatFeelVsLastRun(parsed.feelVsLastRun)}`);
+  }
+  if (parsed.mainProblem?.trim()) {
+    lines.push(`Main problem: ${parsed.mainProblem.trim()}`);
   }
   if (parsed.traitTags?.length) {
     const labels = parsed.traitTags.map((id) => HANDLING_TRAIT_LABELS[id] ?? id);
@@ -373,9 +376,6 @@ export function formatHandlingAssessmentForEngineer(raw: unknown): string {
   }
   if (parsed.traitsOther?.trim()) {
     lines.push(`Other traits: ${parsed.traitsOther.trim()}`);
-  }
-  if (parsed.mainProblem?.trim()) {
-    lines.push(`Main problem: ${parsed.mainProblem.trim()}`);
   }
   if (parsed.carDoesWell?.trim()) {
     lines.push(`Car does well: ${parsed.carDoesWell.trim()}`);

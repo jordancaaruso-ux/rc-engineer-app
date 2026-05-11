@@ -1,58 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareAndPattern";
-import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/engineer/EngineerChatPanel";
-import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
-import { getEngineerQuickPromptById } from "@/lib/engineerQuickPrompts";
+import { EngineerChatPanel } from "@/components/engineer/EngineerChatPanel";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
-
 import { EngineerBetweenRunHintsStrip } from "@/components/engineer/EngineerBetweenRunHintsStrip";
+import { cn } from "@/lib/utils";
+
+type EngineerMainTab = "chat" | "compare";
 
 export function EngineerPageClient() {
-  const [patternDigest, setPatternDigest] = useState<PatternDigestV1 | null>(null);
-  const [includeRunCatalog, setIncludeRunCatalog] = useState(true);
-  const [includePatternDigestInChat, setIncludePatternDigestInChat] = useState(false);
-  const [queuedPrompt, setQueuedPrompt] = useState<EngineerQueuedChatPrompt | null>(null);
-
-  useEffect(() => {
-    if (!patternDigest) {
-      setIncludePatternDigestInChat(false);
-    }
-  }, [patternDigest]);
-
-  const queueEngineerPrompt = useCallback((text: string) => {
-    setQueuedPrompt((prev) => ({ id: (prev?.id ?? 0) + 1, text }));
-  }, []);
-
-  const clearQueuedPrompt = useCallback(() => setQueuedPrompt(null), []);
-
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const autoPromptConsumedRef = useRef(false);
+  const tabParam = searchParams.get("engineerTab")?.trim();
+  const [mainTab, setMainTab] = useState<EngineerMainTab>(() =>
+    tabParam === "compare" ? "compare" : "chat"
+  );
 
   useEffect(() => {
-    if (autoPromptConsumedRef.current) return;
-    const promptId = searchParams.get("engineerPrompt")?.trim();
-    if (!promptId) return;
-    const def = getEngineerQuickPromptById(promptId);
-    if (!def) return;
-    const runId = searchParams.get("runId")?.trim() || null;
-    const compareRunId = searchParams.get("compareRunId")?.trim() || null;
-    if (def.requiresRunId !== false && !runId) return;
-    if (def.requiresCompare && !compareRunId) return;
-
-    autoPromptConsumedRef.current = true;
-    queueEngineerPrompt(def.prompt);
-
-    // Strip the engineerPrompt param so a refresh does not re-submit the canned message.
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("engineerPrompt");
-    const qs = next.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [searchParams, pathname, router, queueEngineerPrompt]);
+    if (tabParam === "compare") setMainTab("compare");
+  }, [tabParam]);
 
   useEffect(() => {
     const runId = searchParams.get("runId")?.trim();
@@ -63,43 +30,59 @@ export function EngineerPageClient() {
     <div className="max-w-4xl mx-auto w-full space-y-6">
       <EngineerBetweenRunHintsStrip />
 
-      <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Ask the Engineer</h2>
-        </div>
-        <div className="p-4 md:p-5">
-          <EngineerChatPanel
-            patternDigest={patternDigest}
-            includeRunCatalog={includeRunCatalog}
-            onIncludeRunCatalogChange={setIncludeRunCatalog}
-            includePatternDigestInChat={includePatternDigestInChat}
-            onIncludePatternDigestInChatChange={setIncludePatternDigestInChat}
-            queuedPrompt={queuedPrompt}
-            onQueuedPromptConsumed={clearQueuedPrompt}
-            onQuickPrompt={queueEngineerPrompt}
-          />
-        </div>
-      </section>
+      <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+        <button
+          type="button"
+          className={cn(
+            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition",
+            mainTab === "chat" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          )}
+          onClick={() => setMainTab("chat")}
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          className={cn(
+            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition",
+            mainTab === "compare" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          )}
+          onClick={() => setMainTab("compare")}
+        >
+          Compare &amp; trend
+        </button>
+      </div>
 
-      <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Compare &amp; trend</h2>
-          <p className="text-xs text-muted-foreground mt-1 leading-snug">
-            Choose target (primary) and comparison runs — same URL as Analysis &quot;Compare with Engineer&quot; (
-            <span className="font-mono">runId</span> / <span className="font-mono">compareRunId</span>). Optional trend
-            digest loads here; enable &quot;Attach Compare &amp; trend digest to chat&quot; above only when you want the
-            series in the conversation.
-          </p>
-        </div>
-        <div className="p-4 md:p-5">
-          <EngineerCompareAndPattern
-            embedded
-            onDigestLoaded={setPatternDigest}
-            showRunSummaryPanel
-            onQueueEngineerChatPrompt={queueEngineerPrompt}
-          />
-        </div>
-      </section>
+      {mainTab === "chat" ? (
+        <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
+            <h2 className="text-lg font-semibold text-foreground tracking-tight">Ask the Engineer</h2>
+            <p className="text-xs text-muted-foreground mt-1 leading-snug">
+              Optional: set runs in <span className="font-medium text-foreground/90">Compare &amp; trend</span> so
+              answers anchor to URL context.
+            </p>
+          </div>
+          <div className="p-4 md:p-5">
+            <EngineerChatPanel />
+          </div>
+        </section>
+      ) : null}
+
+      {mainTab === "compare" ? (
+        <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
+            <h2 className="text-lg font-semibold text-foreground tracking-tight">Compare &amp; trend</h2>
+            <p className="text-xs text-muted-foreground mt-1 leading-snug">
+              Primary and compare runs use <span className="font-mono">runId</span> and{" "}
+              <span className="font-mono">compareRunId</span> in the URL. Load a trend digest when you want a
+              multi-session view for this car.
+            </p>
+          </div>
+          <div className="p-4 md:p-5">
+            <EngineerCompareAndPattern embedded />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
