@@ -12,17 +12,26 @@ import { paceVsFieldSummaryFromEngineerSummary } from "@/lib/engineerPhase5/betw
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import {
-  DRIVE_DIFFICULTY_LABELS,
-  DOES_WELL_LABELS,
+  formatHandlingTraitAxisForEngineer,
   formatPrimaryFocusLine,
-  GENERAL_FEEL_LABELS,
   parseHandlingAssessmentJson,
-  SINGLE_TRAIT_LABELS,
-  STEERING_FEEL_LABELS,
+  type HandlingTraitAxisKey,
+  type PhaseBalance,
 } from "@/lib/runHandlingAssessment";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
+
+const TRAIT_PREVIEW_AXES: HandlingTraitAxisKey[] = [
+  "feelSteering",
+  "feelGeneral",
+  "driveEase",
+  "tractionRoll",
+];
+
+function isPhaseBalanceValue(n: unknown): n is PhaseBalance {
+  return typeof n === "number" && Number.isInteger(n) && n >= -3 && n <= 3;
+}
 
 const runSelectForRefPick = {
   id: true,
@@ -71,14 +80,9 @@ function handlingPreviewFromRun(
     const line = formatPrimaryFocusLine(p.primaryFocus).trim();
     if (line) bits.push(line);
   }
-  if (p?.steeringFeel) bits.push(`Steering: ${STEERING_FEEL_LABELS[p.steeringFeel]}`);
-  if (p?.generalFeel) bits.push(`Feel: ${GENERAL_FEEL_LABELS[p.generalFeel]}`);
-  if (p?.driveDifficulty) bits.push(`Drive: ${DRIVE_DIFFICULTY_LABELS[p.driveDifficulty]}`);
-  if (p?.singleTraits?.length) {
-    bits.push(p.singleTraits.map((t) => SINGLE_TRAIT_LABELS[t] ?? t).join(", "));
-  }
-  if (p?.doesWell?.length) {
-    bits.push(`Strengths: ${p.doesWell.map((t) => DOES_WELL_LABELS[t] ?? t).join(", ")}`);
+  for (const axis of TRAIT_PREVIEW_AXES) {
+    const v = p?.[axis];
+    if (isPhaseBalanceValue(v)) bits.push(formatHandlingTraitAxisForEngineer(axis, v));
   }
   if (p?.feelVsLastRun != null && typeof p.feelVsLastRun === "number") {
     const f = p.feelVsLastRun;

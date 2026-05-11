@@ -4,33 +4,31 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
   buildPrimaryFocusOptions,
-  DRIVE_DIFFICULTY_LABELS,
-  DRIVE_DIFFICULTY_PRESETS,
-  DOES_WELL_IDS,
-  DOES_WELL_LABELS,
-  GENERAL_FEEL_LABELS,
-  GENERAL_FEEL_PRESETS,
-  type CornerPhase,
+  HANDLING_TRAIT_AXIS_UI,
   type FeelVsLastRun,
   type HandlingAssessmentUiState,
+  type HandlingTraitAxisKey,
   type PhaseBalance,
   type PrimaryFocus,
   sanitizeHandlingUiState,
-  SINGLE_TRAIT_IDS,
-  SINGLE_TRAIT_LABELS,
-  STEERING_FEEL_LABELS,
-  STEERING_FEEL_PRESETS,
 } from "@/lib/runHandlingAssessment";
 import { HandlingCornerAnimation } from "@/components/runs/HandlingCornerAnimation";
 
 const PHASE_ROWS: {
   stateKey: "balanceEntry" | "balanceMid" | "balanceExit";
   label: string;
-  phase: CornerPhase;
+  phase: "entry" | "mid" | "exit";
 }[] = [
   { stateKey: "balanceEntry", label: "Entry", phase: "entry" },
   { stateKey: "balanceMid", label: "Mid", phase: "mid" },
   { stateKey: "balanceExit", label: "Exit", phase: "exit" },
+];
+
+const TRAIT_AXIS_KEYS: HandlingTraitAxisKey[] = [
+  "feelSteering",
+  "feelGeneral",
+  "driveEase",
+  "tractionRoll",
 ];
 
 const PHASE_BALANCE_LEVELS: PhaseBalance[] = [-3, -2, -1, 0, 1, 2, 3];
@@ -39,11 +37,6 @@ const FEEL_VS_LAST_RUN_LEVELS: FeelVsLastRun[] = [-3, -2, -1, 0, 1, 2, 3];
 
 function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
   return sanitizeHandlingUiState(next);
-}
-
-function toggleInList<T extends string>(list: T[], id: T): T[] {
-  if (list.includes(id)) return list.filter((t) => t !== id);
-  return [...list, id];
 }
 
 function phaseBalanceChipClass(n: PhaseBalance, current: PhaseBalance | null): string {
@@ -67,15 +60,6 @@ function phaseBalanceChipClass(n: PhaseBalance, current: PhaseBalance | null): s
 
 function feelVsLastRunButtonClass(n: FeelVsLastRun, current: FeelVsLastRun | null): string {
   return phaseBalanceChipClass(n, current);
-}
-
-function presetToggleClass(on: boolean): string {
-  return cn(
-    "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
-    on
-      ? "border-accent bg-accent/15 text-foreground"
-      : "border-border bg-card text-muted-foreground hover:text-foreground"
-  );
 }
 
 function primaryFocusSelectValue(ui: HandlingAssessmentUiState): string {
@@ -107,6 +91,14 @@ export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligibl
     emit({
       ...value,
       [stateKey]: cur === n ? null : n,
+    });
+  }
+
+  function setTraitAxis(axis: HandlingTraitAxisKey, n: PhaseBalance) {
+    const cur = value[axis];
+    emit({
+      ...value,
+      [axis]: cur === n ? null : n,
     });
   }
 
@@ -185,116 +177,38 @@ export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligibl
         })}
       </div>
 
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">Steering feel</div>
-        <div className="flex flex-wrap gap-2">
-          {STEERING_FEEL_PRESETS.map((id) => {
-            const on = value.steeringFeel === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className={presetToggleClass(on)}
-                onClick={() =>
-                  emit({
-                    ...value,
-                    steeringFeel: value.steeringFeel === id ? null : id,
-                  })
-                }
-              >
-                {STEERING_FEEL_LABELS[id]}
-              </button>
-            );
-          })}
+      <div className="space-y-3">
+        <div className="text-xs font-medium text-muted-foreground">
+          Handling traits (−3 left label → +3 right label; same as corner chips)
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">General feel</div>
-        <div className="flex flex-wrap gap-2">
-          {GENERAL_FEEL_PRESETS.map((id) => {
-            const on = value.generalFeel === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className={presetToggleClass(on)}
-                onClick={() =>
-                  emit({
-                    ...value,
-                    generalFeel: value.generalFeel === id ? null : id,
-                  })
-                }
-              >
-                {GENERAL_FEEL_LABELS[id]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">Difficulty to drive</div>
-        <div className="flex flex-wrap gap-2">
-          {DRIVE_DIFFICULTY_PRESETS.map((id) => {
-            const on = value.driveDifficulty === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className={presetToggleClass(on)}
-                onClick={() =>
-                  emit({
-                    ...value,
-                    driveDifficulty: value.driveDifficulty === id ? null : id,
-                  })
-                }
-              >
-                {DRIVE_DIFFICULTY_LABELS[id]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">Single traits</div>
-        <div className="flex flex-wrap gap-2">
-          {SINGLE_TRAIT_IDS.map((id) => {
-            const on = value.singleTraits.includes(id);
-            return (
-              <button
-                key={id}
-                type="button"
-                className={presetToggleClass(on)}
-                onClick={() =>
-                  emit({ ...value, singleTraits: toggleInList(value.singleTraits, id) })
-                }
-              >
-                {SINGLE_TRAIT_LABELS[id]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">What the car does well</div>
-        <div className="flex flex-wrap gap-2">
-          {DOES_WELL_IDS.map((id) => {
-            const on = value.doesWell.includes(id);
-            return (
-              <button
-                key={id}
-                type="button"
-                className={presetToggleClass(on)}
-                onClick={() => emit({ ...value, doesWell: toggleInList(value.doesWell, id) })}
-              >
-                {DOES_WELL_LABELS[id]}
-              </button>
-            );
-          })}
-        </div>
+        {TRAIT_AXIS_KEYS.map((axisKey) => {
+          const meta = HANDLING_TRAIT_AXIS_UI[axisKey];
+          const rowVal = value[axisKey];
+          return (
+            <div
+              key={axisKey}
+              className="space-y-1 border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
+            >
+              <span className="text-[11px] font-medium text-foreground">{meta.title}</span>
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-[10px] text-red-600/90 dark:text-red-400/90">{meta.neg}</span>
+                {PHASE_BALANCE_LEVELS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-pressed={rowVal === n}
+                    className={phaseBalanceChipClass(n, rowVal)}
+                    onClick={() => setTraitAxis(axisKey, n)}
+                  >
+                    {n > 0 ? `+${n}` : String(n)}
+                  </button>
+                ))}
+                <span className="text-[10px] text-emerald-700/90 dark:text-emerald-400/90">{meta.pos}</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Tap again to clear.</p>
+            </div>
+          );
+        })}
       </div>
 
       <div className="space-y-1">

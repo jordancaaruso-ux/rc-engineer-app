@@ -2,19 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { BetweenRunRecentSessionsThings } from "@/components/betweenRunHints/BetweenRunRecentSessionsThings";
+import { BetweenRunHintSummary } from "@/components/betweenRunHints/BetweenRunHintSummary";
 import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { HeroPanel } from "@/components/ui/HeroPanel";
-import { SectionMetaInline, SectionTitle } from "@/components/ui/SectionTitle";
 import { cn } from "@/lib/utils";
-
-function scopeLine(h: BetweenRunHintPayload): string {
-  const bits = [h.scope.carLabel];
-  if (h.scope.trackLabel) bits.push(h.scope.trackLabel);
-  if (h.scope.eventLabel) bits.push(h.scope.eventLabel);
-  return bits.join(" · ");
-}
 
 export function EngineerBetweenRunHintsStrip({ className }: { className?: string }) {
   const searchParams = useSearchParams();
@@ -58,7 +50,7 @@ export function EngineerBetweenRunHintsStrip({ className }: { className?: string
   if (hint === undefined && !error) {
     return (
       <HeroPanel variant="muted" className={cn("text-xs text-muted-foreground", className)}>
-        Loading things to try…
+        Loading between-run hints…
       </HeroPanel>
     );
   }
@@ -67,20 +59,11 @@ export function EngineerBetweenRunHintsStrip({ className }: { className?: string
     return null;
   }
 
-  const sessions = hint.recentSessions ?? [];
-
   return (
     <HeroPanel className={cn(className)}>
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
-        <div className="min-w-0 flex-1 space-y-3">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <SectionTitle>Things to try</SectionTitle>
-            <SectionMetaInline>{scopeLine(hint)}</SectionMetaInline>
-          </div>
-
-          <BetweenRunRecentSessionsThings sessions={sessions} />
-        </div>
-        <ButtonLink href={hint.engineerHref} variant="outline" className="shrink-0">
+        <BetweenRunHintSummary hint={hint} title="Suggested next steps" className="min-w-0 flex-1" />
+        <ButtonLink href={hint.engineerHref} variant="outline" className="shrink-0 self-start">
           Focus in Engineer
         </ButtonLink>
       </div>

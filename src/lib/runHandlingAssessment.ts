@@ -17,85 +17,66 @@ export type PhaseBalance = -3 | -2 | -1 | 0 | 1 | 2 | 3;
 
 export type FeelVsLastRun = PhaseBalance;
 
-/** Preset: steering response / character (no free text). */
-export const STEERING_FEEL_PRESETS = ["pointy", "dull", "nervous", "neutral", "direct", "vague"] as const;
-export type SteeringFeelPreset = (typeof STEERING_FEEL_PRESETS)[number];
-export const STEERING_FEEL_LABELS: Record<SteeringFeelPreset, string> = {
-  pointy: "Pointy",
-  dull: "Dull",
-  nervous: "Nervous",
-  neutral: "Neutral",
-  direct: "Direct",
-  vague: "Vague",
+export type BalanceByPhaseMap = {
+  entry?: PhaseBalance;
+  mid?: PhaseBalance;
+  exit?: PhaseBalance;
 };
 
-/** Preset: overall chassis character. */
-export const GENERAL_FEEL_PRESETS = ["smooth", "plush", "aggressive", "sharp"] as const;
-export type GeneralFeelPreset = (typeof GENERAL_FEEL_PRESETS)[number];
-export const GENERAL_FEEL_LABELS: Record<GeneralFeelPreset, string> = {
-  smooth: "Smooth",
-  plush: "Plush",
-  aggressive: "Aggressive",
-  sharp: "Sharp",
-};
+/** Labels for the four −3…+3 handling trait rows (same control pattern as corner balance). */
+export const HANDLING_TRAIT_AXIS_UI = {
+  feelSteering: { title: "Steering feel", neg: "Dull", pos: "Aggressive" },
+  feelGeneral: { title: "General feel", neg: "Smooth", pos: "Reactive" },
+  driveEase: { title: "Difficulty to drive", neg: "Hard", pos: "Easy" },
+  tractionRoll: { title: "Prone to traction rolling", neg: "Never", pos: "Often" },
+} as const;
 
-export const DRIVE_DIFFICULTY_PRESETS = ["easy", "hard"] as const;
-export type DriveDifficultyPreset = (typeof DRIVE_DIFFICULTY_PRESETS)[number];
-export const DRIVE_DIFFICULTY_LABELS: Record<DriveDifficultyPreset, string> = {
-  easy: "Easy",
-  hard: "Hard",
-};
+export type HandlingTraitAxisKey = keyof typeof HANDLING_TRAIT_AXIS_UI;
 
-/** Optional multi-select “single issue” tags (preset ids only). */
-export const SINGLE_TRAIT_IDS = ["traction_roll", "on_power_snaps", "rear_grip_limit"] as const;
-export type SingleTraitTagId = (typeof SINGLE_TRAIT_IDS)[number];
-export const SINGLE_TRAIT_LABELS: Record<SingleTraitTagId, string> = {
-  traction_roll: "Traction roll",
-  on_power_snaps: "On-power snaps",
-  rear_grip_limit: "Rear grip limit",
-};
+/** Legacy v4 string presets — kept for migrating stored JSON only. */
+const STEERING_FEEL_PRESETS = ["pointy", "dull", "nervous", "neutral", "direct", "vague"] as const;
+type SteeringFeelPreset = (typeof STEERING_FEEL_PRESETS)[number];
 
-/** What the car did well — multi preset, no free text. */
-export const DOES_WELL_IDS = [
+const GENERAL_FEEL_PRESETS = ["smooth", "plush", "aggressive", "sharp"] as const;
+type GeneralFeelPreset = (typeof GENERAL_FEEL_PRESETS)[number];
+
+const DRIVE_DIFFICULTY_PRESETS = ["easy", "hard"] as const;
+type DriveDifficultyPreset = (typeof DRIVE_DIFFICULTY_PRESETS)[number];
+
+const SINGLE_TRAIT_IDS = ["traction_roll", "on_power_snaps", "rear_grip_limit"] as const;
+type SingleTraitTagId = (typeof SINGLE_TRAIT_IDS)[number];
+
+const DOES_WELL_IDS = [
   "predictable_limit",
   "good_rotation",
   "stable_on_throttle",
   "confident_braking",
   "easy_to_place",
 ] as const;
-export type DoesWellPresetId = (typeof DOES_WELL_IDS)[number];
-export const DOES_WELL_LABELS: Record<DoesWellPresetId, string> = {
-  predictable_limit: "Predictable at the limit",
-  good_rotation: "Good rotation",
-  stable_on_throttle: "Stable on throttle",
-  confident_braking: "Confident braking",
-  easy_to_place: "Easy to place",
-};
+type DoesWellPresetId = (typeof DOES_WELL_IDS)[number];
 
 /** Which dimension is the primary focus (must match a selection already made). */
 export type PrimaryFocus =
   | { kind: "balance"; phase: CornerPhase; value: PhaseBalance }
   | { kind: "feel_vs_last"; value: FeelVsLastRun }
-  | { kind: "steering_feel"; value: SteeringFeelPreset }
-  | { kind: "general_feel"; value: GeneralFeelPreset }
-  | { kind: "drive_difficulty"; value: DriveDifficultyPreset }
-  | { kind: "single_trait"; value: SingleTraitTagId }
-  | { kind: "does_well"; value: DoesWellPresetId };
+  | { kind: "feel_steering"; value: PhaseBalance }
+  | { kind: "feel_general"; value: PhaseBalance }
+  | { kind: "drive_ease"; value: PhaseBalance }
+  | { kind: "traction_roll"; value: PhaseBalance };
 
-/** Persisted JSON (current). All optional strings removed — presets only. */
+/** Persisted JSON (current). */
 export type RunHandlingAssessmentParsed = {
-  version: 4;
-  balanceByPhase?: {
-    entry?: PhaseBalance;
-    mid?: PhaseBalance;
-    exit?: PhaseBalance;
-  };
+  version: 5;
+  balanceByPhase?: BalanceByPhaseMap;
   feelVsLastRun?: FeelVsLastRun;
-  steeringFeel?: SteeringFeelPreset;
-  generalFeel?: GeneralFeelPreset;
-  driveDifficulty?: DriveDifficultyPreset;
-  singleTraits?: SingleTraitTagId[];
-  doesWell?: DoesWellPresetId[];
+  /** −3 dull … +3 aggressive */
+  feelSteering?: PhaseBalance;
+  /** −3 smooth … +3 reactive */
+  feelGeneral?: PhaseBalance;
+  /** −3 hard … +3 easy */
+  driveEase?: PhaseBalance;
+  /** −3 never … +3 often */
+  tractionRoll?: PhaseBalance;
   primaryFocus?: PrimaryFocus;
 };
 
@@ -193,7 +174,7 @@ function mergeLegacyUsOsForPhase(
 }
 
 type V3Like = {
-  balanceByPhase?: RunHandlingAssessmentParsed["balanceByPhase"];
+  balanceByPhase?: BalanceByPhaseMap;
   feelVsLastRun?: FeelVsLastRun;
   traitTags?: string[];
   traitsOther?: string;
@@ -237,7 +218,62 @@ function legacyTagsToSingleTraits(tags: string[] | undefined): SingleTraitTagId[
   return out;
 }
 
-function v4HasAnyContent(t: RunHandlingAssessmentParsed): boolean {
+type HandlingAssessmentV4Fields = {
+  balanceByPhase?: BalanceByPhaseMap;
+  feelVsLastRun?: FeelVsLastRun;
+  steeringFeel?: SteeringFeelPreset;
+  generalFeel?: GeneralFeelPreset;
+  driveDifficulty?: DriveDifficultyPreset;
+  singleTraits?: SingleTraitTagId[];
+  doesWell?: DoesWellPresetId[];
+  primaryFocusRaw?: unknown;
+};
+
+function mapSteeringPresetToAxis(p: SteeringFeelPreset): PhaseBalance {
+  const m: Record<SteeringFeelPreset, PhaseBalance> = {
+    dull: -3,
+    vague: -2,
+    neutral: 0,
+    direct: 2,
+    pointy: 3,
+    nervous: 3,
+  };
+  return m[p];
+}
+
+function mapGeneralPresetToAxis(p: GeneralFeelPreset): PhaseBalance {
+  const m: Record<GeneralFeelPreset, PhaseBalance> = {
+    smooth: -3,
+    plush: -2,
+    aggressive: 2,
+    sharp: 3,
+  };
+  return m[p];
+}
+
+function mapDriveDifficultyPresetToAxis(p: DriveDifficultyPreset): PhaseBalance {
+  return p === "hard" ? -3 : 3;
+}
+
+function v4FieldsHasAnyContent(f: HandlingAssessmentV4Fields): boolean {
+  return (
+    Boolean(
+      f.balanceByPhase &&
+        (f.balanceByPhase.entry != null ||
+          f.balanceByPhase.mid != null ||
+          f.balanceByPhase.exit != null)
+    ) ||
+    f.feelVsLastRun != null ||
+    f.steeringFeel != null ||
+    f.generalFeel != null ||
+    f.driveDifficulty != null ||
+    (f.singleTraits != null && f.singleTraits.length > 0) ||
+    (f.doesWell != null && f.doesWell.length > 0) ||
+    f.primaryFocusRaw != null
+  );
+}
+
+function v5HasAnyContent(t: RunHandlingAssessmentParsed): boolean {
   return (
     Boolean(
       t.balanceByPhase &&
@@ -246,90 +282,19 @@ function v4HasAnyContent(t: RunHandlingAssessmentParsed): boolean {
           t.balanceByPhase.exit != null)
     ) ||
     t.feelVsLastRun != null ||
-    t.steeringFeel != null ||
-    t.generalFeel != null ||
-    t.driveDifficulty != null ||
-    (t.singleTraits != null && t.singleTraits.length > 0) ||
-    (t.doesWell != null && t.doesWell.length > 0) ||
+    t.feelSteering != null ||
+    t.feelGeneral != null ||
+    t.driveEase != null ||
+    t.tractionRoll != null ||
     t.primaryFocus != null
   );
 }
 
-function finalizeV4(t: RunHandlingAssessmentParsed): RunHandlingAssessmentParsed | null {
-  return v4HasAnyContent(t) ? t : null;
+function finalizeV5(t: RunHandlingAssessmentParsed): RunHandlingAssessmentParsed | null {
+  return v5HasAnyContent(t) ? t : null;
 }
 
-function migrateV3LikeToV4(v3: V3Like): RunHandlingAssessmentParsed | null {
-  const out: RunHandlingAssessmentParsed = { version: 4 };
-  if (v3.balanceByPhase && Object.keys(v3.balanceByPhase).length) {
-    out.balanceByPhase = { ...v3.balanceByPhase };
-  }
-  if (v3.feelVsLastRun != null && isPhaseBalance(v3.feelVsLastRun)) {
-    out.feelVsLastRun = v3.feelVsLastRun;
-  }
-  const steer = inferSteeringFromLegacyTags(v3.traitTags);
-  if (steer) out.steeringFeel = steer;
-  const singles = legacyTagsToSingleTraits(v3.traitTags);
-  if (singles.length) out.singleTraits = singles;
-  return finalizeV4(out);
-}
-
-function attachLegacyCommonToV3Like(out: V3Like, o: Record<string, unknown>): void {
-  if (Array.isArray(o.traitTags)) {
-    const tags = o.traitTags.filter((t): t is string => typeof t === "string" && t.length > 0) as string[];
-    if (tags.length) out.traitTags = tags;
-  }
-  if (typeof o.traitsOther === "string" && o.traitsOther.trim()) out.traitsOther = o.traitsOther.trim();
-  if (typeof o.mainProblem === "string" && o.mainProblem.trim()) out.mainProblem = o.mainProblem.trim();
-  if (typeof o.carDoesWell === "string" && o.carDoesWell.trim()) out.carDoesWell = o.carDoesWell.trim();
-}
-
-function migrateV1ToV4(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
-  const understeer = normalizePhaseBlock(o.understeer);
-  const oversteer = normalizePhaseBlock(o.oversteer);
-  const ui =
-    typeof o.understeerSeverity === "string" && isLegacySeverity(o.understeerSeverity)
-      ? legacySeverityToIntensity(o.understeerSeverity)
-      : 3;
-  const oi =
-    typeof o.oversteerSeverity === "string" && isLegacySeverity(o.oversteerSeverity)
-      ? legacySeverityToIntensity(o.oversteerSeverity)
-      : 3;
-
-  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
-  for (const p of PHASES) {
-    const b = mergeLegacyUsOsForPhase(understeer?.[p], oversteer?.[p], ui, oi);
-    if (b !== null) balanceByPhase[p] = b;
-  }
-
-  const v3: V3Like = {};
-  if (Object.keys(balanceByPhase).length) v3.balanceByPhase = balanceByPhase;
-  attachLegacyCommonToV3Like(v3, o);
-  return migrateV3LikeToV4(v3);
-}
-
-function migrateV2ToV4(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
-  const understeer = normalizePhaseBlock(o.understeer);
-  const oversteer = normalizePhaseBlock(o.oversteer);
-  const ui =
-    o.understeerIntensity != null && isIntensity1to5(o.understeerIntensity) ? o.understeerIntensity : 3;
-  const oi =
-    o.oversteerIntensity != null && isIntensity1to5(o.oversteerIntensity) ? o.oversteerIntensity : 3;
-
-  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
-  for (const p of PHASES) {
-    const b = mergeLegacyUsOsForPhase(understeer?.[p], oversteer?.[p], ui, oi);
-    if (b !== null) balanceByPhase[p] = b;
-  }
-
-  const v3: V3Like = {};
-  if (Object.keys(balanceByPhase).length) v3.balanceByPhase = balanceByPhase;
-  if (o.feelVsLastRun != null && isPhaseBalance(o.feelVsLastRun)) v3.feelVsLastRun = o.feelVsLastRun;
-  attachLegacyCommonToV3Like(v3, o);
-  return migrateV3LikeToV4(v3);
-}
-
-function parsePrimaryFocus(raw: unknown): PrimaryFocus | undefined {
+function parsePrimaryFocusLegacy(raw: unknown): LegacyV4PrimaryFocus | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const o = raw as Record<string, unknown>;
   const kind = o.kind;
@@ -359,9 +324,187 @@ function parsePrimaryFocus(raw: unknown): PrimaryFocus | undefined {
   return undefined;
 }
 
+/** v4 primaryFocus JSON shapes. */
+type LegacyV4PrimaryFocus =
+  | { kind: "balance"; phase: CornerPhase; value: PhaseBalance }
+  | { kind: "feel_vs_last"; value: FeelVsLastRun }
+  | { kind: "steering_feel"; value: SteeringFeelPreset }
+  | { kind: "general_feel"; value: GeneralFeelPreset }
+  | { kind: "drive_difficulty"; value: DriveDifficultyPreset }
+  | { kind: "single_trait"; value: SingleTraitTagId }
+  | { kind: "does_well"; value: DoesWellPresetId };
+
+function migrateLegacyPrimaryFocusToV5(raw: unknown): PrimaryFocus | undefined {
+  const pf = parsePrimaryFocusLegacy(raw);
+  if (!pf) return parsePrimaryFocusV5(raw);
+  if (pf.kind === "balance" || pf.kind === "feel_vs_last") return pf;
+  if (pf.kind === "steering_feel") {
+    return { kind: "feel_steering", value: mapSteeringPresetToAxis(pf.value) };
+  }
+  if (pf.kind === "general_feel") {
+    return { kind: "feel_general", value: mapGeneralPresetToAxis(pf.value) };
+  }
+  if (pf.kind === "drive_difficulty") {
+    return { kind: "drive_ease", value: mapDriveDifficultyPresetToAxis(pf.value) };
+  }
+  if (pf.kind === "single_trait") {
+    if (pf.value === "traction_roll") return { kind: "traction_roll", value: 2 };
+    return undefined;
+  }
+  return undefined;
+}
+
+function parsePrimaryFocusV5(raw: unknown): PrimaryFocus | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  const kind = o.kind;
+  if (kind === "balance" && typeof o.phase === "string" && PHASES.includes(o.phase as CornerPhase)) {
+    const v = o.value;
+    if (isPhaseBalance(v)) return { kind: "balance", phase: o.phase as CornerPhase, value: v };
+  }
+  if (kind === "feel_vs_last") {
+    const v = o.value;
+    if (isPhaseBalance(v)) return { kind: "feel_vs_last", value: v };
+  }
+  if (kind === "feel_steering") {
+    const v = o.value;
+    if (isPhaseBalance(v)) return { kind: "feel_steering", value: v };
+  }
+  if (kind === "feel_general") {
+    const v = o.value;
+    if (isPhaseBalance(v)) return { kind: "feel_general", value: v };
+  }
+  if (kind === "drive_ease") {
+    const v = o.value;
+    if (isPhaseBalance(v)) return { kind: "drive_ease", value: v };
+  }
+  if (kind === "traction_roll") {
+    const v = o.value;
+    if (isPhaseBalance(v)) return { kind: "traction_roll", value: v };
+  }
+  return undefined;
+}
+
+function primaryFocusMatchesParsed(pf: PrimaryFocus, parsed: RunHandlingAssessmentParsed): boolean {
+  const b = parsed.balanceByPhase;
+  switch (pf.kind) {
+    case "balance": {
+      const v = pf.phase === "entry" ? b?.entry : pf.phase === "mid" ? b?.mid : b?.exit;
+      return v === pf.value;
+    }
+    case "feel_vs_last":
+      return parsed.feelVsLastRun === pf.value;
+    case "feel_steering":
+      return parsed.feelSteering === pf.value;
+    case "feel_general":
+      return parsed.feelGeneral === pf.value;
+    case "drive_ease":
+      return parsed.driveEase === pf.value;
+    case "traction_roll":
+      return parsed.tractionRoll === pf.value;
+    default:
+      return false;
+  }
+}
+
+function migrateV4FieldsToV5(f: HandlingAssessmentV4Fields): RunHandlingAssessmentParsed | null {
+  const out: RunHandlingAssessmentParsed = { version: 5 };
+  if (f.balanceByPhase && Object.keys(f.balanceByPhase).length) {
+    out.balanceByPhase = { ...f.balanceByPhase };
+  }
+  if (f.feelVsLastRun != null && isPhaseBalance(f.feelVsLastRun)) {
+    out.feelVsLastRun = f.feelVsLastRun;
+  }
+  if (f.steeringFeel) out.feelSteering = mapSteeringPresetToAxis(f.steeringFeel);
+  if (f.generalFeel) out.feelGeneral = mapGeneralPresetToAxis(f.generalFeel);
+  if (f.driveDifficulty) out.driveEase = mapDriveDifficultyPresetToAxis(f.driveDifficulty);
+  if (f.singleTraits?.includes("traction_roll")) {
+    const fromTag = 2 as PhaseBalance;
+    out.tractionRoll =
+      out.tractionRoll != null ? (Math.max(out.tractionRoll, fromTag) as PhaseBalance) : fromTag;
+  }
+  const migratedFocus = migrateLegacyPrimaryFocusToV5(f.primaryFocusRaw);
+  if (migratedFocus) {
+    if (primaryFocusMatchesParsed(migratedFocus, out)) out.primaryFocus = migratedFocus;
+  }
+  return finalizeV5(out);
+}
+
+function migrateV3LikeToV4Fields(v3: V3Like): HandlingAssessmentV4Fields | null {
+  const out: HandlingAssessmentV4Fields = {};
+  if (v3.balanceByPhase && Object.keys(v3.balanceByPhase).length) {
+    out.balanceByPhase = { ...v3.balanceByPhase };
+  }
+  if (v3.feelVsLastRun != null && isPhaseBalance(v3.feelVsLastRun)) {
+    out.feelVsLastRun = v3.feelVsLastRun;
+  }
+  const steer = inferSteeringFromLegacyTags(v3.traitTags);
+  if (steer) out.steeringFeel = steer;
+  const singles = legacyTagsToSingleTraits(v3.traitTags);
+  if (singles.length) out.singleTraits = singles;
+  return v4FieldsHasAnyContent(out) ? out : null;
+}
+
+function attachLegacyCommonToV3Like(out: V3Like, o: Record<string, unknown>): void {
+  if (Array.isArray(o.traitTags)) {
+    const tags = o.traitTags.filter((t): t is string => typeof t === "string" && t.length > 0) as string[];
+    if (tags.length) out.traitTags = tags;
+  }
+  if (typeof o.traitsOther === "string" && o.traitsOther.trim()) out.traitsOther = o.traitsOther.trim();
+  if (typeof o.mainProblem === "string" && o.mainProblem.trim()) out.mainProblem = o.mainProblem.trim();
+  if (typeof o.carDoesWell === "string" && o.carDoesWell.trim()) out.carDoesWell = o.carDoesWell.trim();
+}
+
+function migrateV1ToV4(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
+  const understeer = normalizePhaseBlock(o.understeer);
+  const oversteer = normalizePhaseBlock(o.oversteer);
+  const ui =
+    typeof o.understeerSeverity === "string" && isLegacySeverity(o.understeerSeverity)
+      ? legacySeverityToIntensity(o.understeerSeverity)
+      : 3;
+  const oi =
+    typeof o.oversteerSeverity === "string" && isLegacySeverity(o.oversteerSeverity)
+      ? legacySeverityToIntensity(o.oversteerSeverity)
+      : 3;
+
+  const balanceByPhase: BalanceByPhaseMap = {};
+  for (const p of PHASES) {
+    const b = mergeLegacyUsOsForPhase(understeer?.[p], oversteer?.[p], ui, oi);
+    if (b !== null) balanceByPhase[p] = b;
+  }
+
+  const v3: V3Like = {};
+  if (Object.keys(balanceByPhase).length) v3.balanceByPhase = balanceByPhase;
+  attachLegacyCommonToV3Like(v3, o);
+  const fields = migrateV3LikeToV4Fields(v3);
+  return fields ? migrateV4FieldsToV5(fields) : null;
+}
+
+function migrateV2ToV4(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
+  const understeer = normalizePhaseBlock(o.understeer);
+  const oversteer = normalizePhaseBlock(o.oversteer);
+  const ui =
+    o.understeerIntensity != null && isIntensity1to5(o.understeerIntensity) ? o.understeerIntensity : 3;
+  const oi =
+    o.oversteerIntensity != null && isIntensity1to5(o.oversteerIntensity) ? o.oversteerIntensity : 3;
+
+  const balanceByPhase: BalanceByPhaseMap = {};
+  for (const p of PHASES) {
+    const b = mergeLegacyUsOsForPhase(understeer?.[p], oversteer?.[p], ui, oi);
+    if (b !== null) balanceByPhase[p] = b;
+  }
+
+  const v3: V3Like = {};
+  if (Object.keys(balanceByPhase).length) v3.balanceByPhase = balanceByPhase;
+  if (o.feelVsLastRun != null && isPhaseBalance(o.feelVsLastRun)) v3.feelVsLastRun = o.feelVsLastRun;
+  attachLegacyCommonToV3Like(v3, o);
+  const fields = migrateV3LikeToV4Fields(v3);
+  return fields ? migrateV4FieldsToV5(fields) : null;
+}
+
 function parseV4Raw(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
   const bb = o.balanceByPhase;
-  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
+  const balanceByPhase: BalanceByPhaseMap = {};
   if (bb && typeof bb === "object" && !Array.isArray(bb)) {
     const r = bb as Record<string, unknown>;
     for (const p of PHASES) {
@@ -388,24 +531,44 @@ function parseV4Raw(o: Record<string, unknown>): RunHandlingAssessmentParsed | n
     const dw = o.doesWell.filter((t): t is DoesWellPresetId => typeof t === "string" && isDoesWellId(t));
     if (dw.length) doesWell = dw;
   }
-  const primaryFocus = parsePrimaryFocus(o.primaryFocus);
+  const fields: HandlingAssessmentV4Fields = {};
+  if (Object.keys(balanceByPhase).length) fields.balanceByPhase = balanceByPhase;
+  if (fvl !== undefined) fields.feelVsLastRun = fvl;
+  if (steeringFeel) fields.steeringFeel = steeringFeel;
+  if (generalFeel) fields.generalFeel = generalFeel;
+  if (driveDifficulty) fields.driveDifficulty = driveDifficulty;
+  if (singleTraits) fields.singleTraits = singleTraits;
+  if (doesWell) fields.doesWell = doesWell;
+  if (o.primaryFocus != null) fields.primaryFocusRaw = o.primaryFocus;
+  return migrateV4FieldsToV5(fields);
+}
 
-  const out: RunHandlingAssessmentParsed = { version: 4 };
+function parseV5Raw(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
+  const bb = o.balanceByPhase;
+  const balanceByPhase: BalanceByPhaseMap = {};
+  if (bb && typeof bb === "object" && !Array.isArray(bb)) {
+    const r = bb as Record<string, unknown>;
+    for (const p of PHASES) {
+      const v = r[p];
+      if (v != null && isPhaseBalance(v)) balanceByPhase[p] = v;
+    }
+  }
+  const fvl = o.feelVsLastRun != null && isPhaseBalance(o.feelVsLastRun) ? o.feelVsLastRun : undefined;
+  const out: RunHandlingAssessmentParsed = { version: 5 };
   if (Object.keys(balanceByPhase).length) out.balanceByPhase = balanceByPhase;
   if (fvl !== undefined) out.feelVsLastRun = fvl;
-  if (steeringFeel) out.steeringFeel = steeringFeel;
-  if (generalFeel) out.generalFeel = generalFeel;
-  if (driveDifficulty) out.driveDifficulty = driveDifficulty;
-  if (singleTraits) out.singleTraits = singleTraits;
-  if (doesWell) out.doesWell = doesWell;
-  if (primaryFocus) out.primaryFocus = primaryFocus;
-
-  return finalizeV4(out);
+  for (const key of ["feelSteering", "feelGeneral", "driveEase", "tractionRoll"] as const) {
+    const v = o[key];
+    if (v != null && isPhaseBalance(v)) out[key] = v;
+  }
+  const pf = parsePrimaryFocusV5(o.primaryFocus) ?? migrateLegacyPrimaryFocusToV5(o.primaryFocus);
+  if (pf != null && primaryFocusMatchesParsed(pf, out)) out.primaryFocus = pf;
+  return finalizeV5(out);
 }
 
 function parseV3Raw(o: Record<string, unknown>): RunHandlingAssessmentParsed | null {
   const bb = o.balanceByPhase;
-  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
+  const balanceByPhase: BalanceByPhaseMap = {};
   if (bb && typeof bb === "object" && !Array.isArray(bb)) {
     const r = bb as Record<string, unknown>;
     for (const p of PHASES) {
@@ -445,7 +608,8 @@ function parseV3Raw(o: Record<string, unknown>): RunHandlingAssessmentParsed | n
   ) {
     return null;
   }
-  return migrateV3LikeToV4(v3);
+  const fields = migrateV3LikeToV4Fields(v3);
+  return fields ? migrateV4FieldsToV5(fields) : null;
 }
 
 export function parseHandlingAssessmentJson(raw: unknown): RunHandlingAssessmentParsed | null {
@@ -463,6 +627,9 @@ export function parseHandlingAssessmentJson(raw: unknown): RunHandlingAssessment
   if (ver === 3) {
     return parseV3Raw(o);
   }
+  if (ver === 5) {
+    return parseV5Raw(o);
+  }
   if (ver === 4) {
     return parseV4Raw(o);
   }
@@ -470,7 +637,7 @@ export function parseHandlingAssessmentJson(raw: unknown): RunHandlingAssessment
 }
 
 export function emptyHandlingAssessmentV1(): RunHandlingAssessmentParsed {
-  return { version: 4 };
+  return { version: 5 };
 }
 
 export type HandlingAssessmentUiState = {
@@ -478,11 +645,10 @@ export type HandlingAssessmentUiState = {
   balanceMid: PhaseBalance | null;
   balanceExit: PhaseBalance | null;
   feelVsLastRun: FeelVsLastRun | null;
-  steeringFeel: SteeringFeelPreset | null;
-  generalFeel: GeneralFeelPreset | null;
-  driveDifficulty: DriveDifficultyPreset | null;
-  singleTraits: SingleTraitTagId[];
-  doesWell: DoesWellPresetId[];
+  feelSteering: PhaseBalance | null;
+  feelGeneral: PhaseBalance | null;
+  driveEase: PhaseBalance | null;
+  tractionRoll: PhaseBalance | null;
   primaryFocus: PrimaryFocus | null;
 };
 
@@ -492,11 +658,10 @@ export function emptyHandlingAssessmentUiState(): HandlingAssessmentUiState {
     balanceMid: null,
     balanceExit: null,
     feelVsLastRun: null,
-    steeringFeel: null,
-    generalFeel: null,
-    driveDifficulty: null,
-    singleTraits: [],
-    doesWell: [],
+    feelSteering: null,
+    feelGeneral: null,
+    driveEase: null,
+    tractionRoll: null,
     primaryFocus: null,
   };
 }
@@ -516,16 +681,14 @@ export function primaryFocusMatchesUi(f: PrimaryFocus, ui: HandlingAssessmentUiS
     }
     case "feel_vs_last":
       return ui.feelVsLastRun === f.value;
-    case "steering_feel":
-      return ui.steeringFeel === f.value;
-    case "general_feel":
-      return ui.generalFeel === f.value;
-    case "drive_difficulty":
-      return ui.driveDifficulty === f.value;
-    case "single_trait":
-      return ui.singleTraits.includes(f.value);
-    case "does_well":
-      return ui.doesWell.includes(f.value);
+    case "feel_steering":
+      return ui.feelSteering === f.value;
+    case "feel_general":
+      return ui.feelGeneral === f.value;
+    case "drive_ease":
+      return ui.driveEase === f.value;
+    case "traction_roll":
+      return ui.tractionRoll === f.value;
     default:
       return false;
   }
@@ -535,6 +698,11 @@ export function sanitizeHandlingUiState(ui: HandlingAssessmentUiState): Handling
   if (!ui.primaryFocus) return ui;
   if (primaryFocusMatchesUi(ui.primaryFocus, ui)) return ui;
   return { ...ui, primaryFocus: null };
+}
+
+function primaryFocusTraitShortLabel(axis: HandlingTraitAxisKey, v: PhaseBalance): string {
+  const u = HANDLING_TRAIT_AXIS_UI[axis];
+  return `${u.title}: ${v > 0 ? "+" : ""}${v}`;
 }
 
 export function buildPrimaryFocusOptions(ui: HandlingAssessmentUiState): { id: string; focus: PrimaryFocus; label: string }[] {
@@ -564,87 +732,63 @@ export function buildPrimaryFocusOptions(ui: HandlingAssessmentUiState): { id: s
       label: `Feel vs last run: ${formatFeelVsLastRun(uiSan.feelVsLastRun)}`,
     });
   }
-  if (uiSan.steeringFeel != null) {
-    const f: PrimaryFocus = { kind: "steering_feel", value: uiSan.steeringFeel };
+  if (uiSan.feelSteering != null) {
+    const f: PrimaryFocus = { kind: "feel_steering", value: uiSan.feelSteering };
     opts.push({
       id: JSON.stringify(f),
       focus: f,
-      label: `Steering feel: ${STEERING_FEEL_LABELS[uiSan.steeringFeel]}`,
+      label: primaryFocusTraitShortLabel("feelSteering", uiSan.feelSteering),
     });
   }
-  if (uiSan.generalFeel != null) {
-    const f: PrimaryFocus = { kind: "general_feel", value: uiSan.generalFeel };
+  if (uiSan.feelGeneral != null) {
+    const f: PrimaryFocus = { kind: "feel_general", value: uiSan.feelGeneral };
     opts.push({
       id: JSON.stringify(f),
       focus: f,
-      label: `General feel: ${GENERAL_FEEL_LABELS[uiSan.generalFeel]}`,
+      label: primaryFocusTraitShortLabel("feelGeneral", uiSan.feelGeneral),
     });
   }
-  if (uiSan.driveDifficulty != null) {
-    const f: PrimaryFocus = { kind: "drive_difficulty", value: uiSan.driveDifficulty };
+  if (uiSan.driveEase != null) {
+    const f: PrimaryFocus = { kind: "drive_ease", value: uiSan.driveEase };
     opts.push({
       id: JSON.stringify(f),
       focus: f,
-      label: `Difficulty to drive: ${DRIVE_DIFFICULTY_LABELS[uiSan.driveDifficulty]}`,
+      label: primaryFocusTraitShortLabel("driveEase", uiSan.driveEase),
     });
   }
-  for (const id of uiSan.singleTraits) {
-    const f: PrimaryFocus = { kind: "single_trait", value: id };
+  if (uiSan.tractionRoll != null) {
+    const f: PrimaryFocus = { kind: "traction_roll", value: uiSan.tractionRoll };
     opts.push({
       id: JSON.stringify(f),
       focus: f,
-      label: `Issue: ${SINGLE_TRAIT_LABELS[id]}`,
-    });
-  }
-  for (const id of uiSan.doesWell) {
-    const f: PrimaryFocus = { kind: "does_well", value: id };
-    opts.push({
-      id: JSON.stringify(f),
-      focus: f,
-      label: `Does well: ${DOES_WELL_LABELS[id]}`,
+      label: primaryFocusTraitShortLabel("tractionRoll", uiSan.tractionRoll),
     });
   }
   return opts;
 }
 
 export function uiStateFromParsed(parsed: RunHandlingAssessmentParsed | null): HandlingAssessmentUiState {
-  if (!parsed || parsed.version !== 4) return emptyHandlingAssessmentUiState();
+  if (!parsed || parsed.version !== 5) return emptyHandlingAssessmentUiState();
   const b = parsed.balanceByPhase;
-  const base: HandlingAssessmentUiState = {
+  const partialUi: HandlingAssessmentUiState = {
     balanceEntry: b?.entry != null && isPhaseBalance(b.entry) ? b.entry : null,
     balanceMid: b?.mid != null && isPhaseBalance(b.mid) ? b.mid : null,
     balanceExit: b?.exit != null && isPhaseBalance(b.exit) ? b.exit : null,
     feelVsLastRun:
       parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun) ? parsed.feelVsLastRun : null,
-    steeringFeel:
-      parsed.steeringFeel != null && isSteeringFeelPreset(parsed.steeringFeel) ? parsed.steeringFeel : null,
-    generalFeel:
-      parsed.generalFeel != null && isGeneralFeelPreset(parsed.generalFeel) ? parsed.generalFeel : null,
-    driveDifficulty:
-      parsed.driveDifficulty != null && isDriveDifficultyPreset(parsed.driveDifficulty)
-        ? parsed.driveDifficulty
-        : null,
-    singleTraits: parsed.singleTraits ? [...parsed.singleTraits] : [],
-    doesWell: parsed.doesWell ? [...parsed.doesWell] : [],
+    feelSteering:
+      parsed.feelSteering != null && isPhaseBalance(parsed.feelSteering) ? parsed.feelSteering : null,
+    feelGeneral:
+      parsed.feelGeneral != null && isPhaseBalance(parsed.feelGeneral) ? parsed.feelGeneral : null,
+    driveEase: parsed.driveEase != null && isPhaseBalance(parsed.driveEase) ? parsed.driveEase : null,
+    tractionRoll:
+      parsed.tractionRoll != null && isPhaseBalance(parsed.tractionRoll) ? parsed.tractionRoll : null,
+    primaryFocus: null,
+  };
+  const base: HandlingAssessmentUiState = {
+    ...partialUi,
     primaryFocus:
-      parsed.primaryFocus != null && primaryFocusMatchesUi(parsed.primaryFocus, {
-        balanceEntry: b?.entry != null && isPhaseBalance(b.entry) ? b.entry : null,
-        balanceMid: b?.mid != null && isPhaseBalance(b.mid) ? b.mid : null,
-        balanceExit: b?.exit != null && isPhaseBalance(b.exit) ? b.exit : null,
-        feelVsLastRun:
-          parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun) ? parsed.feelVsLastRun : null,
-        steeringFeel:
-          parsed.steeringFeel != null && isSteeringFeelPreset(parsed.steeringFeel) ? parsed.steeringFeel : null,
-        generalFeel:
-          parsed.generalFeel != null && isGeneralFeelPreset(parsed.generalFeel) ? parsed.generalFeel : null,
-        driveDifficulty:
-          parsed.driveDifficulty != null && isDriveDifficultyPreset(parsed.driveDifficulty)
-            ? parsed.driveDifficulty
-            : null,
-        singleTraits: parsed.singleTraits ? [...parsed.singleTraits] : [],
-        doesWell: parsed.doesWell ? [...parsed.doesWell] : [],
-        primaryFocus: null,
-      })
+      parsed.primaryFocus != null && primaryFocusMatchesUi(parsed.primaryFocus, partialUi)
         ? parsed.primaryFocus
         : null,
   };
@@ -653,18 +797,17 @@ export function uiStateFromParsed(parsed: RunHandlingAssessmentParsed | null): H
 
 export function persistedFromUiState(ui: HandlingAssessmentUiState): RunHandlingAssessmentParsed | null {
   const uiSan = sanitizeHandlingUiState(ui);
-  const t: RunHandlingAssessmentParsed = { version: 4 };
-  const balanceByPhase: NonNullable<RunHandlingAssessmentParsed["balanceByPhase"]> = {};
+  const t: RunHandlingAssessmentParsed = { version: 5 };
+  const balanceByPhase: BalanceByPhaseMap = {};
   if (uiSan.balanceEntry != null) balanceByPhase.entry = uiSan.balanceEntry;
   if (uiSan.balanceMid != null) balanceByPhase.mid = uiSan.balanceMid;
   if (uiSan.balanceExit != null) balanceByPhase.exit = uiSan.balanceExit;
   if (Object.keys(balanceByPhase).length) t.balanceByPhase = balanceByPhase;
   if (uiSan.feelVsLastRun != null) t.feelVsLastRun = uiSan.feelVsLastRun;
-  if (uiSan.steeringFeel != null) t.steeringFeel = uiSan.steeringFeel;
-  if (uiSan.generalFeel != null) t.generalFeel = uiSan.generalFeel;
-  if (uiSan.driveDifficulty != null) t.driveDifficulty = uiSan.driveDifficulty;
-  if (uiSan.singleTraits.length) t.singleTraits = [...uiSan.singleTraits];
-  if (uiSan.doesWell.length) t.doesWell = [...uiSan.doesWell];
+  if (uiSan.feelSteering != null) t.feelSteering = uiSan.feelSteering;
+  if (uiSan.feelGeneral != null) t.feelGeneral = uiSan.feelGeneral;
+  if (uiSan.driveEase != null) t.driveEase = uiSan.driveEase;
+  if (uiSan.tractionRoll != null) t.tractionRoll = uiSan.tractionRoll;
   if (uiSan.primaryFocus != null && primaryFocusMatchesUi(uiSan.primaryFocus, uiSan)) {
     t.primaryFocus = uiSan.primaryFocus;
   }
@@ -689,19 +832,22 @@ export function formatPrimaryFocusLine(f: PrimaryFocus): string {
       return `Primary focus: ${f.phase} ${formatPhaseBalanceWord(f.value)}`;
     case "feel_vs_last":
       return `Primary focus: feel vs last run — ${formatFeelVsLastRun(f.value)}`;
-    case "steering_feel":
-      return `Primary focus: steering feel — ${STEERING_FEEL_LABELS[f.value]}`;
-    case "general_feel":
-      return `Primary focus: general feel — ${GENERAL_FEEL_LABELS[f.value]}`;
-    case "drive_difficulty":
-      return `Primary focus: difficulty — ${DRIVE_DIFFICULTY_LABELS[f.value]}`;
-    case "single_trait":
-      return `Primary focus: ${SINGLE_TRAIT_LABELS[f.value]}`;
-    case "does_well":
-      return `Primary focus (strength): ${DOES_WELL_LABELS[f.value]}`;
+    case "feel_steering":
+      return `Primary focus: ${primaryFocusTraitShortLabel("feelSteering", f.value)}`;
+    case "feel_general":
+      return `Primary focus: ${primaryFocusTraitShortLabel("feelGeneral", f.value)}`;
+    case "drive_ease":
+      return `Primary focus: ${primaryFocusTraitShortLabel("driveEase", f.value)}`;
+    case "traction_roll":
+      return `Primary focus: ${primaryFocusTraitShortLabel("tractionRoll", f.value)}`;
     default:
       return "";
   }
+}
+
+export function formatHandlingTraitAxisForEngineer(axis: HandlingTraitAxisKey, v: PhaseBalance): string {
+  const m = HANDLING_TRAIT_AXIS_UI[axis];
+  return `${m.title} (−3 ${m.neg} … +3 ${m.pos}): ${v > 0 ? "+" : ""}${v}`;
 }
 
 /**
@@ -725,20 +871,10 @@ export function formatHandlingAssessmentForEngineer(raw: unknown): string {
   if (parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun)) {
     lines.push(`Feel vs last run on this car: ${formatFeelVsLastRun(parsed.feelVsLastRun)}`);
   }
-  if (parsed.steeringFeel) {
-    lines.push(`Steering feel: ${STEERING_FEEL_LABELS[parsed.steeringFeel]}`);
-  }
-  if (parsed.generalFeel) {
-    lines.push(`General feel: ${GENERAL_FEEL_LABELS[parsed.generalFeel]}`);
-  }
-  if (parsed.driveDifficulty) {
-    lines.push(`Difficulty to drive: ${DRIVE_DIFFICULTY_LABELS[parsed.driveDifficulty]}`);
-  }
-  if (parsed.singleTraits?.length) {
-    lines.push(`Single traits: ${parsed.singleTraits.map((id) => SINGLE_TRAIT_LABELS[id]).join(", ")}`);
-  }
-  if (parsed.doesWell?.length) {
-    lines.push(`Does well: ${parsed.doesWell.map((id) => DOES_WELL_LABELS[id]).join(", ")}`);
+  const traitAxes: HandlingTraitAxisKey[] = ["feelSteering", "feelGeneral", "driveEase", "tractionRoll"];
+  for (const axis of traitAxes) {
+    const v = parsed[axis];
+    if (v != null && isPhaseBalance(v)) lines.push(formatHandlingTraitAxisForEngineer(axis, v));
   }
   if (parsed.primaryFocus) {
     const line = formatPrimaryFocusLine(parsed.primaryFocus);
