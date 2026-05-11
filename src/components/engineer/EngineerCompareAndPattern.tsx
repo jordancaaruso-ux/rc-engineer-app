@@ -5,8 +5,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLine } from "@/lib/runPickerFormat";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
-import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
+import type { PatternDigestRunRow, PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
 import { cn } from "@/lib/utils";
+import { EngineerRunPairVisualCompare } from "@/components/engineer/EngineerRunPairVisualCompare";
+import { formatLap } from "@/lib/runLaps";
 
 type CarOpt = { id: string; name: string };
 type EventOpt = { id: string; name: string };
@@ -54,6 +56,8 @@ export function EngineerCompareAndPattern({
   const [digest, setDigest] = useState<PatternDigestV1 | null>(null);
   const [digestCarId, setDigestCarId] = useState("");
   const [digestSelectedRunIds, setDigestSelectedRunIds] = useState<string[]>([]);
+  const [digestPairRunIdA, setDigestPairRunIdA] = useState("");
+  const [digestPairRunIdB, setDigestPairRunIdB] = useState("");
   const defaultedRunId = useRef(false);
 
   const [compareMode, setCompareMode] = useState<"mine" | "teammate">("mine");
@@ -285,6 +289,31 @@ export function EngineerCompareAndPattern({
     setDigestSelectedRunIds((prev) => prev.filter((id) => digestPickerRuns.some((r) => r.id === id)));
   }, [digestPickerRuns]);
 
+  useEffect(() => {
+    if (!digest?.runs?.length) {
+      setDigestPairRunIdA("");
+      setDigestPairRunIdB("");
+      return;
+    }
+    const rs = digest.runs;
+    if (rs.length >= 2) {
+      setDigestPairRunIdA(rs[0]!.runId);
+      setDigestPairRunIdB(rs[rs.length - 1]!.runId);
+    } else {
+      setDigestPairRunIdA(rs[0]!.runId);
+      setDigestPairRunIdB("");
+    }
+  }, [digest]);
+
+  function digestRunLabel(r: PatternDigestRunRow): string {
+    const best =
+      r.lapSummary.bestLapSeconds != null && Number.isFinite(r.lapSummary.bestLapSeconds)
+        ? formatLap(r.lapSummary.bestLapSeconds)
+        : "—";
+    const ev = r.eventName?.trim();
+    return [r.trackName, ev || null, best].filter(Boolean).join(" · ");
+  }
+
   async function addTeammateByEmail() {
     setTeammateAddErr(null);
     const email = teammateEmail.trim();
@@ -367,6 +396,26 @@ export function EngineerCompareAndPattern({
 
   const teammateCompareReady =
     compareMode === "teammate" && Boolean(teammatePeerId && teammateCarId && primaryTrackId);
+
+  const urlPairLabelA = useMemo(() => {
+    const r = runs.find((x) => x.id === runIdUrl);
+    return r ? formatRunPickerLine(r) : runIdUrl ? `Run ${runIdUrl.slice(0, 8)}…` : "";
+  }, [runs, runIdUrl]);
+
+  const urlPairLabelB = useMemo(() => {
+    const r = runs.find((x) => x.id === compareRunIdUrl);
+    return r ? formatRunPickerLine(r) : compareRunIdUrl ? `Run ${compareRunIdUrl.slice(0, 8)}…` : "";
+  }, [runs, compareRunIdUrl]);
+
+  const digestPairLabelA = useMemo(() => {
+    const r = digest?.runs?.find((x) => x.runId === digestPairRunIdA);
+    return r ? digestRunLabel(r) : digestPairRunIdA ? `Run ${digestPairRunIdA.slice(0, 8)}…` : "";
+  }, [digest, digestPairRunIdA]);
+
+  const digestPairLabelB = useMemo(() => {
+    const r = digest?.runs?.find((x) => x.runId === digestPairRunIdB);
+    return r ? digestRunLabel(r) : digestPairRunIdB ? `Run ${digestPairRunIdB.slice(0, 8)}…` : "";
+  }, [digest, digestPairRunIdB]);
 
   return (
     <div
@@ -585,6 +634,22 @@ export function EngineerCompareAndPattern({
         </div>
       )}
 
+      {runIdUrl && compareRunIdUrl ? (
+        <div className="border-t border-border pt-3 space-y-2">
+          <div className="text-xs ui-title text-muted-foreground">URL selection · setup &amp; laps</div>
+          <p className="text-[11px] text-muted-foreground">
+            Target session (<span className="font-mono">runId</span>) vs comparison session (
+            <span className="font-mono">compareRunId</span>).
+          </p>
+          <EngineerRunPairVisualCompare
+            runIdA={runIdUrl}
+            runIdB={compareRunIdUrl}
+            labelA={urlPairLabelA}
+            labelB={urlPairLabelB}
+          />
+        </div>
+      ) : null}
+
       <div className="border-t border-border pt-3 space-y-2">
         <div className="text-xs ui-title text-muted-foreground">Pattern digest (one car)</div>
         <p className="text-[11px] text-muted-foreground">
@@ -672,15 +737,113 @@ export function EngineerCompareAndPattern({
         </div>
         {digestErr ? <p className="text-[11px] text-destructive">{digestErr}</p> : null}
         {digest ? (
-          <div className="rounded-md border border-border bg-muted/40 p-2 max-h-48 overflow-auto text-[10px] font-mono leading-snug">
-            <div className="text-[10px] text-muted-foreground mb-1">
-              Best lap in series:{" "}
-              {digest.highlight.bestLapSeconds != null ? `${digest.highlight.bestLapSeconds.toFixed(3)}s` : "—"}
-              {digest.highlight.bestLapRunId ? ` · run ${digest.highlight.bestLapRunId.slice(0, 8)}…` : ""}
+          <div className="space-y-3">
+            <div className="rounded-md border border-border bg-muted/40 p-2">
+              <div className="text-[10px] text-muted-foreground mb-2">
+                Best lap in series:{" "}
+                {digest.highlight.bestLapSeconds != null ? `${digest.highlight.bestLapSeconds.toFixed(3)}s` : "—"}
+                {digest.highlight.bestLapRunId ? ` · run ${digest.highlight.bestLapRunId.slice(0, 8)}…` : ""}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] text-[10px]">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/60 text-left font-medium text-muted-foreground">
+                      <th className="px-1.5 py-1">When</th>
+                      <th className="px-1.5 py-1">Track</th>
+                      <th className="px-1.5 py-1">Best</th>
+                      <th className="px-1.5 py-1">Avg 5</th>
+                      <th className="px-1.5 py-1">Avg 10</th>
+                      <th className="px-1.5 py-1">Setup Δ keys</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {digest.runs.map((r) => (
+                      <tr key={r.runId} className="border-b border-border/60 align-top">
+                        <td className="px-1.5 py-1 font-mono tabular-nums text-muted-foreground whitespace-nowrap">
+                          {r.sortIso.slice(0, 16)}
+                        </td>
+                        <td className="px-1.5 py-1">{r.trackName}</td>
+                        <td className="px-1.5 py-1 font-mono tabular-nums">
+                          {r.lapSummary.bestLapSeconds != null && Number.isFinite(r.lapSummary.bestLapSeconds)
+                            ? formatLap(r.lapSummary.bestLapSeconds)
+                            : "—"}
+                        </td>
+                        <td className="px-1.5 py-1 font-mono tabular-nums">
+                          {r.lapSummary.avgTop5Seconds != null && Number.isFinite(r.lapSummary.avgTop5Seconds)
+                            ? formatLap(r.lapSummary.avgTop5Seconds)
+                            : "—"}
+                        </td>
+                        <td className="px-1.5 py-1 font-mono tabular-nums">
+                          {r.lapSummary.avgTop10Seconds != null && Number.isFinite(r.lapSummary.avgTop10Seconds)
+                            ? formatLap(r.lapSummary.avgTop10Seconds)
+                            : "—"}
+                        </td>
+                        <td className="px-1.5 py-1 text-muted-foreground break-words max-w-[12rem]">
+                          {r.setupKeysChangedFromPrevious?.length
+                            ? r.setupKeysChangedFromPrevious.slice(0, 8).join(", ") +
+                              (r.setupKeysChangedFromPrevious.length > 8 ? "…" : "")
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <pre className="whitespace-pre-wrap break-all">{JSON.stringify(digest.runs, null, 0).slice(0, 4000)}</pre>
-            {JSON.stringify(digest.runs).length > 4000 ? (
-              <div className="text-muted-foreground mt-1">…truncated in preview.</div>
+
+            {digest.runs.length >= 2 &&
+            digestPairRunIdA &&
+            digestPairRunIdB &&
+            digestPairRunIdA !== digestPairRunIdB ? (
+              <div className="space-y-2 rounded-md border border-border bg-card/50 p-2">
+                <div className="text-[10px] font-medium text-muted-foreground">Pair compare (setup + laps)</div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <label className="text-[10px] text-muted-foreground" htmlFor="digest-pair-a">
+                      Run A
+                    </label>
+                    <select
+                      id="digest-pair-a"
+                      className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+                      value={digestPairRunIdA}
+                      onChange={(e) => setDigestPairRunIdA(e.target.value)}
+                    >
+                      {digest.runs.map((r) => (
+                        <option key={r.runId} value={r.runId}>
+                          {digestRunLabel(r)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <label className="text-[10px] text-muted-foreground" htmlFor="digest-pair-b">
+                      Run B
+                    </label>
+                    <select
+                      id="digest-pair-b"
+                      className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+                      value={digestPairRunIdB}
+                      onChange={(e) => setDigestPairRunIdB(e.target.value)}
+                    >
+                      {digest.runs.map((r) => (
+                        <option key={`b-${r.runId}`} value={r.runId}>
+                          {digestRunLabel(r)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <EngineerRunPairVisualCompare
+                  runIdA={digestPairRunIdA}
+                  runIdB={digestPairRunIdB}
+                  labelA={digestPairLabelA}
+                  labelB={digestPairLabelB}
+                />
+              </div>
+            ) : digest.runs.length < 2 ? (
+              <p className="text-[11px] text-muted-foreground">
+                Digest needs at least two runs in the series to open side-by-side setup and laps.
+              </p>
             ) : null}
           </div>
         ) : null}

@@ -71,6 +71,12 @@ test("signals: regression + setup + feel", () => {
   assert.ok(sig.includes("feel_worse"));
 });
 
+test("signals: meaningful_setup_change from chronological diff when Engineer setupChanges empty", () => {
+  const s = { ...baseSummary(), setupChanges: [] };
+  const sig = computeBetweenRunSignals(s, null, { chronologicalTuningChangeCount: 2 });
+  assert.ok(sig.includes("meaningful_setup_change"));
+});
+
 test("BetweenRunHintPayloadV2 shape for API / dashboard compatibility", () => {
   const sample: BetweenRunHintPayloadV2 = {
     version: 2,

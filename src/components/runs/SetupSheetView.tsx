@@ -30,6 +30,8 @@ export type SetupSheetViewProps = {
   numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
   /** When true, show search to jump to fields (edit flows only). */
   enableFieldSearch?: boolean;
+  /** When set, only fields whose stable keys pass the predicate are shown (structured + generic templates). */
+  fieldKeyFilter?: (key: string) => boolean;
   /** Setup compare: tint changed value cells A=blue / B=red (labels stay neutral). */
   compareValueColumnRole?: CompareColumnRole | null;
 };
@@ -200,6 +202,7 @@ export function SetupSheetView({
   numericAggregationByKey = null,
   enableFieldSearch = false,
   compareValueColumnRole = null,
+  fieldKeyFilter,
 }: SetupSheetViewProps) {
   const template = templateProp ?? getDefaultSetupSheetTemplate();
   const baseline = baselineValue ?? null;
@@ -212,18 +215,27 @@ export function SetupSheetView({
     [value, onChange]
   );
 
-  const leftGroups = useMemo(
-    () => template.groups.filter((g) => g.column === "left"),
-    [template.groups]
-  );
-  const rightGroups = useMemo(
-    () => template.groups.filter((g) => g.column === "right"),
-    [template.groups]
-  );
-  const fullGroups = useMemo(
-    () => template.groups.filter((g) => g.column === "full" || !g.column),
-    [template.groups]
-  );
+  const leftGroups = useMemo(() => {
+    const raw = template.groups.filter((g) => g.column === "left");
+    if (!fieldKeyFilter) return raw;
+    return raw
+      .map((g) => ({ ...g, fields: g.fields.filter((f) => fieldKeyFilter(f.key)) }))
+      .filter((g) => g.fields.length > 0);
+  }, [template.groups, fieldKeyFilter]);
+  const rightGroups = useMemo(() => {
+    const raw = template.groups.filter((g) => g.column === "right");
+    if (!fieldKeyFilter) return raw;
+    return raw
+      .map((g) => ({ ...g, fields: g.fields.filter((f) => fieldKeyFilter(f.key)) }))
+      .filter((g) => g.fields.length > 0);
+  }, [template.groups, fieldKeyFilter]);
+  const fullGroups = useMemo(() => {
+    const raw = template.groups.filter((g) => g.column === "full" || !g.column);
+    if (!fieldKeyFilter) return raw;
+    return raw
+      .map((g) => ({ ...g, fields: g.fields.filter((f) => fieldKeyFilter(f.key)) }))
+      .filter((g) => g.fields.length > 0);
+  }, [template.groups, fieldKeyFilter]);
 
   const pairedRowCount = Math.max(leftGroups.length, rightGroups.length);
 
@@ -259,6 +271,7 @@ export function SetupSheetView({
           numericAggregationByKey={numericAggregationByKey}
           enableFieldSearch={enableFieldSearch}
           compareValueColumnRole={compareValueColumnRole}
+          fieldKeyFilter={fieldKeyFilter}
         />
       ) : null}
 

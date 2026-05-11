@@ -6,6 +6,7 @@ import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerRef
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import type {
   BetweenRunRecentSessionSnapshotV1,
+  BetweenRunHintPayloadV2,
   RecentSessionsFingerprintMaterial,
 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import { paceVsFieldSummaryFromEngineerSummary } from "@/lib/engineerPhase5/betweenRunHints/paceVsFieldSummary";
@@ -38,6 +39,8 @@ const runSelectForRefPick = {
   createdAt: true,
   sessionCompletedAt: true,
   loggingCompletedAt: true,
+  sortAt: true,
+  carId: true,
   trackId: true,
   tireSetId: true,
   tireRunNumber: true,
@@ -45,6 +48,7 @@ const runSelectForRefPick = {
   driverNotes: true,
   handlingProblems: true,
   handlingAssessmentJson: true,
+  bestLapSeconds: true,
   track: { select: { name: true } },
   trackNameSnapshot: true,
   setupSnapshot: { select: { data: true } },
@@ -118,6 +122,21 @@ function currentSetupLinesFromSnapshot(data: unknown): string[] {
   return lines;
 }
 
+/** Tuning-only lines for primary vs chronological previous snapshot (Engineer ref may be absent). */
+function chronologicalTuningChangeLines(currentData: unknown, previousData: unknown): string[] {
+  const rows = buildSetupDiffRows(normalizeSetupData(currentData), normalizeSetupData(previousData));
+  const lines: string[] = [];
+  for (const r of rows) {
+    if (!r.changed) continue;
+    if (!isTuningComparisonKey(r.key)) continue;
+    const before = r.previous?.trim() ? r.previous : "—";
+    const after = r.current?.trim() ? r.current : "—";
+    lines.push(`${r.label}: ${before} → ${after}${r.unit ? ` ${r.unit}` : ""}`.trim());
+    if (lines.length >= 24) break;
+  }
+  return lines;
+}
+
 async function loadReferenceChainRunIds(userId: string, primaryRunId: string, max: number): Promise<string[]> {
   const chain: string[] = [];
   let cur: string | null = primaryRunId;
@@ -162,10 +181,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
 }): Promise<{
   recentSessions: BetweenRunRecentSessionSnapshotV1[];
   fingerprintMaterial: RecentSessionsFingerprintMaterial;
-  driverContextPack: {
-    combinedNotesAndHandling: string;
-    currentSetupLines: string[];
-  };
+  driverContextPack: BetweenRunHintPayloadV2["driverContextPack"];
 }> {
   const runIds = await loadReferenceChainRunIds(params.userId, params.primaryRunId, 3);
 
@@ -252,12 +268,83 @@ export async function buildRecentSessionsForBetweenHints(params: {
 
   const setupLines = primaryMeta ? currentSetupLinesFromSnapshot(primaryMeta.setupSnapshot?.data) : [];
 
+  let previousRunHandling: string | null = null;
+  let chronologicalSetupChangeLines: string[] = [];
+  let bestPaceBaseline: {
+    runId: string;
+    displayLabel: string;
+    setupLines: string[];
+  } | null = null;
+
+  const primaryCarId = primaryMeta?.carId ?? null;
+  if (primaryCarId && primaryMeta) {
+    const carRuns = await prisma.run.findMany({
+      where: { userId: params.userId, carId: primaryCarId },
+      orderBy: [{ sortAt: "desc" }, { createdAt: "desc" }],
+      take: 60,
+      select: runSelectForRefPick,
+    });
+    const idx = carRuns.findIndex((r) => r.id === params.primaryRunId);
+    const chronologicalPrevious = idx >= 0 && idx < carRuns.length - 1 ? carRuns[idx + 1]! : null;
+    if (chronologicalPrevious) {
+      previousRunHandling = handlingPreviewFromRun(
+        chronologicalPrevious.handlingProblems,
+        chronologicalPrevious.handlingAssessmentJson
+      );
+      chronologicalSetupChangeLines = chronologicalTuningChangeLines(
+        primaryMeta.setupSnapshot?.data,
+        chronologicalPrevious.setupSnapshot?.data
+      );
+    }
+
+    const paceCandidates = carRuns.filter(
+      (r) => r.id !== params.primaryRunId && r.bestLapSeconds != null && Number.isFinite(r.bestLapSeconds)
+    );
+    let bestRun: (typeof carRuns)[number] | null = null;
+    let bestSec = Infinity;
+    for (const r of paceCandidates) {
+      const t = r.bestLapSeconds as number;
+      if (t < bestSec) {
+        bestSec = t;
+        bestRun = r;
+      } else if (t === bestSec && bestRun && r.sortAt != null && bestRun.sortAt != null) {
+        if (r.sortAt > bestRun.sortAt) bestRun = r;
+      }
+    }
+    if (bestRun) {
+      bestPaceBaseline = {
+        runId: bestRun.id,
+        displayLabel: runDisplayLabel(bestRun),
+        setupLines: currentSetupLinesFromSnapshot(bestRun.setupSnapshot?.data),
+      };
+    }
+  }
+
+  const bestPaceLinesSig = bestPaceBaseline?.setupLines.join("|") ?? "";
+  const fingerprintMaterial: RecentSessionsFingerprintMaterial = {
+    runIds,
+    perRun: fpPerRun,
+    contextExtras: {
+      previousRunHandling,
+      bestPaceRunId: bestPaceBaseline?.runId ?? null,
+      bestPaceLinesSig,
+      chronologicalChangeCount: chronologicalSetupChangeLines.length,
+    },
+  };
+
+  const driverContextPack: BetweenRunHintPayloadV2["driverContextPack"] = {
+    combinedNotesAndHandling: noteBits.join("\n"),
+    currentSetupLines: setupLines,
+  };
+  if (previousRunHandling) driverContextPack.previousRunHandling = previousRunHandling;
+  if (bestPaceBaseline) driverContextPack.bestPaceBaseline = bestPaceBaseline;
+  if (chronologicalSetupChangeLines.length > 0) {
+    driverContextPack.chronologicalSetupChangeLines = chronologicalSetupChangeLines;
+  }
+
   return {
     recentSessions,
-    fingerprintMaterial: { runIds, perRun: fpPerRun },
-    driverContextPack: {
-      combinedNotesAndHandling: noteBits.join("\n"),
-      currentSetupLines: setupLines,
-    },
+    fingerprintMaterial,
+    driverContextPack,
   };
 }

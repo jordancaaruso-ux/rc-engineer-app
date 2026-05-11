@@ -11,6 +11,8 @@ import type {
 import type { VehicleDynamicsKbSnippet } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
 
+type DriverContextForHints = BetweenRunHintPayloadV2["driverContextPack"];
+
 function getHintsModel(): string {
   return process.env.ENGINEER_BETWEEN_RUN_HINTS_MODEL?.trim() || "gpt-4o-mini";
 }
@@ -25,13 +27,19 @@ function modelSupportsCustomTemperature(model: string): boolean {
 export function buildKbQueryForBetweenRunHints(params: {
   summary: EngineerRunSummaryV2;
   handlingProblems: string | null;
+  /** When Engineer pairwise `setupChanges` is empty (no reference), e.g. tuning diff vs prior run on car. */
+  extraTerms?: string[] | null;
 }): string {
   const keys = params.summary.setupChanges.map((r) => r.key).slice(0, 12);
   const labels = params.summary.setupChanges.map((r) => r.label).slice(0, 8);
   const feelBits = [params.handlingProblems?.trim() ?? ""].filter(Boolean);
+  const extras = (params.extraTerms ?? [])
+    .map((s) => s.trim().slice(0, 120))
+    .filter(Boolean);
   return [
     ...keys,
     ...labels,
+    ...extras,
     "RC touring car setup",
     params.summary.lapOutcome.best.flag === "regressed" ? "lap time slower tuning" : "",
     params.summary.lapOutcome.avgTop5.flag === "regressed" ? "pace consistency" : "",
@@ -62,6 +70,7 @@ function safeTrimArray(arr: unknown, max: number, maxLen: number): string[] {
 function buildFallbackCopy(params: {
   summary: EngineerRunSummaryV2;
   signals: BetweenRunHintSignal[];
+  chronologicalSetupChangeLines?: string[] | null;
 }): LlmShape {
   const interp = params.summary.interpretation.trim();
   const bullets: string[] = [];
@@ -69,6 +78,12 @@ function buildFallbackCopy(params: {
     const top = params.summary.setupChanges.slice(0, 3);
     for (const ch of top) {
       bullets.push(`Re-check ${ch.label}: you moved ${ch.before} → ${ch.after} — confirm pace/feel before stacking more changes.`);
+    }
+  } else if (params.chronologicalSetupChangeLines?.length) {
+    for (const line of params.chronologicalSetupChangeLines.slice(0, 3)) {
+      bullets.push(
+        `Your sheet moved vs the prior outing on this car (${line}) — confirm pace/feel before stacking more changes.`
+      );
     }
   }
   if (bullets.length === 0) {
@@ -107,7 +122,7 @@ async function callLlmBetweenRunHints(params: {
   patternDigest: PatternDigestV1 | null;
   kbSnippets: VehicleDynamicsKbSnippet[];
   recentSessions: BetweenRunRecentSessionSnapshotV1[];
-  driverContextPack: { combinedNotesAndHandling: string; currentSetupLines: string[] };
+  driverContextPack: DriverContextForHints;
 }): Promise<LlmShape | null> {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) return null;
@@ -142,6 +157,9 @@ async function callLlmBetweenRunHints(params: {
   const driverCtxJson = JSON.stringify({
     combinedNotesAndHandling: params.driverContextPack.combinedNotesAndHandling,
     currentSetupLines: params.driverContextPack.currentSetupLines.slice(0, 30),
+    previousRunHandling: params.driverContextPack.previousRunHandling ?? null,
+    bestPaceBaseline: params.driverContextPack.bestPaceBaseline ?? null,
+    chronologicalSetupChangeLines: (params.driverContextPack.chronologicalSetupChangeLines ?? []).slice(0, 20),
   }).slice(0, 4000);
 
   const system = `You are an RC touring car engineer assistant. Output ONLY valid JSON (no markdown).
@@ -203,12 +221,21 @@ function buildScopeLine(scope: BetweenRunHintScopeV1): string {
 function buildSourcesNote(params: {
   scope: BetweenRunHintScopeV1;
   referenceLabel: string | null;
+  hasEngineerReference: boolean;
+  hasChronologicalDiff: boolean;
 }): string {
   const scopeBits = [params.scope.carLabel];
   if (params.scope.trackLabel) scopeBits.push(params.scope.trackLabel);
   if (params.scope.eventLabel) scopeBits.push(params.scope.eventLabel);
-  const ref = params.referenceLabel?.trim() || "previous session on this car";
-  return `Based on your latest run versus ${ref}. Context: ${scopeBits.join(" · ")}.`;
+  const ctx = scopeBits.join(" · ");
+  if (params.hasEngineerReference) {
+    const ref = params.referenceLabel?.trim() || "previous session on this car";
+    return `Based on your latest run versus ${ref}. Context: ${ctx}.`;
+  }
+  if (params.hasChronologicalDiff) {
+    return `Based on your latest run on this car (no Engineer pairwise reference yet) with tuning changes versus your immediate prior run on this car. Context: ${ctx}.`;
+  }
+  return `Based on your latest run on this car (no Engineer pairwise reference). Context: ${ctx}.`;
 }
 
 export async function assembleBetweenRunHintPayload(params: {
@@ -219,7 +246,7 @@ export async function assembleBetweenRunHintPayload(params: {
   kbSnippets: VehicleDynamicsKbSnippet[];
   referenceLabel: string | null;
   recentSessions: BetweenRunRecentSessionSnapshotV1[];
-  driverContextPack: { combinedNotesAndHandling: string; currentSetupLines: string[] };
+  driverContextPack: DriverContextForHints;
 }): Promise<BetweenRunHintPayloadV2> {
   const engineerHref =
     params.summary.referenceRunId != null
@@ -274,7 +301,12 @@ export async function assembleBetweenRunHintPayload(params: {
     headline,
     bullets: bullets.slice(0, 4),
     avoidRepeating,
-    sourcesNote: buildSourcesNote({ scope: params.scope, referenceLabel: params.referenceLabel }),
+    sourcesNote: buildSourcesNote({
+      scope: params.scope,
+      referenceLabel: params.referenceLabel,
+      hasEngineerReference: params.summary.referenceRunId != null,
+      hasChronologicalDiff: (params.driverContextPack.chronologicalSetupChangeLines?.length ?? 0) > 0,
+    }),
     engineerHref,
     recentSessions: params.recentSessions,
     driverContextPack: params.driverContextPack,

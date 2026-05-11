@@ -10,6 +10,7 @@ import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshot
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
+import { isLogRunSetupGlanceKey } from "@/lib/logRunSetupGlanceKeys";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
@@ -334,6 +335,8 @@ export function NewRunForm(props: {
   const [otherSetupSource, setOtherSetupSource] = useState<"downloaded_setups">("downloaded_setups");
   const [downloadedSetups, setDownloadedSetups] = useState<DownloadedSetupOption[]>([]);
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
+  /** When the setup sheet is expanded, start in tuning glance unless the driver opens the full sheet. */
+  const [setupSheetGlanceOnly, setSetupSheetGlanceOnly] = useState(true);
   /**
    * When editing a saved run (including drafts being finished), the setup the
    * run was logged with is already nailed down. Forcing the user through the
@@ -3331,7 +3334,10 @@ export function NewRunForm(props: {
               </p>
               <button
                 type="button"
-                onClick={() => setSetupSectionExpanded(false)}
+                onClick={() => {
+                  setSetupSheetGlanceOnly(true);
+                  setSetupSectionExpanded(false);
+                }}
                 className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground transition"
               >
                 Collapse
@@ -3412,11 +3418,26 @@ export function NewRunForm(props: {
                 </p>
               )}
             </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 max-w-2xl">
+              <p className="text-[11px] text-muted-foreground min-w-0">
+                {setupSheetGlanceOnly
+                  ? "Showing a quick tuning glance — expand for every field."
+                  : "Full setup sheet."}
+              </p>
+              <button
+                type="button"
+                className="shrink-0 rounded-md border border-border bg-card/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-muted/70 hover:text-foreground transition"
+                onClick={() => setSetupSheetGlanceOnly((v) => !v)}
+              >
+                {setupSheetGlanceOnly ? "Expand full setup sheet" : "Show tuning glance only"}
+              </button>
+            </div>
             <SetupSheetView
               value={setupData}
               onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
               template={setupTemplate}
-              enableFieldSearch
+              enableFieldSearch={!setupSheetGlanceOnly}
+              fieldKeyFilter={setupSheetGlanceOnly ? isLogRunSetupGlanceKey : undefined}
             />
             {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">

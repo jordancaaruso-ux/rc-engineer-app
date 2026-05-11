@@ -61,7 +61,7 @@ export async function peekBetweenRunHint(
   if (!row || row.userId !== userId) return null;
 
   const summaryResult = await getOrComputeEngineerSummaryForRun(userId, primaryRunId);
-  if (!summaryResult?.summary.referenceRunId) return null;
+  if (!summaryResult?.summary) return null;
 
   const run = await prisma.run.findFirst({
     where: { id: primaryRunId, userId },
@@ -94,7 +94,7 @@ export async function getOrComputeBetweenRunHint(
   const summaryResult = await getOrComputeEngineerSummaryForRun(userId, primaryRunId, {
     force: Boolean(opts?.force),
   });
-  if (!summaryResult?.summary.referenceRunId) return { hint: null, cached: false };
+  if (!summaryResult?.summary) return { hint: null, cached: false };
 
   const runMeta = await prisma.run.findFirst({
     where: { id: primaryRunId, userId },
@@ -129,9 +129,11 @@ export async function getOrComputeBetweenRunHint(
     if (parsed) return { hint: parsed, cached: true };
   }
 
+  const chronoCount = fingerprintMaterial.contextExtras?.chronologicalChangeCount ?? 0;
   const signals = computeBetweenRunSignals(
     summaryResult.summary,
-    runMeta?.handlingAssessmentJson ?? null
+    runMeta?.handlingAssessmentJson ?? null,
+    { chronologicalTuningChangeCount: chronoCount }
   );
 
   const digest =
@@ -146,6 +148,7 @@ export async function getOrComputeBetweenRunHint(
   const kbQuery = buildKbQueryForBetweenRunHints({
     summary: summaryResult.summary,
     handlingProblems: runMeta?.handlingProblems ?? null,
+    extraTerms: driverContextPack.chronologicalSetupChangeLines?.slice(0, 4) ?? null,
   });
   const kbSnippets = await searchVehicleDynamicsKb(kbQuery, 6);
 

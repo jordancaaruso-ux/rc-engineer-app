@@ -72,6 +72,16 @@ export type BetweenRunHintPayloadV2 = {
   driverContextPack: {
     combinedNotesAndHandling: string;
     currentSetupLines: string[];
+    /** Immediate prior run on car: structured handling + problems (when available). */
+    previousRunHandling?: string | null;
+    /** Strongest recent pace on this car (excluding primary): tuning snapshot lines. */
+    bestPaceBaseline?: {
+      runId: string;
+      displayLabel: string;
+      setupLines: string[];
+    } | null;
+    /** Primary vs chronological previous run tuning diff (when Engineer pairwise ref is absent). */
+    chronologicalSetupChangeLines?: string[];
   };
 };
 
@@ -92,4 +102,11 @@ export type RecentSessionsFingerprintMaterial = {
     /** Avg-top-5/10 values + flags for cache invalidation when recent-session cards change. */
     lapMultiSig: string | null;
   }>;
+  /** Extra driver-context inputs (single-run hints, best-pace baseline, etc.). */
+  contextExtras?: {
+    previousRunHandling: string | null;
+    bestPaceRunId: string | null;
+    bestPaceLinesSig: string;
+    chronologicalChangeCount: number;
+  };
 };

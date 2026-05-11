@@ -20,15 +20,10 @@ import {
   getIncludedLapDashboardMetrics,
   primaryLapRowsFromRun,
 } from "@/lib/lapAnalysis";
-import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
-import { toCompareRunShape } from "@/lib/runCompareShape";
-import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
-import type { LapRow } from "@/lib/lapAnalysis";
+import { RunLapAnalysisModal } from "@/components/runs/RunLapAnalysisModal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
-import { Button } from "@/components/ui/Button";
 import type {
   EngineerRunSummaryV2,
   ImportedSessionFieldStatsEngineerCompactV1,
@@ -247,6 +242,7 @@ export function RunHistoryTable({
     return runs.some((r) => r.id === initialExpandedRunId) ? initialExpandedRunId : null;
   });
   const [setupModalRunId, setSetupModalRunId] = useState<string | null>(null);
+  const [lapModalRunId, setLapModalRunId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<
     { runId: string; edge: "above" | "below" } | null
@@ -305,6 +301,21 @@ export function RunHistoryTable({
     () => runs.find((r) => r.id === setupModalRunId) ?? null,
     [runs, setupModalRunId]
   );
+  const lapModalRun = useMemo(
+    () => (lapModalRunId ? runs.find((r) => r.id === lapModalRunId) ?? null : null),
+    [runs, lapModalRunId]
+  );
+  const lapModalPickerRuns = useMemo(() => {
+    if (!lapModalRun?.carId) return allRunsDescending;
+    return allRunsDescending.filter((r) => r.car?.id === lapModalRun.carId);
+  }, [allRunsDescending, lapModalRun]);
+  const lapModalUserDisplayName = useMemo(() => {
+    if (!lapModalRun) return userDisplayName;
+    if (!viewerUserId || !lapModalRun.userId || !memberDisplayByUserId) return userDisplayName;
+    return lapModalRun.userId === viewerUserId
+      ? userDisplayName
+      : memberDisplayByUserId[lapModalRun.userId] ?? null;
+  }, [lapModalRun, viewerUserId, memberDisplayByUserId, userDisplayName]);
 
   return (
     <>
@@ -321,12 +332,6 @@ export function RunHistoryTable({
           showMemberColumn && run.userId
             ? memberDisplayByUserId?.[run.userId] ?? "—"
             : null;
-        const lapColumnDriverName =
-          viewerUserId && run.userId && memberDisplayByUserId
-            ? run.userId === viewerUserId
-              ? userDisplayName
-              : memberDisplayByUserId[run.userId] ?? null
-            : userDisplayName;
         const allowRunMutations = !viewerUserId || !run.userId || run.userId === viewerUserId;
         const carDisplay = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
         const trackDisplay = run.track?.name ?? run.trackNameSnapshot ?? "—";
@@ -485,14 +490,24 @@ export function RunHistoryTable({
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <button
-                  type="button"
-                  onClick={() => setSetupModalRunId(run.id)}
-                  className="ui-strong rounded-md border border-border bg-background px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition whitespace-nowrap"
-                  title="View setup sheet for this run; compare to another run from the modal"
-                >
-                  View setup
-                </button>
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSetupModalRunId(run.id)}
+                    className="ui-strong rounded-md border border-border bg-background px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition whitespace-nowrap"
+                    title="View setup sheet for this run; compare to another run from the modal"
+                  >
+                    View setup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLapModalRunId(run.id)}
+                    className="ui-strong rounded-md border border-border bg-background px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition whitespace-nowrap"
+                    title="Open lap column compare for this run"
+                  >
+                    Lap times
+                  </button>
+                </div>
               </td>
               <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
                 {trackDisplay}
@@ -509,7 +524,6 @@ export function RunHistoryTable({
                     run={run}
                     pickerRuns={allRunsDescending}
                     runListSource={runListSource}
-                    userDisplayName={lapColumnDriverName}
                     displayTimeZone={displayTimeZone}
                     allowRunMutations={allowRunMutations}
                   />
@@ -530,6 +544,16 @@ export function RunHistoryTable({
         }
         runListSource={runListSource}
       />
+      {lapModalRun ? (
+        <RunLapAnalysisModal
+          open={lapModalRunId !== null}
+          onClose={() => setLapModalRunId(null)}
+          run={lapModalRun}
+          pickerRunsSameCar={lapModalPickerRuns}
+          runListSource={runListSource}
+          userDisplayName={lapModalUserDisplayName}
+        />
+      ) : null}
     </>
   );
 }
@@ -538,53 +562,27 @@ function RunDetail({
   run,
   pickerRuns,
   runListSource,
-  userDisplayName,
   displayTimeZone,
   allowRunMutations = true,
 }: {
   run: Run;
   pickerRuns: CompareRunShape[];
   runListSource: RunCompareListSource;
-  userDisplayName?: string | null;
   displayTimeZone?: string | null;
   /** False for another member's run on team Sessions (read-only). */
   allowRunMutations?: boolean;
 }) {
   const router = useRouter();
-  const [showLapAnalysis, setShowLapAnalysis] = React.useState(false);
   const [runSessionSummary, setRunSessionSummary] = useState<EngineerRunSummaryV2 | null>(null);
   const [runSessionSummaryLoading, setRunSessionSummaryLoading] = useState(false);
   const [runSessionSummaryErr, setRunSessionSummaryErr] = useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
-  const [importedLapSetsFull, setImportedLapSetsFull] = useState<Run["importedLapSets"] | null>(
-    null
-  );
-  const [importedLapsLoading, setImportedLapsLoading] = useState(false);
-  const [importedLapsError, setImportedLapsError] = useState<string | null>(null);
-  const [libraryLapSessions, setLibraryLapSessions] = useState<
-    Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }>
-  >([]);
-
-  const missingImportedLapRows =
-    (run.importedLapSets?.length ?? 0) > 0 &&
-    run.importedLapSets!.some((s) => !("laps" in s));
-
-  const runForLapCompare = useMemo((): Run => {
-    if (importedLapSetsFull?.length) {
-      return { ...run, importedLapSets: importedLapSetsFull };
-    }
-    return run;
-  }, [run, importedLapSetsFull]);
 
   useEffect(() => {
     setRunSessionSummary(null);
     setRunSessionSummaryErr(null);
     setRunSessionSummaryLoading(false);
-    setShowLapAnalysis(false);
-    setImportedLapSetsFull(null);
-    setImportedLapsError(null);
-    setImportedLapsLoading(false);
   }, [run.id]);
 
   useEffect(() => {
@@ -617,50 +615,6 @@ function RunDetail({
     };
   }, [run.id]);
 
-  useEffect(() => {
-    if (!showLapAnalysis) return;
-    if ((run.importedLapSets?.length ?? 0) === 0) return;
-    if (importedLapSetsFull) return;
-    if (!missingImportedLapRows) {
-      setImportedLapSetsFull(run.importedLapSets);
-      return;
-    }
-    let alive = true;
-    setImportedLapsLoading(true);
-    setImportedLapsError(null);
-    fetch(`/api/runs/${encodeURIComponent(run.id)}/imported-lap-sets`)
-      .then(async (res) => {
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          sets?: Run["importedLapSets"];
-        };
-        if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-        return data.sets ?? [];
-      })
-      .then((sets) => {
-        if (alive) setImportedLapSetsFull(sets);
-      })
-      .catch((err) => {
-        if (alive) {
-          setImportedLapsError(
-            err instanceof Error ? err.message : "Failed to load imported laps"
-          );
-        }
-      })
-      .finally(() => {
-        if (alive) setImportedLapsLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [
-    showLapAnalysis,
-    run.id,
-    run.importedLapSets,
-    importedLapSetsFull,
-    missingImportedLapRows,
-  ]);
-
   async function handleDeleteRun() {
     if (deleting) return;
     const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run), displayTimeZone);
@@ -685,42 +639,6 @@ function RunDetail({
       setDeleting(false);
     }
   }
-
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/lap-time-sessions", { cache: "no-store" })
-      .then((r) => r.json().catch(() => null))
-      .then(
-        (data: {
-          sessions?: Array<{ id: string; createdAt: string; sessionCompletedAt?: string | null; parsedPayload: unknown }>;
-        } | null) => {
-        if (!alive || !data?.sessions) return;
-        const mapped: Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }> = [];
-        for (const s of data.sessions) {
-          const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
-          if (!parsed) continue;
-          const whenIso = resolveImportedSessionDisplayTimeIso({
-            sessionCompletedAt: s.sessionCompletedAt ?? null,
-            parsedPayload: s.parsedPayload,
-            createdAt: s.createdAt,
-          });
-          mapped.push({
-            id: s.id,
-            selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso),
-            laps: parsed.rows,
-            sortTimeIso: whenIso,
-          });
-        }
-        setLibraryLapSessions(mapped);
-      }
-      )
-      .catch(() => {
-        if (alive) setLibraryLapSessions([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   /** Compare / load-setup pickers only offer runs for this vehicle. */
   const pickerRunsSameCar = useMemo(() => {
@@ -784,11 +702,27 @@ function RunDetail({
     `/engineer?runId=${encodeURIComponent(run.id)}&compareRunId=${encodeURIComponent(previousRunOnCar.id)}`;
 
   return (
-    <CardPanel className="bg-muted/40 space-y-5 text-sm">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
-        <div className="min-w-0 space-y-3 xl:max-w-[min(100%,28rem)]">
-          <h3 className="ui-label-caps">Run details</h3>
-          <div className="flex flex-wrap gap-x-4 gap-y-3 max-md:gap-x-3">
+    <CardPanel className="bg-muted/40 space-y-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1" onClick={(e) => e.stopPropagation()}>
+        <div className="min-w-0 text-[11px] text-muted-foreground leading-snug">
+          <span className="text-foreground font-medium">{carDisplay}</span>
+          <span className="text-muted-foreground"> · </span>
+          <span>{trackDisplay}</span>
+        </div>
+        {allowRunMutations ? (
+          <Link
+            href={`/runs/${encodeURIComponent(run.id)}/edit`}
+            className={cn(buttonLinkClassName("primary"), "no-underline shrink-0 text-xs")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            Edit run
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-5">
+        <div className="min-w-0 space-y-2 xl:max-w-[min(100%,28rem)]">
+          <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3">
             <CompactField label="Date / time">
               <RelativeTime
                 iso={resolveRunDisplayInstant(run)}
@@ -815,9 +749,7 @@ function RunDetail({
           </div>
         </div>
 
-        <div className="min-w-0 flex-1 space-y-2 border-t border-border pt-4 xl:border-t-0 xl:border-l xl:border-border xl:pt-0 xl:pl-6">
-          <h3 className="ui-label-caps">Lap times</h3>
-
+        <div className="min-w-0 flex-1 space-y-2 border-t border-border pt-3 xl:border-t-0 xl:border-l xl:border-border xl:pt-0 xl:pl-5">
           <div className="space-y-2">
             <div className="space-y-1">
               <div className="ui-label-caps">You</div>
@@ -885,9 +817,7 @@ function RunDetail({
           </div>
 
           <div className="space-y-1">
-            <div className="ui-label-caps">
-              All laps ({laps.length})
-            </div>
+            <div className="ui-label-caps">All laps ({laps.length})</div>
             {laps.length > 0 ? (
               <ul className="font-mono text-[11px] grid grid-cols-[auto_1fr_auto] gap-x-2 gap-y-0.5 max-h-32 overflow-y-auto rounded border border-border bg-muted/60 px-2 py-1.5">
                 {(ownRows.length === laps.length ? ownRows : laps.map((t, i) => ({
@@ -950,53 +880,13 @@ function RunDetail({
             </details>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-border/60" onClick={(e) => e.stopPropagation()}>
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <p className="text-[11px] text-muted-foreground min-w-0 flex-1">{uploadedLapSetsLine}</p>
-              <div className="flex flex-wrap shrink-0 gap-2">
-                {allowRunMutations ? (
-                  <Link
-                    href={`/runs/${encodeURIComponent(run.id)}/edit`}
-                    className={cn(buttonLinkClassName("primary"), "no-underline")}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Edit run
-                  </Link>
-                ) : null}
-                <Button
-                  type="button"
-                  onClick={() => setShowLapAnalysis((v) => !v)}
-                  className="shrink-0"
-                >
-                  Analyse lap times
-                </Button>
-              </div>
-            </div>
-            {showLapAnalysis ? (
-              <div className="rounded-md border border-border bg-muted/60 p-3 space-y-3">
-                {importedLapsError ? (
-                  <p className="text-xs text-red-600 dark:text-red-400">{importedLapsError}</p>
-                ) : null}
-                {missingImportedLapRows && importedLapsLoading && !importedLapSetsFull ? (
-                  <p className="text-xs text-muted-foreground py-1">Loading imported lap sets…</p>
-                ) : (
-                  <>
-                    <div className="ui-label-caps">Column comparison</div>
-                    <LapComparisonColumnGrid
-                      myDisplayName={userDisplayName}
-                      run={runForLapCompare}
-                      currentRunId={run.id}
-                      otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
-                      compareAnchorRun={toCompareRunShape(run)}
-                      pickerRunsForModal={pickerRunsSameCar}
-                      runListSource={runListSource}
-                      librarySessions={libraryLapSessions}
-                    />
-                  </>
-                )}
-              </div>
-            ) : null}
-          </div>
+          <p
+            className="text-[11px] text-muted-foreground pt-2 border-t border-border/60"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {uploadedLapSetsLine} Use <span className="font-medium text-foreground">Lap times</span> on the row
+            above for column compare.
+          </p>
         </div>
       </div>
 
@@ -1010,7 +900,14 @@ function RunDetail({
           >
             vs previous on same car
           </Link>
-        ) : null}
+        ) : (
+          <Link
+            href={engineerThisRunHref}
+            className="inline-flex items-center rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+          >
+            Open this run in Engineer
+          </Link>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -1028,35 +925,11 @@ function RunDetail({
         />
       </div>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <Link
-            href={engineerVsPreviousHref ?? engineerThisRunHref}
-            className={cn(buttonLinkClassName("primary"), "no-underline")}
-            title="Open this run in the Engineer tab for full setup + lap analysis"
-          >
-            Analyse setup
-          </Link>
-          {allowRunMutations ? (
-            <button
-              type="button"
-              onClick={handleDeleteRun}
-              disabled={deleting}
-              className="ml-auto rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-[11px] font-medium text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
-              title="Permanently delete this run"
-            >
-              {deleting ? "Deleting…" : "Delete run"}
-            </button>
-          ) : null}
-        </div>
-        {deleteError ? (
-          <p className="text-[11px] text-destructive">{deleteError}</p>
-        ) : null}
+      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
         <div className="ui-label-caps">Setup vs previous run</div>
         {setupPreview.mode === "no_baseline" ? (
           <p className="text-muted-foreground text-xs">
-            No earlier run on this car to diff against. Open <span className="font-medium text-foreground">Analyse setup</span> for the
-            full sheet.
+            No earlier run on this car to diff against. Use the Engineer links above for the full sheet.
           </p>
         ) : setupPreview.rows.length === 0 ? (
           <p className="text-muted-foreground text-xs">No setup changes since your previous run on this car.</p>
@@ -1078,8 +951,21 @@ function RunDetail({
             ))}
           </div>
         )}
+        {allowRunMutations ? (
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleDeleteRun}
+              disabled={deleting}
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-[11px] font-medium text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
+              title="Permanently delete this run"
+            >
+              {deleting ? "Deleting…" : "Delete run"}
+            </button>
+          </div>
+        ) : null}
+        {deleteError ? <p className="text-[11px] text-destructive">{deleteError}</p> : null}
       </div>
-
     </CardPanel>
   );
 }

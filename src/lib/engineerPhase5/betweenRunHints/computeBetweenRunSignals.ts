@@ -34,11 +34,13 @@ function lowLapData(summary: EngineerRunSummaryV2): boolean {
  */
 export function computeBetweenRunSignals(
   summary: EngineerRunSummaryV2,
-  handlingAssessmentJson: unknown
+  handlingAssessmentJson: unknown,
+  opts?: { chronologicalTuningChangeCount?: number }
 ): BetweenRunHintSignal[] {
   const signals: BetweenRunHintSignal[] = [];
   if (lowLapData(summary)) signals.push("low_lap_data");
   if (summary.setupChanges.length > 0) signals.push("meaningful_setup_change");
+  else if ((opts?.chronologicalTuningChangeCount ?? 0) > 0) signals.push("meaningful_setup_change");
 
   if (lapSideRegressed(summary)) signals.push("lap_regressed");
   else if (lapSideImproved(summary)) signals.push("lap_improved");

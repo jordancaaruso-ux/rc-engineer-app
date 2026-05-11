@@ -81,6 +81,8 @@ type Props = {
   numericAggregationByKey?: ReadonlyMap<string, NumericAggregationCompareSlice> | null;
   /** Search + jump to field rows (edit flows). */
   enableFieldSearch?: boolean;
+  /** When set, only rows that touch at least one matching stable setup key are shown. */
+  fieldKeyFilter?: (key: string) => boolean;
   /**
    * Setup compare side-by-side: value column only uses A=blue / B=red tints; labels stay neutral.
    * Omit everywhere except the two Setup compare panels.
@@ -119,6 +121,29 @@ function collectFieldSearchEntries(sections: StructuredSection[]): { key: string
     }
   }
   return out;
+}
+
+function structuredRowKeys(row: StructuredRow): string[] {
+  if (row.type === "single") return [row.key];
+  if (row.type === "pair") return [row.leftKey, row.rightKey];
+  if (row.type === "corner4") return [row.ff, row.fr, row.rf, row.rr];
+  if (row.type === "top_deck_block") {
+    return ["top_deck_front", "top_deck_rear", "top_deck_cuts", "top_deck_single", "motor_mount_screws", "top_deck_screws"];
+  }
+  if (row.type === "screw_strip") return [row.key];
+  return [];
+}
+
+function filterSectionsByFieldKey(
+  sections: StructuredSection[],
+  fieldKeyFilter: (key: string) => boolean
+): StructuredSection[] {
+  return sections
+    .map((sec) => ({
+      ...sec,
+      rows: sec.rows.filter((row) => structuredRowKeys(row).some((k) => fieldKeyFilter(k))),
+    }))
+    .filter((sec) => sec.rows.length > 0);
 }
 
 function SetupFieldJumpSearch({
@@ -1745,12 +1770,16 @@ export function SetupSheetStructured({
   numericAggregationByKey = null,
   enableFieldSearch = false,
   compareValueColumnRole = null,
+  fieldKeyFilter,
 }: Props) {
   const baseline = baselineValue ?? null;
   const hasBaseline = baseline != null;
   const compareRole = compareValueColumnRole ?? undefined;
   const sheetRootRef = useRef<HTMLDivElement>(null);
-  const fieldSearchEntries = useMemo(() => collectFieldSearchEntries(sections), [sections]);
+  const sectionsFiltered = useMemo(() => {
+    return fieldKeyFilter ? filterSectionsByFieldKey(sections, fieldKeyFilter) : sections;
+  }, [sections, fieldKeyFilter]);
+  const fieldSearchEntries = useMemo(() => collectFieldSearchEntries(sectionsFiltered), [sectionsFiltered]);
 
   const commit = useCallback(
     (key: string, raw: SetupSnapshotValue) => {
@@ -1886,7 +1915,7 @@ export function SetupSheetStructured({
       {enableFieldSearch && !readOnly ? (
         <SetupFieldJumpSearch entries={fieldSearchEntries} rootRef={sheetRootRef} />
       ) : null}
-      {sections.map((sec) => (
+      {sectionsFiltered.map((sec) => (
         <SectionCard key={sec.id} title={sec.title} showFrontRearHeader={sectionHasPairs(sec.rows)}>
           {sec.rows.map((row) => renderRow(row))}
         </SectionCard>
