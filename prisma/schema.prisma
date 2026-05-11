@@ -42,6 +42,7 @@ model User {
   teammateLinksOwned TeammateLink[] @relation("TeammateLinksOwned")
   teammateLinksPeer  TeammateLink[] @relation("TeammateLinksPeer")
   engineerBetweenRunHints EngineerBetweenRunHint[]
+  engineerDashboardSuggestions EngineerDashboardSuggestion[]
 
   teamMemberships TeamMembership[]
   teamsCreated    Team[]           @relation("TeamsCreated")
@@ -695,6 +696,7 @@ model Run {
   practiceDayUrl String?
 
   betweenRunHint EngineerBetweenRunHint?
+  dashboardSuggestion EngineerDashboardSuggestion?
 
   @@index([userId, sortAt])
 }
@@ -715,6 +717,26 @@ model EngineerBetweenRunHint {
   /** SHA-256 of summary + handling inputs; must match for cache hit. */
   inputFingerprint String
   /** Versioned BetweenRunHintPayload JSON. */
+  payloadJson Json
+
+  @@index([userId, updatedAt])
+}
+
+/** Cached handling/setup-oriented suggestions for Dashboard “Engineer suggestions” tab. */
+model EngineerDashboardSuggestion {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  primaryRunId String @unique
+  primaryRun   Run    @relation(fields: [primaryRunId], references: [id], onDelete: Cascade)
+
+  /** SHA-256 of notes, handling, setup ids, prior run id, and slim spread fingerprint. */
+  inputFingerprint String
+  /** Versioned dashboard suggestion payload JSON. */
   payloadJson Json
 
   @@index([userId, updatedAt])

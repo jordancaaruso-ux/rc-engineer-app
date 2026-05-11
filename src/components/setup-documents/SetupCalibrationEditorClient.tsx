@@ -39,6 +39,11 @@ import {
   inferSectionAndDomainForNewCustomField,
 } from "@/lib/setupCalibrations/calibrationCustomFieldHints";
 import { SetupFieldDefinitionForm } from "@/components/setup-documents/SetupFieldDefinitionForm";
+import { SetupCalibrationQuickParamsPanel } from "@/components/setup-documents/SetupCalibrationQuickParamsPanel";
+import {
+  buildQuickCustomFieldDefinition,
+  type QuickCalibrationFieldKind,
+} from "@/lib/setupCalibrations/quickCalibrationField";
 import { TEMPLATE_PRIORITY_FIELD_KEYS } from "@/lib/setupCalibrations/priorityFieldKeys";
 import {
   getCalibrationFieldCategory,
@@ -614,6 +619,22 @@ export function SetupCalibrationEditorClient({
     const m = new Map<string, PdfFormFieldRow>();
     for (const row of pdfFormRows) m.set(row.name, row);
     return m;
+  }, [pdfFormRows]);
+
+  const acroSelectOptions = useMemo(() => {
+    const out: Array<{ value: string; label: string }> = [];
+    for (const row of pdfFormRows) {
+      const w = row.widgets?.length ?? 0;
+      const count = Math.max(1, w);
+      for (let i = 0; i < count; i++) {
+        const value = `${row.name}#${i}`;
+        out.push({
+          value,
+          label: `${row.name} #${i} (${row.type || "?"})`,
+        });
+      }
+    }
+    return out.sort((a, b) => a.label.localeCompare(b.label));
   }, [pdfFormRows]);
 
   /** Awesomatix + catalog: singleSelect chip flow vs visual multi vs legacy. */
@@ -1774,6 +1795,91 @@ export function SetupCalibrationEditorClient({
     setStatus("Created setup field and mapped.");
   }
 
+  function handleQuickAddField(input: {
+    displayLabel: string;
+    key: string;
+    kind: QuickCalibrationFieldKind;
+    optionLines: string;
+    sectionId: string;
+  }): { ok: true } | { ok: false; error: string } {
+    const reserved = reservedTemplateKeys();
+    const existing = new Set(customFieldDefinitions.map((c) => c.key));
+    const displayLabel = input.displayLabel.trim();
+    if (!displayLabel) return { ok: false, error: "Parameter label is required." };
+    const keyRaw = (input.key.trim() || suggestKeyFromPdfFieldName(displayLabel)).trim();
+    const err = validateCustomFieldKey(keyRaw, reserved, existing);
+    if (err) return { ok: false, error: err };
+
+    const optLines = input.optionLines.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (input.kind === "one_of_many" || input.kind === "many_of_many") {
+      if (optLines.length < 2) {
+        return { ok: false, error: "One-of-many and many-of-many need at least two option lines." };
+      }
+    }
+
+    const sectionOpt =
+      mergedSectionOptions.find((o) => o.id === input.sectionId) ??
+      CUSTOM_FIELD_SECTION_PRESETS.find((p) => p.id === input.sectionId) ??
+      CUSTOM_FIELD_SECTION_PRESETS[CUSTOM_FIELD_SECTION_PRESETS.length - 1]!;
+    const maxOrder = customFieldDefinitions.reduce((m, c) => Math.max(m, c.sortOrder), -1);
+
+    const def = buildQuickCustomFieldDefinition({
+      id: newId("cf"),
+      key: keyRaw,
+      displayLabel,
+      kind: input.kind,
+      optionLabels: optLines,
+      sectionId: sectionOpt.id,
+      sectionTitle: sectionOpt.title,
+      sortOrder: maxOrder + 1,
+    });
+
+    setCustomFieldDefinitions((prev) => [...prev, def]);
+    setActiveSetupFieldKey(def.key);
+    setCreateFieldError(null);
+
+    if (input.kind === "one_of_many" || input.kind === "many_of_many") {
+      const first = def.groupedOptions?.[0]?.optionValue ?? null;
+      setPendingGroupOption(first);
+      setTab("form");
+      setStatus(
+        "Quick field added. For each option, pick an Acro widget in the list below or use the Form tab (select the chip, then click the PDF)."
+      );
+    } else {
+      setPendingGroupOption(null);
+      setTab("form");
+      setStatus(
+        "Quick field added. Pick an Acro widget from the Quick panel dropdown or use the Form tab and click the PDF."
+      );
+    }
+    return { ok: true };
+  }
+
+  function quickAssignGroupOption(
+    canonicalKey: string,
+    optionValue: string,
+    pdfFieldName: string,
+    instanceIndex: number
+  ) {
+    const row = pdfRowByName.get(pdfFieldName);
+    const cross = filterCrossFieldConflicts(
+      listPdfWidgetOwnershipDetails(formFieldMappings, pdfFieldName, instanceIndex, row),
+      canonicalKey
+    );
+    if (cross.length > 0) {
+      setPdfMappingConflict({
+        kind: "groupChip",
+        pdfFieldName,
+        instanceIndex,
+        optionValue,
+        targetCanonicalKey: canonicalKey,
+        conflicts: cross,
+      });
+      return;
+    }
+    assignGroupPdfWidgetApply(canonicalKey, pdfFieldName, instanceIndex, optionValue);
+  }
+
   function assignGroupPdfWidget(pdfFieldName: string, instanceIndex: number, optionValue: string) {
     if (!activeSetupFieldKey) return;
     const targetCanonicalKey = activeSetupFieldKey;
@@ -2356,6 +2462,17 @@ export function SetupCalibrationEditorClient({
 
   return (
     <section className="page-body space-y-3">
+      <SetupCalibrationQuickParamsPanel
+        pdfFormRowsCount={pdfFormRows.length}
+        acroSelectOptions={acroSelectOptions}
+        customFieldDefinitions={customFieldDefinitions}
+        formFieldMappings={formFieldMappings}
+        onQuickAdd={handleQuickAddField}
+        onAssignSimple={(canonicalKey, pdfFieldName, instanceIndex) => {
+          applyWidgetToCanonicalKey(canonicalKey, pdfFieldName, instanceIndex);
+        }}
+        onAssignGroupOption={quickAssignGroupOption}
+      />
       <div className="rounded-lg border border-border bg-card p-3">
         <div className="ui-title text-xs text-muted-foreground">Calibration mapping profile</div>
         <p className="mt-1 text-[11px] text-muted-foreground">

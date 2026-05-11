@@ -263,6 +263,8 @@ export type DashboardHomeModel = {
     createdAt: string;
     sessionCompletedAt: string | null;
     loggingCompletedAt: string | null;
+    /** True when the user finished the logging workflow (may be true while loggingCompletedAt is null on legacy rows). */
+    loggingComplete: boolean;
     carName: string;
     trackName: string | null;
     eventName: string | null;
@@ -281,6 +283,7 @@ const recentRunSelect = {
   createdAt: true,
   sessionCompletedAt: true,
   loggingCompletedAt: true,
+  loggingComplete: true,
   sortAt: true,
   lapTimes: true,
   lapSession: true,
@@ -587,6 +590,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       loggingCompletedAt: recentRun.loggingCompletedAt
         ? recentRun.loggingCompletedAt.toISOString()
         : null,
+      loggingComplete: recentRun.loggingComplete,
       carName: recentRun.car?.name ?? "—",
       trackName: recentRun.track?.name ?? null,
       eventName: recentRun.event?.name ?? null,

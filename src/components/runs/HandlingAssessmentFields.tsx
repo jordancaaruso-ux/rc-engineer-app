@@ -1,14 +1,25 @@
 "use client";
 
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
-  HANDLING_TRAIT_LABELS,
-  HANDLING_TRAIT_TAG_IDS,
+  buildPrimaryFocusOptions,
+  DRIVE_DIFFICULTY_LABELS,
+  DRIVE_DIFFICULTY_PRESETS,
+  DOES_WELL_IDS,
+  DOES_WELL_LABELS,
+  GENERAL_FEEL_LABELS,
+  GENERAL_FEEL_PRESETS,
   type CornerPhase,
   type FeelVsLastRun,
   type HandlingAssessmentUiState,
   type PhaseBalance,
-  type HandlingTraitTagId,
+  type PrimaryFocus,
+  sanitizeHandlingUiState,
+  SINGLE_TRAIT_IDS,
+  SINGLE_TRAIT_LABELS,
+  STEERING_FEEL_LABELS,
+  STEERING_FEEL_PRESETS,
 } from "@/lib/runHandlingAssessment";
 import { HandlingCornerAnimation } from "@/components/runs/HandlingCornerAnimation";
 
@@ -26,9 +37,13 @@ const PHASE_BALANCE_LEVELS: PhaseBalance[] = [-3, -2, -1, 0, 1, 2, 3];
 
 const FEEL_VS_LAST_RUN_LEVELS: FeelVsLastRun[] = [-3, -2, -1, 0, 1, 2, 3];
 
-function toggleTrait(tags: HandlingTraitTagId[], id: HandlingTraitTagId): HandlingTraitTagId[] {
-  if (tags.includes(id)) return tags.filter((t) => t !== id);
-  return [...tags, id];
+function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
+  return sanitizeHandlingUiState(next);
+}
+
+function toggleInList<T extends string>(list: T[], id: T): T[] {
+  if (list.includes(id)) return list.filter((t) => t !== id);
+  return [...list, id];
 }
 
 function phaseBalanceChipClass(n: PhaseBalance, current: PhaseBalance | null): string {
@@ -54,6 +69,22 @@ function feelVsLastRunButtonClass(n: FeelVsLastRun, current: FeelVsLastRun | nul
   return phaseBalanceChipClass(n, current);
 }
 
+function presetToggleClass(on: boolean): string {
+  return cn(
+    "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
+    on
+      ? "border-accent bg-accent/15 text-foreground"
+      : "border-border bg-card text-muted-foreground hover:text-foreground"
+  );
+}
+
+function primaryFocusSelectValue(ui: HandlingAssessmentUiState): string {
+  if (!ui.primaryFocus) return "";
+  const id = JSON.stringify(ui.primaryFocus);
+  const opts = buildPrimaryFocusOptions(ui);
+  return opts.some((o) => o.id === id) ? id : "";
+}
+
 type Props = {
   value: HandlingAssessmentUiState;
   onChange: (next: HandlingAssessmentUiState) => void;
@@ -61,12 +92,19 @@ type Props = {
 };
 
 export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligible = false }: Props) {
+  const primaryFocusOptions = useMemo(() => buildPrimaryFocusOptions(value), [value]);
+  const primaryFocusValue = primaryFocusSelectValue(value);
+
+  function emit(next: HandlingAssessmentUiState) {
+    onChange(patch(next));
+  }
+
   function setPhaseBalance(
     stateKey: "balanceEntry" | "balanceMid" | "balanceExit",
     n: PhaseBalance
   ) {
     const cur = value[stateKey];
-    onChange({
+    emit({
       ...value,
       [stateKey]: cur === n ? null : n,
     });
@@ -88,7 +126,7 @@ export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligibl
                 aria-pressed={value.feelVsLastRun === n}
                 className={feelVsLastRunButtonClass(n, value.feelVsLastRun)}
                 onClick={() =>
-                  onChange({
+                  emit({
                     ...value,
                     feelVsLastRun: value.feelVsLastRun === n ? null : n,
                   })
@@ -148,25 +186,111 @@ export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligibl
       </div>
 
       <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">Quick traits</div>
+        <div className="text-xs font-medium text-muted-foreground">Steering feel</div>
         <div className="flex flex-wrap gap-2">
-          {HANDLING_TRAIT_TAG_IDS.map((id) => {
-            const on = value.traitTags.includes(id);
+          {STEERING_FEEL_PRESETS.map((id) => {
+            const on = value.steeringFeel === id;
             return (
               <button
                 key={id}
                 type="button"
-                className={cn(
-                  "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
-                  on
-                    ? "border-accent bg-accent/15 text-foreground"
-                    : "border-border bg-card text-muted-foreground hover:text-foreground"
-                )}
+                className={presetToggleClass(on)}
                 onClick={() =>
-                  onChange({ ...value, traitTags: toggleTrait(value.traitTags, id) })
+                  emit({
+                    ...value,
+                    steeringFeel: value.steeringFeel === id ? null : id,
+                  })
                 }
               >
-                {HANDLING_TRAIT_LABELS[id]}
+                {STEERING_FEEL_LABELS[id]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-muted-foreground">General feel</div>
+        <div className="flex flex-wrap gap-2">
+          {GENERAL_FEEL_PRESETS.map((id) => {
+            const on = value.generalFeel === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={presetToggleClass(on)}
+                onClick={() =>
+                  emit({
+                    ...value,
+                    generalFeel: value.generalFeel === id ? null : id,
+                  })
+                }
+              >
+                {GENERAL_FEEL_LABELS[id]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-muted-foreground">Difficulty to drive</div>
+        <div className="flex flex-wrap gap-2">
+          {DRIVE_DIFFICULTY_PRESETS.map((id) => {
+            const on = value.driveDifficulty === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={presetToggleClass(on)}
+                onClick={() =>
+                  emit({
+                    ...value,
+                    driveDifficulty: value.driveDifficulty === id ? null : id,
+                  })
+                }
+              >
+                {DRIVE_DIFFICULTY_LABELS[id]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-muted-foreground">Single traits</div>
+        <div className="flex flex-wrap gap-2">
+          {SINGLE_TRAIT_IDS.map((id) => {
+            const on = value.singleTraits.includes(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                className={presetToggleClass(on)}
+                onClick={() =>
+                  emit({ ...value, singleTraits: toggleInList(value.singleTraits, id) })
+                }
+              >
+                {SINGLE_TRAIT_LABELS[id]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-muted-foreground">What the car does well</div>
+        <div className="flex flex-wrap gap-2">
+          {DOES_WELL_IDS.map((id) => {
+            const on = value.doesWell.includes(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                className={presetToggleClass(on)}
+                onClick={() => emit({ ...value, doesWell: toggleInList(value.doesWell, id) })}
+              >
+                {DOES_WELL_LABELS[id]}
               </button>
             );
           })}
@@ -174,43 +298,39 @@ export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligibl
       </div>
 
       <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground" htmlFor="handling-traits-other">
-          Other traits
+        <label className="text-xs font-medium text-muted-foreground" htmlFor="handling-primary-focus">
+          Primary focus (main problem or priority)
         </label>
-        <input
-          id="handling-traits-other"
-          className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-          placeholder="Short free text (e.g. snaps on power)…"
-          value={value.traitsOther}
-          onChange={(e) => onChange({ ...value, traitsOther: e.target.value })}
-        />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="handling-main-problem">
-            Main problem to solve
-          </label>
-          <input
-            id="handling-main-problem"
-            className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-            placeholder="Optional"
-            value={value.mainProblem}
-            onChange={(e) => onChange({ ...value, mainProblem: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="handling-car-well">
-            What the car does well
-          </label>
-          <input
-            id="handling-car-well"
-            className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-            placeholder="Optional"
-            value={value.carDoesWell}
-            onChange={(e) => onChange({ ...value, carDoesWell: e.target.value })}
-          />
-        </div>
+        <select
+          id="handling-primary-focus"
+          className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none disabled:opacity-60"
+          disabled={primaryFocusOptions.length === 0}
+          value={primaryFocusValue}
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (!raw) {
+              emit({ ...value, primaryFocus: null });
+              return;
+            }
+            try {
+              const parsed = JSON.parse(raw) as PrimaryFocus;
+              emit({ ...value, primaryFocus: parsed });
+            } catch {
+              emit({ ...value, primaryFocus: null });
+            }
+          }}
+        >
+          <option value="">
+            {primaryFocusOptions.length === 0
+              ? "Select other options first"
+              : "None selected"}
+          </option>
+          {primaryFocusOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

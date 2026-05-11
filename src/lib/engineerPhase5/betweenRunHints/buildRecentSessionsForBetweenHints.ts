@@ -11,7 +11,15 @@ import type {
 import { paceVsFieldSummaryFromEngineerSummary } from "@/lib/engineerPhase5/betweenRunHints/paceVsFieldSummary";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { parseHandlingAssessmentJson, HANDLING_TRAIT_LABELS } from "@/lib/runHandlingAssessment";
+import {
+  DRIVE_DIFFICULTY_LABELS,
+  DOES_WELL_LABELS,
+  formatPrimaryFocusLine,
+  GENERAL_FEEL_LABELS,
+  parseHandlingAssessmentJson,
+  SINGLE_TRAIT_LABELS,
+  STEERING_FEEL_LABELS,
+} from "@/lib/runHandlingAssessment";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
@@ -59,18 +67,30 @@ function handlingPreviewFromRun(
   const hp = handlingProblems?.trim();
   if (hp) bits.push(hp);
   const p = parseHandlingAssessmentJson(handlingAssessmentJson);
-  if (p?.mainProblem?.trim()) bits.push(`Focus: ${p.mainProblem.trim()}`);
-  if (p?.traitTags?.length) {
-    bits.push(
-      p.traitTags
-        .map((t) => HANDLING_TRAIT_LABELS[t] ?? t)
-        .join(", ")
-    );
+  if (p?.primaryFocus) {
+    const line = formatPrimaryFocusLine(p.primaryFocus).trim();
+    if (line) bits.push(line);
   }
-  if (p?.traitsOther?.trim()) bits.push(p.traitsOther.trim());
+  if (p?.steeringFeel) bits.push(`Steering: ${STEERING_FEEL_LABELS[p.steeringFeel]}`);
+  if (p?.generalFeel) bits.push(`Feel: ${GENERAL_FEEL_LABELS[p.generalFeel]}`);
+  if (p?.driveDifficulty) bits.push(`Drive: ${DRIVE_DIFFICULTY_LABELS[p.driveDifficulty]}`);
+  if (p?.singleTraits?.length) {
+    bits.push(p.singleTraits.map((t) => SINGLE_TRAIT_LABELS[t] ?? t).join(", "));
+  }
+  if (p?.doesWell?.length) {
+    bits.push(`Strengths: ${p.doesWell.map((t) => DOES_WELL_LABELS[t] ?? t).join(", ")}`);
+  }
   if (p?.feelVsLastRun != null && typeof p.feelVsLastRun === "number") {
     const f = p.feelVsLastRun;
     if (f !== 0) bits.push(`Feel vs prior: ${f > 0 ? "+" : ""}${f}`);
+  }
+  const b = p?.balanceByPhase;
+  if (b && (b.entry != null || b.mid != null || b.exit != null)) {
+    const parts: string[] = [];
+    if (b.entry != null) parts.push(`E ${b.entry > 0 ? "+" : ""}${b.entry}`);
+    if (b.mid != null) parts.push(`M ${b.mid > 0 ? "+" : ""}${b.mid}`);
+    if (b.exit != null) parts.push(`X ${b.exit > 0 ? "+" : ""}${b.exit}`);
+    if (parts.length) bits.push(`Balance ${parts.join(" · ")}`);
   }
   if (!bits.length) return null;
   return clampText(bits.join(" · "), 320);

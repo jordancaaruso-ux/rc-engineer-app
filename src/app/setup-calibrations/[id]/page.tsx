@@ -44,7 +44,9 @@ export default async function SetupCalibrationDetailPage({
         <div>
           <h1 className="page-title">Edit calibration</h1>
           <p className="page-subtitle">
-            Calibration is the source of truth for PDF-to-setup mapping. Select AcroForm fields first, then map to calibration fields.
+            Calibration is the source of truth for PDF-to-setup mapping. Use{" "}
+            <span className="text-foreground">Quick add parameters</span> for a simple name → type → Acro widget flow,
+            or the Form tab for full control.
           </p>
         </div>
       </header>
