@@ -70,6 +70,7 @@ export type BetweenRunRecentSessionSnapshotV1 = {
   paceVsFieldSummary: string | null;
   /** Structured pace vs session field average; absent on older cached hint payloads. */
   paceVsFieldMetrics?: PaceVsFieldMetricSnapshotV1[] | null;
+  /** Tuning diffs: vs the next older run in this strip when present; else Engineer pairwise vs referenceRun. */
   setupChangesFromPrevious: string[];
   notesPreview: string | null;
   handlingPreview: string | null;

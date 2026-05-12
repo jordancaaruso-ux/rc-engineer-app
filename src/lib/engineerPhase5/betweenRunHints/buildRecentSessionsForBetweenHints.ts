@@ -152,6 +152,32 @@ function chronologicalTuningChangeLines(currentData: unknown, previousData: unkn
   return lines;
 }
 
+/**
+ * Setup diff for a **newer** run vs the **next older** run in the recent-session strip (same car,
+ * consecutive chrono rows). Matches user expectation for same-day cards; not Engineer referenceRun.
+ */
+function chronoStripSetupDisplayAndSig(
+  newer: { setupSnapshot?: { data: unknown } | null },
+  older: { setupSnapshot?: { data: unknown } | null }
+): { lines: string[]; setupSig: string[] } {
+  const rows = buildSetupDiffRows(
+    normalizeSetupData(newer.setupSnapshot?.data),
+    normalizeSetupData(older.setupSnapshot?.data)
+  );
+  const lines: string[] = [];
+  const setupSig: string[] = [];
+  for (const r of rows) {
+    if (!r.changed) continue;
+    if (!isTuningComparisonKey(r.key)) continue;
+    const before = r.previous?.trim() ? r.previous : "—";
+    const after = r.current?.trim() ? r.current : "—";
+    lines.push(`${r.label}: ${before} → ${after}${r.unit ? ` ${r.unit}` : ""}`.trim());
+    setupSig.push(`${r.key}:${before}>${after}`);
+    if (lines.length >= 24) break;
+  }
+  return { lines, setupSig };
+}
+
 /** Same ordering as run lists / Compare — not Engineer pairwise reference links. */
 const CHRONO_RECENT_SESSIONS_TAKE = 300;
 
@@ -219,8 +245,10 @@ export async function buildRecentSessionsForBetweenHints(params: {
   const recentSessions: BetweenRunRecentSessionSnapshotV1[] = [];
   const fpPerRun: RecentSessionsFingerprintMaterial["perRun"] = [];
 
-  for (const { runId, summary } of summaries) {
+  for (let i = 0; i < summaries.length; i++) {
+    const { runId, summary } = summaries[i]!;
     const meta = metaById.get(runId);
+    const olderMeta = i + 1 < summaries.length ? metaById.get(summaries[i + 1]!.runId) : undefined;
     const label = meta ? runDisplayLabel(meta) : runId;
     const pace = summary ? paceVsFieldSummaryFromEngineerSummary(summary) : null;
     const paceMetrics = summary?.importedSessionFieldStats?.paceVsFieldMeanAnalysis ?? null;
@@ -233,8 +261,18 @@ export async function buildRecentSessionsForBetweenHints(params: {
             )
             .join("|")
         : null;
-    const setupLines =
-      summary?.setupChanges.map((c) => `${c.label}: ${c.before} → ${c.after}`) ?? [];
+
+    let setupLines: string[];
+    let setupSig: string[];
+    if (meta && olderMeta) {
+      const ch = chronoStripSetupDisplayAndSig(meta, olderMeta);
+      setupLines = ch.lines;
+      setupSig = ch.setupSig;
+    } else {
+      setupLines = summary?.setupChanges.map((c) => `${c.label}: ${c.before} → ${c.after}`) ?? [];
+      setupSig = (summary?.setupChanges ?? []).map((c) => `${c.key}:${c.before}>${c.after}`);
+    }
+
     const bestFlag = summary?.lapOutcome.best.flag ?? null;
     const hasRef = Boolean(summary?.referenceRunId);
     const lo = summary?.lapOutcome;
@@ -265,7 +303,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
       runId,
       fieldFingerprint: summary?.fieldFingerprint ?? "",
       bestFlag,
-      setupSig: (summary?.setupChanges ?? []).map((c) => `${c.key}:${c.before}>${c.after}`),
+      setupSig,
       paceLine: pace,
       paceMetricsSig,
       lapMultiSig,
