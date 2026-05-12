@@ -1,6 +1,23 @@
 /** Payload stored in `EngineerBetweenRunHint.payloadJson` and returned to clients. */
 
+import type { HintBaselineProvenance } from "@/lib/engineerPhase5/betweenRunHints/pickHintContextReferenceRun";
 import type { EngineerLapMetricFlag, PaceVsFieldMetricSnapshotV1 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+
+export type BetweenRunCoachingMode =
+  | "low_data"
+  | "maintain_or_refine"
+  | "tune_setup"
+  | "tune_feel"
+  | "field_context"
+  | "mixed";
+
+export type HintSessionBriefV1 = {
+  coachingMode: BetweenRunCoachingMode;
+  /** Deterministic intent lines for the LLM (not shown verbatim to users). */
+  intentLines: string[];
+  /** Optional structured pace-vs-field notes when imported timing supports it. */
+  optionalFieldCommentary: string[];
+};
 
 export type BetweenRunHintSignal =
   | "lap_regressed"
@@ -82,6 +99,12 @@ export type BetweenRunHintPayloadV2 = {
     } | null;
     /** Primary vs chronological previous run tuning diff (when Engineer pairwise ref is absent). */
     chronologicalSetupChangeLines?: string[];
+    /** How the hint pairwise reference was chosen vs calendar/event/chrono/engineer default. */
+    baselineProvenance?: HintBaselineProvenance | null;
+    suggestedChangesPreview?: string | null;
+    suggestedPreRunPreview?: string | null;
+    tireContextLine?: string | null;
+    hintSessionBrief?: HintSessionBriefV1 | null;
   };
 };
 
@@ -108,5 +131,10 @@ export type RecentSessionsFingerprintMaterial = {
     bestPaceRunId: string | null;
     bestPaceLinesSig: string;
     chronologicalChangeCount: number;
+    hintReferenceRunId?: string | null;
+    hintSelectionReason?: string | null;
+    hintBaselineAgeBucket?: string | null;
+    engineerReferenceRunId?: string | null;
+    hintDiffersFromEngineer?: boolean;
   };
 };

@@ -3,11 +3,13 @@ import "server-only";
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import type {
+  BetweenRunCoachingMode,
   BetweenRunHintPayloadV2,
   BetweenRunHintScopeV1,
   BetweenRunHintSignal,
   BetweenRunRecentSessionSnapshotV1,
 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
+import type { HintBaselineProvenance } from "@/lib/engineerPhase5/betweenRunHints/pickHintContextReferenceRun";
 import type { VehicleDynamicsKbSnippet } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
 
@@ -71,6 +73,8 @@ function buildFallbackCopy(params: {
   summary: EngineerRunSummaryV2;
   signals: BetweenRunHintSignal[];
   chronologicalSetupChangeLines?: string[] | null;
+  coachingMode?: BetweenRunCoachingMode | null;
+  baselineProvenance?: HintBaselineProvenance | null;
 }): LlmShape {
   const interp = params.summary.interpretation.trim();
   const bullets: string[] = [];
@@ -101,8 +105,16 @@ function buildFallbackCopy(params: {
       "If the car felt worse after those adjustments, consider walking back the largest setup move for the next outing and change one item at a time.";
   }
   let headline = params.signals.includes("lap_regressed")
-    ? "Pace dropped vs your previous session on this car."
-    : "Review last session vs prior before stacking more changes.";
+    ? "Pace dropped vs your pairwise baseline on this car."
+    : "Review last session vs baseline before stacking more changes.";
+  if (params.coachingMode === "low_data") {
+    headline = "Lap data is thin — prioritize tires, track rhythm, and slower setup churn.";
+  } else if (params.coachingMode === "maintain_or_refine" && !params.signals.includes("lap_regressed")) {
+    headline = "Good momentum — consolidate before stacking more tuning.";
+  }
+  if (params.baselineProvenance?.baselineAgeBucket === "older" && params.signals.includes("lap_regressed")) {
+    headline = "Pace slipped vs an earlier baseline — verify tires and retest one change at a time.";
+  }
   if (interp) {
     const firstSentence = interp.split(/(?<=[.!?])\s+/)[0]?.trim();
     if (firstSentence && firstSentence.length <= 140) headline = `Next: ${firstSentence}`;
@@ -124,6 +136,12 @@ async function callLlmBetweenRunHints(params: {
   recentSessions: BetweenRunRecentSessionSnapshotV1[];
   driverContextPack: DriverContextForHints;
 }): Promise<LlmShape | null> {
+  const brief = params.driverContextPack.hintSessionBrief;
+  const coaching = brief?.coachingMode ?? "mixed";
+  const intentBlock =
+    brief?.intentLines?.length && brief.intentLines.length > 0
+      ? `\nCoaching mode: ${coaching}. Session intents (machine guidance — do not paste verbatim):\n- ${brief.intentLines.slice(0, 14).join("\n- ")}`
+      : `\nCoaching mode: ${coaching}.`;
   const apiKey = getOpenAiApiKey();
   if (!apiKey) return null;
 
@@ -160,9 +178,18 @@ async function callLlmBetweenRunHints(params: {
     previousRunHandling: params.driverContextPack.previousRunHandling ?? null,
     bestPaceBaseline: params.driverContextPack.bestPaceBaseline ?? null,
     chronologicalSetupChangeLines: (params.driverContextPack.chronologicalSetupChangeLines ?? []).slice(0, 20),
-  }).slice(0, 4000);
+    baselineProvenance: params.driverContextPack.baselineProvenance ?? null,
+    suggestedChangesPreview: params.driverContextPack.suggestedChangesPreview ?? null,
+    suggestedPreRunPreview: params.driverContextPack.suggestedPreRunPreview ?? null,
+    tireContextLine: params.driverContextPack.tireContextLine ?? null,
+    hintSessionBrief: params.driverContextPack.hintSessionBrief ?? null,
+  }).slice(0, 5200);
 
   const system = `You are an RC touring car engineer assistant. Output ONLY valid JSON (no markdown).
+${intentBlock}
+When coaching mode is low_data, keep setup prescriptions conservative and emphasize verification, tires, and track context.
+When coaching mode is maintain_or_refine, prefer consolidation and hygiene checks over new tuning experiments.
+When coaching mode is tune_setup or tune_feel, still obey one-change-at-a-time discipline.
 The JSON object must have exactly these keys:
 - "headline": string, under 120 chars, actionable setup guidance (not generic motivation)
 - "bullets": array of 2 to 4 short strings (each under 220 chars), concrete suggestions or test plans
@@ -221,16 +248,33 @@ function buildScopeLine(scope: BetweenRunHintScopeV1): string {
 function buildSourcesNote(params: {
   scope: BetweenRunHintScopeV1;
   referenceLabel: string | null;
-  hasEngineerReference: boolean;
+  hasPairwiseReference: boolean;
   hasChronologicalDiff: boolean;
+  baselineProvenance: HintBaselineProvenance | null;
 }): string {
   const scopeBits = [params.scope.carLabel];
   if (params.scope.trackLabel) scopeBits.push(params.scope.trackLabel);
   if (params.scope.eventLabel) scopeBits.push(params.scope.eventLabel);
   const ctx = scopeBits.join(" · ");
-  if (params.hasEngineerReference) {
-    const ref = params.referenceLabel?.trim() || "previous session on this car";
-    return `Based on your latest run versus ${ref}. Context: ${ctx}.`;
+  let ageHint = "";
+  if (params.baselineProvenance) {
+    if (params.baselineProvenance.baselineAgeBucket === "older") {
+      ageHint = " Baseline is from an earlier outing—not necessarily your last session on this car.";
+    } else if (params.baselineProvenance.baselineAgeBucket === "this_month") {
+      ageHint = " Baseline is within the last few weeks.";
+    }
+  }
+  if (params.hasPairwiseReference) {
+    const ref = params.referenceLabel?.trim() || "your selected baseline session";
+    let out = `Based on your latest run versus ${ref}.${ageHint} Context: ${ctx}.`;
+    const mismatch =
+      params.baselineProvenance?.engineerReferenceRunId &&
+      params.baselineProvenance.engineerReferenceRunId !== params.baselineProvenance.hintReferenceRunId;
+    if (mismatch) {
+      out +=
+        " The default Engineer pairwise compare for this run may use a different reference than these hints—open Engineer for the exact diff.";
+    }
+    return out;
   }
   if (params.hasChronologicalDiff) {
     return `Based on your latest run on this car (no Engineer pairwise reference yet) with tuning changes versus your immediate prior run on this car. Context: ${ctx}.`;
@@ -266,7 +310,13 @@ export async function assembleBetweenRunHintPayload(params: {
     recentSessions: params.recentSessions,
     driverContextPack: params.driverContextPack,
   });
-  const fb = buildFallbackCopy({ summary: params.summary, signals: params.signals });
+  const fb = buildFallbackCopy({
+    summary: params.summary,
+    signals: params.signals,
+    chronologicalSetupChangeLines: params.driverContextPack.chronologicalSetupChangeLines,
+    coachingMode: params.driverContextPack.hintSessionBrief?.coachingMode,
+    baselineProvenance: params.driverContextPack.baselineProvenance ?? null,
+  });
   const llm = fromLlm ?? fb;
 
   const interp = params.summary.interpretation.trim();
@@ -274,8 +324,8 @@ export async function assembleBetweenRunHintPayload(params: {
     typeof llm.headline === "string" && llm.headline.trim()
       ? llm.headline.trim().slice(0, 200)
       : params.signals.includes("lap_regressed")
-        ? "Pace dropped vs your previous session on this car."
-        : "Review last session vs prior before stacking more changes.";
+        ? "Pace dropped vs your pairwise baseline on this car."
+        : "Review last session vs baseline before stacking more changes.";
   if (interp && (!fromLlm || !fromLlm.headline?.trim())) {
     const firstSentence = interp.split(/(?<=[.!?])\s+/)[0]?.trim();
     if (firstSentence && firstSentence.length <= 140) headline = firstSentence;
@@ -304,8 +354,9 @@ export async function assembleBetweenRunHintPayload(params: {
     sourcesNote: buildSourcesNote({
       scope: params.scope,
       referenceLabel: params.referenceLabel,
-      hasEngineerReference: params.summary.referenceRunId != null,
+      hasPairwiseReference: params.summary.referenceRunId != null,
       hasChronologicalDiff: (params.driverContextPack.chronologicalSetupChangeLines?.length ?? 0) > 0,
+      baselineProvenance: params.driverContextPack.baselineProvenance ?? null,
     }),
     engineerHref,
     recentSessions: params.recentSessions,

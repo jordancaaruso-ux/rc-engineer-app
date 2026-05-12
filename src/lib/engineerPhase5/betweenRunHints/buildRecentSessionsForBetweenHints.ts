@@ -178,10 +178,19 @@ async function loadReferenceChainRunIds(userId: string, primaryRunId: string, ma
 export async function buildRecentSessionsForBetweenHints(params: {
   userId: string;
   primaryRunId: string;
+  /** When set, merged into fingerprint `contextExtras` so hint cache invalidates on hint-baseline policy inputs. */
+  hintFingerprintExtras?: {
+    hintReferenceRunId: string;
+    hintSelectionReason: string;
+    hintBaselineAgeBucket: string;
+    engineerReferenceRunId: string | null;
+    hintDiffersFromEngineer: boolean;
+  } | null;
 }): Promise<{
   recentSessions: BetweenRunRecentSessionSnapshotV1[];
   fingerprintMaterial: RecentSessionsFingerprintMaterial;
   driverContextPack: BetweenRunHintPayloadV2["driverContextPack"];
+  chronoPreviousTireMeta: { tireSetId: string | null; tireRunNumber: number } | null;
 }> {
   const runIds = await loadReferenceChainRunIds(params.userId, params.primaryRunId, 3);
 
@@ -270,6 +279,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
 
   let previousRunHandling: string | null = null;
   let chronologicalSetupChangeLines: string[] = [];
+  let chronoPreviousTireMeta: { tireSetId: string | null; tireRunNumber: number } | null = null;
   let bestPaceBaseline: {
     runId: string;
     displayLabel: string;
@@ -287,6 +297,10 @@ export async function buildRecentSessionsForBetweenHints(params: {
     const idx = carRuns.findIndex((r) => r.id === params.primaryRunId);
     const chronologicalPrevious = idx >= 0 && idx < carRuns.length - 1 ? carRuns[idx + 1]! : null;
     if (chronologicalPrevious) {
+      chronoPreviousTireMeta = {
+        tireSetId: chronologicalPrevious.tireSetId,
+        tireRunNumber: chronologicalPrevious.tireRunNumber,
+      };
       previousRunHandling = handlingPreviewFromRun(
         chronologicalPrevious.handlingProblems,
         chronologicalPrevious.handlingAssessmentJson
@@ -321,6 +335,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
   }
 
   const bestPaceLinesSig = bestPaceBaseline?.setupLines.join("|") ?? "";
+  const hintX = params.hintFingerprintExtras;
   const fingerprintMaterial: RecentSessionsFingerprintMaterial = {
     runIds,
     perRun: fpPerRun,
@@ -329,6 +344,15 @@ export async function buildRecentSessionsForBetweenHints(params: {
       bestPaceRunId: bestPaceBaseline?.runId ?? null,
       bestPaceLinesSig,
       chronologicalChangeCount: chronologicalSetupChangeLines.length,
+      ...(hintX
+        ? {
+            hintReferenceRunId: hintX.hintReferenceRunId,
+            hintSelectionReason: hintX.hintSelectionReason,
+            hintBaselineAgeBucket: hintX.hintBaselineAgeBucket,
+            engineerReferenceRunId: hintX.engineerReferenceRunId,
+            hintDiffersFromEngineer: hintX.hintDiffersFromEngineer,
+          }
+        : {}),
     },
   };
 
@@ -346,5 +370,6 @@ export async function buildRecentSessionsForBetweenHints(params: {
     recentSessions,
     fingerprintMaterial,
     driverContextPack,
+    chronoPreviousTireMeta,
   };
 }

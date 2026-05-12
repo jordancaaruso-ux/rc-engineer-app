@@ -63,6 +63,21 @@ test("fingerprint stable for identical inputs", () => {
   assert.equal(a, b);
 });
 
+test("fingerprint splits when engineer summary reference differs for same pairwise summary", () => {
+  const s = baseSummary();
+  const a = buildBetweenRunHintFingerprint({
+    summary: s,
+    handlingAssessmentJson: null,
+    engineerSummaryReferenceRunId: "eng-a",
+  });
+  const b = buildBetweenRunHintFingerprint({
+    summary: s,
+    handlingAssessmentJson: null,
+    engineerSummaryReferenceRunId: "eng-b",
+  });
+  assert.notEqual(a, b);
+});
+
 test("signals: regression + setup + feel", () => {
   const s = baseSummary();
   const sig = computeBetweenRunSignals(s, { version: 3, feelVsLastRun: -1 });

@@ -22,6 +22,11 @@ export function buildBetweenRunHintFingerprint(params: {
   handlingAssessmentJson: unknown;
   /** When omitted, fingerprint matches legacy hints (pre multi-run panel). */
   recentSessionsMaterial?: RecentSessionsFingerprintMaterial | null;
+  /**
+   * Engineer’s persisted/default compare run for this primary (from `getOrComputeEngineerSummaryForRun`).
+   * When hints use a different pairwise `summary`, include this so cache keys stay distinct.
+   */
+  engineerSummaryReferenceRunId?: string | null;
 }): string {
   const sc = params.summary.setupChanges.map((r) => ({
     k: r.key,
@@ -29,8 +34,9 @@ export function buildBetweenRunHintFingerprint(params: {
     after: r.after,
   }));
   const payload = {
-    v: 3 as const,
+    v: 4 as const,
     refId: params.summary.referenceRunId,
+    engineerRefId: params.engineerSummaryReferenceRunId ?? null,
     fieldFp: params.summary.fieldFingerprint,
     lap: {
       best: params.summary.lapOutcome.best,
