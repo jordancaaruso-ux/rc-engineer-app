@@ -8,9 +8,11 @@ import { buildBetweenRunHintFramingIntentLines } from "@/lib/engineerPhase5/betw
 
 test("always includes balance-chip framing", () => {
   const lines = buildBetweenRunHintFramingIntentLines([]);
-  assert.equal(lines.length, 1);
+  assert.equal(lines.length, 3);
   assert.match(lines[0]!, /toward 0/);
   assert.match(lines[0]!, /most balanced/);
+  assert.match(lines[1]!, /run-local/);
+  assert.match(lines[2]!, /pairwise \(hint baseline\)/i);
 });
 
 test("adds pairwise already-applied framing when setup changes exist", () => {
@@ -23,7 +25,7 @@ test("adds pairwise already-applied framing when setup changes exist", () => {
     severity: "medium",
   };
   const lines = buildBetweenRunHintFramingIntentLines([row]);
-  assert.equal(lines.length, 2);
-  assert.match(lines[1]!, /already applied/);
-  assert.match(lines[1]!, /after/);
+  assert.equal(lines.length, 4);
+  assert.match(lines[3]!, /already applied/);
+  assert.match(lines[3]!, /after/);
 });
