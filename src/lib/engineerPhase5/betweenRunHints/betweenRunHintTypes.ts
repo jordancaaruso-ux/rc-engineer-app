@@ -51,7 +51,7 @@ export type BetweenRunHintPayloadV1 = {
   engineerHref: string;
 };
 
-/** Newest session first (up to three on the same car reference chain). */
+/** Newest first: primary run plus up to two immediately older outings on the same car (sortAt / createdAt). */
 export type BetweenRunRecentSessionSnapshotV1 = {
   runId: string;
   displayLabel: string;

@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
-import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
+import { selectChronoRecentRunIds } from "@/lib/engineerPhase5/betweenRunHints/recentSessionsRunWindow";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import type {
   BetweenRunRecentSessionSnapshotV1,
@@ -152,42 +152,28 @@ function chronologicalTuningChangeLines(currentData: unknown, previousData: unkn
   return lines;
 }
 
-async function loadReferenceChainRunIds(userId: string, primaryRunId: string, max: number): Promise<string[]> {
-  const chain: string[] = [];
-  let cur: string | null = primaryRunId;
-  const guard = new Set<string>();
+/** Same ordering as run lists / Compare — not Engineer pairwise reference links. */
+const CHRONO_RECENT_SESSIONS_TAKE = 300;
 
-  while (cur && chain.length < max) {
-    if (guard.has(cur)) break;
-    guard.add(cur);
-    chain.push(cur);
+async function loadChronoRunIdsForRecentHints(
+  userId: string,
+  primaryRunId: string,
+  max: number
+): Promise<string[]> {
+  const primary = await prisma.run.findFirst({
+    where: { id: primaryRunId, userId },
+    select: { id: true, carId: true },
+  });
+  if (!primary?.carId) return [primaryRunId];
 
-    const run = await prisma.run.findFirst({
-      where: { id: cur, userId },
-      select: {
-        id: true,
-        carId: true,
-        trackId: true,
-        tireSetId: true,
-        tireRunNumber: true,
-        createdAt: true,
-        sessionCompletedAt: true,
-      },
-    });
-    if (!run?.carId) break;
-    const ref = await pickEngineerReferenceRunId(userId, {
-      id: run.id,
-      carId: run.carId,
-      trackId: run.trackId,
-      tireSetId: run.tireSetId,
-      tireRunNumber: run.tireRunNumber,
-      createdAt: run.createdAt,
-      sessionCompletedAt: run.sessionCompletedAt,
-    });
-    cur = ref;
-  }
+  const runs = await prisma.run.findMany({
+    where: { userId, carId: primary.carId },
+    orderBy: [{ sortAt: "desc" }, { createdAt: "desc" }],
+    take: CHRONO_RECENT_SESSIONS_TAKE,
+    select: { id: true },
+  });
 
-  return chain;
+  return selectChronoRecentRunIds(runs, primaryRunId, max);
 }
 
 export async function buildRecentSessionsForBetweenHints(params: {
@@ -212,7 +198,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
   driverContextPack: BetweenRunHintPayloadV2["driverContextPack"];
   chronoPreviousTireMeta: { tireSetId: string | null; tireRunNumber: number } | null;
 }> {
-  const runIds = await loadReferenceChainRunIds(params.userId, params.primaryRunId, 3);
+  const runIds = await loadChronoRunIdsForRecentHints(params.userId, params.primaryRunId, 3);
 
   const summaries: Array<{ runId: string; summary: EngineerRunSummaryV2 | null }> = [];
   for (const id of runIds) {
