@@ -194,12 +194,56 @@ html {
   /* min-height allows the document to grow past one viewport so body background covers long pages */
   min-height: 100%;
   min-height: 100dvh;
+  /* Solid fallback behind the fixed wash (overscroll / iOS first paint). */
+  background-color: rgb(var(--color-background));
 }
 
 body {
+  position: relative;
+  z-index: 0;
   font-family: var(--font-sans), system-ui, sans-serif;
   min-height: 100%;
   min-height: 100dvh;
+  /*
+   * Page wash lives on `body::before` (position: fixed) so it always covers the
+   * full visual viewport on iOS — the scrollable `body` background alone can
+   * leave a flat band under the Dynamic Island until the first scroll repaint.
+   */
+  background-color: transparent;
+  /* Stripes stay on the scrollable canvas; corner wash is on `body::before`. */
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent 420px,
+    rgb(var(--color-primary) / var(--body-stripe-red)) 420px,
+    rgb(var(--color-primary) / var(--body-stripe-red)) 840px,
+    rgb(var(--color-accent) / var(--body-stripe-blue)) 840px,
+    rgb(var(--color-accent) / var(--body-stripe-blue)) 1260px
+  );
+  background-attachment: scroll;
+  @apply text-foreground antialiased font-normal;
+}
+
+/* Corner / center wash: fixed layer so iOS paints it behind the island on first frame. */
+body::before {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  /* Extend past the safe-area band so corner radials reach behind the island / home indicator. */
+  top: calc(0px - env(safe-area-inset-top, 0px));
+  width: 100%;
+  min-height: calc(
+    100vh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)
+  );
+  min-height: calc(
+    100dvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)
+  );
+  min-height: calc(
+    100lvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)
+  );
+  z-index: -1;
+  pointer-events: none;
   background-color: rgb(var(--color-background));
   /* Lifted base + softer corner glows. The old gradients were strong enough
      that mid-page reads as a heavy dark wash; we now lift the base a little
@@ -230,18 +274,7 @@ body {
       ellipse 60% 40% at 50% 30%,
       rgb(var(--color-foreground) / var(--body-glow-center)),
       transparent 70%
-    ),
-    repeating-linear-gradient(
-      180deg,
-      transparent 0,
-      transparent 420px,
-      rgb(var(--color-primary) / var(--body-stripe-red)) 420px,
-      rgb(var(--color-primary) / var(--body-stripe-red)) 840px,
-      rgb(var(--color-accent) / var(--body-stripe-blue)) 840px,
-      rgb(var(--color-accent) / var(--body-stripe-blue)) 1260px
     );
-  background-attachment: scroll;
-  @apply text-foreground antialiased font-normal;
 }
 
 * {
