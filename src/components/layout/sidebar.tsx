@@ -88,7 +88,7 @@ export function Sidebar() {
             type="button"
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}
-            className="fixed left-3 top-3 z-[60] pointer-events-auto inline-flex items-center justify-center rounded-lg border border-border bg-secondary/90 p-2 text-foreground backdrop-blur-md shadow-glow-sm hover:bg-secondary/100 transition"
+            className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top,0px))] z-[60] pointer-events-auto inline-flex items-center justify-center rounded-lg border border-border bg-secondary/90 p-2 text-foreground backdrop-blur-md shadow-glow-sm hover:bg-secondary/100 transition"
           >
             <span className="sr-only">Open menu</span>
             <svg
@@ -119,7 +119,7 @@ export function Sidebar() {
               role="dialog"
               aria-modal="true"
               aria-label="Navigation menu"
-              className="absolute left-0 top-0 h-full w-72 max-w-[85vw] border-r border-border bg-secondary/95 backdrop-blur-md shadow-glow-sm overflow-y-auto"
+              className="absolute left-0 top-0 h-full w-72 max-w-[85vw] border-r border-border bg-secondary/95 backdrop-blur-md shadow-glow-sm overflow-y-auto pt-[env(safe-area-inset-top,0px)]"
             >
               <div className="flex justify-end px-4 py-3 border-b border-border">
                 <button

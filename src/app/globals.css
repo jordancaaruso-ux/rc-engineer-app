@@ -193,11 +193,13 @@ html[data-theme-preview="runna"] {
 html {
   /* min-height allows the document to grow past one viewport so body background covers long pages */
   min-height: 100%;
+  min-height: 100dvh;
 }
 
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
   min-height: 100%;
+  min-height: 100dvh;
   background-color: rgb(var(--color-background));
   /* Lifted base + softer corner glows. The old gradients were strong enough
      that mid-page reads as a heavy dark wash; we now lift the base a little
@@ -250,6 +252,8 @@ body {
 .app-shell {
   /* overflow-y visible so document scroll paints body background; clip horizontal bleed only */
   @apply relative flex min-h-screen overflow-x-hidden overflow-y-visible bg-transparent text-foreground;
+  /* Prefer dynamic viewport height on phones so the shell fills under the island. */
+  min-height: 100dvh;
   /* Home indicator / gesture bar on iOS (Capacitor WebView). */
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -287,6 +291,12 @@ body {
 
 .page {
   @apply flex flex-1 flex-col min-w-0;
+  /*
+   * With `viewportFit: "cover"` and iOS `contentInset: "never"`, the document
+   * paints from the physical top; this inset keeps chrome off the island while
+   * the body gradient shows through the padded band.
+   */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .page-header {

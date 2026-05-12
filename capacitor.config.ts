@@ -21,7 +21,13 @@ const config: CapacitorConfig = {
       }
     : undefined,
   ios: {
-    contentInset: "automatic",
+    /**
+     * `automatic` insets the WKWebView scroll view so the first paint often shows
+     * native chrome above the page; scrolling then reveals the document background
+     * under the island. `never` keeps the web layer edge-to-edge; we pad with
+     * `env(safe-area-inset-top)` in CSS (see `.page` and the mobile menu button).
+     */
+    contentInset: "never",
   },
   plugins: {
     SplashScreen: {
