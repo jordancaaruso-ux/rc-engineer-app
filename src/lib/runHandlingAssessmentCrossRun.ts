@@ -3,6 +3,7 @@ import {
   formatPhaseBalanceWord,
   formatPrimaryFocusLine,
   parseHandlingAssessmentJson,
+  phaseBalanceMagnitudeWord,
   type CornerPhase,
   type HandlingTraitAxisKey,
   type PhaseBalance,
@@ -60,6 +61,11 @@ function cornerBalanceLine(
   return `Corner ${phase} (compare → primary): ${cTxt} → ${pTxt}.${tail}`;
 }
 
+function traitNumericWithWord(v: PhaseBalance): string {
+  const w = phaseBalanceMagnitudeWord(v);
+  return `${v > 0 ? "+" : ""}${v}${w ? ` (${w})` : ""}`;
+}
+
 function traitLine(
   axis: HandlingTraitAxisKey,
   compare: RunHandlingAssessmentParsed,
@@ -70,8 +76,8 @@ function traitLine(
   if (!isPb(cv) && !isPb(pv)) return null;
   if (isPb(cv) && isPb(pv) && cv === pv) return null;
   const meta = HANDLING_TRAIT_AXIS_UI[axis];
-  const cStr = isPb(cv) ? `${cv > 0 ? "+" : ""}${cv}` : "—";
-  const pStr = isPb(pv) ? `${pv > 0 ? "+" : ""}${pv}` : "—";
+  const cStr = isPb(cv) ? traitNumericWithWord(cv) : "—";
+  const pStr = isPb(pv) ? traitNumericWithWord(pv) : "—";
   let tail = "";
   if (isPb(cv) && isPb(pv)) {
     const d = pv - cv;

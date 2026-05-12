@@ -133,6 +133,15 @@ function isIntensity1to5(n: unknown): n is HandlingIntensity1to5 {
   return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 5;
 }
 
+/** Magnitude on the −3…+3 chip scale: |1| mild, |2| moderate, |3| severe. */
+export function phaseBalanceMagnitudeWord(v: PhaseBalance): string | null {
+  const a = Math.abs(v);
+  if (a === 1) return "mild";
+  if (a === 2) return "moderate";
+  if (a === 3) return "severe";
+  return null;
+}
+
 function isPhaseBalance(n: unknown): n is PhaseBalance {
   return typeof n === "number" && Number.isInteger(n) && n >= -3 && n <= 3;
 }
@@ -702,7 +711,9 @@ export function sanitizeHandlingUiState(ui: HandlingAssessmentUiState): Handling
 
 function primaryFocusTraitShortLabel(axis: HandlingTraitAxisKey, v: PhaseBalance): string {
   const u = HANDLING_TRAIT_AXIS_UI[axis];
-  return `${u.title}: ${v > 0 ? "+" : ""}${v}`;
+  const mag = phaseBalanceMagnitudeWord(v);
+  const magSeg = mag ? ` — ${mag}` : "";
+  return `${u.title}${magSeg}: ${v > 0 ? "+" : ""}${v}`;
 }
 
 export function buildPrimaryFocusOptions(ui: HandlingAssessmentUiState): { id: string; focus: PrimaryFocus; label: string }[] {
@@ -816,14 +827,18 @@ export function persistedFromUiState(ui: HandlingAssessmentUiState): RunHandling
 
 function formatFeelVsLastRun(v: FeelVsLastRun): string {
   if (v === 0) return "same as last run on this car";
-  if (v < 0) return `${v} (worse than last run on this car)`;
-  return `+${v} (better than last run on this car)`;
+  const mag = phaseBalanceMagnitudeWord(v);
+  const magSeg = mag ? ` — ${mag}` : "";
+  if (v < 0) return `${v}${magSeg} (worse than last run on this car)`;
+  return `+${v}${magSeg} (better than last run on this car)`;
 }
 
 export function formatPhaseBalanceWord(v: PhaseBalance): string {
   if (v === 0) return "neutral";
-  if (v < 0) return `toward push (${v})`;
-  return `toward oversteer (+${v})`;
+  const mag = phaseBalanceMagnitudeWord(v);
+  const magSeg = mag ? ` — ${mag}` : "";
+  if (v < 0) return `toward push${magSeg} (${v})`;
+  return `toward oversteer${magSeg} (+${v})`;
 }
 
 export function formatPrimaryFocusLine(f: PrimaryFocus): string {
@@ -847,7 +862,9 @@ export function formatPrimaryFocusLine(f: PrimaryFocus): string {
 
 export function formatHandlingTraitAxisForEngineer(axis: HandlingTraitAxisKey, v: PhaseBalance): string {
   const m = HANDLING_TRAIT_AXIS_UI[axis];
-  return `${m.title} (−3 ${m.neg} … +3 ${m.pos}): ${v > 0 ? "+" : ""}${v}`;
+  const mag = phaseBalanceMagnitudeWord(v);
+  const magSeg = mag ? ` — ${mag}` : "";
+  return `${m.title} (−3 ${m.neg} … +3 ${m.pos})${magSeg}: ${v > 0 ? "+" : ""}${v}`;
 }
 
 /**

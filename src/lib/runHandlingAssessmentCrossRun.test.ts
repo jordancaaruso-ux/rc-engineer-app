@@ -14,8 +14,8 @@ test("entry balance −3 → −1 shows less push wording and correct trend phra
   const primary = v5({ balanceByPhase: { entry: -1, mid: 0, exit: 0 } });
   const block = buildHandlingAssessmentCrossRunBlock(compare, primary);
   assert.ok(block);
-  assert.match(block, /toward push \(-3\)/);
-  assert.match(block, /toward push \(-1\)/);
+  assert.match(block, /toward push.*severe.*\(-3\)/);
+  assert.match(block, /toward push.*mild.*\(-1\)/);
   assert.match(block, /shifted toward oversteer vs compare by 2 step/);
 });
 

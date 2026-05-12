@@ -5,6 +5,7 @@ import type {
   HintSessionBriefV1,
 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import type { HintBaselineProvenance } from "@/lib/engineerPhase5/betweenRunHints/pickHintContextReferenceRun";
+import { buildBetweenRunHintFramingIntentLines } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintFramingIntentLines";
 
 function buildFieldCommentary(summary: EngineerRunSummaryV2): string[] {
   const rows = summary.importedSessionFieldStats?.paceVsFieldMeanAnalysis;
@@ -103,6 +104,8 @@ export function buildHintSessionBrief(params: {
   intentLines.push(
     "Why-first copy (required): headline and every bullet must make the reasoning obvious — cite at least one concrete pairwise change from pairwiseSetupDigest / setupChanges (exact before→after) and tie it to what lapOutcome / signals / handlingPreview actually show (e.g. slower vs baseline, flat, not meaningful, feel worse). No detached tuning ideas; the reader must see why each step is relevant."
   );
+
+  intentLines.push(...buildBetweenRunHintFramingIntentLines(summary.setupChanges));
 
   return { coachingMode, intentLines, optionalFieldCommentary };
 }
