@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -20,6 +20,7 @@ import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunListScanLine, formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
+import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { normalizeLapTimes } from "@/lib/runLaps";
@@ -1024,6 +1025,28 @@ export function NewRunForm(props: {
     setSetupBaselineSnapshotId(picked.baselineSetupSnapshotId ?? null);
     setSetupBaselineData(cloneSetupSnapshot(next));
   }
+
+  const handleQuickSetupImported = useCallback(
+    async (documentId: string) => {
+      if (!carId) return;
+      const dlRes = await jsonFetch<{ downloadedSetups: DownloadedSetupOption[] }>(
+        `/api/setup/options?carId=${encodeURIComponent(carId)}`
+      );
+      const list = Array.isArray(dlRes.downloadedSetups) ? dlRes.downloadedSetups : [];
+      setDownloadedSetups(list);
+      const picked = list.find((x) => x.id === documentId);
+      if (!picked) return;
+      setSetupSource("other");
+      setLoadOtherSetupSelection(documentId);
+      const next = setupSnapshotWithDerived(picked.setupData);
+      setSetupData(next);
+      setActiveSetupData(next, picked.carId ?? carId ?? null);
+      setSetupBaselineSnapshotId(picked.baselineSetupSnapshotId ?? null);
+      setSetupBaselineData(cloneSetupSnapshot(next));
+      setSetupSectionExpanded(true);
+    },
+    [carId]
+  );
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -3452,7 +3475,52 @@ export function NewRunForm(props: {
                 <span className="font-medium">New</span> to start blank.
               </p>
             ) : null}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
+            {carId && pickerRuns.length === 0 && downloadedSetups.length === 0 ? (
+              <RunLogQuickSetupUpload carId={carId} onImported={handleQuickSetupImported} />
+            ) : null}
+            <div className="flex flex-col gap-2 max-w-2xl border-t border-border/70 pt-3">
+              {(isEditing && editRun?.id) || setupBaselineSnapshotId ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                  {isEditing && editRun?.id ? (
+                    <>
+                      <a
+                        className="text-accent underline decoration-border underline-offset-2 hover:opacity-90"
+                        href={`/api/runs/${editRun.id}/setup-pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        View filled setup PDF
+                      </a>
+                      <a
+                        className="text-accent underline decoration-border underline-offset-2 hover:opacity-90"
+                        href={`/api/runs/${editRun.id}/setup-pdf?download=1`}
+                        rel="noopener noreferrer"
+                      >
+                        Download PDF
+                      </a>
+                    </>
+                  ) : setupBaselineSnapshotId ? (
+                    <>
+                      <a
+                        className="text-accent underline decoration-border underline-offset-2 hover:opacity-90"
+                        href={`/api/setup-snapshots/${setupBaselineSnapshotId}/setup-pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        View filled setup PDF
+                      </a>
+                      <a
+                        className="text-accent underline decoration-border underline-offset-2 hover:opacity-90"
+                        href={`/api/setup-snapshots/${setupBaselineSnapshotId}/setup-pdf?download=1`}
+                        rel="noopener noreferrer"
+                      >
+                        Download PDF
+                      </a>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] text-muted-foreground">
                 Lock in the sheet as the new baseline so later changes show as deltas against it.
               </p>
@@ -3475,6 +3543,7 @@ export function NewRunForm(props: {
                     ? "Save setup snapshot to this run"
                     : "Lock in setup changes"}
               </button>
+            </div>
             </div>
           </>
         )}

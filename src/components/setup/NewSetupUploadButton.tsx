@@ -2,27 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { carTemplateSelectGroups, type CarForTemplateGroup } from "@/lib/cars/setupSheetTemplateCarGroups";
+import {
+  clipboardEventToImageFile,
+  postQuickCreateSetup,
+  QUICK_CREATE_SETUP_ACCEPT_MIME,
+} from "@/lib/setupDocuments/quickCreateSetupClient";
 
 type CarOption = CarForTemplateGroup;
 
-type QuickCreateResponse = {
-  documentId: string;
-  setupId: string | null;
-  calibrationId: string | null;
-  calibrationName: string | null;
-  pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "none";
-  pickDebug: string;
-  parseStatus: "PENDING" | "PARSED" | "PARTIAL" | "FAILED";
-  needsReview: boolean;
-  needsReviewReason: string | null;
-  calibrationAmbiguous: boolean;
-};
-
 type UploadStage = "idle" | "uploading" | "detecting" | "creating" | "done";
-
-const ACCEPT_MIME = "application/pdf,image/jpeg,image/png,image/webp";
 
 function stageLabel(stage: UploadStage): string {
   if (stage === "uploading") return "Uploading…";
@@ -58,8 +48,6 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
   }
 
   function scheduleStageHints() {
-    // Best-effort visual progression while the request is in flight. Endpoint does the real work;
-    // these timers just keep the label moving so the click feels responsive on slow parses.
     clearStageTimers();
     stageTimersRef.current.push(
       window.setTimeout(() => setStage((s) => (s === "uploading" ? "detecting" : s)), 900)
@@ -68,6 +56,40 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
       window.setTimeout(() => setStage((s) => (s === "detecting" ? "creating" : s)), 2600)
     );
   }
+
+  const upload = useCallback(
+    async (file: File, carId: string) => {
+      setError(null);
+      setStage("uploading");
+      scheduleStageHints();
+      const result = await postQuickCreateSetup(file, carId);
+      clearStageTimers();
+      if (!result.ok) {
+        setError(result.error);
+        setStage("idle");
+        return;
+      }
+      setStage("done");
+      const data = result.data;
+      const docId = data.documentId;
+      if (data.needsReview || !data.setupId) {
+        router.push(`/setup-documents/${docId}`);
+        router.refresh();
+      } else {
+        const params = new URLSearchParams();
+        params.set("created", docId);
+        params.set("setupId", data.setupId);
+        if (data.calibrationName) params.set("calibration", data.calibrationName);
+        if (data.calibrationAmbiguous) params.set("calibrationAmbiguous", "1");
+        router.push(`/setup?${params.toString()}`);
+        router.refresh();
+      }
+      setStage("idle");
+    },
+    // scheduleStageHints/clearStageTimers close over stable refs; inlining would duplicate timer UX.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- router-only external dep
+    [router]
+  );
 
   function openPicker() {
     if (busy) return;
@@ -96,53 +118,22 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
     void upload(f, carId);
   }
 
-  async function upload(file: File, carId: string) {
-    setError(null);
-    setStage("uploading");
-    scheduleStageHints();
-    try {
-      const fd = new FormData();
-      fd.set("file", file);
-      fd.set("carId", carId);
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 60000);
-      const res = await fetch("/api/setup-documents/quick-create", {
-        method: "POST",
-        body: fd,
-        signal: controller.signal,
-      });
-      window.clearTimeout(timeoutId);
-      const data = (await res.json().catch(() => ({}))) as Partial<QuickCreateResponse> & {
-        error?: string;
-      };
-      if (!res.ok || !data.documentId) {
-        setError(data.error || "Upload failed.");
-        setStage("idle");
-        clearStageTimers();
-        return;
-      }
-      clearStageTimers();
-      setStage("done");
-      const docId = data.documentId;
-      if (data.needsReview || !data.setupId) {
-        router.push(`/setup-documents/${docId}`);
-        router.refresh();
-        return;
-      }
-      const params = new URLSearchParams();
-      params.set("created", docId);
-      params.set("setupId", data.setupId);
-      if (data.calibrationName) params.set("calibration", data.calibrationName);
-      if (data.calibrationAmbiguous) params.set("calibrationAmbiguous", "1");
-      router.push(`/setup?${params.toString()}`);
-      router.refresh();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Upload failed.";
-      const aborted = e instanceof Error && e.name === "AbortError";
-      setError(aborted ? "Upload timed out. Try again." : msg);
-      setStage("idle");
-      clearStageTimers();
+  function onPaste(ev: React.ClipboardEvent) {
+    if (busy || noCars) return;
+    const f = clipboardEventToImageFile(ev);
+    if (!f) return;
+    ev.preventDefault();
+    pendingFileRef.current = f;
+    if (templateGroups.length > 1 && !selectedCarId) {
+      setCarPickerOpen(true);
+      return;
     }
+    const carId = selectedCarId || templateGroups[0]?.defaultCarId;
+    if (!carId) {
+      setCarPickerOpen(true);
+      return;
+    }
+    void upload(f, carId);
   }
 
   function confirmCarPicker() {
@@ -159,34 +150,46 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
   }
 
   return (
-    <div className="relative inline-flex items-center gap-2">
+    <div className="relative inline-flex flex-col items-stretch gap-1 sm:flex-row sm:items-center sm:gap-2">
       <input
         ref={fileInputRef}
         type="file"
-        accept={ACCEPT_MIME}
+        accept={QUICK_CREATE_SETUP_ACCEPT_MIME}
         className="hidden"
         onChange={onFileChosen}
         disabled={busy}
       />
-      {noCars ? (
-        <Link
-          href="/cars"
-          className="rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
-          title="Add a car first"
-        >
-          Add car first
-        </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={openPicker}
-          disabled={busy}
-          className="rounded-md border border-primary/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
-          title="Upload a setup sheet and auto-create a setup"
-        >
-          {stageLabel(stage)}
-        </button>
-      )}
+      <div className="inline-flex items-center gap-2">
+        {noCars ? (
+          <Link
+            href="/cars"
+            className="rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
+            title="Add a car first"
+          >
+            Add car first
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={openPicker}
+            disabled={busy}
+            className="rounded-md border border-primary/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
+            title="Upload a setup sheet and auto-create a setup"
+          >
+            {stageLabel(stage)}
+          </button>
+        )}
+        {!noCars ? (
+          <div
+            tabIndex={0}
+            onPaste={onPaste}
+            className="rounded border border-dashed border-border/80 bg-card/40 px-2 py-1 text-[10px] text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
+            title="Click here, then Ctrl+V to paste a screenshot"
+          >
+            Paste image
+          </div>
+        ) : null}
+      </div>
       {error ? (
         <span className="text-[11px] text-rose-400" role="alert">
           {error}
