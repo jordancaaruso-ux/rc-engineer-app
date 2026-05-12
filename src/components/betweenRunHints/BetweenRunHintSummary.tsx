@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { BetweenRunRecentSessionsThings } from "@/components/betweenRunHints/BetweenRunRecentSessionsThings";
 import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
+import {
+  filterAvoidRepeatingForBetweenRunHints,
+  pseudoSetupChangesFromSessionLines,
+} from "@/lib/engineerPhase5/betweenRunHints/avoidRepeatingFilterForHints";
 import { SectionMetaInline, SectionTitle } from "@/components/ui/SectionTitle";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +31,13 @@ export function BetweenRunHintSummary({
   const hasSessions = sessions.length > 0;
   const bullets = hint.bullets?.filter((b) => typeof b === "string" && b.trim().length > 0) ?? [];
   const headline = hint.headline?.trim() ?? "";
-  const avoid = hint.avoidRepeating?.trim() ?? "";
+  const setupRows = pseudoSetupChangesFromSessionLines(sessions[0]?.setupChangesFromPrevious ?? []);
+  const filteredAvoid = filterAvoidRepeatingForBetweenRunHints({
+    text: hint.avoidRepeating,
+    setupChanges: setupRows,
+    headline,
+    bullets,
+  });
   const sources = hint.sourcesNote?.trim() ?? "";
 
   return (
@@ -55,13 +65,6 @@ export function BetweenRunHintSummary({
         </p>
       ) : null}
 
-      {avoid ? (
-        <p className="rounded-md border border-amber-500/25 bg-amber-500/5 px-2 py-1.5 text-[11px] leading-snug text-foreground/90">
-          <span className="font-medium text-foreground">Avoid repeating: </span>
-          {avoid}
-        </p>
-      ) : null}
-
       {sources ? (
         <p className="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{sources}</p>
       ) : null}
@@ -73,6 +76,12 @@ export function BetweenRunHintSummary({
           </summary>
           <div className="border-t border-border/60 px-2 pb-2 pt-1">
             <BetweenRunRecentSessionsThings sessions={sessions} />
+            {filteredAvoid ? (
+              <p className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-2 py-1.5 text-[11px] leading-snug text-foreground/90">
+                <span className="font-medium text-foreground">Watch-out: </span>
+                {filteredAvoid}
+              </p>
+            ) : null}
           </div>
         </details>
       ) : null}

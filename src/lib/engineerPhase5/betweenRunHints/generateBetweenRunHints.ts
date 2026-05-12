@@ -10,6 +10,7 @@ import type {
   BetweenRunRecentSessionSnapshotV1,
 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import type { HintBaselineProvenance } from "@/lib/engineerPhase5/betweenRunHints/pickHintContextReferenceRun";
+import { filterAvoidRepeatingForBetweenRunHints } from "@/lib/engineerPhase5/betweenRunHints/avoidRepeatingFilterForHints";
 import type { VehicleDynamicsKbSnippet } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
 
@@ -57,6 +58,15 @@ type LlmShape = {
   avoidRepeating?: string | null;
 };
 
+/** Soften imperative "Revert …" copy into hedged suggestion style for headlines/bullets. */
+function softenIfLeadingRevert(line: string): string {
+  const t = line.trim();
+  if (!/^Revert\b/i.test(t)) return line;
+  const rest = t.replace(/^Revert\s+/i, "").trim();
+  if (!rest) return line;
+  return `Consider testing whether walking back ${rest} helps — lap metrics did not improve on paper.`;
+}
+
 function safeTrimArray(arr: unknown, max: number, maxLen: number): string[] {
   if (!Array.isArray(arr)) return [];
   const out: string[] = [];
@@ -93,17 +103,8 @@ function buildFallbackCopy(params: {
   if (bullets.length === 0) {
     bullets.push("Pick one setup lever from your last change list to verify or walk back on the next outing.");
   }
-  let avoid: string | null = null;
-  if (
-    params.signals.includes("lap_regressed") &&
-    params.signals.includes("meaningful_setup_change")
-  ) {
-    avoid =
-      "Avoid stacking more changes in the same direction as the last session until you confirm pace; consider reverting part of the last change set and retest.";
-  } else if (params.signals.includes("feel_worse") && params.signals.includes("meaningful_setup_change")) {
-    avoid =
-      "If the car felt worse after those adjustments, consider walking back the largest setup move for the next outing and change one item at a time.";
-  }
+  /** Prefer null — specific lines come from the LLM when warranted; generic avoid lines felt noisy. */
+  const avoid: string | null = null;
   let headline = params.signals.includes("lap_regressed")
     ? "Pace dropped vs your pairwise baseline on this car."
     : "Review last session vs baseline before stacking more changes.";
@@ -178,6 +179,7 @@ async function callLlmBetweenRunHints(params: {
     previousRunHandling: params.driverContextPack.previousRunHandling ?? null,
     bestPaceBaseline: params.driverContextPack.bestPaceBaseline ?? null,
     chronologicalSetupChangeLines: (params.driverContextPack.chronologicalSetupChangeLines ?? []).slice(0, 20),
+    pairwiseSetupDigest: params.driverContextPack.pairwiseSetupDigest ?? null,
     baselineProvenance: params.driverContextPack.baselineProvenance ?? null,
     suggestedChangesPreview: params.driverContextPack.suggestedChangesPreview ?? null,
     suggestedPreRunPreview: params.driverContextPack.suggestedPreRunPreview ?? null,
@@ -191,21 +193,23 @@ When coaching mode is low_data, keep setup prescriptions conservative and emphas
 When coaching mode is maintain_or_refine, prefer consolidation and hygiene checks over new tuning experiments.
 When coaching mode is tune_setup or tune_feel, still obey one-change-at-a-time discipline.
 The JSON object must have exactly these keys:
-- "headline": string, under 120 chars, actionable setup guidance (not generic motivation)
+- "headline": string, under 120 chars, hedged next-step guidance (not generic motivation). Do **not** start with imperative **"Revert"** — use phrasing like **"Consider testing …"**, **"Worth verifying whether …"**, and tie claims to **lapOutcome** flags (e.g. metrics not improving / not meaningful) without sounding certain about causality.
 - "bullets": array of 2 to 4 short strings (each under 220 chars), concrete suggestions or test plans
-- "avoidRepeating": string or null — when lap metrics regressed OR driver feel worsened AND there were setup changes since the reference run, give ONE short line about not repeating the same direction of changes until verified; when a regression lines up with a specific documented setup move across recentSessions, you may name reverting that move; otherwise null
+- "avoidRepeating": **almost always null**. Only set when you add **one** non-redundant, **specific** watch-out that is **not** already implied by the headline/bullets. Do **not** use boilerplate ("Do not repeat … until verified", "Avoid stacking …"). If you cannot name a concrete lever from the JSON, return null.
 
 Rules:
+- **driverContextPack.pairwiseSetupDigest** (when present) is the **canonical list** of documented pairwise tuning moves for this hint — treat it as authoritative alongside summary.setupChanges; index 0 recentSessions should align with that list for the primary run.
+- When **two or more** setup change rows clearly share a family (e.g. multiple labels contain "damper" / damping), you must **either** address **each** in separate bullets **or** use one umbrella bullet that explicitly names the family (e.g. front and rear damper % moved together). Do **not** single out one damper row if the digest lists multiple damper moves unless you explain why the others are lower priority.
 - You receive up to three recentSessions objects in chronological order **newest first** (index 0 = latest run). Each includes best lap, avg top 5, avg top 10 (when lap counts allow), vs-prior flags when a reference exists, optional paceVsFieldSummary / paceVsFieldMetrics from imported timing, setupChangesFromPrevious, notesPreview, handlingPreview.
-- Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **explicit revert** ideas when lap flags (best or multi-lap) are regressed and setupChangesFromPrevious plausibly correlate.
-- Do not paraphrase the engineer summary interpretation field as the headline or bullets; interpretation is context only. Bullets must be **new** concrete next-run actions (what to try, verify, or revert), grounded in setupChanges, handlingPreview, signals, or KB excerpts.
+- Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **hedged walk-back / verify** ideas when lap flags (best or multi-lap) are regressed and setupChangesFromPrevious plausibly correlate.
+- Do not paraphrase the engineer summary interpretation field as the headline or bullets; interpretation is context only. Bullets must be **new** concrete next-run actions (what to try, verify, or revert), grounded in setupChanges, pairwiseSetupDigest, handlingPreview, signals, or KB excerpts.
 - Ground technical claims ONLY in the provided KB excerpts and the structured JSON (summary, recentSessions, driverContextPack). If unsure, hedge with "test" / "verify".
 - Do not invent exact setup numbers not present in the JSON.
 - Prefer one-change-at-a-time discipline when recommending reversals.
 - Scope context: ${params.scopeLine}
 - Signals (machine tags): ${params.signals.join(", ")}`;
 
-  const user = `KB excerpts:\n${kbText || "(none)"}\n\nPattern digest tail:\n${digestNote}\n\nEngineer summary JSON (latest vs its immediate reference):\n${summaryJson}\n\nRecent sessions (newest first, up to 3):\n${recentJson}\n\nDriver context pack:\n${driverCtxJson}`;
+  const user = `KB excerpts:\n${kbText || "(none)"}\n\nPattern digest tail:\n${digestNote}\n\nPairwise summary JSON (primary vs hint baseline):\n${summaryJson}\n\nRecent sessions (newest first, up to 3):\n${recentJson}\n\nDriver context pack:\n${driverCtxJson}`;
 
   const body: Record<string, unknown> = {
     model,
@@ -322,23 +326,29 @@ export async function assembleBetweenRunHintPayload(params: {
   const interp = params.summary.interpretation.trim();
   let headline =
     typeof llm.headline === "string" && llm.headline.trim()
-      ? llm.headline.trim().slice(0, 200)
+      ? softenIfLeadingRevert(llm.headline.trim().slice(0, 200))
       : params.signals.includes("lap_regressed")
         ? "Pace dropped vs your pairwise baseline on this car."
         : "Review last session vs baseline before stacking more changes.";
   if (interp && (!fromLlm || !fromLlm.headline?.trim())) {
     const firstSentence = interp.split(/(?<=[.!?])\s+/)[0]?.trim();
-    if (firstSentence && firstSentence.length <= 140) headline = firstSentence;
+    if (firstSentence && firstSentence.length <= 140) headline = softenIfLeadingRevert(`Next: ${firstSentence}`).slice(0, 200);
   }
 
-  let bullets = safeTrimArray(llm.bullets, 4, 220);
+  let bullets = safeTrimArray(llm.bullets, 4, 220).map((b) => softenIfLeadingRevert(b));
   if (bullets.length < 2) {
-    bullets = safeTrimArray(fb.bullets, 4, 220);
+    bullets = safeTrimArray(fb.bullets, 4, 220).map((b) => softenIfLeadingRevert(b));
   }
 
   let avoidRepeating: string | null =
     typeof llm.avoidRepeating === "string" && llm.avoidRepeating.trim() ? llm.avoidRepeating.trim().slice(0, 400) : null;
   if (!avoidRepeating && fb.avoidRepeating) avoidRepeating = fb.avoidRepeating;
+  avoidRepeating = filterAvoidRepeatingForBetweenRunHints({
+    text: avoidRepeating,
+    setupChanges: params.summary.setupChanges,
+    headline,
+    bullets,
+  });
 
   return {
     version: 2,

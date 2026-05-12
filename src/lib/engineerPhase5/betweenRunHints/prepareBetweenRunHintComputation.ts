@@ -10,6 +10,7 @@ import { buildBetweenRunHintFingerprint } from "@/lib/engineerPhase5/betweenRunH
 import { buildRecentSessionsForBetweenHints } from "@/lib/engineerPhase5/betweenRunHints/buildRecentSessionsForBetweenHints";
 import { pickHintContextReferenceRun } from "@/lib/engineerPhase5/betweenRunHints/pickHintContextReferenceRun";
 import { buildHintSessionBrief } from "@/lib/engineerPhase5/betweenRunHints/buildHintSessionBrief";
+import { buildPairwiseSetupDigestForHints } from "@/lib/engineerPhase5/betweenRunHints/pairwiseSetupDigestForHints";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import type {
   BetweenRunHintPayloadV2,
@@ -176,6 +177,7 @@ export async function prepareBetweenRunHintComputation(
     await buildRecentSessionsForBetweenHints({
       userId,
       primaryRunId,
+      primaryPairwiseSummary: hintSummary,
       hintFingerprintExtras,
     });
 
@@ -193,6 +195,7 @@ export async function prepareBetweenRunHintComputation(
 
   const driverContextPack: BetweenRunHintPayloadV2["driverContextPack"] = {
     ...basePack,
+    pairwiseSetupDigest: buildPairwiseSetupDigestForHints(hintSummary),
     baselineProvenance: provenance,
     suggestedChangesPreview: clampText(runMeta.suggestedChanges, 420),
     suggestedPreRunPreview: clampText(runMeta.suggestedPreRun, 420),

@@ -178,6 +178,11 @@ async function loadReferenceChainRunIds(userId: string, primaryRunId: string, ma
 export async function buildRecentSessionsForBetweenHints(params: {
   userId: string;
   primaryRunId: string;
+  /**
+   * When hints compare the primary to a different baseline than `getOrComputeEngineerSummaryForRun`,
+   * pass that pairwise summary so the primary recent-session card matches what the LLM sees in `summaryJson`.
+   */
+  primaryPairwiseSummary?: EngineerRunSummaryV2 | null;
   /** When set, merged into fingerprint `contextExtras` so hint cache invalidates on hint-baseline policy inputs. */
   hintFingerprintExtras?: {
     hintReferenceRunId: string;
@@ -196,8 +201,12 @@ export async function buildRecentSessionsForBetweenHints(params: {
 
   const summaries: Array<{ runId: string; summary: EngineerRunSummaryV2 | null }> = [];
   for (const id of runIds) {
-    const res = await getOrComputeEngineerSummaryForRun(params.userId, id);
-    summaries.push({ runId: id, summary: res?.summary ?? null });
+    if (id === params.primaryRunId && params.primaryPairwiseSummary) {
+      summaries.push({ runId: id, summary: params.primaryPairwiseSummary });
+    } else {
+      const res = await getOrComputeEngineerSummaryForRun(params.userId, id);
+      summaries.push({ runId: id, summary: res?.summary ?? null });
+    }
   }
 
   const metaRows = await prisma.run.findMany({

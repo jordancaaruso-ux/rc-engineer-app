@@ -105,6 +105,8 @@ export type BetweenRunHintPayloadV2 = {
     suggestedPreRunPreview?: string | null;
     tireContextLine?: string | null;
     hintSessionBrief?: HintSessionBriefV1 | null;
+    /** Canonical list of pairwise setup moves for this hint (matches primary card when override is used). */
+    pairwiseSetupDigest?: string | null;
   };
 };
 
