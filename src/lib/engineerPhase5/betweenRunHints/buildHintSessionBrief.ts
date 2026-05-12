@@ -100,5 +100,9 @@ export function buildHintSessionBrief(params: {
     );
   }
 
+  intentLines.push(
+    "Why-first copy (required): headline and every bullet must make the reasoning obvious — cite at least one concrete pairwise change from pairwiseSetupDigest / setupChanges (exact before→after) and tie it to what lapOutcome / signals / handlingPreview actually show (e.g. slower vs baseline, flat, not meaningful, feel worse). No detached tuning ideas; the reader must see why each step is relevant."
+  );
+
   return { coachingMode, intentLines, optionalFieldCommentary };
 }

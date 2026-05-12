@@ -87,16 +87,23 @@ function buildFallbackCopy(params: {
   baselineProvenance?: HintBaselineProvenance | null;
 }): LlmShape {
   const interp = params.summary.interpretation.trim();
+  const lapCue = params.signals.includes("lap_regressed")
+    ? "Lap pace vs this baseline looks slower or flat — "
+    : params.signals.includes("lap_improved")
+      ? "Lap pace vs this baseline improved — "
+      : "";
   const bullets: string[] = [];
   if (params.summary.setupChanges.length > 0) {
     const top = params.summary.setupChanges.slice(0, 3);
     for (const ch of top) {
-      bullets.push(`Re-check ${ch.label}: you moved ${ch.before} → ${ch.after} — confirm pace/feel before stacking more changes.`);
+      bullets.push(
+        `${lapCue}You moved ${ch.label} from ${ch.before} to ${ch.after} vs baseline — verify whether that change is actually helping pace/feel before stacking more tuning.`
+      );
     }
   } else if (params.chronologicalSetupChangeLines?.length) {
     for (const line of params.chronologicalSetupChangeLines.slice(0, 3)) {
       bullets.push(
-        `Your sheet moved vs the prior outing on this car (${line}) — confirm pace/feel before stacking more changes.`
+        `${lapCue}Your sheet moved vs the prior outing on this car (${line}) — verify pace/feel before stacking more changes.`
       );
     }
   }
@@ -119,6 +126,13 @@ function buildFallbackCopy(params: {
   if (interp) {
     const firstSentence = interp.split(/(?<=[.!?])\s+/)[0]?.trim();
     if (firstSentence && firstSentence.length <= 140) headline = `Next: ${firstSentence}`;
+  }
+  if (params.summary.setupChanges.length > 0 && params.signals.includes("lap_regressed")) {
+    const parts = params.summary.setupChanges
+      .slice(0, 3)
+      .map((c) => `${c.label} ${c.before}→${c.after}`)
+      .join(", ");
+    headline = `You changed ${parts} vs baseline, but lap metrics don't show a gain — check whether those moves helped.`.slice(0, 200);
   }
 
   return {
@@ -193,15 +207,17 @@ When coaching mode is low_data, keep setup prescriptions conservative and emphas
 When coaching mode is maintain_or_refine, prefer consolidation and hygiene checks over new tuning experiments.
 When coaching mode is tune_setup or tune_feel, still obey one-change-at-a-time discipline.
 The JSON object must have exactly these keys:
-- "headline": string, under 120 chars, hedged next-step guidance (not generic motivation). Do **not** start with imperative **"Revert"** — use phrasing like **"Consider testing …"**, **"Worth verifying whether …"**, and tie claims to **lapOutcome** flags (e.g. metrics not improving / not meaningful) without sounding certain about causality.
-- "bullets": array of 2 to 4 short strings (each under 220 chars), concrete suggestions or test plans
+- "headline": string, under 120 chars, hedged next-step guidance (not generic motivation). Do **not** start with imperative **"Revert"** — use phrasing like **"Consider testing …"**, **"Worth verifying whether …"**. The headline must answer **why** we are nudging: name **at least one** documented pairwise change (exact before→after from JSON) **and** what the data suggests (e.g. lap best/avg5 regressed or flat vs baseline, not meaningful, feel worse) — reader must not wonder what triggered the suggestion.
+- "bullets": array of 2 to 4 short strings (each under 220 chars). **Each** bullet must be **why-first**: start with or immediately include (a) what **changed vs baseline** using values from pairwiseSetupDigest/setupChanges and (b) the **outcome signal** (lapOutcome flags, feel signals, handlingPreview, or field metrics). Then the suggestion. Example: "You raised front/rear damper % to 80 vs baseline; best lap regressed — verify whether that damping change is helping before touching droop."
 - "avoidRepeating": **almost always null**. Only set when you add **one** non-redundant, **specific** watch-out that is **not** already implied by the headline/bullets. Do **not** use boilerplate ("Do not repeat … until verified", "Avoid stacking …"). If you cannot name a concrete lever from the JSON, return null.
 
 Rules:
+- **No orphan suggestions**: do not recommend a lever (e.g. droop) that does **not** appear in pairwiseSetupDigest/setupChanges unless you justify it in the **same** bullet using feel/handlingPreview/signals or KB text; otherwise stick to documented moves.
 - **driverContextPack.pairwiseSetupDigest** (when present) is the **canonical list** of documented pairwise tuning moves for this hint — treat it as authoritative alongside summary.setupChanges; index 0 recentSessions should align with that list for the primary run.
 - When **two or more** setup change rows clearly share a family (e.g. multiple labels contain "damper" / damping), you must **either** address **each** in separate bullets **or** use one umbrella bullet that explicitly names the family (e.g. front and rear damper % moved together). Do **not** single out one damper row if the digest lists multiple damper moves unless you explain why the others are lower priority.
 - You receive up to three recentSessions objects in chronological order **newest first** (index 0 = latest run). Each includes best lap, avg top 5, avg top 10 (when lap counts allow), vs-prior flags when a reference exists, optional paceVsFieldSummary / paceVsFieldMetrics from imported timing, setupChangesFromPrevious, notesPreview, handlingPreview.
 - Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **hedged walk-back / verify** ideas when lap flags (best or multi-lap) are regressed and setupChangesFromPrevious plausibly correlate.
+- Prefer bullets that open with **You changed …**, **Given …**, or **Because …** so the causal chain is obvious in the first few words.
 - Do not paraphrase the engineer summary interpretation field as the headline or bullets; interpretation is context only. Bullets must be **new** concrete next-run actions (what to try, verify, or revert), grounded in setupChanges, pairwiseSetupDigest, handlingPreview, signals, or KB excerpts.
 - Ground technical claims ONLY in the provided KB excerpts and the structured JSON (summary, recentSessions, driverContextPack). If unsure, hedge with "test" / "verify".
 - Do not invent exact setup numbers not present in the JSON.
