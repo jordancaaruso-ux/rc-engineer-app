@@ -820,7 +820,7 @@ function formatFeelVsLastRun(v: FeelVsLastRun): string {
   return `+${v} (better than last run on this car)`;
 }
 
-function formatPhaseBalanceWord(v: PhaseBalance): string {
+export function formatPhaseBalanceWord(v: PhaseBalance): string {
   if (v === 0) return "neutral";
   if (v < 0) return `toward push (${v})`;
   return `toward oversteer (+${v})`;

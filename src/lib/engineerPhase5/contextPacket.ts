@@ -14,6 +14,7 @@ import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKey
 import { buildSetupDiffRows, normalizeSetupData } from "@/lib/setupDiff";
 import { displayRunNotesTextOnly } from "@/lib/runNotes";
 import { formatHandlingAssessmentForEngineer } from "@/lib/runHandlingAssessment";
+import { buildHandlingAssessmentCrossRunBlock } from "@/lib/runHandlingAssessmentCrossRun";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { canViewPeerRuns, isRunSharedWithTeam, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
 import { computeFieldImportSessionFromSets } from "@/lib/lapField/fieldImportSession";
@@ -495,6 +496,11 @@ export type EngineerFocusedRunPairContext = {
     compare: unknown | null;
   };
   /**
+   * Deterministic compare→primary handling deltas on shared scales (balance + trait axes), plus a
+   * feel-vs-last-run footnote when needed — prefer this over re-deriving signed deltas from previews.
+   */
+  handlingCrossRunDeltaBlock: string | null;
+  /**
    * vehicle-dynamics KB sections chosen by keyword overlap with changed setup keys—use for handling
    * text alongside rcEffectHints (compare→primary direction is authoritative).
    */
@@ -965,5 +971,11 @@ export async function buildFocusedRunPairContext(
       primary: primary.handlingAssessmentJson ?? null,
       compare: compare?.handlingAssessmentJson ?? null,
     },
+    handlingCrossRunDeltaBlock: compareSlice
+      ? buildHandlingAssessmentCrossRunBlock(
+          compare?.handlingAssessmentJson ?? null,
+          primary.handlingAssessmentJson ?? null
+        )
+      : null,
   };
 }

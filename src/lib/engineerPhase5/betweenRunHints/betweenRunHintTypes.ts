@@ -91,6 +91,11 @@ export type BetweenRunHintPayloadV2 = {
     currentSetupLines: string[];
     /** Immediate prior run on car: structured handling + problems (when available). */
     previousRunHandling?: string | null;
+    /**
+     * When the newest session's handling preview is thin but older recentSessions rows show push /
+     * understeer (parsed balance or problems text), deterministic reminder for the LLM.
+     */
+    priorHandlingCarryforward?: string | null;
     /** Strongest recent pace on this car (excluding primary): tuning snapshot lines. */
     bestPaceBaseline?: {
       runId: string;
@@ -138,5 +143,7 @@ export type RecentSessionsFingerprintMaterial = {
     hintBaselineAgeBucket?: string | null;
     engineerReferenceRunId?: string | null;
     hintDiffersFromEngineer?: boolean;
+    /** Stable digest when priorHandlingCarryforward is present/changes. */
+    priorHandlingSig?: string;
   };
 };

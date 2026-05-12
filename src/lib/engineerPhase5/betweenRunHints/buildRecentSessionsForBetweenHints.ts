@@ -34,6 +34,21 @@ function isPhaseBalanceValue(n: unknown): n is PhaseBalance {
   return typeof n === "number" && Number.isInteger(n) && n >= -3 && n <= 3;
 }
 
+const PRIMARY_HANDLING_THIN_CHAR_LIMIT = 72;
+
+function handlingShowsPushBias(handlingProblems: string | null, handlingAssessmentJson: unknown): boolean {
+  const hp = handlingProblems?.toLowerCase() ?? "";
+  if (/\b(understeer|push)\b/.test(hp)) return true;
+  const parsed = parseHandlingAssessmentJson(handlingAssessmentJson);
+  const b = parsed?.balanceByPhase;
+  if (!b) return false;
+  for (const phase of ["entry", "mid", "exit"] as const) {
+    const v = b[phase];
+    if (isPhaseBalanceValue(v) && v < 0) return true;
+  }
+  return false;
+}
+
 const runSelectForRefPick = {
   id: true,
   createdAt: true,
@@ -344,6 +359,34 @@ export async function buildRecentSessionsForBetweenHints(params: {
   }
 
   const bestPaceLinesSig = bestPaceBaseline?.setupLines.join("|") ?? "";
+
+  let priorHandlingCarryforward: string | null = null;
+  const primaryHandlingPreview = primaryMeta
+    ? handlingPreviewFromRun(primaryMeta.handlingProblems, primaryMeta.handlingAssessmentJson)
+    : null;
+  const primaryHandlingThin =
+    !primaryHandlingPreview ||
+    primaryHandlingPreview.replace(/\s+/g, " ").trim().length < PRIMARY_HANDLING_THIN_CHAR_LIMIT;
+  if (primaryMeta && primaryHandlingThin) {
+    const olderBits: string[] = [];
+    for (const id of runIds.slice(1)) {
+      const m = metaById.get(id);
+      if (!m) continue;
+      if (!handlingShowsPushBias(m.handlingProblems, m.handlingAssessmentJson)) continue;
+      const preview = handlingPreviewFromRun(m.handlingProblems, m.handlingAssessmentJson);
+      olderBits.push(`${runDisplayLabel(m)}${preview ? ` — ${preview}` : ""}`);
+      if (olderBits.length >= 2) break;
+    }
+    if (olderBits.length > 0) {
+      priorHandlingCarryforward =
+        `Earlier on this car (see recentSessions[1+].handlingPreview): ${olderBits.join(" · ")}. ` +
+        `Latest handlingPreview is thin — if push/understeer is not clearly resolved on the newest session, verify balance before stacking more tuning moves.`;
+      if (priorHandlingCarryforward.length > 480) {
+        priorHandlingCarryforward = `${priorHandlingCarryforward.slice(0, 479)}…`;
+      }
+    }
+  }
+
   const hintX = params.hintFingerprintExtras;
   const fingerprintMaterial: RecentSessionsFingerprintMaterial = {
     runIds,
@@ -353,6 +396,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
       bestPaceRunId: bestPaceBaseline?.runId ?? null,
       bestPaceLinesSig,
       chronologicalChangeCount: chronologicalSetupChangeLines.length,
+      priorHandlingSig: priorHandlingCarryforward ?? "",
       ...(hintX
         ? {
             hintReferenceRunId: hintX.hintReferenceRunId,
@@ -374,6 +418,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
   if (chronologicalSetupChangeLines.length > 0) {
     driverContextPack.chronologicalSetupChangeLines = chronologicalSetupChangeLines;
   }
+  if (priorHandlingCarryforward) driverContextPack.priorHandlingCarryforward = priorHandlingCarryforward;
 
   return {
     recentSessions,

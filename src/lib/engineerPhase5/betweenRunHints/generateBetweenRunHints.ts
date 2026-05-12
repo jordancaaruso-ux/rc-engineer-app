@@ -191,6 +191,7 @@ async function callLlmBetweenRunHints(params: {
     combinedNotesAndHandling: params.driverContextPack.combinedNotesAndHandling,
     currentSetupLines: params.driverContextPack.currentSetupLines.slice(0, 30),
     previousRunHandling: params.driverContextPack.previousRunHandling ?? null,
+    priorHandlingCarryforward: params.driverContextPack.priorHandlingCarryforward ?? null,
     bestPaceBaseline: params.driverContextPack.bestPaceBaseline ?? null,
     chronologicalSetupChangeLines: (params.driverContextPack.chronologicalSetupChangeLines ?? []).slice(0, 20),
     pairwiseSetupDigest: params.driverContextPack.pairwiseSetupDigest ?? null,
@@ -216,6 +217,8 @@ Rules:
 - **driverContextPack.pairwiseSetupDigest** (when present) is the **canonical list** of documented pairwise tuning moves for this hint — treat it as authoritative alongside summary.setupChanges; index 0 recentSessions should align with that list for the primary run.
 - When **two or more** setup change rows clearly share a family (e.g. multiple labels contain "damper" / damping), you must **either** address **each** in separate bullets **or** use one umbrella bullet that explicitly names the family (e.g. front and rear damper % moved together). Do **not** single out one damper row if the digest lists multiple damper moves unless you explain why the others are lower priority.
 - You receive up to three recentSessions objects in chronological order **newest first** (index 0 = latest run). Each includes best lap, avg top 5, avg top 10 (when lap counts allow), vs-prior flags when a reference exists, optional paceVsFieldSummary / paceVsFieldMetrics from imported timing, setupChangesFromPrevious, notesPreview, handlingPreview.
+- When **driverContextPack.priorHandlingCarryforward** is non-null, older **recentSessions** cards showed push/understeer cues while the newest session's handlingPreview was thin — use that as **verification context** (balance / prior bias may still matter) before prescribing new experiments; still obey one-change-at-a-time discipline.
+- **Session-relative handling:** any "feel vs prior outing" style wording on a run card is relative to **that run's** previous session on the car, not a direct A-vs-B score between arbitrary rows — do **not** subtract or chain those numbers across non-adjacent sessions unless the JSON explicitly gives you an adjacent pair.
 - Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **hedged walk-back / verify** ideas when lap flags (best or multi-lap) are regressed and setupChangesFromPrevious plausibly correlate.
 - Prefer bullets that open with **You changed …**, **Given …**, or **Because …** so the causal chain is obvious in the first few words.
 - Do not paraphrase the engineer summary interpretation field as the headline or bullets; interpretation is context only. Bullets must be **new** concrete next-run actions (what to try, verify, or revert), grounded in setupChanges, pairwiseSetupDigest, handlingPreview, signals, or KB excerpts.
