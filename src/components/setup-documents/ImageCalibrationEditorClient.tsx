@@ -26,6 +26,13 @@ type DraftField = {
 
 type DraftAnchor = { id: string; region: ImageRegion };
 
+type DetectedRegion = {
+  id: string;
+  kind: "checkbox" | "textValue" | "unknown";
+  confidence: number;
+  region: ImageRegion;
+};
+
 type DeriveCalibrationOption = {
   id: string;
   name: string;
@@ -125,6 +132,10 @@ export function ImageCalibrationEditorClient(props: Props) {
   );
   const [deriveSaving, setDeriveSaving] = useState(false);
   const [deriveError, setDeriveError] = useState<string | null>(null);
+  const [detectedRegions, setDetectedRegions] = useState<DetectedRegion[]>([]);
+  const [detectingRegions, setDetectingRegions] = useState(false);
+  const [detectError, setDetectError] = useState<string | null>(null);
+  const [showDetectedRegions, setShowDetectedRegions] = useState(true);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -223,6 +234,71 @@ export function ImageCalibrationEditorClient(props: Props) {
   const removeAnchor = useCallback((id: string) => {
     setAnchors((prev) => prev.filter((a) => a.id !== id));
   }, []);
+
+  const assignRegionToCurrentTarget = useCallback(
+    (region: ImageRegion): boolean => {
+      if (drawMode?.kind === "field-region") {
+        updateField(drawMode.fieldId, { region });
+        setDrawMode(null);
+        return true;
+      }
+      if (drawMode?.kind === "field-option") {
+        updateOption(drawMode.fieldId, drawMode.optionId, { region });
+        setDrawMode(null);
+        return true;
+      }
+      if (drawMode?.kind === "page-region") {
+        setPageRegion(region);
+        setDrawMode(null);
+        return true;
+      }
+      if (drawMode?.kind === "anchor") {
+        const id = drawMode.anchorId;
+        if (id) setAnchors((prev) => prev.map((a) => (a.id === id ? { ...a, region } : a)));
+        setDrawMode(null);
+        return true;
+      }
+      const active = fields.find((f) => f.id === activeFieldId);
+      if (!active) {
+        setDetectError("Pick a setup field first, then click a detected box.");
+        return false;
+      }
+      if (active.kind === "text" || active.kind === "checkbox") {
+        updateField(active.id, { region });
+        return true;
+      }
+      const emptyOption = active.options.find((o) => o.region.wPct === 0 || o.region.hPct === 0);
+      if (emptyOption) {
+        updateOption(active.id, emptyOption.id, { region });
+        return true;
+      }
+      setDetectError("For grouped fields, add/select an option with Draw, then click a detected box.");
+      return false;
+    },
+    [activeFieldId, drawMode, fields, updateField, updateOption]
+  );
+
+  const loadDetectedRegions = useCallback(async () => {
+    setDetectingRegions(true);
+    setDetectError(null);
+    try {
+      const res = await fetch(`/api/setup-documents/${props.documentId}/detect-image-regions`, { cache: "no-store" });
+      const data = (await res.json().catch(() => ({}))) as {
+        candidates?: DetectedRegion[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setDetectError(data.error || `Detection failed (${res.status})`);
+        return;
+      }
+      setDetectedRegions(data.candidates ?? []);
+      setShowDetectedRegions(true);
+    } catch (e) {
+      setDetectError(e instanceof Error ? e.message : "Detection failed");
+    } finally {
+      setDetectingRegions(false);
+    }
+  }, [props.documentId]);
 
   function pointFromEvent(ev: React.MouseEvent): { xPct: number; yPct: number } | null {
     const overlay = overlayRef.current;
@@ -454,6 +530,39 @@ export function ImageCalibrationEditorClient(props: Props) {
     );
   }
 
+  function renderDetectedRegion(candidate: DetectedRegion) {
+    const color =
+      candidate.kind === "checkbox"
+        ? "#10b981"
+        : candidate.kind === "textValue"
+          ? "#f97316"
+          : "#94a3b8";
+    return (
+      <button
+        key={candidate.id}
+        type="button"
+        title={`${candidate.kind} · ${(candidate.confidence * 100).toFixed(0)}%`}
+        className="absolute pointer-events-auto rounded-sm"
+        style={{
+          left: `${candidate.region.xPct * 100}%`,
+          top: `${candidate.region.yPct * 100}%`,
+          width: `${candidate.region.wPct * 100}%`,
+          height: `${candidate.region.hPct * 100}%`,
+          border: `1.5px dashed ${color}`,
+          background: `${color}18`,
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseMove={(e) => e.stopPropagation()}
+        onMouseUp={(e) => {
+          e.stopPropagation();
+          assignRegionToCurrentTarget(candidate.region);
+        }}
+      >
+        <span className="sr-only">Assign detected {candidate.kind} region</span>
+      </button>
+    );
+  }
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -490,6 +599,9 @@ export function ImageCalibrationEditorClient(props: Props) {
                 setDragCurrent(null);
               }}
             >
+              {showDetectedRegions
+                ? detectedRegions.map((candidate) => renderDetectedRegion(candidate))
+                : null}
               {fields.map((f) => {
                 const color = f.id === activeFieldId ? "#22c55e" : "#3b82f6";
                 const label = f.key || "(no key)";
@@ -554,6 +666,43 @@ export function ImageCalibrationEditorClient(props: Props) {
           {saveOk ? (
             <div className="rounded border border-emerald-500/50 bg-emerald-500/10 p-2 text-xs text-emerald-700 dark:text-emerald-300">
               Saved. Returning to document review…
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium">Detected boxes</div>
+            <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={showDetectedRegions}
+                onChange={(e) => setShowDetectedRegions(e.target.checked)}
+              />
+              show
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Detect likely value boxes and checkboxes, then choose a setup field and click a detected
+            box to assign it. This helps calibrate JPEG-only sheets without trusting AI to name the
+            parameter.
+          </p>
+          <button
+            type="button"
+            onClick={loadDetectedRegions}
+            disabled={detectingRegions}
+            className="w-full rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {detectingRegions ? "Detecting…" : detectedRegions.length > 0 ? "Re-detect boxes" : "Detect boxes"}
+          </button>
+          {detectedRegions.length > 0 ? (
+            <div className="text-[10px] text-muted-foreground">
+              {detectedRegions.length} candidates found. Green = checkbox-like, orange = value-like.
+            </div>
+          ) : null}
+          {detectError ? (
+            <div className="rounded border border-amber-500/50 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+              {detectError}
             </div>
           ) : null}
         </div>
