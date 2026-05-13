@@ -50,6 +50,8 @@ export type ImageRawExtraction = {
   alignedImage: Buffer;
   widthPx: number;
   heightPx: number;
+  /** Page crop used when the calibration is PDF-page-normalized. */
+  detectedPageRegion?: ImageRegion;
   /** 0..1, 1 = perfect anchor match. ≥0.6 is the soft "trustworthy" threshold. */
   anchorMatchScore: number;
   /** Hamming distance to the calibration's reference whole-image pHash (0..64). */
@@ -70,6 +72,74 @@ function regionToPixels(region: ImageRegion, widthPx: number, heightPx: number):
   if (left < 0 || top < 0) return null;
   if (left + width > widthPx || top + height > heightPx) return null;
   return { left, top, width, height };
+}
+
+function expandRegion(region: ImageRegion, amount: number): ImageRegion {
+  const x = Math.max(0, region.xPct - amount);
+  const y = Math.max(0, region.yPct - amount);
+  const right = Math.min(1, region.xPct + region.wPct + amount);
+  const bottom = Math.min(1, region.yPct + region.hPct + amount);
+  return { xPct: x, yPct: y, wPct: Math.max(0, right - x), hPct: Math.max(0, bottom - y) };
+}
+
+async function detectLikelyPageRegion(input: {
+  buf: Buffer;
+  widthPx: number;
+  heightPx: number;
+  expectedAspect: number;
+  fallback: ImageRegion;
+}): Promise<ImageRegion> {
+  if (input.widthPx <= 0 || input.heightPx <= 0 || input.expectedAspect <= 0) return input.fallback;
+  const sampleWidth = Math.min(480, input.widthPx);
+  const sampleHeight = Math.max(1, Math.round(sampleWidth * input.heightPx / input.widthPx));
+  try {
+    const { data, info } = await sharp(input.buf)
+      .removeAlpha()
+      .resize(sampleWidth, sampleHeight, { fit: "fill" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let minX = info.width;
+    let minY = info.height;
+    let maxX = -1;
+    let maxY = -1;
+    let count = 0;
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const i = (y * info.width + x) * info.channels;
+        const r = data[i] ?? 0;
+        const g = data[i + 1] ?? r;
+        const b = data[i + 2] ?? r;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const whiteish = max >= 185 && min >= 170 && max - min <= 55;
+        if (!whiteish) continue;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        count++;
+      }
+    }
+    const area = info.width * info.height;
+    const coverage = area > 0 ? count / area : 0;
+    if (maxX < minX || maxY < minY || coverage < 0.12) return input.fallback;
+    const region = expandRegion(
+      {
+        xPct: minX / info.width,
+        yPct: minY / info.height,
+        wPct: (maxX - minX + 1) / info.width,
+        hPct: (maxY - minY + 1) / info.height,
+      },
+      0.01
+    );
+    const aspect = (region.wPct * input.widthPx) / Math.max(1, region.hPct * input.heightPx);
+    const aspectRatio = aspect / input.expectedAspect;
+    if (aspectRatio < 0.65 || aspectRatio > 1.55) return input.fallback;
+    if (region.wPct * region.hPct < 0.35) return input.fallback;
+    return region;
+  } catch {
+    return input.fallback;
+  }
 }
 
 async function dHashOfBuffer(buf: Buffer): Promise<string> {
@@ -121,10 +191,27 @@ export async function extractImageRawDataFromFile(input: {
         throw new Error("Could not read image dimensions");
       }
 
-      const targetWidth = ref?.widthPx ?? inWidth;
-      const targetHeight = ref?.heightPx ?? inHeight;
-      const aligned = await sharp(buf)
-        .removeAlpha()
+      const refPage = ref?.pageRegion;
+      let detectedPageRegion: ImageRegion | undefined;
+      let targetWidth = ref?.widthPx ?? inWidth;
+      let targetHeight = ref?.heightPx ?? inHeight;
+      let inputForAlignment = sharp(buf).removeAlpha();
+      if (refPage) {
+        const fallback = refPage;
+        const expectedAspect = (refPage.wPct * (ref?.widthPx ?? inWidth)) / Math.max(1, refPage.hPct * (ref?.heightPx ?? inHeight));
+        detectedPageRegion = await detectLikelyPageRegion({
+          buf,
+          widthPx: inWidth,
+          heightPx: inHeight,
+          expectedAspect,
+          fallback,
+        });
+        const crop = regionToPixels(detectedPageRegion, inWidth, inHeight);
+        if (crop) inputForAlignment = inputForAlignment.extract(crop);
+        targetWidth = Math.max(1, Math.round(refPage.wPct * (ref?.widthPx ?? inWidth)));
+        targetHeight = Math.max(1, Math.round(refPage.hPct * (ref?.heightPx ?? inHeight)));
+      }
+      const aligned = await inputForAlignment
         .resize(targetWidth, targetHeight, { fit: "fill" })
         .png()
         .toBuffer();
@@ -172,6 +259,7 @@ export async function extractImageRawDataFromFile(input: {
         alignedImage: aligned,
         widthPx: targetWidth,
         heightPx: targetHeight,
+        detectedPageRegion,
         anchorMatchScore,
         pHashHamming,
       };
@@ -331,7 +419,7 @@ export type ImageMappingDiagnostic = {
   templateType?: string;
   expected: { textFields: number; checkboxFields: number; groupFields: number };
   matched: { keys: number; keysSample: string[] };
-  alignment: { anchorMatchScore: number; pHashHamming: number | null };
+  alignment: { anchorMatchScore: number; pHashHamming: number | null; detectedPageRegion?: ImageRegion };
   warnings?: string[];
 };
 
@@ -458,6 +546,7 @@ export async function mapExtractedImageWithCalibration(input: {
     alignment: {
       anchorMatchScore: input.extracted.anchorMatchScore,
       pHashHamming: input.extracted.pHashHamming,
+      detectedPageRegion: input.extracted.detectedPageRegion,
     },
     warnings: warnings.length ? warnings : undefined,
   };

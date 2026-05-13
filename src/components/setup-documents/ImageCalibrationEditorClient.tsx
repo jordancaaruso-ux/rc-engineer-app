@@ -37,6 +37,7 @@ type DeriveCalibrationOption = {
 type DraftMode =
   | { kind: "field-region"; fieldId: string }
   | { kind: "field-option"; fieldId: string; optionId: string }
+  | { kind: "page-region" }
   | { kind: "anchor"; anchorId?: string };
 
 type Props = {
@@ -46,6 +47,7 @@ type Props = {
   fieldCatalog: SetupFieldMeta[];
   initialFields?: ImageCalibrationField[];
   initialAnchors?: ImageRegion[];
+  initialPageRegion?: ImageRegion;
   initialName?: string;
   initialCalibrationId?: string;
   deriveCalibrationOptions?: DeriveCalibrationOption[];
@@ -106,6 +108,9 @@ export function ImageCalibrationEditorClient(props: Props) {
   );
   const [anchors, setAnchors] = useState<DraftAnchor[]>(
     (props.initialAnchors ?? []).map((r) => ({ id: newId("a"), region: r }))
+  );
+  const [pageRegion, setPageRegion] = useState<ImageRegion>(
+    props.initialPageRegion ?? { xPct: 0, yPct: 0, wPct: 1, hPct: 1 }
   );
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null);
   const [drawMode, setDrawMode] = useState<DraftMode | null>(null);
@@ -269,6 +274,8 @@ export function ImageCalibrationEditorClient(props: Props) {
       updateField(drawMode.fieldId, { region });
     } else if (drawMode.kind === "field-option") {
       updateOption(drawMode.fieldId, drawMode.optionId, { region });
+    } else if (drawMode.kind === "page-region") {
+      setPageRegion(region);
     } else if (drawMode.kind === "anchor") {
       const id = drawMode.anchorId;
       if (id) {
@@ -384,6 +391,7 @@ export function ImageCalibrationEditorClient(props: Props) {
           calibrationId: deriveCalibrationId,
           deriveFromCalibrationId: deriveCalibrationId,
           exampleDocumentId: props.documentId,
+          pageRegion,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -411,7 +419,7 @@ export function ImageCalibrationEditorClient(props: Props) {
     } finally {
       setDeriveSaving(false);
     }
-  }, [attachCalibrationAndProcess, deriveCalibrationId, props.documentId, router]);
+  }, [attachCalibrationAndProcess, deriveCalibrationId, pageRegion, props.documentId, router]);
 
   const activeField = fields.find((f) => f.id === activeFieldId) ?? null;
   const activeOptionId = drawMode?.kind === "field-option" ? drawMode.optionId : null;
@@ -506,6 +514,9 @@ export function ImageCalibrationEditorClient(props: Props) {
                   ? renderRect(a.region, "#a855f7", "anchor", `${a.id}-r`)
                   : null
               )}
+              {pageRegion.wPct < 0.999 || pageRegion.hPct < 0.999 || pageRegion.xPct > 0.001 || pageRegion.yPct > 0.001
+                ? renderRect(pageRegion, "#f59e0b", "sheet page", "page-region")
+                : null}
               {inProgressRect ? renderRect(inProgressRect, "#f97316", "drawing") : null}
             </div>
           </div>
@@ -545,6 +556,34 @@ export function ImageCalibrationEditorClient(props: Props) {
               Saved. Returning to document review…
             </div>
           ) : null}
+        </div>
+
+        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+          <div className="text-sm font-medium">Sheet page bounds</div>
+          <p className="text-xs text-muted-foreground">
+            For editable-PDF-derived mappings, draw around the visible setup sheet page in this
+            screenshot. If the image is already only the sheet, leave it as full image.
+          </p>
+          <div className="flex items-center gap-2 text-[10px]">
+            <span className="text-muted-foreground flex-1">
+              {(pageRegion.xPct * 100).toFixed(1)}%, {(pageRegion.yPct * 100).toFixed(1)}% ·{" "}
+              {(pageRegion.wPct * 100).toFixed(1)}% × {(pageRegion.hPct * 100).toFixed(1)}%
+            </span>
+            <button
+              type="button"
+              onClick={() => setDrawMode({ kind: "page-region" })}
+              className="rounded border border-border px-2 py-0.5 hover:bg-muted"
+            >
+              Draw
+            </button>
+            <button
+              type="button"
+              onClick={() => setPageRegion({ xPct: 0, yPct: 0, wPct: 1, hPct: 1 })}
+              className="rounded border border-border px-2 py-0.5 hover:bg-muted"
+            >
+              Full image
+            </button>
+          </div>
         </div>
 
         <div className="rounded-md border border-border bg-card p-3 space-y-2">

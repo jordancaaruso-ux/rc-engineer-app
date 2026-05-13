@@ -61,6 +61,7 @@ export default async function CalibrateImagePage({
 
   let initialFields: ImageCalibrationField[] = [];
   let initialAnchors: ImageRegion[] = [];
+  let initialPageRegion: ImageRegion | undefined;
   let initialName: string | undefined;
   let initialCalibrationId: string | undefined;
   if (doc.calibrationProfileId) {
@@ -73,6 +74,7 @@ export default async function CalibrateImagePage({
       const ic = norm.imageCalibration;
       if (ic) {
         initialFields = ic.fields;
+        initialPageRegion = ic.reference.pageRegion;
         initialAnchors = (ic.reference.anchors ?? []).map((a) => ({
           xPct: a.xPct,
           yPct: a.yPct,
@@ -140,6 +142,7 @@ export default async function CalibrateImagePage({
           fieldCatalog={fieldCatalog}
           initialFields={initialFields}
           initialAnchors={initialAnchors}
+          initialPageRegion={initialPageRegion}
           initialName={initialName}
           initialCalibrationId={initialCalibrationId}
           deriveCalibrationOptions={deriveCalibrationOptions}

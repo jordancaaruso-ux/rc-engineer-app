@@ -346,6 +346,12 @@ export type ImageCalibrationReference = {
   exampleDocumentId: string;
   widthPx: number;
   heightPx: number;
+  /**
+   * Optional normalized bounding box of the actual setup-sheet page inside the reference image.
+   * For editable-PDF-derived mappings, field regions are page-relative and imports crop/resize the
+   * detected page to this aspect before reading fields.
+   */
+  pageRegion?: ImageRegion;
   /** Whole-image dHash hex used by the auto-pick step (Hamming-comparable across calibrations). */
   pHash64: string;
   /** Bag of OCR tokens from the top ~25% of the reference image (used as a tiebreaker). */
@@ -450,6 +456,7 @@ export function normalizeImageCalibration(value: unknown): ImageCalibration | un
   const headerTokens = headerTokensRaw
     .map((t) => (typeof t === "string" ? t.trim().toLowerCase() : ""))
     .filter(Boolean);
+  const pageRegion = isImageRegion(ref.pageRegion) ? normalizeImageRegion(ref.pageRegion) : undefined;
   const anchorsRaw = Array.isArray(ref.anchors) ? ref.anchors : [];
   const anchors: ImageCalibrationAnchor[] = [];
   for (const a of anchorsRaw) {
@@ -483,6 +490,7 @@ export function normalizeImageCalibration(value: unknown): ImageCalibration | un
       exampleDocumentId,
       widthPx,
       heightPx,
+      pageRegion,
       pHash64,
       headerTokens,
       anchors: anchors.length ? anchors : undefined,

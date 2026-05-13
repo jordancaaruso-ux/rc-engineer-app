@@ -37,6 +37,7 @@ type Body = {
   exampleDocumentId?: string;
   fields?: unknown[];
   anchors?: AnchorInput[];
+  pageRegion?: AnchorInput | null;
 };
 
 function clamp01(n: number): number {
@@ -55,14 +56,21 @@ function regionFromAnchor(input: AnchorInput): ImageRegion {
   };
 }
 
-function regionFromPdfWidget(widget: PdfFormFieldWidgetRect): ImageRegion | null {
+function regionFromPdfWidget(widget: PdfFormFieldWidgetRect, pageRegion?: ImageRegion): ImageRegion | null {
   if (widget.pageNumber !== 1) return null;
   if (widget.pageWidth <= 0 || widget.pageHeight <= 0 || widget.width <= 0 || widget.height <= 0) return null;
-  return {
+  const pageRelative = {
     xPct: clamp01(widget.x / widget.pageWidth),
     yPct: clamp01(widget.y / widget.pageHeight),
     wPct: clamp01(widget.width / widget.pageWidth),
     hPct: clamp01(widget.height / widget.pageHeight),
+  };
+  if (!pageRegion) return pageRelative;
+  return {
+    xPct: clamp01(pageRegion.xPct + pageRelative.xPct * pageRegion.wPct),
+    yPct: clamp01(pageRegion.yPct + pageRelative.yPct * pageRegion.hPct),
+    wPct: clamp01(pageRelative.wPct * pageRegion.wPct),
+    hPct: clamp01(pageRelative.hPct * pageRegion.hPct),
   };
 }
 
@@ -82,13 +90,14 @@ function simpleImageFieldFromRule(input: {
   rule: { pdfFieldName: string; widgetInstanceIndex?: number };
   extracted: PdfFormFieldsExtraction;
   warnings: string[];
+  pageRegion?: ImageRegion;
 }): ImageCalibrationField | null {
   const widget = findWidget(input.extracted, input.rule.pdfFieldName, input.rule.widgetInstanceIndex);
   if (!widget) {
     input.warnings.push(`missing_widget:${input.key}:${input.rule.pdfFieldName}#${input.rule.widgetInstanceIndex ?? 0}`);
     return null;
   }
-  const region = regionFromPdfWidget(widget);
+  const region = regionFromPdfWidget(widget, input.pageRegion);
   if (!region) {
     input.warnings.push(`unsupported_widget_region:${input.key}:${input.rule.pdfFieldName}#${widget.instanceIndex}`);
     return null;
@@ -103,6 +112,7 @@ function simpleImageFieldFromRule(input: {
 function deriveImageFieldsFromPdfMappings(input: {
   calibrationDataJson: unknown;
   extracted: PdfFormFieldsExtraction;
+  pageRegion?: ImageRegion;
 }): { fields: ImageCalibrationField[]; warnings: string[] } {
   const calibrationData = normalizeCalibrationData(input.calibrationDataJson);
   const mappings = calibrationData.formFieldMappings ?? {};
@@ -115,7 +125,7 @@ function deriveImageFieldsFromPdfMappings(input: {
       warnings.push(`missing_widget:${key}:${value}:${pdfFieldName}#${widgetInstanceIndex ?? 0}`);
       return null;
     }
-    const region = regionFromPdfWidget(widget);
+    const region = regionFromPdfWidget(widget, input.pageRegion);
     if (!region) {
       warnings.push(`unsupported_widget_region:${key}:${value}:${pdfFieldName}#${widget.instanceIndex}`);
       return null;
@@ -158,6 +168,7 @@ function deriveImageFieldsFromPdfMappings(input: {
       rule: rule as PdfFormFieldMappingRule & { pdfFieldName: string; widgetInstanceIndex?: number },
       extracted: input.extracted,
       warnings,
+      pageRegion: input.pageRegion,
     });
     if (simple) fields.push(simple);
   }
@@ -236,6 +247,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const deriveFromCalibrationId = body.deriveFromCalibrationId?.trim() || null;
+  const pageRegion =
+    deriveFromCalibrationId && body.pageRegion
+      ? regionFromAnchor(body.pageRegion)
+      : deriveFromCalibrationId
+        ? { xPct: 0, yPct: 0, wPct: 1, hPct: 1 }
+        : undefined;
   const fieldsRaw = Array.isArray(body.fields) ? body.fields : [];
   const fields: ImageCalibrationField[] = [];
   for (const raw of fieldsRaw) {
@@ -322,6 +339,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       exampleDocumentId,
       widthPx: fingerprint.widthPx,
       heightPx: fingerprint.heightPx,
+      pageRegion,
       pHash64: fingerprint.pHash64,
       headerTokens: fingerprint.headerTokens,
       anchors: anchors.length ? anchors : undefined,
