@@ -37,6 +37,13 @@ export default function RootLayout({ children }: { children: ReactNode }): React
   return (
     <html lang="en" className={`${montserrat.variable} dark`}>
       <body className="min-h-screen font-sans font-normal antialiased">
+        {/*
+         * Fixed page wash. Lives outside any stacking context so the corner
+         * radials reliably paint behind the iOS Dynamic Island / home
+         * indicator on first frame in WKWebView (where pseudo-elements with
+         * negative z-index can be clipped by body's stacking context).
+         */}
+        <div className="page-bg" aria-hidden="true" />
         <Script
           id="rc-tz-cookie-bootstrap"
           strategy="beforeInteractive"
