@@ -295,6 +295,202 @@ export function parseCustomSetupFieldDefinition(raw: unknown): CustomSetupFieldD
   };
 }
 
+/**
+ * Normalized (0..1) rectangle in the calibration's reference image space. Resolution-independent
+ * so the same rules apply to any future upload of the same screenshot template.
+ */
+export type ImageRegion = { xPct: number; yPct: number; wPct: number; hPct: number };
+
+/**
+ * Single field rule in an image-based calibration. Mirrors the PDF formField/region split:
+ * - "text" reads OCR text from the cropped region (vision model).
+ * - "checkbox" classifies a single rectangle as filled/empty.
+ * - "singleChoiceGroup"/"multiSelectGroup" classifies multiple option rectangles and emits the
+ *   winner (or list of winners) as the field value.
+ */
+export type ImageCalibrationField =
+  | { kind: "text"; key: string; region: ImageRegion; numericOnly?: boolean }
+  | {
+      kind: "checkbox";
+      key: string;
+      region: ImageRegion;
+      checkedValue?: string;
+      uncheckedValue?: string;
+      /** Mean-darkness threshold (0..1) above which the box counts as checked; default 0.5. */
+      threshold?: number;
+    }
+  | {
+      kind: "singleChoiceGroup";
+      key: string;
+      options: Array<{ value: string; region: ImageRegion }>;
+    }
+  | {
+      kind: "multiSelectGroup";
+      key: string;
+      options: Array<{ value: string; region: ImageRegion }>;
+    };
+
+/** Small fixed-position landmark used to verify alignment between the reference and a new upload. */
+export type ImageCalibrationAnchor = {
+  /** Normalized centre of the anchor crop in the reference image. */
+  xPct: number;
+  yPct: number;
+  /** Normalized size of the anchor crop. */
+  wPct: number;
+  hPct: number;
+  /** 64-bit dHash of the anchor crop, hex-encoded. */
+  pHash: string;
+};
+
+export type ImageCalibrationReference = {
+  exampleDocumentId: string;
+  widthPx: number;
+  heightPx: number;
+  /** Whole-image dHash hex used by the auto-pick step (Hamming-comparable across calibrations). */
+  pHash64: string;
+  /** Bag of OCR tokens from the top ~25% of the reference image (used as a tiebreaker). */
+  headerTokens: string[];
+  /** Optional anchor crops for affine alignment of new uploads. */
+  anchors?: ImageCalibrationAnchor[];
+};
+
+export type ImageCalibration = {
+  reference: ImageCalibrationReference;
+  fields: ImageCalibrationField[];
+};
+
+export function isImageRegion(value: unknown): value is ImageRegion {
+  if (!value || typeof value !== "object") return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.xPct === "number"
+    && typeof r.yPct === "number"
+    && typeof r.wPct === "number"
+    && typeof r.hPct === "number"
+    && Number.isFinite(r.xPct)
+    && Number.isFinite(r.yPct)
+    && Number.isFinite(r.wPct)
+    && Number.isFinite(r.hPct)
+  );
+}
+
+function clampPct(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
+function normalizeImageRegion(value: ImageRegion): ImageRegion {
+  return {
+    xPct: clampPct(value.xPct),
+    yPct: clampPct(value.yPct),
+    wPct: clampPct(value.wPct),
+    hPct: clampPct(value.hPct),
+  };
+}
+
+export function normalizeImageCalibrationField(value: unknown): ImageCalibrationField | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  const key = typeof v.key === "string" ? v.key.trim() : "";
+  if (!key) return null;
+  const kind = v.kind;
+  if (kind === "text") {
+    if (!isImageRegion(v.region)) return null;
+    return {
+      kind: "text",
+      key,
+      region: normalizeImageRegion(v.region),
+      numericOnly: typeof v.numericOnly === "boolean" ? v.numericOnly : undefined,
+    };
+  }
+  if (kind === "checkbox") {
+    if (!isImageRegion(v.region)) return null;
+    const threshold =
+      typeof v.threshold === "number" && Number.isFinite(v.threshold) ? clampPct(v.threshold) : undefined;
+    return {
+      kind: "checkbox",
+      key,
+      region: normalizeImageRegion(v.region),
+      checkedValue: typeof v.checkedValue === "string" ? v.checkedValue : undefined,
+      uncheckedValue: typeof v.uncheckedValue === "string" ? v.uncheckedValue : undefined,
+      threshold,
+    };
+  }
+  if (kind === "singleChoiceGroup" || kind === "multiSelectGroup") {
+    const optionsRaw = Array.isArray(v.options) ? v.options : [];
+    const options: Array<{ value: string; region: ImageRegion }> = [];
+    for (const o of optionsRaw) {
+      if (!o || typeof o !== "object") continue;
+      const oo = o as Record<string, unknown>;
+      const optionValue = typeof oo.value === "string" ? oo.value.trim() : "";
+      if (!optionValue) continue;
+      if (!isImageRegion(oo.region)) continue;
+      options.push({ value: optionValue, region: normalizeImageRegion(oo.region) });
+    }
+    if (options.length === 0) return null;
+    return { kind, key, options };
+  }
+  return null;
+}
+
+export function normalizeImageCalibration(value: unknown): ImageCalibration | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  const refRaw = v.reference;
+  if (!refRaw || typeof refRaw !== "object") return undefined;
+  const ref = refRaw as Record<string, unknown>;
+  const exampleDocumentId = typeof ref.exampleDocumentId === "string" ? ref.exampleDocumentId.trim() : "";
+  const widthPx = typeof ref.widthPx === "number" && Number.isFinite(ref.widthPx) ? ref.widthPx : 0;
+  const heightPx = typeof ref.heightPx === "number" && Number.isFinite(ref.heightPx) ? ref.heightPx : 0;
+  const pHash64 = typeof ref.pHash64 === "string" ? ref.pHash64.trim().toLowerCase() : "";
+  if (!exampleDocumentId || widthPx <= 0 || heightPx <= 0 || !pHash64) return undefined;
+  const headerTokensRaw = Array.isArray(ref.headerTokens) ? ref.headerTokens : [];
+  const headerTokens = headerTokensRaw
+    .map((t) => (typeof t === "string" ? t.trim().toLowerCase() : ""))
+    .filter(Boolean);
+  const anchorsRaw = Array.isArray(ref.anchors) ? ref.anchors : [];
+  const anchors: ImageCalibrationAnchor[] = [];
+  for (const a of anchorsRaw) {
+    if (!a || typeof a !== "object") continue;
+    const aa = a as Record<string, unknown>;
+    if (
+      typeof aa.xPct !== "number"
+      || typeof aa.yPct !== "number"
+      || typeof aa.wPct !== "number"
+      || typeof aa.hPct !== "number"
+      || typeof aa.pHash !== "string"
+    ) {
+      continue;
+    }
+    anchors.push({
+      xPct: clampPct(aa.xPct),
+      yPct: clampPct(aa.yPct),
+      wPct: clampPct(aa.wPct),
+      hPct: clampPct(aa.hPct),
+      pHash: aa.pHash.trim().toLowerCase(),
+    });
+  }
+  const fieldsRaw = Array.isArray(v.fields) ? v.fields : [];
+  const fields: ImageCalibrationField[] = [];
+  for (const f of fieldsRaw) {
+    const norm = normalizeImageCalibrationField(f);
+    if (norm) fields.push(norm);
+  }
+  return {
+    reference: {
+      exampleDocumentId,
+      widthPx,
+      heightPx,
+      pHash64,
+      headerTokens,
+      anchors: anchors.length ? anchors : undefined,
+    },
+    fields,
+  };
+}
+
 export type SetupSheetCalibrationData = {
   calibrationMeta?: {
     versionLabel?: string;
@@ -305,6 +501,7 @@ export type SetupSheetCalibrationData = {
     | "pdf_form_fields"
     | "editable_pdf_text_mapping"
     | "pdf_region_fallback"
+    | "image_region_v1"
     | string;
   documentMeta?: {
     pageCount?: number;
@@ -333,6 +530,12 @@ export type SetupSheetCalibrationData = {
    * Custom fields store visibility on `CustomSetupFieldDefinition`.
    */
   fieldDisplayOverrides?: Record<string, FieldDisplayOverride>;
+  /**
+   * Image-based mapping (screenshots / scanned setup sheets). When set, the IMAGE branch of
+   * processImport uses these regions instead of the PDF-only `fields` map. Lives next to the
+   * PDF maps so a single calibration can in principle support both formats.
+   */
+  imageCalibration?: ImageCalibration;
 };
 
 export function isCalibrationFieldRegion(value: unknown): value is CalibrationFieldRegion {
@@ -454,6 +657,7 @@ function inferTemplateType(out: SetupSheetCalibrationData): void {
   const formN = Object.keys(out.formFieldMappings ?? {}).length;
   const textN = Object.keys(out.fieldMappings ?? {}).length;
   const regionN = Object.keys(out.fields ?? {}).length;
+  const imageN = out.imageCalibration?.fields.length ?? 0;
   if (formN > 0) {
     out.templateType = "pdf_form_fields";
     return;
@@ -464,6 +668,10 @@ function inferTemplateType(out: SetupSheetCalibrationData): void {
   }
   if (regionN > 0) {
     out.templateType = "pdf_region_fallback";
+    return;
+  }
+  if (imageN > 0) {
+    out.templateType = "image_region_v1";
     return;
   }
   out.templateType = "pdf_form_fields";
@@ -652,6 +860,9 @@ export function normalizeCalibrationData(input: unknown): SetupSheetCalibrationD
     out.fieldDisplayOverrides = fo;
   }
 
+  const imageCal = normalizeImageCalibration(obj.imageCalibration);
+  if (imageCal) out.imageCalibration = imageCal;
+
   if (typeof obj.templateType !== "string") {
     inferTemplateType(out);
   }
@@ -662,10 +873,12 @@ export function calibrationMappingCounts(data: SetupSheetCalibrationData): {
   formFields: number;
   textFields: number;
   regionFields: number;
+  imageFields: number;
 } {
   return {
     formFields: Object.keys(data.formFieldMappings ?? {}).length,
     textFields: Object.keys(data.fieldMappings ?? {}).length,
     regionFields: Object.keys(data.fields ?? {}).length,
+    imageFields: data.imageCalibration?.fields.length ?? 0,
   };
 }

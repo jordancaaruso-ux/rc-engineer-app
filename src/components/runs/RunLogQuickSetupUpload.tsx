@@ -63,6 +63,13 @@ export function RunLogQuickSetupUpload(props: {
       }
       const data = result.data;
       setStage("done");
+      // Image upload with no calibration match → send the user to the calibration wizard.
+      const isImageMime = file.type?.toLowerCase().startsWith("image/");
+      if (isImageMime && data.pickSource === "none" && !data.setupId) {
+        router.push(`/setup-documents/${data.documentId}/calibrate-image`);
+        router.refresh();
+        return;
+      }
       if (data.needsReview || !data.setupId) {
         router.push(`/setup-documents/${data.documentId}`);
         router.refresh();
@@ -93,8 +100,10 @@ export function RunLogQuickSetupUpload(props: {
     <div className="max-w-2xl rounded-md border border-primary/25 bg-primary/5 p-3 space-y-2">
       <div className="text-xs font-medium text-foreground">No saved setups for this car yet</div>
       <p className="text-[11px] text-muted-foreground leading-snug">
-        Upload a <span className="font-medium text-foreground">PDF</span> setup sheet to auto-import (same as Setup
-        page). Images paste here too — they usually need review until image calibrations exist.
+        Upload a <span className="font-medium text-foreground">PDF</span> setup sheet to auto-import.
+        For <span className="font-medium text-foreground">screenshots</span>, the first time we see a
+        sheet template you&apos;ll draw rectangles around each value once — every future paste then
+        imports automatically.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <input

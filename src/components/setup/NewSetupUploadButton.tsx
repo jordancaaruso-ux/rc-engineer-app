@@ -72,7 +72,11 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
       setStage("done");
       const data = result.data;
       const docId = data.documentId;
-      if (data.needsReview || !data.setupId) {
+      const isImageMime = file.type?.toLowerCase().startsWith("image/");
+      if (isImageMime && data.pickSource === "none" && !data.setupId) {
+        router.push(`/setup-documents/${docId}/calibrate-image`);
+        router.refresh();
+      } else if (data.needsReview || !data.setupId) {
         router.push(`/setup-documents/${docId}`);
         router.refresh();
       } else {

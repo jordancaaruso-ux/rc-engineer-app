@@ -19,6 +19,10 @@ import {
   repickCalibrationForBytes,
   type RepickOutcome,
 } from "@/lib/setupCalibrations/autoPickCalibration";
+import {
+  buildImageCalibrationCandidates,
+  repickImageCalibrationForBytes,
+} from "@/lib/setupCalibrations/autoPickImageCalibration";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
 import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
 
@@ -57,12 +61,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Missing file field" }, { status: 400 });
   }
 
-  const carResolved = await resolveOwnedCarId(user.id, form.get("carId"));
-  if (!carResolved.ok) {
-    return NextResponse.json({ error: carResolved.message }, { status: 400 });
+  const explicitCarIdRaw = form.get("carId");
+  const explicitCarIdProvided = typeof explicitCarIdRaw === "string" && explicitCarIdRaw.trim() !== "";
+  let carId: string | null = null;
+  let setupSheetTemplate: string | null = null;
+  if (explicitCarIdProvided) {
+    const carResolved = await resolveOwnedCarId(user.id, explicitCarIdRaw);
+    if (!carResolved.ok) {
+      return NextResponse.json({ error: carResolved.message }, { status: 400 });
+    }
+    carId = carResolved.carId;
+    setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carId);
   }
-  const carId = carResolved.carId;
-  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carId);
 
   if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
@@ -83,12 +93,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to read uploaded file" }, { status: 400 });
   }
 
-  // Fingerprint-based calibration pick (PDF only).
+  // Fingerprint-based calibration pick. PDFs use AcroForm field name fingerprints; images use a
+  // visual pHash + header-token fingerprint stored on the calibration's imageCalibration.
   let outcome: RepickOutcome = {
     pickedCalibrationId: null,
     pickedCalibrationName: null,
     pickSource: "none",
-    pickDebug: "quickCreate:auto skipped (non-pdf)",
+    pickDebug: "quickCreate:auto skipped (unsupported mime)",
   };
   if (mimeType === PDF_MIME) {
     try {
@@ -105,6 +116,65 @@ export async function POST(request: Request): Promise<NextResponse> {
         pickSource: "none",
         pickDebug: `quickCreate:auto fingerprint_error=${msg.slice(0, 200)}`,
       };
+    }
+  } else if (mimeType.startsWith("image/")) {
+    try {
+      const candidates = await buildImageCalibrationCandidates({ userId: user.id });
+      outcome = await repickImageCalibrationForBytes(bytes, candidates, {
+        debugPrefix: "quickCreate:imageAuto",
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      outcome = {
+        pickedCalibrationId: null,
+        pickedCalibrationName: null,
+        pickSource: "none",
+        pickDebug: `quickCreate:imageAuto fingerprint_error=${msg.slice(0, 200)}`,
+      };
+    }
+  }
+
+  // Auto-default carId from the picked calibration when the upload didn't specify one.
+  // Look up canonical setupSheetTemplate values from past SetupDocuments using this calibration;
+  // if exactly one of the user's cars has that template, use it. Avoids forcing a car picker for
+  // repeat users pasting screenshots from an entry point that doesn't already have a car context.
+  if (!carId && outcome.pickedCalibrationId) {
+    const past = await prisma.setupDocument.findMany({
+      where: {
+        userId: user.id,
+        calibrationProfileId: outcome.pickedCalibrationId,
+        setupSheetTemplate: { not: null },
+      },
+      select: { setupSheetTemplate: true },
+      take: 25,
+    });
+    const templates = new Set(
+      past.map((p) => p.setupSheetTemplate).filter((t): t is string => Boolean(t))
+    );
+    if (templates.size === 1) {
+      const template = templates.values().next().value as string;
+      const matchingCars = await prisma.car.findMany({
+        where: {
+          userId: user.id,
+          setupSheetTemplate: { equals: template, mode: "insensitive" },
+        },
+        select: { id: true },
+        take: 2,
+      });
+      if (matchingCars.length === 1) {
+        carId = matchingCars[0]!.id;
+        setupSheetTemplate = template;
+      }
+    }
+  }
+  // We still need a car to materialise a SetupSnapshot. Without one, accept the upload but
+  // require a manual car pick during review (needsReview=true downstream).
+  if (!carId) {
+    if (!explicitCarIdProvided) {
+      // No car context at all → keep going so user can pick a car in the review screen.
+      console.log(
+        `[setup-documents/quick-create] no carId; proceeding without car (calibration=${outcome.pickedCalibrationId ?? "none"})`
+      );
     }
   }
 
@@ -183,16 +253,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     },
   });
   const parseStatus = (latest?.parseStatus ?? "PENDING") as QuickCreateResponse["parseStatus"];
-  const calibrationAmbiguous = mimeType === PDF_MIME && outcome.pickSource === "ambiguous_suggestion";
+  const calibrationAmbiguous = outcome.pickSource === "ambiguous_suggestion";
 
   // Decide if the document is clean enough to materialise a SetupSnapshot automatically.
-  if (!pickedCalibrationId && mimeType === PDF_MIME) {
+  if (!pickedCalibrationId && (mimeType === PDF_MIME || mimeType.startsWith("image/"))) {
     needsReview = true;
-    needsReviewReason = needsReviewReason ?? "No calibration matched — pick one in review.";
-  }
-  if (mimeType !== PDF_MIME) {
-    needsReview = true;
-    needsReviewReason = needsReviewReason ?? "Images need manual review before a setup is created.";
+    needsReviewReason =
+      needsReviewReason
+      ?? (mimeType.startsWith("image/")
+        ? "No image calibration matched — draw regions once to teach the app this sheet."
+        : "No calibration matched — pick one in review.");
   }
   if (parseStatus === "FAILED") {
     needsReview = true;

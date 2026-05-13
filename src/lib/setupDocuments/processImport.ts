@@ -6,6 +6,10 @@ import { loadSetupDocumentFileFromStorage, sourceTypeFromMime } from "@/lib/setu
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { extractPdfRawDataFromFile, mapExtractedPdfWithCalibration } from "@/lib/setupCalibrations/pdfExtractPipeline";
+import {
+  extractImageRawDataFromFile,
+  mapExtractedImageWithCalibration,
+} from "@/lib/setupCalibrations/imageExtractPipeline";
 import { SetupDocumentImportStages, type SetupDocumentImportStage } from "@/lib/setupDocuments/importStages";
 import type { SetupDocumentParsedResult } from "@/lib/setupDocuments/types";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
@@ -498,8 +502,114 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
           importOutcome: "PARTIAL_DIAGNOSTIC",
         },
       });
+    } else if (sourceType === "IMAGE" && effectiveCalibration.calibrationId) {
+      const calRow = await prisma.setupSheetCalibration.findFirst({
+        where: { id: effectiveCalibration.calibrationId },
+        select: { calibrationDataJson: true, name: true },
+      });
+      if (!calRow) throw new Error(`Calibration not found: ${effectiveCalibration.calibrationId}`);
+
+      stage = SetupDocumentImportStages.FIELD_MAPPING_STARTED;
+      await startStage({ docId: doc.id, stage: SetupDocumentImportStages.FIELD_MAPPING_STARTED, status: "PROCESSING" });
+
+      const tImageExtract = procDbg() ? performance.now() : 0;
+      const rawImage = await withTimeout(
+        extractImageRawDataFromFile({
+          file,
+          calibrationDataJsonForMeta: calRow.calibrationDataJson,
+          onStage: async (s, e, data) => {
+            const label = `image_extract:${s}`;
+            if (e === "start") {
+              await startStage({ docId: doc.id, stage: label, status: "PROCESSING" });
+            } else {
+              await finishStage({ docId: doc.id, stage: label, status: "PROCESSING", extra: data });
+            }
+          },
+        }),
+        25000,
+        "extractImageRawDataFromFile"
+      );
+      if (procDbg()) {
+        console.log(
+          `[setup-process-timing] doc=${doc.id} extractImageRawDataFromFile ${(performance.now() - tImageExtract).toFixed(1)}ms ${rawImage.widthPx}x${rawImage.heightPx} anchorScore=${rawImage.anchorMatchScore.toFixed(2)}`
+        );
+      }
+
+      const tImageMap = procDbg() ? performance.now() : 0;
+      const mappedImage = await withTimeout(
+        mapExtractedImageWithCalibration({
+          extracted: rawImage,
+          calibrationDataJson: calRow.calibrationDataJson,
+          calibrationProfileId: effectiveCalibration.calibrationId,
+          onStage: async (s, e, data) => {
+            const label = `image_map:${s}`;
+            if (e === "start") {
+              await startStage({ docId: doc.id, stage: label, status: "PROCESSING" });
+            } else {
+              await finishStage({ docId: doc.id, stage: label, status: "PROCESSING", extra: data });
+            }
+          },
+        }),
+        45000,
+        "mapExtractedImageWithCalibration"
+      );
+      if (procDbg()) {
+        console.log(
+          `[setup-process-timing] doc=${doc.id} mapExtractedImageWithCalibration ${(performance.now() - tImageMap).toFixed(1)}ms importedKeys=${mappedImage.importedKeys.length}`
+        );
+      }
+
+      normalizedParsedData = normalizeParsedSetupData(mappedImage.parsedData);
+      const lowAlignment = rawImage.anchorMatchScore < 0.5;
+      const expectedFields =
+        mappedImage.diagnostic.expected.textFields
+        + mappedImage.diagnostic.expected.checkboxFields
+        + mappedImage.diagnostic.expected.groupFields;
+      const missCount = Math.max(0, expectedFields - mappedImage.importedKeys.length);
+      const calibrationParseStatus =
+        mappedImage.importedKeys.length >= 10
+          ? lowAlignment ? "PARTIAL" : "PARSED"
+          : mappedImage.importedKeys.length > 0
+            ? "PARTIAL"
+            : "FAILED";
+      const hasWarnings =
+        lowAlignment
+        || missCount > 0
+        || (mappedImage.diagnostic.warnings?.length ?? 0) > 0;
+
+      await prisma.setupDocument.update({
+        where: { id: doc.id },
+        data: {
+          parseStatus: calibrationParseStatus,
+          importDiagnosticJson: {
+            kind: "image_import_diagnostic_v1",
+            filename: doc.originalFilename,
+            calibrationAttemptedId: effectiveCalibration.calibrationId,
+            calibrationAttemptedName: calRow.name,
+            widthPx: rawImage.widthPx,
+            heightPx: rawImage.heightPx,
+            anchorMatchScore: rawImage.anchorMatchScore,
+            pHashHamming: rawImage.pHashHamming,
+            mapping: mappedImage.diagnostic,
+          } as object,
+          importOutcome: hasWarnings ? "COMPLETED_WITH_WARNINGS" : "COMPLETED_TRUSTED",
+        },
+      });
+      stage = SetupDocumentImportStages.FIELD_MAPPING_COMPLETED;
+      await finishStage({ docId: doc.id, stage: SetupDocumentImportStages.FIELD_MAPPING_STARTED, status: "PROCESSING" });
+      await startStage({
+        docId: doc.id,
+        stage,
+        status: "PROCESSING",
+        extra: {
+          calibrationName: calRow.name,
+          importedKeys: mappedImage.importedKeys.length,
+          anchorMatchScore: rawImage.anchorMatchScore,
+        },
+      });
+      await finishStage({ docId: doc.id, stage, status: "PROCESSING" });
     } else {
-      // For images we only have basic parsing right now; still mark mapping stages.
+      // Image upload without an image calibration → still need manual review (calibration wizard).
       stage = SetupDocumentImportStages.FIELD_MAPPING_STARTED;
       await startStage({ docId: doc.id, stage: SetupDocumentImportStages.FIELD_MAPPING_STARTED, status: "PROCESSING" });
       stage = SetupDocumentImportStages.FIELD_MAPPING_COMPLETED;

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
@@ -7,6 +8,7 @@ import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrat
 import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDocumentReviewClient";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
+import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 
 export default async function SetupDocumentDetailPage({
   params,
@@ -90,6 +92,16 @@ export default async function SetupDocumentDetailPage({
     setupDocumentId: doc.id,
   });
 
+  const isImage = doc.sourceType === "IMAGE" || (doc.mimeType ?? "").startsWith("image/");
+  const linkedCalibrationFields = doc.calibrationProfileId
+    ? (() => {
+        const cal = calibrations.find((c) => c.id === doc.calibrationProfileId);
+        if (!cal) return 0;
+        return normalizeCalibrationData(cal.calibrationDataJson).imageCalibration?.fields.length ?? 0;
+      })()
+    : 0;
+  const showImageCalibrateCta = isImage && linkedCalibrationFields === 0;
+
   return (
     <>
       <header className="page-header">
@@ -98,6 +110,25 @@ export default async function SetupDocumentDetailPage({
           <p className="page-subtitle">Review parsed values before creating a setup snapshot.</p>
         </div>
       </header>
+      {showImageCalibrateCta ? (
+        <div className="page-body pb-0">
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-3 flex items-center justify-between gap-3">
+            <div className="text-xs">
+              <div className="font-medium text-foreground">Teach the app this screenshot</div>
+              <div className="text-muted-foreground">
+                Draw rectangles around each value once. Future uploads of this template will import
+                automatically.
+              </div>
+            </div>
+            <Link
+              href={`/setup-documents/${doc.id}/calibrate-image`}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+            >
+              Open image calibration
+            </Link>
+          </div>
+        </div>
+      ) : null}
       <SetupDocumentReviewClient
         doc={{
           ...doc,

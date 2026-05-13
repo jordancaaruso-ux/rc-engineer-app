@@ -49,7 +49,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
             <div className="px-4 py-6 text-sm text-muted-foreground">No calibrations saved yet.</div>
           ) : (
             calibrations.map((c) => {
-              const { formFields, textFields, regionFields } = calibrationMappingCounts(
+              const { formFields, textFields, regionFields, imageFields } = calibrationMappingCounts(
                 normalizeCalibrationData(c.calibrationDataJson)
               );
               return (
@@ -58,7 +58,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
                     <div className="ui-title text-sm text-foreground normal-case">{c.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {c.sourceType} · {formFields} form · {textFields} text · {regionFields} region ·{" "}
-                      {new Date(c.createdAt).toLocaleDateString()}
+                      {imageFields} image · {new Date(c.createdAt).toLocaleDateString()}
                     </div>
                   </div>
                   <Link href={`/setup-calibrations/${c.id}`} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">
