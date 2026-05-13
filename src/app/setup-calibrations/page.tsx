@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { CalibrationDeleteButton } from "@/components/setup-documents/CalibrationDeleteButton";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
@@ -52,6 +53,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
               const { formFields, textFields, regionFields, imageFields } = calibrationMappingCounts(
                 normalizeCalibrationData(c.calibrationDataJson)
               );
+              const owned = c.userId === user.id;
               return (
                 <div key={c.id} className="px-4 py-3 flex items-center justify-between gap-2">
                   <div>
@@ -59,11 +61,17 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
                     <div className="text-xs text-muted-foreground">
                       {c.sourceType} · {formFields} form · {textFields} text · {regionFields} region ·{" "}
                       {imageFields} image · {new Date(c.createdAt).toLocaleDateString()}
+                      {c.communityShared ? " · community" : ""}
                     </div>
                   </div>
-                  <Link href={`/setup-calibrations/${c.id}`} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">
-                    Open
-                  </Link>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {owned ? (
+                      <CalibrationDeleteButton calibrationId={c.id} calibrationName={c.name} />
+                    ) : null}
+                    <Link href={`/setup-calibrations/${c.id}`} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">
+                      Open
+                    </Link>
+                  </div>
                 </div>
               );
             })

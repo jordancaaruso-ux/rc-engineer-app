@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
+import { CalibrationDeleteButton } from "@/components/setup-documents/CalibrationDeleteButton";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
@@ -41,13 +42,20 @@ export default async function SetupCalibrationDetailPage({
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">Edit calibration</h1>
-          <p className="page-subtitle">
-            Calibration is the source of truth for PDF-to-setup mapping. Use{" "}
-            <span className="text-foreground">Quick add parameters</span> for a simple name → type → Acro widget flow,
-            or the Form tab for full control.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div>
+            <h1 className="page-title">Edit calibration</h1>
+            <p className="page-subtitle">
+              Calibration is the source of truth for PDF-to-setup mapping. Use{" "}
+              <span className="text-foreground">Quick add parameters</span> for a simple name → type → Acro widget flow,
+              or the Form tab for full control.
+            </p>
+          </div>
+          <CalibrationDeleteButton
+            calibrationId={calibration.id}
+            calibrationName={calibration.name}
+            redirectTo="/setup-calibrations"
+          />
         </div>
       </header>
       <SetupCalibrationEditorClient

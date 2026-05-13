@@ -103,3 +103,23 @@ export async function PATCH(request: Request, ctx: Ctx) {
   return NextResponse.json({ calibration });
 }
 
+export async function DELETE(_request: Request, ctx: Ctx) {
+  if (!hasDatabaseUrl()) {
+    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+  }
+  const { id } = await ctx.params;
+  const user = await getAuthenticatedApiUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const existing = await prisma.setupSheetCalibration.findFirst({
+    where: { id, userId: user.id },
+    select: { id: true },
+  });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.setupSheetCalibration.delete({
+    where: { id },
+  });
+  return NextResponse.json({ ok: true });
+}
+
