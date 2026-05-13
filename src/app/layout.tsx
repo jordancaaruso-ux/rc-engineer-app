@@ -38,24 +38,26 @@ export default function RootLayout({ children }: { children: ReactNode }): React
     <html lang="en" className={`${montserrat.variable} dark`}>
       <body className="min-h-screen font-sans font-normal antialiased">
         {/*
-         * Fixed page wash. Lives outside any stacking context so the corner
-         * radials reliably paint behind the iOS Dynamic Island / home
-         * indicator on first frame in WKWebView (where pseudo-elements with
-         * negative z-index can be clipped by body's stacking context).
+         * Fixed page wash sits at z-index 0 (never negative): in WKWebView a
+         * negative z-index can paint under `html`’s canvas background, which
+         * reads as a flat band from the physical top down to the Dynamic Island.
+         * `.app-root` stacks all UI above it so modals/portals still work.
          */}
         <div className="page-bg" aria-hidden="true" />
-        <Script
-          id="rc-tz-cookie-bootstrap"
-          strategy="beforeInteractive"
-        >{`(function(){try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;document.cookie='${RC_TIMEZONE_COOKIE}='+encodeURIComponent(tz)+';path=/;max-age=31536000;SameSite=Lax';}catch(e){}})();`}</Script>
-        <AuthSessionProvider>
-          <TimeZoneCookieSync />
-          <CapacitorDeepLinkBridge />
-          <div className="app-shell">
-            <Sidebar />
-            <main className="page">{children}</main>
-          </div>
-        </AuthSessionProvider>
+        <div className="app-root">
+          <Script
+            id="rc-tz-cookie-bootstrap"
+            strategy="beforeInteractive"
+          >{`(function(){try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;document.cookie='${RC_TIMEZONE_COOKIE}='+encodeURIComponent(tz)+';path=/;max-age=31536000;SameSite=Lax';}catch(e){}})();`}</Script>
+          <AuthSessionProvider>
+            <TimeZoneCookieSync />
+            <CapacitorDeepLinkBridge />
+            <div className="app-shell">
+              <Sidebar />
+              <main className="page">{children}</main>
+            </div>
+          </AuthSessionProvider>
+        </div>
       </body>
     </html>
   );

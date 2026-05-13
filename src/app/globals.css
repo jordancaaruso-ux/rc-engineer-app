@@ -222,16 +222,19 @@ body {
 }
 
 /*
- * Fixed corner / center wash. A real DOM element (rendered in `layout.tsx`)
- * rather than a pseudo so it isn't trapped by any stacking context body picks
- * up later. With `viewport-fit: cover`, `inset: 0` covers the visual viewport
- * including under the Dynamic Island / home indicator.
+ * Fixed corner / center wash (see `layout.tsx`). Stays at z-index 0 — not
+ * negative — so WKWebView does not paint it under `html`’s solid canvas fill.
+ * Negative `inset` pulls past safe areas so the radial origins sit in the
+ * true screen corners (including behind the Dynamic Island) with
+ * `viewport-fit: cover`.
  */
 .page-bg {
   position: fixed;
-  inset: 0;
-  z-index: -1;
+  inset: calc(0px - env(safe-area-inset-top, 0px)) calc(0px - env(safe-area-inset-right, 0px))
+    calc(0px - env(safe-area-inset-bottom, 0px)) calc(0px - env(safe-area-inset-left, 0px));
+  z-index: 0;
   pointer-events: none;
+  background-color: rgb(var(--color-background));
   background-image:
     radial-gradient(
       ellipse 120% 90% at 0% 0%,
@@ -258,6 +261,12 @@ body {
       rgb(var(--color-foreground) / var(--body-glow-center)),
       transparent 70%
     );
+}
+
+/* All interactive UI above `.page-bg` (z-index 0). Keeps portaled overlays working if they share this subtree. */
+.app-root {
+  position: relative;
+  z-index: 1;
 }
 
 * {
