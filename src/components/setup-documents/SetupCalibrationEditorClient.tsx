@@ -87,6 +87,8 @@ type PdfTextStructureDocument = {
 type PdfFormFieldWidget = {
   instanceIndex?: number;
   pageNumber: number;
+  pageWidth?: number;
+  pageHeight?: number;
   x: number;
   y: number;
   width: number;

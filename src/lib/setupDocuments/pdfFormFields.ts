@@ -28,6 +28,8 @@ import { isPresetWithOtherCompanionKey } from "@/lib/setup/presetWithOther";
 export type PdfFormFieldWidgetRect = {
   instanceIndex: number;
   pageNumber: number;
+  pageWidth: number;
+  pageHeight: number;
   x: number;
   y: number;
   width: number;
@@ -145,6 +147,8 @@ export function collectWidgetLayouts(pdfDoc: PDFDocument, field: PDFField): PdfF
       items.push({
         instanceIndex: 0,
         pageNumber: pageIdx + 1,
+        pageWidth: page.getWidth(),
+        pageHeight,
         x,
         y: yTop,
         width: rect.width,

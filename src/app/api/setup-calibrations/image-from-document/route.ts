@@ -15,13 +15,24 @@ import {
   type ImageCalibrationAnchor,
   type ImageCalibrationField,
   type ImageRegion,
+  type PdfFormFieldMappingRule,
 } from "@/lib/setupCalibrations/types";
+import {
+  getCalibrationFieldKind,
+} from "@/lib/setupCalibrations/calibrationFieldCatalog";
+import {
+  extractPdfFormFields,
+  type PdfFormFieldsExtraction,
+  type PdfFormFieldWidgetRect,
+} from "@/lib/setupDocuments/pdfFormFields";
 
 type AnchorInput = { xPct: number; yPct: number; wPct: number; hPct: number };
 
 type Body = {
   /** When provided, updates this calibration in-place; otherwise a new one is created. */
   calibrationId?: string | null;
+  /** Optional editable-PDF calibration whose AcroForm widgets should become image regions. */
+  deriveFromCalibrationId?: string | null;
   name?: string;
   exampleDocumentId?: string;
   fields?: unknown[];
@@ -42,6 +53,116 @@ function regionFromAnchor(input: AnchorInput): ImageRegion {
     wPct: clamp01(input.wPct),
     hPct: clamp01(input.hPct),
   };
+}
+
+function regionFromPdfWidget(widget: PdfFormFieldWidgetRect): ImageRegion | null {
+  if (widget.pageNumber !== 1) return null;
+  if (widget.pageWidth <= 0 || widget.pageHeight <= 0 || widget.width <= 0 || widget.height <= 0) return null;
+  return {
+    xPct: clamp01(widget.x / widget.pageWidth),
+    yPct: clamp01(widget.y / widget.pageHeight),
+    wPct: clamp01(widget.width / widget.pageWidth),
+    hPct: clamp01(widget.height / widget.pageHeight),
+  };
+}
+
+function findWidget(
+  extracted: PdfFormFieldsExtraction,
+  pdfFieldName: string,
+  widgetInstanceIndex?: number
+): PdfFormFieldWidgetRect | null {
+  const row = extracted.fields.find((f) => f.name === pdfFieldName);
+  if (!row) return null;
+  const index = widgetInstanceIndex ?? 0;
+  return row.widgets.find((w) => w.instanceIndex === index) ?? row.widgets[index] ?? null;
+}
+
+function simpleImageFieldFromRule(input: {
+  key: string;
+  rule: { pdfFieldName: string; widgetInstanceIndex?: number };
+  extracted: PdfFormFieldsExtraction;
+  warnings: string[];
+}): ImageCalibrationField | null {
+  const widget = findWidget(input.extracted, input.rule.pdfFieldName, input.rule.widgetInstanceIndex);
+  if (!widget) {
+    input.warnings.push(`missing_widget:${input.key}:${input.rule.pdfFieldName}#${input.rule.widgetInstanceIndex ?? 0}`);
+    return null;
+  }
+  const region = regionFromPdfWidget(widget);
+  if (!region) {
+    input.warnings.push(`unsupported_widget_region:${input.key}:${input.rule.pdfFieldName}#${widget.instanceIndex}`);
+    return null;
+  }
+  const kind = getCalibrationFieldKind(input.key);
+  if (kind === "boolean") {
+    return { kind: "checkbox", key: input.key, region, checkedValue: "1", uncheckedValue: "" };
+  }
+  return { kind: "text", key: input.key, region, numericOnly: kind === "number" || undefined };
+}
+
+function deriveImageFieldsFromPdfMappings(input: {
+  calibrationDataJson: unknown;
+  extracted: PdfFormFieldsExtraction;
+}): { fields: ImageCalibrationField[]; warnings: string[] } {
+  const calibrationData = normalizeCalibrationData(input.calibrationDataJson);
+  const mappings = calibrationData.formFieldMappings ?? {};
+  const fields: ImageCalibrationField[] = [];
+  const warnings: string[] = [];
+
+  const optionRegion = (key: string, value: string, pdfFieldName: string, widgetInstanceIndex?: number) => {
+    const widget = findWidget(input.extracted, pdfFieldName, widgetInstanceIndex);
+    if (!widget) {
+      warnings.push(`missing_widget:${key}:${value}:${pdfFieldName}#${widgetInstanceIndex ?? 0}`);
+      return null;
+    }
+    const region = regionFromPdfWidget(widget);
+    if (!region) {
+      warnings.push(`unsupported_widget_region:${key}:${value}:${pdfFieldName}#${widget.instanceIndex}`);
+      return null;
+    }
+    return { value, region };
+  };
+
+  for (const [key, rule] of Object.entries(mappings)) {
+    if ("mode" in rule && rule.mode === "singleChoiceWidgetGroup") {
+      const options = Object.entries(rule.options)
+        .map(([value, ref]) => optionRegion(key, value, rule.pdfFieldName, ref.widgetInstanceIndex))
+        .filter(Boolean) as Array<{ value: string; region: ImageRegion }>;
+      if (options.length > 0) fields.push({ kind: "singleChoiceGroup", key, options });
+      continue;
+    }
+    if ("mode" in rule && rule.mode === "multiSelectWidgetGroup") {
+      const options = Object.entries(rule.options)
+        .map(([value, ref]) => optionRegion(key, value, rule.pdfFieldName, ref.widgetInstanceIndex))
+        .filter(Boolean) as Array<{ value: string; region: ImageRegion }>;
+      if (options.length > 0) fields.push({ kind: "multiSelectGroup", key, options });
+      continue;
+    }
+    if ("mode" in rule && rule.mode === "singleChoiceNamedFields") {
+      const options = Object.entries(rule.options)
+        .map(([value, ref]) => optionRegion(key, value, ref.pdfFieldName, ref.widgetInstanceIndex))
+        .filter(Boolean) as Array<{ value: string; region: ImageRegion }>;
+      if (options.length > 0) fields.push({ kind: "singleChoiceGroup", key, options });
+      continue;
+    }
+    if ("mode" in rule && rule.mode === "multiSelectNamedFields") {
+      const options = Object.entries(rule.options)
+        .map(([value, ref]) => optionRegion(key, value, ref.pdfFieldName, ref.widgetInstanceIndex))
+        .filter(Boolean) as Array<{ value: string; region: ImageRegion }>;
+      if (options.length > 0) fields.push({ kind: "multiSelectGroup", key, options });
+      continue;
+    }
+
+    const simple = simpleImageFieldFromRule({
+      key,
+      rule: rule as PdfFormFieldMappingRule & { pdfFieldName: string; widgetInstanceIndex?: number },
+      extracted: input.extracted,
+      warnings,
+    });
+    if (simple) fields.push(simple);
+  }
+
+  return { fields, warnings };
 }
 
 async function dHashHexFromBuffer(buf: Buffer): Promise<string> {
@@ -114,11 +235,64 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Example document must be an image upload" }, { status: 400 });
   }
 
+  const deriveFromCalibrationId = body.deriveFromCalibrationId?.trim() || null;
   const fieldsRaw = Array.isArray(body.fields) ? body.fields : [];
   const fields: ImageCalibrationField[] = [];
   for (const raw of fieldsRaw) {
     const norm = normalizeImageCalibrationField(raw);
     if (norm) fields.push(norm);
+  }
+
+  let derivedWarnings: string[] = [];
+  let targetCalibrationId = body.calibrationId?.trim() || null;
+  if (deriveFromCalibrationId) {
+    const sourceCalibration = await prisma.setupSheetCalibration.findFirst({
+      where: { id: deriveFromCalibrationId, userId: user.id },
+      select: {
+        id: true,
+        calibrationDataJson: true,
+        exampleDocument: {
+          select: { id: true, storagePath: true, mimeType: true },
+        },
+      },
+    });
+    if (!sourceCalibration) {
+      return NextResponse.json({ error: "Source PDF calibration not found" }, { status: 404 });
+    }
+    if (!sourceCalibration.exampleDocument || sourceCalibration.exampleDocument.mimeType !== "application/pdf") {
+      return NextResponse.json(
+        { error: "Source calibration needs an editable PDF example document" },
+        { status: 400 }
+      );
+    }
+    let pdfBytes: Buffer;
+    try {
+      pdfBytes = await readBytesFromStorageRef(sourceCalibration.exampleDocument.storagePath);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to read source PDF";
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+    const extractedPdf = await extractPdfFormFields(pdfBytes);
+    if (!extractedPdf.hasFormFields) {
+      return NextResponse.json(
+        { error: extractedPdf.loadError || "Source PDF has no AcroForm fields" },
+        { status: 400 }
+      );
+    }
+    const derived = deriveImageFieldsFromPdfMappings({
+      calibrationDataJson: sourceCalibration.calibrationDataJson,
+      extracted: extractedPdf,
+    });
+    fields.splice(0, fields.length, ...derived.fields);
+    derivedWarnings = derived.warnings;
+    targetCalibrationId = targetCalibrationId ?? sourceCalibration.id;
+  }
+
+  if (deriveFromCalibrationId && fields.length === 0) {
+    return NextResponse.json(
+      { error: "No image fields could be derived from the source PDF calibration", warnings: derivedWarnings },
+      { status: 400 }
+    );
   }
 
   let imageBytes: Buffer;
@@ -155,7 +329,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     fields,
   };
 
-  const calibrationId = body.calibrationId?.trim() || null;
+  const calibrationId = targetCalibrationId;
   if (calibrationId) {
     const existing = await prisma.setupSheetCalibration.findFirst({
       where: { id: calibrationId, userId: user.id },
@@ -164,20 +338,30 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!existing) return NextResponse.json({ error: "Calibration not found" }, { status: 404 });
     const merged = normalizeCalibrationData(existing.calibrationDataJson);
     merged.imageCalibration = imageCalibration;
-    merged.templateType = "image_region_v1";
+    if (!deriveFromCalibrationId) merged.templateType = "image_region_v1";
     const nextName = body.name?.trim() || existing.name;
+    const data: {
+      name: string;
+      calibrationDataJson: object;
+      sourceType?: string;
+      exampleDocumentId?: string;
+    } = {
+      name: nextName,
+      calibrationDataJson: merged as unknown as object,
+    };
+    if (!deriveFromCalibrationId) {
+      data.sourceType = "awesomatix_image_v1";
+      data.exampleDocumentId = exampleDocumentId;
+    }
     await prisma.setupSheetCalibration.update({
       where: { id: calibrationId },
-      data: {
-        name: nextName,
-        sourceType: "awesomatix_image_v1",
-        calibrationDataJson: merged as unknown as object,
-        exampleDocumentId,
-      },
+      data,
     });
     return NextResponse.json({
       calibrationId,
       mode: "updated",
+      derivedFields: deriveFromCalibrationId ? fields.length : undefined,
+      warnings: derivedWarnings.length ? derivedWarnings : undefined,
       hammingToReference: hammingDistanceHex(fingerprint.pHash64, imageCalibration.reference.pHash64),
     });
   }

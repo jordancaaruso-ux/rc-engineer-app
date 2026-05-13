@@ -26,6 +26,14 @@ type DraftField = {
 
 type DraftAnchor = { id: string; region: ImageRegion };
 
+type DeriveCalibrationOption = {
+  id: string;
+  name: string;
+  exampleDocumentFilename: string | null;
+  formFieldCount: number;
+  imageFieldCount: number;
+};
+
 type DraftMode =
   | { kind: "field-region"; fieldId: string }
   | { kind: "field-option"; fieldId: string; optionId: string }
@@ -40,6 +48,7 @@ type Props = {
   initialAnchors?: ImageRegion[];
   initialName?: string;
   initialCalibrationId?: string;
+  deriveCalibrationOptions?: DeriveCalibrationOption[];
 };
 
 function newId(prefix: string): string {
@@ -106,6 +115,11 @@ export function ImageCalibrationEditorClient(props: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState<{ calibrationId: string } | null>(null);
+  const [deriveCalibrationId, setDeriveCalibrationId] = useState(
+    props.deriveCalibrationOptions?.[0]?.id ?? ""
+  );
+  const [deriveSaving, setDeriveSaving] = useState(false);
+  const [deriveError, setDeriveError] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -300,6 +314,20 @@ export function ImageCalibrationEditorClient(props: Props) {
     return { ok: true, fields: out };
   }, [fields]);
 
+  const attachCalibrationAndProcess = useCallback(
+    async (calibrationId: string) => {
+      await fetch(`/api/setup-documents/${props.documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ calibrationProfileId: calibrationId }),
+      });
+      await fetch(`/api/setup-documents/${props.documentId}/process`, { method: "POST" });
+      router.push(`/setup-documents/${props.documentId}`);
+      router.refresh();
+    },
+    [props.documentId, router]
+  );
+
   const onSave = useCallback(async () => {
     setSaveError(null);
     const collected = collectFieldsForSave();
@@ -329,24 +357,61 @@ export function ImageCalibrationEditorClient(props: Props) {
       }
       setSaveOk({ calibrationId: data.calibrationId });
       try {
-        await fetch(`/api/setup-documents/${props.documentId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ calibrationProfileId: data.calibrationId }),
-        });
-        await fetch(`/api/setup-documents/${props.documentId}/process`, { method: "POST" });
+        await attachCalibrationAndProcess(data.calibrationId);
       } catch {
         // Non-fatal; review screen will offer a manual re-process button.
       }
-      router.push(`/setup-documents/${props.documentId}`);
-      router.refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Save failed";
       setSaveError(msg);
     } finally {
       setSaving(false);
     }
-  }, [anchors, collectFieldsForSave, name, props.documentId, props.initialCalibrationId, router]);
+  }, [anchors, attachCalibrationAndProcess, collectFieldsForSave, name, props.documentId, props.initialCalibrationId]);
+
+  const onDeriveFromPdfCalibration = useCallback(async () => {
+    if (!deriveCalibrationId) {
+      setDeriveError("Choose an editable PDF calibration first.");
+      return;
+    }
+    setDeriveSaving(true);
+    setDeriveError(null);
+    try {
+      const res = await fetch("/api/setup-calibrations/image-from-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          calibrationId: deriveCalibrationId,
+          deriveFromCalibrationId: deriveCalibrationId,
+          exampleDocumentId: props.documentId,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        calibrationId?: string;
+        error?: string;
+        derivedFields?: number;
+        warnings?: string[];
+      };
+      if (!res.ok || !data.calibrationId) {
+        setDeriveError(data.error?.trim() || `Derive failed (${res.status})`);
+        return;
+      }
+      if ((data.derivedFields ?? 0) <= 0) {
+        setDeriveError("No fields were derived from that PDF calibration.");
+        return;
+      }
+      try {
+        await attachCalibrationAndProcess(data.calibrationId);
+      } catch {
+        router.push(`/setup-documents/${props.documentId}`);
+        router.refresh();
+      }
+    } catch (e) {
+      setDeriveError(e instanceof Error ? e.message : "Derive failed");
+    } finally {
+      setDeriveSaving(false);
+    }
+  }, [attachCalibrationAndProcess, deriveCalibrationId, props.documentId, router]);
 
   const activeField = fields.find((f) => f.id === activeFieldId) ?? null;
   const activeOptionId = drawMode?.kind === "field-option" ? drawMode.optionId : null;
@@ -480,6 +545,50 @@ export function ImageCalibrationEditorClient(props: Props) {
               Saved. Returning to document review…
             </div>
           ) : null}
+        </div>
+
+        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+          <div className="text-sm font-medium">Use editable PDF mapping</div>
+          <p className="text-xs text-muted-foreground">
+            If you have already calibrated the editable PDF for this sheet, the app can convert those
+            AcroForm widgets into image regions automatically. Use drawing only for fields the PDF
+            does not cover.
+          </p>
+          {(props.deriveCalibrationOptions ?? []).length > 0 ? (
+            <>
+              <label className="block text-xs text-muted-foreground">PDF calibration</label>
+              <select
+                value={deriveCalibrationId}
+                onChange={(e) => setDeriveCalibrationId(e.target.value)}
+                className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs"
+              >
+                {(props.deriveCalibrationOptions ?? []).map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.name} · {opt.formFieldCount} PDF fields
+                    {opt.imageFieldCount > 0 ? ` · ${opt.imageFieldCount} image fields` : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={onDeriveFromPdfCalibration}
+                disabled={deriveSaving || !deriveCalibrationId}
+                className="w-full rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+              >
+                {deriveSaving ? "Deriving…" : "Derive image map from PDF fields"}
+              </button>
+              {deriveError ? (
+                <div className="rounded border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive">
+                  {deriveError}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-xs text-amber-600">
+              No editable PDF calibrations with form mappings were found yet. Calibrate the PDF first,
+              then return here to derive the screenshot map.
+            </p>
+          )}
         </div>
 
         <div className="rounded-md border border-border bg-card p-3 space-y-2">

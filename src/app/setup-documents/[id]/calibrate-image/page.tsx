@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { ImageCalibrationEditorClient } from "@/components/setup-documents/ImageCalibrationEditorClient";
 import { buildCalibrationFieldCatalog } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import {
+  calibrationMappingCounts,
   normalizeCalibrationData,
   type ImageCalibrationField,
   type ImageRegion,
@@ -85,6 +86,34 @@ export default async function CalibrateImagePage({
   }
 
   const fieldCatalog = buildCalibrationFieldCatalog();
+  const calibrationRows = await prisma.setupSheetCalibration.findMany({
+    where: { userId: user.id },
+    select: {
+      id: true,
+      name: true,
+      calibrationDataJson: true,
+      exampleDocument: {
+        select: { originalFilename: true, mimeType: true },
+      },
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  const deriveCalibrationOptions = calibrationRows
+    .map((row) => {
+      const data = normalizeCalibrationData(row.calibrationDataJson);
+      const counts = calibrationMappingCounts(data);
+      return {
+        id: row.id,
+        name: row.name,
+        exampleDocumentFilename: row.exampleDocument?.originalFilename ?? null,
+        exampleDocumentMimeType: row.exampleDocument?.mimeType ?? null,
+        formFieldCount: counts.formFields,
+        imageFieldCount: counts.imageFields,
+      };
+    })
+    .filter((row) => row.exampleDocumentMimeType === "application/pdf" && row.formFieldCount > 0)
+    .map(({ exampleDocumentMimeType: _exampleDocumentMimeType, ...row }) => row);
 
   return (
     <>
@@ -113,6 +142,7 @@ export default async function CalibrateImagePage({
           initialAnchors={initialAnchors}
           initialName={initialName}
           initialCalibrationId={initialCalibrationId}
+          deriveCalibrationOptions={deriveCalibrationOptions}
         />
       </section>
     </>
