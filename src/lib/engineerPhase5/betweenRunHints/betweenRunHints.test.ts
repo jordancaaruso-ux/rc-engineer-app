@@ -6,6 +6,10 @@ import { test } from "node:test";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { buildBetweenRunHintFingerprint } from "@/lib/engineerPhase5/betweenRunHints/buildBetweenRunHintFingerprint";
 import { computeBetweenRunSignals } from "@/lib/engineerPhase5/betweenRunHints/computeBetweenRunSignals";
+import {
+  buildGroupedPairwiseSetupChangeLines,
+  buildPairwiseSetupDigestForHints,
+} from "@/lib/engineerPhase5/betweenRunHints/pairwiseSetupDigestForHints";
 import type { BetweenRunHintPayloadV1, BetweenRunHintPayloadV2 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 
 function baseSummary(): EngineerRunSummaryV2 {
@@ -90,6 +94,97 @@ test("signals: meaningful_setup_change from chronological diff when Engineer set
   const s = { ...baseSummary(), setupChanges: [] };
   const sig = computeBetweenRunSignals(s, null, { chronologicalTuningChangeCount: 2 });
   assert.ok(sig.includes("meaningful_setup_change"));
+});
+
+test("pairwise digest groups equal under lower arm front and rear lowering", () => {
+  const s = {
+    ...baseSummary(),
+    setupChanges: [
+      { key: "under_lower_arm_shims_ff", label: "Under lower arm shims FF", before: "2.5", after: "1.5", rankReason: "", severity: "major" },
+      { key: "under_lower_arm_shims_fr", label: "Under lower arm shims FR", before: "2.5", after: "1.5", rankReason: "", severity: "major" },
+      { key: "under_lower_arm_shims_rf", label: "Under lower arm shims RF", before: "2.5", after: "1.5", rankReason: "", severity: "major" },
+      { key: "under_lower_arm_shims_rr", label: "Under lower arm shims RR", before: "2.5", after: "1.5", rankReason: "", severity: "major" },
+    ],
+  };
+  const digest = buildPairwiseSetupDigestForHints(s);
+  assert.match(digest ?? "", /front and rear axles lowered/);
+  assert.doesNotMatch(digest ?? "", /Under lower arm shims FF:/);
+});
+
+test("pairwise digest explains lower arm anti geometry when pair amounts differ", () => {
+  const s = {
+    ...baseSummary(),
+    setupChanges: [
+      { key: "under_lower_arm_shims_ff", label: "Under lower arm shims FF", before: "2.5", after: "1.5", rankReason: "", severity: "major" },
+      { key: "under_lower_arm_shims_fr", label: "Under lower arm shims FR", before: "2.5", after: "2.0", rankReason: "", severity: "major" },
+      { key: "under_lower_arm_shims_rf", label: "Under lower arm shims RF", before: "2.5", after: "2.0", rankReason: "", severity: "major" },
+      { key: "under_lower_arm_shims_rr", label: "Under lower arm shims RR", before: "2.5", after: "1.5", rankReason: "", severity: "major" },
+    ],
+  };
+  const grouped = buildGroupedPairwiseSetupChangeLines(s);
+  assert.ok(grouped.lines.some((line) => line.includes("anti-dive geometry also changed")));
+  assert.ok(grouped.lines.some((line) => line.includes("anti-squat geometry also changed")));
+  assert.ok(grouped.kbTerms.includes("anti-dive"));
+  assert.ok(grouped.kbTerms.includes("anti-squat"));
+});
+
+test("pairwise digest groups upper inner pairs without anti geometry", () => {
+  const s = {
+    ...baseSummary(),
+    setupChanges: [
+      { key: "upper_inner_shims_ff", label: "Upper inner shims FF", before: "1.0", after: "2.0", rankReason: "", severity: "major" },
+      { key: "upper_inner_shims_fr", label: "Upper inner shims FR", before: "1.0", after: "1.5", rankReason: "", severity: "major" },
+      { key: "upper_inner_shims_rf", label: "Upper inner shims RF", before: "1.0", after: "2.0", rankReason: "", severity: "major" },
+      { key: "upper_inner_shims_rr", label: "Upper inner shims RR", before: "1.0", after: "2.0", rankReason: "", severity: "major" },
+    ],
+  };
+  const digest = buildPairwiseSetupDigestForHints(s) ?? "";
+  assert.match(digest, /Upper inner shims: front axle raised/);
+  assert.match(digest, /upper-link angle along the car also changed/);
+  assert.match(digest, /Upper inner shims: rear axle raised/);
+  assert.doesNotMatch(digest, /anti-dive|anti-squat/);
+});
+
+test("pairwise digest combines matching upper inner front and rear axle moves", () => {
+  const s = {
+    ...baseSummary(),
+    setupChanges: [
+      { key: "upper_inner_shims_ff", label: "Upper inner shims FF", before: "1.0", after: "2.0", rankReason: "", severity: "major" },
+      { key: "upper_inner_shims_fr", label: "Upper inner shims FR", before: "1.0", after: "2.0", rankReason: "", severity: "major" },
+      { key: "upper_inner_shims_rf", label: "Upper inner shims RF", before: "1.0", after: "2.0", rankReason: "", severity: "major" },
+      { key: "upper_inner_shims_rr", label: "Upper inner shims RR", before: "1.0", after: "2.0", rankReason: "", severity: "major" },
+    ],
+  };
+  const digest = buildPairwiseSetupDigestForHints(s) ?? "";
+  assert.match(digest, /Upper inner shims: front and rear axles raised/);
+  assert.doesNotMatch(digest, /Upper inner shims FF:/);
+  assert.doesNotMatch(digest, /anti-dive|anti-squat/);
+});
+
+test("pairwise digest groups front and rear spring changes by direction", () => {
+  const s = {
+    ...baseSummary(),
+    setupChanges: [
+      { key: "front_spring_rate_gf_mm", label: "Spring rate Front", before: "23", after: "21", rankReason: "", severity: "major" },
+      { key: "rear_spring_rate_gf_mm", label: "Spring rate Rear", before: "24", after: "22", rankReason: "", severity: "major" },
+    ],
+  };
+  const digest = buildPairwiseSetupDigestForHints(s) ?? "";
+  assert.match(digest, /Spring rate: front and rear softened/);
+});
+
+test("pairwise digest does not flatten opposing front and rear spring changes", () => {
+  const s = {
+    ...baseSummary(),
+    setupChanges: [
+      { key: "front_spring_rate_gf_mm", label: "Spring rate Front", before: "23", after: "21", rankReason: "", severity: "major" },
+      { key: "rear_spring_rate_gf_mm", label: "Spring rate Rear", before: "22", after: "24", rankReason: "", severity: "major" },
+    ],
+  };
+  const digest = buildPairwiseSetupDigestForHints(s) ?? "";
+  assert.doesNotMatch(digest, /front and rear softened|front and rear stiffened/);
+  assert.match(digest, /Spring rate Front: 23 → 21/);
+  assert.match(digest, /Spring rate Rear: 22 → 24/);
 });
 
 test("BetweenRunHintPayloadV2 shape for API / dashboard compatibility", () => {

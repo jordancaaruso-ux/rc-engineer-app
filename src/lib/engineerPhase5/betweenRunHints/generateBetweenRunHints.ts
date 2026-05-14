@@ -13,6 +13,7 @@ import type { HintBaselineProvenance } from "@/lib/engineerPhase5/betweenRunHint
 import { filterAvoidRepeatingForBetweenRunHints } from "@/lib/engineerPhase5/betweenRunHints/avoidRepeatingFilterForHints";
 import type { VehicleDynamicsKbSnippet } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import type { PatternDigestV1 } from "@/lib/engineerPhase5/patternDigestTypes";
+import { buildGroupedPairwiseSetupChangeLines } from "@/lib/engineerPhase5/betweenRunHints/pairwiseSetupDigestForHints";
 
 type DriverContextForHints = BetweenRunHintPayloadV2["driverContextPack"];
 
@@ -35,6 +36,7 @@ export function buildKbQueryForBetweenRunHints(params: {
 }): string {
   const keys = params.summary.setupChanges.map((r) => r.key).slice(0, 12);
   const labels = params.summary.setupChanges.map((r) => r.label).slice(0, 8);
+  const grouped = buildGroupedPairwiseSetupChangeLines(params.summary);
   const feelBits = [params.handlingProblems?.trim() ?? ""].filter(Boolean);
   const extras = (params.extraTerms ?? [])
     .map((s) => s.trim().slice(0, 120))
@@ -42,6 +44,8 @@ export function buildKbQueryForBetweenRunHints(params: {
   return [
     ...keys,
     ...labels,
+    ...grouped.kbTerms,
+    ...grouped.lines.slice(0, 4),
     ...extras,
     "RC touring car setup",
     params.summary.lapOutcome.best.flag === "regressed" ? "lap time slower tuning" : "",
@@ -94,10 +98,10 @@ function buildFallbackCopy(params: {
       : "";
   const bullets: string[] = [];
   if (params.summary.setupChanges.length > 0) {
-    const top = params.summary.setupChanges.slice(0, 3);
-    for (const ch of top) {
+    const grouped = buildGroupedPairwiseSetupChangeLines(params.summary);
+    for (const line of grouped.lines.slice(0, 3)) {
       bullets.push(
-        `${lapCue}You moved ${ch.label} from ${ch.before} to ${ch.after} vs baseline — verify whether that change is actually helping pace/feel before stacking more tuning.`
+        `${lapCue}You changed ${line} vs baseline — verify whether that grouped move is actually helping pace/feel before stacking more tuning.`
       );
     }
   } else if (params.chronologicalSetupChangeLines?.length) {
@@ -128,10 +132,7 @@ function buildFallbackCopy(params: {
     if (firstSentence && firstSentence.length <= 140) headline = `Next: ${firstSentence}`;
   }
   if (params.summary.setupChanges.length > 0 && params.signals.includes("lap_regressed")) {
-    const parts = params.summary.setupChanges
-      .slice(0, 3)
-      .map((c) => `${c.label} ${c.before}→${c.after}`)
-      .join(", ");
+    const parts = buildGroupedPairwiseSetupChangeLines(params.summary).lines.slice(0, 3).join(", ");
     headline = `You changed ${parts} vs baseline, but lap metrics don't show a gain — check whether those moves helped.`.slice(0, 200);
   }
 
@@ -200,6 +201,7 @@ async function callLlmBetweenRunHints(params: {
     suggestedPreRunPreview: params.driverContextPack.suggestedPreRunPreview ?? null,
     tireContextLine: params.driverContextPack.tireContextLine ?? null,
     hintSessionBrief: params.driverContextPack.hintSessionBrief ?? null,
+    setupOutcomeCaveats: (params.driverContextPack.setupOutcomeCaveats ?? []).slice(0, 5),
   }).slice(0, 5200);
 
   const system = `You are an RC touring car engineer assistant. Output ONLY valid JSON (no markdown).
@@ -216,7 +218,9 @@ Rules:
 - **No orphan suggestions**: do not recommend a lever (e.g. droop) that does **not** appear in pairwiseSetupDigest/setupChanges unless you justify it in the **same** bullet using feel/handlingPreview/signals or KB text; otherwise stick to documented moves.
 - **driverContextPack.pairwiseSetupDigest** (when present) is the **canonical list** of documented pairwise tuning moves for this hint — treat it as authoritative alongside **summary.setupChanges** for the primary-vs-hint-baseline story. **recentSessions.setupChangesFromPrevious** on index 0 is the tuning diff vs **index 1** (next older outing in the strip) when both exist, which may differ from the hint baseline — use digest for baseline headline causality; use strip diffs for same-day progression between adjacent cards.
 - **hintSessionBrief.intentLines** lines starting with **"Deterministic:"** define how to read **corner balance** (0 = balanced; **|score|** away from 0 = less balanced) and that **pairwise before→after is already on the car** — you **must** follow them: never prescribe the same before→after as a forward experiment; assume **current = after** for digest rows; if things worsened, prefer **revert toward before**, verify, or a **different** lever.
-- When **two or more** setup change rows clearly share a family (e.g. multiple labels contain "damper" / damping), you must **either** address **each** in separate bullets **or** use one umbrella bullet that explicitly names the family (e.g. front and rear damper % moved together). Do **not** single out one damper row if the digest lists multiple damper moves unless you explain why the others are lower priority.
+- When **two or more** setup change rows clearly share a family (e.g. springs, damper/damping, ride height, ARB, droop/downstop/upstop, upper/lower shims), prefer **one umbrella bullet** using the grouped fact from pairwiseSetupDigest (e.g. "front and rear springs softened") instead of separate front/rear bullets. Do **not** single out one row from a grouped family unless you explain why the others are lower priority.
+- For **under lower arm shims**, treat FF+FR as one front-axle lower-arm move and RF+RR as one rear-axle lower-arm move when they change together. Equal/same-direction pair changes are lower-arm height / roll-centre moves; unequal FF−FR changes also alter front anti-dive, and unequal RF−RR changes also alter rear anti-squat.
+- For **upper inner shims**, apply the same FF+FR / RF+RR grouping discipline. Equal/same-direction pair changes are upper-inner pickup height / roll-centre moves; unequal FF−FR or RF−RR changes alter the upper-inner pickup split / upper-link angle along the car. Do **not** call these anti-dive or anti-squat.
 - You receive up to three recentSessions objects in chronological order **newest first** (index 0 = latest run). Each includes best lap, avg top 5, avg top 10 (when lap counts allow), vs-prior flags when a reference exists, optional paceVsFieldSummary / paceVsFieldMetrics from imported timing, **setupChangesFromPrevious** (diff vs the next older strip card for index 0 vs 1 and 1 vs 2 when present; the oldest card uses Engineer pairwise vs its referenceRun when there is no third older peer in the strip), notesPreview, handlingPreview.
 - When **driverContextPack.priorHandlingCarryforward** is non-null, it summarizes **machine-derived** push/understeer cues from older handling while the newest session's handlingPreview was thin — use it only as **verification** before new experiments; do **not** blend it with user **notesPreview** into invented cross-run stories (e.g. \"chronic plow\") unless multiple named runs' notes in the JSON actually support that.
 - **Run-local notes:** never attribute notesPreview from run A to the causal story of run B. When quoting notes, name **displayLabel** and/or **runId**. Do not generalize one run's note to \"previous runs\" / \"chronic …\" unless **multiple** notesPreview fields show the same theme.
@@ -224,6 +228,7 @@ Rules:
 - **Session-relative handling:** any "feel vs prior outing" style wording on a run card is relative to **that run's** previous session on the car, not a direct A-vs-B score between arbitrary rows — do **not** subtract or chain those numbers across non-adjacent sessions unless the JSON explicitly gives you an adjacent pair.
 - Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **hedged walk-back / verify** ideas when lap flags (best or multi-lap) are regressed and the **same card's** setup/notes/handling plausibly correlate; obey run-local note rules above.
 - Prefer bullets that open with **You changed …**, **Given …**, or **Because …** so the causal chain is obvious in the first few words.
+- **Setup outcome memory:** If driverContextPack.setupOutcomeCaveats contains lines, include at most one concise caveat. These are history/context only. Do **not** change, replace, reverse, or rank setup suggestions because of them; simply note the prior better/worse-chip outcome when the same direction appears.
 - Do not paraphrase the engineer summary interpretation field as the headline or bullets; interpretation is context only. Bullets must be **new** concrete next-run actions (what to try, verify, or revert), grounded in setupChanges, pairwiseSetupDigest, handlingPreview, signals, or KB excerpts.
 - Ground technical claims ONLY in the provided KB excerpts and the structured JSON (summary, recentSessions, driverContextPack). If unsure, hedge with "test" / "verify".
 - Do not invent exact setup numbers not present in the JSON.
@@ -360,6 +365,10 @@ export async function assembleBetweenRunHintPayload(params: {
   let bullets = safeTrimArray(llm.bullets, 4, 220).map((b) => softenIfLeadingRevert(b));
   if (bullets.length < 2) {
     bullets = safeTrimArray(fb.bullets, 4, 220).map((b) => softenIfLeadingRevert(b));
+  }
+  const memoryCaveat = params.driverContextPack.setupOutcomeCaveats?.[0]?.trim();
+  if (memoryCaveat && !bullets.some((b) => b.toLowerCase().includes("history caveat"))) {
+    bullets = [...bullets.slice(0, 3), memoryCaveat.slice(0, 220)];
   }
 
   let avoidRepeating: string | null =
