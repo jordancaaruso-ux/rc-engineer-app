@@ -8,7 +8,7 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { compareSetupField } from "@/lib/setupCompare/compare";
-import { displayRunNotes } from "@/lib/runNotes";
+import { formatHandlingAssessmentDetailLines } from "@/lib/runHandlingAssessment";
 import { formatLapSourceSummary, tryReadLapSourceUrl } from "@/lib/lapSession/display";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
@@ -70,6 +70,7 @@ type Run = {
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;
+  handlingAssessmentJson?: unknown;
   suggestedChanges?: string | null;
   car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
   track?: { id: string; name: string } | null;
@@ -169,6 +170,18 @@ function setupRows(data: unknown): { label: string; value: string }[] {
     rows.push({ label: key.replace(/_/g, " "), value: String(v) });
   }
   return rows;
+}
+
+function runNotesOnly(run: Pick<Run, "notes" | "driverNotes">): string {
+  return run.notes?.trim() || run.driverNotes?.trim() || "";
+}
+
+function handlingDetails(run: Pick<Run, "handlingProblems" | "handlingAssessmentJson">): string {
+  const lines: string[] = [];
+  const legacy = run.handlingProblems?.trim();
+  if (legacy) lines.push(legacy);
+  lines.push(...formatHandlingAssessmentDetailLines(run.handlingAssessmentJson));
+  return lines.join("\n");
 }
 
 /** Inline analysis preview: only fields that differ from the previous run on the same car (compare semantics). */
@@ -339,13 +352,11 @@ export function RunHistoryTable({
           ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
           : "—";
         const primaryLapRows = primaryLapRowsFromRun(run);
-        const bestLapDisplay = formatLap(
-          run.bestLapSeconds ?? getBestLap(primaryLapRows)
-        );
-        const avg5Display = formatLap(
-          run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRows, 5)
-        );
+        const listLapDash = getIncludedLapDashboardMetrics(primaryLapRows);
+        const bestLapDisplay = formatLap(run.bestLapSeconds ?? getBestLap(primaryLapRows));
+        const medianLapDisplay = formatLap(listLapDash.median);
         const avg10Display = formatLap(getAverageTopN(primaryLapRows, 10));
+        const sessionDisplay = formatRunSessionDisplay(run);
         const isDragging = draggingId === run.id;
         const showDropAbove = dropTarget?.runId === run.id && dropTarget.edge === "above";
         const showDropBelow = dropTarget?.runId === run.id && dropTarget.edge === "below";
@@ -461,7 +472,7 @@ export function RunHistoryTable({
               <td className="px-2 py-1.5 md:px-4 md:py-2 min-w-0 align-middle">
                 <div className="flex flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
                   <span className="text-xs text-foreground leading-snug line-clamp-1 break-words min-w-0">
-                    {formatRunSessionDisplay(run)}
+                    {sessionDisplay === "—" ? "" : sessionDisplay}
                   </span>
                   {run.loggingComplete === false ? (
                     <span
@@ -477,7 +488,7 @@ export function RunHistoryTable({
                 {bestLapDisplay}
               </td>
               <td className="px-2 py-1.5 md:px-4 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
-                {avg5Display}
+                {medianLapDisplay}
               </td>
               <td className="hidden md:table-cell px-4 py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
                 {avg10Display}
@@ -662,6 +673,7 @@ function RunDetail({
             }[run.meetingSessionType] ?? run.meetingSessionType
           : "—"
       : "—";
+  const hasMeetingType = meetingType !== "—";
   const previousRunOnCar = useMemo(() => {
     if (!run.carId) return null;
     const idx = pickerRunsSameCar.findIndex((r) => r.id === run.id);
@@ -676,7 +688,7 @@ function RunDetail({
     }
     const changed = setupChangedRowsSincePrevious(run.setupSnapshot?.data, prevData);
     return { mode: "diff" as const, rows: changed };
-  }, [run.setupSnapshot?.data, previousRunOnCar]);
+  }, [run.carId, run.setupSnapshot?.data, previousRunOnCar]);
   const ownRows = primaryLapRowsFromRun(run);
   const lapDash = getIncludedLapDashboardMetrics(ownRows);
   const fieldStats = runSessionSummary?.importedSessionFieldStats;
@@ -695,6 +707,7 @@ function RunDetail({
       : uploadedLapSetCount === 1
         ? "1 driver lap set uploaded"
         : `${uploadedLapSetCount} driver lap sets uploaded`;
+  const handlingDetailsText = handlingDetails(run);
 
   const engineerThisRunHref = `/engineer?runId=${encodeURIComponent(run.id)}`;
   const engineerVsPreviousHref =
@@ -734,7 +747,7 @@ function RunDetail({
               label="Session type"
               value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}
             />
-            <CompactField label="Meeting session" value={meetingType} />
+            {hasMeetingType ? <CompactField label="Meeting session" value={meetingType} /> : null}
             <CompactField label="Label" value={run.sessionLabel?.trim() || "—"} />
             <CompactField label="Car" value={carDisplay} />
             <CompactField label="Track" value={trackDisplay} />
@@ -913,10 +926,18 @@ function RunDetail({
       <div className="space-y-2">
         <DetailRow
           label="Notes"
-          value={displayRunNotes(run) || "—"}
+          value={runNotesOnly(run) || "—"}
           multiline
           emptyAsDash
         />
+        {handlingDetailsText ? (
+          <DetailRow
+            label="Handling details"
+            value={handlingDetailsText}
+            multiline
+            emptyAsDash
+          />
+        ) : null}
         <DetailRow
           label="Things to try"
           value={run.suggestedChanges?.trim() || "—"}

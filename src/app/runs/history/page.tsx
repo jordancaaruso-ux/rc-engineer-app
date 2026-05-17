@@ -362,8 +362,7 @@ export default async function RunHistoryPage({
                               Best
                             </th>
                             <th className="px-2 py-1.5 md:px-4 md:py-2 whitespace-nowrap">
-                              <span className="hidden xl:inline">Avg top 5</span>
-                              <span className="xl:hidden">Avg 5</span>
+                              Median
                             </th>
                             <th className="hidden md:table-cell px-4 py-2 whitespace-nowrap">
                               <span className="hidden xl:inline">Avg top 10</span>

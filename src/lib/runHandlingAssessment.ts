@@ -716,6 +716,30 @@ function primaryFocusTraitShortLabel(axis: HandlingTraitAxisKey, v: PhaseBalance
   return `${u.title}${magSeg}: ${v > 0 ? "+" : ""}${v}`;
 }
 
+function sentenceCase(s: string): string {
+  return s ? `${s.charAt(0).toUpperCase()}${s.slice(1)}` : s;
+}
+
+function adverbForMagnitude(v: PhaseBalance): string | null {
+  const a = Math.abs(v);
+  if (a === 1) return "slightly";
+  if (a === 2) return "moderately";
+  if (a === 3) return "severely";
+  return null;
+}
+
+function adjectiveForMagnitude(v: PhaseBalance): string | null {
+  const a = Math.abs(v);
+  if (a === 1) return "mild";
+  if (a === 2) return "moderate";
+  if (a === 3) return "severe";
+  return null;
+}
+
+function signedValue(v: PhaseBalance): string {
+  return v > 0 ? `+${v}` : String(v);
+}
+
 export function buildPrimaryFocusOptions(ui: HandlingAssessmentUiState): { id: string; focus: PrimaryFocus; label: string }[] {
   const uiSan = sanitizeHandlingUiState(ui);
   const opts: { id: string; focus: PrimaryFocus; label: string }[] = [];
@@ -826,19 +850,17 @@ export function persistedFromUiState(ui: HandlingAssessmentUiState): RunHandling
 }
 
 function formatFeelVsLastRun(v: FeelVsLastRun): string {
-  if (v === 0) return "same as last run on this car";
-  const mag = phaseBalanceMagnitudeWord(v);
-  const magSeg = mag ? ` — ${mag}` : "";
-  if (v < 0) return `${v}${magSeg} (worse than last run on this car)`;
-  return `+${v}${magSeg} (better than last run on this car)`;
+  if (v === 0) return "same as previous run on this car (0)";
+  const adv = adverbForMagnitude(v);
+  const direction = v < 0 ? "worse" : "better";
+  return `${adv ? `${adv} ` : ""}${direction} than previous run on this car (${signedValue(v)})`;
 }
 
 export function formatPhaseBalanceWord(v: PhaseBalance): string {
   if (v === 0) return "neutral";
-  const mag = phaseBalanceMagnitudeWord(v);
-  const magSeg = mag ? ` — ${mag}` : "";
-  if (v < 0) return `toward push${magSeg} (${v})`;
-  return `toward oversteer${magSeg} (+${v})`;
+  const adj = adjectiveForMagnitude(v);
+  const direction = v < 0 ? "understeer" : "oversteer";
+  return `${adj ? `${adj} ` : ""}${direction} (${signedValue(v)})`;
 }
 
 export function formatPrimaryFocusLine(f: PrimaryFocus): string {
@@ -862,9 +884,40 @@ export function formatPrimaryFocusLine(f: PrimaryFocus): string {
 
 export function formatHandlingTraitAxisForEngineer(axis: HandlingTraitAxisKey, v: PhaseBalance): string {
   const m = HANDLING_TRAIT_AXIS_UI[axis];
-  const mag = phaseBalanceMagnitudeWord(v);
-  const magSeg = mag ? ` — ${mag}` : "";
-  return `${m.title} (−3 ${m.neg} … +3 ${m.pos})${magSeg}: ${v > 0 ? "+" : ""}${v}`;
+  if (v === 0) return `${m.title}: neutral (0)`;
+  const adv = adverbForMagnitude(v);
+  const direction = v > 0 ? m.pos.toLowerCase() : m.neg.toLowerCase();
+  return `${m.title}: ${adv ? `${adv} ` : ""}${direction} (${signedValue(v)})`;
+}
+
+function formatPhaseBalanceDetail(phase: CornerPhase, v: PhaseBalance): string {
+  const phaseLabel = phase === "mid" ? "mid-corner" : phase;
+  if (v === 0) return `Neutral ${phaseLabel} balance (0)`;
+  const adj = adjectiveForMagnitude(v);
+  const direction = v < 0 ? "understeer" : "oversteer";
+  return sentenceCase(`${adj ? `${adj} ` : ""}${phaseLabel} ${direction} (${signedValue(v)})`);
+}
+
+export function formatHandlingAssessmentDetailLines(raw: unknown): string[] {
+  const parsed = parseHandlingAssessmentJson(raw);
+  if (!parsed) return [];
+  const lines: string[] = [];
+  if (parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun)) {
+    lines.push(`Feel vs last run: ${sentenceCase(formatFeelVsLastRun(parsed.feelVsLastRun))}`);
+  }
+  const b = parsed.balanceByPhase;
+  if (b) {
+    for (const p of PHASES) {
+      const v = b[p];
+      if (v != null && isPhaseBalance(v)) lines.push(formatPhaseBalanceDetail(p, v));
+    }
+  }
+  const traitAxes: HandlingTraitAxisKey[] = ["feelSteering", "feelGeneral", "driveEase", "tractionRoll"];
+  for (const axis of traitAxes) {
+    const v = parsed[axis];
+    if (v != null && isPhaseBalance(v)) lines.push(formatHandlingTraitAxisForEngineer(axis, v));
+  }
+  return lines;
 }
 
 /**
@@ -873,32 +926,14 @@ export function formatHandlingTraitAxisForEngineer(axis: HandlingTraitAxisKey, v
 export function formatHandlingAssessmentForEngineer(raw: unknown): string {
   const parsed = parseHandlingAssessmentJson(raw);
   if (!parsed) return "";
-  const lines: string[] = [];
-  const b = parsed.balanceByPhase;
-  if (b && (b.entry != null || b.mid != null || b.exit != null)) {
-    const parts: string[] = [];
-    for (const p of PHASES) {
-      const v = b[p];
-      if (v != null && isPhaseBalance(v)) {
-        parts.push(`${p} ${formatPhaseBalanceWord(v)}`);
-      }
-    }
-    if (parts.length) lines.push(`Corner balance (−3 push … +3 oversteer): ${parts.join("; ")}`);
-  }
-  if (parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun)) {
-    lines.push(`Feel vs last run on this car: ${formatFeelVsLastRun(parsed.feelVsLastRun)}`);
-  }
-  const traitAxes: HandlingTraitAxisKey[] = ["feelSteering", "feelGeneral", "driveEase", "tractionRoll"];
-  for (const axis of traitAxes) {
-    const v = parsed[axis];
-    if (v != null && isPhaseBalance(v)) lines.push(formatHandlingTraitAxisForEngineer(axis, v));
-  }
+  const lines = formatHandlingAssessmentDetailLines(parsed);
+  const focusLines: string[] = [];
   if (parsed.primaryFocus) {
     const line = formatPrimaryFocusLine(parsed.primaryFocus);
-    if (line) lines.push(line);
+    if (line) focusLines.push(line);
   }
-  if (!lines.length) return "";
-  return ["— Handling —", ...lines].join("\n");
+  if (!lines.length && !focusLines.length) return "";
+  return ["— Handling —", ...lines, ...focusLines].join("\n");
 }
 
 export function isHandlingAssessmentMeaningful(raw: unknown): boolean {

@@ -48,6 +48,10 @@ function formatRelative(then: Date, now: Date): string {
   return rtf.format(years, "year");
 }
 
+function capitalizeFirst(s: string): string {
+  return s ? `${s.charAt(0).toUpperCase()}${s.slice(1)}` : s;
+}
+
 /**
  * Render a timestamp in the user's local timezone.
  *
@@ -121,7 +125,7 @@ export function RelativeTime({
   if (display === "sessions") {
     const dayDiff = Math.abs(calendarDayDifference(dt, now, timeZone));
     const label =
-      dayDiff <= 3 ? relative : formatRunDateOnly(dt, timeZone ?? undefined);
+      dayDiff <= 3 ? capitalizeFirst(relative) : formatRunDateOnly(dt, timeZone ?? undefined);
     const titleExact =
       timeZone != null && String(timeZone).trim()
         ? formatRunCreatedAtDateTime(dt, timeZone)
