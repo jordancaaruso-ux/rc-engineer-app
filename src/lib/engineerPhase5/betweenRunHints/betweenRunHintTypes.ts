@@ -113,6 +113,11 @@ export type BetweenRunHintPayloadV2 = {
     hintSessionBrief?: HintSessionBriefV1 | null;
     /** Canonical list of pairwise setup moves for this hint (matches primary card when override is used). */
     pairwiseSetupDigest?: string | null;
+    /**
+     * Prior matching setup outcomes from this car. Caveat-only: these lines should be mentioned
+     * without changing the underlying recommendation.
+     */
+    setupOutcomeCaveats?: string[];
   };
 };
 
@@ -146,5 +151,6 @@ export type RecentSessionsFingerprintMaterial = {
     hintDiffersFromEngineer?: boolean;
     /** Stable digest when priorHandlingCarryforward is present/changes. */
     priorHandlingSig?: string;
+    setupOutcomeMemoryFingerprint?: string | null;
   };
 };
