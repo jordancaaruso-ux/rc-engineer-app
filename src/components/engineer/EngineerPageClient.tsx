@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareAndPattern";
 import { EngineerChatPanel } from "@/components/engineer/EngineerChatPanel";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
-import { EngineerBetweenRunHintsStrip } from "@/components/engineer/EngineerBetweenRunHintsStrip";
+import { EngineerSuggestionsStrip } from "@/components/engineer/EngineerSuggestionsStrip";
 import { cn } from "@/lib/utils";
 
 type EngineerMainTab = "chat" | "compare";
@@ -28,7 +28,7 @@ export function EngineerPageClient() {
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6">
-      <EngineerBetweenRunHintsStrip />
+      <EngineerSuggestionsStrip />
 
       <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
         <button

@@ -66,6 +66,20 @@ function isEligible(run: {
   return Boolean(run.loggingCompletedAt) || run.loggingComplete;
 }
 
+/** Latest run on the account eligible for dashboard Engineer suggestions (matches {@link isEligible}). */
+export async function findLatestPrimaryRunIdForDashboardSuggestion(userId: string): Promise<string | null> {
+  const run = await prisma.run.findFirst({
+    where: {
+      userId,
+      carId: { not: null },
+      OR: [{ loggingCompletedAt: { not: null } }, { loggingComplete: true }],
+    },
+    orderBy: { sortAt: "desc" },
+    select: { id: true },
+  });
+  return run?.id ?? null;
+}
+
 function scopeLineFromRun(run: {
   car: { name: string } | null;
   track: { name: string } | null;
