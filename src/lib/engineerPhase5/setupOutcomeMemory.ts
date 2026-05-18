@@ -25,7 +25,7 @@ export type SetupOutcomeMemoryRowV1 = {
   suggestionEffect: "caveat_only";
   evidence: string[];
   confidence: SetupOutcomeConfidence;
-  matchedBy?: "exact_key_direction" | "text_family_direction";
+  matchedBy?: "exact_key_direction";
   context: {
     sameTrack: boolean | null;
     sameEvent: boolean | null;
@@ -196,21 +196,11 @@ function confidenceForPair(input: {
   return "low";
 }
 
-function familyTokensForKey(key: string, label: string): string[] {
-  const out = new Set<string>([key.toLowerCase(), label.toLowerCase()]);
-  if (key.includes("under_lower_arm_shims")) {
-    out.add("lower arm");
-    out.add("lower arms");
-    out.add("under lower arm");
-    out.add("inner lower arm");
-  }
-  if (key.includes("upper_inner_shims")) out.add("upper inner");
-  if (key.includes("upper_outer_shims")) out.add("upper outer");
-  if (key.includes("damper_oil")) out.add("damper oil");
-  if (key.includes("spring")) out.add("spring");
-  if (key.includes("arb")) out.add("arb");
-  if (key.includes("droop") || key.includes("downstop")) out.add("droop");
-  return [...out];
+function rowMatchesCandidate(row: SetupOutcomeMemoryRowV1, candidate: SetupOutcomeMemoryCandidate): SetupOutcomeMemoryRowV1 | null {
+  if (!candidate.key || candidate.key !== row.key) return null;
+  const dir = candidateDirection(candidate);
+  if (dir && dir !== row.direction) return null;
+  return { ...row, matchedBy: "exact_key_direction" };
 }
 
 function candidateDirection(candidate: SetupOutcomeMemoryCandidate): string | null {
@@ -220,19 +210,6 @@ function candidateDirection(candidate: SetupOutcomeMemoryCandidate): string | nu
   if (/\b(raise|raised|raising|higher|more|increase|increased)\b/.test(t)) return "raised";
   if (/\b(soften|softened|softer)\b/.test(t)) return "softened";
   if (/\b(stiffen|stiffened|stiffer)\b/.test(t)) return "stiffened";
-  return null;
-}
-
-function rowMatchesCandidate(row: SetupOutcomeMemoryRowV1, candidate: SetupOutcomeMemoryCandidate): SetupOutcomeMemoryRowV1 | null {
-  const dir = candidateDirection(candidate);
-  if (candidate.key && candidate.key === row.key && (!dir || dir === row.direction)) {
-    return { ...row, matchedBy: "exact_key_direction" };
-  }
-  const text = normalizeText([candidate.label, candidate.text].filter(Boolean).join(" "));
-  if (!text) return null;
-  if (dir && dir !== row.direction) return null;
-  const tokens = familyTokensForKey(row.key, row.label);
-  if (tokens.some((token) => token && text.includes(token))) return { ...row, matchedBy: "text_family_direction" };
   return null;
 }
 
@@ -263,6 +240,7 @@ export function buildSetupOutcomeMemoryFromRuns(params: {
   anchorRunId?: string | null;
   runs: SetupOutcomeMemoryRunInput[];
   candidates?: SetupOutcomeMemoryCandidate[] | null;
+  caveatKeyAllowlist?: string[] | null;
   generatedAtIso?: string;
 }): SetupOutcomeMemoryV1 {
   const sorted = [...params.runs].sort((a, b) => a.sortAt.getTime() - b.sortAt.getTime());
@@ -357,11 +335,15 @@ export function buildSetupOutcomeMemoryFromRuns(params: {
   });
 
   const limitedRows = ranked.slice(0, MAX_ROWS);
-  const caveatLines = limitedRows.slice(0, MAX_CAVEATS).map(caveatLine);
+  const allow =
+    params.caveatKeyAllowlist && params.caveatKeyAllowlist.length > 0 ? new Set(params.caveatKeyAllowlist) : null;
+  const caveatSourceRows = allow ? limitedRows.filter((r) => allow.has(r.key)) : limitedRows;
+  const caveatLines = caveatSourceRows.slice(0, MAX_CAVEATS).map(caveatLine);
   const fingerprint = hashMemoryMaterial({
-    v: 1,
+    v: 2,
     carId: params.carId,
     anchorRunId: params.anchorRunId ?? null,
+    caveatFilter: params.caveatKeyAllowlist ? [...params.caveatKeyAllowlist].sort() : null,
     rows: limitedRows.map((r) => ({
       k: r.key,
       d: r.direction,
@@ -391,6 +373,7 @@ export async function buildSetupOutcomeMemoryForRun(params: {
   anchorRunId: string | null;
   carId: string | null;
   candidates?: SetupOutcomeMemoryCandidate[] | null;
+  caveatKeyAllowlist?: string[] | null;
   limit?: number;
 }): Promise<SetupOutcomeMemoryV1 | null> {
   const carId =
@@ -437,5 +420,6 @@ export async function buildSetupOutcomeMemoryForRun(params: {
     anchorRunId: params.anchorRunId,
     runs,
     candidates: params.candidates,
+    caveatKeyAllowlist: params.caveatKeyAllowlist,
   });
 }

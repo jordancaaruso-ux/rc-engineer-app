@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
 import {
   buildEngineeringReadV1,
   type EngineeringReadRunInput,
@@ -10,6 +11,8 @@ import {
 export type EngineeringReadDbRunRow = {
   id: string;
   sortAt: Date;
+  createdAt: Date;
+  sessionCompletedAt: Date | null;
   trackId: string | null;
   eventId: string | null;
   tireSetId: string | null;
@@ -39,6 +42,7 @@ function rowToInput(row: EngineeringReadDbRunRow): EngineeringReadRunInput {
     eventId: row.eventId,
     tireSetId: row.tireSetId,
     tireLabel: tireLabel(row),
+    tireCompoundLabel: row.tireSet?.label ?? null,
     tireRunNumber: row.tireRunNumber ?? 1,
     carRating: row.carRating ?? null,
     handlingAssessmentJson: row.handlingAssessmentJson,
@@ -54,6 +58,8 @@ function rowToInput(row: EngineeringReadDbRunRow): EngineeringReadRunInput {
 const engineeringReadRunSelect = {
   id: true,
   sortAt: true,
+  createdAt: true,
+  sessionCompletedAt: true,
   trackId: true,
   eventId: true,
   tireSetId: true,
@@ -96,8 +102,8 @@ export async function buildEngineeringReadForRun(params: {
 
 /**
  * Engineering read where the reference run is constrained to the same car. Preferred
- * call for surfaces that already know the carId; falls back to the prior run on that
- * car ordered by `sortAt`.
+ * call for surfaces that already know the carId; falls back to the Engineer pairwise
+ * reference picker (same track / tyre context when possible).
  */
 export async function buildEngineeringReadForCarRun(params: {
   userId: string;
@@ -119,17 +125,21 @@ export async function buildEngineeringReadForCarRun(params: {
     })) as EngineeringReadDbRunRow | null;
   }
   if (!referenceRow) {
-    referenceRow = (await prisma.run.findFirst({
-      where: {
-        userId: params.userId,
-        carId: params.carId,
-        id: { not: anchor.id },
-        sortAt: { lt: anchor.sortAt },
-        loggingComplete: true,
-      },
-      orderBy: { sortAt: "desc" },
-      select: engineeringReadRunSelect,
-    })) as EngineeringReadDbRunRow | null;
+    const refId = await pickEngineerReferenceRunId(params.userId, {
+      id: anchor.id,
+      carId: params.carId,
+      trackId: anchor.trackId,
+      tireSetId: anchor.tireSetId,
+      tireRunNumber: anchor.tireRunNumber,
+      createdAt: anchor.createdAt,
+      sessionCompletedAt: anchor.sessionCompletedAt,
+    });
+    if (refId) {
+      referenceRow = (await prisma.run.findFirst({
+        where: { id: refId, userId: params.userId },
+        select: engineeringReadRunSelect,
+      })) as EngineeringReadDbRunRow | null;
+    }
   }
 
   return buildEngineeringReadV1({

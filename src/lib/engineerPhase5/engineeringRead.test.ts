@@ -37,6 +37,7 @@ function makeRun(overrides: Partial<EngineeringReadRunInput> & { id: string }): 
     eventId: overrides.eventId ?? "event-a",
     tireSetId: overrides.tireSetId ?? "tire-set-1",
     tireLabel: overrides.tireLabel ?? "Sweep 32R · set 1",
+    tireCompoundLabel: overrides.tireCompoundLabel ?? null,
     tireRunNumber: overrides.tireRunNumber ?? 2,
     carRating: overrides.carRating ?? null,
     handlingAssessmentJson: overrides.handlingAssessmentJson ?? null,
@@ -143,6 +144,7 @@ test("tire choice change shows up as a hypothesis and a known-fundamental signal
     id: "ref",
     tireSetId: "tire-set-1",
     tireLabel: "Sweep 32R · set 1",
+    tireCompoundLabel: "Sweep 32R",
   });
   const cur = makeRun({
     id: "cur",
@@ -150,9 +152,11 @@ test("tire choice change shows up as a hypothesis and a known-fundamental signal
     carRating: 4,
     tireSetId: "tire-set-2",
     tireLabel: "Sweep 28R · set 2",
+    tireCompoundLabel: "Sweep 28R",
     handlingAssessmentJson: handling({ version: 3, feelVsLastRun: -2 }),
   });
   const read = buildEngineeringReadV1({ anchor: cur, reference: ref });
+  assert.equal(read.changeRead.tireChangeSignificance, "compound_change");
   assert.equal(read.changeRead.tireSetChanged, true);
   assert.equal(read.changeRead.tireLabelChanged, true);
   const causes = read.hypotheses.map((h) => h.cause);

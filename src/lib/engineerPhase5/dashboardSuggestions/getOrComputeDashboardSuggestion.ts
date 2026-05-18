@@ -12,11 +12,17 @@ import { generateDashboardEngineerSuggestionPayload } from "@/lib/engineerPhase5
 import { buildSetupOutcomeMemoryForRun } from "@/lib/engineerPhase5/setupOutcomeMemory";
 import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
+import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
 
 const runSelect = {
   id: true,
   sortAt: true,
+  createdAt: true,
+  sessionCompletedAt: true,
   carId: true,
+  trackId: true,
+  tireSetId: true,
+  tireRunNumber: true,
   carRating: true,
   loggingComplete: true,
   loggingCompletedAt: true,
@@ -84,21 +90,24 @@ export async function getOrComputeDashboardSuggestion(
     return { suggestions: null, cached: false };
   }
 
-  const prior = run.carId
-    ? await prisma.run.findFirst({
-        where: {
-          userId,
-          carId: run.carId,
-          id: { not: run.id },
-          sortAt: { lt: run.sortAt },
-        },
-        orderBy: { sortAt: "desc" },
-        select: {
-          id: true,
-          setupSnapshot: { select: { id: true, data: true } },
-        },
-      })
-    : null;
+  let prior: { id: string; setupSnapshot: { id: string; data: unknown } | null } | null = null;
+  if (run.carId) {
+    const refId = await pickEngineerReferenceRunId(userId, {
+      id: run.id,
+      carId: run.carId,
+      trackId: run.trackId,
+      tireSetId: run.tireSetId,
+      tireRunNumber: run.tireRunNumber,
+      createdAt: run.createdAt,
+      sessionCompletedAt: run.sessionCompletedAt,
+    });
+    if (refId) {
+      prior = await prisma.run.findFirst({
+        where: { id: refId, userId },
+        select: { id: true, setupSnapshot: { select: { id: true, data: true } } },
+      });
+    }
+  }
 
   const lastUserMessage = getEffectiveRunNotes({
     notes: run.notes,
@@ -133,20 +142,19 @@ export async function getOrComputeDashboardSuggestion(
     previous: r.previous,
     current: r.current,
   }));
+  const diffCandidates = setupDiffChanged.map((r) => ({
+    key: r.key,
+    label: r.label,
+    before: r.previous,
+    after: r.current,
+  }));
+  const caveatKeyAllowlist = diffCandidates.map((c) => c.key).filter((k): k is string => Boolean(k));
   const setupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
     userId,
     anchorRunId: run.id,
     carId: run.carId,
-    candidates: [
-      ...setupDiffChanged.map((r) => ({
-        key: r.key,
-        label: r.label,
-        before: r.previous,
-        after: r.current,
-      })),
-      { text: run.suggestedChanges },
-      { text: run.appliedChanges },
-    ],
+    candidates: diffCandidates,
+    caveatKeyAllowlist,
   });
 
   const engineeringBrain = run.carId
@@ -214,6 +222,8 @@ export async function getOrComputeDashboardSuggestion(
     scopeLine: scopeLineFromRun(run),
     kbSnippets,
     setupDiffChanged,
+    allowedChassisKeys: setupDiffChanged.map((r) => r.key),
+    tireChangeSignificance: engineeringBrain?.engineeringRead.changeRead.tireChangeSignificance ?? null,
     spreadSlim,
     suggestedChanges: run.suggestedChanges,
     appliedChanges: run.appliedChanges,
@@ -270,22 +280,33 @@ export async function peekDashboardSuggestion(
       carId: true,
       carRating: true,
       sortAt: true,
+      createdAt: true,
+      sessionCompletedAt: true,
+      trackId: true,
+      tireSetId: true,
+      tireRunNumber: true,
     },
   });
   if (!run || !isEligible(run)) return null;
 
-  const prior = run.carId
-    ? await prisma.run.findFirst({
-        where: {
-          userId,
-          carId: run.carId,
-          id: { not: primaryRunId },
-          sortAt: { lt: run.sortAt },
-        },
-        orderBy: { sortAt: "desc" },
+  let prior: { id: string; setupSnapshot: { id: string; data: unknown } | null } | null = null;
+  if (run.carId) {
+    const refId = await pickEngineerReferenceRunId(userId, {
+      id: primaryRunId,
+      carId: run.carId,
+      trackId: run.trackId,
+      tireSetId: run.tireSetId,
+      tireRunNumber: run.tireRunNumber,
+      createdAt: run.createdAt,
+      sessionCompletedAt: run.sessionCompletedAt,
+    });
+    if (refId) {
+      prior = await prisma.run.findFirst({
+        where: { id: refId, userId },
         select: { id: true, setupSnapshot: { select: { id: true, data: true } } },
-      })
-    : null;
+      });
+    }
+  }
 
   const lastUserMessage = getEffectiveRunNotes({
     notes: run.notes,
@@ -326,20 +347,19 @@ export async function peekDashboardSuggestion(
       previous: r.previous,
       current: r.current,
     }));
+  const diffCandidates = setupDiffChanged.map((r) => ({
+    key: r.key,
+    label: r.label,
+    before: r.previous,
+    after: r.current,
+  }));
+  const caveatKeyAllowlist = diffCandidates.map((c) => c.key).filter((k): k is string => Boolean(k));
   const setupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
     userId,
     anchorRunId: primaryRunId,
     carId: run.carId,
-    candidates: [
-      ...setupDiffChanged.map((r) => ({
-        key: r.key,
-        label: r.label,
-        before: r.previous,
-        after: r.current,
-      })),
-      { text: run.suggestedChanges },
-      { text: run.appliedChanges },
-    ],
+    candidates: diffCandidates,
+    caveatKeyAllowlist,
   });
 
   const engineeringBrain = run.carId

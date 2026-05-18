@@ -90,8 +90,18 @@ function buildPromptLines(input: {
 
   // Change attribution
   const change = input.read.changeRead;
-  if (change.tireSetChanged === true || change.tireLabelChanged === true) {
-    lines.push("Tires changed vs reference run — tires are a fundamental setup choice, weight them like setup.");
+  if (change.tireChangeSignificance === "compound_change") {
+    lines.push(
+      "Tyres: compound / product line changed vs reference — dominant variable; chassis advice is secondary until tyres are understood."
+    );
+  } else if (change.tireChangeSignificance === "new_set_same_compound") {
+    lines.push(
+      "Tyres: same compound on a different physical set vs reference — expect some grip shift; do not narrate like a compound swap."
+    );
+  } else if (change.tireChangeSignificance === "wear_index_only") {
+    lines.push(
+      "Tyres: same set stepped to a new tyre-run index — wear/scrub progression only; do not treat like a compound change."
+    );
   }
   if (change.chassisChangedKeyCount > 0) {
     const sample = change.chassisChangedKeys.slice(0, 4).map((k) => k.label).join(", ");

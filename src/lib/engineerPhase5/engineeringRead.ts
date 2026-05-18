@@ -120,12 +120,28 @@ export type PaceReadV1 = {
   };
 };
 
+/** How important a tyre delta is vs the reference run (uses `TireSet.label` as compound line). */
+export type TireChangeSignificanceV1 =
+  | "none"
+  | "unknown"
+  /** Same `tireSetId`, different `tireRunNumber` only — wear index / session count, not a compound swap. */
+  | "wear_index_only"
+  /** Different physical set row but same compound label — fresher rubber, not a new tyre family. */
+  | "new_set_same_compound"
+  /** `TireSet.label` changed — treat as the dominant variable ahead of chassis tuning stories. */
+  | "compound_change";
+
 export type ChangeReadV1 = {
   /** Was a different tire set/label used vs. the reference run? */
   tireSetChanged: boolean | null;
   tireLabelChanged: boolean | null;
   /** Always informative when the linked tire set is the same: did the run number step forward? */
   tireRunNumberDelta: number | null;
+  /**
+   * Interprets tyre deltas using structured `TireSet.label` (compound) vs set id vs run index.
+   * `wear_index_only` must not be narrated like a compound change.
+   */
+  tireChangeSignificance: TireChangeSignificanceV1;
   /** Number of chassis tuning keys that changed (filtered by tuningComparisonKeys). */
   chassisChangedKeyCount: number;
   /** Sample of the chassis keys that changed, in arbitrary order, capped. */
@@ -181,6 +197,11 @@ export type EngineeringReadRunInput = {
   tireSetId: string | null;
   /** Label of the tire set (compound + set number). */
   tireLabel: string | null;
+  /**
+   * Canonical compound / product line from `TireSet.label` (excludes per-run formatting).
+   * Used to separate compound swaps from fresh sets of the same rubber.
+   */
+  tireCompoundLabel: string | null;
   tireRunNumber: number;
   carRating: number | null;
   handlingAssessmentJson: unknown;
@@ -506,6 +527,27 @@ function buildPaceInterpretation(input: {
   return "pace shape unclear";
 }
 
+function normalizeTireCompoundLabel(raw: string | null | undefined): string | null {
+  const t = (raw ?? "").trim().toLowerCase();
+  return t.length > 0 ? t : null;
+}
+
+function classifyTireChangeSignificance(
+  current: EngineeringReadRunInput,
+  reference: EngineeringReadRunInput,
+  tireSetChanged: boolean | null,
+  tireRunNumberDelta: number | null
+): TireChangeSignificanceV1 {
+  const curC = normalizeTireCompoundLabel(current.tireCompoundLabel);
+  const refC = normalizeTireCompoundLabel(reference.tireCompoundLabel);
+  if (curC && refC && curC !== refC) return "compound_change";
+  if (tireSetChanged === true) return "new_set_same_compound";
+  const sameSet = Boolean(current.tireSetId && reference.tireSetId && current.tireSetId === reference.tireSetId);
+  if (sameSet && tireRunNumberDelta != null && tireRunNumberDelta !== 0) return "wear_index_only";
+  if (tireSetChanged == null && !curC && !refC && tireRunNumberDelta != null && tireRunNumberDelta !== 0) return "unknown";
+  return "none";
+}
+
 function buildChangeRead(
   current: EngineeringReadRunInput,
   reference: EngineeringReadRunInput | null
@@ -515,6 +557,7 @@ function buildChangeRead(
       tireSetChanged: null,
       tireLabelChanged: null,
       tireRunNumberDelta: null,
+      tireChangeSignificance: "none",
       chassisChangedKeyCount: 0,
       chassisChangedKeys: [],
       hasLargeChassisChange: false,
@@ -530,6 +573,8 @@ function buildChangeRead(
     typeof current.tireRunNumber === "number" && typeof reference.tireRunNumber === "number"
       ? current.tireRunNumber - reference.tireRunNumber
       : null;
+
+  const tireChangeSignificance = classifyTireChangeSignificance(current, reference, tireSetChanged, tireRunNumberDelta);
 
   const cur = normalizeSetupData(current.setupSnapshotData);
   const prev = normalizeSetupData(reference.setupSnapshotData);
@@ -553,6 +598,7 @@ function buildChangeRead(
     tireSetChanged,
     tireLabelChanged,
     tireRunNumberDelta,
+    tireChangeSignificance,
     chassisChangedKeyCount: changedKeys.length,
     chassisChangedKeys: detailed,
     hasLargeChassisChange,
@@ -570,7 +616,8 @@ function buildHypotheses(
   const noFeelChange = feel.betterWorse.direction === "same" || feel.betterWorse.direction === "unknown";
   const significantFeelChange = !noFeelChange;
   const noChassisChange = change.chassisChangedKeyCount === 0;
-  const tireChanged = change.tireSetChanged === true || change.tireLabelChanged === true;
+  const tireMajor = change.tireChangeSignificance === "compound_change";
+  const tireModerate = change.tireChangeSignificance === "new_set_same_compound";
 
   if (!significantFeelChange && pace.peakPace.direction === "unknown" && pace.repeatability.direction === "unknown") {
     return [
@@ -584,17 +631,28 @@ function buildHypotheses(
 
   const hypotheses: HypothesisV1[] = [];
 
-  if (tireChanged) {
-    const reasons = [
-      "Tire compound / set switched vs reference run — tires are a fundamental setup choice and usually dominate handling delta when changed.",
-    ];
+  if (tireMajor || tireModerate) {
+    const reasons = tireMajor
+      ? [
+          "Tyre compound / product line changed vs the reference session — treat this as the dominant variable before implicating chassis tuning.",
+        ]
+      : [
+          "Same tyre compound on a different physical set vs reference — expect some grip/feel shift, but it is usually smaller than a compound change.",
+        ];
     if (change.chassisChangedKeyCount <= 2) {
-      reasons.push("Few chassis-side changes alongside the tire change, so attribution leans tire-heavy.");
+      reasons.push(
+        tireMajor
+          ? "Few chassis-side changes alongside the compound swap — lean tire-heavy in the story."
+          : "Few chassis-side changes alongside a fresh set — keep chassis attribution cautious."
+      );
     } else if (change.hasLargeChassisChange) {
-      reasons.push("Large chassis change also present — tire vs chassis attribution should be considered jointly.");
+      reasons.push("Large chassis change also present — separate tyre effects from chassis effects deliberately.");
     }
-    const confidence: EngineeringReadConfidence =
-      change.chassisChangedKeyCount <= 2 || change.hasLargeChassisChange === false ? "medium" : "low";
+    const confidence: EngineeringReadConfidence = tireMajor
+      ? change.chassisChangedKeyCount <= 2
+        ? "medium"
+        : "low"
+      : "low";
     hypotheses.push({ cause: "tire_choice", confidence, reasons });
   }
 
@@ -605,18 +663,19 @@ function buildHypotheses(
     if (change.hasLargeChassisChange) {
       reasons.push("At least one change is a major knob (spring, oil, key shim group).");
     }
-    if (tireChanged) reasons.push("Tire choice also changed — chassis explanation must compete with tire effect.");
+    if (tireMajor) reasons.push("Tyre compound changed — chassis explanations stay secondary until tyres are understood.");
+    else if (tireModerate) reasons.push("Fresh set of the same compound may contribute — keep chassis attribution hedged.");
     let confidence: EngineeringReadConfidence = change.hasLargeChassisChange ? "medium" : "low";
-    if (!tireChanged && change.hasLargeChassisChange) confidence = "high";
+    if (!tireMajor && !tireModerate && change.hasLargeChassisChange) confidence = "high";
     hypotheses.push({ cause: "chassis_setup_change", confidence, reasons });
   }
 
-  if (!tireChanged && noChassisChange && significantFeelChange) {
+  if (!tireMajor && !tireModerate && noChassisChange && significantFeelChange) {
     hypotheses.push({
       cause: "driving_or_external",
       confidence: "low",
       reasons: [
-        "Feel/pace shifted but neither tires nor chassis setup changed — look at driving, track evolution, or temperature.",
+        "Feel/pace shifted but neither tyres nor chassis setup changed — look at driving, track evolution, or temperature.",
       ],
     });
   }
@@ -659,15 +718,30 @@ function buildRecommendationStrategy(
   // Rated low or strong negative feel = diagnose / suggest a tested compensation.
   const strongNegativeFeel = feel.betterWorse.direction === "worse" && (feel.betterWorse.magnitudeWord === "moderate" || feel.betterWorse.magnitudeWord === "strong");
   if ((carRating != null && carRating <= 4) || strongNegativeFeel) {
-    if (topHypothesis === "tire_choice" && topConfidence !== "low") {
+    if (
+      topHypothesis === "tire_choice" &&
+      topConfidence !== "low" &&
+      change.tireChangeSignificance === "compound_change"
+    ) {
       return {
         mode: "diagnose",
         strength: "normal",
         primaryAdvice:
-          "Treat the tire switch as the likely dominant variable. Re-run with the prior tire choice before chasing chassis changes.",
-        expectedEffect: "Isolate how much of the worse feel is tire-driven before changing setup.",
+          "Tyre compound changed — treat that as the dominant variable. Re-run on the prior compound (or accept this compound) before chasing chassis changes.",
+        expectedEffect: "Isolate how much of the worse feel is tyre-family driven before changing setup.",
         fallbackIfWrong:
-          "If feel does not return with the prior tires, revisit the chassis changes that moved alongside the swap.",
+          "If feel does not improve after isolating tyres, revisit the chassis changes that moved alongside the swap.",
+        preferEngineerChat: false,
+      };
+    }
+    if (topHypothesis === "tire_choice" && change.tireChangeSignificance === "new_set_same_compound" && topConfidence !== "low") {
+      return {
+        mode: "verify",
+        strength: "soft",
+        primaryAdvice:
+          "Same compound on a fresher set can shift grip — bank another session on this rubber before blaming chassis; keep any chassis tweak small and reversible.",
+        expectedEffect: "Confirm whether the feel is scrub/set life vs a chassis issue.",
+        fallbackIfWrong: null,
         preferEngineerChat: false,
       };
     }
@@ -715,7 +789,8 @@ function buildRecommendationStrategy(
       primaryAdvice:
         "Pick the single most recent chassis change most relevant to the symptom and test one step in that direction next run.",
       expectedEffect: "Move balance by a small, recoverable amount toward the desired direction.",
-      fallbackIfWrong: "If the symptom worsens, revert and try a different mechanism with similar effect.",
+      fallbackIfWrong:
+        "If the symptom worsens, revert and re-test with a different lever that your KB snippets explicitly tie to the same symptom.",
       preferEngineerChat: false,
     };
   }
@@ -765,6 +840,7 @@ export function buildEngineeringReadV1(input: {
       change: {
         tireSet: changeRead.tireSetChanged,
         tireLabel: changeRead.tireLabelChanged,
+        tireSig: changeRead.tireChangeSignificance,
         chassisCount: changeRead.chassisChangedKeyCount,
         chassisKeys: changeRead.chassisChangedKeys.map((r) => r.key),
         largeChange: changeRead.hasLargeChassisChange,
@@ -823,8 +899,18 @@ export function summarizeEngineeringReadAsLines(read: EngineeringReadV1): string
       }${sample ? ` (${sample}${read.changeRead.chassisChangedKeys.length > 3 ? ", …" : ""})` : ""}`
     );
   }
-  if (read.changeRead.tireSetChanged === true || read.changeRead.tireLabelChanged === true) {
-    lines.push("Tire set / label changed vs reference run — treat as a fundamental setup choice.");
+  if (read.changeRead.tireChangeSignificance === "compound_change") {
+    lines.push(
+      "Tyres: compound / product line changed vs reference — this is the highest-priority variable; chassis advice must stay conditional until tyres are understood."
+    );
+  } else if (read.changeRead.tireChangeSignificance === "new_set_same_compound") {
+    lines.push(
+      "Tyres: same compound on a different physical set vs reference — expect some grip shift; do not narrate this like a compound swap."
+    );
+  } else if (read.changeRead.tireChangeSignificance === "wear_index_only") {
+    lines.push(
+      "Tyres: same set stepped to a new tyre-run index — normal wear/scrub progression; do not treat like a compound change."
+    );
   }
   if (read.hypotheses.length > 0) {
     const top = read.hypotheses[0]!;
