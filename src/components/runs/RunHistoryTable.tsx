@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatRunSessionDisplay } from "@/lib/runSession";
-import { formatRunCreatedAtDateTime, formatRunDateOnly } from "@/lib/formatDate";
+import { formatRunCreatedAtDateTime, formatRunDateCompact } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
@@ -146,7 +146,7 @@ function LapStatChip({ label, value, title }: { label: string; value: string; ti
 }
 
 /** Main sessions grid columns (excluding drag handle, member, compare pair). */
-const SESSION_TABLE_BODY_COLS = 9;
+const SESSION_TABLE_BODY_COLS_WITHOUT_SESSION = 8;
 
 function setupFieldLabel(key: string): string {
   const f = DEFAULT_SETUP_FIELDS.find((d) => d.key === key);
@@ -223,6 +223,7 @@ export function RunHistoryTable({
   viewerUserId = null,
   memberDisplayByUserId,
   showMemberColumn = false,
+  showSessionColumn = true,
 }: {
   runs: Run[];
   allRunsDescending: CompareRunShape[];
@@ -248,6 +249,7 @@ export function RunHistoryTable({
   /** `userId` → display label for team Sessions (`?teamId=`). */
   memberDisplayByUserId?: Record<string, string>;
   showMemberColumn?: boolean;
+  showSessionColumn?: boolean;
 }) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(() => {
@@ -270,7 +272,8 @@ export function RunHistoryTable({
   const totalCols =
     (enableReorder ? 1 : 0) +
     (showMemberColumn ? 1 : 0) +
-    SESSION_TABLE_BODY_COLS +
+    SESSION_TABLE_BODY_COLS_WITHOUT_SESSION +
+    (showSessionColumn ? 1 : 0) +
     (showComparePairColumn ? 1 : 0);
 
   async function commitReorder(draggedId: string, targetId: string, edge: "above" | "below") {
@@ -354,9 +357,10 @@ export function RunHistoryTable({
         const primaryLapRows = primaryLapRowsFromRun(run);
         const listLapDash = getIncludedLapDashboardMetrics(primaryLapRows);
         const bestLapDisplay = formatLap(run.bestLapSeconds ?? getBestLap(primaryLapRows));
+        const avg5Display = formatLap(run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRows, 5));
         const medianLapDisplay = formatLap(listLapDash.median);
-        const avg10Display = formatLap(getAverageTopN(primaryLapRows, 10));
         const sessionDisplay = formatRunSessionDisplay(run);
+        const runInstant = resolveRunDisplayInstant(run);
         const isDragging = draggingId === run.id;
         const showDropAbove = dropTarget?.runId === run.id && dropTarget.edge === "above";
         const showDropBelow = dropTarget?.runId === run.id && dropTarget.edge === "below";
@@ -458,40 +462,36 @@ export function RunHistoryTable({
                   {memberLabel}
                 </td>
               ) : null}
-              <td className="px-2 py-1.5 md:px-4 md:py-2 align-middle text-xs text-foreground leading-snug">
-                <RelativeTime
-                  iso={resolveRunDisplayInstant(run)}
-                  fallback={formatRunDateOnly(
-                    resolveRunDisplayInstant(run),
-                    displayTimeZone
-                  )}
-                  display="sessions"
-                  timeZone={displayTimeZone}
-                />
+              <td className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs text-foreground leading-snug tabular-nums whitespace-nowrap">
+                <span title={formatRunCreatedAtDateTime(runInstant, displayTimeZone)}>
+                  {formatRunDateCompact(runInstant, displayTimeZone)}
+                </span>
               </td>
-              <td className="px-2 py-1.5 md:px-4 md:py-2 min-w-0 align-middle">
-                <div className="flex flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
-                  <span className="text-xs text-foreground leading-snug line-clamp-1 break-words min-w-0">
-                    {sessionDisplay === "—" ? "" : sessionDisplay}
-                  </span>
-                  {run.loggingComplete === false ? (
-                    <span
-                      className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[8px] md:text-[9px] ui-title text-amber-900 dark:text-amber-100"
-                      title="Logging not marked complete"
-                    >
-                      Draft
+              {showSessionColumn ? (
+                <td className="px-2 py-1.5 md:px-3 md:py-2 min-w-0 align-middle">
+                  <div className="flex flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
+                    <span className="text-xs text-foreground leading-snug line-clamp-1 break-words min-w-0">
+                      {sessionDisplay === "—" ? "" : sessionDisplay}
                     </span>
-                  ) : null}
-                </div>
-              </td>
-              <td className="px-2 py-1.5 md:px-4 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+                    {run.loggingComplete === false ? (
+                      <span
+                        className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[8px] md:text-[9px] ui-title text-amber-900 dark:text-amber-100"
+                        title="Logging not marked complete"
+                      >
+                        Draft
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
+              ) : null}
+              <td className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
                 {bestLapDisplay}
               </td>
-              <td className="px-2 py-1.5 md:px-4 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
-                {medianLapDisplay}
+              <td className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+                {avg5Display}
               </td>
-              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
-                {avg10Display}
+              <td className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+                {medianLapDisplay}
               </td>
               <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
                 {carDisplay}

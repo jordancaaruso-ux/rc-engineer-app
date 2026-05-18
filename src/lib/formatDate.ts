@@ -113,6 +113,24 @@ export function formatRunDateOnly(d: string | Date, timeZone?: string | null): s
   return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, opts).format(dt);
 }
 
+export function formatRunDateCompact(d: string | Date, timeZone?: string | null): string {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  const tz = timeZone?.trim();
+  const parts = new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, {
+    day: "numeric",
+    month: "numeric",
+    year: "2-digit",
+    ...(tz ? { timeZone: tz } : {}),
+  }).formatToParts(dt);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value;
+  const day = get("day");
+  const month = get("month");
+  const year = get("year");
+  return day && month && year ? `${day}/${month}/${year}` : "—";
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /**
