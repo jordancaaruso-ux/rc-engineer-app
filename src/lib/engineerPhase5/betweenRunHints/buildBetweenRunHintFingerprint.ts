@@ -27,6 +27,7 @@ export function buildBetweenRunHintFingerprint(params: {
    * When hints use a different pairwise `summary`, include this so cache keys stay distinct.
    */
   engineerSummaryReferenceRunId?: string | null;
+  setupOutcomeMemoryFingerprint?: string | null;
 }): string {
   const sc = params.summary.setupChanges.map((r) => ({
     k: r.key,
@@ -34,7 +35,7 @@ export function buildBetweenRunHintFingerprint(params: {
     after: r.after,
   }));
   const payload = {
-    v: 4 as const,
+    v: 5 as const,
     refId: params.summary.referenceRunId,
     engineerRefId: params.engineerSummaryReferenceRunId ?? null,
     fieldFp: params.summary.fieldFingerprint,
@@ -47,6 +48,7 @@ export function buildBetweenRunHintFingerprint(params: {
     interpretation: params.summary.interpretation,
     handling: params.handlingAssessmentJson ?? null,
     recent: params.recentSessionsMaterial ?? null,
+    setupOutcomeMemoryFp: params.setupOutcomeMemoryFingerprint ?? null,
   };
   const json = JSON.stringify(payload, stableReplacer);
   return createHash("sha256").update(json, "utf8").digest("hex");

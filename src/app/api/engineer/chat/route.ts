@@ -21,6 +21,8 @@ import {
 } from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
 import { computeResolvedScopeTireStepsV1 } from "@/lib/engineerPhase5/tireLifePriors/computeResolvedScopeTireSteps";
 import { buildSetupHandlingPaceBundle } from "@/lib/engineerPhase5/setupHandlingPaceBundle";
+import { buildSetupOutcomeMemoryForRun } from "@/lib/engineerPhase5/setupOutcomeMemory";
+import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
 import {
   parsePaceVsFieldRunDigestPayload,
   parsePaceVsFieldRunDigestSubsetPayload,
@@ -169,6 +171,23 @@ export async function POST(request: Request) {
     });
 
     const setupHandlingPaceBundle = buildSetupHandlingPaceBundle(focusedRunPair);
+    const setupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
+      userId: user.id,
+      anchorRunId: anchorForRichContext,
+      carId: richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null,
+    }).catch(() => null);
+
+    const brainCarId = richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null;
+    const brainAnchor = anchorForRichContext;
+    const engineeringBrain =
+      brainCarId && brainAnchor
+        ? await buildEngineeringBrainV1({
+            userId: user.id,
+            carId: brainCarId,
+            anchorRunId: brainAnchor,
+            referenceRunId: focusedRunPair?.compare?.id ?? null,
+          }).catch(() => null)
+        : null;
 
     const resolvedScopeTireSteps =
       resolvedRunScope &&
@@ -197,6 +216,13 @@ export async function POST(request: Request) {
       tireLifePriors,
       /** Deterministic setup vs lap vs feel correlation facts for focused pair chat (null without focused pair). */
       setupHandlingPaceBundle,
+      /** Prior setup changes on this car tied to better/worse chips; caveat-only, not ranking logic. */
+      setupOutcomeMemory,
+      /**
+       * Deterministic engineering brain (runQuality + feelRead + paceRead + hypotheses + recommendationStrategy
+       * + known-good/known-bad memory + mechanism analogies). The LLM should explain this — not re-derive.
+       */
+      engineeringBrain,
       /**
        * Pooled tire run **1→2** pace medians across multiple sets in resolvedRunScope, by event×track.
        * Null when scope missing, ambiguous, or too few valid pairs.
@@ -218,6 +244,8 @@ export async function POST(request: Request) {
       tireLifePriors,
       resolvedScopeTireSteps,
       setupHandlingPaceBundle,
+      setupOutcomeMemory,
+      engineeringBrain,
       thingsToTry: basePacket.thingsToTry,
       thingsToDo: basePacket.thingsToDo,
       paceVsFieldRunDigest,
@@ -247,6 +275,19 @@ export async function POST(request: Request) {
           anchorRunId: focused.primaryRunId,
           focusedPair: focusedPairForTirePriors(focused),
         });
+        const reSetupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
+          userId: user.id,
+          anchorRunId: focused.primaryRunId,
+          carId: focused.primary.carId,
+        }).catch(() => null);
+        const reEngineeringBrain = focused.primary.carId
+          ? await buildEngineeringBrainV1({
+              userId: user.id,
+              carId: focused.primary.carId,
+              anchorRunId: focused.primaryRunId,
+              referenceRunId: focused.compare?.id ?? null,
+            }).catch(() => null)
+          : null;
         return {
           ...baseForMerge,
           engineerSummary: summary,
@@ -254,6 +295,8 @@ export async function POST(request: Request) {
           richEngineerContext: rich,
           tireLifePriors: reTire,
           setupHandlingPaceBundle: buildSetupHandlingPaceBundle(focused),
+          setupOutcomeMemory: reSetupOutcomeMemory,
+          engineeringBrain: reEngineeringBrain,
         };
       },
     });

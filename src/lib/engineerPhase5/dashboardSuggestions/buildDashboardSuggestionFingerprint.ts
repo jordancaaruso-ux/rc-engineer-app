@@ -26,9 +26,14 @@ export function buildDashboardSuggestionFingerprint(params: {
   spreadMaterial: unknown;
   /** Engineer summary field fingerprint when summary exists; else null. */
   engineerSummaryFieldFingerprint: string | null;
+  setupOutcomeMemoryFingerprint?: string | null;
+  /** Shared engineering-brain fingerprint (read + known-good + analogies). */
+  engineeringBrainFingerprint?: string | null;
+  /** Required 1-10 car rating; invalidates cache when the driver re-rates the run. */
+  carRating?: number | null;
 }): string {
   const payload = {
-    v: 2 as const,
+    v: 4 as const,
     notes: params.notes,
     driverNotes: params.driverNotes,
     handlingProblems: params.handlingProblems,
@@ -40,6 +45,9 @@ export function buildDashboardSuggestionFingerprint(params: {
     priorSetupSnapshotId: params.priorSetupSnapshotId,
     spread: params.spreadMaterial,
     summaryFp: params.engineerSummaryFieldFingerprint,
+    setupOutcomeMemoryFp: params.setupOutcomeMemoryFingerprint ?? null,
+    brainFp: params.engineeringBrainFingerprint ?? null,
+    carRating: params.carRating ?? null,
   };
   const json = JSON.stringify(payload, stableReplacer);
   return createHash("sha256").update(json, "utf8").digest("hex");

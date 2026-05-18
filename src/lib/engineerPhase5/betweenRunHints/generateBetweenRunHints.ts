@@ -202,7 +202,9 @@ async function callLlmBetweenRunHints(params: {
     tireContextLine: params.driverContextPack.tireContextLine ?? null,
     hintSessionBrief: params.driverContextPack.hintSessionBrief ?? null,
     setupOutcomeCaveats: (params.driverContextPack.setupOutcomeCaveats ?? []).slice(0, 5),
-  }).slice(0, 5200);
+    engineeringBrainPromptLines: (params.driverContextPack.engineeringBrainPromptLines ?? []).slice(0, 12),
+    engineeringBrainRecommendation: params.driverContextPack.engineeringBrainRecommendation ?? null,
+  }).slice(0, 6400);
 
   const system = `You are an RC touring car engineer assistant. Output ONLY valid JSON (no markdown).
 ${intentBlock}
@@ -228,6 +230,7 @@ Rules:
 - **Session-relative handling:** any "feel vs prior outing" style wording on a run card is relative to **that run's** previous session on the car, not a direct A-vs-B score between arbitrary rows — do **not** subtract or chain those numbers across non-adjacent sessions unless the JSON explicitly gives you an adjacent pair.
 - Use recentSessions together with driverContextPack (notes/handling + currentSetupLines) to propose **positive** setup experiments OR **hedged walk-back / verify** ideas when lap flags (best or multi-lap) are regressed and the **same card's** setup/notes/handling plausibly correlate; obey run-local note rules above.
 - Prefer bullets that open with **You changed …**, **Given …**, or **Because …** so the causal chain is obvious in the first few words.
+- **Engineering brain:** driverContextPack.engineeringBrainPromptLines is the **deterministic diagnosis** (rating, feel, pace shape, hypotheses, recommendation strategy). Treat it as the spine of your response. Explain its conclusions in driver-friendly language; do not re-derive them from raw notes, and do not contradict them unless the JSON contradicts itself. Honour **engineeringBrainRecommendation.mode** (celebrate/verify/diagnose/suggest_test/suggest_compensation) and **strength** (soft/normal/strong); when **preferEngineerChat=true**, end with a hedged nudge to open Ask the Engineer.
 - **Setup outcome memory:** If driverContextPack.setupOutcomeCaveats contains lines, include at most one concise caveat. These are history/context only. Do **not** change, replace, reverse, or rank setup suggestions because of them; simply note the prior better/worse-chip outcome when the same direction appears.
 - Do not paraphrase the engineer summary interpretation field as the headline or bullets; interpretation is context only. Bullets must be **new** concrete next-run actions (what to try, verify, or revert), grounded in setupChanges, pairwiseSetupDigest, handlingPreview, signals, or KB excerpts.
 - Ground technical claims ONLY in the provided KB excerpts and the structured JSON (summary, recentSessions, driverContextPack). If unsure, hedge with "test" / "verify".

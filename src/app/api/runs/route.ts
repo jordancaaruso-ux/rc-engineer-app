@@ -89,11 +89,25 @@ type RunUpsertBody = {
   /** Optional structured handling assessment (versioned JSON). */
   handlingAssessmentJson?: unknown;
   /**
+   * Overall car rating 1-10 captured at "Run complete". Required when `loggingIntent`
+   * is `completed` (or when editing an already-completed run); drafts may omit it.
+   * Anchors the Engineer's runQuality signal and known-good / known-bad memory.
+   */
+  carRating?: number | null;
+  /**
    * When false, mutual team members will not see this run in team Sessions / team-only Engineer paths.
    * TeammateLink peers are unaffected. Default true when omitted.
    */
   shareWithTeam?: boolean;
 };
+
+function normalizeCarRating(raw: unknown): number | null {
+  if (raw == null) return null;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
+  const rounded = Math.round(raw);
+  if (rounded < 1 || rounded > 10) return null;
+  return rounded;
+}
 
 function prismaJsonFromHandlingBody(raw: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
   const parsed = parseHandlingAssessmentJson(raw);
@@ -142,6 +156,15 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   /** Editing a run already marked complete: never revert to draft or rewrite tire/battery run # from the client. */
   const loggingWasAlreadyComplete = existingUpdate?.loggingComplete === true;
   const loggingComplete = loggingWasAlreadyComplete ? true : body.loggingIntent !== "draft";
+
+  const carRatingNormalized = normalizeCarRating(body.carRating);
+  // Required when the run is logged complete (new or edit). Drafts stay loose.
+  if (loggingComplete && carRatingNormalized == null) {
+    return NextResponse.json(
+      { error: "carRating (1-10) is required to mark a run complete" },
+      { status: 400 }
+    );
+  }
 
   const shareWithTeam = body.shareWithTeam === false ? false : true;
 
@@ -344,6 +367,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         driverNotes: null,
         handlingProblems: null,
         handlingAssessmentJson: prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null),
+        carRating: carRatingNormalized,
         suggestedChanges: body.suggestedChanges?.trim() || null,
         suggestedPreRun: body.suggestedPreRun?.trim() || null,
         sessionLabel: body.sessionLabel?.trim() || null,
@@ -398,6 +422,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     }
     if ("handlingAssessmentJson" in body) {
       updateData.handlingAssessmentJson = prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null);
+    }
+    if ("carRating" in body) {
+      updateData.carRating = carRatingNormalized;
     }
     if (typeof body.shareWithTeam === "boolean") {
       updateData.shareWithTeam = body.shareWithTeam;

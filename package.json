@@ -23,6 +23,7 @@
     "db:migrate:resolve:run-share-with-team": "npx dotenv-cli -e .env.local -- prisma migrate resolve --applied 20260428120000_run_share_with_team",
     "test:grip-spread": "npx tsx src/lib/engineerPhase5/gripSpreadContrast.test.ts",
     "test:between-hints": "npx tsx src/lib/engineerPhase5/betweenRunHints/betweenRunHints.test.ts",
+    "test:engineering-read": "npx tsx src/lib/engineerPhase5/engineeringRead.test.ts",
     "check:legacy-local-user": "npx tsx scripts/check-legacy-local-user.ts",
     "backfill:setup-car": "npx tsx scripts/backfill-setup-documents-car-id.ts",
     "db:prune-calibrations": "npx tsx scripts/prune-calibrations-keep-community-shared.ts",

@@ -11,6 +11,8 @@ import { buildRecentSessionsForBetweenHints } from "@/lib/engineerPhase5/between
 import { pickHintContextReferenceRun } from "@/lib/engineerPhase5/betweenRunHints/pickHintContextReferenceRun";
 import { buildHintSessionBrief } from "@/lib/engineerPhase5/betweenRunHints/buildHintSessionBrief";
 import { buildPairwiseSetupDigestForHints } from "@/lib/engineerPhase5/betweenRunHints/pairwiseSetupDigestForHints";
+import { buildSetupOutcomeMemoryForRun } from "@/lib/engineerPhase5/setupOutcomeMemory";
+import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import type {
   BetweenRunHintPayloadV2,
@@ -127,6 +129,7 @@ export async function prepareBetweenRunHintComputation(
       driverNotes: true,
       tireSetId: true,
       tireRunNumber: true,
+      carRating: true,
     },
   });
   if (!runMetaRow?.carId) return null;
@@ -135,6 +138,7 @@ export async function prepareBetweenRunHintComputation(
     ...runMetaRow,
     carId: runMetaRow.carId,
   };
+  const carRating: number | null = runMetaRow.carRating ?? null;
 
   const pick = await pickHintContextReferenceRun(
     userId,
@@ -192,6 +196,28 @@ export async function prepareBetweenRunHintComputation(
     handlingProblems: runMeta.handlingProblems,
     baselineProvenance: provenance,
   });
+  const setupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
+    userId,
+    anchorRunId: primaryRunId,
+    carId: runMeta.carId,
+    candidates: [
+      ...hintSummary.setupChanges.map((r) => ({
+        key: r.key,
+        label: r.label,
+        before: r.before,
+        after: r.after,
+      })),
+      { text: runMeta.suggestedChanges },
+      { text: runMeta.suggestedPreRun },
+    ],
+  });
+
+  const engineeringBrain = await buildEngineeringBrainV1({
+    userId,
+    carId: runMeta.carId,
+    anchorRunId: primaryRunId,
+    referenceRunId: provenance?.hintReferenceRunId ?? engineerRef ?? null,
+  }).catch(() => null);
 
   const driverContextPack: BetweenRunHintPayloadV2["driverContextPack"] = {
     ...basePack,
@@ -204,13 +230,36 @@ export async function prepareBetweenRunHintComputation(
       chronoPreviousTireMeta
     ),
     hintSessionBrief: sessionBrief,
+    setupOutcomeCaveats: setupOutcomeMemory?.caveatLines ?? [],
+    engineeringBrainPromptLines: engineeringBrain?.promptLines ?? [],
+    engineeringBrainRecommendation: engineeringBrain
+      ? {
+          mode: engineeringBrain.engineeringRead.recommendationStrategy.mode,
+          strength: engineeringBrain.engineeringRead.recommendationStrategy.strength,
+          preferEngineerChat:
+            engineeringBrain.engineeringRead.recommendationStrategy.preferEngineerChat,
+        }
+      : null,
   };
 
   const fp = buildBetweenRunHintFingerprint({
     summary: hintSummary,
     handlingAssessmentJson: runMeta.handlingAssessmentJson ?? null,
-    recentSessionsMaterial: fingerprintMaterial,
+    recentSessionsMaterial: {
+      ...fingerprintMaterial,
+      contextExtras: {
+        ...(fingerprintMaterial.contextExtras ?? {
+          previousRunHandling: null,
+          bestPaceRunId: null,
+          bestPaceLinesSig: "",
+          chronologicalChangeCount: 0,
+        }),
+        engineeringBrainFingerprint: engineeringBrain?.fingerprint ?? null,
+        carRating,
+      },
+    },
     engineerSummaryReferenceRunId: engineerRef,
+    setupOutcomeMemoryFingerprint: setupOutcomeMemory?.fingerprint ?? null,
   });
 
   return {

@@ -74,6 +74,7 @@ export default async function EditRunPage({
       suggestedChanges: true,
       suggestedPreRun: true,
       handlingAssessmentJson: true,
+      carRating: true,
       lapTimes: true,
       lapSession: true,
       importedLapSets: {
@@ -177,6 +178,7 @@ export default async function EditRunPage({
             suggestedChanges: run.suggestedChanges,
             suggestedPreRun: run.suggestedPreRun,
             handlingAssessmentJson: run.handlingAssessmentJson,
+            carRating: run.carRating,
             lapTimes: run.lapTimes,
             lapSession: run.lapSession,
             importedLapSets: run.importedLapSets.map((s) => ({

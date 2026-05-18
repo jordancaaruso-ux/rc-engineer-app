@@ -9,12 +9,15 @@ import { searchVehicleDynamicsKb } from "@/lib/engineerPhase5/vehicleDynamicsKb"
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import { buildDashboardSuggestionFingerprint } from "@/lib/engineerPhase5/dashboardSuggestions/buildDashboardSuggestionFingerprint";
 import { generateDashboardEngineerSuggestionPayload } from "@/lib/engineerPhase5/dashboardSuggestions/generateDashboardEngineerSuggestionPayload";
+import { buildSetupOutcomeMemoryForRun } from "@/lib/engineerPhase5/setupOutcomeMemory";
+import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
 
 const runSelect = {
   id: true,
   sortAt: true,
   carId: true,
+  carRating: true,
   loggingComplete: true,
   loggingCompletedAt: true,
   notes: true,
@@ -130,6 +133,30 @@ export async function getOrComputeDashboardSuggestion(
     previous: r.previous,
     current: r.current,
   }));
+  const setupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
+    userId,
+    anchorRunId: run.id,
+    carId: run.carId,
+    candidates: [
+      ...setupDiffChanged.map((r) => ({
+        key: r.key,
+        label: r.label,
+        before: r.previous,
+        after: r.current,
+      })),
+      { text: run.suggestedChanges },
+      { text: run.appliedChanges },
+    ],
+  });
+
+  const engineeringBrain = run.carId
+    ? await buildEngineeringBrainV1({
+        userId,
+        carId: run.carId,
+        anchorRunId: run.id,
+        referenceRunId: prior?.id ?? null,
+      }).catch(() => null)
+    : null;
 
   const summaryResult = await getOrComputeEngineerSummaryForRun(userId, run.id).catch(() => null);
   const summaryJson = summaryResult?.summary
@@ -153,6 +180,9 @@ export async function getOrComputeDashboardSuggestion(
     priorSetupSnapshotId: prior?.setupSnapshot?.id ?? null,
     spreadMaterial: spreadSlim,
     engineerSummaryFieldFingerprint: summaryResult?.summary.fieldFingerprint ?? null,
+    setupOutcomeMemoryFingerprint: setupOutcomeMemory?.fingerprint ?? null,
+    engineeringBrainFingerprint: engineeringBrain?.fingerprint ?? null,
+    carRating: run.carRating ?? null,
   });
 
   const existing = await prisma.engineerDashboardSuggestion.findUnique({
@@ -189,6 +219,13 @@ export async function getOrComputeDashboardSuggestion(
     appliedChanges: run.appliedChanges,
     notesPreview,
     summaryJson,
+    setupOutcomeCaveats: setupOutcomeMemory?.caveatLines ?? [],
+    engineeringBrainPromptLines: engineeringBrain?.promptLines ?? [],
+    recommendationMode: engineeringBrain?.engineeringRead.recommendationStrategy.mode ?? null,
+    recommendationStrength:
+      engineeringBrain?.engineeringRead.recommendationStrategy.strength ?? null,
+    preferEngineerChat:
+      engineeringBrain?.engineeringRead.recommendationStrategy.preferEngineerChat ?? false,
     engineerHref,
   });
 
@@ -231,6 +268,7 @@ export async function peekDashboardSuggestion(
       loggingComplete: true,
       loggingCompletedAt: true,
       carId: true,
+      carRating: true,
       sortAt: true,
     },
   });
@@ -245,7 +283,7 @@ export async function peekDashboardSuggestion(
           sortAt: { lt: run.sortAt },
         },
         orderBy: { sortAt: "desc" },
-        select: { id: true, setupSnapshot: { select: { id: true } } },
+        select: { id: true, setupSnapshot: { select: { id: true, data: true } } },
       })
     : null;
 
@@ -274,6 +312,44 @@ export async function peekDashboardSuggestion(
     })) ?? [];
 
   const summaryResult = await getOrComputeEngineerSummaryForRun(userId, primaryRunId).catch(() => null);
+  const curSetup = normalizeSetupData((await prisma.run.findFirst({
+    where: { id: primaryRunId, userId },
+    select: { setupSnapshot: { select: { data: true } } },
+  }))?.setupSnapshot?.data ?? null);
+  const prevSetup = prior?.setupSnapshot?.data != null ? normalizeSetupData(prior.setupSnapshot.data) : null;
+  const setupDiffChanged = buildSetupDiffRows(curSetup, prevSetup)
+    .filter((r) => r.changed)
+    .slice(0, 40)
+    .map((r) => ({
+      key: r.key,
+      label: r.label,
+      previous: r.previous,
+      current: r.current,
+    }));
+  const setupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
+    userId,
+    anchorRunId: primaryRunId,
+    carId: run.carId,
+    candidates: [
+      ...setupDiffChanged.map((r) => ({
+        key: r.key,
+        label: r.label,
+        before: r.previous,
+        after: r.current,
+      })),
+      { text: run.suggestedChanges },
+      { text: run.appliedChanges },
+    ],
+  });
+
+  const engineeringBrain = run.carId
+    ? await buildEngineeringBrainV1({
+        userId,
+        carId: run.carId,
+        anchorRunId: primaryRunId,
+        referenceRunId: prior?.id ?? null,
+      }).catch(() => null)
+    : null;
 
   const fp = buildDashboardSuggestionFingerprint({
     notes: run.notes,
@@ -287,6 +363,9 @@ export async function peekDashboardSuggestion(
     priorSetupSnapshotId: prior?.setupSnapshot?.id ?? null,
     spreadMaterial: spreadSlim,
     engineerSummaryFieldFingerprint: summaryResult?.summary.fieldFingerprint ?? null,
+    setupOutcomeMemoryFingerprint: setupOutcomeMemory?.fingerprint ?? null,
+    engineeringBrainFingerprint: engineeringBrain?.fingerprint ?? null,
+    carRating: run.carRating ?? null,
   });
 
   if (fp !== row.inputFingerprint) return null;

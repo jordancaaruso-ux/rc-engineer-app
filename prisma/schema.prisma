@@ -628,6 +628,12 @@ model Run {
   handlingProblems String?
   /** Optional structured handling tags / balance / prompts (see runHandlingAssessment). */
   handlingAssessmentJson Json?
+  /**
+   * Required 1–10 overall car rating captured at "Run complete". Nullable in DB so legacy and
+   * draft runs aren't broken, but the run-complete API path enforces it. Drives the
+   * Engineer's `runQuality` signal + known-good / known-bad history mining.
+   */
+  carRating Int?
   suggestedChanges String?
   /** Pre–next-run reminders; same bullet format as `suggestedChanges` (ActionItem `THINGS_TO_DO`). */
   suggestedPreRun  String?
@@ -699,6 +705,7 @@ model Run {
   dashboardSuggestion EngineerDashboardSuggestion?
 
   @@index([userId, sortAt])
+  @@index([userId, carId, carRating])
 }
 
 /** Cached proactive “next session” hints for Dashboard / Engineer (LLM + fingerprint invalidation). */

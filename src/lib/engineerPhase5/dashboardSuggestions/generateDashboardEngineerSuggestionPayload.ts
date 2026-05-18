@@ -56,6 +56,11 @@ async function callLlm(params: {
   appliedChanges: string | null;
   notesPreview: string;
   summaryJson: string | null;
+  setupOutcomeCaveats: string[];
+  engineeringBrainPromptLines: string[];
+  recommendationMode: string | null;
+  recommendationStrength: string | null;
+  preferEngineerChat: boolean;
 }): Promise<LlmShape | null> {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) return null;
@@ -69,17 +74,30 @@ async function callLlm(params: {
   const system = `You are an RC touring car engineer assistant. Output ONLY valid JSON (no markdown).
 The JSON object must have exactly these keys:
 - "headline": string, under 140 chars, actionable for the driver's **next** session
-- "bullets": array of 3 to 6 short strings (each under 240 chars). Tie each bullet to: (a) a handling/notes issue they reported, (b) a setup-versus-typical position (below_typical / above_typical / mid), (c) a prior-run setup change when provided, and/or (d) KB excerpts — say which when you use it.
+- "bullets": array of 3 to 6 short strings (each under 240 chars). Tie each bullet to: (a) a handling/notes issue they reported, (b) a setup-versus-typical position (below_typical / above_typical / mid), (c) a prior-run setup change when provided, (d) the engineering-brain read, and/or (e) KB excerpts — say which when you use it.
 - "tryNextSession": array of 2 to 4 very short checklist strings (each under 120 chars) for what to verify or try first.
 
 Rules:
-- Ground claims ONLY in the provided JSON and KB excerpts. If data is missing, say what is missing instead of inventing numbers.
-- Respect community position bands: if a parameter is already "below_typical" or "above_typical", do not recommend pushing further in that same extreme direction unless you add an explicit hedge ("only if you still see X on track").
-- Prefer one-change-at-a-time when suggesting new setup moves.
+- The "engineering brain" lines are the deterministic diagnosis. Treat them as the spine of the response: explain the conclusions in driver-friendly language; do not re-derive them or contradict them from raw notes.
+- Driver rating + handling chips outrank free notes. Quote notes only as context.
+- Tires are a fundamental setup choice — never treat a tire change as a free variable when something handling-related shifted.
+- Do not state pace metrics as rigid roles (best lap ≠ "the peak", etc.). Lean on the pace shape interpretation provided.
+- Respect community position bands: if a parameter is already "below_typical" or "above_typical", do not recommend pushing further in that extreme direction unless you add an explicit hedge ("only if you still see X on track").
+- Prefer one-change-at-a-time when suggesting new setup moves; honour the engineering brain's recommendation strategy mode and strength.
 - suggestedChanges / appliedChanges are free-text the driver wrote about what they changed or plan to change — treat as intent, not measured truth.
+- Setup outcome caveats are prior history for this car only. If present, include them as caveats only; do **not** change, reverse, or rank the setup suggestions because of them.
+- When the brain says preferEngineerChat=true OR data is thin, include one tryNextSession line suggesting the user open Ask the Engineer for a deeper look.
 - Scope: ${params.scopeLine}`;
 
-  const user = `KB excerpts:\n${kbText || "(none)"}\n\nNotes + handling (may overlap):\n${params.notesPreview.slice(0, 4000)}\n\nSuggested / applied changes text:\nSuggested: ${(params.suggestedChanges ?? "").slice(0, 1200)}\nApplied: ${(params.appliedChanges ?? "").slice(0, 1200)}\n\nSetup vs prior run (changed rows only):\n${JSON.stringify(params.setupDiffChanged).slice(0, 6000)}\n\nSetup vs community (slim rows):\n${JSON.stringify(params.spreadSlim).slice(0, 8000)}\n\nEngineer summary (optional, latest vs reference when present):\n${params.summaryJson ?? "null"}`;
+  const brainText = params.engineeringBrainPromptLines.length > 0
+    ? params.engineeringBrainPromptLines.slice(0, 12).join("\n")
+    : "(no engineering brain — fall back to KB + setup spread.)";
+  const strategyLine =
+    params.recommendationMode && params.recommendationStrength
+      ? `mode=${params.recommendationMode}, strength=${params.recommendationStrength}, preferEngineerChat=${params.preferEngineerChat}`
+      : `mode=unknown, strength=soft, preferEngineerChat=${params.preferEngineerChat}`;
+
+  const user = `Engineering brain (deterministic diagnosis — explain, don't re-derive):\n${brainText}\n\nRecommendation strategy: ${strategyLine}\n\nKB excerpts:\n${kbText || "(none)"}\n\nNotes + handling (may overlap):\n${params.notesPreview.slice(0, 4000)}\n\nSuggested / applied changes text:\nSuggested: ${(params.suggestedChanges ?? "").slice(0, 1200)}\nApplied: ${(params.appliedChanges ?? "").slice(0, 1200)}\n\nSetup outcome caveats (caveat-only, do not alter recommendation):\n${JSON.stringify(params.setupOutcomeCaveats.slice(0, 5)).slice(0, 1800)}\n\nSetup vs prior run (changed rows only):\n${JSON.stringify(params.setupDiffChanged).slice(0, 6000)}\n\nSetup vs community (slim rows):\n${JSON.stringify(params.spreadSlim).slice(0, 8000)}\n\nEngineer summary (optional, latest vs reference when present):\n${params.summaryJson ?? "null"}`;
 
   const body: Record<string, unknown> = {
     model,
@@ -122,6 +140,11 @@ export async function generateDashboardEngineerSuggestionPayload(params: {
   appliedChanges: string | null;
   notesPreview: string;
   summaryJson: string | null;
+  setupOutcomeCaveats?: string[];
+  engineeringBrainPromptLines?: string[];
+  recommendationMode?: string | null;
+  recommendationStrength?: string | null;
+  preferEngineerChat?: boolean;
   engineerHref: string;
 }): Promise<DashboardEngineerSuggestionPayloadV1> {
   const llm = await callLlm({
@@ -133,14 +156,30 @@ export async function generateDashboardEngineerSuggestionPayload(params: {
     appliedChanges: params.appliedChanges,
     notesPreview: params.notesPreview,
     summaryJson: params.summaryJson,
+    setupOutcomeCaveats: params.setupOutcomeCaveats ?? [],
+    engineeringBrainPromptLines: params.engineeringBrainPromptLines ?? [],
+    recommendationMode: params.recommendationMode ?? null,
+    recommendationStrength: params.recommendationStrength ?? null,
+    preferEngineerChat: params.preferEngineerChat ?? false,
   });
 
+  const brainFallbackBullets = (params.engineeringBrainPromptLines ?? []).slice(0, 4);
   const fb = buildFallback({
-    headline: "Review handling notes against setup vs typical before the next session.",
-    bullets: [
-      "Cross-check the parameters you moved last time with how the car felt in notes.",
-      "Use Engineer compare when you have a prior run on this car loaded as compare.",
-    ],
+    headline:
+      params.recommendationMode === "celebrate"
+        ? "Car was rated well — bank this setup as a known-good reference before changing more."
+        : params.recommendationMode === "verify"
+          ? "Pace and feel disagree — verify with another run on this setup before chasing changes."
+          : params.recommendationMode === "diagnose"
+            ? "Diagnose first — open Engineer chat with this run loaded."
+            : "Review handling notes against setup vs typical before the next session.",
+    bullets:
+      brainFallbackBullets.length > 0
+        ? brainFallbackBullets
+        : [
+            "Cross-check the parameters you moved last time with how the car felt in notes.",
+            "Use Engineer compare when you have a prior run on this car loaded as compare.",
+          ],
   });
 
   const headline =
@@ -149,8 +188,21 @@ export async function generateDashboardEngineerSuggestionPayload(params: {
       : fb.headline;
   let bullets = safeTrimArray(llm?.bullets, 6, 240);
   if (bullets.length < 2) bullets = fb.bullets;
+  const memoryCaveat = params.setupOutcomeCaveats?.[0]?.trim();
+  if (memoryCaveat && !bullets.some((b) => b.toLowerCase().includes("history caveat"))) {
+    bullets = [...bullets.slice(0, 5), memoryCaveat.slice(0, 240)];
+  }
   let tryNext = safeTrimArray(llm?.tryNextSession, 4, 120);
   if (tryNext.length < 1) tryNext = fb.tryNextSession;
+  if (
+    params.preferEngineerChat &&
+    !tryNext.some((t) => t.toLowerCase().includes("engineer"))
+  ) {
+    tryNext = [
+      ...tryNext.slice(0, 3),
+      "Open Ask the Engineer with this run for a deeper diagnosis.",
+    ];
+  }
 
   return {
     version: 1,

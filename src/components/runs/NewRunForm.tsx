@@ -101,6 +101,8 @@ type LastRun = {
   suggestedChanges?: string | null;
   suggestedPreRun?: string | null;
   handlingAssessmentJson?: unknown;
+  /** Required 1-10 overall car rating captured when the run is marked complete. */
+  carRating?: number | null;
   /** Session race class when not only from event (e.g. practice). */
   raceClass?: string | null;
   lapTimes?: unknown;
@@ -293,6 +295,8 @@ export function NewRunForm(props: {
   const [notesSubTab, setNotesSubTab] = useState<"notes" | "things" | "todo">("notes");
   const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
   const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
+  /** Required 1-10 overall car rating; null until the driver sets one. Server enforces presence at "Run complete". */
+  const [carRating, setCarRating] = useState<number | null>(null);
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("tires");
   const [trackSaveWarning, setTrackSaveWarning] = useState(false);
   const [trackGripTags, setTrackGripTags] = useState<string[]>([]);
@@ -533,6 +537,11 @@ export function NewRunForm(props: {
     const parsedHandling = parseHandlingAssessmentJson(r.handlingAssessmentJson);
     setHandlingUi(uiStateFromParsed(parsedHandling));
     setHandlingDetailExpanded(isHandlingAssessmentMeaningful(r.handlingAssessmentJson));
+    setCarRating(
+      typeof r.carRating === "number" && Number.isFinite(r.carRating) && r.carRating >= 1 && r.carRating <= 10
+        ? Math.round(r.carRating)
+        : null
+    );
 
     const existingLaps = normalizeLapTimes(r.lapTimes ?? []);
     const existingText = existingLaps.length ? existingLaps.map((n) => n.toFixed(3)).join("\n") : "";
@@ -1888,6 +1897,12 @@ export function NewRunForm(props: {
       setRunDetailsTab("track");
       return;
     }
+    // Car rating is required when completing a run so the Engineer always has an
+    // absolute "was the car good?" signal. Drafts can be saved without it.
+    if (intent === "completed" && (carRating == null || carRating < 1 || carRating > 10)) {
+      setInlineError("Rate the car 1–10 before marking the run complete.");
+      return;
+    }
     // Surface unsaved setup edits before we write — the driver gets to review
     // exactly what they changed vs. the loaded baseline. Continuing from the
     // confirmation passes `bypassUnsavedSetupCheck: true` so we don't loop.
@@ -2001,6 +2016,7 @@ export function NewRunForm(props: {
           suggestedChanges: suggestedChanges.trim() || null,
           suggestedPreRun: suggestedPreRun.trim() || null,
           handlingAssessmentJson: persistedFromUiState(handlingUi),
+          carRating,
           shareWithTeam,
           sessionLabel: null,
           importedLapSets,
@@ -3706,6 +3722,47 @@ export function NewRunForm(props: {
             aria-label="Things to do before next run"
           />
         )}
+        <div className="pt-1">
+          <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div className="text-xs font-medium text-foreground">
+                Car rating <span className="text-[10px] font-normal text-muted-foreground">(required to complete · 1 awful → 10 perfect)</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {carRating == null ? "Not rated" : `${carRating} / 10`}
+              </div>
+            </div>
+            <div
+              role="radiogroup"
+              aria-label="Car rating 1 to 10"
+              className="mt-2 grid grid-cols-10 gap-1"
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
+                const selected = carRating === n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setCarRating((cur) => (cur === n ? null : n))}
+                    className={cn(
+                      "rounded-md border px-0 py-1 text-xs font-medium tabular-nums transition",
+                      selected
+                        ? "border-accent bg-accent text-accent-foreground shadow-sm"
+                        : "border-border bg-card text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+              The Engineer uses this as the anchor &quot;was the car good?&quot; signal alongside your handling chips when ranking past setups.
+            </p>
+          </div>
+        </div>
         <div className="pt-1">
           <button
             type="button"

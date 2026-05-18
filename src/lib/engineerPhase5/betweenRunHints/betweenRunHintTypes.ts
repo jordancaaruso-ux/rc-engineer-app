@@ -118,6 +118,17 @@ export type BetweenRunHintPayloadV2 = {
      * without changing the underlying recommendation.
      */
     setupOutcomeCaveats?: string[];
+    /**
+     * Deterministic engineering-brain summary lines (rating, feel, pace shape, hypotheses,
+     * recommendation strategy). The LLM should explain these — not re-derive from raw notes.
+     */
+    engineeringBrainPromptLines?: string[];
+    /** Recommendation strategy fields surfaced for downstream UI / fallback wording. */
+    engineeringBrainRecommendation?: {
+      mode: string;
+      strength: string;
+      preferEngineerChat: boolean;
+    } | null;
   };
 };
 
@@ -152,5 +163,9 @@ export type RecentSessionsFingerprintMaterial = {
     /** Stable digest when priorHandlingCarryforward is present/changes. */
     priorHandlingSig?: string;
     setupOutcomeMemoryFingerprint?: string | null;
+    /** Engineering brain fingerprint (read + known-good + analogies). */
+    engineeringBrainFingerprint?: string | null;
+    /** Driver-provided rating; invalidates cache when it changes. */
+    carRating?: number | null;
   };
 };
