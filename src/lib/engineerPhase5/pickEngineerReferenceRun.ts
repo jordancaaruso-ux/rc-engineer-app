@@ -19,8 +19,12 @@ function sortMs(run: { createdAt: Date; sessionCompletedAt: Date | null }): numb
 }
 
 /**
- * Choose a reference run chronologically before `current` for Engineer pairwise summaries.
- * Prefers same track + tire conditions before falling back to "previous on car" by time.
+ * Choose the reference run for Engineer pairwise summaries: the **most recent other run
+ * on the same car** that is strictly **before** `current` in time (`createdAt` /
+ * `sessionCompletedAt` via {@link resolveRunDisplayInstant}).
+ *
+ * This intentionally ignores track / tire matching so "what changed recently" always
+ * means **last session vs this session** on that car, not a same-venue heuristic.
  */
 export async function pickEngineerReferenceRunId(
   userId: string,
@@ -41,9 +45,6 @@ export async function pickEngineerReferenceRunId(
       id: true,
       createdAt: true,
       sessionCompletedAt: true,
-      trackId: true,
-      tireSetId: true,
-      tireRunNumber: true,
     },
     take: 500,
     orderBy: { createdAt: "desc" },
@@ -52,26 +53,5 @@ export async function pickEngineerReferenceRunId(
   const before = peers.filter((p) => sortMs(p) < tCur);
   before.sort((a, b) => sortMs(b) - sortMs(a));
 
-  const first = (pred: (r: (typeof before)[number]) => boolean) => before.find(pred);
-
-  if (current.trackId && current.tireSetId) {
-    const r = first(
-      (c) =>
-        c.trackId === current.trackId &&
-        c.tireSetId === current.tireSetId &&
-        c.tireRunNumber === current.tireRunNumber
-    );
-    if (r) return r.id;
-  }
-  if (current.trackId) {
-    const r = first(
-      (c) => c.trackId === current.trackId && c.tireRunNumber === current.tireRunNumber
-    );
-    if (r) return r.id;
-  }
-  if (current.trackId) {
-    const r = first((c) => c.trackId === current.trackId);
-    if (r) return r.id;
-  }
   return before[0]?.id ?? null;
 }

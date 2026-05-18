@@ -33,7 +33,7 @@ export function buildDashboardSuggestionFingerprint(params: {
   carRating?: number | null;
 }): string {
   const payload = {
-    v: 5 as const,
+    v: 6 as const,
     notes: params.notes,
     driverNotes: params.driverNotes,
     handlingProblems: params.handlingProblems,
