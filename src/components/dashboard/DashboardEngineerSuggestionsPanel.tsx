@@ -5,12 +5,40 @@ import Link from "next/link";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 
-export function DashboardEngineerSuggestionsPanel({ runId }: { runId: string }) {
-  const [suggestions, setSuggestions] = useState<DashboardEngineerSuggestionPayloadV1 | null>(null);
-  const [loading, setLoading] = useState(true);
+function isHydratedFromSsr(
+  runId: string,
+  initialSuggestions: DashboardEngineerSuggestionPayloadV1 | null | undefined
+): initialSuggestions is DashboardEngineerSuggestionPayloadV1 {
+  return (
+    initialSuggestions != null &&
+    typeof initialSuggestions.primaryRunId === "string" &&
+    initialSuggestions.primaryRunId === runId
+  );
+}
+
+export function DashboardEngineerSuggestionsPanel({
+  runId,
+  initialSuggestions,
+}: {
+  runId: string;
+  /** SSR peek payload when fingerprint matches; `null` means “no cache yet — sync fetch”. */
+  initialSuggestions?: DashboardEngineerSuggestionPayloadV1 | null;
+}) {
+  const hydrated = isHydratedFromSsr(runId, initialSuggestions);
+  const [suggestions, setSuggestions] = useState<DashboardEngineerSuggestionPayloadV1 | null>(() =>
+    hydrated ? initialSuggestions : null
+  );
+  const [loading, setLoading] = useState(() => !hydrated);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isHydratedFromSsr(runId, initialSuggestions)) {
+      setSuggestions(initialSuggestions);
+      setLoading(false);
+      setErr(null);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setErr(null);
@@ -43,7 +71,7 @@ export function DashboardEngineerSuggestionsPanel({ runId }: { runId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [runId]);
+  }, [runId, initialSuggestions]);
 
   if (loading) {
     return <p className="text-[11px] text-muted-foreground">Loading engineer suggestions…</p>;

@@ -5,7 +5,7 @@ import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
 import { DashboardPreviousRunCard } from "@/components/dashboard/DashboardPreviousRunCard";
 import { TodaySummaryCard } from "@/components/dashboard/TodaySummaryCard";
-import { DashboardBetweenRunHintsSection } from "@/components/dashboard/DashboardBetweenRunHintsSection";
+import { DashboardEngineerSuggestionsSection } from "@/components/dashboard/DashboardEngineerSuggestionsSection";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -33,8 +33,8 @@ export function DashboardHome({
     todayDraftRunId,
     todayDraftSavedAt,
     todaysChanges,
-    betweenRunHint,
-    betweenRunHintsPrimaryRunId,
+    engineerSuggestionsInitial,
+    engineerSuggestionsPrimaryRunId,
   } = model;
 
   // One prominent "what do I do next" entry point. Resolves to the
@@ -105,9 +105,12 @@ export function DashboardHome({
           </Link>
         </HeroPanel>
 
-        <DashboardBetweenRunHintsSection
-          initialHint={betweenRunHint}
-          primaryRunId={betweenRunHintsPrimaryRunId}
+        <DashboardEngineerSuggestionsSection
+          initialSuggestions={engineerSuggestionsInitial}
+          primaryRunId={engineerSuggestionsPrimaryRunId}
+          carName={recentRun?.carName ?? "Car"}
+          trackName={recentRun?.trackName ?? null}
+          eventName={recentRun?.eventName ?? null}
         />
 
         {activeEvent ? (

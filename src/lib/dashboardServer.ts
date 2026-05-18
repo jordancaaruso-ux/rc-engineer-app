@@ -10,8 +10,8 @@ import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapS
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
-import type { BetweenRunHintPayload } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
-import { peekBetweenRunHint } from "@/lib/engineerPhase5/betweenRunHints/getOrComputeBetweenRunHints";
+import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
+import { peekDashboardSuggestion } from "@/lib/engineerPhase5/dashboardSuggestions/getOrComputeDashboardSuggestion";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
@@ -260,6 +260,7 @@ export type DashboardHomeModel = {
   }>;
   recentRun: null | {
     id: string;
+    carId: string | null;
     createdAt: string;
     sessionCompletedAt: string | null;
     loggingCompletedAt: string | null;
@@ -272,10 +273,10 @@ export type DashboardHomeModel = {
     bestLap: number | null;
     avgTop5: number | null;
   };
-  /** Cached proactive Engineer hints for the latest run (peek on SSR). Client may sync-fetch when null. */
-  betweenRunHint: BetweenRunHintPayload | null;
-  /** Latest run id eligible for between-run hints (requires car); mirrors SSR peek gate. */
-  betweenRunHintsPrimaryRunId: string | null;
+  /** Cached dashboard Engineer suggestions for the latest run (peek on SSR). Client sync-fetches when null. */
+  engineerSuggestionsInitial: DashboardEngineerSuggestionPayloadV1 | null;
+  /** Latest run id eligible for dashboard Engineer suggestions (requires car + completed logging). */
+  engineerSuggestionsPrimaryRunId: string | null;
 };
 
 const recentRunSelect = {
@@ -583,6 +584,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     const m = computeIncludedLapMetricsFromRun(recentRun);
     recent = {
       id: recentRun.id,
+      carId: recentRun.car?.id ?? null,
       createdAt: recentRun.createdAt.toISOString(),
       sessionCompletedAt: recentRun.sessionCompletedAt
         ? recentRun.sessionCompletedAt.toISOString()
@@ -602,14 +604,15 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
 
   const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
 
-  let betweenRunHintsPrimaryRunId: string | null = null;
-  let betweenRunHint: BetweenRunHintPayload | null = null;
-  if (recentRun?.car?.id) {
-    betweenRunHintsPrimaryRunId = recentRun.id;
+  const runLoggingComplete = Boolean(recent?.loggingCompletedAt) || recent?.loggingComplete === true;
+  let engineerSuggestionsPrimaryRunId: string | null = null;
+  let engineerSuggestionsInitial: DashboardEngineerSuggestionPayloadV1 | null = null;
+  if (recent?.carId && runLoggingComplete) {
+    engineerSuggestionsPrimaryRunId = recent.id;
     try {
-      betweenRunHint = await peekBetweenRunHint(userId, recentRun.id);
+      engineerSuggestionsInitial = await peekDashboardSuggestion(userId, recent.id);
     } catch {
-      betweenRunHint = null;
+      engineerSuggestionsInitial = null;
     }
   }
 
@@ -646,7 +649,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
         .find((r) => r.loggingComplete === false)?.createdAt.toISOString() ?? null,
     todaysChanges,
     recentRun: recent,
-    betweenRunHint,
-    betweenRunHintsPrimaryRunId,
+    engineerSuggestionsInitial,
+    engineerSuggestionsPrimaryRunId,
   };
 }
