@@ -86,12 +86,14 @@ Rules:
 - The "engineering brain" lines are the deterministic diagnosis. Treat them as the spine of the response: explain the conclusions in driver-friendly language; do not re-derive them or contradict them from raw notes.
 - Driver rating + handling chips outrank free notes. Quote notes only as context.
 - **Tyre tiering (tireChangeSignificance):** When it is **compound_change**, tyres are the headline story — isolate tyre effects before chassis tuning. When **new_set_same_compound**, acknowledge fresher rubber but do **not** narrate it like a compound swap. When **wear_index_only** or **none**, do **not** invent a tyre-swap explanation for handling deltas.
-- **Chassis allow-list:** allowedChassisKeys lists the only chassis tuning keys that changed vs the **previous run** (most recent prior run on this car, by time — not same-track heuristics). For **forward** chassis experiments, you may only name knobs whose keys appear in that JSON array. If a lever is **not** in the list, you must **not** recommend changing it (no droop/downstop/arms/etc. unless its key is present). KB text may explain feel but must not introduce new numeric prescriptions for keys outside the list.
+- **Measured tuning diff (hard rule):** The JSON array **authoritativeSetupDiff** is the **only** source of truth for which **chassis tuning keys** changed between saved setup snapshots vs the previous run. Do **not** claim any chassis key changed — and do **not** quote before/after values — unless that **key** appears in authoritativeSetupDiff. The Engineer summary JSON in this prompt **does not** include setupChanges; never infer missing deltas from it.
+- **Free-text discipline:** suggestedChanges / appliedChanges are the driver's notes about intent or plans — **never** treat them as proof that a setup field changed on the sheet, and **never** use them to invent numeric before/after for a key.
+- **Chassis allow-list:** allowedChassisKeys duplicates the keys in authoritativeSetupDiff. For **any** forward-looking chassis adjustment (including "consider", "explore", "might help", "verify whether…"), you may only name knobs whose **key** is in that array. If a lever is **not** in the list, you must **not** name it or suggest moving it — including droop, downstop, shim packs, arms, toe, camber, springs, roll bars, ride height, oils, etc. KB text may explain handling concepts **only in generic terms** unless a KB line is tied to a key that is in the list.
+- If **allowedChassisKeys** is an empty array \`[]\`, you must **not** recommend any specific chassis hardware change; stick to tyres (per tireChangeSignificance), pace / repeatability verification, community spread context without naming absent keys, and/or opening Engineer chat.
 - **No silent cross-lever analogies:** do not substitute a different chassis lever for one in the diff unless a KB excerpt in this prompt explicitly links the mechanism for this symptom.
 - Do not state pace metrics as rigid roles (best lap ≠ "the peak", etc.). Lean on the pace shape interpretation provided.
 - Respect community position bands: if a parameter is already "below_typical" or "above_typical", do not recommend pushing further in that extreme direction unless you add an explicit hedge ("only if you still see X on track").
 - Prefer one-change-at-a-time when suggesting new setup moves; honour the engineering brain's recommendation strategy mode and strength.
-- suggestedChanges / appliedChanges are free-text the driver wrote about what they changed or plan to change — treat as intent, not measured truth.
 - Setup outcome caveats are prior history for this car only. If present, include **at most one** concise caveat inside the bullets; do **not** change, reverse, or rank the setup suggestions because of them.
 - When the brain says preferEngineerChat=true OR data is thin, include one tryNextSession line suggesting the user open Ask the Engineer for a deeper look.
 - Scope: ${params.scopeLine}`;
@@ -104,7 +106,7 @@ Rules:
       ? `mode=${params.recommendationMode}, strength=${params.recommendationStrength}, preferEngineerChat=${params.preferEngineerChat}`
       : `mode=unknown, strength=soft, preferEngineerChat=${params.preferEngineerChat}`;
 
-  const user = `Engineering brain (deterministic diagnosis — explain, don't re-derive):\n${brainText}\n\nRecommendation strategy: ${strategyLine}\n\ntireChangeSignificance: ${tireSig}\nallowedChassisKeys (forward suggestions must be subset of these keys):\n${allowKeysJson}\n\nKB excerpts:\n${kbText || "(none)"}\n\nNotes + handling (may overlap):\n${params.notesPreview.slice(0, 4000)}\n\nSuggested / applied changes text:\nSuggested: ${(params.suggestedChanges ?? "").slice(0, 1200)}\nApplied: ${(params.appliedChanges ?? "").slice(0, 1200)}\n\nSetup outcome caveats (caveat-only, do not alter recommendation):\n${JSON.stringify(params.setupOutcomeCaveats.slice(0, 5)).slice(0, 1800)}\n\nSetup vs previous run — most recent prior run on this car (changed rows only):\n${JSON.stringify(params.setupDiffChanged).slice(0, 6000)}\n\nSetup vs community (slim rows):\n${JSON.stringify(params.spreadSlim).slice(0, 8000)}\n\nEngineer summary (optional, same previous-run reference when present):\n${params.summaryJson ?? "null"}`;
+  const user = `Engineering brain (deterministic diagnosis — explain, don't re-derive):\n${brainText}\n\nRecommendation strategy: ${strategyLine}\n\ntireChangeSignificance: ${tireSig}\nallowedChassisKeys (must mirror authoritativeSetupDiff keys):\n${allowKeysJson}\n\nKB excerpts:\n${kbText || "(none)"}\n\nNotes + handling (may overlap):\n${params.notesPreview.slice(0, 4000)}\n\nSuggested / applied changes text:\nSuggested: ${(params.suggestedChanges ?? "").slice(0, 1200)}\nApplied: ${(params.appliedChanges ?? "").slice(0, 1200)}\n\nSetup outcome caveats (caveat-only, do not alter recommendation):\n${JSON.stringify(params.setupOutcomeCaveats.slice(0, 5)).slice(0, 1800)}\n\nauthoritativeSetupDiff — tuning keys that changed vs previous run (sole source for chassis deltas; Engineer compare engine):\n${JSON.stringify(params.setupDiffChanged).slice(0, 6000)}\n\nSetup vs community (slim rows):\n${JSON.stringify(params.spreadSlim).slice(0, 8000)}\n\nEngineer summary (pace + interpretation only; no per-key setup list):\n${params.summaryJson ?? "null"}`;
 
   const body: Record<string, unknown> = {
     model,
@@ -220,7 +222,7 @@ export async function generateDashboardEngineerSuggestionPayload(params: {
     tryNextSession: tryNext.slice(0, 4),
     sourcesNote: `Grounded in your saved run, setup vs typical for this car${
       params.setupDiffChanged.length
-        ? ", and chassis diffs vs the same baseline run used in your Engineer summary (track / tyre aware when data allows)"
+        ? ", and tuning diffs vs the previous run on this car (same compare engine as Engineer)"
         : ""
     }. KB excerpts are retrieved, not invented.`,
     engineerHref: params.engineerHref,

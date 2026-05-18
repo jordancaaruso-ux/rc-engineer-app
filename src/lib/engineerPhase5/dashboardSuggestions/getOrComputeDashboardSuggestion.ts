@@ -3,8 +3,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveRunNotes } from "@/lib/engineerPhase5/mergeRunNotes";
 import { buildEngineerRichContextV1 } from "@/lib/engineerPhase5/engineerRichContext";
-import { buildSetupDiffRows } from "@/lib/setupDiff";
-import { normalizeSetupData } from "@/lib/runSetup";
+import { loadNumericAggregationMapForCar } from "@/lib/engineerPhase5/loadNumericAggregationMapForCar";
+import { rankSetupChangesForEngineer } from "@/lib/engineerPhase5/rankSetupChangesForEngineer";
 import { searchVehicleDynamicsKb } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import { buildDashboardSuggestionFingerprint } from "@/lib/engineerPhase5/dashboardSuggestions/buildDashboardSuggestionFingerprint";
@@ -77,6 +77,23 @@ function scopeLineFromRun(run: {
   return parts.join(" · ");
 }
 
+/** Same tuning diff engine as Engineer summary / engineering read (not raw string diff). */
+async function authoritativeSetupDiffVsPrior(params: {
+  carId: string | null;
+  currentData: unknown;
+  priorData: unknown | null;
+}): Promise<Array<{ key: string; label: string; previous: string | null; current: string }>> {
+  if (params.priorData == null) return [];
+  const agg = params.carId ? await loadNumericAggregationMapForCar(params.carId) : new Map();
+  const rows = rankSetupChangesForEngineer(params.currentData, params.priorData, agg, { limit: 40 });
+  return rows.map((r) => ({
+    key: r.key,
+    label: r.label,
+    previous: r.before,
+    current: r.after,
+  }));
+}
+
 export async function getOrComputeDashboardSuggestion(
   userId: string,
   primaryRunId: string,
@@ -133,15 +150,11 @@ export async function getOrComputeDashboardSuggestion(
       median: r.spread?.median ?? null,
     })) ?? [];
 
-  const curSetup = normalizeSetupData(run.setupSnapshot?.data ?? null);
-  const prevSetup = prior?.setupSnapshot?.data != null ? normalizeSetupData(prior.setupSnapshot.data) : null;
-  const diffRows = buildSetupDiffRows(curSetup, prevSetup).filter((r) => r.changed);
-  const setupDiffChanged = diffRows.slice(0, 40).map((r) => ({
-    key: r.key,
-    label: r.label,
-    previous: r.previous,
-    current: r.current,
-  }));
+  const setupDiffChanged = await authoritativeSetupDiffVsPrior({
+    carId: run.carId,
+    currentData: run.setupSnapshot?.data ?? null,
+    priorData: prior?.setupSnapshot?.data ?? null,
+  });
   const diffCandidates = setupDiffChanged.map((r) => ({
     key: r.key,
     label: r.label,
@@ -170,9 +183,9 @@ export async function getOrComputeDashboardSuggestion(
   const summaryJson = summaryResult?.summary
     ? JSON.stringify({
         lapOutcome: summaryResult.summary.lapOutcome,
-        setupChanges: summaryResult.summary.setupChanges.slice(0, 24),
         interpretation: summaryResult.summary.interpretation,
         referenceRunId: summaryResult.summary.referenceRunId,
+        note: "Chassis setup deltas are omitted here — use authoritativeSetupDiff only (matches Engineer compare).",
       }).slice(0, 6000)
     : null;
 
@@ -333,20 +346,15 @@ export async function peekDashboardSuggestion(
     })) ?? [];
 
   const summaryResult = await getOrComputeEngineerSummaryForRun(userId, primaryRunId).catch(() => null);
-  const curSetup = normalizeSetupData((await prisma.run.findFirst({
+  const primarySnap = await prisma.run.findFirst({
     where: { id: primaryRunId, userId },
     select: { setupSnapshot: { select: { data: true } } },
-  }))?.setupSnapshot?.data ?? null);
-  const prevSetup = prior?.setupSnapshot?.data != null ? normalizeSetupData(prior.setupSnapshot.data) : null;
-  const setupDiffChanged = buildSetupDiffRows(curSetup, prevSetup)
-    .filter((r) => r.changed)
-    .slice(0, 40)
-    .map((r) => ({
-      key: r.key,
-      label: r.label,
-      previous: r.previous,
-      current: r.current,
-    }));
+  });
+  const setupDiffChanged = await authoritativeSetupDiffVsPrior({
+    carId: run.carId,
+    currentData: primarySnap?.setupSnapshot?.data ?? null,
+    priorData: prior?.setupSnapshot?.data ?? null,
+  });
   const diffCandidates = setupDiffChanged.map((r) => ({
     key: r.key,
     label: r.label,

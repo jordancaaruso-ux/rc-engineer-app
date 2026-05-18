@@ -43,8 +43,10 @@ function rankReasonFromCompare(key: string, sev: string, gradientIntensity?: num
 export function rankSetupChangesForEngineer(
   currentData: unknown,
   referenceData: unknown,
-  numericAggregationByKey: ReadonlyMap<string, NumericAggregationCompareSlice> | null
+  numericAggregationByKey: ReadonlyMap<string, NumericAggregationCompareSlice> | null,
+  opts?: { limit?: number }
 ): EngineerSetupChangeRow[] {
+  const limit = opts?.limit != null ? Math.min(120, Math.max(1, opts.limit)) : MAX_CHANGES;
   const keys = listSetupKeysChangedBetweenSnapshots(currentData, referenceData, {
     keyFilter: isTuningComparisonKey,
   });
@@ -76,5 +78,5 @@ export function rankSetupChangesForEngineer(
     return a.label.localeCompare(b.label);
   });
 
-  return rows.slice(0, MAX_CHANGES);
+  return rows.slice(0, limit);
 }
