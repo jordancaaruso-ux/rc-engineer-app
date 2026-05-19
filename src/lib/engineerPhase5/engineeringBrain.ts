@@ -3,7 +3,7 @@
  *
  * Wraps the deterministic `engineeringRead`, the rating-driven known-good / known-bad
  * memory, and the mechanism analogies that explain how proposed changes relate to
- * past changes. Both the Dashboard "Suggested next steps" tile and "Ask the Engineer"
+ * past changes. Both the Dashboard Engineer suggestions hero and "Ask the Engineer"
  * receive the same packet — they only differ in how much depth they expose to the
  * end user.
  */
@@ -63,8 +63,12 @@ function buildPromptLines(input: {
   // Feel
   const feel = input.read.feelRead;
   if (feel.betterWorse.direction !== "unknown") {
+    const feelLabel =
+      feel.betterWorse.source === "rating_vs_reference"
+        ? "Feel vs reference (car rating; no better/worse chip)"
+        : "Feel vs last run chip";
     lines.push(
-      `Feel vs last run chip: ${feel.betterWorse.direction}${feel.betterWorse.magnitudeWord ? ` (${feel.betterWorse.magnitudeWord})` : ""}.`
+      `${feelLabel}: ${feel.betterWorse.direction}${feel.betterWorse.magnitudeWord ? ` (${feel.betterWorse.magnitudeWord})` : ""}.`
     );
   }
   const phaseLines: string[] = [];
@@ -92,15 +96,15 @@ function buildPromptLines(input: {
   const change = input.read.changeRead;
   if (change.tireChangeSignificance === "compound_change") {
     lines.push(
-      "Tyres: compound / product line changed vs reference — dominant variable; chassis advice is secondary until tyres are understood."
+      "Tyre context (equipment — not a chassis sheet key): compound / product line changed vs reference — dominant **rubber/session** variable; chassis advice stays secondary until that context is clear."
     );
   } else if (change.tireChangeSignificance === "new_set_same_compound") {
     lines.push(
-      "Tyres: same compound on a different physical set vs reference — expect some grip shift; do not narrate like a compound swap."
+      "Tyre context (equipment — not a chassis sheet key): same compound on a different physical set vs reference — expect some grip shift; do not narrate like a compound swap."
     );
   } else if (change.tireChangeSignificance === "wear_index_only") {
     lines.push(
-      "Tyres: same set stepped to a new tyre-run index — wear/scrub progression only; do not treat like a compound change."
+      "Tyre context (equipment — not a chassis sheet key): same set stepped to a new tyre-run index — wear/scrub progression only; do not treat like a compound change."
     );
   }
   if (change.chassisChangedKeyCount > 0) {

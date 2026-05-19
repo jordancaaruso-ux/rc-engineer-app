@@ -4,16 +4,18 @@
  * the data-enhanced-engineer plan:
  *
  * - Required car rating + better/worse chip are the strongest feel/outcome signals.
+ *   When the chip is unset, rating vs the reference run is used as a fallback.
  * - Phase balance chips are evaluated per `entry` / `mid` / `exit`.
  * - Pace metrics are described as a fluid shape (peak vs repeatability) rather than
  *   single hard-coded indicators.
- * - Tire choices are treated as a fundamental setup choice, scored alongside chassis
- *   changes in `hypotheses` rather than as an external variable.
+ * - Tyre set / compound / run-index deltas are **equipment and session context** (not
+ *   chassis keys on the setup sheet), but they still score in `hypotheses` alongside
+ *   chassis changes so attribution stays honest when rubber moves.
  * - Notes are descriptive context only — they never outweigh chips/rating.
  *
- * Suggested next steps + Ask the Engineer both consume this object so they share a
- * single diagnosis. The LLM is asked to explain `engineeringRead`, not to re-derive
- * conclusions from raw notes + spread.
+ * Dashboard Engineer suggestions + Ask the Engineer both consume this object so they
+ * share a single diagnosis. The LLM is asked to explain `engineeringRead`, not to
+ * re-derive conclusions from raw notes + spread.
  */
 import { createHash } from "node:crypto";
 
@@ -30,6 +32,7 @@ import {
   type PhaseBalance,
   type RunHandlingAssessmentParsed,
 } from "@/lib/runHandlingAssessment";
+import { inferFeelVsReferenceFromRatings } from "@/lib/engineerPhase5/inferFeelFromRatings";
 import { listSetupKeysChangedBetweenSnapshots } from "@/lib/setupCompare/listSetupKeysChangedBetweenSnapshots";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 import { compareSetupField } from "@/lib/setupCompare/compare";
@@ -60,12 +63,16 @@ export type FeelReadPhase = {
   movedTowardNeutral: boolean | null;
 };
 
+export type FeelBetterWorseSource = "chip" | "rating_vs_reference" | null;
+
 export type FeelReadV1 = {
-  /** Single explicit better/worse chip (-3..+3). */
+  /** Better/worse chip (-3..+3), or rating vs reference when chip unset. */
   betterWorse: {
     direction: "better" | "worse" | "same" | "unknown";
     value: PhaseBalance | null;
     magnitudeWord: "mild" | "moderate" | "strong" | null;
+    /** How direction was determined; chip always wins when set (non-null, including 0). */
+    source: FeelBetterWorseSource;
   };
   phaseBalance: Record<CornerPhase, FeelReadPhase>;
   traits: {
@@ -128,7 +135,7 @@ export type TireChangeSignificanceV1 =
   | "wear_index_only"
   /** Different physical set row but same compound label — fresher rubber, not a new tyre family. */
   | "new_set_same_compound"
-  /** `TireSet.label` changed — treat as the dominant variable ahead of chassis tuning stories. */
+  /** `TireSet.label` changed — dominant **rubber/session** context ahead of chassis tuning stories. */
   | "compound_change";
 
 export type ChangeReadV1 = {
@@ -337,12 +344,42 @@ function buildFeelRead(
   const parsedReference = reference
     ? parseHandlingAssessmentJson(reference.handlingAssessmentJson)
     : null;
-  const better = parsedCurrent?.feelVsLastRun ?? null;
+  const chip = parsedCurrent?.feelVsLastRun;
   const directionFromFeel = (v: PhaseBalance | null): FeelReadV1["betterWorse"]["direction"] => {
     if (v == null) return "unknown";
     if (v === 0) return "same";
     return v < 0 ? "worse" : "better";
   };
+
+  let betterWorse: FeelReadV1["betterWorse"];
+  if (chip != null) {
+    betterWorse = {
+      direction: directionFromFeel(chip),
+      value: chip,
+      magnitudeWord: phaseMagnitudeWord(chip),
+      source: "chip",
+    };
+  } else {
+    const fromRating = reference
+      ? inferFeelVsReferenceFromRatings(current.carRating, reference.carRating)
+      : null;
+    if (fromRating) {
+      betterWorse = {
+        direction: fromRating.direction,
+        value: fromRating.value,
+        magnitudeWord: fromRating.magnitudeWord,
+        source: "rating_vs_reference",
+      };
+    } else {
+      betterWorse = {
+        direction: "unknown",
+        value: null,
+        magnitudeWord: null,
+        source: null,
+      };
+    }
+  }
+
   const traits = {
     feelSteering: parsedCurrent?.feelSteering ?? null,
     feelGeneral: parsedCurrent?.feelGeneral ?? null,
@@ -360,11 +397,7 @@ function buildFeelRead(
     { entry: {} as FeelReadPhase, mid: {} as FeelReadPhase, exit: {} as FeelReadPhase }
   );
   return {
-    betterWorse: {
-      direction: directionFromFeel(better),
-      value: better,
-      magnitudeWord: phaseMagnitudeWord(better),
-    },
+    betterWorse,
     phaseBalance: phases,
     traits,
     notesContext: gatherNotesContext(current),
@@ -688,6 +721,25 @@ function buildHypotheses(
     });
   }
 
+  if (
+    feel.betterWorse.direction === "better" &&
+    change.chassisChangedKeyCount > 0 &&
+    runQuality.carRating != null &&
+    runQuality.carRating >= 6
+  ) {
+    const ratingNote =
+      feel.betterWorse.source === "rating_vs_reference"
+        ? "Car rating improved vs the reference run (no better/worse chip)."
+        : "Driver marked feel better vs the reference run.";
+    hypotheses.unshift({
+      cause: "no_change_or_unknown",
+      confidence: "medium",
+      reasons: [
+        `${ratingNote} Chassis keys also changed — do not recommend reversing those moves without an on-track reason.`,
+      ],
+    });
+  }
+
   return hypotheses;
 }
 
@@ -830,7 +882,10 @@ export function buildEngineeringReadV1(input: {
       id: input.anchor.id,
       sortAtIso: input.anchor.sortAtIso,
       carRating: input.anchor.carRating,
-      feel: feelRead,
+      feel: {
+        ...feelRead,
+        betterWorseSource: feelRead.betterWorse.source,
+      },
       paceShape: {
         peak: paceRead.peakPace.direction,
         peakDelta: paceRead.peakPace.deltaSeconds,
@@ -875,10 +930,14 @@ export function summarizeEngineeringReadAsLines(read: EngineeringReadV1): string
   const lines: string[] = [];
   lines.push(`Run quality: ${read.runQuality.summary}`);
   if (read.feelRead.betterWorse.direction !== "unknown") {
+    const src =
+      read.feelRead.betterWorse.source === "rating_vs_reference"
+        ? " — from car rating vs reference run (no better/worse chip)"
+        : "";
     lines.push(
       `Feel vs last run: ${read.feelRead.betterWorse.direction}${
         read.feelRead.betterWorse.magnitudeWord ? ` (${read.feelRead.betterWorse.magnitudeWord})` : ""
-      }`
+      }${src}`
     );
   }
   for (const phase of ["entry", "mid", "exit"] as CornerPhase[]) {
@@ -901,15 +960,15 @@ export function summarizeEngineeringReadAsLines(read: EngineeringReadV1): string
   }
   if (read.changeRead.tireChangeSignificance === "compound_change") {
     lines.push(
-      "Tyres: compound / product line changed vs reference — this is the highest-priority variable; chassis advice must stay conditional until tyres are understood."
+      "Tyre context (equipment — not a chassis sheet key): compound / product line changed vs reference — highest-priority **rubber/session** variable; chassis advice stays conditional until that context is clear."
     );
   } else if (read.changeRead.tireChangeSignificance === "new_set_same_compound") {
     lines.push(
-      "Tyres: same compound on a different physical set vs reference — expect some grip shift; do not narrate this like a compound swap."
+      "Tyre context (equipment — not a chassis sheet key): same compound on a different physical set vs reference — expect some grip shift; do not narrate this like a compound swap."
     );
   } else if (read.changeRead.tireChangeSignificance === "wear_index_only") {
     lines.push(
-      "Tyres: same set stepped to a new tyre-run index — normal wear/scrub progression; do not treat like a compound change."
+      "Tyre context (equipment — not a chassis sheet key): same set stepped to a new tyre-run index — normal wear/scrub progression; do not treat like a compound change."
     );
   }
   if (read.hypotheses.length > 0) {

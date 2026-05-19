@@ -10,6 +10,7 @@ import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngi
 import { buildDashboardSuggestionFingerprint } from "@/lib/engineerPhase5/dashboardSuggestions/buildDashboardSuggestionFingerprint";
 import { generateDashboardEngineerSuggestionPayload } from "@/lib/engineerPhase5/dashboardSuggestions/generateDashboardEngineerSuggestionPayload";
 import { buildSetupOutcomeMemoryForRun } from "@/lib/engineerPhase5/setupOutcomeMemory";
+import { kbPhysicsPromptLinesForKeys } from "@/lib/engineerPhase5/kbSetupKeyPhysics";
 import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
 import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
@@ -257,6 +258,7 @@ export async function getOrComputeDashboardSuggestion(
     notesPreview,
     summaryJson,
     setupOutcomeCaveats: setupOutcomeMemory?.caveatLines ?? [],
+    kbPhysicsPromptLines,
     engineeringBrainPromptLines: engineeringBrain?.promptLines ?? [],
     recommendationMode: engineeringBrain?.engineeringRead.recommendationStrategy.mode ?? null,
     recommendationStrength:

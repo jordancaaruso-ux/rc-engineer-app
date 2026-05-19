@@ -1,3 +1,5 @@
+import { kbMechanismMappingsForKey } from "@/lib/engineerPhase5/kbSetupKeyPhysics";
+
 /**
  * Setup-key → mechanism mapping informed by `content/vehicle-dynamics/*.md`.
  *
@@ -153,9 +155,7 @@ const KEY_MAP: Record<string, SetupMechanismMapping[]> = {
   toe_rear: [{ mechanism: "rear_toe", whenIncreasedEffect: "more" }],
   camber_front: [{ mechanism: "front_camber", whenIncreasedEffect: "more" }],
   camber_rear: [{ mechanism: "rear_camber", whenIncreasedEffect: "more" }],
-  // Bump steer / toe gain
-  bump_steer_shims_front: [{ mechanism: "front_bump_steer", whenIncreasedEffect: "more" }],
-  toe_gain_shims_rear: [{ mechanism: "rear_toe_gain", whenIncreasedEffect: "more" }],
+  // bump_steer_shims_front / toe_gain_shims_rear — resolved via kbSetupKeyPhysics in mechanismsForKey()
   // Hub under-stack
   under_hub_shims_front: [
     { mechanism: "front_rc_lower_arm", whenIncreasedEffect: "raises" },
@@ -174,6 +174,13 @@ const KEY_MAP: Record<string, SetupMechanismMapping[]> = {
  * still use the key in advice without a mapping — mechanism mapping is supplemental.
  */
 export function mechanismsForKey(key: string): SetupMechanismMapping[] {
+  const kb = kbMechanismMappingsForKey(key);
+  if (kb.length > 0) {
+    return kb.map((m) => ({
+      mechanism: m.mechanism,
+      whenIncreasedEffect: m.whenIncreasedEffect,
+    }));
+  }
   return KEY_MAP[key] ?? [];
 }
 

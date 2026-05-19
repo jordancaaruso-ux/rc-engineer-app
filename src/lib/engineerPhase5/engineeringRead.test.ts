@@ -9,7 +9,8 @@
  *   3. Pace metrics are interpreted fluidly — peak vs repeatability — not by hard-coded
  *      "avg top 3 = peak" / "avg top 10 = repeatability" labels.
  *   4. Pace vs feel disagreement is surfaced rather than hidden.
- *   5. Tire choice changes are treated as a fundamental setup choice in `hypotheses`.
+ *   5. Tyre context (set / compound / run index) scores in `hypotheses` as equipment
+ *      context, separate from chassis sheet keys.
  *   6. The recommendation strategy switches mode (celebrate / verify / diagnose) based on
  *      the rating + pace shape + chip evidence — not on free-text notes.
  *   7. The fingerprint is stable across logically-equivalent runs.
@@ -189,18 +190,49 @@ test("low rating + strong worse chip + chassis-only change suggests compensation
   assert.equal(read.recommendationStrategy.preferEngineerChat, true);
 });
 
-test("notes alone never invent a chip outcome (notes are descriptive context only)", () => {
-  const ref = makeRun({ id: "ref" });
+test("notes alone do not set feel; rating vs reference still applies", () => {
+  const ref = makeRun({ id: "ref", carRating: 7 });
   const cur = makeRun({
     id: "cur",
     sortAtIso: "2026-05-15T11:00:00.000Z",
-    carRating: 6,
+    carRating: 4,
     notes: "Car felt awful, was sliding everywhere, definitely worse than before.",
     handlingProblems: "Mid-corner push, exit looseness",
   });
   const read = buildEngineeringReadV1({ anchor: cur, reference: ref });
-  assert.equal(read.feelRead.betterWorse.direction, "unknown", "no chip = unknown, regardless of notes");
+  assert.equal(read.feelRead.betterWorse.direction, "worse", "rating 4 vs 7 infers worse without chip");
+  assert.equal(read.feelRead.betterWorse.source, "rating_vs_reference");
   assert.ok(read.feelRead.notesContext.length > 0, "notes are surfaced as descriptive context");
+});
+
+test("better/worse chip wins over rating when both are present", () => {
+  const ref = makeRun({ id: "ref", carRating: 6 });
+  const cur = makeRun({
+    id: "cur",
+    carRating: 7,
+    handlingAssessmentJson: handling({ version: 3, feelVsLastRun: -2 }),
+  });
+  const read = buildEngineeringReadV1({ anchor: cur, reference: ref });
+  assert.equal(read.feelRead.betterWorse.direction, "worse");
+  assert.equal(read.feelRead.betterWorse.source, "chip");
+});
+
+test("car rating vs reference infers better feel when chip is unset", () => {
+  const cur = makeRun({
+    id: "cur",
+    sortAtIso: "2026-05-15T11:00:00.000Z",
+    carRating: 7,
+    setupSnapshotData: { toe_gain_shims_rear: 1 },
+  });
+  const refSetup = makeRun({
+    id: "ref",
+    carRating: 6,
+    setupSnapshotData: { toe_gain_shims_rear: 2 },
+  });
+  const read = buildEngineeringReadV1({ anchor: cur, reference: refSetup });
+  assert.equal(read.feelRead.betterWorse.direction, "better");
+  assert.equal(read.feelRead.betterWorse.source, "rating_vs_reference");
+  assert.equal(read.feelRead.betterWorse.magnitudeWord, "mild");
 });
 
 test("fingerprint is stable across two equivalent reads", () => {

@@ -13,6 +13,7 @@ function run(input: {
   order: number;
   setup: Record<string, unknown>;
   feelVsLastRun?: number;
+  carRating?: number | null;
   notes?: string | null;
   laps?: number[];
   trackId?: string | null;
@@ -33,6 +34,7 @@ function run(input: {
     handlingProblems: null,
     handlingAssessmentJson:
       input.feelVsLastRun == null ? null : { version: 5, feelVsLastRun: input.feelVsLastRun },
+    carRating: input.carRating ?? null,
     setupSnapshot: { data: input.setup },
   };
 }
@@ -131,4 +133,26 @@ test("opposite direction does not match a prior caveat", () => {
 
   assert.equal(memory.rows.length, 0);
   assert.equal(memory.caveatLines.length, 0);
+});
+
+test("rating vs prior run infers positive outcome when chip unset", () => {
+  const memory = buildSetupOutcomeMemoryFromRuns({
+    userId: "u1",
+    carId: "c1",
+    runs: [
+      run({ id: "r1", order: 1, carRating: 6, setup: { toe_gain_shims_rear: 2 } }),
+      run({
+        id: "r2",
+        order: 2,
+        carRating: 7,
+        setup: { toe_gain_shims_rear: 1 },
+      }),
+    ],
+    candidates: [{ key: "toe_gain_shims_rear", before: "2", after: "1" }],
+    generatedAtIso: "2026-01-03T00:00:00.000Z",
+  });
+
+  assert.equal(memory.rows[0]?.outcome, "positive");
+  assert.equal(memory.rows[0]?.outcomeSource, "prior_run_rating");
+  assert.match(memory.caveatLines[0] ?? "", /car rating vs the prior run was better/);
 });

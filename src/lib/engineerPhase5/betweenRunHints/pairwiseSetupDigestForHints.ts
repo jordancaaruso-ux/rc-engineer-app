@@ -1,4 +1,5 @@
 import type { EngineerRunSummaryV2, EngineerSetupChangeRow } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import { describeSetupChangePerKb } from "@/lib/engineerPhase5/kbSetupKeyPhysics";
 
 const MAX_LEN = 520;
 const EPS = 1e-4;
@@ -219,6 +220,8 @@ function directionForShims(d: number | null): "raised" | "lowered" | "changed" {
 }
 
 function rowText(row: EngineerSetupChangeRow): string {
+  const kb = describeSetupChangePerKb(row.key, row.before, row.after);
+  if (kb) return kb;
   return `${row.label}: ${row.before} → ${row.after}`;
 }
 

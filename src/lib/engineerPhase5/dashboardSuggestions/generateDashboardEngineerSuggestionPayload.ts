@@ -59,6 +59,7 @@ async function callLlm(params: {
   notesPreview: string;
   summaryJson: string | null;
   setupOutcomeCaveats: string[];
+  kbPhysicsPromptLines: string[];
   engineeringBrainPromptLines: string[];
   recommendationMode: string | null;
   recommendationStrength: string | null;
@@ -79,17 +80,19 @@ async function callLlm(params: {
   const system = `You are an RC touring car engineer assistant. Output ONLY valid JSON (no markdown).
 The JSON object must have exactly these keys:
 - "headline": string, under 140 chars, actionable for the driver's **next** session
-- "bullets": array of 3 to 6 short strings (each under 240 chars). Tie each bullet to: (a) a handling/notes issue they reported, (b) a setup-versus-typical position (below_typical / above_typical / mid), (c) a documented pairwise setup change when provided, (d) the engineering-brain read, and/or (e) KB excerpts — say which when you use it.
+- "bullets": array of 3 to 6 short strings (each under 240 chars). Tie each bullet to: (a) a handling/notes issue they reported, (b) a setup-versus-typical position (below_typical / above_typical / mid), (c) a documented pairwise **chassis** setup change when provided, (d) the engineering-brain read, and/or (e) KB excerpts — say which when you use it.
 - "tryNextSession": array of 2 to 4 very short checklist strings (each under 120 chars) for what to verify or try first.
 
 Rules:
 - The "engineering brain" lines are the deterministic diagnosis. Treat them as the spine of the response: explain the conclusions in driver-friendly language; do not re-derive them or contradict them from raw notes.
 - Driver rating + handling chips outrank free notes. Quote notes only as context.
-- **Tyre tiering (tireChangeSignificance):** When it is **compound_change**, tyres are the headline story — isolate tyre effects before chassis tuning. When **new_set_same_compound**, acknowledge fresher rubber but do **not** narrate it like a compound swap. When **wear_index_only** or **none**, do **not** invent a tyre-swap explanation for handling deltas.
+- When engineering brain reports feel vs reference as **better** (chip or **rating vs prior run**), do **not** recommend reversing a chassis key listed in authoritativeSetupDiff unless you add an explicit on-track hedge.
+- **KB physics lines** (if present) are authoritative for shim-count vs effect on keys like toe gain / bump steer. Never equate "more shims" with "more toe gain" on \`toe_gain_shims_rear\` — follow the KB line exactly. Do not invent shim physics for keys without a KB physics line.
+- **Tyre tiering (tireChangeSignificance):** Tyres are **equipment / session context**, not another **chassis tuning key** on the setup sheet — do **not** phrase them like "turning the same knob" as springs or shims. When **compound_change**, treat rubber as the headline **context** (isolate tyre effects before chassis tuning). When **new_set_same_compound**, acknowledge fresher rubber but do **not** narrate it like a compound swap. When **wear_index_only** or **none**, do **not** invent a tyre-swap explanation for handling deltas.
 - **Measured tuning diff (hard rule):** The JSON array **authoritativeSetupDiff** is the **only** source of truth for which **chassis tuning keys** changed between saved setup snapshots vs the previous run. Do **not** claim any chassis key changed — and do **not** quote before/after values — unless that **key** appears in authoritativeSetupDiff. The Engineer summary JSON in this prompt **does not** include setupChanges; never infer missing deltas from it.
 - **Free-text discipline:** suggestedChanges / appliedChanges are the driver's notes about intent or plans — **never** treat them as proof that a setup field changed on the sheet, and **never** use them to invent numeric before/after for a key.
 - **Chassis allow-list:** allowedChassisKeys duplicates the keys in authoritativeSetupDiff. For **any** forward-looking chassis adjustment (including "consider", "explore", "might help", "verify whether…"), you may only name knobs whose **key** is in that array. If a lever is **not** in the list, you must **not** name it or suggest moving it — including droop, downstop, shim packs, arms, toe, camber, springs, roll bars, ride height, oils, etc. KB text may explain handling concepts **only in generic terms** unless a KB line is tied to a key that is in the list.
-- If **allowedChassisKeys** is an empty array \`[]\`, you must **not** recommend any specific chassis hardware change; stick to tyres (per tireChangeSignificance), pace / repeatability verification, community spread context without naming absent keys, and/or opening Engineer chat.
+- If **allowedChassisKeys** is an empty array \`[]\`, you must **not** recommend any specific chassis hardware change; stick to **tyre session context** (per tireChangeSignificance), pace / repeatability verification, community spread context without naming absent keys, and/or opening Engineer chat.
 - **No silent cross-lever analogies:** do not substitute a different chassis lever for one in the diff unless a KB excerpt in this prompt explicitly links the mechanism for this symptom.
 - Do not state pace metrics as rigid roles (best lap ≠ "the peak", etc.). Lean on the pace shape interpretation provided.
 - Respect community position bands: if a parameter is already "below_typical" or "above_typical", do not recommend pushing further in that extreme direction unless you add an explicit hedge ("only if you still see X on track").
@@ -106,7 +109,12 @@ Rules:
       ? `mode=${params.recommendationMode}, strength=${params.recommendationStrength}, preferEngineerChat=${params.preferEngineerChat}`
       : `mode=unknown, strength=soft, preferEngineerChat=${params.preferEngineerChat}`;
 
-  const user = `Engineering brain (deterministic diagnosis — explain, don't re-derive):\n${brainText}\n\nRecommendation strategy: ${strategyLine}\n\ntireChangeSignificance: ${tireSig}\nallowedChassisKeys (must mirror authoritativeSetupDiff keys):\n${allowKeysJson}\n\nKB excerpts:\n${kbText || "(none)"}\n\nNotes + handling (may overlap):\n${params.notesPreview.slice(0, 4000)}\n\nSuggested / applied changes text:\nSuggested: ${(params.suggestedChanges ?? "").slice(0, 1200)}\nApplied: ${(params.appliedChanges ?? "").slice(0, 1200)}\n\nSetup outcome caveats (caveat-only, do not alter recommendation):\n${JSON.stringify(params.setupOutcomeCaveats.slice(0, 5)).slice(0, 1800)}\n\nauthoritativeSetupDiff — tuning keys that changed vs previous run (sole source for chassis deltas; Engineer compare engine):\n${JSON.stringify(params.setupDiffChanged).slice(0, 6000)}\n\nSetup vs community (slim rows):\n${JSON.stringify(params.spreadSlim).slice(0, 8000)}\n\nEngineer summary (pace + interpretation only; no per-key setup list):\n${params.summaryJson ?? "null"}`;
+  const kbPhysicsBlock =
+    params.kbPhysicsPromptLines.length > 0
+      ? params.kbPhysicsPromptLines.join("\n")
+      : "(none — only use KB excerpts for shim physics)";
+
+  const user = `Engineering brain (deterministic diagnosis — explain, don't re-derive):\n${brainText}\n\nRecommendation strategy: ${strategyLine}\n\ntireChangeSignificance: ${tireSig}\nallowedChassisKeys (must mirror authoritativeSetupDiff keys):\n${allowKeysJson}\n\nKB physics (authoritative shim-count conventions — override field-name guesses):\n${kbPhysicsBlock}\n\nKB excerpts:\n${kbText || "(none)"}\n\nNotes + handling (may overlap):\n${params.notesPreview.slice(0, 4000)}\n\nSuggested / applied changes text:\nSuggested: ${(params.suggestedChanges ?? "").slice(0, 1200)}\nApplied: ${(params.appliedChanges ?? "").slice(0, 1200)}\n\nSetup outcome caveats (caveat-only, do not alter recommendation):\n${JSON.stringify(params.setupOutcomeCaveats.slice(0, 5)).slice(0, 1800)}\n\nauthoritativeSetupDiff — tuning keys that changed vs previous run (sole source for chassis deltas; Engineer compare engine):\n${JSON.stringify(params.setupDiffChanged).slice(0, 6000)}\n\nSetup vs community (slim rows):\n${JSON.stringify(params.spreadSlim).slice(0, 8000)}\n\nEngineer summary (pace + interpretation only; no per-key setup list):\n${params.summaryJson ?? "null"}`;
 
   const body: Record<string, unknown> = {
     model,
@@ -152,6 +160,7 @@ export async function generateDashboardEngineerSuggestionPayload(params: {
   notesPreview: string;
   summaryJson: string | null;
   setupOutcomeCaveats?: string[];
+  kbPhysicsPromptLines?: string[];
   engineeringBrainPromptLines?: string[];
   recommendationMode?: string | null;
   recommendationStrength?: string | null;
@@ -170,6 +179,7 @@ export async function generateDashboardEngineerSuggestionPayload(params: {
     notesPreview: params.notesPreview,
     summaryJson: params.summaryJson,
     setupOutcomeCaveats: params.setupOutcomeCaveats ?? [],
+    kbPhysicsPromptLines: params.kbPhysicsPromptLines ?? [],
     engineeringBrainPromptLines: params.engineeringBrainPromptLines ?? [],
     recommendationMode: params.recommendationMode ?? null,
     recommendationStrength: params.recommendationStrength ?? null,

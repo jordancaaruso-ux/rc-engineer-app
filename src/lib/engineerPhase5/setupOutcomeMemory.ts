@@ -6,6 +6,7 @@ import { normalizeSetupData, DEFAULT_SETUP_FIELDS } from "@/lib/runSetup";
 import { listSetupKeysChangedBetweenSnapshots } from "@/lib/setupCompare/listSetupKeysChangedBetweenSnapshots";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 import { compareSetupField } from "@/lib/setupCompare/compare";
+import { inferFeelVsReferenceFromRatings } from "@/lib/engineerPhase5/inferFeelFromRatings";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { buildCatalogFromTemplate, buildFieldMetaMap } from "@/lib/setupFieldCatalog";
 
@@ -68,6 +69,7 @@ export type SetupOutcomeMemoryRunInput = {
   driverNotes: string | null;
   handlingProblems: string | null;
   handlingAssessmentJson: unknown;
+  carRating: number | null;
   setupSnapshot: { data: unknown } | null;
 };
 
@@ -168,16 +170,47 @@ function lapEvidence(
   return { polarity: null, lines };
 }
 
-function chipEvidence(raw: unknown): { polarity: SetupOutcomePolarity | null; line: string | null; magnitude: number } {
-  const parsed = parseHandlingAssessmentJson(raw);
+function feelOutcomeEvidence(
+  current: SetupOutcomeMemoryRunInput,
+  previous: SetupOutcomeMemoryRunInput
+): {
+  polarity: SetupOutcomePolarity | null;
+  line: string | null;
+  magnitude: number;
+  source: SetupOutcomeSource | null;
+} {
+  const parsed = parseHandlingAssessmentJson(current.handlingAssessmentJson);
   const feel = parsed?.feelVsLastRun;
-  if (typeof feel !== "number" || feel === 0) return { polarity: null, line: null, magnitude: 0 };
-  const mag = Math.abs(feel);
-  return {
-    polarity: feel < 0 ? "negative" : "positive",
-    line: `better/worse chip marked ${feel < 0 ? "worse" : "better"} (${feel > 0 ? "+" : ""}${feel})`,
-    magnitude: mag,
-  };
+  if (typeof feel === "number" && feel !== 0) {
+    const mag = Math.abs(feel);
+    return {
+      polarity: feel < 0 ? "negative" : "positive",
+      line: `better/worse chip marked ${feel < 0 ? "worse" : "better"} (${feel > 0 ? "+" : ""}${feel})`,
+      magnitude: mag,
+      source: "post_run_chip",
+    };
+  }
+  if (feel === 0) {
+    return {
+      polarity: null,
+      line: "better/worse chip marked same",
+      magnitude: 0,
+      source: "post_run_chip",
+    };
+  }
+
+  const fromRating = inferFeelVsReferenceFromRatings(current.carRating, previous.carRating);
+  if (fromRating && fromRating.direction !== "unknown" && fromRating.direction !== "same") {
+    const mag = fromRating.value != null ? Math.abs(fromRating.value) : 1;
+    return {
+      polarity: fromRating.direction === "worse" ? "negative" : "positive",
+      line: `car rating ${previous.carRating}/10 → ${current.carRating}/10 (${fromRating.direction} vs prior run; no better/worse chip)`,
+      magnitude: mag,
+      source: "prior_run_rating",
+    };
+  }
+
+  return { polarity: null, line: null, magnitude: 0, source: null };
 }
 
 function confidenceForPair(input: {
@@ -188,7 +221,11 @@ function confidenceForPair(input: {
   sameTireSet: boolean | null;
   sameTireRunIndex: boolean | null;
 }): SetupOutcomeConfidence {
-  if (input.source !== "post_run_chip") return "low";
+  if (input.source === "notes_laps_only") return "low";
+  if (input.source === "prior_run_rating") {
+    if (input.changedKeyCount <= 2 && input.sameTrack !== false && input.chipMagnitude >= 1) return "medium";
+    return "low";
+  }
   if (input.changedKeyCount <= 2 && input.sameTrack !== false && input.sameTireSet !== false && input.chipMagnitude >= 2) {
     return "high";
   }
@@ -217,8 +254,13 @@ function caveatLine(row: SetupOutcomeMemoryRowV1): string {
   const source =
     row.outcomeSource === "post_run_chip"
       ? `you marked this ${row.outcome === "negative" ? "worse" : "better"} after the run`
-      : `notes/lap data only ${row.outcome === "negative" ? "looked worse" : "looked better"}`;
-  const prefix = row.outcomeSource === "post_run_chip" ? "History caveat" : "Soft history caveat";
+      : row.outcomeSource === "prior_run_rating"
+        ? `car rating vs the prior run ${row.outcome === "negative" ? "was worse" : "was better"} (no better/worse chip)`
+        : `notes/lap data only ${row.outcome === "negative" ? "looked worse" : "looked better"}`;
+  const prefix =
+    row.outcomeSource === "post_run_chip" || row.outcomeSource === "prior_run_rating"
+      ? "History caveat"
+      : "Soft history caveat";
   return `${prefix}: ${row.label} ${row.direction} (${row.priorChange}) previously ${row.outcome === "negative" ? "had a negative result" : "had a positive result"} — ${source}. Keep the suggestion unchanged; use this as context only.`;
 }
 
@@ -256,14 +298,14 @@ export function buildSetupOutcomeMemoryFromRuns(params: {
     );
     if (changedKeys.length === 0) continue;
 
-    const chip = chipEvidence(current.handlingAssessmentJson);
+    const feel = feelOutcomeEvidence(current, previous);
     const notes = [current.notes, current.driverNotes, current.handlingProblems].filter(Boolean).join(" · ");
     const notesPolarity = noteSentiment(notes);
     const laps = lapEvidence(current, previous);
-    const outcome = chip.polarity ?? notesPolarity ?? laps.polarity;
+    const outcome = feel.polarity ?? notesPolarity ?? laps.polarity;
     if (!outcome) continue;
 
-    const source: SetupOutcomeSource = chip.polarity ? "post_run_chip" : "notes_laps_only";
+    const source: SetupOutcomeSource = feel.source ?? "notes_laps_only";
     const cur = normalizeSetupData(current.setupSnapshot?.data);
     const prev = normalizeSetupData(previous.setupSnapshot?.data);
     const sameTrack = current.trackId && previous.trackId ? current.trackId === previous.trackId : null;
@@ -277,7 +319,7 @@ export function buildSetupOutcomeMemoryFromRuns(params: {
       const label = labelForKey(key);
       const direction = directionForKey(key, cmp.normalizedB, cmp.normalizedA);
       const evidence = [
-        chip.line,
+        feel.line,
         ...(source === "notes_laps_only" && notesPolarity ? [`notes text looked ${notesPolarity}`] : []),
         ...laps.lines.slice(0, 2),
       ].filter((line): line is string => Boolean(line));
@@ -294,7 +336,7 @@ export function buildSetupOutcomeMemoryFromRuns(params: {
         evidence,
         confidence: confidenceForPair({
           source,
-          chipMagnitude: chip.magnitude,
+          chipMagnitude: feel.magnitude,
           changedKeyCount: changedKeys.length,
           sameTrack,
           sameTireSet,
@@ -324,7 +366,8 @@ export function buildSetupOutcomeMemoryFromRuns(params: {
       : rows;
 
   const ranked = dedupeRows(candidateRows).sort((a, b) => {
-    const sourceRank = (r: SetupOutcomeMemoryRowV1) => (r.outcomeSource === "post_run_chip" ? 1 : 0);
+    const sourceRank = (r: SetupOutcomeMemoryRowV1) =>
+      r.outcomeSource === "post_run_chip" ? 2 : r.outcomeSource === "prior_run_rating" ? 1 : 0;
     const outcomeRank = (r: SetupOutcomeMemoryRowV1) => (r.outcome === "negative" ? 1 : 0);
     const confRank: Record<SetupOutcomeConfidence, number> = { high: 3, medium: 2, low: 1 };
     return (
@@ -409,6 +452,7 @@ export async function buildSetupOutcomeMemoryForRun(params: {
       driverNotes: true,
       handlingProblems: true,
       handlingAssessmentJson: true,
+      carRating: true,
       setupSnapshot: { select: { data: true } },
     },
   });
