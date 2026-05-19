@@ -11,7 +11,7 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { buildCatalogFromTemplate, buildFieldMetaMap } from "@/lib/setupFieldCatalog";
 
 export type SetupOutcomePolarity = "positive" | "negative";
-export type SetupOutcomeSource = "post_run_chip" | "notes_laps_only";
+export type SetupOutcomeSource = "post_run_chip" | "prior_run_rating" | "notes_laps_only";
 export type SetupOutcomeConfidence = "high" | "medium" | "low";
 
 export type SetupOutcomeMemoryRowV1 = {

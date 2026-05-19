@@ -245,6 +245,8 @@ export async function getOrComputeDashboardSuggestion(
       ? `/engineer?${new URLSearchParams({ runId: run.id, compareRunId: prior.id }).toString()}`
       : `/engineer?${new URLSearchParams({ runId: run.id }).toString()}`;
 
+  const kbPhysicsPromptLines = kbPhysicsPromptLinesForKeys(setupDiffChanged.map((r) => r.key));
+
   const payload = await generateDashboardEngineerSuggestionPayload({
     primaryRunId: run.id,
     scopeLine: scopeLineFromRun(run),
