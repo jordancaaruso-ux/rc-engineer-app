@@ -8,6 +8,8 @@ import { A800RR_FIELD_CATALOG } from "@/lib/setupDocuments/fieldMap";
 import type {
   CalibrationFieldRegion,
   PdfFormFieldMappingRule,
+  PdfFormMultiSelectNamedFieldsMapping,
+  PdfFormSingleChoiceNamedFieldsMapping,
   TextFieldMappingRule,
   CalibrationSheetField,
   CalibrationSheetGroupField,
@@ -118,7 +120,69 @@ function rulePdfFieldName(rule: PdfFormFieldMappingRule): string {
     const first = Object.values(rule.options)[0];
     return first?.pdfFieldName ?? "";
   }
+  if ("mode" in rule && (rule.mode === "singleChoiceWidgetGroup" || rule.mode === "multiSelectWidgetGroup")) {
+    return rule.pdfFieldName;
+  }
   return rule.pdfFieldName;
+}
+
+function isNamedFieldsMappingRule(
+  rule: PdfFormFieldMappingRule
+): rule is PdfFormSingleChoiceNamedFieldsMapping | PdfFormMultiSelectNamedFieldsMapping {
+  return (
+    "mode" in rule &&
+    (rule.mode === "singleChoiceNamedFields" || rule.mode === "multiSelectNamedFields")
+  );
+}
+
+function pdfRowForFormRule(
+  rule: PdfFormFieldMappingRule,
+  pdfRowByName: Map<string, PdfFormFieldRow>
+): PdfFormFieldRow | undefined {
+  if ("pdfFieldName" in rule && typeof rule.pdfFieldName === "string" && rule.pdfFieldName.trim()) {
+    return pdfRowByName.get(rule.pdfFieldName);
+  }
+  if (isNamedFieldsMappingRule(rule)) {
+    for (const ref of Object.values(rule.options)) {
+      const row = pdfRowByName.get(ref.pdfFieldName);
+      if (row) return row;
+    }
+  }
+  return undefined;
+}
+
+function formatNamedFieldsLiveValues(
+  rule: PdfFormFieldMappingRule,
+  pdfRowByName: Map<string, PdfFormFieldRow>
+): string {
+  if (!isNamedFieldsMappingRule(rule)) return "";
+  const parts: string[] = [];
+  for (const [label, ref] of Object.entries(rule.options)) {
+    const row = pdfRowByName.get(ref.pdfFieldName);
+    if (!row) {
+      parts.push(`${label}:?`);
+      continue;
+    }
+    const w =
+      ref.widgetInstanceIndex != null
+        ? row.widgets?.find((wi) => wi.instanceIndex === ref.widgetInstanceIndex)
+        : undefined;
+    if (w?.checked === true) parts.push(`${label}:on`);
+    else if (w?.checked === false) parts.push(`${label}:off`);
+    else parts.push(`${label}:${formatPdfFieldDisplayValue(row)}`);
+  }
+  return parts.join(" ");
+}
+
+function formRulePanelValue(
+  rule: PdfFormFieldMappingRule,
+  pdfRowByName: Map<string, PdfFormFieldRow>
+): string | null {
+  const named = formatNamedFieldsLiveValues(rule, pdfRowByName);
+  if (named) return named;
+  const row = pdfRowForFormRule(rule, pdfRowByName);
+  if (!row) return null;
+  return formatPdfFieldDisplayValue(row);
 }
 
 /** Stable id for one AcroForm widget instance (field name + instance index). */
@@ -4269,10 +4333,8 @@ export function SetupCalibrationEditorClient({
                     const isSelected = activeSetupFieldKey === field.key;
                     const mapped = mappingLabel(field.key);
                     const formRule = formFieldMappings[field.key];
-                    const pdfRow =
-                      formRule && "pdfFieldName" in formRule
-                        ? pdfRowByName.get(formRule.pdfFieldName)
-                        : undefined;
+                    const pdfRow = formRule ? pdfRowForFormRule(formRule, pdfRowByName) : undefined;
+                    const panelValue = formRule ? formRulePanelValue(formRule, pdfRowByName) : null;
                     const cf = customFieldByKey.get(field.key);
                     const tmplHiddenSheet = !cf && fieldDisplayOverrides[field.key]?.showInSetupSheet === false;
                     const tmplHiddenAnalysis = !cf && fieldDisplayOverrides[field.key]?.showInAnalysis === false;
@@ -4305,11 +4367,11 @@ export function SetupCalibrationEditorClient({
                             {tmplHiddenAnalysis ? "hidden · analysis" : ""}
                           </div>
                         ) : null}
-                        {formRule && pdfRow ? (
+                        {formRule && panelValue ? (
                           <div className="text-[10px] text-muted-foreground">
                             <span className="font-mono text-foreground/80">{summarizeFormRuleForPanel(formRule, pdfRow)}</span>
                             <span className="mx-1">·</span>
-                            <span>{formatPdfFieldDisplayValue(pdfRow)}</span>
+                            <span>{panelValue}</span>
                           </div>
                         ) : formRule ? (
                           <div className="text-[10px] text-muted-foreground">
@@ -4363,10 +4425,8 @@ export function SetupCalibrationEditorClient({
                         const isSelected = activeSetupFieldKey === field.key;
                         const mapped = mappingLabel(field.key);
                         const formRule = formFieldMappings[field.key];
-                        const pdfRow =
-                          formRule && "pdfFieldName" in formRule
-                            ? pdfRowByName.get(formRule.pdfFieldName)
-                            : undefined;
+                        const pdfRow = formRule ? pdfRowForFormRule(formRule, pdfRowByName) : undefined;
+                        const panelValue = formRule ? formRulePanelValue(formRule, pdfRowByName) : null;
                         return (
                           <button
                             key={field.key}
@@ -4384,11 +4444,11 @@ export function SetupCalibrationEditorClient({
                                 {mapped}
                               </span>
                             </div>
-                            {formRule && pdfRow ? (
+                            {formRule && panelValue ? (
                               <div className="text-[10px] text-muted-foreground">
                                 <span className="font-mono text-foreground/80">{summarizeFormRuleForPanel(formRule, pdfRow)}</span>
                                 <span className="mx-1">·</span>
-                                <span>{formatPdfFieldDisplayValue(pdfRow)}</span>
+                                <span>{panelValue}</span>
                               </div>
                             ) : formRule ? (
                               <div className="text-[10px] text-muted-foreground">

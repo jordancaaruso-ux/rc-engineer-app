@@ -3,6 +3,7 @@ import { getSingleSelectChipOptions } from "@/lib/setupCalibrations/calibrationF
 import {
   displayPresetWithOther,
   getPresetWithOtherFromData,
+  isEmptyPresetWithOther,
   isPresetWithOtherFieldKey,
   normalizePresetWithOtherFromUnknown,
   presetWithOtherEquals,
@@ -127,6 +128,8 @@ const normForPdfToken = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " 
 export function readSetupSingleChoiceForPdf(data: SetupSnapshotData, key: string): string {
   if (!isPresetWithOtherFieldKey(key)) return readSetupField(data, key);
   const opts = getSingleSelectChipOptions(key);
+  const pov = getPresetWithOtherFromData(data as Record<string, unknown>, key, opts);
+  if (isEmptyPresetWithOther(pov)) return "";
   const presel = readPresetWithOtherSelection(data, key);
   if (presel) {
     if (opts?.length) {

@@ -20,7 +20,11 @@ import {
 } from "@/lib/a800rrSetupRead";
 import { canonicalSetupFieldKey } from "@/lib/setupDocuments/normalize";
 import { collectWidgetLayouts } from "@/lib/setupDocuments/pdfFormFields";
-import type { CalibrationFieldRegion, PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import type {
+  CalibrationFieldRegion,
+  PdfFormFieldMappingRule,
+  PdfFormOptionFieldRef,
+} from "@/lib/setupCalibrations/types";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { AWESOMATIX_MULTI_SELECT_GROUPS } from "@/lib/setupDocuments/awesomatixWidgetGroups";
 import { SETUP_PDF_RENDER_PIPELINE_VERSION, type SetupPdfRenderResult } from "@/lib/setup/renderTypes";
@@ -46,10 +50,6 @@ function normLabel(s: string): string {
   return s.trim().toLowerCase();
 }
 
-/**
- * True when the snapshot’s current choice matches a calibration option label, ignoring
- * case/edge whitespace (import may store C07R vs c07R vs calibration key “C07R”).
- */
 function singleChoiceLabelMatchesCurrent(current: string, optionLabel: string): boolean {
   if (!current.trim()) return false;
   return normLabel(current) === normLabel(optionLabel);
@@ -57,22 +57,35 @@ function singleChoiceLabelMatchesCurrent(current: string, optionLabel: string): 
 
 function optionMatchesSelection(appKey: string, label: string, selected: string[]): boolean {
   const target = normLabel(label);
-  if (appKey === "top_deck_screws" || appKey === "top_deck_cuts") return selected.map(normLabel).includes(target);
   return selected.map(normLabel).includes(target);
 }
 
-/**
- * Cover the template PDF’s baked-in checkbox / radio art so unselected options do not
- * show false ticks. Widget-group modes do not use AcroForm check/uncheck (only X marks);
- * the base file often still draws every position as “on”.
- */
+/** Clear AcroForm state so flatten() does not bake template/example ticks over drawn marks. */
+function resetAcroFieldFormState(field: PDFField): void {
+  try {
+    if (field instanceof PDFCheckBox) {
+      field.uncheck();
+      return;
+    }
+    if (field instanceof PDFRadioGroup) {
+      try {
+        field.select("Off");
+      } catch {
+        /* some PDFs have no Off export */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function coverWidgetWithWhite(
   page: ReturnType<PDFDocument["getPages"]>[number],
   pageHeight: number,
   rect: { x: number; y: number; width: number; height: number }
 ): void {
   const r = viewerRectToPdfRect(rect, pageHeight);
-  const pad = 1.2;
+  const pad = 2;
   try {
     page.drawRectangle({
       x: r.x - pad,
@@ -93,8 +106,6 @@ function drawSelectionMark(
   rect: { x: number; y: number; width: number; height: number }
 ): void {
   const r = viewerRectToPdfRect(rect, pageHeight);
-  // Draw a clean, flattened “X” mark inside the widget bounds.
-  // This avoids blue boxes / widget borders and does not rely on PDF form appearance streams.
   const pad = Math.max(0.8, Math.min(2.2, Math.min(r.width, r.height) * 0.12));
   const x1 = r.x + pad;
   const y1 = r.y + pad;
@@ -106,6 +117,98 @@ function drawSelectionMark(
   } catch {
     /* ignore */
   }
+}
+
+function applyWidgetGroupMarks(
+  pdfDoc: PDFDocument,
+  pages: ReturnType<PDFDocument["getPages"]>,
+  field: PDFField,
+  options: Record<string, { widgetInstanceIndex: number }>,
+  isSelected: (label: string) => boolean
+): void {
+  resetAcroFieldFormState(field);
+  const widgets = collectWidgetLayouts(pdfDoc, field);
+  for (const [label, ref] of Object.entries(options)) {
+    const w = widgets[ref.widgetInstanceIndex];
+    if (!w) continue;
+    const page = pages[w.pageNumber - 1];
+    if (!page) continue;
+    const ph = page.getHeight();
+    coverWidgetWithWhite(page, ph, w);
+    if (isSelected(label)) drawSelectionMark(page, ph, w);
+  }
+}
+
+function trySelectRadioOption(field: PDFRadioGroup, label: string): boolean {
+  const want = normLabel(label);
+  for (const opt of field.getOptions()) {
+    if (normLabel(opt) === want) {
+      try {
+        field.select(opt);
+        return true;
+      } catch {
+        /* try next */
+      }
+    }
+  }
+  return false;
+}
+
+function applyNamedOptionState(
+  pdfDoc: PDFDocument,
+  form: ReturnType<PDFDocument["getForm"]>,
+  pages: ReturnType<PDFDocument["getPages"]>,
+  ref: PdfFormOptionFieldRef,
+  label: string,
+  shouldBeOn: boolean
+): void {
+  const field = form.getFieldMaybe(ref.pdfFieldName);
+  if (!field) return;
+
+  const widgets = collectWidgetLayouts(pdfDoc, field);
+  const idx = ref.widgetInstanceIndex;
+  const multiWidget = supportsPerWidgetToggle(field) && widgets.length > 1 && idx != null;
+
+  if (multiWidget) {
+    const w = widgets[idx];
+    if (!w) return;
+    const page = pages[w.pageNumber - 1];
+    if (!page) return;
+    const ph = page.getHeight();
+    coverWidgetWithWhite(page, ph, w);
+    if (shouldBeOn) drawSelectionMark(page, ph, w);
+    return;
+  }
+
+  if (field instanceof PDFCheckBox) {
+    try {
+      if (shouldBeOn) field.check();
+      else field.uncheck();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+
+  if (field instanceof PDFRadioGroup) {
+    if (shouldBeOn) trySelectRadioOption(field, label);
+    else resetAcroFieldFormState(field);
+  }
+}
+
+function collectWidgetGroupFieldNames(mappings: Record<string, PdfFormFieldMappingRule>): Set<string> {
+  const names = new Set<string>();
+  for (const rule of Object.values(mappings)) {
+    if (!rule || typeof rule !== "object") continue;
+    if (
+      "mode" in rule &&
+      (rule.mode === "singleChoiceWidgetGroup" || rule.mode === "multiSelectWidgetGroup") &&
+      rule.pdfFieldName?.trim()
+    ) {
+      names.add(rule.pdfFieldName.trim());
+    }
+  }
+  return names;
 }
 
 /**
@@ -132,10 +235,14 @@ export async function applySetupValuesToPdfDocument(
       if ("mode" in rule && rule.mode === "singleChoiceNamedFields") {
         const current = readSetupSingleChoiceForPdf(setup, appKey).trim();
         for (const [label, ref] of Object.entries(rule.options)) {
-          const field = form.getFieldMaybe(ref.pdfFieldName);
-          if (!field || !(field instanceof PDFCheckBox)) continue;
-          if (singleChoiceLabelMatchesCurrent(current, label)) field.check();
-          else field.uncheck();
+          applyNamedOptionState(
+            pdfDoc,
+            form,
+            pages,
+            ref,
+            label,
+            singleChoiceLabelMatchesCurrent(current, label)
+          );
         }
         continue;
       }
@@ -146,10 +253,14 @@ export async function applySetupValuesToPdfDocument(
             ? readSetupScrewSelection(setup, appKey)
             : readSetupMultiSelection(setup, appKey);
         for (const [label, ref] of Object.entries(rule.options)) {
-          const field = form.getFieldMaybe(ref.pdfFieldName);
-          if (!field || !(field instanceof PDFCheckBox)) continue;
-          if (optionMatchesSelection(appKey, label, selected)) field.check();
-          else field.uncheck();
+          applyNamedOptionState(
+            pdfDoc,
+            form,
+            pages,
+            ref,
+            label,
+            optionMatchesSelection(appKey, label, selected)
+          );
         }
         continue;
       }
@@ -158,16 +269,9 @@ export async function applySetupValuesToPdfDocument(
         const current = readSetupSingleChoiceForPdf(setup, appKey).trim();
         const field = form.getFieldMaybe(rule.pdfFieldName);
         if (!field) continue;
-        const widgets = collectWidgetLayouts(pdfDoc, field);
-        for (const [label, ref] of Object.entries(rule.options)) {
-          const w = widgets[ref.widgetInstanceIndex];
-          if (!w) continue;
-          const page = pages[w.pageNumber - 1];
-          if (!page) continue;
-          const ph = page.getHeight();
-          coverWidgetWithWhite(page, ph, w);
-          if (singleChoiceLabelMatchesCurrent(current, label)) drawSelectionMark(page, ph, w);
-        }
+        applyWidgetGroupMarks(pdfDoc, pages, field, rule.options, (label) =>
+          singleChoiceLabelMatchesCurrent(current, label)
+        );
         continue;
       }
 
@@ -178,16 +282,9 @@ export async function applySetupValuesToPdfDocument(
             : readSetupMultiSelection(setup, appKey);
         const field = form.getFieldMaybe(rule.pdfFieldName);
         if (!field) continue;
-        const widgets = collectWidgetLayouts(pdfDoc, field);
-        for (const [label, ref] of Object.entries(rule.options)) {
-          const w = widgets[ref.widgetInstanceIndex];
-          if (!w) continue;
-          const page = pages[w.pageNumber - 1];
-          if (!page) continue;
-          const ph = page.getHeight();
-          coverWidgetWithWhite(page, ph, w);
-          if (optionMatchesSelection(appKey, label, selected)) drawSelectionMark(page, ph, w);
-        }
+        applyWidgetGroupMarks(pdfDoc, pages, field, rule.options, (label) =>
+          optionMatchesSelection(appKey, label, selected)
+        );
         continue;
       }
 
@@ -221,19 +318,22 @@ function applySimpleMappingRule(
   const idx = simple.widgetInstanceIndex;
 
   if (multi && idx != null && idx >= 0 && idx < widgets.length) {
+    resetAcroFieldFormState(field);
     const selected =
       appKey === "motor_mount_screws" || appKey === "top_deck_screws" || appKey === "top_deck_cuts"
         ? readSetupScrewSelection(setup, appKey)
-        : [];
-    const w = widgets[idx]!;
-    const page = pages[w.pageNumber - 1];
-    if (!page) return;
-    const ph = page.getHeight();
-    coverWidgetWithWhite(page, ph, w);
-    const order = AWESOMATIX_MULTI_SELECT_GROUPS[appKey];
-    const label = order?.[idx] ?? String(idx);
-    if (selected.length > 0 && optionMatchesSelection(appKey, label, selected)) {
-      drawSelectionMark(page, ph, w);
+        : readSetupMultiSelection(setup, appKey);
+    for (let i = 0; i < widgets.length; i++) {
+      const w = widgets[i]!;
+      const page = pages[w.pageNumber - 1];
+      if (!page) continue;
+      const ph = page.getHeight();
+      coverWidgetWithWhite(page, ph, w);
+      const order = AWESOMATIX_MULTI_SELECT_GROUPS[appKey];
+      const label = order?.[i] ?? String(i);
+      if (selected.length > 0 && optionMatchesSelection(appKey, label, selected)) {
+        drawSelectionMark(page, ph, w);
+      }
     }
     return;
   }
@@ -261,9 +361,13 @@ function applySimpleMappingRule(
   }
 
   if (field instanceof PDFRadioGroup) {
-    const v = readSetupField(setup, appKey).trim();
+    const choice = readSetupSingleChoiceForPdf(setup, appKey).trim() || readSetupField(setup, appKey).trim();
     try {
-      if (v) field.select(v);
+      if (!choice) {
+        resetAcroFieldFormState(field);
+      } else if (!trySelectRadioOption(field, choice)) {
+        field.select(choice);
+      }
     } catch {
       /* invalid export value */
     }
@@ -325,16 +429,24 @@ export async function renderSetupPdfSnapshot(input: {
 }): Promise<SetupPdfRenderResult | null> {
   try {
     const pdfDoc = await PDFDocument.load(input.basePdfBytes, { ignoreEncryption: true });
+    const cal = normalizeCalibrationData(input.calibrationJson);
     await applySetupValuesToPdfDocument(pdfDoc, input.calibrationJson, input.setupValues);
+
+    const widgetGroupNames = collectWidgetGroupFieldNames(cal.formFieldMappings ?? {});
     try {
       const form = pdfDoc.getForm();
+      for (const name of widgetGroupNames) {
+        const field = form.getFieldMaybe(name);
+        if (field) resetAcroFieldFormState(field);
+      }
       const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
       try {
         form.updateFieldAppearances(helv);
       } catch {
-        /* optional; some PDFs omit appearance streams */
+        /* optional */
       }
-      form.flatten();
+      // Do not regenerate checkbox appearances from stale template state over drawn X marks.
+      form.flatten({ updateFieldAppearances: false });
     } catch {
       /* some PDFs flatten poorly; still return bytes */
     }

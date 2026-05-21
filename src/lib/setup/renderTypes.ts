@@ -9,4 +9,4 @@ export type SetupPdfRenderResult = {
   pipelineVersion: number;
 };
 
-export const SETUP_PDF_RENDER_PIPELINE_VERSION = 1;
+export const SETUP_PDF_RENDER_PIPELINE_VERSION = 2;
