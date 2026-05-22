@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
-import { storeVideoAnalysisLocalFile } from "@/lib/videoAnalysis/storage";
+import { storeVideoAnalysisReferenceFile } from "@/lib/videoAnalysis/storage";
+import { StorageConfigurationError } from "@/lib/setupDocuments/storage";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 
 type Params = { params: Promise<{ profileId: string }> };
@@ -51,12 +52,19 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Missing file" }, { status: 400 });
   }
 
-  const { storagePath } = await storeVideoAnalysisLocalFile(file, "reference");
-  const updated = await prisma.trackCameraProfile.update({
-    where: { id: profileId },
-    data: { referenceImagePath: storagePath },
-    select: { id: true, referenceImagePath: true },
-  });
-
-  return NextResponse.json(updated);
+  try {
+    const { storagePath } = await storeVideoAnalysisReferenceFile(file);
+    const updated = await prisma.trackCameraProfile.update({
+      where: { id: profileId },
+      data: { referenceImagePath: storagePath },
+      select: { id: true, referenceImagePath: true },
+    });
+    return NextResponse.json(updated);
+  } catch (err) {
+    if (err instanceof StorageConfigurationError) {
+      return NextResponse.json({ error: err.message }, { status: 503 });
+    }
+    const message = err instanceof Error ? err.message : "Upload failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

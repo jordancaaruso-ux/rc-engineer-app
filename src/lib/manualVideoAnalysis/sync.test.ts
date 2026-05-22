@@ -1,4 +1,5 @@
 import { predictSfEndTime, buildSfPredictions } from "./sync";
+import { defaultDriverKeys } from "./timing";
 import type { ManualDriver, ManualSyncState } from "./types";
 
 const me: ManualDriver = {
@@ -42,5 +43,14 @@ if (t3comp == null || Math.abs(t3comp - 112.4) > 0.01) {
 
 const preds = buildSfPredictions(drivers, sync, { me: [2, 3], competitor: [3] });
 if (preds.length < 3) throw new Error("predictions missing");
+
+const allComp: ManualDriver[] = [
+  { key: "a", driverName: "A", normalizedName: "a", role: "competitor", laps: [] },
+  { key: "b", driverName: "B", normalizedName: "b", role: "competitor", laps: [] },
+];
+const keys = defaultDriverKeys(allComp);
+if (keys.meKey !== "a" || keys.competitorKey !== "b") {
+  throw new Error(`expected a/b keys, got ${keys.meKey}/${keys.competitorKey}`);
+}
 
 console.log("manualVideoAnalysis sync.test.ts OK");

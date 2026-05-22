@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { loadDriversFromRun } from "@/lib/manualVideoAnalysis/loadTiming";
+import { defaultDriverKeys } from "@/lib/manualVideoAnalysis/timing";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -21,5 +22,5 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.json({ drivers });
+  return NextResponse.json({ drivers, defaults: defaultDriverKeys(drivers) });
 }

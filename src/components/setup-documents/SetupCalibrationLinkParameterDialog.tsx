@@ -107,9 +107,15 @@ export function SetupCalibrationLinkParameterDialog(props: {
     setError(null);
     if (isGroupedModelField(row.field)) {
       const optCount = modelFieldOptionEntries(row.field).length;
+      if (optCount < 2) {
+        setError(
+          `“${row.field.displayLabel}” has no options on the sheet model. Open the schema editor, add one option per line (e.g. 1, 2, 3, 4), save, then return here.`
+        );
+        return;
+      }
       if (widgetCount !== optCount) {
         setError(
-          `“${row.field.displayLabel}” has ${optCount} options — select ${optCount} PDF control${optCount === 1 ? "" : "s"} on the sheet (you have ${widgetCount}).`
+          `“${row.field.displayLabel}” has ${optCount} options — select exactly ${optCount} PDF control${optCount === 1 ? "" : "s"} on the sheet (you have ${widgetCount}).`
         );
         return;
       }
@@ -197,11 +203,22 @@ export function SetupCalibrationLinkParameterDialog(props: {
                     : "Select the same number of PDF controls as the parameter has options."}
                 </p>
               ) : (
-                eligibleRows.map((row) => (
+                eligibleRows.map((row) => {
+                  const optCount = isGroupedModelField(row.field)
+                    ? modelFieldOptionEntries(row.field).length
+                    : 0;
+                  const countMismatch =
+                    isGroupedModelField(row.field) && optCount >= 2 && optCount !== widgetCount;
+                  return (
                   <button
                     key={row.field.key}
                     type="button"
-                    className="flex w-full flex-col gap-0.5 rounded border border-border bg-muted/25 px-3 py-2 text-left hover:bg-muted/50"
+                    disabled={countMismatch}
+                    className={`flex w-full flex-col gap-0.5 rounded border px-3 py-2 text-left ${
+                      countMismatch
+                        ? "cursor-not-allowed border-border/50 bg-muted/15 opacity-60"
+                        : "border-border bg-muted/25 hover:bg-muted/50"
+                    }`}
                     onClick={() => goToAssign(row)}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -218,8 +235,14 @@ export function SetupCalibrationLinkParameterDialog(props: {
                         ? ` · ${modelFieldOptionEntries(row.field).length} options`
                         : ""}
                     </span>
+                    {countMismatch ? (
+                      <span className="text-[10px] text-amber-200/90">
+                        Select {optCount} PDF controls (you have {widgetCount})
+                      </span>
+                    ) : null}
                   </button>
-                ))
+                  );
+                })
               )}
             </div>
           ) : (

@@ -10,6 +10,7 @@ import {
 } from "@/lib/manualVideoAnalysis/types";
 import {
   applyBest3Selection,
+  defaultDriverKeys,
   setDriverRoles,
 } from "@/lib/manualVideoAnalysis/timing";
 
@@ -46,15 +47,20 @@ function NewManualAnalysisForm() {
   useEffect(() => {
     if (!trackId) {
       setProfiles([]);
+      setProfileId("");
       return;
     }
     void fetch(`/api/tracks/${trackId}/camera-profiles`)
       .then((r) => r.json())
       .then((d) => {
-        setProfiles(d.profiles ?? []);
-        if (!profileId && d.profiles?.[0]) setProfileId(d.profiles[0].id);
+        const list = d.profiles ?? [];
+        setProfiles(list);
+        setProfileId((prev) => {
+          if (prev && list.some((p: { id: string }) => p.id === prev)) return prev;
+          return list[0]?.id ?? "";
+        });
       });
-  }, [trackId, profileId]);
+  }, [trackId]);
 
   async function loadDrivers() {
     setLoading(true);
@@ -69,8 +75,7 @@ function NewManualAnalysisForm() {
         return;
       }
       const d = await res.json();
-      setDrivers(d.drivers ?? []);
-      pickDefaults(d.drivers ?? []);
+      applyLoadedDrivers(d.drivers ?? [], d.defaults);
       return;
     }
     if (!timingUrl.trim()) {
@@ -90,24 +95,45 @@ function NewManualAnalysisForm() {
       return;
     }
     const d = await res.json();
-    setDrivers(d.drivers ?? []);
-    pickDefaults(d.drivers ?? []);
+    applyLoadedDrivers(d.drivers ?? [], d.defaults);
   }
 
-  function pickDefaults(list: ManualDriver[]) {
-    const me = list.find((d) => d.role === "me");
-    const comp = list.find((d) => d.role === "competitor");
-    if (me) setMeKey(me.key);
-    if (comp) setCompetitorKey(comp.key);
-    else if (list.length >= 2) {
-      setMeKey(list[0]!.key);
-      setCompetitorKey(list[1]!.key);
+  function applyLoadedDrivers(
+    list: ManualDriver[],
+    defaults?: { meKey: string; competitorKey: string }
+  ) {
+    setDrivers(list);
+    const keys = defaults ?? defaultDriverKeys(list);
+    setMeKey(keys.meKey);
+    setCompetitorKey(keys.competitorKey);
+    if (list.length < 2) {
+      setMsg("Need at least two drivers in the timing data to compare.");
+    } else if (!keys.meKey || !keys.competitorKey) {
+      setMsg("Select yourself (Me) and a competitor in the dropdowns below.");
+    } else {
+      setMsg(null);
     }
   }
 
   async function createJob() {
-    if (!trackId || !profileId || !meKey || !competitorKey) {
-      setMsg("Select track, profile, me, and competitor");
+    if (!trackId) {
+      setMsg("Select a track.");
+      return;
+    }
+    if (!profileId) {
+      setMsg("Select a camera profile (or create one for this track).");
+      return;
+    }
+    if (!meKey) {
+      setMsg("Select yourself in the Me dropdown.");
+      return;
+    }
+    if (!competitorKey) {
+      setMsg("Select a competitor in the Competitor dropdown.");
+      return;
+    }
+    if (meKey === competitorKey) {
+      setMsg("Me and competitor must be different drivers.");
       return;
     }
     let session: ManualVideoSessionV1 = {
@@ -144,7 +170,13 @@ function NewManualAnalysisForm() {
         <select
           className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1"
           value={trackId}
-          onChange={(e) => setTrackId(e.target.value)}
+          onChange={(e) => {
+            setTrackId(e.target.value);
+            setProfileId("");
+            setDrivers([]);
+            setMeKey("");
+            setCompetitorKey("");
+          }}
         >
           <option value="">Select track</option>
           {tracks.map((t) => (

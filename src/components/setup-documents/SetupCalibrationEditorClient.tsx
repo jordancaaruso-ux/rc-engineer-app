@@ -50,9 +50,10 @@ import { SetupCalibrationModelSidebar } from "@/components/setup-documents/Setup
 import {
   buildGroupedRuleFromAssignments,
   extractAssignmentsFromGroupedRule,
-  groupedBehaviorForModelField,
+  groupedBehaviorForAssignments,
   type ModelOptionAssignment,
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
+import { enrichSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import {
   buildQuickCustomFieldDefinition,
   type QuickCalibrationFieldKind,
@@ -512,24 +513,37 @@ export function SetupCalibrationEditorClient({
 
   const modelLinkedMode = Boolean(initialSetupSheetModelId && setupSheetModelSchema);
 
-  useEffect(() => {
+  const loadSetupSheetModelSchema = useCallback(async () => {
     if (!initialSetupSheetModelId) {
       setSetupSheetModelSchema(null);
       return;
     }
-    let cancelled = false;
-    fetch(`/api/setup-sheet-models/${initialSetupSheetModelId}`)
-      .then((r) => r.json())
-      .then((d: { model?: { schema?: SetupSheetModelSchema } }) => {
-        if (!cancelled && d.model?.schema) setSetupSheetModelSchema(d.model.schema);
-      })
-      .catch(() => {
-        if (!cancelled) setSetupSheetModelSchema(null);
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const res = await fetch(`/api/setup-sheet-models/${initialSetupSheetModelId}`, { cache: "no-store" });
+      const d = (await res.json().catch(() => ({}))) as { model?: { schema?: SetupSheetModelSchema } };
+      if (d.model?.schema) {
+        setSetupSheetModelSchema({
+          ...d.model.schema,
+          fields: enrichSetupSheetModelSchemaFields(d.model.schema.fields),
+        });
+      } else {
+        setSetupSheetModelSchema(null);
+      }
+    } catch {
+      setSetupSheetModelSchema(null);
+    }
   }, [initialSetupSheetModelId]);
+
+  useEffect(() => {
+    void loadSetupSheetModelSchema();
+  }, [loadSetupSheetModelSchema]);
+
+  useEffect(() => {
+    if (!initialSetupSheetModelId) return;
+    const onFocus = () => void loadSetupSheetModelSchema();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [initialSetupSheetModelId, loadSetupSheetModelSchema]);
 
   useEffect(() => {
     if (modelLinkedMode) setTab("form");
@@ -2044,9 +2058,14 @@ export function SetupCalibrationEditorClient({
   function commitModelGroupedLink(parameterKey: string, assignments: ModelOptionAssignment[]) {
     const field = setupSheetModelSchema?.fields.find((f) => f.key === parameterKey);
     if (!field) return;
-    const behavior = groupedBehaviorForModelField(field);
+    const behavior = groupedBehaviorForAssignments(field, assignments);
     const rule = buildGroupedRuleFromAssignments(behavior, assignments);
-    if (!rule) return;
+    if (!rule) {
+      setStatus(
+        "Could not save mapping — assign each option to a different PDF control from your selection, then confirm."
+      );
+      return;
+    }
 
     setFormFieldMappings((prev) => {
       let next = { ...prev };

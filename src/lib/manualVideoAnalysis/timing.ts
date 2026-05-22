@@ -22,22 +22,47 @@ export function driversFromParseResult(
     ];
   }
 
-  const normPrimary = primaryDriverName?.trim().toLowerCase();
+  const normPrimary = primaryDriverName?.trim().toLowerCase() || null;
+  let foundMe = false;
   return sd.map((d, idx) => {
     const laps = lapsFromSessionDriver(d);
-    const isMe =
-      normPrimary != null &&
-      (d.normalizedName.toLowerCase().includes(normPrimary) ||
+    let role: "me" | "competitor" = "competitor";
+    if (normPrimary) {
+      const isMe =
+        d.normalizedName.toLowerCase().includes(normPrimary) ||
         d.driverName.toLowerCase().includes(normPrimary) ||
-        normPrimary.includes(d.normalizedName.toLowerCase()));
+        normPrimary.includes(d.normalizedName.toLowerCase());
+      if (isMe && !foundMe) {
+        role = "me";
+        foundMe = true;
+      }
+    } else if (idx === 0) {
+      role = "me";
+      foundMe = true;
+    }
     return {
       key: d.driverId || d.id || `d${idx}`,
       driverName: d.driverName,
       normalizedName: d.normalizedName,
-      role: isMe ? "me" : "competitor",
+      role,
       laps,
     } as ManualDriver;
   });
+}
+
+/** Pick default me/competitor keys for UI selects (always two distinct keys when possible). */
+export function defaultDriverKeys(drivers: ManualDriver[]): {
+  meKey: string;
+  competitorKey: string;
+} {
+  if (drivers.length === 0) return { meKey: "", competitorKey: "" };
+  const me = drivers.find((d) => d.role === "me");
+  const competitor = drivers.find((d) => d.role === "competitor" && d.key !== me?.key);
+  if (me && competitor) return { meKey: me.key, competitorKey: competitor.key };
+  if (drivers.length >= 2) {
+    return { meKey: drivers[0]!.key, competitorKey: drivers[1]!.key };
+  }
+  return { meKey: drivers[0]!.key, competitorKey: "" };
 }
 
 function lapsFromSessionDriver(d: LapUrlSessionDriver): ManualDriverLap[] {

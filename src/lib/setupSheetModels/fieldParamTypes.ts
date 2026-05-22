@@ -1,4 +1,6 @@
 import { suggestKeyFromPdfFieldName } from "@/lib/setupCalibrations/customFieldCatalog";
+import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { awesomatixGroupKind } from "@/lib/setupDocuments/awesomatixWidgetGroups";
 import type { SetupSheetModelFieldDef } from "@/lib/setupSheetModels/types";
 import type { QuickCalibrationFieldKind } from "@/lib/setupCalibrations/quickCalibrationField";
 
@@ -10,6 +12,17 @@ export type SchemaParameterKind =
   | "many_of_many";
 
 export function schemaKindFromField(f: SetupSheetModelFieldDef): SchemaParameterKind {
+  const groupedLabels = f.groupedOptionLabels?.length ?? 0;
+  if (groupedLabels >= 2) {
+    if (
+      f.groupBehaviorType === "singleSelect"
+      || f.groupBehaviorType === "singleChoiceGroup"
+      || f.uiType === "select"
+    ) {
+      return "one_of_many";
+    }
+    return "many_of_many";
+  }
   if (f.uiType === "checkbox" || f.valueType === "boolean") return "checkbox";
   if (f.uiType === "select" || f.groupBehaviorType === "singleSelect" || f.groupBehaviorType === "singleChoiceGroup") {
     return "one_of_many";
@@ -57,7 +70,7 @@ export function buildFieldDefFromKind(input: {
     case "one_of_many": {
       const labels = (input.optionLabels ?? []).map((l) => l.trim()).filter(Boolean);
       if (labels.length < 2) return { error: "One of many needs at least 2 options." };
-      const values = labels.map((l, i) => suggestKeyFromPdfFieldName(l) || `opt_${i + 1}`);
+      const values = labels.map((l, i) => groupedOptionValueFromLabel(l, i));
       return {
         ...base,
         valueType: "enum",
@@ -70,12 +83,15 @@ export function buildFieldDefFromKind(input: {
     case "many_of_many": {
       const labels = (input.optionLabels ?? []).map((l) => l.trim()).filter(Boolean);
       if (labels.length < 2) return { error: "Many of many needs at least 2 options." };
-      const values = labels.map((l, i) => suggestKeyFromPdfFieldName(l) || `opt_${i + 1}`);
+      const values = labels.map((l, i) => groupedOptionValueFromLabel(l, i));
+      const key = (input.key?.trim() || suggestKeyFromPdfFieldName(displayLabel)).trim();
+      const behavior =
+        awesomatixGroupKind(key) === "multi" ? ("visualMulti" as const) : ("multiChoiceGroup" as const);
       return {
         ...base,
         valueType: "multi",
         uiType: "multiSelect",
-        groupBehaviorType: "multiChoiceGroup",
+        groupBehaviorType: behavior,
         groupedOptionLabels: labels,
         groupedOptionValues: values,
       };

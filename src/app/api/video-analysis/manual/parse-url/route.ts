@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { loadDriversFromTimingUrl } from "@/lib/manualVideoAnalysis/loadTiming";
+import { defaultDriverKeys } from "@/lib/manualVideoAnalysis/timing";
 
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -19,7 +21,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "url required" }, { status: 400 });
   }
 
-  const result = await loadDriversFromTimingUrl(body.url.trim(), body.primaryDriverName);
+  const primaryDriverName =
+    body.primaryDriverName?.trim() ||
+    (await getLiveRcDriverNameSetting(user.id)) ||
+    null;
+
+  const result = await loadDriversFromTimingUrl(body.url.trim(), primaryDriverName);
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
@@ -27,5 +34,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     drivers: result.drivers,
     parserId: result.parserId,
+    defaults: defaultDriverKeys(result.drivers),
+    primaryDriverName,
   });
 }

@@ -10,6 +10,7 @@ import {
   buildCalibrationFieldCatalog,
   getCalibrationFieldKind,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
+import { enrichGroupedOptionsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 export { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetTemplateId";
@@ -22,25 +23,27 @@ export function buildA800SeedSchema(): SetupSheetModelSchema {
   for (const meta of catalog) {
     if (meta.groupId === "document" || meta.groupId === "metadata") continue;
     const kind = getCalibrationFieldKind(meta.key);
-    fields.push({
-      key: meta.key,
-      displayLabel: meta.label,
-      sectionId: meta.groupId,
-      sectionTitle: meta.groupTitle,
-      valueType: kind === "number" ? "number" : kind === "boolean" ? "boolean" : "string",
-      uiType:
-        kind === "boolean"
-          ? "checkbox"
-          : kind === "singleSelect"
-            ? "select"
-            : kind === "visualMulti"
-              ? "multiSelect"
-              : "text",
-      unit: meta.unit,
-      showInSetupSheet: true,
-      showInAnalysis: true,
-      sortOrder: order++,
-    });
+    fields.push(
+      enrichGroupedOptionsOnField({
+        key: meta.key,
+        displayLabel: meta.label,
+        sectionId: meta.groupId,
+        sectionTitle: meta.groupTitle,
+        valueType: kind === "number" ? "number" : kind === "boolean" ? "boolean" : "string",
+        uiType:
+          kind === "boolean"
+            ? "checkbox"
+            : kind === "singleSelect"
+              ? "select"
+              : kind === "visualMulti"
+                ? "multiSelect"
+                : "text",
+        unit: meta.unit,
+        showInSetupSheet: true,
+        showInAnalysis: true,
+        sortOrder: order++,
+      })
+    );
   }
 
   const structuredSections = A800RR_STRUCTURED_SECTIONS.map((sec) => ({

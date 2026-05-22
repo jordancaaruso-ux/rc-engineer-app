@@ -79,7 +79,8 @@ export function TrackCameraProfileEditor({
       body: fd,
     });
     if (!res.ok) {
-      setMsg("Reference upload failed");
+      const err = await res.json().catch(() => ({}));
+      setMsg((err as { error?: string }).error ?? "Reference upload failed");
       return;
     }
     setMsg("Reference image uploaded");

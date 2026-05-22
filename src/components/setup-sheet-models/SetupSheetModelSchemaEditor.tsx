@@ -15,6 +15,7 @@ import {
   UNIVERSAL_TOURING_PARAMETERS,
   universalParameterIdForSnapshotKey,
 } from "@/lib/setupSheetModels/universalParameters";
+import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 
 const KIND_OPTIONS: { value: SchemaParameterKind; label: string }[] = [
   { value: "number", label: "Number" },
@@ -284,7 +285,7 @@ export function SetupSheetModelSchemaEditor(props: {
                     className="min-h-[4rem] rounded border border-border bg-card px-2 py-1.5 font-mono"
                     value={optionLines}
                     onChange={(e) => setOptionLines(e.target.value)}
-                    placeholder={"Thin\nMedium\nThick"}
+                    placeholder={"1\n2\n3\n4"}
                   />
                 </label>
               )}
@@ -385,9 +386,7 @@ function FieldEditPanel(props: {
             if (kind === "one_of_many" || kind === "many_of_many") {
               if (labels.length >= 2) {
                 patch.groupedOptionLabels = labels;
-                patch.groupedOptionValues = labels.map(
-                  (l, i) => suggestKeyFromPdfFieldName(l) || `opt_${i + 1}`
-                );
+                patch.groupedOptionValues = labels.map((l, i) => groupedOptionValueFromLabel(l, i));
               }
             }
             props.onSave(patch);

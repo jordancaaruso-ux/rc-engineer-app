@@ -5,6 +5,8 @@ import {
   type GroupedFieldOptionDefinition,
 } from "@/lib/setupCalibrations/types";
 import { schemaKindFromField, type SchemaParameterKind } from "@/lib/setupSheetModels/fieldParamTypes";
+import { awesomatixGroupKind } from "@/lib/setupDocuments/awesomatixWidgetGroups";
+import { enrichGroupedOptionsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 export type ModelOptionAssignment = {
@@ -33,8 +35,9 @@ export function isSimpleModelField(f: SetupSheetModelFieldDef): boolean {
 }
 
 export function modelFieldOptionEntries(f: SetupSheetModelFieldDef): Array<{ value: string; label: string }> {
-  const labels = f.groupedOptionLabels ?? [];
-  const values = f.groupedOptionValues ?? [];
+  const enriched = enrichGroupedOptionsOnField(f);
+  const labels = enriched.groupedOptionLabels ?? [];
+  const values = enriched.groupedOptionValues ?? [];
   if (labels.length === 0) return [];
   return labels.map((label, i) => ({
     label,
@@ -43,8 +46,26 @@ export function modelFieldOptionEntries(f: SetupSheetModelFieldDef): Array<{ val
 }
 
 export function groupedBehaviorForModelField(f: SetupSheetModelFieldDef): GroupedFieldBehaviorType {
-  if (f.groupBehaviorType) return f.groupBehaviorType;
-  return schemaKindFromField(f) === "one_of_many" ? "singleSelect" : "multiChoiceGroup";
+  const enriched = enrichGroupedOptionsOnField(f);
+  if (enriched.groupBehaviorType) return enriched.groupBehaviorType;
+  if (awesomatixGroupKind(enriched.key) === "multi") return "visualMulti";
+  return schemaKindFromField(enriched) === "one_of_many" ? "singleSelect" : "multiChoiceGroup";
+}
+
+/** Prefer visualMulti when every assigned widget shares one AcroForm field name (Awesomatix row). */
+export function groupedBehaviorForAssignments(
+  field: SetupSheetModelFieldDef,
+  assignments: ModelOptionAssignment[]
+): GroupedFieldBehaviorType {
+  const base = groupedBehaviorForModelField(field);
+  if (assignments.length < 2) return base;
+  const refs = assignments.map((a) => parseAcroKey(a.sourceKey));
+  const samePdfFieldName =
+    refs.every((r) => r.pdfFieldName === refs[0]!.pdfFieldName) && Boolean(refs[0]!.pdfFieldName);
+  if (samePdfFieldName && (base === "multiChoiceGroup" || schemaKindFromField(field) === "many_of_many")) {
+    return "visualMulti";
+  }
+  return base;
 }
 
 /** Whether a model parameter has a complete form-field mapping. */
@@ -160,11 +181,14 @@ export type ModelParameterRow = {
 export function listModelParameters(schema: SetupSheetModelSchema): ModelParameterRow[] {
   return [...schema.fields]
     .sort((a, b) => a.sortOrder - b.sortOrder || a.displayLabel.localeCompare(b.displayLabel))
-    .map((field) => ({
-      field,
-      kind: schemaKindFromField(field),
-      mapped: false,
-    }));
+    .map((field) => {
+      const enriched = enrichGroupedOptionsOnField(field);
+      return {
+        field: enriched,
+        kind: schemaKindFromField(enriched),
+        mapped: false,
+      };
+    });
 }
 
 export function modelMappingProgress(
@@ -185,7 +209,11 @@ export function filterParametersForWidgetCount(
     return rows.filter((r) => r.kind === "number" || r.kind === "text" || r.kind === "checkbox");
   }
   if (widgetCount >= 2) {
-    return rows.filter((r) => r.kind === "one_of_many" || r.kind === "many_of_many");
+    return rows.filter((r) => {
+      if (r.kind !== "one_of_many" && r.kind !== "many_of_many") return false;
+      const optCount = modelFieldOptionEntries(r.field).length;
+      return optCount >= 2 && optCount === widgetCount;
+    });
   }
   return [];
 }
