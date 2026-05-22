@@ -12,7 +12,7 @@ import {
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
 import type { SetupSheetModelFieldDef } from "@/lib/setupSheetModels/types";
 
-function screwField(): SetupSheetModelFieldDef {
+function screwFieldWithoutOptions(): SetupSheetModelFieldDef {
   return {
     key: "motor_mount_screws",
     displayLabel: "Motor mount screws",
@@ -43,22 +43,30 @@ function customFourField(): SetupSheetModelFieldDef {
   };
 }
 
-test("motor_mount_screws gains options from Awesomatix catalog when schema omits them", () => {
-  const opts = modelFieldOptionEntries(screwField());
-  assert.equal(opts.length, 5);
-  assert.equal(opts[0]?.label, "1");
+test("modelFieldOptionEntries uses schema only when options omitted on key", () => {
+  const opts = modelFieldOptionEntries(screwFieldWithoutOptions());
+  assert.equal(opts.length, 0);
 });
 
-test("filterParametersForWidgetCount includes custom 4-option field when 4 widgets selected", () => {
+test("filterParametersForWidgetCount includes wizard 4-option field when 4 widgets selected", () => {
+  const fourOnMotorKey: SetupSheetModelFieldDef = {
+    ...screwFieldWithoutOptions(),
+    groupedOptionLabels: ["1", "2", "3", "4"],
+    groupedOptionValues: ["1", "2", "3", "4"],
+    groupBehaviorType: "multiChoiceGroup",
+  };
   const rows = listModelParameters({
     version: 1,
     label: "Test",
     structuredSections: [],
-    fields: [customFourField(), screwField()],
+    fields: [customFourField(), screwFieldWithoutOptions(), fourOnMotorKey],
   });
   const eligible = filterParametersForWidgetCount(rows, 4);
   assert.ok(eligible.some((r) => r.field.key === "mount_screws"));
-  assert.ok(!eligible.some((r) => r.field.key === "motor_mount_screws"));
+  const motorEligible = eligible.find((r) => r.field.key === "motor_mount_screws");
+  assert.ok(motorEligible);
+  assert.equal(motorEligible!.field.groupedOptionLabels?.length, 4);
+  assert.equal(modelFieldOptionEntries(screwFieldWithoutOptions()).length, 0);
 });
 
 test("groupedBehaviorForAssignments uses visualMulti when widgets share one pdf field name", () => {

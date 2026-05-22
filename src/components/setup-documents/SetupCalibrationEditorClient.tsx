@@ -53,7 +53,7 @@ import {
   groupedBehaviorForAssignments,
   type ModelOptionAssignment,
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
-import { enrichSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import {
   buildQuickCustomFieldDefinition,
   type QuickCalibrationFieldKind,
@@ -524,7 +524,7 @@ export function SetupCalibrationEditorClient({
       if (d.model?.schema) {
         setSetupSheetModelSchema({
           ...d.model.schema,
-          fields: enrichSetupSheetModelSchemaFields(d.model.schema.fields),
+          fields: normalizeSetupSheetModelSchemaFields(d.model.schema.fields),
         });
       } else {
         setSetupSheetModelSchema(null);

@@ -1,9 +1,9 @@
 import { predictSfEndTime, buildSfPredictions } from "./sync";
 import {
   defaultDriverKeys,
-  applyDefaultLapSelection,
+  applyTop3LapSelection,
   setLapIncluded,
-  includedLapNumbers,
+  pickBestNLapNumbers,
 } from "./timing";
 import { emptyManualSession } from "./types";
 import type { ManualDriver, ManualSyncState } from "./types";
@@ -59,20 +59,23 @@ if (keys.meKey !== "a" || keys.competitorKey !== "b") {
   throw new Error(`expected a/b keys, got ${keys.meKey}/${keys.competitorKey}`);
 }
 
-let session = applyDefaultLapSelection({
+let session = applyTop3LapSelection({
   ...emptyManualSession(),
   drivers: [me, comp],
 });
-if (session.selectedLaps.me.length !== 3 || session.selectedLaps.competitor.length !== 3) {
-  throw new Error("expected all laps selected by default");
+const meTop = pickBestNLapNumbers(me.laps, 3);
+if (
+  session.selectedLaps.me.join() !== meTop.join() ||
+  session.selectedLaps.me.length !== 3
+) {
+  throw new Error("expected top 3 fastest laps selected");
 }
-session = setLapIncluded(session, "me", 1, false);
-const meAfter = session.drivers.find((d) => d.role === "me")!;
-if (includedLapNumbers(meAfter.laps).includes(1)) {
-  throw new Error("lap 1 should be excluded");
+session = setLapIncluded(session, "me", 2, false);
+if (session.selectedLaps.me.includes(2)) {
+  throw new Error("discarded lap 2 should leave top 3");
 }
-if (session.selectedLaps.me.includes(1)) {
-  throw new Error("selectedLaps should drop discarded lap");
+if (!session.selectedLaps.me.includes(3)) {
+  throw new Error("lap 3 should refill top 3 after discarding lap 2");
 }
 
 console.log("manualVideoAnalysis sync.test.ts OK");

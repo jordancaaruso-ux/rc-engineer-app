@@ -48,7 +48,7 @@ export type ManualVideoSessionV1 = {
   localVideoName?: string | null;
   drivers: ManualDriver[];
   sync: ManualSyncState;
-  /** Lap numbers included for sync / marking (all laps unless user discards) */
+  /** Top 3 lap numbers per driver (refills when a lap is discarded) */
   selectedLaps: { me: number[]; competitor: number[] };
   marks: ManualFrameMark[];
 };

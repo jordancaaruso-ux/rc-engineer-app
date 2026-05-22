@@ -3,12 +3,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { enrichSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
-function enrichSchema(schema: SetupSheetModelSchema | null): SetupSheetModelSchema | null {
+function normalizeSchema(schema: SetupSheetModelSchema | null): SetupSheetModelSchema | null {
   if (!schema) return null;
-  return { ...schema, fields: enrichSetupSheetModelSchemaFields(schema.fields) };
+  return { ...schema, fields: normalizeSetupSheetModelSchemaFields(schema.fields) };
 }
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -27,7 +27,7 @@ export async function GET(_request: Request, ctx: RouteCtx) {
   });
   if (!model) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const schema = enrichSchema(parseSetupSheetModelSchema(model.schemaJson));
+  const schema = normalizeSchema(parseSetupSheetModelSchema(model.schemaJson));
   return NextResponse.json({
     model: {
       id: model.id,
@@ -71,7 +71,7 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     select: { id: true, name: true, slug: true, schemaJson: true, updatedAt: true },
   });
 
-  const schema = enrichSchema(parseSetupSheetModelSchema(model.schemaJson));
+  const schema = normalizeSchema(parseSetupSheetModelSchema(model.schemaJson));
   revalidatePath("/cars");
   revalidatePath(`/setup-sheet-models/${id}`);
   return NextResponse.json({

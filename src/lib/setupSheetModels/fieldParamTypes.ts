@@ -1,6 +1,5 @@
 import { suggestKeyFromPdfFieldName } from "@/lib/setupCalibrations/customFieldCatalog";
 import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
-import { awesomatixGroupKind } from "@/lib/setupDocuments/awesomatixWidgetGroups";
 import type { SetupSheetModelFieldDef } from "@/lib/setupSheetModels/types";
 import type { QuickCalibrationFieldKind } from "@/lib/setupCalibrations/quickCalibrationField";
 
@@ -84,14 +83,11 @@ export function buildFieldDefFromKind(input: {
       const labels = (input.optionLabels ?? []).map((l) => l.trim()).filter(Boolean);
       if (labels.length < 2) return { error: "Many of many needs at least 2 options." };
       const values = labels.map((l, i) => groupedOptionValueFromLabel(l, i));
-      const key = (input.key?.trim() || suggestKeyFromPdfFieldName(displayLabel)).trim();
-      const behavior =
-        awesomatixGroupKind(key) === "multi" ? ("visualMulti" as const) : ("multiChoiceGroup" as const);
       return {
         ...base,
         valueType: "multi",
         uiType: "multiSelect",
-        groupBehaviorType: behavior,
+        groupBehaviorType: "multiChoiceGroup",
         groupedOptionLabels: labels,
         groupedOptionValues: values,
       };

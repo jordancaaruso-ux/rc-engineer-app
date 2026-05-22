@@ -1,6 +1,5 @@
 import { GENERIC_SETUP_SHEET_V1 } from "@/lib/setupSheetTemplate";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
-import { universalParameterIdForSnapshotKey } from "@/lib/setupSheetModels/universalParameters";
 
 /** Build initial schema from the built-in generic touring preset. */
 export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSchema {
@@ -37,7 +36,6 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
   for (const [key, meta] of keyMeta) {
     const isSession = meta.sectionId === "session";
     const isNotes = key.includes("notes") || key === "tires_setup";
-    const universalParameterId = universalParameterIdForSnapshotKey(key);
     const sessionInAnalysis = key === "track_surface" || key === "traction";
     const sessionFieldExtras =
       key === "track_surface"
@@ -69,7 +67,6 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
       showInSetupSheet: true,
       showInAnalysis: !isSession || sessionInAnalysis,
       sortOrder: order++,
-      universalParameterId,
       ...(sessionFieldExtras
         ? {
             groupBehaviorType: sessionFieldExtras.groupBehaviorType,

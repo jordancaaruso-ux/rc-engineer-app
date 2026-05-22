@@ -9,7 +9,7 @@ import {
   type ManualDriver,
 } from "@/lib/manualVideoAnalysis/types";
 import {
-  applyDefaultLapSelection,
+  applyTop3LapSelection,
   defaultDriverKeys,
   setDriverRoles,
 } from "@/lib/manualVideoAnalysis/timing";
@@ -142,7 +142,7 @@ function NewManualAnalysisForm() {
       timingUrl: useRun ? null : timingUrl.trim(),
       drivers: setDriverRoles(drivers, meKey, competitorKey),
     };
-    session = applyDefaultLapSelection(session);
+    session = applyTop3LapSelection(session);
 
     const res = await fetch("/api/video-analysis/jobs", {
       method: "POST",
@@ -285,7 +285,7 @@ function NewManualAnalysisForm() {
             </select>
           </label>
           <p className="text-xs text-muted-foreground">
-            All laps are included by default; discard outliers (e.g. race lap 1) on the analysis page.
+            Top 3 laps per driver are picked automatically; discard outliers on the analysis page.
           </p>
         </>
       )}

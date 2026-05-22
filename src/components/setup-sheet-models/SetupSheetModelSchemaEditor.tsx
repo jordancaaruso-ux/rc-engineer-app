@@ -115,16 +115,10 @@ export function SetupSheetModelSchemaEditor(props: {
       setLocalError(`Key "${built.key}" already exists on this sheet model.`);
       return;
     }
-    const withUniversal: SetupSheetModelFieldDef = {
-      ...built,
-      universalParameterId:
-        universalParameterIdForSnapshotKey(built.key) ??
-        built.universalParameterId,
-    };
     onChange({
       ...schema,
-      fields: [...schema.fields, withUniversal],
-      structuredSections: appendSingleRow(schema.structuredSections, sec.id, sec.title, withUniversal),
+      fields: [...schema.fields, built],
+      structuredSections: appendSingleRow(schema.structuredSections, sec.id, sec.title, built),
     });
     setLabel("");
     setKey("");
@@ -135,8 +129,9 @@ export function SetupSheetModelSchemaEditor(props: {
   return (
     <div className="space-y-4">
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Define parameters and how they appear on the run setup sheet (number, one-of-many with options, etc.). Calibrate
-        your PDF to these keys in the next step.
+        Define parameters for this sheet model (types and options are stored here — the source of truth for PDF
+        calibration). Optionally link a field to a universal parameter for cross-car stats. Calibrate your PDF in the
+        next step.
       </p>
 
       {localError ? (

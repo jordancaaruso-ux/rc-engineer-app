@@ -10,7 +10,7 @@ import {
   buildCalibrationFieldCatalog,
   getCalibrationFieldKind,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
-import { enrichGroupedOptionsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { materializeAwesomatixTemplateDefaultsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 export { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetTemplateId";
@@ -24,7 +24,7 @@ export function buildA800SeedSchema(): SetupSheetModelSchema {
     if (meta.groupId === "document" || meta.groupId === "metadata") continue;
     const kind = getCalibrationFieldKind(meta.key);
     fields.push(
-      enrichGroupedOptionsOnField({
+      materializeAwesomatixTemplateDefaultsOnField({
         key: meta.key,
         displayLabel: meta.label,
         sectionId: meta.groupId,

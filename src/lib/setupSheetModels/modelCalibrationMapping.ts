@@ -5,8 +5,7 @@ import {
   type GroupedFieldOptionDefinition,
 } from "@/lib/setupCalibrations/types";
 import { schemaKindFromField, type SchemaParameterKind } from "@/lib/setupSheetModels/fieldParamTypes";
-import { awesomatixGroupKind } from "@/lib/setupDocuments/awesomatixWidgetGroups";
-import { enrichGroupedOptionsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { normalizeGroupedFieldOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 export type ModelOptionAssignment = {
@@ -35,9 +34,9 @@ export function isSimpleModelField(f: SetupSheetModelFieldDef): boolean {
 }
 
 export function modelFieldOptionEntries(f: SetupSheetModelFieldDef): Array<{ value: string; label: string }> {
-  const enriched = enrichGroupedOptionsOnField(f);
-  const labels = enriched.groupedOptionLabels ?? [];
-  const values = enriched.groupedOptionValues ?? [];
+  const normalized = normalizeGroupedFieldOnField(f);
+  const labels = normalized.groupedOptionLabels ?? [];
+  const values = normalized.groupedOptionValues ?? [];
   if (labels.length === 0) return [];
   return labels.map((label, i) => ({
     label,
@@ -46,10 +45,9 @@ export function modelFieldOptionEntries(f: SetupSheetModelFieldDef): Array<{ val
 }
 
 export function groupedBehaviorForModelField(f: SetupSheetModelFieldDef): GroupedFieldBehaviorType {
-  const enriched = enrichGroupedOptionsOnField(f);
-  if (enriched.groupBehaviorType) return enriched.groupBehaviorType;
-  if (awesomatixGroupKind(enriched.key) === "multi") return "visualMulti";
-  return schemaKindFromField(enriched) === "one_of_many" ? "singleSelect" : "multiChoiceGroup";
+  const normalized = normalizeGroupedFieldOnField(f);
+  if (normalized.groupBehaviorType) return normalized.groupBehaviorType;
+  return schemaKindFromField(normalized) === "one_of_many" ? "singleSelect" : "multiChoiceGroup";
 }
 
 /** Prefer visualMulti when every assigned widget shares one AcroForm field name (Awesomatix row). */
@@ -182,10 +180,10 @@ export function listModelParameters(schema: SetupSheetModelSchema): ModelParamet
   return [...schema.fields]
     .sort((a, b) => a.sortOrder - b.sortOrder || a.displayLabel.localeCompare(b.displayLabel))
     .map((field) => {
-      const enriched = enrichGroupedOptionsOnField(field);
+      const normalized = normalizeGroupedFieldOnField(field);
       return {
-        field: enriched,
-        kind: schemaKindFromField(enriched),
+        field: normalized,
+        kind: schemaKindFromField(normalized),
         mapped: false,
       };
     });

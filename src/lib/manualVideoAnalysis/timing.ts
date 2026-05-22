@@ -127,15 +127,7 @@ export function pickBestNLapNumbers(laps: ManualDriverLap[], n = 3): number[] {
     .map((l) => l.lapNumber);
 }
 
-/** Lap numbers included for sync / sector marking (default: all laps). */
-export function includedLapNumbers(laps: ManualDriverLap[]): number[] {
-  return [...laps]
-    .filter((l) => l.isIncluded !== false && l.lapTimeSec > 0)
-    .map((l) => l.lapNumber)
-    .sort((a, b) => a - b);
-}
-
-/** Default isIncluded true; selectedLaps = all included laps. */
+/** Default isIncluded true; selectedLaps = best 3 included laps per driver. */
 export function normalizeManualSession(session: ManualVideoSessionV1): ManualVideoSessionV1 {
   const drivers = session.drivers.map((d) => ({
     ...d,
@@ -144,24 +136,25 @@ export function normalizeManualSession(session: ManualVideoSessionV1): ManualVid
       isIncluded: l.isIncluded !== false,
     })),
   }));
-  return applyDefaultLapSelection({ ...session, drivers });
+  return applyTop3LapSelection({ ...session, drivers });
 }
 
-/** All included laps per driver (not best-3 only). */
-export function applyDefaultLapSelection(session: ManualVideoSessionV1): ManualVideoSessionV1 {
+/** Top 3 fastest included laps per driver (working set for sync / marking). */
+export function applyTop3LapSelection(session: ManualVideoSessionV1): ManualVideoSessionV1 {
   const me = session.drivers.find((d) => d.role === "me");
   const comp = session.drivers.find((d) => d.role === "competitor");
   return {
     ...session,
     selectedLaps: {
-      me: me ? includedLapNumbers(me.laps) : [],
-      competitor: comp ? includedLapNumbers(comp.laps) : [],
+      me: me ? pickBestNLapNumbers(me.laps, 3) : [],
+      competitor: comp ? pickBestNLapNumbers(comp.laps, 3) : [],
     },
   };
 }
 
-/** @deprecated Use applyDefaultLapSelection */
-export const applyBest3Selection = applyDefaultLapSelection;
+/** @deprecated Use applyTop3LapSelection */
+export const applyDefaultLapSelection = applyTop3LapSelection;
+export const applyBest3Selection = applyTop3LapSelection;
 
 export function setLapIncluded(
   session: ManualVideoSessionV1,
@@ -178,7 +171,7 @@ export function setLapIncluded(
       ),
     };
   });
-  return applyDefaultLapSelection({ ...session, drivers });
+  return applyTop3LapSelection({ ...session, drivers });
 }
 
 export function bestIncludedLapNumbers(
