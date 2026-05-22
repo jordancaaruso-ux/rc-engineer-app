@@ -1,8 +1,12 @@
--- CreateEnum
-CREATE TYPE "VideoAnalysisJobStatus" AS ENUM ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED');
+-- Idempotent: objects may already exist from a prior db push on production.
 
--- CreateTable
-CREATE TABLE "TrackCameraProfile" (
+DO $$ BEGIN
+  CREATE TYPE "VideoAnalysisJobStatus" AS ENUM ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "TrackCameraProfile" (
     "id" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -16,8 +20,7 @@ CREATE TABLE "TrackCameraProfile" (
     CONSTRAINT "TrackCameraProfile_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "TrackSectorLine" (
+CREATE TABLE IF NOT EXISTS "TrackSectorLine" (
     "id" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "profileId" TEXT NOT NULL,
@@ -32,8 +35,7 @@ CREATE TABLE "TrackSectorLine" (
     CONSTRAINT "TrackSectorLine_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "VideoAnalysisJob" (
+CREATE TABLE IF NOT EXISTS "VideoAnalysisJob" (
     "id" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -51,42 +53,79 @@ CREATE TABLE "VideoAnalysisJob" (
     CONSTRAINT "VideoAnalysisJob_pkey" PRIMARY KEY ("id")
 );
 
--- AlterTable
-ALTER TABLE "VideoAsset" ADD COLUMN "localAnalysisPath" TEXT,
-ADD COLUMN "runId" TEXT,
-ADD COLUMN "trackId" TEXT;
+ALTER TABLE "VideoAsset" ADD COLUMN IF NOT EXISTS "localAnalysisPath" TEXT;
+ALTER TABLE "VideoAsset" ADD COLUMN IF NOT EXISTS "runId" TEXT;
+ALTER TABLE "VideoAsset" ADD COLUMN IF NOT EXISTS "trackId" TEXT;
 
--- CreateIndex
-CREATE INDEX "TrackCameraProfile_userId_trackId_idx" ON "TrackCameraProfile"("userId", "trackId");
-CREATE INDEX "TrackCameraProfile_trackId_idx" ON "TrackCameraProfile"("trackId");
+CREATE INDEX IF NOT EXISTS "TrackCameraProfile_userId_trackId_idx" ON "TrackCameraProfile"("userId", "trackId");
+CREATE INDEX IF NOT EXISTS "TrackCameraProfile_trackId_idx" ON "TrackCameraProfile"("trackId");
 
--- CreateIndex
-CREATE UNIQUE INDEX "TrackSectorLine_profileId_lineKey_key" ON "TrackSectorLine"("profileId", "lineKey");
-CREATE INDEX "TrackSectorLine_profileId_sortOrder_idx" ON "TrackSectorLine"("profileId", "sortOrder");
+CREATE UNIQUE INDEX IF NOT EXISTS "TrackSectorLine_profileId_lineKey_key" ON "TrackSectorLine"("profileId", "lineKey");
+CREATE INDEX IF NOT EXISTS "TrackSectorLine_profileId_sortOrder_idx" ON "TrackSectorLine"("profileId", "sortOrder");
 
--- CreateIndex
-CREATE INDEX "VideoAnalysisJob_userId_createdAt_idx" ON "VideoAnalysisJob"("userId", "createdAt");
-CREATE INDEX "VideoAnalysisJob_trackId_idx" ON "VideoAnalysisJob"("trackId");
-CREATE INDEX "VideoAnalysisJob_runId_idx" ON "VideoAnalysisJob"("runId");
+CREATE INDEX IF NOT EXISTS "VideoAnalysisJob_userId_createdAt_idx" ON "VideoAnalysisJob"("userId", "createdAt");
+CREATE INDEX IF NOT EXISTS "VideoAnalysisJob_trackId_idx" ON "VideoAnalysisJob"("trackId");
+CREATE INDEX IF NOT EXISTS "VideoAnalysisJob_runId_idx" ON "VideoAnalysisJob"("runId");
 
--- CreateIndex
-CREATE INDEX "VideoAsset_runId_idx" ON "VideoAsset"("runId");
-CREATE INDEX "VideoAsset_trackId_idx" ON "VideoAsset"("trackId");
+CREATE INDEX IF NOT EXISTS "VideoAsset_runId_idx" ON "VideoAsset"("runId");
+CREATE INDEX IF NOT EXISTS "VideoAsset_trackId_idx" ON "VideoAsset"("trackId");
 
--- AddForeignKey
-ALTER TABLE "TrackCameraProfile" ADD CONSTRAINT "TrackCameraProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "TrackCameraProfile" ADD CONSTRAINT "TrackCameraProfile_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "Track"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "TrackCameraProfile" ADD CONSTRAINT "TrackCameraProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
--- AddForeignKey
-ALTER TABLE "TrackSectorLine" ADD CONSTRAINT "TrackSectorLine_profileId_fkey" FOREIGN KEY ("profileId") REFERENCES "TrackCameraProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "TrackCameraProfile" ADD CONSTRAINT "TrackCameraProfile_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "Track"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
--- AddForeignKey
-ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "Track"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_profileId_fkey" FOREIGN KEY ("profileId") REFERENCES "TrackCameraProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_videoAssetId_fkey" FOREIGN KEY ("videoAssetId") REFERENCES "VideoAsset"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "TrackSectorLine" ADD CONSTRAINT "TrackSectorLine_profileId_fkey" FOREIGN KEY ("profileId") REFERENCES "TrackCameraProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
--- AddForeignKey
-ALTER TABLE "VideoAsset" ADD CONSTRAINT "VideoAsset_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "VideoAsset" ADD CONSTRAINT "VideoAsset_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "Track"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "Track"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_profileId_fkey" FOREIGN KEY ("profileId") REFERENCES "TrackCameraProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_videoAssetId_fkey" FOREIGN KEY ("videoAssetId") REFERENCES "VideoAsset"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "VideoAnalysisJob" ADD CONSTRAINT "VideoAnalysisJob_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "VideoAsset" ADD CONSTRAINT "VideoAsset_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "VideoAsset" ADD CONSTRAINT "VideoAsset_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "Track"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
