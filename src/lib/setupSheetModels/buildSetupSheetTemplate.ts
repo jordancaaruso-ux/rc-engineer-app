@@ -1,4 +1,4 @@
-import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import type { SetupSheetFieldChipOptions, SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import {
   modelLayoutToStructuredSections,
   parseSetupSheetModelSchema,
@@ -24,12 +24,32 @@ export function buildSetupSheetTemplateFromParsedSchema(
   const visibleFields = schema.fields.filter((f) => f.showInSetupSheet);
   const groups = groupFieldsBySection(visibleFields);
 
+  const fieldChipOptionsByKey = buildFieldChipOptionsFromSchema(schema);
+
   return {
     id: `model-${modelId}`,
     label: schema.label || modelName,
     structuredSections,
     groups,
+    fieldChipOptionsByKey,
   };
+}
+
+function buildFieldChipOptionsFromSchema(
+  schema: SetupSheetModelSchema
+): Record<string, SetupSheetFieldChipOptions> | undefined {
+  const out: Record<string, SetupSheetFieldChipOptions> = {};
+  for (const f of schema.fields) {
+    const labels = f.groupedOptionLabels?.map((l) => l.trim()).filter(Boolean) ?? [];
+    if (labels.length < 2) continue;
+    const multi =
+      f.uiType === "multiSelect"
+      || f.valueType === "multi"
+      || f.groupBehaviorType === "multiChoiceGroup"
+      || f.groupBehaviorType === "visualMulti";
+    out[f.key] = { options: labels, multi };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function groupFieldsBySection(

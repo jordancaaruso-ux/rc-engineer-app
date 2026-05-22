@@ -41,6 +41,7 @@ import {
 } from "@/lib/setupCompare/compareHighlight";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import type { FieldCompareResult } from "@/lib/setupCompare/types";
+import type { SetupSheetFieldChipOptions } from "@/lib/setupSheetTemplate";
 import {
   DERIVED_FRONT_SPRING_RATE_KEY,
   DERIVED_REAR_SPRING_RATE_KEY,
@@ -83,6 +84,8 @@ type Props = {
   enableFieldSearch?: boolean;
   /** When set, only rows that touch at least one matching stable setup key are shown. */
   fieldKeyFilter?: (key: string) => boolean;
+  /** Model sheet chip options (from SetupSheetModel schema). */
+  fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
   /**
    * Setup compare side-by-side: value column only uses A=blue / B=red tints; labels stay neutral.
    * Omit everywhere except the two Setup compare panels.
@@ -415,7 +418,12 @@ function primaryDisplayForChipField(value: string, options: string[]): string | 
   return value.trim();
 }
 
-function fieldOptionsForKey(key: string): { options: string[]; multi: boolean } | null {
+function fieldOptionsForKey(
+  key: string,
+  fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null
+): { options: string[]; multi: boolean } | null {
+  const modelOpts = fieldChipOptionsByKey?.[key];
+  if (modelOpts && modelOpts.options.length > 0) return modelOpts;
   const multi = getVisualMultiOptions(key);
   if (multi && multi.length > 0) return { options: multi, multi: true };
   const single = getSingleSelectChipOptions(key);
@@ -852,6 +860,7 @@ function EditableSingle({
   compareColumnRole,
   readOnly,
   onCommit,
+  fieldChipOptionsByKey,
 }: {
   fieldKey: string;
   label: string;
@@ -866,6 +875,7 @@ function EditableSingle({
   compareColumnRole?: CompareColumnRole;
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
+  fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
   const chipAccent: "sky" | "rose" = compareColumnRole === "b" ? "rose" : "sky";
   const v = fieldValue(value, fieldKey);
@@ -880,7 +890,7 @@ function EditableSingle({
 
   const showCompareEdit = hasBaseline && !focused;
   const effectiveReadOnly = readOnly || isDerivedSetupKey(fieldKey);
-  const options = fieldOptionsForKey(fieldKey);
+  const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
   const beginEdit = () => {
     setFocused(true);
     setLocal(v);
@@ -1179,6 +1189,7 @@ function PairSideCell({
   highlightChangedKeys,
   numericAggregationByKey,
   compareValueColumnRole,
+  fieldChipOptionsByKey,
 }: {
   fieldKey: string;
   side: "Front" | "Rear";
@@ -1191,6 +1202,7 @@ function PairSideCell({
   highlightChangedKeys: Set<string> | null;
   numericAggregationByKey: ReadonlyMap<string, NumericAggregationCompareSlice> | null | undefined;
   compareValueColumnRole?: CompareColumnRole | null;
+  fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
   const v = fieldValue(value, fieldKey);
   const b = baseline ? fieldValue(baseline, fieldKey) : "";
@@ -1208,7 +1220,7 @@ function PairSideCell({
   }, [v, focused]);
 
   const showCompareEdit = hasBaseline && !focused;
-  const options = fieldOptionsForKey(fieldKey);
+  const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
   const beginEdit = () => {
     setFocused(true);
     setLocal(v);
@@ -1380,9 +1392,13 @@ function PairRow({
   highlightChangedKeys,
   numericAggregationByKey,
   compareValueColumnRole,
+  fieldChipOptionsByKey,
 }: {
   row: Extract<StructuredRow, { type: "pair" }>;
-} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey" | "compareValueColumnRole"> & {
+} & Pick<
+  Props,
+  "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey" | "compareValueColumnRole" | "fieldChipOptionsByKey"
+> & {
   baseline: SetupSnapshotData | null;
   hasBaseline: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
@@ -1410,6 +1426,7 @@ function PairRow({
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
           compareValueColumnRole={compareValueColumnRole}
+          fieldChipOptionsByKey={fieldChipOptionsByKey}
         />
         <PairSideCell
           fieldKey={row.rightKey}
@@ -1423,6 +1440,7 @@ function PairRow({
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
           compareValueColumnRole={compareValueColumnRole}
+          fieldChipOptionsByKey={fieldChipOptionsByKey}
         />
       </div>
     </div>
@@ -1771,6 +1789,7 @@ export function SetupSheetStructured({
   enableFieldSearch = false,
   compareValueColumnRole = null,
   fieldKeyFilter,
+  fieldChipOptionsByKey = null,
 }: Props) {
   const baseline = baselineValue ?? null;
   const hasBaseline = baseline != null;
@@ -1840,6 +1859,7 @@ export function SetupSheetStructured({
           compareColumnRole={compareRole}
           readOnly={readOnly}
           onCommit={commit}
+          fieldChipOptionsByKey={fieldChipOptionsByKey}
         />
       );
     }
@@ -1856,6 +1876,7 @@ export function SetupSheetStructured({
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
           compareValueColumnRole={compareValueColumnRole}
+          fieldChipOptionsByKey={fieldChipOptionsByKey}
         />
       );
     }

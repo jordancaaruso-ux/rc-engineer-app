@@ -272,6 +272,7 @@ export function SetupSheetView({
           enableFieldSearch={enableFieldSearch}
           compareValueColumnRole={compareValueColumnRole}
           fieldKeyFilter={fieldKeyFilter}
+          fieldChipOptionsByKey={template.fieldChipOptionsByKey ?? null}
         />
       ) : null}
 

@@ -154,7 +154,10 @@ export default async function SetupDocumentDetailPage({
           setupSheetModelSlug: doc.setupSheetModel?.slug ?? null,
         }}
         cars={cars}
-        calibrations={calibrations}
+        calibrations={calibrations.map((c) => ({
+          ...c,
+          createdAt: c.createdAt.toISOString(),
+        }))}
         reviewSetupTemplate={reviewSetupTemplate}
       />
     </>

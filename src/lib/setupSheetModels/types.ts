@@ -196,6 +196,5 @@ function fieldKindFromModelField(
   if (!field) return undefined;
   if (field.uiType === "checkbox") return "bool";
   if (field.uiType === "multiSelect" || field.valueType === "multi") return "multi";
-  if (field.uiType === "select" || field.groupBehaviorType) return "multi";
   return undefined;
 }

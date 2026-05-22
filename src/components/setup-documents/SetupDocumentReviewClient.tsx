@@ -110,9 +110,10 @@ export function SetupDocumentReviewClient({
   const [reparsing, setReparsing] = useState(false);
   const [creatingSetup, setCreatingSetup] = useState(false);
   const [mode, setMode] = useState<"review" | "manual">("review");
-  const [calibrationName, setCalibrationName] = useState(
-    `${doc.originalFilename.replace(/\.[^.]+$/, "")} calibration`
-  );
+  const [calibrationName, setCalibrationName] = useState(() => {
+    const base = (doc.originalFilename ?? "setup").replace(/\.[^.]+$/, "");
+    return `${base} calibration`;
+  });
   const [savingCalibration, setSavingCalibration] = useState(false);
   const [savingCalibrationSelection, setSavingCalibrationSelection] = useState(false);
   const [processingImport, setProcessingImport] = useState(false);
@@ -679,7 +680,11 @@ export function SetupDocumentReviewClient({
                       <div className="mt-2 rounded border border-border/60 bg-card/40 p-2">
                         <div>
                           <span className="text-foreground">Matched keys:</span>{" "}
-                          {diagnostic.mapping?.matched?.keys ?? 0}
+                          {typeof diagnostic.mapping?.matched?.keys === "number"
+                            ? diagnostic.mapping.matched.keys
+                            : Array.isArray(diagnostic.mapping?.matched?.keys)
+                              ? diagnostic.mapping.matched.keys.length
+                              : 0}
                         </div>
                         {Array.isArray(diagnostic.mapping?.unmatched?.expectedFormKeys) ? (
                           <div className="mt-1">
@@ -986,7 +991,7 @@ export function SetupDocumentReviewClient({
                     type="button"
                     className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
                     onClick={saveCalibration}
-                    disabled={savingCalibration || doc.mimeType !== "application/pdf"}
+                    disabled={savingCalibration || (doc.mimeType ?? "") !== "application/pdf"}
                   >
                     {savingCalibration ? "Creating…" : "Create text template"}
                   </button>
@@ -1049,7 +1054,7 @@ export function SetupDocumentReviewClient({
               </button>
             </div>
             <div className="h-[80vh] bg-muted/20">
-              {doc.mimeType.startsWith("image/") ? (
+              {(doc.mimeType ?? "").startsWith("image/") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={previewUrl} alt={doc.originalFilename} className="h-full w-full object-contain" />
               ) : (

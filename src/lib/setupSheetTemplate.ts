@@ -23,12 +23,17 @@ export type SetupSheetGroupDef = {
   fields: SetupSheetFieldDef[];
 };
 
+/** Chip / one-of-many options for model-defined fields (not in the A800 catalog). */
+export type SetupSheetFieldChipOptions = { options: string[]; multi: boolean };
+
 export type SetupSheetTemplate = {
   id: string;
   label: string;
   groups: SetupSheetGroupDef[];
   /** When set (e.g. A800RR v2), SetupSheetView renders structured sections instead of legacy groups. */
   structuredSections?: StructuredSection[];
+  /** Per-key chip options from SetupSheetModel schema (e.g. Mugen ARB thicknesses). */
+  fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions>;
 };
 
 /**
