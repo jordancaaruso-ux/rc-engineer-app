@@ -11,6 +11,10 @@ import {
   type SchemaParameterKind,
 } from "@/lib/setupSheetModels/fieldParamTypes";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import {
+  UNIVERSAL_TOURING_PARAMETERS,
+  universalParameterIdForSnapshotKey,
+} from "@/lib/setupSheetModels/universalParameters";
 
 const KIND_OPTIONS: { value: SchemaParameterKind; label: string }[] = [
   { value: "number", label: "Number" },
@@ -110,10 +114,16 @@ export function SetupSheetModelSchemaEditor(props: {
       setLocalError(`Key "${built.key}" already exists on this sheet model.`);
       return;
     }
+    const withUniversal: SetupSheetModelFieldDef = {
+      ...built,
+      universalParameterId:
+        universalParameterIdForSnapshotKey(built.key) ??
+        built.universalParameterId,
+    };
     onChange({
       ...schema,
-      fields: [...schema.fields, built],
-      structuredSections: appendSingleRow(schema.structuredSections, sec.id, sec.title, built),
+      fields: [...schema.fields, withUniversal],
+      structuredSections: appendSingleRow(schema.structuredSections, sec.id, sec.title, withUniversal),
     });
     setLabel("");
     setKey("");
@@ -146,6 +156,11 @@ export function SetupSheetModelSchemaEditor(props: {
                 <span className="font-medium text-foreground">{f.displayLabel}</span>
                 <span className="font-mono text-[10px] text-muted-foreground">{f.key}</span>
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{schemaKindFromField(f)}</span>
+                {f.universalParameterId ? (
+                  <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-mono text-sky-200">
+                    ↗ {f.universalParameterId}
+                  </span>
+                ) : null}
                 {f.unit ? <span className="text-[10px] text-muted-foreground">{f.unit}</span> : null}
                 {!readOnly ? (
                   <>
@@ -310,6 +325,7 @@ function FieldEditPanel(props: {
   const [optionLines, setOptionLines] = useState(
     (props.field.groupedOptionLabels ?? []).join("\n")
   );
+  const [universalId, setUniversalId] = useState(props.field.universalParameterId ?? "");
   const kind = schemaKindFromField(props.field);
 
   return (
@@ -330,6 +346,21 @@ function FieldEditPanel(props: {
           onChange={(e) => setUnit(e.target.value)}
         />
       </label>
+      <label className="block text-[10px] text-muted-foreground">
+        Universal parameter (cross-car stats)
+        <select
+          className="mt-0.5 w-full rounded border border-border bg-muted/40 px-2 py-1 text-xs"
+          value={universalId}
+          onChange={(e) => setUniversalId(e.target.value)}
+        >
+          <option value="">None — use sheet key only</option>
+          {UNIVERSAL_TOURING_PARAMETERS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label} ({p.id})
+            </option>
+          ))}
+        </select>
+      </label>
       {(kind === "one_of_many" || kind === "many_of_many") && (
         <label className="block text-[10px] text-muted-foreground">
           Options (one per line)
@@ -349,6 +380,7 @@ function FieldEditPanel(props: {
             const patch: Partial<SetupSheetModelFieldDef> = {
               displayLabel: displayLabel.trim() || props.field.displayLabel,
               unit: unit.trim() || undefined,
+              universalParameterId: universalId.trim() || undefined,
             };
             if (kind === "one_of_many" || kind === "many_of_many") {
               if (labels.length >= 2) {

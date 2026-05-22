@@ -1,5 +1,6 @@
 import { GENERIC_SETUP_SHEET_V1 } from "@/lib/setupSheetTemplate";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { universalParameterIdForSnapshotKey } from "@/lib/setupSheetModels/universalParameters";
 
 /** Build initial schema from the built-in generic touring preset. */
 export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSchema {
@@ -34,18 +35,48 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
 
   let order = 0;
   for (const [key, meta] of keyMeta) {
+    const isSession = meta.sectionId === "session";
     const isNotes = key.includes("notes") || key === "tires_setup";
+    const universalParameterId = universalParameterIdForSnapshotKey(key);
+    const sessionInAnalysis = key === "track_surface" || key === "traction";
+    const sessionFieldExtras =
+      key === "track_surface"
+        ? {
+            uiType: "select" as const,
+            valueType: "enum" as const,
+            groupBehaviorType: "singleSelect" as const,
+            groupedOptionLabels: ["Asphalt", "Carpet"],
+            groupedOptionValues: ["asphalt", "carpet"],
+          }
+        : key === "traction"
+          ? {
+              uiType: "multiSelect" as const,
+              valueType: "multi" as const,
+              groupBehaviorType: "multiChoiceGroup" as const,
+              groupedOptionLabels: ["Low", "Medium", "High"],
+              groupedOptionValues: ["low", "medium", "high"],
+            }
+          : null;
+
     fields.push({
       key,
       displayLabel: meta.label,
       sectionId: meta.sectionId,
       sectionTitle: meta.sectionTitle,
-      valueType: isNotes ? "string" : "number",
-      uiType: isNotes ? "textarea" : "text",
+      valueType: sessionFieldExtras?.valueType ?? (isSession || isNotes ? "string" : "number"),
+      uiType: sessionFieldExtras?.uiType ?? (isSession ? "text" : isNotes ? "textarea" : "text"),
       unit: meta.unit,
       showInSetupSheet: true,
-      showInAnalysis: true,
+      showInAnalysis: !isSession || sessionInAnalysis,
       sortOrder: order++,
+      universalParameterId,
+      ...(sessionFieldExtras
+        ? {
+            groupBehaviorType: sessionFieldExtras.groupBehaviorType,
+            groupedOptionLabels: sessionFieldExtras.groupedOptionLabels,
+            groupedOptionValues: sessionFieldExtras.groupedOptionValues,
+          }
+        : {}),
     });
   }
 

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   storeVideoFile,
   VIDEO_ALLOWED_MIME,
-  VIDEO_MAX_BYTES,
+  videoMaxUploadBytes,
 } from "@/lib/videos/storage";
 
 export async function GET() {
@@ -51,9 +51,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing file field" }, { status: 400 });
   }
 
-  if (file.size > VIDEO_MAX_BYTES) {
+  const maxBytes = videoMaxUploadBytes();
+  if (file.size > maxBytes) {
     return NextResponse.json(
-      { error: `File too large (max ${(VIDEO_MAX_BYTES / (1024 * 1024)).toFixed(1)} MB)` },
+      { error: `File too large (max ${(maxBytes / (1024 * 1024)).toFixed(0)} MB)` },
       { status: 400 }
     );
   }
@@ -69,8 +70,17 @@ export async function POST(request: Request) {
   const labelRaw = form.get("label");
   const label =
     typeof labelRaw === "string" && labelRaw.trim() ? labelRaw.trim().slice(0, 120) : null;
+  const runIdRaw = form.get("runId");
+  const trackIdRaw = form.get("trackId");
+  const runId = typeof runIdRaw === "string" && runIdRaw.trim() ? runIdRaw.trim() : null;
+  const trackId = typeof trackIdRaw === "string" && trackIdRaw.trim() ? trackIdRaw.trim() : null;
+  const localPathRaw = form.get("localAnalysisPath");
+  const localAnalysisPath =
+    typeof localPathRaw === "string" && localPathRaw.trim()
+      ? localPathRaw.trim().slice(0, 500)
+      : null;
 
-  const { storagePath } = await storeVideoFile(file);
+  const { storagePath } = await storeVideoFile(file, { maxBytes });
 
   const created = await prisma.videoAsset.create({
     data: {
@@ -80,6 +90,9 @@ export async function POST(request: Request) {
       mimeType,
       bytes: file.size,
       label,
+      runId,
+      trackId,
+      localAnalysisPath,
     },
     select: { id: true },
   });

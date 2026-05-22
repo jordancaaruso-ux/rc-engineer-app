@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { NewRunForm } from "@/components/runs/NewRunForm";
+import { RunVideoAnalysisSection } from "@/components/videoAnalysis/RunVideoAnalysisSection";
 import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 
 export const dynamic = "force-dynamic";
@@ -195,6 +196,10 @@ export default async function EditRunPage({
             shareWithTeam: run.shareWithTeam,
           }}
         />
+        <div className="mt-8 max-w-2xl rounded-lg border border-border bg-card p-4">
+          <h2 className="text-sm font-medium mb-2">Video sector analysis</h2>
+          <RunVideoAnalysisSection runId={run.id} trackId={run.trackId} />
+        </div>
       </section>
     </>
   );

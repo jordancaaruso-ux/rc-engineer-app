@@ -22,6 +22,7 @@ import {
 } from "@/lib/setupCompare/numericGradientConfig";
 import { parseNumericFromSetupString } from "@/lib/setup/parseSetupNumeric";
 import { getParameterClassificationOverride } from "@/lib/setupAggregations/parameterClassificationOverrides";
+import { canonicalAggregationParameterKey } from "@/lib/setupSheetModels/universalParameters";
 
 /** At least this many non-empty parameter keys required on the snapshot to count toward aggregation. */
 export const MIN_DISTINCT_KEYS_FOR_ELIGIBILITY = 2;
@@ -210,11 +211,12 @@ export function getOrCreateBucket(
   key: string,
   obs: { tag: "multi"; tokens: string[] } | { tag: "scalar"; nOrS: number | string }
 ): PerKeyState {
+  const bucketKey = canonicalAggregationParameterKey(key);
   if (obs.tag === "multi") {
-    let b = map.get(key);
+    let b = map.get(bucketKey);
     if (!b || b.kind !== "multi") {
       b = { kind: "multi", tokenDocCount: new Map(), documentCount: 0 };
-      map.set(key, b);
+      map.set(bucketKey, b);
     }
     const seenInDoc = new Set<string>();
     for (const t of obs.tokens) {
@@ -229,10 +231,10 @@ export function getOrCreateBucket(
     return b;
   }
 
-  let b = map.get(key);
+  let b = map.get(bucketKey);
   if (!b || b.kind !== "scalar") {
     b = { kind: "scalar", values: [] };
-    map.set(key, b);
+    map.set(bucketKey, b);
   }
   b.values.push(obs.nOrS);
   return b;

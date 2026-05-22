@@ -22,6 +22,11 @@ export type SetupSheetModelFieldDef = {
   groupedOptionLabels?: string[];
   groupedOptionValues?: string[];
   notes?: string;
+  /**
+   * When set, equals {@link canonicalAggregationParameterKey} for cross-car stats
+   * (e.g. `droop_front` even if this sheet labels the row "Downstop").
+   */
+  universalParameterId?: string;
 };
 
 export type SetupSheetModelLayoutRow =
@@ -119,6 +124,10 @@ function parseFieldDef(raw: unknown): SetupSheetModelFieldDef | null {
     groupedOptionLabels,
     groupedOptionValues,
     notes: typeof r.notes === "string" ? r.notes.trim() || undefined : undefined,
+    universalParameterId:
+      typeof r.universalParameterId === "string" && r.universalParameterId.trim()
+        ? r.universalParameterId.trim()
+        : undefined,
   };
 }
 

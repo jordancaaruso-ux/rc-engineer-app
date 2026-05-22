@@ -1,0 +1,21 @@
+[project]
+name = "rc-video-analysis"
+version = "0.1.0"
+description = "RC heat video sector timing — detect, track, line crossings"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26.0",
+  "opencv-python-headless>=4.9.0",
+  "ultralytics>=8.3.0",
+]
+
+[project.scripts]
+rc-video-analysis = "rc_video_analysis.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rc_video_analysis*"]

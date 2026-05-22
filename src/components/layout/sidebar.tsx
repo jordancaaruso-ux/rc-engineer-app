@@ -12,7 +12,7 @@ const navItems = [
   { href: "/runs/new", label: "Log your run" },
   { href: "/runs/history", label: "Sessions" },
   { href: "/teams", label: "Teams" },
-  { href: "/videos/overlay", label: "Video analysis" },
+  { href: "/videos/analysis", label: "Video analysis" },
   { href: "/setup", label: "Setup" },
   { href: "/events", label: "Events" },
   { href: "/cars", label: "Cars" },

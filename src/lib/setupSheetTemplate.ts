@@ -50,6 +50,17 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
   label: "Generic touring",
   structuredSections: [
     {
+      id: "session",
+      title: "Session / track",
+      rows: [
+        { type: "single", key: "driver", label: "Driver" },
+        { type: "single", key: "setup_date", label: "Date" },
+        { type: "single", key: "track_surface", label: "Surface" },
+        { type: "single", key: "track_layout", label: "Layout" },
+        { type: "single", key: "traction", label: "Traction" },
+      ],
+    },
+    {
       id: "suspension",
       title: "Suspension (Front / Rear)",
       rows: [
@@ -86,6 +97,18 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
     },
   ],
   groups: [
+    {
+      id: "session",
+      title: "Session / track",
+      column: "full",
+      fields: [
+        { key: "driver", label: "Driver" },
+        { key: "setup_date", label: "Date" },
+        { key: "track_surface", label: "Surface" },
+        { key: "track_layout", label: "Layout" },
+        { key: "traction", label: "Traction" },
+      ],
+    },
     {
       id: "suspension",
       title: "Suspension",

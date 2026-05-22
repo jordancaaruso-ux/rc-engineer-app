@@ -1053,6 +1053,11 @@ model VideoAnalysisJob {
   /** Optional manual MOT id remaps: [{ fromId, toId, startSec, endSec }] */
   idCorrectionsJson Json?
 
+  /** `worker` = Python JSON import; `manual` = user frame marks + transponder sync. */
+  analysisMode String @default("worker")
+  /** ManualVideoSessionV1 — sync anchors, sector frame marks, driver selection. */
+  manualJson Json?
+
   @@index([userId, createdAt])
   @@index([trackId])
   @@index([runId])

@@ -13,6 +13,10 @@ import { geometryDerivedScalarObservations } from "@/lib/setupAggregations/setup
 import { GRIP_BUCKET_ANY, gripBucketsForDoc } from "@/lib/setupAggregations/gripBuckets";
 import { refreshCommunitySharedCalibrationsFromEligibleDocs } from "@/lib/setupCalibrations/communitySharedCalibrations";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
+import {
+  UNIVERSAL_TOURING_TEMPLATE_ID,
+  isUniversalTouringTuningParameter,
+} from "@/lib/setupSheetModels/universalParameters";
 
 export type RebuildCommunityAggregationsExclusionCounts = {
   totalDocumentsExamined: number;
@@ -164,6 +168,17 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
       }
       for (const [k, obs] of obsPerKey) {
         getOrCreateBucket(keyMap, k, obs);
+      }
+
+      const universalBucketKey = `${UNIVERSAL_TOURING_TEMPLATE_ID}\x1e${trackSurface}\x1e${bucket}`;
+      let universalMap = byTemplateSurfaceGrip.get(universalBucketKey);
+      if (!universalMap) {
+        universalMap = new Map();
+        byTemplateSurfaceGrip.set(universalBucketKey, universalMap);
+      }
+      for (const [k, obs] of obsPerKey) {
+        if (!isUniversalTouringTuningParameter(k)) continue;
+        getOrCreateBucket(universalMap, k, obs);
       }
     }
   }

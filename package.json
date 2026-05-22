@@ -24,6 +24,8 @@
     "test:grip-spread": "npx tsx src/lib/engineerPhase5/gripSpreadContrast.test.ts",
     "test:between-hints": "npx tsx src/lib/engineerPhase5/betweenRunHints/betweenRunHints.test.ts",
     "test:engineering-read": "npx tsx src/lib/engineerPhase5/engineeringRead.test.ts",
+    "test:video-analysis": "npx tsx src/lib/videoAnalysis/sectorStats.test.ts",
+    "test:manual-video-analysis": "npx tsx src/lib/manualVideoAnalysis/sync.test.ts",
     "check:legacy-local-user": "npx tsx scripts/check-legacy-local-user.ts",
     "backfill:setup-car": "npx tsx scripts/backfill-setup-documents-car-id.ts",
     "db:prune-calibrations": "npx tsx scripts/prune-calibrations-keep-community-shared.ts",

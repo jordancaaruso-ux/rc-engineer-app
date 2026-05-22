@@ -1,3 +1,5 @@
+import { canonicalAggregationParameterKey } from "@/lib/setupSheetModels/universalParameters";
+
 /**
  * Manual overrides for aggregation classification (numeric vs categorical).
  *
@@ -55,6 +57,8 @@ export const PARAMETER_CLASSIFICATION_OVERRIDES: Record<string, ParameterClassif
   damper_oil_front: "numeric",
   downstop_front: "numeric",
   downstop_rear: "numeric",
+  droop_front: "numeric",
+  droop_rear: "numeric",
   servo_horn_height: "numeric",
   weight_balance_front_percent: "numeric",
 
@@ -130,5 +134,9 @@ export const PARAMETER_CLASSIFICATION_OVERRIDES: Record<string, ParameterClassif
 export function getParameterClassificationOverride(
   key: string
 ): ParameterClassificationOverride | undefined {
-  return PARAMETER_CLASSIFICATION_OVERRIDES[key];
+  const direct = PARAMETER_CLASSIFICATION_OVERRIDES[key];
+  if (direct) return direct;
+  const canonical = canonicalAggregationParameterKey(key);
+  if (canonical !== key) return PARAMETER_CLASSIFICATION_OVERRIDES[canonical];
+  return undefined;
 }
