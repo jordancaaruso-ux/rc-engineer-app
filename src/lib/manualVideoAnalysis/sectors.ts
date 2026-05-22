@@ -1,6 +1,7 @@
 import type { ManualFrameMark, ManualVideoSessionV1 } from "./types";
 import { lapSfKey } from "./types";
 import { predictSfEndTime, predictSfStartTime } from "./sync";
+import { bestIncludedLapNumbers } from "./timing";
 
 export type SectorLineInfo = {
   lineKey: string;
@@ -171,7 +172,7 @@ export function averageSectorSplits(
   sectorLines: SectorLineInfo[],
   role: "me" | "competitor"
 ): Map<string, number> {
-  const laps = role === "me" ? session.selectedLaps.me : session.selectedLaps.competitor;
+  const laps = bestIncludedLapNumbers(session, role, 3);
   const sums = new Map<string, { sum: number; count: number }>();
   for (const lapNumber of laps) {
     const bd = computeLapBreakdown(session, sectorLines, role, lapNumber);

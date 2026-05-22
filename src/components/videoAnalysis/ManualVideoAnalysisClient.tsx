@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { VideoWithLineOverlay } from "./VideoWithLineOverlay";
+import { VideoFrameControls } from "./VideoFrameControls";
 import type { SectorLineNorm } from "./SectorLineCanvas";
-import type { ManualVideoSessionV1, ManualFrameMark, DriverRole } from "@/lib/manualVideoAnalysis/types";
+import type {
+  ManualVideoSessionV1,
+  ManualDriver,
+  DriverRole,
+} from "@/lib/manualVideoAnalysis/types";
 import { lapSfKey } from "@/lib/manualVideoAnalysis/types";
 import { buildSfPredictions, type LapSfPrediction } from "@/lib/manualVideoAnalysis/sync";
 import {
@@ -13,6 +18,10 @@ import {
   averageSectorSplits,
   type SectorCompareRow,
 } from "@/lib/manualVideoAnalysis/sectors";
+import {
+  normalizeManualSession,
+  setLapIncluded,
+} from "@/lib/manualVideoAnalysis/timing";
 
 type SectorLineApi = SectorLineNorm & { sortOrder: number };
 
@@ -36,6 +45,42 @@ type JobData = {
 
 type Tab = "sync" | "mark" | "compare";
 
+function DriverLapIncludeList({
+  driver,
+  displayName,
+  onToggle,
+}: {
+  driver: ManualDriver;
+  displayName: string;
+  onToggle: (lapNumber: number, included: boolean) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="font-medium text-xs">{displayName}</p>
+      <ul className="space-y-0.5">
+        {driver.laps.map((lap) => (
+          <li key={lap.lapNumber} className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={lap.isIncluded !== false}
+                onChange={(e) => onToggle(lap.lapNumber, e.target.checked)}
+              />
+              <span className="font-mono">L{lap.lapNumber}</span>
+              <span className="font-mono text-muted-foreground">
+                {lap.lapTimeSec.toFixed(3)}s
+              </span>
+            </label>
+            {lap.isIncluded === false && (
+              <span className="text-muted-foreground">discarded</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoObjectUrlRef = useRef<string | null>(null);
@@ -48,6 +93,7 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [markLap, setMarkLap] = useState<{ role: DriverRole; lapNumber: number } | null>(null);
   const [anchorLapInput, setAnchorLapInput] = useState("1");
+  const [showGlobalOffset, setShowGlobalOffset] = useState(false);
 
   const lines: SectorLineNorm[] =
     data?.sectorLines.map((l) => ({
@@ -65,7 +111,13 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
     if (!res.ok) return;
     const json = (await res.json()) as JobData;
     setData(json);
-    if (json.manual?.session) setSession(json.manual.session);
+    if (json.manual?.session) {
+      const normalized = normalizeManualSession(json.manual.session);
+      setSession(normalized);
+      if (normalized.sync.anchor?.lapNumber) {
+        setAnchorLapInput(String(normalized.sync.anchor.lapNumber));
+      }
+    }
   }, [jobId]);
 
   useEffect(() => {
@@ -79,13 +131,14 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
   }, []);
 
   async function saveSession(next: ManualVideoSessionV1) {
-    setSession(next);
+    const normalized = normalizeManualSession(next);
+    setSession(normalized);
     setSaving(true);
     setMsg(null);
     const res = await fetch(`/api/video-analysis/jobs/${jobId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ manualJson: next }),
+      body: JSON.stringify({ manualJson: normalized }),
     });
     setSaving(false);
     if (!res.ok) {
@@ -119,12 +172,13 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
   function seekTo(sec: number | null) {
     if (sec == null || !videoRef.current) return;
     videoRef.current.currentTime = Math.max(0, sec);
+    videoRef.current.pause();
   }
 
   function setAnchor() {
     if (!session) return;
     const lapNumber = parseInt(anchorLapInput, 10);
-    if (!Number.isFinite(lapNumber)) return;
+    if (!Number.isFinite(lapNumber) || lapNumber < 1) return;
     const next: ManualVideoSessionV1 = {
       ...session,
       sync: {
@@ -137,7 +191,10 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
       },
     };
     void saveSession(next);
-    setMsg(`Anchor set: your lap ${lapNumber} SF at ${currentVideoTime().toFixed(2)}s`);
+    const name = session.drivers.find((d) => d.role === "me")?.driverName ?? "You";
+    setMsg(
+      `Baseline set: ${name} lap ${lapNumber} crosses finish at ${currentVideoTime().toFixed(2)}s`
+    );
   }
 
   function setPerLapSf(role: DriverRole, lapNumber: number) {
@@ -154,7 +211,18 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
       },
     };
     void saveSession(next);
-    setMsg(`SF override: ${role} lap ${lapNumber}`);
+    const name =
+      session.drivers.find((d) => d.role === role)?.driverName ??
+      (role === "me" ? "You" : "Competitor");
+    setMsg(`Fine-tuned finish: ${name} lap ${lapNumber}`);
+  }
+
+  function toggleLapIncluded(role: DriverRole, lapNumber: number, included: boolean) {
+    if (!session) return;
+    void saveSession(setLapIncluded(session, role, lapNumber, included));
+    if (!included && markLap?.role === role && markLap.lapNumber === lapNumber) {
+      setMarkLap(null);
+    }
   }
 
   function upsertMark(role: DriverRole, lapNumber: number, lineKey: string) {
@@ -166,6 +234,18 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
     marks.push({ driverRole: role, lapNumber, lineKey, videoTimeSec: t });
     void saveSession({ ...session, marks });
     setMsg(`Marked ${lineKey} at ${t.toFixed(3)}s`);
+  }
+
+  function jumpAndFineTune(role: DriverRole, lapNumber: number) {
+    const p = predictions.find(
+      (x) => x.driverRole === role && x.lapNumber === lapNumber
+    );
+    seekTo(p?.predictedEndSec ?? null);
+    setMsg(
+      p?.predictedEndSec != null
+        ? `Jumped to predicted finish — use frame step, then Fine-tune finish`
+        : `Set your lap 1 baseline first`
+    );
   }
 
   const predictions =
@@ -202,9 +282,17 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
 
-  const meName = session.drivers.find((d) => d.role === "me")?.driverName ?? "Me";
-  const compName =
-    session.drivers.find((d) => d.role === "competitor")?.driverName ?? "Competitor";
+  const meDriver = session.drivers.find((d) => d.role === "me");
+  const compDriver = session.drivers.find((d) => d.role === "competitor");
+  const meName = meDriver?.driverName ?? "Me";
+  const compName = compDriver?.driverName ?? "Competitor";
+  const anchorLap = parseInt(anchorLapInput, 10);
+  const anchorLapValid = Number.isFinite(anchorLap) && anchorLap >= 1;
+
+  const markLapChips = [
+    ...session.selectedLaps.me.map((n) => ({ role: "me" as const, n })),
+    ...session.selectedLaps.competitor.map((n) => ({ role: "competitor" as const, n })),
+  ];
 
   return (
     <div className="flex flex-col gap-4 max-w-4xl">
@@ -238,6 +326,7 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
         activeLineKey={activeLine}
         videoRef={videoRef}
       />
+      <VideoFrameControls videoRef={videoRef} active={!!videoSrc} />
 
       <div className="flex gap-2 text-xs">
         {(["sync", "mark", "compare"] as Tab[]).map((t) => (
@@ -249,7 +338,7 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
             }`}
             onClick={() => setTab(t)}
           >
-            {t === "sync" ? "SF sync" : t === "mark" ? "Sector marks" : "Compare"}
+            {t === "sync" ? "1. Timing sync" : t === "mark" ? "2. Sector marks" : "3. Compare"}
           </button>
         ))}
         <Link
@@ -262,33 +351,146 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
 
       {tab === "sync" && (
         <div className="rounded-lg border border-border bg-card p-4 space-y-4 text-xs">
-          <h2 className="font-medium text-sm">Start/finish sync</h2>
-          <p className="text-muted-foreground">
-            Scrub to when <strong>{meName}</strong> crosses SF on a known lap, then set anchor.
-            Predicted times use session lap spacing; override any best lap if video drifts.
-          </p>
-          <div className="flex flex-wrap gap-2 items-center">
-            <label>
-              Anchor lap #
-              <input
-                className="ml-1 w-14 rounded border border-border px-1 py-0.5"
-                value={anchorLapInput}
-                onChange={(e) => setAnchorLapInput(e.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
-              onClick={setAnchor}
-            >
-              Set anchor at playhead
-            </button>
-            <label className="flex items-center gap-1">
-              Global offset (s)
+          <h2 className="font-medium text-sm">Timing sync</h2>
+          <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+            <li>
+              Scrub to when <strong>{meName}</strong> crosses the finish line on a known lap (usually
+              lap 1).
+            </li>
+            <li>Uncheck any bad laps (e.g. out-lap / incomplete lap 1).</li>
+            <li>
+              For each included lap: <strong>Jump to finish</strong> → frame-step →{" "}
+              <strong>Fine-tune finish</strong>.
+            </li>
+          </ol>
+
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+            <p className="font-medium text-sm">Step 1 — Baseline (your car)</p>
+            <div className="flex flex-wrap gap-2 items-center">
+              <label>
+                My lap #
+                <input
+                  className="ml-1 w-14 rounded border border-border px-1 py-0.5"
+                  value={anchorLapInput}
+                  onChange={(e) => setAnchorLapInput(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground"
+                onClick={setAnchor}
+                disabled={!anchorLapValid}
+              >
+                {anchorLapValid
+                  ? `Set my lap ${anchorLap} finish here`
+                  : "Set finish here"}
+              </button>
+            </div>
+            {session.sync.anchor ? (
+              <p className="text-muted-foreground">
+                Baseline: {meName} lap {session.sync.anchor.lapNumber} at{" "}
+                {session.sync.anchor.videoTimeSec.toFixed(2)}s in video
+              </p>
+            ) : (
+              <p className="text-amber-600 dark:text-amber-400">
+                Set a baseline before jumping to other laps.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <p className="font-medium text-sm">Laps to analyze</p>
+            <p className="text-muted-foreground">
+              All laps are included by default. Uncheck to discard (common for race lap 1).
+            </p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {meDriver && (
+                <DriverLapIncludeList
+                  driver={meDriver}
+                  displayName={meName}
+                  onToggle={(lapNumber, included) =>
+                    toggleLapIncluded("me", lapNumber, included)
+                  }
+                />
+              )}
+              {compDriver && (
+                <DriverLapIncludeList
+                  driver={compDriver}
+                  displayName={compName}
+                  onToggle={(lapNumber, included) =>
+                    toggleLapIncluded("competitor", lapNumber, included)
+                  }
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="font-medium text-sm">Step 2 — Sync finish per lap</p>
+            {!session.sync.anchor && (
+              <p className="text-muted-foreground">Complete step 1 first.</p>
+            )}
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-muted-foreground border-b border-border">
+                  <th className="py-1">Driver</th>
+                  <th className="py-1">Lap</th>
+                  <th className="py-1">Transponder</th>
+                  <th className="py-1">Predicted finish</th>
+                  <th className="py-1" />
+                </tr>
+              </thead>
+              <tbody>
+                {predictions.map((p) => (
+                  <tr key={`${p.driverRole}-${p.lapNumber}`} className="border-b border-border/50">
+                    <td className="py-1">{p.driverRole === "me" ? meName : compName}</td>
+                    <td className="py-1 font-mono">{p.lapNumber}</td>
+                    <td className="py-1 font-mono">{p.lapTimeSec.toFixed(3)}s</td>
+                    <td className="py-1 font-mono">
+                      {p.predictedEndSec != null ? `${p.predictedEndSec.toFixed(2)}s` : "—"}
+                      {p.overridden ? " ✓" : ""}
+                    </td>
+                    <td className="py-1 whitespace-nowrap">
+                      <button
+                        type="button"
+                        className="underline mr-2"
+                        disabled={p.predictedEndSec == null}
+                        onClick={() => jumpAndFineTune(p.driverRole, p.lapNumber)}
+                      >
+                        Jump here
+                      </button>
+                      <button
+                        type="button"
+                        className="underline"
+                        onClick={() => setPerLapSf(p.driverRole, p.lapNumber)}
+                      >
+                        Fine-tune finish
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <details
+            className="text-muted-foreground"
+            open={showGlobalOffset || (session.sync.globalOffsetSec ?? 0) !== 0}
+            onToggle={(e) => setShowGlobalOffset((e.target as HTMLDetailsElement).open)}
+          >
+            <summary className="cursor-pointer font-medium text-foreground">
+              Advanced: shift all predicted times
+            </summary>
+            <p className="mt-2">
+              Adds seconds to every predicted finish time. Use only if every lap is consistently
+              early or late vs the video; per-lap <strong>Fine-tune finish</strong> is usually better.
+            </p>
+            <label className="flex items-center gap-1 mt-2">
+              Shift (seconds)
               <input
                 type="number"
                 step="0.1"
-                className="w-16 rounded border border-border px-1"
+                className="w-20 rounded border border-border px-1"
                 value={session.sync.globalOffsetSec ?? 0}
                 onChange={(e) => {
                   const v = parseFloat(e.target.value);
@@ -302,52 +504,7 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
                 }}
               />
             </label>
-          </div>
-          {session.sync.anchor && (
-            <p className="text-muted-foreground">
-              Anchor: lap {session.sync.anchor.lapNumber} at {session.sync.anchor.videoTimeSec.toFixed(2)}s
-            </p>
-          )}
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-muted-foreground border-b border-border">
-                <th className="py-1">Driver</th>
-                <th className="py-1">Lap</th>
-                <th className="py-1">Transponder</th>
-                <th className="py-1">Predicted SF</th>
-                <th className="py-1" />
-              </tr>
-            </thead>
-            <tbody>
-              {predictions.map((p) => (
-                <tr key={`${p.driverRole}-${p.lapNumber}`} className="border-b border-border/50">
-                  <td className="py-1">{p.driverRole === "me" ? meName : compName}</td>
-                  <td className="py-1 font-mono">{p.lapNumber}</td>
-                  <td className="py-1 font-mono">{p.lapTimeSec.toFixed(3)}s</td>
-                  <td className="py-1 font-mono">
-                    {p.predictedEndSec != null ? `${p.predictedEndSec.toFixed(2)}s` : "—"}
-                    {p.overridden ? " *" : ""}
-                  </td>
-                  <td className="py-1">
-                    <button
-                      type="button"
-                      className="underline mr-2"
-                      onClick={() => seekTo(p.predictedEndSec)}
-                    >
-                      Jump
-                    </button>
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={() => setPerLapSf(p.driverRole, p.lapNumber)}
-                    >
-                      SF here
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          </details>
         </div>
       )}
 
@@ -355,45 +512,58 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
         <div className="rounded-lg border border-border bg-card p-4 space-y-3 text-xs">
           <h2 className="font-medium text-sm">Sector frame marks</h2>
           <p className="text-muted-foreground">
-            Select a lap, scrub to each sector crossing, mark line at playhead. Mark SF end last.
+            Pick a lap, jump near the start, scrub with frame step, mark each sector at the playhead.
+            Mark the finish line last.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {[...session.selectedLaps.me.map((n) => ({ role: "me" as const, n })),
-              ...session.selectedLaps.competitor.map((n) => ({
-                role: "competitor" as const,
-                n,
-              }))].map(({ role, n }) => (
-              <button
-                key={`${role}-${n}`}
-                type="button"
-                className={`rounded-md px-2 py-1 border ${
-                  markLap?.role === role && markLap?.lapNumber === n
-                    ? "border-primary bg-primary/10"
-                    : "border-border"
-                }`}
-                onClick={() => setMarkLap({ role, lapNumber: n })}
-              >
-                {role === "me" ? meName : compName} L{n}
-              </button>
-            ))}
-          </div>
+          {markLapChips.length === 0 ? (
+            <p className="text-muted-foreground">
+              No laps selected — include laps on the Timing sync tab.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {markLapChips.map(({ role, n }) => (
+                <button
+                  key={`${role}-${n}`}
+                  type="button"
+                  className={`rounded-md px-2 py-1 border ${
+                    markLap?.role === role && markLap?.lapNumber === n
+                      ? "border-primary bg-primary/10"
+                      : "border-border"
+                  }`}
+                  onClick={() => setMarkLap({ role, lapNumber: n })}
+                >
+                  {role === "me" ? meName : compName} L{n}
+                </button>
+              ))}
+            </div>
+          )}
           {markLap && (
             <div className="space-y-2">
               <p className="font-medium">
                 {markLap.role === "me" ? meName : compName} — lap {markLap.lapNumber}
               </p>
-              <button
-                type="button"
-                className="rounded border border-border px-2 py-1"
-                onClick={() => {
-                  const p = predictions.find(
-                    (x) => x.driverRole === markLap.role && x.lapNumber === markLap.lapNumber
-                  );
-                  seekTo(p?.predictedStartSec ?? p?.predictedEndSec ?? null);
-                }}
-              >
-                Jump to predicted lap start
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded border border-border px-2 py-1 hover:bg-muted"
+                  onClick={() => {
+                    const p = predictions.find(
+                      (x) =>
+                        x.driverRole === markLap.role && x.lapNumber === markLap.lapNumber
+                    );
+                    seekTo(p?.predictedStartSec ?? p?.predictedEndSec ?? null);
+                  }}
+                >
+                  Jump to lap start
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-border px-2 py-1 hover:bg-muted"
+                  onClick={() => jumpAndFineTune(markLap.role, markLap.lapNumber)}
+                >
+                  Jump to finish
+                </button>
+              </div>
               {markOrder.map((ln) => (
                 <button
                   key={ln.lineKey}
@@ -404,7 +574,7 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
                     upsertMark(markLap.role, markLap.lapNumber, ln.lineKey);
                   }}
                 >
-                  Mark {ln.label}
+                  Mark {ln.label} at playhead
                   {session.marks.find(
                     (m) =>
                       m.driverRole === markLap.role &&
@@ -423,7 +593,7 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
                   upsertMark(markLap.role, markLap.lapNumber, "sf");
                 }}
               >
-                Mark SF end (finish line)
+                Mark finish line at playhead
                 {session.marks.find(
                   (m) =>
                     m.driverRole === markLap.role &&
@@ -494,7 +664,9 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
               ))}
             </tbody>
           </table>
-          <h3 className="text-muted-foreground pt-2">Average across best 3 laps (marked sectors)</h3>
+          <h3 className="text-muted-foreground pt-2">
+            Average across best 3 included laps (marked sectors)
+          </h3>
           <table className="w-full">
             <thead>
               <tr className="border-b border-border text-muted-foreground">

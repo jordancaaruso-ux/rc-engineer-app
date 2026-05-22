@@ -9,7 +9,7 @@ import {
   type ManualDriver,
 } from "@/lib/manualVideoAnalysis/types";
 import {
-  applyBest3Selection,
+  applyDefaultLapSelection,
   defaultDriverKeys,
   setDriverRoles,
 } from "@/lib/manualVideoAnalysis/timing";
@@ -142,7 +142,7 @@ function NewManualAnalysisForm() {
       timingUrl: useRun ? null : timingUrl.trim(),
       drivers: setDriverRoles(drivers, meKey, competitorKey),
     };
-    session = applyBest3Selection(session);
+    session = applyDefaultLapSelection(session);
 
     const res = await fetch("/api/video-analysis/jobs", {
       method: "POST",
@@ -285,7 +285,7 @@ function NewManualAnalysisForm() {
             </select>
           </label>
           <p className="text-xs text-muted-foreground">
-            Best 3 laps per driver will be selected automatically for sector marking.
+            All laps are included by default; discard outliers (e.g. race lap 1) on the analysis page.
           </p>
         </>
       )}

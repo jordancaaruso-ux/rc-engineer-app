@@ -1,5 +1,5 @@
 import type { LapUrlParseResult, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
-import type { ManualDriver, ManualDriverLap, ManualVideoSessionV1 } from "./types";
+import type { DriverRole, ManualDriver, ManualDriverLap, ManualVideoSessionV1 } from "./types";
 
 export function driversFromParseResult(
   parsed: LapUrlParseResult,
@@ -127,14 +127,66 @@ export function pickBestNLapNumbers(laps: ManualDriverLap[], n = 3): number[] {
     .map((l) => l.lapNumber);
 }
 
-export function applyBest3Selection(session: ManualVideoSessionV1): ManualVideoSessionV1 {
+/** Lap numbers included for sync / sector marking (default: all laps). */
+export function includedLapNumbers(laps: ManualDriverLap[]): number[] {
+  return [...laps]
+    .filter((l) => l.isIncluded !== false && l.lapTimeSec > 0)
+    .map((l) => l.lapNumber)
+    .sort((a, b) => a - b);
+}
+
+/** Default isIncluded true; selectedLaps = all included laps. */
+export function normalizeManualSession(session: ManualVideoSessionV1): ManualVideoSessionV1 {
+  const drivers = session.drivers.map((d) => ({
+    ...d,
+    laps: d.laps.map((l) => ({
+      ...l,
+      isIncluded: l.isIncluded !== false,
+    })),
+  }));
+  return applyDefaultLapSelection({ ...session, drivers });
+}
+
+/** All included laps per driver (not best-3 only). */
+export function applyDefaultLapSelection(session: ManualVideoSessionV1): ManualVideoSessionV1 {
   const me = session.drivers.find((d) => d.role === "me");
   const comp = session.drivers.find((d) => d.role === "competitor");
   return {
     ...session,
     selectedLaps: {
-      me: me ? pickBestNLapNumbers(me.laps, 3) : [],
-      competitor: comp ? pickBestNLapNumbers(comp.laps, 3) : [],
+      me: me ? includedLapNumbers(me.laps) : [],
+      competitor: comp ? includedLapNumbers(comp.laps) : [],
     },
   };
+}
+
+/** @deprecated Use applyDefaultLapSelection */
+export const applyBest3Selection = applyDefaultLapSelection;
+
+export function setLapIncluded(
+  session: ManualVideoSessionV1,
+  role: DriverRole,
+  lapNumber: number,
+  included: boolean
+): ManualVideoSessionV1 {
+  const drivers = session.drivers.map((d) => {
+    if (d.role !== role) return d;
+    return {
+      ...d,
+      laps: d.laps.map((l) =>
+        l.lapNumber === lapNumber ? { ...l, isIncluded: included } : l
+      ),
+    };
+  });
+  return applyDefaultLapSelection({ ...session, drivers });
+}
+
+export function bestIncludedLapNumbers(
+  session: ManualVideoSessionV1,
+  role: DriverRole,
+  n = 3
+): number[] {
+  const driver = session.drivers.find((d) => d.role === role);
+  if (!driver) return [];
+  return pickBestNLapNumbers(driver.laps, n);
 }
