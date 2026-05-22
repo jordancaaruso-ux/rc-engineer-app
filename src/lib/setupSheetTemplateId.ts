@@ -4,6 +4,9 @@
 export const SETUP_SHEET_TEMPLATE_NONE: null = null;
 export const SETUP_SHEET_TEMPLATE_A800RR = "awesomatix_a800rr" as const;
 
+/** `SetupSheetModel.slug` for the built-in A800RR model (same value as {@link SETUP_SHEET_TEMPLATE_A800RR}). */
+export const SETUP_SHEET_MODEL_SLUG_A800RR = SETUP_SHEET_TEMPLATE_A800RR;
+
 export type SetupSheetTemplateId = typeof SETUP_SHEET_TEMPLATE_A800RR | null;
 
 export const SETUP_SHEET_TEMPLATE_OPTIONS: Array<{ value: string; label: string }> = [

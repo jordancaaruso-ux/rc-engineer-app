@@ -8,8 +8,10 @@ import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { getA800rrSetupSheetTemplateWithDisplayPreferences } from "@/lib/setupCalibrations/customFieldCatalog";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
-import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
-import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
+import {
+  SETUP_SHEET_MODEL_SLUG_A800RR,
+  SETUP_SHEET_TEMPLATE_A800RR,
+} from "@/lib/setupSheetTemplateId";
 import { normalizeCalibrationData, type CustomSetupFieldDefinition } from "@/lib/setupCalibrations/types";
 import { getEffectiveFieldCatalog } from "@/lib/setupDocuments/fieldMap";
 import { mappedFieldKeys } from "@/lib/setupDocuments/normalize";

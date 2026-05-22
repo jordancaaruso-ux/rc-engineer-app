@@ -15,8 +15,10 @@ import type { SetupDocumentParsedResult } from "@/lib/setupDocuments/types";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { computeA800rrDerived } from "@/lib/setupCalculations/a800rrDerived";
 import { computeDetailedDerivedFieldStatuses } from "@/lib/setup/derivedFields";
-import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
-import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
+import {
+  SETUP_SHEET_MODEL_SLUG_A800RR,
+  SETUP_SHEET_TEMPLATE_A800RR,
+} from "@/lib/setupSheetTemplateId";
 
 type ImportStatus = "PENDING" | "PROCESSING" | "FAILED" | "COMPLETED" | "COMPLETED_WITH_WARNINGS";
 type DebugLogEntry = {

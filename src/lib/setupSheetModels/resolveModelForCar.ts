@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { SETUP_SHEET_TEMPLATE_A800RR, isA800RRCar } from "@/lib/setupSheetTemplateId";
+import {
+  SETUP_SHEET_MODEL_SLUG_A800RR,
+  SETUP_SHEET_TEMPLATE_A800RR,
+  isA800RRCar,
+} from "@/lib/setupSheetTemplateId";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
-import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
 
 export type ResolvedSetupSheetModel = {
   id: string;

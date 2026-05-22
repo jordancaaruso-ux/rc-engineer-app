@@ -1,5 +1,10 @@
+import "server-only";
+
 import { prisma } from "@/lib/prisma";
-import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
+import {
+  SETUP_SHEET_MODEL_SLUG_A800RR,
+  SETUP_SHEET_TEMPLATE_A800RR,
+} from "@/lib/setupSheetTemplateId";
 import { A800RR_STRUCTURED_SECTIONS } from "@/lib/a800rrSetupDisplayConfig";
 import {
   buildCalibrationFieldCatalog,
@@ -7,7 +12,7 @@ import {
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
-export const SETUP_SHEET_MODEL_SLUG_A800RR = "awesomatix_a800rr";
+export { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetTemplateId";
 
 /** Build schema from A800 catalog + structured sections (for migration seed). */
 export function buildA800SeedSchema(): SetupSheetModelSchema {
