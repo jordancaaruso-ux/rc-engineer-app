@@ -45,9 +45,18 @@ export function validateCustomFieldKey(
   if (!KEY_RE.test(k)) {
     return "Use lowercase snake_case: letters, digits, underscores (e.g. driver_name, track_date).";
   }
-  if (reservedKeys.has(k)) return `Key "${k}" is already used by the base setup template.`;
+  if (reservedKeys.has(k)) return reservedTemplateKeyError(k);
   if (existingCustomKeys.has(k)) return `Key "${k}" is already used by another custom field.`;
   return null;
+}
+
+/** User-facing hint when a label/key matches a built-in setup sheet field (e.g. arb_front). */
+export function reservedTemplateKeyError(key: string, displayLabel?: string): string {
+  const name = displayLabel?.trim() || key;
+  return (
+    `"${name}" is already on the setup sheet (${key}). In the Form tab, select it in the Setup field catalog, ` +
+    `pick 2+ PDF controls, choose One of many or Many of many, then Continue — you do not need Quick add or a duplicate field.`
+  );
 }
 
 export function suggestKeyFromPdfFieldName(name: string): string {

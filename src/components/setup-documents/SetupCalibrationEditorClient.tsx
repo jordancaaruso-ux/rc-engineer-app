@@ -32,6 +32,7 @@ import {
   inferUiTypeFromAcroType,
   mergeCustomFieldsIntoCatalog,
   reservedTemplateKeys,
+  reservedTemplateKeyError,
   suggestKeyFromPdfFieldName,
   validateCustomFieldKey,
 } from "@/lib/setupCalibrations/customFieldCatalog";
@@ -1297,14 +1298,8 @@ export function SetupCalibrationEditorClient({
   function beginCreateGroupedFromSelection() {
     const keys = acroSelection.keys;
     if (keys.length < 2) return;
-    setCreateFieldEditKey(null);
     setCreateFieldError(null);
-    setActiveSetupFieldKey(null);
-    setSetupFieldFormScope("new");
-    setEditorMode("createGroupedField");
-    setPendingGroupedSourceKeys([...keys]);
     setShowAddMappingForm(false);
-    setShowCreateFieldForm(true);
     setPendingGroupOption(null);
     const names = keys.map((k) => {
       const ref = parseAcroKey(k);
@@ -1319,41 +1314,38 @@ export function SetupCalibrationEditorClient({
       .filter(Boolean);
     const hintList = lines.length === keys.length ? lines : undefined;
     initGroupedEditorFromSources(keys, behaviorForInit, undefined, hintList);
-    if (hintList) {
-      // #region agent log
-      fetch("http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6b04c6" },
-        body: JSON.stringify({
-          sessionId: "6b04c6",
-          runId: "grouped-start",
-          hypothesisId: "H2",
-          location: "beginCreateGroupedFromSelection",
-          message: "option name hints applied",
-          data: { nKeys: keys.length, nHintLines: lines.length },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-    }
-    if (preset) {
-      // #region agent log
-      fetch("http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6b04c6" },
-        body: JSON.stringify({
-          sessionId: "6b04c6",
-          runId: "grouped-start",
-          hypothesisId: "H3",
-          location: "beginCreateGroupedFromSelection",
-          message: "using newFieldKindPreset",
-          data: { ui: preset.ui, valueType: preset.valueType, behavior: preset.behavior },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-    }
     setNewFieldKindPreset(null);
+
+    const templateKey =
+      activeSetupFieldKey && !customFieldKeySet.has(activeSetupFieldKey) ? activeSetupFieldKey : null;
+    if (templateKey) {
+      setCreateFieldEditKey(null);
+      setSetupFieldFormScope("template");
+      setEditorMode("editSetupField");
+      setPendingGroupedSourceKeys(null);
+      setActiveSetupFieldKey(templateKey);
+      openEditTemplateFieldForKey(templateKey);
+      if (preset) {
+        setCfUiType(preset.ui);
+        setCfValueType(preset.valueType);
+        setGroupBehaviorType(preset.behavior);
+      } else {
+        setGroupBehaviorType(behaviorForInit);
+      }
+      setShowCreateFieldForm(true);
+      const label = mergedLabelMap[templateKey] ?? templateKey;
+      setStatus(
+        `Link ${keys.length} PDF controls to “${label}” (${templateKey}). Name each option below, then Save changes.`
+      );
+      return;
+    }
+
+    setCreateFieldEditKey(null);
+    setActiveSetupFieldKey(null);
+    setSetupFieldFormScope("new");
+    setEditorMode("createGroupedField");
+    setPendingGroupedSourceKeys([...keys]);
+    setShowCreateFieldForm(true);
     const first = parseAcroKey(keys[0]!);
     const row = pdfRowByName.get(first.pdfFieldName);
     setCfKey(suggestKeyFromPdfFieldName(names.join("_").slice(0, 64) || row?.name || "group_field"));
@@ -1563,21 +1555,6 @@ export function SetupCalibrationEditorClient({
           return;
         }
         const buildB = resolveGroupedBuildBehavior(cfUiType, groupBehaviorType);
-        // #region agent log
-        fetch("http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6b04c6" },
-          body: JSON.stringify({
-            sessionId: "6b04c6",
-            runId: "commit-grouped",
-            hypothesisId: "H2",
-            location: "commitCreateField:template+grouped",
-            message: "buildGrouped",
-            data: { cfUiType, groupBehaviorType: groupBehaviorType, buildBehavior: buildB },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         const groupedRule = buildGroupedFormMappingFromPayload(buildB, groupedPayload);
         if (!groupedRule) {
           setCreateFieldError("Grouped fields require at least two valid source options.");
@@ -1710,7 +1687,12 @@ export function SetupCalibrationEditorClient({
 
     if (pendingGroupedSourceKeys && pendingGroupedSourceKeys.length >= 2) {
       const existing = new Set(customFieldDefinitions.map((c) => c.key));
-      const err = validateCustomFieldKey(cfKey, reserved, existing);
+      const keyTrim = cfKey.trim();
+      if (reserved.has(keyTrim)) {
+        setCreateFieldError(reservedTemplateKeyError(keyTrim, cfLabel));
+        return;
+      }
+      const err = validateCustomFieldKey(keyTrim, reserved, existing);
       if (err) {
         setCreateFieldError(err);
         return;
@@ -1737,21 +1719,6 @@ export function SetupCalibrationEditorClient({
         return;
       }
       const buildB = resolveGroupedBuildBehavior(cfUiType, groupBehaviorType);
-      // #region agent log
-      fetch("http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6b04c6" },
-        body: JSON.stringify({
-          sessionId: "6b04c6",
-          runId: "commit-grouped",
-          hypothesisId: "H2",
-          location: "commitCreateField:pending+grouped",
-          message: "buildGrouped",
-          data: { cfUiType, groupBehaviorType, buildBehavior: buildB },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       const groupedRule = buildGroupedFormMappingFromPayload(buildB, groupedPayload);
       if (!groupedRule) {
         setCreateFieldError("Grouped fields require at least two valid source options.");
@@ -1873,6 +1840,9 @@ export function SetupCalibrationEditorClient({
     const displayLabel = input.displayLabel.trim();
     if (!displayLabel) return { ok: false, error: "Parameter label is required." };
     const keyRaw = (input.key.trim() || suggestKeyFromPdfFieldName(displayLabel)).trim();
+    if (reserved.has(keyRaw)) {
+      return { ok: false, error: reservedTemplateKeyError(keyRaw, displayLabel) };
+    }
     const err = validateCustomFieldKey(keyRaw, reserved, existing);
     if (err) return { ok: false, error: err };
 
@@ -3707,7 +3677,9 @@ export function SetupCalibrationEditorClient({
                         className="rounded border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
                         onClick={beginCreateGroupedFromSelection}
                       >
-                        Continue — open grouped field form
+                        {activeSetupFieldKey && !customFieldKeySet.has(activeSetupFieldKey)
+                          ? `Continue — map to ${mergedLabelMap[activeSetupFieldKey] ?? activeSetupFieldKey}`
+                          : "Continue — open grouped field form"}
                       </button>
                       <button
                         type="button"
@@ -3795,6 +3767,12 @@ export function SetupCalibrationEditorClient({
                     select unmapped PDF widgets to create a new field.
                   </p>
                 )}
+                {activeSetupFieldKey && !customFieldKeySet.has(activeSetupFieldKey) ? (
+                  <p className="mt-2 text-[10px] text-sky-100/90">
+                    Base sheet field: use One of many / Many of many above, select PDF controls, then{" "}
+                    <span className="font-medium text-foreground">Continue — map to …</span> (not Quick add).
+                  </p>
+                ) : null}
               </div>
 
               {showCreateFieldForm ? (
