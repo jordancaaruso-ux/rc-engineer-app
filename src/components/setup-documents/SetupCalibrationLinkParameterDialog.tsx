@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildGroupedRuleFromAssignments,
   defaultOptionAssignments,
@@ -76,9 +76,17 @@ export function SetupCalibrationLinkParameterDialog(props: {
   const setAssignments = onAssignmentsChange ?? setInternalAssignments;
   const assignOnPdfRow = assignOnPdfOptionValue;
   const setAssignOnPdfRow = (v: string | null) => onAssignOnPdfOptionChange?.(v);
+  const wasOpenRef = useRef(false);
 
+  /** Initialize only when the dialog opens — not when parent assignment state updates after pick. */
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
+
     setError(null);
     if (initialParameterKey && initialAssignments?.length) {
       setSelectedKey(initialParameterKey);
@@ -90,7 +98,7 @@ export function SetupCalibrationLinkParameterDialog(props: {
     setSelectedKey(null);
     setAssignments([]);
     onAssignOnPdfOptionChange?.(null);
-  }, [open, initialParameterKey, initialAssignments, onAssignOnPdfOptionChange]);
+  }, [open, initialParameterKey, initialAssignments, onAssignOnPdfOptionChange, setAssignments]);
 
   const selectedField = useMemo(() => {
     if (!selectedKey) return null;
