@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { CarList } from "@/components/cars/CarList";
+import { ensureA800SetupSheetModelForUser } from "@/lib/setupSheetModels/seedA800Model";
 
 /** User-specific list — always read fresh (avoids stale tab vs /runs/new). */
 export const dynamic = "force-dynamic";
@@ -27,10 +28,19 @@ export default async function CarManagerPage(): Promise<ReactNode> {
   }
 
   const user = await requireCurrentUser();
+  await ensureA800SetupSheetModelForUser(user.id);
   const cars = await prisma.car.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true },
+    select: {
+      id: true,
+      name: true,
+      chassis: true,
+      notes: true,
+      setupSheetTemplate: true,
+      setupSheetModelId: true,
+      setupSheetModel: { select: { id: true, name: true } },
+    },
   });
 
   return (

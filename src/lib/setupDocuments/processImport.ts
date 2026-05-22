@@ -15,6 +15,8 @@ import type { SetupDocumentParsedResult } from "@/lib/setupDocuments/types";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { computeA800rrDerived } from "@/lib/setupCalculations/a800rrDerived";
 import { computeDetailedDerivedFieldStatuses } from "@/lib/setup/derivedFields";
+import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
+import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
 
 type ImportStatus = "PENDING" | "PROCESSING" | "FAILED" | "COMPLETED" | "COMPLETED_WITH_WARNINGS";
 type DebugLogEntry = {
@@ -631,8 +633,22 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     stage = SetupDocumentImportStages.DATABASE_SAVE_STARTED;
     const tFinalDb = procDbg() ? performance.now() : 0;
     await startStage({ docId: doc.id, stage: SetupDocumentImportStages.DATABASE_SAVE_STARTED, status: "PROCESSING" });
-    const { diagnostics: derivedDiagnostics } = computeA800rrDerived(normalizedParsedData);
-    const derivedStatuses = computeDetailedDerivedFieldStatuses(normalizedParsedData, derivedDiagnostics);
+    const docForDerived = await prisma.setupDocument.findUnique({
+      where: { id: doc.id },
+      select: {
+        setupSheetModelId: true,
+        setupSheetTemplate: true,
+        setupSheetModel: { select: { slug: true } },
+      },
+    });
+    const useA800Derived =
+      docForDerived?.setupSheetModel?.slug === SETUP_SHEET_MODEL_SLUG_A800RR
+      || (!docForDerived?.setupSheetModelId
+        && docForDerived?.setupSheetTemplate === SETUP_SHEET_TEMPLATE_A800RR);
+    const derivedDiagnostics = useA800Derived ? computeA800rrDerived(normalizedParsedData).diagnostics : null;
+    const derivedStatuses = derivedDiagnostics
+      ? computeDetailedDerivedFieldStatuses(normalizedParsedData, derivedDiagnostics)
+      : [];
     const existingDiag = await prisma.setupDocument.findUnique({
       where: { id: doc.id },
       select: { importDiagnosticJson: true },
@@ -650,21 +666,30 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
         parsedAt: new Date(),
         importDiagnosticJson: {
           ...diagnosticBase,
-          derivedFields: {
-            ...(typeof diagnosticBase.derivedFields === "object" && diagnosticBase.derivedFields != null
-              ? (diagnosticBase.derivedFields as Record<string, unknown>)
-              : {}),
-            statuses: derivedStatuses,
-            formulaImplemented: true,
-            strategy: "a800rr_spring_lookup_table_v1",
-            validation: derivedDiagnostics.validation,
-            importedDisplay: derivedDiagnostics.importedDisplay,
-            computed: derivedDiagnostics.computed,
-            resolutionHints: derivedDiagnostics.resolutionHints,
-            springFrontResolution: derivedDiagnostics.springFrontResolution,
-            springRearResolution: derivedDiagnostics.springRearResolution,
-            inputs: derivedDiagnostics.inputs,
-          },
+          derivedFields: derivedDiagnostics
+            ? {
+                ...(typeof diagnosticBase.derivedFields === "object" && diagnosticBase.derivedFields != null
+                  ? (diagnosticBase.derivedFields as Record<string, unknown>)
+                  : {}),
+                statuses: derivedStatuses,
+                formulaImplemented: true,
+                strategy: "a800rr_spring_lookup_table_v1",
+                validation: derivedDiagnostics.validation,
+                importedDisplay: derivedDiagnostics.importedDisplay,
+                computed: derivedDiagnostics.computed,
+                resolutionHints: derivedDiagnostics.resolutionHints,
+                springFrontResolution: derivedDiagnostics.springFrontResolution,
+                springRearResolution: derivedDiagnostics.springRearResolution,
+                inputs: derivedDiagnostics.inputs,
+              }
+            : {
+                ...(typeof diagnosticBase.derivedFields === "object" && diagnosticBase.derivedFields != null
+                  ? (diagnosticBase.derivedFields as Record<string, unknown>)
+                  : {}),
+                statuses: derivedStatuses,
+                formulaImplemented: false,
+                strategy: "model_sheet_v1",
+              },
         } as object,
       },
     });

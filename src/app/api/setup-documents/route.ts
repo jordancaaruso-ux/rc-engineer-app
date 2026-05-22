@@ -72,6 +72,27 @@ export async function POST(request: Request) {
   if (!carResolved.ok) {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
+  const setupSheetModelIdRaw = form.get("setupSheetModelId");
+  let setupSheetModelId =
+    typeof setupSheetModelIdRaw === "string" && setupSheetModelIdRaw.trim()
+      ? setupSheetModelIdRaw.trim()
+      : null;
+  const carRow = await prisma.car.findFirst({
+    where: { id: carResolved.carId, userId: user.id },
+    select: { setupSheetModelId: true, setupSheetTemplate: true },
+  });
+  if (!setupSheetModelId && carRow?.setupSheetModelId) {
+    setupSheetModelId = carRow.setupSheetModelId;
+  }
+  if (setupSheetModelId) {
+    const model = await prisma.setupSheetModel.findFirst({
+      where: { id: setupSheetModelId, userId: user.id },
+      select: { id: true, slug: true },
+    });
+    if (!model) {
+      return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
+    }
+  }
   const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carResolved.carId);
   if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
@@ -116,6 +137,6 @@ export async function POST(request: Request) {
   console.log(`[setup-documents/upload] doc=${created.id} stored ${file.name} (${mimeType})`);
   if (dbg) console.log(`[setup-upload-timing] POST total ${(performance.now() - t0).toFixed(1)}ms`);
 
-  return NextResponse.json({ id: created.id }, { status: 201 });
+  return NextResponse.json({ id: created.id, document: { id: created.id } }, { status: 201 });
 }
 

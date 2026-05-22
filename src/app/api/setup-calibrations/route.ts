@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     calibrationDataJson?: unknown;
     exampleDocumentId?: string | null;
     clonedFromCalibrationId?: string | null;
+    setupSheetModelId?: string | null;
   };
   const name = body.name?.trim() || "Setup sheet calibration";
   const sourceType = body.sourceType?.trim() || "awesomatix_pdf";
@@ -56,6 +57,16 @@ export async function POST(request: Request) {
     });
     inheritedExampleDocumentId = base?.exampleDocumentId ?? null;
   }
+  let setupSheetModelId = body.setupSheetModelId?.trim() || null;
+  if (setupSheetModelId) {
+    const model = await prisma.setupSheetModel.findFirst({
+      where: { id: setupSheetModelId, userId: user.id },
+      select: { id: true },
+    });
+    if (!model) {
+      return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
+    }
+  }
   const created = await prisma.setupSheetCalibration.create({
     data: {
       userId: user.id,
@@ -63,9 +74,10 @@ export async function POST(request: Request) {
       sourceType,
       calibrationDataJson: (body.calibrationDataJson ?? {}) as object,
       exampleDocumentId: body.exampleDocumentId ?? inheritedExampleDocumentId ?? null,
+      setupSheetModelId,
     },
-    select: { id: true },
+    select: { id: true, name: true },
   });
-  return NextResponse.json({ id: created.id }, { status: 201 });
+  return NextResponse.json({ id: created.id, calibration: { id: created.id, name: created.name } }, { status: 201 });
 }
 

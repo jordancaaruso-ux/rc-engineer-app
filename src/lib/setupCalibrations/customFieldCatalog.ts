@@ -116,6 +116,14 @@ export function reservedTemplateKeys(): Set<string> {
   );
 }
 
+/** Reserved keys when editing calibrations: model schema keys, or legacy A800 template keys. */
+export function getReservedKeysForCalibrationEditor(
+  modelFieldKeys: Set<string> | null | undefined
+): Set<string> {
+  if (modelFieldKeys && modelFieldKeys.size > 0) return modelFieldKeys;
+  return reservedTemplateKeys();
+}
+
 /** All A800RR structured section groups plus custom presets — use for custom field section assignment. */
 export function getMergedSectionGroupOptions(): Array<{ id: string; title: string }> {
   const seen = new Set<string>();

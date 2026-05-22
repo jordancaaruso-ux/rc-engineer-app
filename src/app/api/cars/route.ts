@@ -46,6 +46,7 @@ export async function POST(request: Request) {
       chassis?: string | null;
       notes?: string | null;
       setupSheetTemplate?: string | null;
+      setupSheetModelId?: string | null;
     };
     const name = body.name?.trim();
     if (!name) {
@@ -57,15 +58,33 @@ export async function POST(request: Request) {
     const setupSheetTemplateRaw = canonicalSetupSheetTemplateId(body.setupSheetTemplate ?? null);
     const setupSheetTemplate =
       setupSheetTemplateRaw === SETUP_SHEET_TEMPLATE_A800RR ? SETUP_SHEET_TEMPLATE_A800RR : null;
+    let setupSheetModelId: string | null = body.setupSheetModelId?.trim() || null;
+    if (setupSheetModelId) {
+      const model = await prisma.setupSheetModel.findFirst({
+        where: { id: setupSheetModelId, userId: user.id },
+        select: { id: true },
+      });
+      if (!model) {
+        return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
+      }
+    }
     const car = await prisma.car.create({
       data: {
         name,
         chassis: body.chassis?.trim() || null,
         notes: body.notes?.trim() || null,
         setupSheetTemplate,
+        setupSheetModelId,
         userId: user.id,
       },
-      select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true },
+      select: {
+        id: true,
+        name: true,
+        chassis: true,
+        notes: true,
+        setupSheetTemplate: true,
+        setupSheetModelId: true,
+      },
     });
     revalidatePath("/cars");
     revalidatePath("/runs/new");

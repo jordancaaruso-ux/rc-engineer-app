@@ -31,11 +31,13 @@ import {
   getMergedSectionGroupOptions,
   inferUiTypeFromAcroType,
   mergeCustomFieldsIntoCatalog,
-  reservedTemplateKeys,
+  getReservedKeysForCalibrationEditor,
   reservedTemplateKeyError,
   suggestKeyFromPdfFieldName,
   validateCustomFieldKey,
 } from "@/lib/setupCalibrations/customFieldCatalog";
+import { buildCatalogFromModelSchema, modelFieldKeys } from "@/lib/setupSheetModels/modelFieldCatalog";
+import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import {
   applyCalibrationFieldRecipe,
   inferGroupedFieldDefaultsFromPdfNames,
@@ -328,6 +330,7 @@ export function SetupCalibrationEditorClient({
   initialName,
   initialSourceType,
   initialCalibrationData,
+  setupSheetModelId: initialSetupSheetModelId = null,
 }: {
   calibrationId: string;
   documentId: string;
@@ -336,6 +339,8 @@ export function SetupCalibrationEditorClient({
   initialName: string;
   initialSourceType: string;
   initialCalibrationData: unknown;
+  /** When set, catalog and reserved keys come from this model schema only (not A800). */
+  setupSheetModelId?: string | null;
 }) {
   const router = useRouter();
   const [documentId, setDocumentId] = useState(initialDocumentId);
@@ -490,6 +495,31 @@ export function SetupCalibrationEditorClient({
   const [attachCandidates, setAttachCandidates] = useState<Array<{ id: string; originalFilename: string }>>([]);
   const [attachListLoading, setAttachListLoading] = useState(false);
   const [attachLinking, setAttachLinking] = useState(false);
+  const [setupSheetModelSchema, setSetupSheetModelSchema] = useState<SetupSheetModelSchema | null>(null);
+
+  useEffect(() => {
+    if (!initialSetupSheetModelId) {
+      setSetupSheetModelSchema(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/setup-sheet-models/${initialSetupSheetModelId}`)
+      .then((r) => r.json())
+      .then((d: { model?: { schema?: SetupSheetModelSchema } }) => {
+        if (!cancelled && d.model?.schema) setSetupSheetModelSchema(d.model.schema);
+      })
+      .catch(() => {
+        if (!cancelled) setSetupSheetModelSchema(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSetupSheetModelId]);
+
+  const modelFieldKeySet = useMemo(
+    () => (setupSheetModelSchema ? modelFieldKeys(setupSheetModelSchema) : null),
+    [setupSheetModelSchema]
+  );
 
   const loadPdfCandidates = useCallback(async () => {
     setAttachListLoading(true);
@@ -670,7 +700,10 @@ export function SetupCalibrationEditorClient({
   }, [customFieldDefinitions]);
 
   const sortedCatalog = useMemo(() => {
-    const merged = mergeCustomFieldsIntoCatalog(A800RR_FIELD_CATALOG, customFieldDefinitions);
+    const base = setupSheetModelSchema
+      ? buildCatalogFromModelSchema(setupSheetModelSchema)
+      : A800RR_FIELD_CATALOG;
+    const merged = mergeCustomFieldsIntoCatalog(base, customFieldDefinitions);
     return [...merged].sort((a, b) => {
       const ia = TEMPLATE_PRIORITY_FIELD_KEYS.indexOf(a.key as (typeof TEMPLATE_PRIORITY_FIELD_KEYS)[number]);
       const ib = TEMPLATE_PRIORITY_FIELD_KEYS.indexOf(b.key as (typeof TEMPLATE_PRIORITY_FIELD_KEYS)[number]);
@@ -680,7 +713,7 @@ export function SetupCalibrationEditorClient({
       if (a.groupTitle !== b.groupTitle) return a.groupTitle.localeCompare(b.groupTitle);
       return a.label.localeCompare(b.label);
     });
-  }, [customFieldDefinitions]);
+  }, [customFieldDefinitions, setupSheetModelSchema]);
 
   const pdfRowByName = useMemo(() => {
     const m = new Map<string, PdfFormFieldRow>();
@@ -741,6 +774,15 @@ export function SetupCalibrationEditorClient({
     const def = customFieldByKey.get(fieldKey);
     const custom = customFieldGroupedChipContext(def);
     if (custom) return custom.entries;
+    if (setupSheetModelSchema) {
+      const mf = setupSheetModelSchema.fields.find((f) => f.key === fieldKey);
+      if (mf?.groupedOptionLabels?.length && mf.groupedOptionValues?.length) {
+        return mf.groupedOptionLabels.map((label, i) => ({
+          value: mf.groupedOptionValues![i] ?? `opt_${i + 1}`,
+          label,
+        }));
+      }
+    }
     return baseCatalogChipOptionValues(fieldKey).map((v) => ({ value: v, label: v }));
   }
 
@@ -1525,7 +1567,7 @@ export function SetupCalibrationEditorClient({
 
   function commitCreateField() {
     setCreateFieldError(null);
-    const reserved = reservedTemplateKeys();
+    const reserved = getReservedKeysForCalibrationEditor(modelFieldKeySet);
 
     if (setupFieldFormScope === "template" && activeSetupFieldKey) {
       const key = activeSetupFieldKey;
@@ -1835,7 +1877,7 @@ export function SetupCalibrationEditorClient({
     optionLines: string;
     sectionId: string;
   }): { ok: true } | { ok: false; error: string } {
-    const reserved = reservedTemplateKeys();
+    const reserved = getReservedKeysForCalibrationEditor(modelFieldKeySet);
     const existing = new Set(customFieldDefinitions.map((c) => c.key));
     const displayLabel = input.displayLabel.trim();
     if (!displayLabel) return { ok: false, error: "Parameter label is required." };

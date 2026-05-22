@@ -33,6 +33,7 @@ export default async function SetupCalibrationDetailPage({
       sourceType: true,
       calibrationDataJson: true,
       exampleDocumentId: true,
+      setupSheetModelId: true,
       exampleDocument: {
         select: { id: true, originalFilename: true },
       },
@@ -70,6 +71,7 @@ export default async function SetupCalibrationDetailPage({
         initialName={calibration.name}
         initialSourceType={calibration.sourceType}
         initialCalibrationData={calibration.calibrationDataJson}
+        setupSheetModelId={calibration.setupSheetModelId}
       />
     </>
   );

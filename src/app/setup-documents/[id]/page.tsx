@@ -9,6 +9,8 @@ import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibration
 import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDocumentReviewClient";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
+import { loadSetupSheetModelById } from "@/lib/setupSheetModels/resolveModelForCar";
+import { buildSetupSheetTemplateFromParsedSchema } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
 
 export default async function SetupDocumentDetailPage({
   params,
@@ -64,6 +66,9 @@ export default async function SetupDocumentDetailPage({
         updatedAt: true,
         createdSetupId: true,
         carId: true,
+        setupSheetModelId: true,
+        setupSheetTemplate: true,
+        setupSheetModel: { select: { id: true, name: true, slug: true } },
       },
     }),
     prisma.car.findMany({
@@ -86,6 +91,14 @@ export default async function SetupDocumentDetailPage({
   ]);
 
   if (!doc) notFound();
+
+  let reviewSetupTemplate = null;
+  if (doc.setupSheetModelId) {
+    const model = await loadSetupSheetModelById(user.id, doc.setupSheetModelId);
+    if (model) {
+      reviewSetupTemplate = buildSetupSheetTemplateFromParsedSchema(model.id, model.name, model.schema);
+    }
+  }
   // Resolve effective calibration without forcing defaults.
   const effectiveCalibration = await ensureSetupDocumentCalibrationProfileId({
     userId: user.id,
@@ -138,9 +151,11 @@ export default async function SetupDocumentDetailPage({
           parseStartedAt: doc.parseStartedAt ? doc.parseStartedAt.toISOString() : null,
           parseFinishedAt: doc.parseFinishedAt ? doc.parseFinishedAt.toISOString() : null,
           effectiveCalibration,
+          setupSheetModelSlug: doc.setupSheetModel?.slug ?? null,
         }}
         cars={cars}
         calibrations={calibrations}
+        reviewSetupTemplate={reviewSetupTemplate}
       />
     </>
   );

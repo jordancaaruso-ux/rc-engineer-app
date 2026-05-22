@@ -35,10 +35,13 @@ model User {
   actionItems     ActionItem[]
   setupDocuments  SetupDocument[]
   setupCalibrations SetupSheetCalibration[]
+  setupSheetModels  SetupSheetModel[]
   setupImportBatches SetupImportBatch[]
   importedLapTimeSessions ImportedLapTimeSession[]
   watchedLapSources WatchedLapSource[]
   videoAssets     VideoAsset[]
+  trackCameraProfiles TrackCameraProfile[]
+  videoAnalysisJobs   VideoAnalysisJob[]
   teammateLinksOwned TeammateLink[] @relation("TeammateLinksOwned")
   teammateLinksPeer  TeammateLink[] @relation("TeammateLinksPeer")
   engineerBetweenRunHints EngineerBetweenRunHint[]
@@ -169,21 +172,47 @@ model ActionItem {
   @@index([userId, listKind, normKey, isArchived])
 }
 
+/// User-defined setup sheet model (e.g. Mugen MTC3): parameter schema shared by all cars of that model.
+model SetupSheetModel {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  name       String
+  /// Stable id for aggregation and built-in seeds (e.g. mugen_mtc3, awesomatix_a800rr).
+  slug       String
+  schemaJson Json
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  cars           Car[]
+  setupDocuments SetupDocument[]
+  calibrations   SetupSheetCalibration[]
+
+  @@unique([userId, slug])
+  @@index([userId, updatedAt])
+}
+
 model Car {
   id                 String   @id @default(cuid())
   name               String
   chassis            String?
   notes              String?
-  setupSheetTemplate String?  // "awesomatix_a800rr" | null/"none" = no sheet
+  setupSheetTemplate String?  // legacy: "awesomatix_a800rr" | null; prefer setupSheetModelId
+  setupSheetModelId  String?
   createdAt          DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
+  setupSheetModel SetupSheetModel? @relation(fields: [setupSheetModelId], references: [id], onDelete: SetNull)
+
   runs      Run[]
   snapshots SetupSnapshot[]
   setupDocuments SetupDocument[]
   setupParameterAggregations SetupParameterAggregation[]
+
+  @@index([setupSheetModelId])
 }
 
 model Track {
@@ -202,6 +231,9 @@ model Track {
   runs            Run[]
   events          Event[]
   favouriteTracks FavouriteTrack[]
+  cameraProfiles  TrackCameraProfile[]
+  videoAssets     VideoAsset[]
+  videoAnalysisJobs VideoAnalysisJob[]
 }
 
 model FavouriteTrack {
@@ -500,8 +532,10 @@ model SetupDocument {
 
   car   Car?  @relation(fields: [carId], references: [id], onDelete: SetNull)
   carId String?
-  /// Canonical `Car.setupSheetTemplate` (e.g. awesomatix_a800rr). All cars of this type use the same sheet; not a single-vehicle link.
+  /// Canonical `Car.setupSheetTemplate` (e.g. awesomatix_a800rr). Legacy; prefer setupSheetModelId.
   setupSheetTemplate String?
+  setupSheetModelId  String?
+  setupSheetModel    SetupSheetModel? @relation(fields: [setupSheetModelId], references: [id], onDelete: SetNull)
 
   setupImportBatchId String?
   setupImportBatch   SetupImportBatch? @relation(fields: [setupImportBatchId], references: [id], onDelete: Cascade)
@@ -517,6 +551,8 @@ model SetupDocument {
   @@index([userId, createdAt])
   @@index([userId, parseStatus])
   @@index([userId, setupSheetTemplate])
+  @@index([userId, setupSheetModelId])
+  @@index([setupSheetModelId])
   @@index([setupImportBatchId])
   @@index([carId])
   @@unique([userId, sourceUrl])
@@ -531,6 +567,7 @@ model SetupSheetCalibration {
   sourceType String
   calibrationDataJson Json
   exampleDocumentId String?
+  setupSheetModelId String?
   /**
    * True when this row is one of the top calibrations (by use on aggregation-eligible uploads), recomputed
    * on community rebuild—readable and applicable by all authenticated users for setup uploads.
@@ -540,12 +577,15 @@ model SetupSheetCalibration {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
+  setupSheetModel SetupSheetModel? @relation(fields: [setupSheetModelId], references: [id], onDelete: SetNull)
   exampleDocument SetupDocument? @relation("CalibrationExampleDocument", fields: [exampleDocumentId], references: [id], onDelete: SetNull)
   runsUsingCalibration Run[] @relation("RunSetupPdfCalibration")
   documentsUsingCalibration SetupDocument[] @relation("SetupDocumentCalibration")
   setupImportBatches        SetupImportBatch[]
 
   @@index([userId, createdAt])
+  @@index([userId, setupSheetModelId])
+  @@index([setupSheetModelId])
   @@index([communityShared, createdAt])
 }
 
@@ -703,6 +743,9 @@ model Run {
 
   betweenRunHint EngineerBetweenRunHint?
   dashboardSuggestion EngineerDashboardSuggestion?
+
+  videoAnalysisJobs VideoAnalysisJob[]
+  videoAssets         VideoAsset[]
 
   @@index([userId, sortAt])
   @@index([userId, carId, carRating])
@@ -890,6 +933,62 @@ model RunImportedLap {
   @@index([lapSetId, lapNumber])
 }
 
+enum VideoAnalysisJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+/** Fisheye (or fixed) camera setup for a track layout — reference frame + sector lines. */
+model TrackCameraProfile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId String
+
+  name String @default("Main camera")
+
+  /** Local path, blob URL, or `/uploads/...` for reference still. */
+  referenceImagePath String?
+  /** Optional OpenCV fisheye intrinsics JSON. */
+  lensJson Json?
+  /** Last known good homography (reference <- query) for drift hints. */
+  lastAlignmentJson Json?
+
+  sectorLines TrackSectorLine[]
+  analysisJobs VideoAnalysisJob[]
+
+  @@index([userId, trackId])
+  @@index([trackId])
+}
+
+/** Sector / start-finish line in normalized [0,1] coords on the profile reference image. */
+model TrackSectorLine {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  profile   TrackCameraProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+
+  /** Stable id within profile, e.g. `sf`, `s1`. */
+  lineKey   String
+  label     String
+  x1        Float
+  y1        Float
+  x2        Float
+  y2        Float
+  sortOrder Int @default(0)
+
+  @@unique([profileId, lineKey])
+  @@index([profileId, sortOrder])
+}
+
 model VideoAsset {
   id               String   @id @default(cuid())
   createdAt        DateTime @default(now())
@@ -906,6 +1005,56 @@ model VideoAsset {
   /** Optional free-text label (e.g. "Q2 A-main onboard"). */
   label            String?
 
+  /** Optional local path when analysis runs on device (not uploaded). */
+  localAnalysisPath String?
+
+  run   Run?   @relation(fields: [runId], references: [id], onDelete: SetNull)
+  runId String?
+
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  trackId String?
+
+  analysisJobs VideoAnalysisJob[]
+
   @@index([userId, createdAt])
+  @@index([runId])
+  @@index([trackId])
+}
+
+/** Video sector analysis job — results imported from Python worker JSON. */
+model VideoAnalysisJob {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  status VideoAnalysisJobStatus @default(PENDING)
+
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId String
+
+  profile   TrackCameraProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+
+  videoAsset   VideoAsset? @relation(fields: [videoAssetId], references: [id], onDelete: SetNull)
+  videoAssetId String?
+
+  run   Run?   @relation(fields: [runId], references: [id], onDelete: SetNull)
+  runId String?
+
+  /** Per-session alignment (homography, inlier ratio, user overrides). */
+  alignmentJson Json?
+  /** Worker output: VideoAnalysisResultV1 (tracks, laps, sectors, idSwapHints). */
+  resultJson Json?
+  errorMessage String?
+
+  /** Optional manual MOT id remaps: [{ fromId, toId, startSec, endSec }] */
+  idCorrectionsJson Json?
+
+  @@index([userId, createdAt])
+  @@index([trackId])
+  @@index([runId])
 }
 

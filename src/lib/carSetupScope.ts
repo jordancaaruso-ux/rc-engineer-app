@@ -8,9 +8,16 @@ import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 export async function carIdsSharingSetupTemplate(userId: string, carId: string): Promise<string[]> {
   const car = await prisma.car.findFirst({
     where: { id: carId, userId },
-    select: { setupSheetTemplate: true },
+    select: { setupSheetTemplate: true, setupSheetModelId: true },
   });
   if (!car) return [carId];
+  if (car.setupSheetModelId) {
+    const rows = await prisma.car.findMany({
+      where: { userId, setupSheetModelId: car.setupSheetModelId },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
   const canonical = canonicalSetupSheetTemplateId(car.setupSheetTemplate ?? null);
   if (!canonical) return [carId];
   const rows = await prisma.car.findMany({
@@ -39,9 +46,20 @@ export async function canonicalSetupTemplateForUserCarId(
 /** True if `targetCarId` is allowed when turning this document into a `SetupSnapshot` (same type as upload, or legacy sibling). */
 export async function isCarValidTargetForSetupDocument(
   userId: string,
-  doc: { carId: string | null; setupSheetTemplate: string | null },
+  doc: {
+    carId: string | null;
+    setupSheetTemplate: string | null;
+    setupSheetModelId?: string | null;
+  },
   targetCarId: string
 ): Promise<boolean> {
+  if (doc.setupSheetModelId) {
+    const target = await prisma.car.findFirst({
+      where: { id: targetCarId, userId },
+      select: { setupSheetModelId: true },
+    });
+    return target?.setupSheetModelId === doc.setupSheetModelId;
+  }
   if (doc.setupSheetTemplate) {
     const t = await canonicalSetupTemplateForUserCarId(userId, targetCarId);
     return t === doc.setupSheetTemplate;

@@ -7,6 +7,9 @@ import { interpretAwesomatixSetupSnapshot } from "@/lib/setupDocuments/awesomati
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { getA800rrSetupSheetTemplateWithDisplayPreferences } from "@/lib/setupCalibrations/customFieldCatalog";
+import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
+import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
 import { normalizeCalibrationData, type CustomSetupFieldDefinition } from "@/lib/setupCalibrations/types";
 import { getEffectiveFieldCatalog } from "@/lib/setupDocuments/fieldMap";
 import { mappedFieldKeys } from "@/lib/setupDocuments/normalize";
@@ -69,20 +72,38 @@ type SetupDocumentDetail = {
   updatedAt: string;
   createdSetupId: string | null;
   carId: string | null;
+  setupSheetModelId?: string | null;
+  setupSheetModelSlug?: string | null;
+  setupSheetTemplate?: string | null;
 };
+
+function useA800SheetPostProcess(doc: SetupDocumentDetail): boolean {
+  if (doc.setupSheetModelSlug === SETUP_SHEET_MODEL_SLUG_A800RR) return true;
+  if (doc.setupSheetModelId) return false;
+  return doc.setupSheetTemplate === SETUP_SHEET_MODEL_SLUG_A800RR;
+}
+
+function postProcessImportedSetup(data: SetupSnapshotData, useA800: boolean): SetupSnapshotData {
+  const base = useA800 ? interpretAwesomatixSetupSnapshot(data) : data;
+  return applyDerivedFieldsToSnapshot(base);
+}
 
 export function SetupDocumentReviewClient({
   doc,
   cars,
   calibrations,
+  reviewSetupTemplate: reviewSetupTemplateProp = null,
 }: {
   doc: SetupDocumentDetail;
   cars: CarOption[];
   calibrations: Calibration[];
+  /** When set (per-model sheet), used instead of A800 layout for preview. */
+  reviewSetupTemplate?: SetupSheetTemplate | null;
 }) {
+  const useA800 = useA800SheetPostProcess(doc);
   const [liveDoc, setLiveDoc] = useState<SetupDocumentDetail>(doc);
   const [setupData, setSetupData] = useState<SetupSnapshotData>(() =>
-    applyDerivedFieldsToSnapshot(interpretAwesomatixSetupSnapshot(normalizeSetupData(doc.parsedDataJson)))
+    postProcessImportedSetup(normalizeSetupData(doc.parsedDataJson), useA800)
   );
   const [savingCarLink, setSavingCarLink] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -152,8 +173,8 @@ export function SetupDocumentReviewClient({
                 ? "warnings"
                 : "processed";
   useEffect(() => {
-    setSetupData(applyDerivedFieldsToSnapshot(interpretAwesomatixSetupSnapshot(normalizeSetupData(liveDoc.parsedDataJson))));
-  }, [liveDoc.id, liveDoc.updatedAt, liveDoc.parsedDataJson]);
+    setSetupData(postProcessImportedSetup(normalizeSetupData(liveDoc.parsedDataJson), useA800SheetPostProcess(liveDoc)));
+  }, [liveDoc.id, liveDoc.updatedAt, liveDoc.parsedDataJson, liveDoc.setupSheetModelId, liveDoc.setupSheetModelSlug]);
 
   // Keep picker synced to the document's stored calibration selection.
   useEffect(() => {
@@ -242,12 +263,13 @@ export function SetupDocumentReviewClient({
   );
   const reviewSetupTemplate = useMemo(
     () =>
-      getA800rrSetupSheetTemplateWithDisplayPreferences(
-        effectiveCustomFieldDefinitions,
-        selectedCalibrationNormalized?.fieldDisplayOverrides,
-        "setup"
-      ),
-    [selectedCalibrationNormalized, effectiveCustomFieldDefinitions]
+      reviewSetupTemplateProp
+        ?? getA800rrSetupSheetTemplateWithDisplayPreferences(
+          effectiveCustomFieldDefinitions,
+          selectedCalibrationNormalized?.fieldDisplayOverrides,
+          "setup"
+        ),
+    [reviewSetupTemplateProp, selectedCalibrationNormalized, effectiveCustomFieldDefinitions]
   );
   const totalTrackedFields = useMemo(
     () => getEffectiveFieldCatalog(effectiveCustomFieldDefinitions).length,
@@ -261,15 +283,18 @@ export function SetupDocumentReviewClient({
   const stuck = liveDoc.importStatus === "PROCESSING" && (parseAgeMs != null ? parseAgeMs > 60000 : false);
   const diagnostic = liveDoc.importDiagnosticJson as any;
   const liveDerived = useMemo(() => {
+    if (!useA800) {
+      return { diagnostics: null, statuses: {} as ReturnType<typeof computeDetailedDerivedFieldStatuses> };
+    }
     const { diagnostics } = computeA800rrDerived(setupData);
     return {
       diagnostics,
       statuses: computeDetailedDerivedFieldStatuses(setupData, diagnostics),
     };
-  }, [setupData]);
+  }, [setupData, useA800]);
   const derivedStatuses = liveDerived.statuses;
-  const derivedValidation = liveDerived.diagnostics.validation;
-  const resolutionHints = liveDerived.diagnostics.resolutionHints;
+  const derivedValidation = liveDerived.diagnostics?.validation;
+  const resolutionHints = liveDerived.diagnostics?.resolutionHints;
 
   async function saveDraft() {
     setSavingDraft(true);
@@ -458,7 +483,10 @@ export function SetupDocumentReviewClient({
           setStatus(null);
           return;
         }
-        const next = applyDerivedFieldsToSnapshot(interpretAwesomatixSetupSnapshot(normalizeSetupData(data.parsedData ?? {})));
+        const next = postProcessImportedSetup(
+          normalizeSetupData(data.parsedData ?? {}),
+          useA800SheetPostProcess(liveDoc)
+        );
         const imported = new Set(data.importedKeys ?? []);
         setSetupData(next);
         setLiveDoc((cur) => ({
@@ -752,6 +780,7 @@ export function SetupDocumentReviewClient({
               </span>
             ) : null}
           </div>
+          {useA800 && liveDerived.diagnostics ? (
           <div className="mt-2 rounded border border-border/70 bg-card/30 px-2 py-1.5 text-[11px] text-muted-foreground">
             <span className="text-foreground">Derived (canonical inputs):</span>{" "}
             <span className="font-mono">
@@ -768,18 +797,19 @@ export function SetupDocumentReviewClient({
             </span>
             <div className="mt-1 font-mono text-[10px] opacity-90">
               validate front=
-              {formatDerivedValidationLine(derivedValidation.frontSpringRateGfMm)} · rear=
-              {formatDerivedValidationLine(derivedValidation.rearSpringRateGfMm)} · ratio=
-              {formatDerivedValidationLine(derivedValidation.finalDriveRatio)}
+              {formatDerivedValidationLine(derivedValidation?.frontSpringRateGfMm)} · rear=
+              {formatDerivedValidationLine(derivedValidation?.rearSpringRateGfMm)} · ratio=
+              {formatDerivedValidationLine(derivedValidation?.finalDriveRatio)}
             </div>
-            {(resolutionHints.frontSpring || resolutionHints.rearSpring || resolutionHints.finalDrive) && (
+            {(resolutionHints?.frontSpring || resolutionHints?.rearSpring || resolutionHints?.finalDrive) && (
               <div className="mt-1 space-y-0.5 text-[10px] text-amber-200/85">
-                {resolutionHints.frontSpring ? <div>{resolutionHints.frontSpring}</div> : null}
-                {resolutionHints.rearSpring ? <div>{resolutionHints.rearSpring}</div> : null}
-                {resolutionHints.finalDrive ? <div>{resolutionHints.finalDrive}</div> : null}
+                {resolutionHints?.frontSpring ? <div>{resolutionHints.frontSpring}</div> : null}
+                {resolutionHints?.rearSpring ? <div>{resolutionHints.rearSpring}</div> : null}
+                {resolutionHints?.finalDrive ? <div>{resolutionHints.finalDrive}</div> : null}
               </div>
             )}
           </div>
+          ) : null}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button

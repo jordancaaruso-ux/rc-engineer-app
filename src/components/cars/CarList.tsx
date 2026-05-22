@@ -14,6 +14,8 @@ type Car = {
   chassis?: string | null;
   notes?: string | null;
   setupSheetTemplate?: string | null;
+  setupSheetModelId?: string | null;
+  setupSheetModel?: { id: string; name: string } | null;
 };
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -80,8 +82,22 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-lg border border-sky-500/35 bg-sky-500/5 p-4">
+        <div className="ui-title text-sm text-sky-100/95">New car with custom setup sheet</div>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Define parameters for a car model (e.g. Mugen MTC3), upload a PDF, and calibrate — without inheriting the
+          Awesomatix A800 sheet.
+        </p>
+        <Link
+          href="/cars/new/setup"
+          className={cn(buttonLinkClassName("primary"), "mt-3 inline-flex text-sm")}
+        >
+          Start setup wizard
+        </Link>
+      </div>
+
       <form onSubmit={handleAdd} className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
-        <div className="ui-title text-sm text-muted-foreground">Add car</div>
+        <div className="ui-title text-sm text-muted-foreground">Add car (quick)</div>
         <div className="grid gap-3 md:grid-cols-3">
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
@@ -166,8 +182,17 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
                   </Link>
                   {c.chassis && <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>}
                   <span className="block text-[11px] text-muted-foreground mt-0.5">
-                    Setup type: {labelForSetupSheetTemplate(c.setupSheetTemplate ?? null)}
+                    Setup sheet:{" "}
+                    {c.setupSheetModel?.name ?? labelForSetupSheetTemplate(c.setupSheetTemplate ?? null)}
                   </span>
+                  {c.setupSheetModelId ? (
+                    <Link
+                      href={`/setup-sheet-models/${c.setupSheetModelId}/schema`}
+                      className="block text-[10px] text-sky-300 hover:underline mt-0.5"
+                    >
+                      Edit parameters
+                    </Link>
+                  ) : null}
                 </div>
                 <span className="text-[11px] text-muted-foreground font-mono">{c.id.slice(0, 8)}</span>
               </li>

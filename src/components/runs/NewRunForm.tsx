@@ -12,7 +12,7 @@ import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { isLogRunSetupGlanceKey } from "@/lib/logRunSetupGlanceKeys";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
@@ -46,7 +46,12 @@ import {
   type HandlingAssessmentUiState,
 } from "@/lib/runHandlingAssessment";
 
-type CarOption = { id: string; name: string; setupSheetTemplate?: string | null };
+type CarOption = {
+  id: string;
+  name: string;
+  setupSheetTemplate?: string | null;
+  setupSheetModelId?: string | null;
+};
 type TrackOption = {
   id: string;
   name: string;
@@ -740,10 +745,32 @@ export function NewRunForm(props: {
   }, [tireSetId, batteryId, tireSets, batteries]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
+  const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
+
+  useEffect(() => {
+    if (!carId || !selectedCar?.setupSheetModelId) {
+      setModelTemplate(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/cars/${carId}/setup-sheet-template`)
+      .then((r) => r.json())
+      .then((d: { template?: SetupSheetTemplate }) => {
+        if (!cancelled && d.template) setModelTemplate(d.template);
+      })
+      .catch(() => {
+        if (!cancelled) setModelTemplate(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [carId, selectedCar?.setupSheetModelId]);
+
   const setupTemplate = useMemo(() => {
+    if (modelTemplate) return modelTemplate;
     if (isA800RRCar(selectedCar?.setupSheetTemplate)) return A800RR_SETUP_SHEET_V1;
     return getDefaultSetupSheetTemplate();
-  }, [selectedCar?.setupSheetTemplate]);
+  }, [modelTemplate, selectedCar?.setupSheetTemplate]);
 
   const loadedSetupRun = useMemo(
     () => (loadSetupSelection ? pickerRuns.find((r) => r.id === loadSetupSelection) ?? null : null),

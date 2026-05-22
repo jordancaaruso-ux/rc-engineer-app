@@ -54,7 +54,7 @@ export default async function NewRunPage({
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, setupSheetTemplate: true },
+      select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true },
     }),
     prisma.track.findMany({
       where: { userId: user.id },
