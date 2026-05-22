@@ -45,6 +45,14 @@ import {
 } from "@/lib/setupCalibrations/calibrationCustomFieldHints";
 import { SetupFieldDefinitionForm } from "@/components/setup-documents/SetupFieldDefinitionForm";
 import { SetupCalibrationQuickParamsPanel } from "@/components/setup-documents/SetupCalibrationQuickParamsPanel";
+import { SetupCalibrationLinkParameterDialog } from "@/components/setup-documents/SetupCalibrationLinkParameterDialog";
+import { SetupCalibrationModelSidebar } from "@/components/setup-documents/SetupCalibrationModelSidebar";
+import {
+  buildGroupedRuleFromAssignments,
+  extractAssignmentsFromGroupedRule,
+  groupedBehaviorForModelField,
+  type ModelOptionAssignment,
+} from "@/lib/setupSheetModels/modelCalibrationMapping";
 import {
   buildQuickCustomFieldDefinition,
   type QuickCalibrationFieldKind,
@@ -496,6 +504,13 @@ export function SetupCalibrationEditorClient({
   const [attachListLoading, setAttachListLoading] = useState(false);
   const [attachLinking, setAttachLinking] = useState(false);
   const [setupSheetModelSchema, setSetupSheetModelSchema] = useState<SetupSheetModelSchema | null>(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkDialogEditKey, setLinkDialogEditKey] = useState<string | null>(null);
+  const [linkDialogAssignments, setLinkDialogAssignments] = useState<ModelOptionAssignment[] | null>(null);
+  const [linkAssignOnPdfOption, setLinkAssignOnPdfOption] = useState<string | null>(null);
+  const [schemaNavPending, setSchemaNavPending] = useState(false);
+
+  const modelLinkedMode = Boolean(initialSetupSheetModelId && setupSheetModelSchema);
 
   useEffect(() => {
     if (!initialSetupSheetModelId) {
@@ -516,10 +531,21 @@ export function SetupCalibrationEditorClient({
     };
   }, [initialSetupSheetModelId]);
 
+  useEffect(() => {
+    if (modelLinkedMode) setTab("form");
+  }, [modelLinkedMode]);
+
   const modelFieldKeySet = useMemo(
     () => (setupSheetModelSchema ? modelFieldKeys(setupSheetModelSchema) : null),
     [setupSheetModelSchema]
   );
+
+  const calibrationDirty = useMemo(() => {
+    const initial = normalizeCalibrationData(initialCalibrationData);
+    if (name.trim() !== (initialName ?? "").trim()) return true;
+    if (JSON.stringify(formFieldMappings) !== JSON.stringify(initial.formFieldMappings ?? {})) return true;
+    return false;
+  }, [formFieldMappings, initialCalibrationData, initialName, name]);
 
   const loadPdfCandidates = useCallback(async () => {
     setAttachListLoading(true);
@@ -736,6 +762,17 @@ export function SetupCalibrationEditorClient({
     }
     return out.sort((a, b) => a.label.localeCompare(b.label));
   }, [pdfFormRows]);
+
+  const widgetOptionsForLink = useMemo(() => {
+    return acroSelection.keys.map((key) => {
+      const ref = parseAcroKey(key);
+      const row = pdfRowByName.get(ref.pdfFieldName);
+      return {
+        value: key,
+        label: `${ref.pdfFieldName} #${ref.instanceIndex}${row?.type ? ` (${row.type})` : ""}`,
+      };
+    });
+  }, [acroSelection.keys, pdfRowByName]);
 
   /** Awesomatix + catalog: singleSelect chip flow vs visual multi vs legacy. */
   function effectiveWidgetGroupKind(fieldKey: string | null): "single" | "multi" | null {
@@ -1980,8 +2017,110 @@ export function SetupCalibrationEditorClient({
     assignGroupPdfWidgetApply(targetCanonicalKey, pdfFieldName, instanceIndex, optionValue);
   }
 
+  function closeLinkDialog() {
+    setLinkDialogOpen(false);
+    setLinkDialogEditKey(null);
+    setLinkDialogAssignments(null);
+    setLinkAssignOnPdfOption(null);
+  }
+
+  function openLinkDialogForSelection(editKey?: string | null) {
+    if (!setupSheetModelSchema) return;
+    if (editKey) {
+      const rule = formFieldMappings[editKey];
+      const assignments = rule ? extractAssignmentsFromGroupedRule(rule) : [];
+      const keys = assignments.map((a) => a.sourceKey).filter(Boolean);
+      setAcroSelection({ keys, activeKey: keys[0] ?? null });
+      setLinkDialogEditKey(editKey);
+      setLinkDialogAssignments(assignments);
+    } else {
+      setLinkDialogEditKey(null);
+      setLinkDialogAssignments(null);
+    }
+    setLinkAssignOnPdfOption(null);
+    setLinkDialogOpen(true);
+  }
+
+  function commitModelGroupedLink(parameterKey: string, assignments: ModelOptionAssignment[]) {
+    const field = setupSheetModelSchema?.fields.find((f) => f.key === parameterKey);
+    if (!field) return;
+    const behavior = groupedBehaviorForModelField(field);
+    const rule = buildGroupedRuleFromAssignments(behavior, assignments);
+    if (!rule) return;
+
+    setFormFieldMappings((prev) => {
+      let next = { ...prev };
+      for (const a of assignments) {
+        const ref = parseAcroKey(a.sourceKey);
+        const row = pdfRowByName.get(ref.pdfFieldName);
+        next = removePdfWidgetFromMappings(next, ref.pdfFieldName, ref.instanceIndex, row);
+      }
+      next[parameterKey] = rule;
+      return next;
+    });
+    setAcroSelection({ keys: [], activeKey: null });
+    closeLinkDialog();
+    setStatus(`Mapped “${field.displayLabel}”.`);
+  }
+
+  function handleNavigateToSchema() {
+    if (!initialSetupSheetModelId) return;
+    const href = `/setup-sheet-models/${initialSetupSheetModelId}/schema?returnTo=${encodeURIComponent(`/setup-calibrations/${calibrationId}`)}`;
+    if (calibrationDirty) {
+      setSchemaNavPending(true);
+      return;
+    }
+    router.push(href);
+  }
+
+  /** Model-linked: PDF-first selection and link dialog only. */
+  function onAcroWidgetClickModel(pdfFieldName: string, instanceIndex: number) {
+    const toggleKey = acroSourceKey({ pdfFieldName, instanceIndex });
+    const row = pdfRowByName.get(pdfFieldName);
+
+    if (linkDialogOpen && linkAssignOnPdfOption && linkDialogAssignments) {
+      const inSelection = acroSelection.keys.includes(toggleKey);
+      if (inSelection) {
+        setLinkDialogAssignments(
+          linkDialogAssignments.map((a) =>
+            a.optionValue === linkAssignOnPdfOption ? { ...a, sourceKey: toggleKey } : a
+          )
+        );
+        setLinkAssignOnPdfOption(null);
+        setStatus(null);
+      }
+      return;
+    }
+
+    const mappingKeys = findAppKeysForWidget(formFieldMappings, pdfFieldName, instanceIndex, row);
+    if (mappingKeys.length >= 1) {
+      const k0 = mappingKeys[0]!;
+      setActiveSetupFieldKey(k0);
+      setAcroSelection({ keys: [toggleKey], activeKey: toggleKey });
+      setStatus(`Mapped to ${setupSheetModelSchema?.fields.find((f) => f.key === k0)?.displayLabel ?? k0}.`);
+      return;
+    }
+
+    setActiveSetupFieldKey(null);
+    setAcroSelection((prev) => {
+      const removing = prev.keys.includes(toggleKey);
+      const nextKeys = removing ? prev.keys.filter((k) => k !== toggleKey) : [...prev.keys, toggleKey];
+      const nextActive = !removing
+        ? toggleKey
+        : prev.activeKey === toggleKey
+          ? nextKeys[0] ?? null
+          : prev.activeKey;
+      return { keys: nextKeys, activeKey: nextActive };
+    });
+    setStatus(null);
+  }
+
   /** Mapped click → edit setup field + highlight PDF. Unmapped → source multi-select only (toggle); clears editor. */
   function onAcroWidgetClick(pdfFieldName: string, instanceIndex: number) {
+    if (modelLinkedMode) {
+      onAcroWidgetClickModel(pdfFieldName, instanceIndex);
+      return;
+    }
     const row = pdfRowByName.get(pdfFieldName);
     const mappingKeys = findAppKeysForWidget(formFieldMappings, pdfFieldName, instanceIndex, row);
     const toggleKey = acroSourceKey({ pdfFieldName, instanceIndex });
@@ -2540,22 +2679,34 @@ export function SetupCalibrationEditorClient({
 
   return (
     <section className="page-body space-y-3">
-      <SetupCalibrationQuickParamsPanel
-        pdfFormRowsCount={pdfFormRows.length}
-        acroSelectOptions={acroSelectOptions}
-        customFieldDefinitions={customFieldDefinitions}
-        formFieldMappings={formFieldMappings}
-        onQuickAdd={handleQuickAddField}
-        onAssignSimple={(canonicalKey, pdfFieldName, instanceIndex) => {
-          applyWidgetToCanonicalKey(canonicalKey, pdfFieldName, instanceIndex);
-        }}
-        onAssignGroupOption={quickAssignGroupOption}
-      />
+      {!modelLinkedMode ? (
+        <SetupCalibrationQuickParamsPanel
+          pdfFormRowsCount={pdfFormRows.length}
+          acroSelectOptions={acroSelectOptions}
+          customFieldDefinitions={customFieldDefinitions}
+          formFieldMappings={formFieldMappings}
+          onQuickAdd={handleQuickAddField}
+          onAssignSimple={(canonicalKey, pdfFieldName, instanceIndex) => {
+            applyWidgetToCanonicalKey(canonicalKey, pdfFieldName, instanceIndex);
+          }}
+          onAssignGroupOption={quickAssignGroupOption}
+        />
+      ) : null}
       <div className="rounded-lg border border-border bg-card p-3">
         <div className="ui-title text-xs text-muted-foreground">Calibration mapping profile</div>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          <span className="text-foreground">Form fields</span> tab: click an AcroForm widget to select it, then link it to a
-          setup field in the side panel. Printed text and regions are <span className="text-foreground/80">fallbacks only</span>.
+          {modelLinkedMode ? (
+            <>
+              Click PDF controls on the left, then <span className="text-foreground">Link to parameter</span> in the side
+              panel. For grouped parameters (one of many / many of many), you will match each option to a specific control.
+            </>
+          ) : (
+            <>
+              <span className="text-foreground">Form fields</span> tab: click an AcroForm widget to select it, then link it to a
+              setup field in the side panel. Printed text and regions are{" "}
+              <span className="text-foreground/80">fallbacks only</span>.
+            </>
+          )}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
@@ -2663,37 +2814,39 @@ export function SetupCalibrationEditorClient({
             </div>
           ) : null}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 border-b border-border pb-2">
-          <button
-            type="button"
-            className={`rounded px-3 py-1.5 text-xs font-medium ${tab === "sheet" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setTab("sheet")}
-          >
-            Full sheet
-          </button>
-          <button
-            type="button"
-            className={`rounded px-3 py-1.5 text-xs font-medium ${tab === "form" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setTab("form")}
-          >
-            Form fields
-          </button>
-          <span className="text-[10px] text-muted-foreground">Fallback</span>
-          <button
-            type="button"
-            className={`rounded px-2 py-1 text-[11px] ${tab === "text" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setTab("text")}
-          >
-            Printed text
-          </button>
-          <button
-            type="button"
-            className={`rounded px-2 py-1 text-[11px] ${tab === "region" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setTab("region")}
-          >
-            Regions
-          </button>
-        </div>
+        {!modelLinkedMode ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-b border-border pb-2">
+            <button
+              type="button"
+              className={`rounded px-3 py-1.5 text-xs font-medium ${tab === "sheet" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setTab("sheet")}
+            >
+              Full sheet
+            </button>
+            <button
+              type="button"
+              className={`rounded px-3 py-1.5 text-xs font-medium ${tab === "form" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setTab("form")}
+            >
+              Form fields
+            </button>
+            <span className="text-[10px] text-muted-foreground">Fallback</span>
+            <button
+              type="button"
+              className={`rounded px-2 py-1 text-[11px] ${tab === "text" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setTab("text")}
+            >
+              Printed text
+            </button>
+            <button
+              type="button"
+              className={`rounded px-2 py-1 text-[11px] ${tab === "region" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setTab("region")}
+            >
+              Regions
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[2fr_1fr]">
@@ -3147,7 +3300,9 @@ export function SetupCalibrationEditorClient({
               <div>
                 <div className="ui-title text-xs text-muted-foreground">AcroForm map</div>
                 <p className="mt-0.5 max-w-xl text-[11px] text-muted-foreground">
-                  Click a field to select it (highlighted on the PDF), then use the right panel to add or edit the setup mapping.
+                  {modelLinkedMode
+                    ? "Click PDF controls to select them, then link to a parameter in the side panel."
+                    : "Click a field to select it (highlighted on the PDF), then use the right panel to add or edit the setup mapping."}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -3204,7 +3359,14 @@ export function SetupCalibrationEditorClient({
               <>
                 {!pdfFormMeta?.hasFormFields && !pdfFormLoading ? (
                   <div className="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
-                    No AcroForm fields found. Use <strong>Printed text</strong> or <strong>Regions</strong> (fallback tabs).
+                    {modelLinkedMode
+                      ? "No AcroForm fields found in this PDF. Link a different example PDF that has fillable form fields."
+                      : (
+                        <>
+                          No AcroForm fields found. Use <strong>Printed text</strong> or <strong>Regions</strong> (fallback
+                          tabs).
+                        </>
+                      )}
                   </div>
                 ) : null}
                 <div
@@ -3291,8 +3453,9 @@ export function SetupCalibrationEditorClient({
                     : null}
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  For grouped fields: in the catalog, pick an option button (blue = active), then the PDF. The button stays
-                  blue when that option is linked. Details are in the right column.
+                  {modelLinkedMode
+                    ? "Highlighted controls are selectable. Green = already mapped. Select controls, then use Link to parameter in the side panel."
+                    : "For grouped fields: in the catalog, pick an option button (blue = active), then the PDF. The button stays blue when that option is linked. Details are in the right column."}
                 </p>
                 <div className="mt-3 border-t border-border pt-2">
                   <button
@@ -3640,7 +3803,20 @@ export function SetupCalibrationEditorClient({
         )}
 
         <div className="rounded-lg border border-border bg-card p-3">
-          {tab === "form" ? (
+          {modelLinkedMode && tab === "form" && setupSheetModelSchema && initialSetupSheetModelId ? (
+            <SetupCalibrationModelSidebar
+              schema={setupSheetModelSchema}
+              modelId={initialSetupSheetModelId}
+              calibrationId={calibrationId}
+              formFieldMappings={formFieldMappings}
+              widgetSelectionCount={acroSelection.keys.length}
+              onOpenLinkDialog={() => openLinkDialogForSelection(null)}
+              onClearSelection={() => setAcroSelection({ keys: [], activeKey: null })}
+              onEditGroupedParameter={(key) => openLinkDialogForSelection(key)}
+              calibrationDirty={calibrationDirty}
+              onNavigateToAddParameter={handleNavigateToSchema}
+            />
+          ) : tab === "form" ? (
             <>
               <div className="mb-3 space-y-3 rounded border border-border/80 bg-muted/25 p-3 text-xs">
                 <div className="ui-title text-[11px] text-foreground/90">Add a custom field</div>
@@ -4507,6 +4683,85 @@ export function SetupCalibrationEditorClient({
           </div>
         </div>
       </div>
+
+      {setupSheetModelSchema && linkDialogOpen ? (
+        <SetupCalibrationLinkParameterDialog
+          open={linkDialogOpen}
+          widgetSourceKeys={acroSelection.keys}
+          widgetOptions={widgetOptionsForLink}
+          schema={setupSheetModelSchema}
+          formFieldMappings={formFieldMappings}
+          initialParameterKey={linkDialogEditKey}
+          initialAssignments={linkDialogAssignments}
+          assignments={linkDialogAssignments}
+          onAssignmentsChange={setLinkDialogAssignments}
+          assignOnPdfOptionValue={linkAssignOnPdfOption}
+          onAssignOnPdfOptionChange={setLinkAssignOnPdfOption}
+          onClose={closeLinkDialog}
+          onConfirmSimple={(parameterKey) => {
+            const key = acroSelection.keys[0];
+            if (!key) return;
+            const ref = parseAcroKey(key);
+            applyWidgetToCanonicalKey(parameterKey, ref.pdfFieldName, ref.instanceIndex);
+            setAcroSelection({ keys: [], activeKey: null });
+            closeLinkDialog();
+          }}
+          onConfirmGrouped={commitModelGroupedLink}
+        />
+      ) : null}
+
+      {schemaNavPending ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="max-w-md rounded-lg border border-border bg-card p-4 shadow-lg">
+            <div className="text-sm font-semibold text-foreground">Save calibration first?</div>
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+              You have unsaved mapping changes. Save before adding parameters on the sheet model so your PDF links are kept.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded border border-border px-3 py-1.5 text-xs hover:bg-muted"
+                onClick={() => setSchemaNavPending(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded border border-border px-3 py-1.5 text-xs hover:bg-muted"
+                onClick={() => {
+                  setSchemaNavPending(false);
+                  if (initialSetupSheetModelId) {
+                    router.push(
+                      `/setup-sheet-models/${initialSetupSheetModelId}/schema?returnTo=${encodeURIComponent(`/setup-calibrations/${calibrationId}`)}`
+                    );
+                  }
+                }}
+              >
+                Continue without saving
+              </button>
+              <button
+                type="button"
+                className="rounded border border-sky-500/60 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100 hover:bg-sky-500/25"
+                onClick={async () => {
+                  await save();
+                  setSchemaNavPending(false);
+                  if (initialSetupSheetModelId) {
+                    router.push(
+                      `/setup-sheet-models/${initialSetupSheetModelId}/schema?returnTo=${encodeURIComponent(`/setup-calibrations/${calibrationId}`)}`
+                    );
+                  }
+                }}
+              >
+                Save & continue
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {pdfMappingConflict ? (
         <div

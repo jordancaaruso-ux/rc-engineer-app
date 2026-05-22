@@ -47,9 +47,15 @@ export default async function SetupCalibrationDetailPage({
           <div>
             <h1 className="page-title">Edit calibration</h1>
             <p className="page-subtitle">
-              Calibration is the source of truth for PDF-to-setup mapping. Use{" "}
-              <span className="text-foreground">Quick add parameters</span> for a simple name → type → Acro widget flow,
-              or the Form tab for full control.
+              {calibration.setupSheetModelId
+                ? "Click PDF controls, link them to parameters on your sheet model, and match each grouped option to the correct control."
+                : (
+                  <>
+                    Calibration is the source of truth for PDF-to-setup mapping. Use{" "}
+                    <span className="text-foreground">Quick add parameters</span> for a simple name → type → Acro widget
+                    flow, or the Form tab for full control.
+                  </>
+                )}
             </p>
           </div>
           <CalibrationDeleteButton
