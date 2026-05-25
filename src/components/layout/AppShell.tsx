@@ -18,7 +18,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <Sidebar />
-      <main className={cn("page", "pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0")}>{children}</main>
+      <main
+        className={cn(
+          "page",
+          "pb-[calc(var(--mobile-tab-bar-height)+var(--mobile-tab-fab-overhang)+env(safe-area-inset-bottom))] md:pb-0"
+        )}
+      >
+        {children}
+      </main>
       <BottomNav />
     </div>
   );

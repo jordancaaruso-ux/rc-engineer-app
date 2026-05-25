@@ -50,6 +50,11 @@
   --color-surface-runna-deep: 16 16 16;
   --color-surface-runna: 22 22 22;
   --color-surface-runna-inset: 26 26 26;
+
+  /* Mobile bottom tab bar (see BottomNav.tsx) */
+  --mobile-tab-bar-height: 3.25rem;
+  --mobile-tab-fab-size: 3.25rem;
+  --mobile-tab-fab-overhang: 1.375rem;
 }
 
 /* Near-black previews: darker base + surfaces; slightly softer corner glow so hues stay subtle. */
@@ -206,8 +211,9 @@ body {
    * Body background is transparent so the fixed `.page-bg` wash shows behind
    * iOS safe areas (Dynamic Island, home indicator). The scrolling stripe
    * pattern still rides on body so it tracks document scroll like before.
+   * Solid fallback on html covers overscroll / browser chrome gaps.
    */
-  background-color: transparent;
+  background-color: rgb(var(--color-background));
   background-image: repeating-linear-gradient(
     180deg,
     transparent 0,
@@ -267,6 +273,7 @@ body {
 .app-root {
   position: relative;
   z-index: 1;
+  min-height: 100dvh;
 }
 
 * {
@@ -275,14 +282,17 @@ body {
 
 /* Shell sits on body’s corner gradient; cards stay solid via Tailwind colors */
 .app-shell {
-  /* overflow-y visible so document scroll paints body background; clip horizontal bleed only */
-  @apply relative flex min-h-screen overflow-x-hidden overflow-y-visible bg-transparent text-foreground;
-  /* Prefer dynamic viewport height on phones so the shell fills under the island. */
-  min-height: 100dvh;
+  @apply relative flex min-h-[100dvh] overflow-x-hidden overflow-y-visible bg-transparent text-foreground;
 }
 
 .bottom-nav {
-  padding-bottom: env(safe-area-inset-bottom);
+  /*
+   * Opaque bar + safe-area fill so no black band shows between nav and
+   * home indicator / mobile browser chrome. Matches card surface, not page wash.
+   */
+  background-color: rgb(var(--color-card));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow: visible;
 }
 
 /* NOTE: Avoid creating sibling stacking contexts here.
@@ -317,22 +327,29 @@ body {
 }
 
 .page {
-  @apply flex flex-1 flex-col min-w-0;
-  /*
-   * With `viewportFit: "cover"` and iOS `contentInset: "never"`, the document
-   * paints from the physical top; this inset keeps chrome off the island while
-   * the body gradient shows through the padded band.
-   */
-  padding-top: env(safe-area-inset-top, 0px);
+  @apply flex min-w-0 flex-1 flex-col;
+  min-height: 100dvh;
+}
+
+@media (min-width: 768px) {
+  .page {
+    min-height: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }
 
 .page-header {
-  @apply flex items-center justify-between border-b border-border py-3;
-  /* Respect notch / rounded-corner safe areas so the far-left edge of the
-     header never lands under a device bezel. Desktop rendering is unaffected
-     (env() resolves to 0 when there's no inset). */
+  @apply flex items-center justify-between border-b border-border;
+  padding-top: calc(0.625rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.75rem;
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+
+@media (min-width: 768px) {
+  .page-header {
+    padding-top: 0.75rem;
+  }
 }
 
 .page-title {
