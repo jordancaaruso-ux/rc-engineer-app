@@ -25,6 +25,7 @@ import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
+import { primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
@@ -550,9 +551,14 @@ export function NewRunForm(props: {
 
     const existingLaps = normalizeLapTimes(r.lapTimes ?? []);
     const existingText = existingLaps.length ? existingLaps.map((n) => n.toFixed(3)).join("\n") : "";
+    const existingLapRows = primaryLapRowsFromRun({
+      lapTimes: r.lapTimes ?? [],
+      lapSession: r.lapSession,
+    });
     setLapIngest({
       ...defaultLapIngestValue(),
       manualText: existingText,
+      manualLapRows: existingLapRows.length ? existingLapRows : null,
       sourceKind: existingText ? "manual" : "manual",
       sourceDetail: r.lapSession ? "Existing laps loaded (edit)" : null,
       parserId: null,
@@ -767,8 +773,18 @@ export function NewRunForm(props: {
   }, [carId, selectedCar?.setupSheetModelId]);
 
   const setupTemplate = useMemo(() => {
+    if (isA800RRCar(selectedCar?.setupSheetTemplate)) {
+      if (modelTemplate?.fieldChipOptionsByKey) {
+        return {
+          ...A800RR_SETUP_SHEET_V1,
+          id: modelTemplate.id,
+          label: modelTemplate.label || A800RR_SETUP_SHEET_V1.label,
+          fieldChipOptionsByKey: modelTemplate.fieldChipOptionsByKey,
+        } satisfies SetupSheetTemplate;
+      }
+      return A800RR_SETUP_SHEET_V1;
+    }
     if (modelTemplate) return modelTemplate;
-    if (isA800RRCar(selectedCar?.setupSheetTemplate)) return A800RR_SETUP_SHEET_V1;
     return getDefaultSetupSheetTemplate();
   }, [modelTemplate, selectedCar?.setupSheetTemplate]);
 
@@ -2028,6 +2044,21 @@ export function NewRunForm(props: {
                   isIncluded: true,
                 }));
               }
+              if (lapIngest.manualLapRows && lapIngest.manualLapRows.length === lapTimes.length) {
+                return lapIngest.manualLapRows.map((row) => ({
+                  isIncluded: row.isIncluded,
+                }));
+              }
+              if (lapTimes.length > 0) {
+                const rows = applyMedianBandAutoExclude(
+                  lapTimes.map((t, i) => ({
+                    lapNumber: i + 1,
+                    lapTimeSeconds: t,
+                    isIncluded: true,
+                  }))
+                );
+                return rows.map((row) => ({ isIncluded: row.isIncluded }));
+              }
               return undefined;
             })(),
           },
@@ -2181,12 +2212,12 @@ export function NewRunForm(props: {
       {/* Copy last run shortcut (optional) — hidden when finishing a draft,
           since the run already has its own baseline nailed down. */}
       {!isDraft ? (
-      <div className="rounded-lg border border-border bg-muted/70 px-4 py-3">
+      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 shadow-sm shadow-black/20">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
             className={cn(
-              "ui-title rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-muted transition",
+              "ui-title rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-700 transition hover:border-emerald-500/55 hover:bg-emerald-500/15 dark:text-emerald-300",
               !copyPreviewRun && "opacity-60 pointer-events-none"
             )}
             onClick={() => {

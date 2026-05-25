@@ -272,6 +272,111 @@ type ChatCompletionMessage =
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
+type ChatCompletionStreamResult = {
+  content: string | null;
+  toolCalls: ToolCall[] | null;
+};
+
+async function readOpenAiChatStream(
+  res: Response,
+  onToken?: (delta: string) => void
+): Promise<ChatCompletionStreamResult> {
+  const reader = res.body?.getReader();
+  if (!reader) {
+    throw new Error("OpenAI stream had no body");
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+  const toolCallsByIndex = new Map<number, ToolCall>();
+  let sawToolCalls = false;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === "[DONE]") continue;
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(payload) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      const choice = (parsed.choices as Array<{ delta?: Record<string, unknown> }> | undefined)?.[0];
+      const delta = choice?.delta;
+      if (!delta) continue;
+      if (typeof delta.content === "string" && delta.content.length > 0) {
+        content += delta.content;
+        if (onToken && !sawToolCalls) onToken(delta.content);
+      }
+      const deltaToolCalls = delta.tool_calls as
+        | Array<{ index?: number; id?: string; type?: string; function?: { name?: string; arguments?: string } }>
+        | undefined;
+      if (deltaToolCalls) {
+        sawToolCalls = true;
+        for (const tc of deltaToolCalls) {
+          const idx = typeof tc.index === "number" ? tc.index : 0;
+          const existing = toolCallsByIndex.get(idx) ?? {
+            id: tc.id ?? "",
+            type: "function" as const,
+            function: { name: "", arguments: "" },
+          };
+          if (tc.id) existing.id = tc.id;
+          if (tc.function?.name) existing.function.name = tc.function.name;
+          if (typeof tc.function?.arguments === "string") {
+            existing.function.arguments += tc.function.arguments;
+          }
+          toolCallsByIndex.set(idx, existing);
+        }
+      }
+    }
+  }
+
+  const toolCalls =
+    toolCallsByIndex.size > 0
+      ? [...toolCallsByIndex.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([, tc]) => tc)
+      : null;
+
+  return {
+    content: content.length > 0 ? content : null,
+    toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : null,
+  };
+}
+
+async function postChatCompletion(
+  apiKey: string,
+  body: Record<string, unknown>,
+  onToken?: (delta: string) => void
+): Promise<{ ok: boolean; status: number; data?: Record<string, unknown>; streamResult?: ChatCompletionStreamResult }> {
+  const useStream = Boolean(onToken);
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ...body, stream: useStream }),
+  });
+  if (useStream) {
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      return { ok: false, status: res.status, data };
+    }
+    const streamResult = await readOpenAiChatStream(res, onToken);
+    return { ok: true, status: res.status, streamResult };
+  }
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: res.ok, status: res.status, data };
+}
+
 async function executeSearchOrListTool(
   name: string,
   argsJson: string,
@@ -373,6 +478,7 @@ export async function generateEngineerChatReplyWithTools(params: {
   messages: EngineerChatMessage[];
   userId: string;
   mergeContextWithFocusedPair: (focused: EngineerFocusedRunPairContext) => Promise<unknown>;
+  onToken?: (delta: string) => void;
 }): Promise<{
   reply: string;
   contextJson: unknown;
@@ -436,43 +542,25 @@ export async function generateEngineerChatReplyWithTools(params: {
       },
     });
     // #endregion
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: __dbgBodyStr,
+    const bodyObj = buildChatCompletionBody(opts.model, opts.temperature, {
+      messages: messagesApi,
+      ...(useTools ? { tools: TOOLS, tool_choice: "auto" as const } : { tool_choice: "none" as const }),
     });
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    // #region agent log
-    const __dbgIterMs = Date.now() - __dbgIterT0;
-    // #endregion
+    const res = await postChatCompletion(apiKey, bodyObj, params.onToken);
     if (!res.ok) {
-      const msg = (data.error as { message?: string } | undefined)?.message || `OpenAI error (${res.status})`;
+      const msg =
+        (res.data?.error as { message?: string } | undefined)?.message || `OpenAI error (${res.status})`;
       throw new Error(msg);
     }
-    const choice = (data.choices as Array<{ message?: Record<string, unknown> }> | undefined)?.[0];
-    const msg = choice?.message;
+    const msg =
+      res.streamResult != null
+        ? {
+            content: res.streamResult.content,
+            tool_calls: res.streamResult.toolCalls ?? undefined,
+          }
+        : (res.data?.choices as Array<{ message?: Record<string, unknown> }> | undefined)?.[0]?.message;
     const toolCalls = msg?.tool_calls as ToolCall[] | undefined;
     const content = (msg?.content as string | null | undefined) ?? null;
-    // #region agent log
-    __dbgSend({
-      runId: 'llm-iter',
-      hypothesisId: 'H1',
-      location: 'src/lib/engineerPhase5/openaiEngineer.ts:iter-end',
-      message: 'iteration end',
-      data: {
-        iter,
-        iterMs: __dbgIterMs,
-        toolCallsCount: toolCalls ? toolCalls.length : 0,
-        toolCallNames: (toolCalls ?? []).map((t) => t.function?.name ?? ''),
-        contentChars: typeof content === 'string' ? content.length : 0,
-        usage: (data as { usage?: unknown }).usage ?? null,
-        httpStatus: res.status,
-      },
-    });
-    // #endregion
 
     if (toolCalls && toolCalls.length > 0) {
       messagesApi.push({

@@ -32,6 +32,8 @@ export type UrlImportBlock = {
 
 export type LapIngestFormValue = {
   manualText: string;
+  /** Per-lap inclusion for manual/edit entry (preserved across edits). */
+  manualLapRows?: LapRow[] | null;
   sourceKind: LapSourceKind;
   sourceDetail: string | null;
   parserId: string | null;
@@ -45,6 +47,7 @@ type IngestTab = "manual" | "photo" | "url" | "csv";
 
 const DEFAULT_VALUE: LapIngestFormValue = {
   manualText: "",
+  manualLapRows: null,
   sourceKind: "manual",
   sourceDetail: null,
   parserId: null,
@@ -63,6 +66,29 @@ function initDriverLapRows(drivers: LapUrlSessionDriver[]): Record<string, LapRo
     out[d.driverId] = applyMedianBandAutoExclude(raw);
   }
   return out;
+}
+
+function syncManualLapRowsFromText(text: string, existing: LapRow[] | null | undefined): LapRow[] {
+  const times = parseManualLapText(text);
+  if (times.length === 0) return [];
+  if (
+    existing &&
+    existing.length === times.length &&
+    existing.every((r, i) => Math.abs(r.lapTimeSeconds - times[i]!) < 0.0005)
+  ) {
+    return existing.map((r, i) => ({
+      ...r,
+      lapNumber: i + 1,
+      lapTimeSeconds: times[i]!,
+    }));
+  }
+  return applyMedianBandAutoExclude(
+    times.map((t, i) => ({
+      lapNumber: i + 1,
+      lapTimeSeconds: t,
+      isIncluded: true,
+    }))
+  );
 }
 
 function blockLabelTimeIso(block: UrlImportBlock): string {
@@ -211,7 +237,19 @@ export function LapTimesIngestPanel({
   }, [practiceDayUrl]);
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
-  const metrics = useMemo(() => computeLapMetrics(parsedLaps), [parsedLaps]);
+  const manualMetrics = useMemo(() => {
+    const rows = value.manualLapRows;
+    if (rows?.length) {
+      const included = rows.filter((r) => r.isIncluded && r.lapNumber !== 0);
+      return {
+        lapCount: included.length,
+        bestLap: getBestLap(rows),
+        averageTop5: getAverageTopN(rows, 5),
+      };
+    }
+    return computeLapMetrics(parsedLaps);
+  }, [value.manualLapRows, parsedLaps]);
+  const metrics = manualMetrics;
 
   const urlPrimaryPreviewMetrics = useMemo(() => {
     if (value.sourceKind !== "url") return null;
@@ -267,9 +305,11 @@ export function LapTimesIngestPanel({
       const conf = (data as { confidence?: string | null })?.confidence ?? null;
       const filename = (data as { filename?: string | null })?.filename ?? file.name;
       const textFromLaps = laps.length ? laps.map((n) => n.toFixed(3)).join("\n") : value.manualText;
+      const manualLapRows = syncManualLapRowsFromText(textFromLaps, null);
       onChange({
         ...value,
         manualText: textFromLaps,
+        manualLapRows: manualLapRows.length ? manualLapRows : null,
         sourceKind: "screenshot",
         sourceDetail: filename || null,
         parserId: (data as { extractorId?: string })?.extractorId ?? "openai_gpt4o_mini_vision_v1",
@@ -932,8 +972,8 @@ export function LapTimesIngestPanel({
                   <div className="space-y-1 rounded-md border border-border bg-surface-runna-inset p-2">
                     <div className="ui-title text-sm text-muted-foreground">Lap preview</div>
                     <p className="text-[10px] leading-snug text-muted-foreground mb-1">
-                      Laps farther than ±50% from this driver&apos;s session median start excluded; use Include to
-                      restore a lap.
+                      Fast laps well below the session median start excluded; slow laps only when far above
+                      median. Use Include to restore a lap.
                     </p>
                     {(() => {
                       const keys = activePreviewKey?.split(":");
@@ -1024,9 +1064,11 @@ export function LapTimesIngestPanel({
             value={value.manualText}
             onChange={(e) => {
               const text = e.target.value;
+              const manualLapRows = syncManualLapRowsFromText(text, value.manualLapRows);
               onChange({
                 ...value,
                 manualText: text,
+                manualLapRows: manualLapRows.length ? manualLapRows : null,
                 sourceKind: tab === "manual" ? "manual" : value.sourceKind,
                 sourceDetail: tab === "manual" ? null : value.sourceDetail,
                 parserId: tab === "manual" ? null : value.parserId,
@@ -1035,6 +1077,48 @@ export function LapTimesIngestPanel({
             }}
             aria-label="Lap times"
           />
+          {value.manualLapRows && value.manualLapRows.length > 0 ? (
+            <div className="space-y-1 rounded-md border border-border bg-surface-runna-inset p-2">
+              <div className="ui-title text-sm text-muted-foreground">Lap include / exclude</div>
+              <p className="text-[10px] leading-snug text-muted-foreground mb-1">
+                Fast laps well below the session median start excluded; slow laps only when far above median.
+              </p>
+              <ul className="font-mono text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-surface-runna p-2 space-y-1">
+                {value.manualLapRows.map((row, i) => (
+                  <li
+                    key={`manual-${row.lapNumber}-${i}`}
+                    className={cn(
+                      "flex flex-wrap items-center gap-2 rounded px-1 py-0.5",
+                      row.isIncluded ? "opacity-100" : "opacity-50 line-through"
+                    )}
+                  >
+                    <span className="text-muted-foreground w-8 shrink-0">{row.lapNumber}.</span>
+                    <span className="min-w-[4.5rem]">{row.lapTimeSeconds.toFixed(3)}s</span>
+                    {!row.isIncluded ? (
+                      <span className="ui-title text-[10px] text-muted-foreground">Excluded</span>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={cn(
+                        "ml-auto shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium transition",
+                        row.isIncluded
+                          ? "border-border bg-surface-runna-inset hover:bg-surface-runna"
+                          : "border-border bg-surface-runna hover:bg-surface-runna-inset"
+                      )}
+                      onClick={() => {
+                        const next = value.manualLapRows!.map((r, idx) =>
+                          idx === i ? { ...r, isIncluded: !r.isIncluded } : r
+                        );
+                        onChange({ ...value, manualLapRows: next });
+                      }}
+                    >
+                      {row.isIncluded ? "Included" : "Excluded"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

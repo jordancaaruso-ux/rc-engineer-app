@@ -37,7 +37,22 @@ export type SetupSheetModelLayoutRow =
       unit?: string;
       leftKey: string;
       rightKey: string;
-    };
+    }
+  | {
+      type: "corner4";
+      ff: string;
+      fr: string;
+      rf: string;
+      rr: string;
+      label: string;
+      unit?: string;
+    }
+  | {
+      type: "screw_strip";
+      key: "motor_mount_screws" | "top_deck_screws" | "top_deck_cuts";
+      label: string;
+    }
+  | { type: "top_deck_block" };
 
 export type SetupSheetModelSchema = {
   version: 1;
@@ -160,6 +175,32 @@ function parseLayoutRow(raw: unknown): SetupSheetModelLayoutRow | null {
       rightKey,
     };
   }
+  if (type === "corner4") {
+    const ff = typeof r.ff === "string" ? r.ff.trim() : "";
+    const fr = typeof r.fr === "string" ? r.fr.trim() : "";
+    const rf = typeof r.rf === "string" ? r.rf.trim() : "";
+    const rr = typeof r.rr === "string" ? r.rr.trim() : "";
+    const label = typeof r.label === "string" ? r.label.trim() : "";
+    if (!ff || !fr || !rf || !rr) return null;
+    return {
+      type: "corner4",
+      ff,
+      fr,
+      rf,
+      rr,
+      label: label || "Corner",
+      unit: typeof r.unit === "string" ? r.unit.trim() || undefined : undefined,
+    };
+  }
+  if (type === "screw_strip") {
+    const key = r.key;
+    const label = typeof r.label === "string" ? r.label.trim() : "";
+    if (key !== "motor_mount_screws" && key !== "top_deck_screws" && key !== "top_deck_cuts") return null;
+    return { type: "screw_strip", key, label: label || key };
+  }
+  if (type === "top_deck_block") {
+    return { type: "top_deck_block" };
+  }
   return null;
 }
 
@@ -182,6 +223,23 @@ export function modelLayoutToStructuredSections(
           fieldKind: kind,
           multiline: row.multiline,
         };
+      }
+      if (row.type === "corner4") {
+        return {
+          type: "corner4",
+          ff: row.ff,
+          fr: row.fr,
+          rf: row.rf,
+          rr: row.rr,
+          label: row.label,
+          unit: row.unit,
+        };
+      }
+      if (row.type === "screw_strip") {
+        return { type: "screw_strip", key: row.key, label: row.label };
+      }
+      if (row.type === "top_deck_block") {
+        return { type: "top_deck_block" };
       }
       const left = schema.fields.find((f) => f.key === row.leftKey);
       const right = schema.fields.find((f) => f.key === row.rightKey);

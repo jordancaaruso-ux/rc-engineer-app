@@ -29,6 +29,7 @@ import {
 } from "@/lib/engineerPhase5/paceVsFieldRunDigestParse";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 function focusedPairForTirePriors(
   focused: null | Awaited<ReturnType<typeof buildFocusedRunPairContext>>
@@ -68,6 +69,158 @@ function exceptionToClientPayload(err: unknown): { message: string; debug?: stri
   return { message: message || "Engineer chat failed", debug };
 }
 
+type ChatRequestBody = {
+  messages?: Array<{ role?: unknown; content?: unknown }>;
+  runId?: unknown;
+  compareRunId?: unknown;
+  includePatternDigest?: unknown;
+  patternDigest?: unknown;
+  includeRunCatalog?: unknown;
+  timeZone?: unknown;
+  paceVsFieldRunDigest?: unknown;
+  paceVsFieldRunDigestSubset?: unknown;
+  stream?: unknown;
+};
+
+async function buildEngineerChatContext(params: {
+  userId: string;
+  body: ChatRequestBody | null;
+  messages: EngineerChatMessage[];
+  runId: string;
+  compareRunId: string;
+  timeZone: string;
+}) {
+  const { userId, body, messages, runId, compareRunId, timeZone } = params;
+  const basePacket = await buildEngineerContextPacketV1(userId);
+  const lastUser = [...messages].reverse().find((m) => m.role === "user");
+  const anchorForRichContext = runId || basePacket.latestRun?.id || null;
+
+  const [richEngineerContext, resolvedRunScope, focusedRunPair] = await Promise.all([
+    lastUser && typeof lastUser.content === "string"
+      ? buildEngineerRichContextV1({
+          userId,
+          anchorRunId: anchorForRichContext,
+          lastUserMessage: lastUser.content,
+        })
+      : Promise.resolve(null),
+    !runId && lastUser
+      ? resolveRunScopeForEngineerChat({
+          userId,
+          lastUserMessage: lastUser.content,
+          timeZone,
+        }).catch(() => null)
+      : Promise.resolve(null),
+    runId
+      ? buildFocusedRunPairContext(userId, runId, compareRunId || null)
+      : Promise.resolve(null),
+  ]);
+
+  if (runId && !focusedRunPair) {
+    return { error: "Run not found" as const };
+  }
+
+  const patternDigest =
+    body?.includePatternDigest === true &&
+    body?.patternDigest &&
+    typeof body.patternDigest === "object" &&
+    body.patternDigest !== null
+      ? body.patternDigest
+      : null;
+
+  const includeRunCatalog = body?.includeRunCatalog === true;
+  const paceVsFieldRunDigest = parsePaceVsFieldRunDigestPayload(body?.paceVsFieldRunDigest);
+  const paceVsFieldRunDigestSubset = parsePaceVsFieldRunDigestSubsetPayload(body?.paceVsFieldRunDigestSubset);
+
+  const brainCarId = richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null;
+  const brainAnchor = anchorForRichContext;
+
+  const [
+    summaryResult,
+    tireLifePriors,
+    setupOutcomeMemory,
+    engineeringBrain,
+    runCatalog,
+    resolvedScopeTireSteps,
+  ] = await Promise.all([
+    !focusedRunPair
+      ? getOrComputeEngineerSummaryForLatestRun(userId)
+      : !compareRunId
+        ? getOrComputeEngineerSummaryForRun(userId, focusedRunPair.primaryRunId)
+        : Promise.resolve(null),
+    buildTireLifePriorsForChatContext({
+      userId,
+      anchorRunId: anchorForRichContext,
+      focusedPair: focusedPairForTirePriors(focusedRunPair),
+    }),
+    buildSetupOutcomeMemoryForRun({
+      userId,
+      anchorRunId: anchorForRichContext,
+      carId: richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null,
+    }).catch(() => null),
+    brainCarId && brainAnchor
+      ? buildEngineeringBrainV1({
+          userId,
+          carId: brainCarId,
+          anchorRunId: brainAnchor,
+          referenceRunId: focusedRunPair?.compare?.id ?? null,
+        }).catch(() => null)
+      : Promise.resolve(null),
+    includeRunCatalog ? buildRunCatalogV1({ userId }) : Promise.resolve(null),
+    resolvedRunScope &&
+    !resolvedRunScope.ambiguousMeetingScope &&
+    resolvedRunScope.runs.length >= 2
+      ? computeResolvedScopeTireStepsV1({
+          userId,
+          runIds: resolvedRunScope.runs.map((r) => r.runId),
+        }).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+
+  const engineerSummary: EngineerRunSummaryV2 | null = summaryResult?.summary ?? null;
+  const setupHandlingPaceBundle = buildSetupHandlingPaceBundle(focusedRunPair);
+
+  const contextJson = {
+    defaultDashboardContext: basePacket,
+    engineerSummary,
+    richEngineerContext,
+    resolvedRunScope,
+    focusedRunPair,
+    patternDigest,
+    runCatalog,
+    tireLifePriors,
+    setupHandlingPaceBundle,
+    setupOutcomeMemory,
+    engineeringBrain,
+    resolvedScopeTireSteps,
+    thingsToTry: basePacket.thingsToTry,
+    thingsToDo: basePacket.thingsToDo,
+    paceVsFieldRunDigest,
+    paceVsFieldRunDigestSubset,
+  };
+
+  const baseForMerge = {
+    defaultDashboardContext: basePacket,
+    resolvedRunScope,
+    patternDigest,
+    runCatalog,
+    tireLifePriors,
+    resolvedScopeTireSteps,
+    setupHandlingPaceBundle,
+    setupOutcomeMemory,
+    engineeringBrain,
+    thingsToTry: basePacket.thingsToTry,
+    thingsToDo: basePacket.thingsToDo,
+    paceVsFieldRunDigest,
+    paceVsFieldRunDigestSubset,
+  };
+
+  return {
+    contextJson,
+    baseForMerge,
+    lastUser,
+  };
+}
+
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return jsonError(500, "DATABASE_URL is not set");
@@ -79,24 +232,7 @@ export async function POST(request: Request) {
   try {
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const body = (await request.json().catch(() => null)) as
-    | {
-        messages?: Array<{ role?: unknown; content?: unknown }>;
-        runId?: unknown;
-        compareRunId?: unknown;
-        /** When true, server attaches patternDigest from the client (Compare & trend). Default off so chat stays independent. */
-        includePatternDigest?: unknown;
-        patternDigest?: unknown;
-        /** When false, omit account run catalog from context (default: include). */
-        includeRunCatalog?: unknown;
-        /** IANA timezone for local-calendar run resolution (e.g. from Intl). */
-        timeZone?: unknown;
-        /** Client-built digest from GET /api/engineer/pace-vs-field-digest (optional). */
-        paceVsFieldRunDigest?: unknown;
-        /** Client-built selected rows from that digest (optional). */
-        paceVsFieldRunDigestSubset?: unknown;
-      }
-    | null;
+    const body = (await request.json().catch(() => null)) as ChatRequestBody | null;
     const raw = Array.isArray(body?.messages) ? body!.messages : [];
     const messages: EngineerChatMessage[] = raw
       .map((m) => {
@@ -111,194 +247,107 @@ export async function POST(request: Request) {
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
     const timeZone =
       typeof body?.timeZone === "string" && body.timeZone.trim().length > 0 ? body.timeZone.trim() : "UTC";
+    const useStream = body?.stream === true;
 
-    const basePacket = await buildEngineerContextPacketV1(user.id);
-
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
-    const anchorForRichContext = runId || basePacket.latestRun?.id || null;
-    const richEngineerContext =
-      lastUser && typeof lastUser.content === "string"
-        ? await buildEngineerRichContextV1({
-            userId: user.id,
-            anchorRunId: anchorForRichContext,
-            lastUserMessage: lastUser.content,
-          })
-        : null;
-    const resolvedRunScope =
-      !runId && lastUser
-        ? await resolveRunScopeForEngineerChat({
-            userId: user.id,
-            lastUserMessage: lastUser.content,
-            timeZone,
-          }).catch(() => null)
-        : null;
-
-    let focusedRunPair = null as Awaited<ReturnType<typeof buildFocusedRunPairContext>>;
-    if (runId) {
-      focusedRunPair = await buildFocusedRunPairContext(user.id, runId, compareRunId || null);
-      if (!focusedRunPair) {
-        return jsonError(404, "Run not found");
-      }
-    }
-
-    let engineerSummary: EngineerRunSummaryV2 | null = null;
-    if (!focusedRunPair) {
-      const summaryResult = await getOrComputeEngineerSummaryForLatestRun(user.id);
-      engineerSummary = summaryResult?.summary ?? null;
-    } else if (focusedRunPair && !compareRunId) {
-      const summaryResult = await getOrComputeEngineerSummaryForRun(user.id, focusedRunPair.primaryRunId);
-      engineerSummary = summaryResult?.summary ?? null;
-    }
-
-    const patternDigest =
-      body?.includePatternDigest === true &&
-      body?.patternDigest &&
-      typeof body.patternDigest === "object" &&
-      body.patternDigest !== null
-        ? body.patternDigest
-        : null;
-
-    const includeRunCatalog = body?.includeRunCatalog === true;
-    const runCatalog = includeRunCatalog ? await buildRunCatalogV1({ userId: user.id }) : null;
-
-    const paceVsFieldRunDigest = parsePaceVsFieldRunDigestPayload(body?.paceVsFieldRunDigest);
-    const paceVsFieldRunDigestSubset = parsePaceVsFieldRunDigestSubsetPayload(body?.paceVsFieldRunDigestSubset);
-
-    const tireLifePriors = await buildTireLifePriorsForChatContext({
+    const built = await buildEngineerChatContext({
       userId: user.id,
-      anchorRunId: anchorForRichContext,
-      focusedPair: focusedPairForTirePriors(focusedRunPair),
-    });
-
-    const setupHandlingPaceBundle = buildSetupHandlingPaceBundle(focusedRunPair);
-    const setupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
-      userId: user.id,
-      anchorRunId: anchorForRichContext,
-      carId: richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null,
-    }).catch(() => null);
-
-    const brainCarId = richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null;
-    const brainAnchor = anchorForRichContext;
-    const engineeringBrain =
-      brainCarId && brainAnchor
-        ? await buildEngineeringBrainV1({
-            userId: user.id,
-            carId: brainCarId,
-            anchorRunId: brainAnchor,
-            referenceRunId: focusedRunPair?.compare?.id ?? null,
-          }).catch(() => null)
-        : null;
-
-    const resolvedScopeTireSteps =
-      resolvedRunScope &&
-      !resolvedRunScope.ambiguousMeetingScope &&
-      resolvedRunScope.runs.length >= 2
-        ? await computeResolvedScopeTireStepsV1({
-            userId: user.id,
-            runIds: resolvedRunScope.runs.map((r) => r.runId),
-          }).catch(() => null)
-        : null;
-
-    const contextJson = {
-      defaultDashboardContext: basePacket,
-      engineerSummary,
-      /** Car, class, tires, track, setup vs template spread, retrieved vehicle-dynamics KB. */
-      richEngineerContext,
-      /** Auto-resolved runs from the latest user message (natural-language time scope). */
-      resolvedRunScope,
-      /** When set with `compareRunId`, deterministic summary is omitted (its reference run may differ). */
-      focusedRunPair,
-      /** Optional chronological series + setup deltas (same car) for trend questions. */
-      patternDigest,
-      /** Account-wide run inventory (compact rows); null when client disables to save tokens. */
-      runCatalog,
-      /** Learned k→k+1 tire-run pace medians (best, avg top 5/10/15) on this tire set. */
-      tireLifePriors,
-      /** Deterministic setup vs lap vs feel correlation facts for focused pair chat (null without focused pair). */
-      setupHandlingPaceBundle,
-      /** Prior setup changes on this car tied to better/worse chips; caveat-only, not ranking logic. */
-      setupOutcomeMemory,
-      /**
-       * Deterministic engineering brain (runQuality + feelRead + paceRead + hypotheses + recommendationStrategy
-       * + known-good/known-bad memory + mechanism analogies). The LLM should explain this — not re-derive.
-       */
-      engineeringBrain,
-      /**
-       * Pooled tire run **1→2** pace medians across multiple sets in resolvedRunScope, by event×track.
-       * Null when scope missing, ambiguous, or too few valid pairs.
-       */
-      resolvedScopeTireSteps,
-      thingsToTry: basePacket.thingsToTry,
-      thingsToDo: basePacket.thingsToDo,
-      /** Pre-scanned runs with meaningful avg top 10 vs session field mean (optional). */
-      paceVsFieldRunDigest,
-      /** User-selected slice of paceVsFieldRunDigest for focused answers (optional). */
-      paceVsFieldRunDigestSubset,
-    };
-
-    const baseForMerge = {
-      defaultDashboardContext: basePacket,
-      resolvedRunScope,
-      patternDigest,
-      runCatalog,
-      tireLifePriors,
-      resolvedScopeTireSteps,
-      setupHandlingPaceBundle,
-      setupOutcomeMemory,
-      engineeringBrain,
-      thingsToTry: basePacket.thingsToTry,
-      thingsToDo: basePacket.thingsToDo,
-      paceVsFieldRunDigest,
-      paceVsFieldRunDigestSubset,
-    };
-
-    const out = await generateEngineerChatReplyWithTools({
-      contextJson,
+      body,
       messages,
-      userId: user.id,
-      mergeContextWithFocusedPair: async (focused) => {
-        let summary: EngineerRunSummaryV2 | null = null;
-        if (!focused.compareRunId) {
-          const summaryResult = await getOrComputeEngineerSummaryForRun(user.id, focused.primaryRunId);
-          summary = summaryResult?.summary ?? null;
-        }
-        const rich =
-          lastUser && typeof lastUser.content === "string"
-            ? await buildEngineerRichContextV1({
-                userId: user.id,
-                anchorRunId: focused.primaryRunId,
-                lastUserMessage: lastUser.content,
-              })
-            : null;
-        const reTire = await buildTireLifePriorsForChatContext({
+      runId,
+      compareRunId,
+      timeZone,
+    });
+    if ("error" in built) {
+      return jsonError(404, built.error ?? "Run not found");
+    }
+    const { contextJson, baseForMerge, lastUser } = built;
+
+    const mergeContextWithFocusedPair = async (
+      focused: NonNullable<Awaited<ReturnType<typeof buildFocusedRunPairContext>>>
+    ) => {
+      const [summaryResult, rich, reTire, reSetupOutcomeMemory, reEngineeringBrain] = await Promise.all([
+        !focused.compareRunId
+          ? getOrComputeEngineerSummaryForRun(user.id, focused.primaryRunId)
+          : Promise.resolve(null),
+        lastUser && typeof lastUser.content === "string"
+          ? buildEngineerRichContextV1({
+              userId: user.id,
+              anchorRunId: focused.primaryRunId,
+              lastUserMessage: lastUser.content,
+            })
+          : Promise.resolve(null),
+        buildTireLifePriorsForChatContext({
           userId: user.id,
           anchorRunId: focused.primaryRunId,
           focusedPair: focusedPairForTirePriors(focused),
-        });
-        const reSetupOutcomeMemory = await buildSetupOutcomeMemoryForRun({
+        }),
+        buildSetupOutcomeMemoryForRun({
           userId: user.id,
           anchorRunId: focused.primaryRunId,
           carId: focused.primary.carId,
-        }).catch(() => null);
-        const reEngineeringBrain = focused.primary.carId
-          ? await buildEngineeringBrainV1({
+        }).catch(() => null),
+        focused.primary.carId
+          ? buildEngineeringBrainV1({
               userId: user.id,
               carId: focused.primary.carId,
               anchorRunId: focused.primaryRunId,
               referenceRunId: focused.compare?.id ?? null,
             }).catch(() => null)
-          : null;
-        return {
-          ...baseForMerge,
-          engineerSummary: summary,
-          focusedRunPair: focused,
-          richEngineerContext: rich,
-          tireLifePriors: reTire,
-          setupHandlingPaceBundle: buildSetupHandlingPaceBundle(focused),
-          setupOutcomeMemory: reSetupOutcomeMemory,
-          engineeringBrain: reEngineeringBrain,
-        };
-      },
+          : Promise.resolve(null),
+      ]);
+      return {
+        ...baseForMerge,
+        engineerSummary: summaryResult?.summary ?? null,
+        focusedRunPair: focused,
+        richEngineerContext: rich,
+        tireLifePriors: reTire,
+        setupHandlingPaceBundle: buildSetupHandlingPaceBundle(focused),
+        setupOutcomeMemory: reSetupOutcomeMemory,
+        engineeringBrain: reEngineeringBrain,
+      };
+    };
+
+    if (useStream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const send = (event: string, data: unknown) => {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+          };
+          try {
+            const out = await generateEngineerChatReplyWithTools({
+              contextJson,
+              messages,
+              userId: user.id,
+              mergeContextWithFocusedPair,
+              onToken: (t) => send("token", { t }),
+            });
+            send("done", {
+              reply: out.reply,
+              resolvedFocus: out.resolvedFocus,
+            });
+          } catch (err) {
+            const { message } = exceptionToClientPayload(err);
+            send("error", { message });
+          } finally {
+            controller.close();
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+        },
+      });
+    }
+
+    const out = await generateEngineerChatReplyWithTools({
+      contextJson,
+      messages,
+      userId: user.id,
+      mergeContextWithFocusedPair,
     });
 
     return NextResponse.json({
@@ -312,4 +361,3 @@ export async function POST(request: Request) {
     return jsonError(500, message, debug);
   }
 }
-

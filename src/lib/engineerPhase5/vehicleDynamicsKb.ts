@@ -100,6 +100,58 @@ type ScoredChunk = {
   snippet: VehicleDynamicsKbSnippet;
 };
 
+type KbIndexEntry = {
+  title: string;
+  body: string;
+  file: string;
+  keyTokens: Set<string>;
+};
+
+let kbIndexCache: KbIndexEntry[] | null = null;
+let kbIndexLoadPromise: Promise<KbIndexEntry[]> | null = null;
+
+async function loadKbIndex(): Promise<KbIndexEntry[]> {
+  if (kbIndexCache) return kbIndexCache;
+  if (!kbIndexLoadPromise) {
+    kbIndexLoadPromise = (async () => {
+      let files: string[] = [];
+      try {
+        files = (await fs.readdir(KB_DIR)).filter((f) => f.endsWith(".md") && f.toLowerCase() !== "readme.md");
+      } catch {
+        return [];
+      }
+      const entries: KbIndexEntry[] = [];
+      for (const file of files) {
+        const full = path.join(KB_DIR, file);
+        let raw = "";
+        try {
+          raw = await fs.readFile(full, "utf8");
+        } catch {
+          continue;
+        }
+        const chunks: Array<{ title: string; body: string }> = [];
+        if (/\n##\s/.test(raw)) {
+          const parts = raw.split(/\n(?=##\s)/);
+          for (const part of parts) {
+            const lines = part.trim().split("\n");
+            const titleLine = lines[0]?.replace(/^#+\s*/, "").trim() || file;
+            const body = lines.slice(1).join("\n").trim();
+            chunks.push({ title: titleLine, body });
+          }
+        } else {
+          chunks.push({ title: file.replace(/\.md$/i, ""), body: raw.trim() });
+        }
+        for (const { title, body } of chunks) {
+          entries.push({ title, body, file, keyTokens: extractKeyTokens(body) });
+        }
+      }
+      kbIndexCache = entries;
+      return entries;
+    })();
+  }
+  return kbIndexLoadPromise;
+}
+
 /**
  * Keyword search over markdown files in `content/vehicle-dynamics/`.
  * Sections split on `##` headings. Two-phase ranking:
@@ -118,52 +170,24 @@ export async function searchVehicleDynamicsKb(
   const tokens = tokenize(query);
   if (tokens.length === 0) return [];
 
-  let files: string[] = [];
-  try {
-    files = (await fs.readdir(KB_DIR)).filter((f) => f.endsWith(".md") && f.toLowerCase() !== "readme.md");
-  } catch {
-    return [];
-  }
-
+  const index = await loadKbIndex();
   const scored: ScoredChunk[] = [];
 
-  for (const file of files) {
-    const full = path.join(KB_DIR, file);
-    let raw = "";
-    try {
-      raw = await fs.readFile(full, "utf8");
-    } catch {
-      continue;
-    }
-    const chunks: Array<{ title: string; body: string }> = [];
-    if (/\n##\s/.test(raw)) {
-      const parts = raw.split(/\n(?=##\s)/);
-      for (const part of parts) {
-        const lines = part.trim().split("\n");
-        const titleLine = lines[0]?.replace(/^#+\s*/, "").trim() || file;
-        const body = lines.slice(1).join("\n").trim();
-        chunks.push({ title: titleLine, body });
-      }
-    } else {
-      chunks.push({ title: file.replace(/\.md$/i, ""), body: raw.trim() });
-    }
-    for (const { title, body } of chunks) {
-      const keyLine = extractKeyLine(body);
-      const keyTokens = extractKeyTokens(body);
-      const sc = scoreChunk(title, keyLine, body, tokens);
-      if (sc <= 0) continue;
-      const text = `${title}\n${body}`;
-      const excerpt = text.length > 900 ? `${text.slice(0, 897)}…` : text;
-      scored.push({
-        score: sc,
-        keyTokens,
-        snippet: {
-          sourcePath: `vehicle-dynamics/${file}`,
-          title: title.length > 80 ? `${title.slice(0, 77)}…` : title,
-          excerpt,
-        },
-      });
-    }
+  for (const { title, body, file, keyTokens } of index) {
+    const keyLine = extractKeyLine(body);
+    const sc = scoreChunk(title, keyLine, body, tokens);
+    if (sc <= 0) continue;
+    const text = `${title}\n${body}`;
+    const excerpt = text.length > 900 ? `${text.slice(0, 897)}…` : text;
+    scored.push({
+      score: sc,
+      keyTokens,
+      snippet: {
+        sourcePath: `vehicle-dynamics/${file}`,
+        title: title.length > 80 ? `${title.slice(0, 77)}…` : title,
+        excerpt,
+      },
+    });
   }
 
   scored.sort((a, b) => b.score - a.score);

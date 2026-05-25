@@ -1,6 +1,12 @@
 import type { LapRow } from "@/lib/lapAnalysis";
 
-/** Relative half-width around median: exclude laps outside `[median * (1 - band), median * (1 + band)]`. */
+/** Exclude laps faster than median × (1 − fastBand). Tight — catches grid/start-line timing errors. */
+export const DEFAULT_LAP_OUTLIER_FAST_BAND = 0.12;
+
+/** Exclude laps slower than median × (1 + slowBand). Looser — keeps plausible slow laps from inconsistency. */
+export const DEFAULT_LAP_OUTLIER_SLOW_BAND = 0.35;
+
+/** @deprecated Symmetric band kept for legacy callers/tests; prefer fastBand + slowBand. */
 export const DEFAULT_LAP_OUTLIER_RELATIVE_BAND = 0.5;
 
 /** Need at least this many finite non-zero laps before applying the rule. */
@@ -17,20 +23,27 @@ function medianSorted(sorted: number[]): number {
 }
 
 /**
- * Auto-set `isIncluded: false` for laps whose time lies outside a symmetric relative band
- * around the session median (per driver list). Lap 0 is never used for the median and is
- * left unchanged. Re-includes the closest excluded laps if the first pass would leave too
- * few included laps.
+ * Auto-set `isIncluded: false` for laps outside asymmetric bands around the session median.
+ * Fast outliers (impossible laps) use a tighter floor; slow outliers use a looser ceiling.
+ * Lap 0 is never used for the median and is left unchanged. Re-includes the closest excluded
+ * laps if the first pass would leave too few included laps.
  */
 export function applyMedianBandAutoExclude(
   rows: LapRow[],
   opts?: {
+    fastBand?: number;
+    slowBand?: number;
+    /** @deprecated When set without fastBand/slowBand, applies symmetric band to both sides. */
     band?: number;
     minLaps?: number;
     minIncluded?: number;
   }
 ): LapRow[] {
-  const band = opts?.band ?? DEFAULT_LAP_OUTLIER_RELATIVE_BAND;
+  const legacyBand = opts?.band ?? DEFAULT_LAP_OUTLIER_RELATIVE_BAND;
+  const fastBand =
+    opts?.fastBand ?? (opts?.band != null ? legacyBand : DEFAULT_LAP_OUTLIER_FAST_BAND);
+  const slowBand =
+    opts?.slowBand ?? (opts?.band != null ? legacyBand : DEFAULT_LAP_OUTLIER_SLOW_BAND);
   const minLaps = opts?.minLaps ?? DEFAULT_MIN_LAPS_FOR_OUTLIER_RULE;
   const minIncluded = opts?.minIncluded ?? DEFAULT_MIN_INCLUDED_AFTER_AUTO_EXCLUDE;
 
@@ -52,8 +65,8 @@ export function applyMedianBandAutoExclude(
   const med = medianSorted(sortedTimes);
   if (!Number.isFinite(med) || med <= 0) return next;
 
-  const low = med * (1 - band);
-  const high = med * (1 + band);
+  const low = med * (1 - fastBand);
+  const high = med * (1 + slowBand);
 
   for (const i of statIndices) {
     const t = next[i]!.lapTimeSeconds;

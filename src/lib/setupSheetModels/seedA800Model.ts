@@ -11,9 +11,52 @@ import {
   getCalibrationFieldKind,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { materializeAwesomatixTemplateDefaultsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
-import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import type {
+  SetupSheetModelFieldDef,
+  SetupSheetModelLayoutRow,
+  SetupSheetModelSchema,
+} from "@/lib/setupSheetModels/types";
 
 export { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetTemplateId";
+
+function structuredRowToModelLayout(row: (typeof A800RR_STRUCTURED_SECTIONS)[0]["rows"][0]): SetupSheetModelLayoutRow | null {
+  if (row.type === "single") {
+    return {
+      type: "single",
+      key: row.key,
+      label: row.label,
+      unit: row.unit,
+      multiline: row.multiline,
+    };
+  }
+  if (row.type === "pair") {
+    return {
+      type: "pair",
+      label: row.label,
+      unit: row.unit,
+      leftKey: row.leftKey,
+      rightKey: row.rightKey,
+    };
+  }
+  if (row.type === "corner4") {
+    return {
+      type: "corner4",
+      ff: row.ff,
+      fr: row.fr,
+      rf: row.rf,
+      rr: row.rr,
+      label: row.label,
+      unit: row.unit,
+    };
+  }
+  if (row.type === "screw_strip") {
+    return { type: "screw_strip", key: row.key, label: row.label };
+  }
+  if (row.type === "top_deck_block") {
+    return { type: "top_deck_block" };
+  }
+  return null;
+}
 
 /** Build schema from A800 catalog + structured sections (for migration seed). */
 export function buildA800SeedSchema(): SetupSheetModelSchema {
@@ -50,31 +93,8 @@ export function buildA800SeedSchema(): SetupSheetModelSchema {
     id: sec.id,
     title: sec.title,
     rows: sec.rows
-      .filter((row): row is Extract<typeof row, { type: "single" } | { type: "pair" }> =>
-        row.type === "single" || row.type === "pair"
-      )
-      .map((row) => {
-        if (row.type === "pair") {
-          return {
-            type: "pair" as const,
-            label: row.label,
-            unit: row.unit,
-            leftKey: row.leftKey,
-            rightKey: row.rightKey,
-          };
-        }
-        if (row.type === "single") {
-          return {
-            type: "single" as const,
-            key: row.key,
-            label: row.label,
-            unit: row.unit,
-            multiline: row.multiline,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean) as SetupSheetModelSchema["structuredSections"][0]["rows"],
+      .map((row) => structuredRowToModelLayout(row))
+      .filter((row): row is SetupSheetModelLayoutRow => row != null),
   }));
 
   return {

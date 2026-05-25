@@ -8,6 +8,51 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export type EngineerQueuedChatPrompt = { id: number; text: string };
 
+async function readSseStream(
+  res: Response,
+  onToken: (text: string) => void
+): Promise<{ reply: string; resolvedFocus: { runId: string; compareRunId: string | null } | null }> {
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("Stream had no body");
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let reply = "";
+  let resolvedFocus: { runId: string; compareRunId: string | null } | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const lines = chunk.split("\n");
+      let event = "message";
+      let dataLine = "";
+      for (const line of lines) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        if (line.startsWith("data:")) dataLine = line.slice(5).trim();
+      }
+      if (!dataLine) continue;
+      const data = JSON.parse(dataLine) as Record<string, unknown>;
+      if (event === "token" && typeof data.t === "string") {
+        reply += data.t;
+        onToken(data.t);
+      } else if (event === "done") {
+        if (typeof data.reply === "string" && data.reply.trim()) reply = data.reply;
+        resolvedFocus =
+          data.resolvedFocus && typeof data.resolvedFocus === "object"
+            ? (data.resolvedFocus as { runId: string; compareRunId: string | null })
+            : null;
+      } else if (event === "error") {
+        throw new Error(typeof data.message === "string" ? data.message : "Engineer chat failed");
+      }
+    }
+  }
+
+  return { reply, resolvedFocus };
+}
+
 export function EngineerChatPanel({
   queuedPrompt = null,
   onQueuedPromptConsumed,
@@ -38,25 +83,69 @@ export function EngineerChatPanel({
     messagesRef.current = messages;
   }, [messages]);
 
+  function applyResolvedFocus(resolved: { runId: string; compareRunId: string | null } | null) {
+    if (!resolved?.runId) return;
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("runId", resolved.runId);
+    if (resolved.compareRunId) sp.set("compareRunId", resolved.compareRunId);
+    else sp.delete("compareRunId");
+    router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+  }
+
   async function submitConversation(next: ChatMessage[]) {
     setChatBusy(true);
     setChatErr(null);
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
     try {
       const res = await fetch("/api/engineer/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: next,
+          stream: true,
           ...(runIdFromUrl ? { runId: runIdFromUrl } : {}),
           ...(compareRunIdFromUrl ? { compareRunId: compareRunIdFromUrl } : {}),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
+
+      if (res.headers.get("content-type")?.includes("text/event-stream") && res.ok && res.body) {
+        const { reply, resolvedFocus } = await readSseStream(res, (token) => {
+          setMessages((prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last?.role === "assistant") {
+              copy[copy.length - 1] = { ...last, content: last.content + token };
+            }
+            messagesRef.current = copy;
+            return copy;
+          });
+        });
+        applyResolvedFocus(resolvedFocus);
+        setMessages((prev) => {
+          const copy = [...prev];
+          const last = copy[copy.length - 1];
+          if (last?.role === "assistant") {
+            copy[copy.length - 1] = {
+              role: "assistant",
+              content: reply || last.content || "—",
+            };
+          }
+          const trimmed = copy.slice(-8);
+          messagesRef.current = trimmed;
+          return trimmed;
+        });
+        return;
+      }
+
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         debug?: string;
+        reply?: string;
+        resolvedFocus?: { runId: string; compareRunId: string | null } | null;
       };
       if (!res.ok) {
+        setMessages((prev) => prev.slice(0, -1));
         const base =
           data.error?.trim() ||
           (res.status === 502 || res.status === 503
@@ -68,22 +157,16 @@ export function EngineerChatPanel({
         setChatErr(base + extra);
         return;
       }
-      const resolved = (data as { resolvedFocus?: { runId: string; compareRunId: string | null } | null })
-        .resolvedFocus;
-      if (resolved?.runId) {
-        const sp = new URLSearchParams(searchParams.toString());
-        sp.set("runId", resolved.runId);
-        if (resolved.compareRunId) sp.set("compareRunId", resolved.compareRunId);
-        else sp.delete("compareRunId");
-        router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
-      }
-      const reply = (data as { reply?: string }).reply ?? "";
+      applyResolvedFocus(data.resolvedFocus ?? null);
+      const reply = data.reply ?? "";
       setMessages((prev) => {
-        const withAssistant = [...prev, { role: "assistant" as const, content: reply || "—" }].slice(-8);
+        const withoutEmpty = prev.slice(0, -1);
+        const withAssistant = [...withoutEmpty, { role: "assistant" as const, content: reply || "—" }].slice(-8);
         messagesRef.current = withAssistant;
         return withAssistant;
       });
     } catch (e) {
+      setMessages((prev) => (prev[prev.length - 1]?.content === "" ? prev.slice(0, -1) : prev));
       const msg = e instanceof Error ? e.message : "Network error — check connection and try again.";
       setChatErr(`Could not reach server: ${msg}`);
     } finally {
@@ -139,7 +222,7 @@ export function EngineerChatPanel({
                 <div className="text-[10px] ui-title text-muted-foreground mb-1">
                   {m.role === "user" ? "You" : "Engineer"}
                 </div>
-                <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                <div className="whitespace-pre-wrap break-words">{m.content || (chatBusy ? "…" : "—")}</div>
               </div>
             ))
           )}

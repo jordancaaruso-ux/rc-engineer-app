@@ -6,7 +6,9 @@ import { test } from "node:test";
 import type { LapRow } from "@/lib/lapAnalysis";
 import {
   applyMedianBandAutoExclude,
+  DEFAULT_LAP_OUTLIER_FAST_BAND,
   DEFAULT_LAP_OUTLIER_RELATIVE_BAND,
+  DEFAULT_LAP_OUTLIER_SLOW_BAND,
   DEFAULT_MIN_LAPS_FOR_OUTLIER_RULE,
 } from "@/lib/lapImport/autoExcludeOutlierLaps";
 
@@ -18,6 +20,12 @@ function rows(times: number[]): LapRow[] {
   }));
 }
 
+function median15Session(extra: number, atIndex: number): LapRow[] {
+  const times = [15, 16, 15, 16];
+  times.splice(atIndex, 0, extra);
+  return rows(times);
+}
+
 test("no-op when fewer than min laps", () => {
   const r = rows([20, 21, 22]);
   const out = applyMedianBandAutoExclude(r);
@@ -27,7 +35,7 @@ test("no-op when fewer than min laps", () => {
   );
 });
 
-test("excludes slow outlier beyond 1.5x median", () => {
+test("excludes slow outlier beyond slow band (legacy symmetric)", () => {
   const r = rows([20, 20, 20, 20, 60]);
   const out = applyMedianBandAutoExclude(r, {
     band: DEFAULT_LAP_OUTLIER_RELATIVE_BAND,
@@ -37,10 +45,26 @@ test("excludes slow outlier beyond 1.5x median", () => {
   assert.ok(out.slice(0, 4).every((x) => x.isIncluded));
 });
 
-test("excludes fast outlier below 0.5x median", () => {
-  const r = rows([5, 20, 20, 20, 20]);
-  const out = applyMedianBandAutoExclude(r);
-  assert.equal(out[0]!.isIncluded, false);
+test("excludes fast outlier below fast floor at ~15s median", () => {
+  assert.equal(applyMedianBandAutoExclude(median15Session(6, 0))[0]!.isIncluded, false);
+  assert.equal(applyMedianBandAutoExclude(median15Session(8, 0))[0]!.isIncluded, false);
+  assert.equal(applyMedianBandAutoExclude(median15Session(12, 0))[0]!.isIncluded, false);
+  assert.equal(applyMedianBandAutoExclude(median15Session(13, 0))[0]!.isIncluded, false);
+});
+
+test("keeps plausible slow laps within slow band at ~15s median", () => {
+  assert.equal(applyMedianBandAutoExclude(median15Session(14, 0))[0]!.isIncluded, true);
+  assert.equal(applyMedianBandAutoExclude(median15Session(18, 0))[0]!.isIncluded, true);
+  assert.equal(applyMedianBandAutoExclude(median15Session(19, 0))[0]!.isIncluded, true);
+});
+
+test("excludes very slow laps beyond slow band at ~15s median", () => {
+  assert.equal(applyMedianBandAutoExclude(median15Session(24, 0))[0]!.isIncluded, false);
+});
+
+test("default asymmetric bands use fastBand 0.12 and slowBand 0.35", () => {
+  assert.equal(DEFAULT_LAP_OUTLIER_FAST_BAND, 0.12);
+  assert.equal(DEFAULT_LAP_OUTLIER_SLOW_BAND, 0.35);
 });
 
 test("re-includes closest laps until at least 2 remain when band excludes almost all", () => {
