@@ -6,6 +6,7 @@ import { searchVehicleDynamicsKb } from "@/lib/engineerPhase5/vehicleDynamicsKb"
 import { assembleBetweenRunHintPayload, buildKbQueryForBetweenRunHints } from "@/lib/engineerPhase5/betweenRunHints/generateBetweenRunHints";
 import { prepareBetweenRunHintComputation } from "@/lib/engineerPhase5/betweenRunHints/prepareBetweenRunHintComputation";
 import type { BetweenRunHintPayloadV2 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
+import { engineerEligibleRunWhere } from "@/lib/engineerPhase5/runEligibility";
 
 function parseHintPayload(raw: unknown): BetweenRunHintPayloadV2 | null {
   if (!raw || typeof raw !== "object") return null;
@@ -115,11 +116,7 @@ export async function getOrComputeBetweenRunHint(
 
 export async function findLatestPrimaryRunIdForHints(userId: string): Promise<string | null> {
   const run = await prisma.run.findFirst({
-    where: {
-      userId,
-      loggingComplete: true,
-      carId: { not: null },
-    },
+    where: { userId, ...engineerEligibleRunWhere },
     orderBy: { sortAt: "desc" },
     select: { id: true },
   });

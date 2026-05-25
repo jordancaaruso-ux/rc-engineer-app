@@ -14,6 +14,10 @@ import { kbPhysicsPromptLinesForKeys } from "@/lib/engineerPhase5/kbSetupKeyPhys
 import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
 import { pickEngineerReferenceRunId } from "@/lib/engineerPhase5/pickEngineerReferenceRun";
+import {
+  engineerEligibleRunWhere,
+  isRunEligibleForEngineerArtifacts,
+} from "@/lib/engineerPhase5/runEligibility";
 
 const runSelect = {
   id: true,
@@ -63,18 +67,13 @@ function isEligible(run: {
   loggingCompletedAt: Date | null;
   carId: string | null;
 }): boolean {
-  if (!run.carId) return false;
-  return Boolean(run.loggingCompletedAt) || run.loggingComplete;
+  return isRunEligibleForEngineerArtifacts(run);
 }
 
 /** Latest run on the account eligible for dashboard Engineer suggestions (matches {@link isEligible}). */
 export async function findLatestPrimaryRunIdForDashboardSuggestion(userId: string): Promise<string | null> {
   const run = await prisma.run.findFirst({
-    where: {
-      userId,
-      carId: { not: null },
-      OR: [{ loggingCompletedAt: { not: null } }, { loggingComplete: true }],
-    },
+    where: { userId, ...engineerEligibleRunWhere },
     orderBy: { sortAt: "desc" },
     select: { id: true },
   });

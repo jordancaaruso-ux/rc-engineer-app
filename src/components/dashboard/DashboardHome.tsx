@@ -61,15 +61,15 @@ export function DashboardHome({
         </div>
       </header>
 
-      <section className="page-body flex max-w-3xl flex-col gap-3">
-        <HeroPanel>
+      <section className="page-body flex max-w-3xl flex-col gap-4">
+        <HeroPanel variant="muted" className="bg-card/80">
           <Link
             href={primaryAction.href}
-            className="group flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-1 py-0.5 text-left outline-offset-2 transition hover:bg-emerald-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/40"
+            className="group flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-1 py-0.5 text-left outline-offset-2 transition hover:bg-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/40"
           >
             <div className="min-w-0 flex-1 space-y-1">
               {todayDraftRunId ? (
-                <div className="text-[11px] ui-title text-emerald-700 dark:text-emerald-300">
+                <div className="text-[11px] ui-title text-accent">
                   Unfinished run
                 </div>
               ) : null}
@@ -87,7 +87,7 @@ export function DashboardHome({
                 </SectionMeta>
               ) : null}
               {todayDraftRunId && todayDraftSavedAt ? (
-                <div className="text-[10px] font-mono tabular-nums text-emerald-700 dark:text-emerald-300">
+                <div className="text-[10px] font-mono tabular-nums text-muted-foreground">
                   Saved{" "}
                   <RelativeTime
                     iso={todayDraftSavedAt}
@@ -98,7 +98,7 @@ export function DashboardHome({
             </div>
             <span
               aria-hidden
-              className="shrink-0 rounded-md border border-emerald-500/40 bg-background/60 px-2 py-1 text-[11px] font-medium text-emerald-800 transition group-hover:border-emerald-500/55 dark:text-emerald-200"
+              className="shrink-0 rounded-md border border-primary/40 bg-background/60 px-2 py-1 text-[11px] font-medium text-primary transition group-hover:border-primary/55"
             >
               {todayDraftRunId ? "Finish →" : "Start →"}
             </span>
@@ -151,7 +151,7 @@ export function DashboardHome({
           hasActiveEvent={Boolean(activeEvent)}
         />
 
-        <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/30">
+        <div className="rounded-xl border border-border bg-card/80 p-4 shadow-sm">
           <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <ActionItemListPanel
               list="try"
@@ -180,7 +180,7 @@ function EventContextCard({
   activeEvent: NonNullable<DashboardHomeModel["activeEvent"]>;
 }) {
   return (
-    <CardPanel className="shadow-black/30 p-3 sm:p-4">
+    <CardPanel className="p-4">
       <div className="text-xs font-medium text-muted-foreground">
         Active race meeting
       </div>

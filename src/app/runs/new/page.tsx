@@ -71,11 +71,12 @@ export default async function NewRunPage({
   return (
     <>
       <header className="page-header">
-        <div>
+        <div className="min-w-0">
           <h1 className="page-title">Log your run</h1>
+          <p className="page-subtitle mt-0.5">Capture session details, laps, and setup.</p>
         </div>
       </header>
-      <section className="page-body">
+      <section className="page-body max-w-3xl">
         <NewRunImportLinkChooser
           incompleteRuns={incompleteRunsForImport}
           importedLapTimeSessionId={importedLapTimeSessionIdRaw || null}

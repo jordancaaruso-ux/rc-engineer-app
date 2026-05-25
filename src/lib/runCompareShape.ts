@@ -21,7 +21,7 @@ export function toCompareRunShape(run: {
   handlingProblems?: string | null;
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   tireRunNumber: number;
-  setupSnapshot?: { id: string; data: unknown } | null;
+  setupSnapshot?: { id: string; data?: unknown } | null;
   sessionCompletedAt?: Date | string | null;
   loggingCompletedAt?: Date | string | null;
   sortAt?: Date | string | null;

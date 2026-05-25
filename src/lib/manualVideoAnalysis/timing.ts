@@ -29,9 +29,10 @@ export function driversFromParseResult(
     let role: "me" | "competitor" = "competitor";
     if (normPrimary) {
       const isMe =
+        d.normalizedName.toLowerCase() === normPrimary ||
+        d.driverName.toLowerCase() === normPrimary ||
         d.normalizedName.toLowerCase().includes(normPrimary) ||
-        d.driverName.toLowerCase().includes(normPrimary) ||
-        normPrimary.includes(d.normalizedName.toLowerCase());
+        d.driverName.toLowerCase().includes(normPrimary);
       if (isMe && !foundMe) {
         role = "me";
         foundMe = true;

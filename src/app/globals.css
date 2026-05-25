@@ -4,42 +4,42 @@
 :root {
   color-scheme: dark;
   /* Legacy single-hex aliases (some docs / snippets); UI uses Tailwind + rgb triplets below. */
-  --background: #0e1312;
-  --foreground: #ecf2ef;
-  --surface: #19201d;
-  --secondary-bg: #151c1a;
-  --muted-fg: #b0bbb7;
-  --faint: #73807b;
-  --border: #2a332f;
+  --background: #121214;
+  --foreground: #e8eaec;
+  --surface: #18181a;
+  --secondary-bg: #141416;
+  --muted-fg: #989ca0;
+  --faint: #5f6266;
+  --border: #202024;
   --accent: #2563eb;
   --primary: #c92a2a;
 
-  /* Tailwind theme bridge: space-separated RGB for `rgb(var(--x) / <alpha>)` */
-  --color-background: 14 19 18;
-  --color-foreground: 236 242 239;
-  --color-card: 25 32 29;
-  --color-card-foreground: 236 242 239;
+  /* Carbon Light default — slightly lifted surfaces; blue/red page mesh unchanged. */
+  --color-background: 12 12 14;
+  --color-foreground: 232 234 236;
+  --color-card: 18 18 20;
+  --color-card-foreground: 232 234 236;
   --color-primary: 201 42 42;
   --color-primary-foreground: 248 249 250;
-  --color-secondary: 21 28 26;
-  --color-secondary-foreground: 236 242 239;
-  --color-muted: 23 31 28;
-  --color-muted-foreground: 176 187 183;
+  --color-secondary: 14 14 16;
+  --color-secondary-foreground: 230 232 234;
+  --color-muted: 16 16 18;
+  --color-muted-foreground: 152 156 160;
   --color-accent: 37 99 235;
   --color-accent-foreground: 248 249 250;
   --color-destructive: 122 30 30;
-  --color-border: 42 51 47;
-  --color-input: 26 33 31;
+  --color-border: 32 32 36;
+  --color-input: 17 17 19;
   --color-ring: 201 42 42;
-  --color-faint: 115 128 123;
+  --color-faint: 95 98 102;
 
   /* Body mesh gradient alphas (theme previews may override) */
-  --body-glow-red-strong: 0.28;
-  --body-glow-red-soft: 0.24;
-  --body-glow-blue: 0.16;
-  --body-glow-center: 0.025;
-  --body-stripe-red: 0.03;
-  --body-stripe-blue: 0.035;
+  --body-glow-red-strong: 0.22;
+  --body-glow-red-soft: 0.19;
+  --body-glow-blue: 0.12;
+  --body-glow-center: 0.02;
+  --body-stripe-red: 0.024;
+  --body-stripe-blue: 0.028;
   /* boxShadow.glow / glow-sm (override per theme preview when primary feels too loud) */
   --glow-shadow-rgb: 201 42 42;
 
@@ -279,7 +279,9 @@ body {
   @apply relative flex min-h-screen overflow-x-hidden overflow-y-visible bg-transparent text-foreground;
   /* Prefer dynamic viewport height on phones so the shell fills under the island. */
   min-height: 100dvh;
-  /* Home indicator / gesture bar on iOS (Capacitor WebView). */
+}
+
+.bottom-nav {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -331,14 +333,6 @@ body {
      (env() resolves to 0 when there's no inset). */
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
-}
-
-/* Mobile: reserve space for the fixed hamburger at top-left.
-   Still respect the safe-area inset so notched phones keep their left edge. */
-@media (max-width: 767px) {
-  .page-header {
-    padding-left: calc(3.75rem + env(safe-area-inset-left));
-  }
 }
 
 .page-title {

@@ -36,7 +36,7 @@ export type SetupSheetModalRun = {
   track?: { id: string; name: string } | null;
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   event?: { name: string; track?: { name: string } | null } | null;
-  setupSnapshot?: { id: string; data: unknown } | null;
+  setupSnapshot?: { id: string; data?: unknown } | null;
   lapTimes?: unknown;
 };
 
@@ -64,6 +64,7 @@ export function SetupSheetModal({
     NumericAggregationCompareSlice
   > | null>(null);
   const [portalReady, setPortalReady] = useState(false);
+  const [loadedSetupData, setLoadedSetupData] = useState<unknown>(null);
 
   useEffect(() => {
     setPortalReady(true);
@@ -83,6 +84,30 @@ export function SetupSheetModal({
     setMode("this_run_only");
     setOtherRunId("");
   }, [open, run?.id]);
+
+  useEffect(() => {
+    if (!open || !run?.setupSnapshot?.id) {
+      setLoadedSetupData(null);
+      return;
+    }
+    if (run.setupSnapshot.data !== undefined) {
+      setLoadedSetupData(run.setupSnapshot.data);
+      return;
+    }
+    let alive = true;
+    void fetch(`/api/runs/${encodeURIComponent(run.id)}/setup-snapshot`)
+      .then((res) => res.json())
+      .then((payload: { setupSnapshot?: { data?: unknown } }) => {
+        if (!alive) return;
+        setLoadedSetupData(payload.setupSnapshot?.data ?? {});
+      })
+      .catch(() => {
+        if (alive) setLoadedSetupData({});
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, run?.id, run?.setupSnapshot?.id, run?.setupSnapshot?.data]);
 
   useEffect(() => {
     const bump = () => setActiveTick((t) => t + 1);
@@ -132,8 +157,8 @@ export function SetupSheetModal({
   }, [mode, otherRunId, runs]);
 
   const runSetup = useMemo<SetupSnapshotData>(
-    () => normalizeSetupData(run?.setupSnapshot?.data ?? {}),
-    [run?.setupSnapshot?.data]
+    () => normalizeSetupData(loadedSetupData ?? run?.setupSnapshot?.data ?? {}),
+    [loadedSetupData, run?.setupSnapshot?.data]
   );
 
   const baselineValue = useMemo<SetupSnapshotData | null>(() => {

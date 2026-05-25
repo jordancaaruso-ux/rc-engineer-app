@@ -74,6 +74,25 @@ export async function POST(request: Request) {
   const trackIdRaw = form.get("trackId");
   const runId = typeof runIdRaw === "string" && runIdRaw.trim() ? runIdRaw.trim() : null;
   const trackId = typeof trackIdRaw === "string" && trackIdRaw.trim() ? trackIdRaw.trim() : null;
+
+  if (runId) {
+    const ownedRun = await prisma.run.findFirst({
+      where: { id: runId, userId: user.id },
+      select: { id: true },
+    });
+    if (!ownedRun) {
+      return NextResponse.json({ error: "Run not found" }, { status: 400 });
+    }
+  }
+  if (trackId) {
+    const ownedTrack = await prisma.track.findFirst({
+      where: { id: trackId, userId: user.id },
+      select: { id: true },
+    });
+    if (!ownedTrack) {
+      return NextResponse.json({ error: "Track not found" }, { status: 400 });
+    }
+  }
   const localPathRaw = form.get("localAnalysisPath");
   const localAnalysisPath =
     typeof localPathRaw === "string" && localPathRaw.trim()

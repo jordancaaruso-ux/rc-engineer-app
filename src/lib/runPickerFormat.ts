@@ -23,7 +23,7 @@ export type RunPickerRun = {
   trackNameSnapshot?: string | null;
   lapTimes?: unknown;
   /** Present when run comes from for-picker / last APIs (load setup). */
-  setupSnapshot?: { id: string; data: unknown } | null;
+  setupSnapshot?: { id: string; data?: unknown } | null;
   /** On-track session time when known (import). */
   sessionCompletedAt?: Date | string | null;
   /** First save as complete; see {@link resolveRunDisplayInstant}. */

@@ -20,13 +20,13 @@ export async function fetchUrlText(url: string): Promise<FetchTextResult> {
         Accept: "text/html,application/json;q=0.9,text/plain;q=0.8,*/*;q=0.1",
       },
     });
+    if (!res.ok) {
+      return { ok: false, error: `HTTP ${res.status} from server`, status: res.status };
+    }
     const ct = res.headers.get("content-type") ?? "";
     const buf = await res.arrayBuffer();
     if (buf.byteLength > MAX_BYTES) {
       return { ok: false, error: "Page too large to import (max ~1.5 MB).", status: res.status };
-    }
-    if (!res.ok) {
-      return { ok: false, error: `HTTP ${res.status} from server`, status: res.status };
     }
     const text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
     return { ok: true, text, contentType: ct, finalUrl: res.url };

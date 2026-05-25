@@ -6,6 +6,7 @@ import {
   getMyNameSetting,
 } from "@/lib/appSettings";
 import { SettingsClient } from "@/components/settings/SettingsClient";
+import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
 import { ManufacturerBaselineAdminSection } from "@/components/settings/ManufacturerBaselineAdminSection";
@@ -32,12 +33,16 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="container mx-auto max-w-2xl py-8">
-      <h1 className="page-title text-base">Settings</h1>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Per-user preferences. These persist across Log Your Run forms and lap imports.
-      </p>
-      <div className="mt-6">
+    <>
+      <header className="page-header">
+        <div className="min-w-0">
+          <h1 className="page-title text-base">Settings</h1>
+          <p className="page-subtitle mt-0.5">
+            Per-user preferences. These persist across Log Your Run forms and lap imports.
+          </p>
+        </div>
+      </header>
+      <section className="page-body max-w-2xl">
         <SettingsClient
           initial={{
             myName: myName ?? "",
@@ -46,6 +51,7 @@ export default async function SettingsPage() {
             currentPracticeDayUrl: currentPracticeDayUrl ?? "",
           }}
         />
+        <SettingsNavSection />
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (
           <>
@@ -53,7 +59,7 @@ export default async function SettingsPage() {
             <ManufacturerBaselineAdminSection />
           </>
         ) : null}
-      </div>
-    </div>
+      </section>
+    </>
   );
 }

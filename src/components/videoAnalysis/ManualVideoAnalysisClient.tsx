@@ -1,15 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { VideoWithLineOverlay } from "./VideoWithLineOverlay";
 import { VideoFrameControls } from "./VideoFrameControls";
 import type { SectorLineNorm } from "./SectorLineCanvas";
 import type { ManualVideoSessionV1, DriverRole } from "@/lib/manualVideoAnalysis/types";
-import { lapSfKey } from "@/lib/manualVideoAnalysis/types";
+import { LAP_START_LINE_KEY, lapSfKey } from "@/lib/manualVideoAnalysis/types";
 import { compareBestLaps, averageSectorSplits } from "@/lib/manualVideoAnalysis/sectors";
 import {
   getLapAlignmentPreview,
+  getLapAlignSteps,
+  isValidLapSpan,
   confirmLapAlignmentMarks,
   type LapAlignmentPreview,
 } from "@/lib/manualVideoAnalysis/predictSectors";
@@ -101,8 +103,11 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
   const [saving, setSaving] = useState(false);
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [activeLap, setActiveLap] = useState<ActiveLap | null>(null);
+  const [alignStepIndex, setAlignStepIndex] = useState(0);
   const [anchorLapInput, setAnchorLapInput] = useState("1");
   const [showDiscardPool, setShowDiscardPool] = useState(false);
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPersistRef = useRef<ManualVideoSessionV1 | null>(null);
 
   const lines: SectorLineNorm[] =
     data?.sectorLines.map((l) => ({
@@ -143,10 +148,11 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
   useEffect(() => {
     return () => {
       if (videoObjectUrlRef.current) URL.revokeObjectURL(videoObjectUrlRef.current);
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     };
   }, []);
 
-  async function saveSession(next: ManualVideoSessionV1) {
+  async function persistSession(next: ManualVideoSessionV1, opts?: { reload?: boolean }) {
     const normalized = normalizeManualSession(next);
     setSession(normalized);
     setSaving(true);
@@ -159,9 +165,29 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
     setSaving(false);
     if (!res.ok) {
       setMsg("Failed to save");
-      return;
+      return false;
     }
-    void load();
+    if (opts?.reload) void load();
+    return true;
+  }
+
+  function schedulePersist(next: ManualVideoSessionV1) {
+    pendingPersistRef.current = next;
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      const pending = pendingPersistRef.current;
+      pendingPersistRef.current = null;
+      if (pending) void persistSession(pending);
+    }, 500);
+  }
+
+  async function saveSession(next: ManualVideoSessionV1) {
+    if (persistTimerRef.current) {
+      clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    pendingPersistRef.current = null;
+    await persistSession(next, { reload: true });
   }
 
   function setVideoFile(file: File | null) {
@@ -207,20 +233,35 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
     setMsg(`Baseline: your lap ${lapNumber} finish at ${currentVideoTime().toFixed(2)}s`);
   }
 
-  function fineTuneSf(role: DriverRole, lapNumber: number) {
-    if (!session) return;
-    const key = lapSfKey(role, lapNumber);
-    void saveSession({
-      ...session,
-      sync: {
-        ...session.sync,
-        perLapSfEnd: {
-          ...session.sync.perLapSfEnd,
-          [key]: currentVideoTime(),
-        },
-      },
+  function applyMarkAtPlayhead(
+    base: ManualVideoSessionV1,
+    lap: ActiveLap,
+    lineKey: string,
+    isLapFinish: boolean
+  ): ManualVideoSessionV1 {
+    const t = currentVideoTime();
+    const marks = base.marks.filter(
+      (m) =>
+        !(m.driverRole === lap.role && m.lapNumber === lap.lapNumber && m.lineKey === lineKey)
+    );
+    marks.push({
+      driverRole: lap.role,
+      lapNumber: lap.lapNumber,
+      lineKey,
+      videoTimeSec: t,
     });
-    setMsg(`Finish updated for lap ${lapNumber}`);
+    let next: ManualVideoSessionV1 = { ...base, marks };
+    if (isLapFinish) {
+      const key = lapSfKey(lap.role, lap.lapNumber);
+      next = {
+        ...next,
+        sync: {
+          ...next.sync,
+          perLapSfEnd: { ...next.sync.perLapSfEnd, [key]: t },
+        },
+      };
+    }
+    return normalizeManualSession(next);
   }
 
   function discardLap(role: DriverRole, lapNumber: number) {
@@ -232,18 +273,68 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
     setMsg(`Lap ${lapNumber} discarded — top 3 refilled`);
   }
 
+  function overlayLineForStep(step: { lineKey: string; isLapStart: boolean; isLapFinish: boolean }) {
+    if (step.isLapStart || step.isLapFinish) return "sf";
+    return step.lineKey;
+  }
+
+  function seekToAlignStep(
+    preview: LapAlignmentPreview,
+    stepIndex: number,
+    steps: ReturnType<typeof getLapAlignSteps>
+  ) {
+    const step = steps[stepIndex];
+    if (!step) return;
+    setAlignStepIndex(stepIndex);
+    setActiveLine(overlayLineForStep(step));
+    seekTo(step.videoTimeSec);
+  }
+
   function selectLap(role: DriverRole, lapNumber: number) {
-    setActiveLap({ role, lapNumber });
     if (!session) return;
     const preview = getLapAlignmentPreview(session, sectorLinesForCompute, role, lapNumber);
-    if (preview?.lapStartSec != null) {
-      seekTo(Math.max(0, preview.lapStartSec - 1));
-    } else if (preview?.lapEndSec != null) {
-      seekTo(preview.lapEndSec);
+    setActiveLap({ role, lapNumber });
+    setAlignStepIndex(0);
+    if (preview?.lapStartSec == null || preview.lapEndSec == null) {
+      setMsg("Set your lap finish baseline first.");
+      return;
     }
-    if (preview?.crossings[0]) {
-      setActiveLine(preview.crossings[0].lineKey);
+    const steps = getLapAlignSteps(preview);
+    if (steps.length === 0) {
+      setMsg("Could not predict lap timing.");
+      return;
     }
+    seekToAlignStep(preview, 0, steps);
+    setMsg(`Lap ${lapNumber}: at lap start — align sectors, then lap finish.`);
+  }
+
+  function advanceAlignStep(applyPlayhead: boolean) {
+    if (!session || !activeLap) return;
+    let s = session;
+    const preview0 = getLapAlignmentPreview(s, sectorLinesForCompute, activeLap.role, activeLap.lapNumber);
+    if (!preview0?.lapEndSec) return;
+    const steps0 = getLapAlignSteps(preview0);
+    const step = steps0[alignStepIndex];
+    if (!step) return;
+
+    if (applyPlayhead) {
+      s = applyMarkAtPlayhead(s, activeLap, step.lineKey, step.isLapFinish);
+      setSession(s);
+      schedulePersist(s);
+    }
+
+    const preview = getLapAlignmentPreview(s, sectorLinesForCompute, activeLap.role, activeLap.lapNumber);
+    if (!preview) return;
+    const steps = getLapAlignSteps(preview);
+    const nextIndex = alignStepIndex + 1;
+    if (nextIndex >= steps.length) {
+      setAlignStepIndex(steps.length - 1);
+      setMsg("All steps done — save lap alignment.");
+      return;
+    }
+    seekToAlignStep(preview, nextIndex, steps);
+    const next = steps[nextIndex]!;
+    setMsg(`${next.label} — frame-step if needed, then Next`);
   }
 
   function confirmActiveLap() {
@@ -258,73 +349,40 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
     setMsg(`Lap ${activeLap.lapNumber} alignment saved`);
   }
 
-  function jumpToCrossing(c: { lineKey: string; videoTimeSec: number }) {
-    setActiveLine(c.lineKey);
-    seekTo(c.videoTimeSec);
-  }
+  const activePreview: LapAlignmentPreview | null = useMemo(
+    () =>
+      session && activeLap
+        ? getLapAlignmentPreview(
+            session,
+            sectorLinesForCompute,
+            activeLap.role,
+            activeLap.lapNumber
+          )
+        : null,
+    [session, activeLap, sectorLinesForCompute]
+  );
 
-  function setCrossingAtPlayhead(lineKey: string) {
-    if (!session || !activeLap) return;
-    const t = currentVideoTime();
-    const marks = session.marks.filter(
-      (m) =>
-        !(
-          m.driverRole === activeLap.role &&
-          m.lapNumber === activeLap.lapNumber &&
-          m.lineKey === lineKey
+  const alignSteps = useMemo(
+    () =>
+      activePreview && isValidLapSpan(activePreview.lapStartSec, activePreview.lapEndSec)
+        ? getLapAlignSteps(activePreview)
+        : [],
+    [activePreview]
+  );
+  const currentAlignStep = alignSteps[alignStepIndex] ?? null;
+
+  const currentStepConfirmed =
+    session &&
+    activeLap &&
+    currentAlignStep &&
+    (currentAlignStep.isLapStart
+      ? session.marks.some(
+          (m) =>
+            m.driverRole === activeLap.role &&
+            m.lapNumber === activeLap.lapNumber &&
+            m.lineKey === LAP_START_LINE_KEY
         )
-    );
-    marks.push({
-      driverRole: activeLap.role,
-      lapNumber: activeLap.lapNumber,
-      lineKey,
-      videoTimeSec: t,
-    });
-    if (lineKey === "sf") {
-      const key = lapSfKey(activeLap.role, activeLap.lapNumber);
-      void saveSession({
-        ...session,
-        marks,
-        sync: {
-          ...session.sync,
-          perLapSfEnd: { ...session.sync.perLapSfEnd, [key]: t },
-        },
-      });
-    } else {
-      void saveSession({ ...session, marks });
-    }
-    setMsg(`${lineKey} at ${t.toFixed(2)}s`);
-  }
-
-  const activePreview: LapAlignmentPreview | null =
-    session && activeLap
-      ? getLapAlignmentPreview(
-          session,
-          sectorLinesForCompute,
-          activeLap.role,
-          activeLap.lapNumber
-        )
-      : null;
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v || !activePreview?.crossings.length) return;
-    const onTime = () => {
-      const t = v.currentTime;
-      let best = activePreview.crossings[0]!;
-      let bestD = Math.abs(t - best.videoTimeSec);
-      for (const c of activePreview.crossings) {
-        const d = Math.abs(t - c.videoTimeSec);
-        if (d < bestD) {
-          bestD = d;
-          best = c;
-        }
-      }
-      if (bestD < 1.5) setActiveLine(best.lineKey);
-    };
-    v.addEventListener("timeupdate", onTime);
-    return () => v.removeEventListener("timeupdate", onTime);
-  }, [activePreview]);
+      : activePreview?.crossings.find((c) => c.lineKey === currentAlignStep.lineKey)?.confirmed);
 
   if (!data || !session) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -423,7 +481,9 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
             className={`rounded-lg border border-border bg-card p-3 space-y-2 ${!hasAnchor ? "opacity-50 pointer-events-none" : ""}`}
           >
             <p className="font-medium text-sm">2. Top 3 laps</p>
-            <p className="text-muted-foreground">Click a lap to preview. × discards (next fastest refills).</p>
+            <p className="text-muted-foreground">
+              Click a lap — video jumps to calculated lap start (SF), then S1, S2, …, finish.
+            </p>
             {meDriver && (
               <Top3LapChips
                 label={meName}
@@ -486,75 +546,79 @@ export function ManualVideoAnalysisClient({ jobId }: { jobId: string }) {
               <p className="font-medium text-sm">
                 Lap {activeLap.lapNumber} · {activeLap.role === "me" ? meName : compName}
                 <span className="font-mono text-muted-foreground ml-2">
-                  {activePreview.lapTimeSec.toFixed(3)}s transponder
+                  {activePreview.lapTimeSec.toFixed(3)}s
                 </span>
               </p>
-              {!activePreview.crossings.length ? (
+              {!currentAlignStep ? (
                 <p className="text-amber-600 dark:text-amber-400">Set baseline first.</p>
               ) : (
                 <>
-                  <p className="text-muted-foreground">
-                    Guessed sectors (equal split). Scrub to match, then confirm.
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Step {alignStepIndex + 1} of {alignSteps.length}
                   </p>
-                  <ul className="space-y-1">
-                    {activePreview.crossings.map((c) => (
-                      <li
-                        key={c.lineKey}
-                        className={`flex items-center justify-between gap-2 rounded px-1.5 py-0.5 ${
-                          activeLine === c.lineKey ? "bg-primary/10" : ""
+                  <p className="font-medium text-sm">{currentAlignStep.label}</p>
+                  <p className="text-muted-foreground">
+                    {currentAlignStep.isLapStart
+                      ? "Exact calculated lap start (SF crossing). Adjust if needed, then Next."
+                      : currentAlignStep.isLapFinish
+                        ? "Calculated lap finish (SF). Adjust if needed, then save."
+                        : "Guessed sector time from lap split — align crossing, then Next."}
+                  </p>
+                  <p className="font-mono text-muted-foreground">
+                    Predicted {currentAlignStep.videoTimeSec.toFixed(2)}s
+                    {currentStepConfirmed ? " · adjusted ✓" : ""}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {alignSteps.map((s, i) => (
+                      <button
+                        key={`${s.lineKey}-${i}`}
+                        type="button"
+                        title={s.label}
+                        className={`rounded px-1.5 py-0.5 font-mono text-[10px] border ${
+                          i === alignStepIndex
+                            ? "border-primary bg-primary/15"
+                            : "border-border opacity-60"
                         }`}
+                        onClick={() => seekToAlignStep(activePreview, i, alignSteps)}
                       >
-                        <span>
-                          {c.label}
-                          <span className="font-mono text-muted-foreground ml-1">
-                            {c.videoTimeSec.toFixed(2)}s
-                          </span>
-                          {c.confirmed ? <span className="text-green-600 ml-1">✓</span> : null}
-                        </span>
-                        <span className="shrink-0 flex gap-1">
-                          <button
-                            type="button"
-                            className="underline"
-                            onClick={() => jumpToCrossing(c)}
-                          >
-                            Go
-                          </button>
-                          <button
-                            type="button"
-                            className="underline"
-                            onClick={() => setCrossingAtPlayhead(c.lineKey)}
-                          >
-                            Here
-                          </button>
-                        </span>
-                      </li>
+                        {s.isLapStart ? "Start" : s.isLapFinish ? "End" : s.lineKey}
+                      </button>
                     ))}
-                  </ul>
+                  </div>
                   <div className="flex flex-wrap gap-2 pt-1">
                     <button
                       type="button"
                       className="rounded-md border border-border px-2 py-1 hover:bg-muted"
-                      onClick={() => {
-                        if (activePreview.lapEndSec != null) seekTo(activePreview.lapEndSec);
-                      }}
+                      onClick={() =>
+                        seekToAlignStep(activePreview, alignStepIndex, alignSteps)
+                      }
                     >
-                      Jump to finish
+                      Replay step
                     </button>
                     <button
                       type="button"
                       className="rounded-md border border-border px-2 py-1 hover:bg-muted"
-                      onClick={() => fineTuneSf(activeLap.role, activeLap.lapNumber)}
+                      onClick={() => advanceAlignStep(true)}
                     >
-                      Finish at playhead
+                      Set here & next
                     </button>
                     <button
                       type="button"
-                      className="rounded-md bg-primary px-2 py-1 text-primary-foreground ml-auto"
-                      onClick={confirmActiveLap}
+                      className="rounded-md bg-primary px-2 py-1 text-primary-foreground"
+                      onClick={() => advanceAlignStep(false)}
                     >
-                      Confirm lap
+                      Next →
                     </button>
                   </div>
+                  {alignStepIndex >= alignSteps.length - 1 && (
+                    <button
+                      type="button"
+                      className="rounded-md border border-green-600/50 px-2 py-1 w-full mt-1 hover:bg-muted"
+                      onClick={confirmActiveLap}
+                    >
+                      Save lap alignment
+                    </button>
+                  )}
                 </>
               )}
             </div>

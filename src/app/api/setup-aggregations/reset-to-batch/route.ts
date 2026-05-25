@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
 import { rebuildSetupAggregationsForUserCars } from "@/lib/setupAggregations/rebuildCarParameterAggregations";
 import { rebuildCommunityTemplateAggregations } from "@/lib/setupAggregations/rebuildCommunityTemplateAggregations";
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
 
   const [userCars, community] = await Promise.all([
     rebuildSetupAggregationsForUserCars(user.id),
-    rebuildCommunityTemplateAggregations(),
+    isAuthAdminEmail(user.email) ? rebuildCommunityTemplateAggregations() : Promise.resolve(null),
   ]);
 
   return NextResponse.json(

@@ -502,15 +502,6 @@ export async function generateEngineerChatReplyWithTools(params: {
   ];
 
   const MAX_ITERS = 10;
-  // #region agent log
-  const __dbgSend = (payload: Record<string, unknown>) => {
-    fetch('http://127.0.0.1:7349/ingest/41177859-c46a-4945-9afc-e968b6564943', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4f2a81' },
-      body: JSON.stringify({ sessionId: '4f2a81', timestamp: Date.now(), ...payload }),
-    }).catch(() => {});
-  };
-  // #endregion
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const opts = getEngineerChatModelAndTemperature();
     messagesApi[0] = {
@@ -519,29 +510,6 @@ export async function generateEngineerChatReplyWithTools(params: {
     };
 
     const useTools = true;
-    // #region agent log
-    const __dbgIterT0 = Date.now();
-    const __dbgBodyStr = JSON.stringify(
-      buildChatCompletionBody(opts.model, opts.temperature, {
-        messages: messagesApi,
-        ...(useTools ? { tools: TOOLS, tool_choice: "auto" as const } : { tool_choice: "none" as const }),
-      })
-    );
-    __dbgSend({
-      runId: 'llm-iter',
-      hypothesisId: 'H1,H2',
-      location: 'src/lib/engineerPhase5/openaiEngineer.ts:iter-start',
-      message: 'iteration start',
-      data: {
-        iter,
-        messagesCount: messagesApi.length,
-        contextSysMsgChars:
-          typeof messagesApi[1]?.content === 'string' ? (messagesApi[1].content as string).length : 0,
-        totalBodyChars: __dbgBodyStr.length,
-        model: opts.model,
-      },
-    });
-    // #endregion
     const bodyObj = buildChatCompletionBody(opts.model, opts.temperature, {
       messages: messagesApi,
       ...(useTools ? { tools: TOOLS, tool_choice: "auto" as const } : { tool_choice: "none" as const }),
@@ -590,42 +558,12 @@ export async function generateEngineerChatReplyWithTools(params: {
             typeof argsObj.compare_run_id === "string" && argsObj.compare_run_id.trim()
               ? argsObj.compare_run_id.trim()
               : null;
-          // #region agent log
-          const __dbgFocusT0 = Date.now();
-          // #endregion
           const applied = await applyEngineerFocusTool(params.userId, primary, compare);
           if (!applied.ok) {
             messagesApi.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: applied.error }) });
-            // #region agent log
-            __dbgSend({
-              runId: 'llm-tool',
-              hypothesisId: 'H5',
-              location: 'src/lib/engineerPhase5/openaiEngineer.ts:apply-focus-fail',
-              message: 'apply_engineer_focus failed',
-              data: { iter, ms: Date.now() - __dbgFocusT0, error: applied.error },
-            });
-            // #endregion
             continue;
           }
-          // #region agent log
-          const __dbgMergeT0 = Date.now();
-          // #endregion
           workingContext = await params.mergeContextWithFocusedPair(applied.focusedRunPair);
-          // #region agent log
-          __dbgSend({
-            runId: 'llm-tool',
-            hypothesisId: 'H5',
-            location: 'src/lib/engineerPhase5/openaiEngineer.ts:apply-focus-ok',
-            message: 'apply_engineer_focus + merge context',
-            data: {
-              iter,
-              applyMs: __dbgMergeT0 - __dbgFocusT0,
-              mergeMs: Date.now() - __dbgMergeT0,
-              primaryRunId: applied.focusedRunPair.primaryRunId,
-              hasCompare: Boolean(applied.focusedRunPair.compareRunId),
-            },
-          });
-          // #endregion
           resolvedFocus = {
             runId: applied.focusedRunPair.primaryRunId,
             compareRunId: applied.focusedRunPair.compareRunId,
@@ -646,25 +584,7 @@ export async function generateEngineerChatReplyWithTools(params: {
           continue;
         }
 
-        // #region agent log
-        const __dbgToolT0 = Date.now();
-        // #endregion
         const toolContent = await executeSearchOrListTool(name, args, params.userId);
-        // #region agent log
-        __dbgSend({
-          runId: 'llm-tool',
-          hypothesisId: 'H1',
-          location: 'src/lib/engineerPhase5/openaiEngineer.ts:search-list-tool',
-          message: 'search/list tool executed',
-          data: {
-            iter,
-            tool: name,
-            argsChars: args.length,
-            ms: Date.now() - __dbgToolT0,
-            resultChars: toolContent.length,
-          },
-        });
-        // #endregion
         messagesApi.push({ role: "tool", tool_call_id: tc.id, content: toolContent });
       }
       continue;

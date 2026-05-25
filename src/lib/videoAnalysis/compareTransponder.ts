@@ -24,12 +24,27 @@ export function compareVideoToTransponder(
       : [...tracks].sort((a, b) => b.lapCount - a.lapCount)[0];
   if (!target) return null;
 
-  const videoTimes = [...target.laps].sort((a, b) => a.lapIndex - b.lapIndex).map((l) => l.lapTimeSec);
-  const refTimes = [...transponderLaps]
-    .sort((a, b) => a.lapNumber - b.lapNumber)
-    .map((l) => l.lapTimeSec);
-  const n = Math.min(videoTimes.length, refTimes.length);
-  const deltas = Array.from({ length: n }, (_, i) => Math.abs(videoTimes[i]! - refTimes[i]!));
+  const videoByLap = new Map<number, number>();
+  for (const lap of target.laps) {
+    const key = lap.lapIndex;
+    if (!videoByLap.has(key)) videoByLap.set(key, lap.lapTimeSec);
+  }
+  const refByLap = new Map<number, number>();
+  for (const lap of transponderLaps) {
+    if (!refByLap.has(lap.lapNumber)) refByLap.set(lap.lapNumber, lap.lapTimeSec);
+  }
+
+  const sharedLaps = [...videoByLap.keys()]
+    .filter((n) => refByLap.has(n))
+    .sort((a, b) => a - b);
+
+  const deltas = sharedLaps.map((n) =>
+    Math.abs(videoByLap.get(n)! - refByLap.get(n)!)
+  );
+  const videoTimes = sharedLaps.map((n) => videoByLap.get(n)!);
+  const refTimes = sharedLaps.map((n) => refByLap.get(n)!);
+
+  const n = deltas.length;
   const sorted = [...deltas].sort((a, b) => a - b);
   const median = sorted.length ? sorted[Math.floor(sorted.length / 2)]! : null;
   const within015 = deltas.filter((d) => d <= 0.15).length;
@@ -39,7 +54,7 @@ export function compareVideoToTransponder(
     medianDeltaSec: median,
     pctWithin0_15s: n ? within015 / n : 0,
     deltasSec: deltas.map((d) => Math.round(d * 1000) / 1000),
-    videoLapTimesSec: videoTimes.slice(0, n),
-    transponderLapTimesSec: refTimes.slice(0, n),
+    videoLapTimesSec: videoTimes,
+    transponderLapTimesSec: refTimes,
   };
 }

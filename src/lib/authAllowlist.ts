@@ -1,15 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { parseEmailSetFromEnv } from "@/lib/authEmailSets";
 
 /** Comma- or whitespace-separated list in env (case-insensitive). */
 export function parseEnvAuthAllowlist(): Set<string> {
-  const raw = process.env.AUTH_ALLOWED_EMAILS?.trim();
-  if (!raw) return new Set();
-  return new Set(
-    raw
-      .split(/[,\s]+/)
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean)
-  );
+  return parseEmailSetFromEnv(process.env.AUTH_ALLOWED_EMAILS);
 }
 
 /**

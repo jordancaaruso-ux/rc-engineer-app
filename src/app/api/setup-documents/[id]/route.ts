@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
+import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -104,14 +106,27 @@ export async function PATCH(request: Request, ctx: Ctx) {
       data.parsedSetupManuallyEdited = true;
     }
   }
-  if (body.parseStatus) {
+  if (body.parseStatus && isAuthAdminEmail(user.email)) {
     data.parseStatus = body.parseStatus;
   }
   if (body.calibrationProfileId !== undefined) {
-    data.calibrationProfileId =
+    const nextId =
       typeof body.calibrationProfileId === "string" && body.calibrationProfileId.trim()
         ? body.calibrationProfileId.trim()
         : null;
+    if (nextId) {
+      const effective = await getEffectiveCalibrationProfileId({
+        userId: user.id,
+        explicitCalibrationId: nextId,
+        context: "setup-documents PATCH",
+      });
+      if (!effective.calibrationId) {
+        return NextResponse.json({ error: "Calibration not found or not accessible" }, { status: 400 });
+      }
+      data.calibrationProfileId = effective.calibrationId;
+    } else {
+      data.calibrationProfileId = null;
+    }
     data.parsedCalibrationProfileId = null;
     data.parsedAt = null;
     data.importStatus = "PENDING";

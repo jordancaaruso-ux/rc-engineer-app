@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { parseTimingUrl } from "@/lib/lapUrlParsers/registry";
-import { validateTimingHttpUrl } from "@/lib/lapImport/service";
+import { validateTimingHttpUrlResolved } from "@/lib/lapImport/service";
 import { driversFromParseResult, driversFromRunImportedLapSets } from "./timing";
 import type { ManualDriver } from "./types";
 
@@ -22,9 +22,12 @@ export async function loadDriversFromRun(
 
 export async function loadDriversFromTimingUrl(
   url: string,
-  primaryDriverName?: string | null
+  primaryDriverName?: string | null,
+  options?: { allowAnyPublicHost?: boolean }
 ): Promise<{ drivers: ManualDriver[]; parserId: string } | { error: string }> {
-  const v = validateTimingHttpUrl(url);
+  const v = await validateTimingHttpUrlResolved(url, {
+    allowAnyPublicHost: options?.allowAnyPublicHost,
+  });
   if (!v.ok) return { error: v.error };
   const parsed = await parseTimingUrl(v.normalized, {
     driverName: primaryDriverName ?? undefined,

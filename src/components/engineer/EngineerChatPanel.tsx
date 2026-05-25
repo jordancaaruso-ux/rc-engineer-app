@@ -110,17 +110,43 @@ export function EngineerChatPanel({
       });
 
       if (res.headers.get("content-type")?.includes("text/event-stream") && res.ok && res.body) {
-        const { reply, resolvedFocus } = await readSseStream(res, (token) => {
+        let pendingTokens = "";
+        let flushRaf: number | null = null;
+        const flushTokens = () => {
+          flushRaf = null;
+          if (!pendingTokens) return;
+          const chunk = pendingTokens;
+          pendingTokens = "";
           setMessages((prev) => {
             const copy = [...prev];
             const last = copy[copy.length - 1];
             if (last?.role === "assistant") {
-              copy[copy.length - 1] = { ...last, content: last.content + token };
+              copy[copy.length - 1] = { ...last, content: last.content + chunk };
             }
             messagesRef.current = copy;
             return copy;
           });
+        };
+        const { reply, resolvedFocus } = await readSseStream(res, (token) => {
+          pendingTokens += token;
+          if (flushRaf == null) {
+            flushRaf = requestAnimationFrame(flushTokens);
+          }
         });
+        if (flushRaf != null) cancelAnimationFrame(flushRaf);
+        if (pendingTokens) {
+          const chunk = pendingTokens;
+          pendingTokens = "";
+          setMessages((prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last?.role === "assistant") {
+              copy[copy.length - 1] = { ...last, content: last.content + chunk };
+            }
+            messagesRef.current = copy;
+            return copy;
+          });
+        }
         applyResolvedFocus(resolvedFocus);
         setMessages((prev) => {
           const copy = [...prev];

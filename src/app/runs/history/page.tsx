@@ -23,7 +23,7 @@ const runHistoryInclude = {
   track: { select: { id: true, name: true } },
   tireSet: { select: { id: true, label: true, setNumber: true } },
   event: { include: { track: { select: { name: true } } } },
-  setupSnapshot: { select: { id: true, data: true } },
+  setupSnapshot: { select: { id: true } },
   importedLapSets: {
     orderBy: { createdAt: "asc" as const },
     select: {
@@ -214,6 +214,7 @@ export default async function RunHistoryPage({
 
   const groups = buildGroups(runs);
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
+  const compareRunsDescending = allRunsDescending.map(toCompareRunShape);
   const rawFocus = resolvedSearch.focusRun;
   const focusRunRaw = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;
   const focusRunParam =
@@ -385,7 +386,7 @@ export default async function RunHistoryPage({
                           <tbody>
                             <RunHistoryTable
                               runs={group.runs}
-                              allRunsDescending={allRunsDescending.map(toCompareRunShape)}
+                              allRunsDescending={compareRunsDescending}
                               runListSource={teamMode ? "team_runs" : "my_runs"}
                               userDisplayName={userDisplayName}
                               displayTimeZone={displayTimeZone}

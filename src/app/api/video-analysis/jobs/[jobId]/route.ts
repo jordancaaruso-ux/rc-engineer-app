@@ -7,6 +7,7 @@ import { computeSectorMatrix } from "@/lib/videoAnalysis/sectorStats";
 import type { MotIdCorrection } from "@/lib/videoAnalysis/types";
 import { compareVideoToTransponder } from "@/lib/videoAnalysis/compareTransponder";
 import { parseManualVideoSessionV1 } from "@/lib/manualVideoAnalysis/types";
+import { normalizeManualSession } from "@/lib/manualVideoAnalysis/timing";
 import { buildSfPredictions } from "@/lib/manualVideoAnalysis/sync";
 import {
   compareBestLaps,
@@ -132,6 +133,15 @@ export async function PATCH(request: Request, { params }: Params) {
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  let manualJsonUpdate: object | undefined;
+  if (body?.manualJson !== undefined) {
+    const parsed = parseManualVideoSessionV1(body.manualJson);
+    if (!parsed) {
+      return NextResponse.json({ error: "Invalid manualJson" }, { status: 400 });
+    }
+    manualJsonUpdate = normalizeManualSession(parsed) as object;
+  }
+
   const job = await prisma.videoAnalysisJob.update({
     where: { id: jobId },
     data: {
@@ -143,7 +153,7 @@ export async function PATCH(request: Request, { params }: Params) {
         ? { idCorrectionsJson: body.idCorrectionsJson as object }
         : {}),
       ...(body?.status ? { status: body.status } : {}),
-      ...(body?.manualJson !== undefined ? { manualJson: body.manualJson as object } : {}),
+      ...(manualJsonUpdate !== undefined ? { manualJson: manualJsonUpdate } : {}),
     },
     select: { id: true },
   });

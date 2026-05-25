@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { loadDriversFromTimingUrl } from "@/lib/manualVideoAnalysis/loadTiming";
@@ -7,7 +8,7 @@ import { defaultDriverKeys } from "@/lib/manualVideoAnalysis/timing";
 
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
-    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -26,7 +27,9 @@ export async function POST(request: Request) {
     (await getLiveRcDriverNameSetting(user.id)) ||
     null;
 
-  const result = await loadDriversFromTimingUrl(body.url.trim(), primaryDriverName);
+  const result = await loadDriversFromTimingUrl(body.url.trim(), primaryDriverName, {
+    allowAnyPublicHost: isAuthAdminEmail(user.email),
+  });
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

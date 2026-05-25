@@ -3,7 +3,7 @@ import { Montserrat } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import type { ReactNode } from "react";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AppShell } from "@/components/layout/AppShell";
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
 import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLinkBridge";
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
@@ -35,7 +35,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }): ReactNode {
   return (
-    <html lang="en" className={`${montserrat.variable} dark`}>
+    <html lang="en" className={montserrat.variable}>
       <body className="min-h-screen font-sans font-normal antialiased">
         {/*
          * Fixed page wash sits at z-index 0 (never negative): in WKWebView a
@@ -52,10 +52,7 @@ export default function RootLayout({ children }: { children: ReactNode }): React
           <AuthSessionProvider>
             <TimeZoneCookieSync />
             <CapacitorDeepLinkBridge />
-            <div className="app-shell">
-              <Sidebar />
-              <main className="page">{children}</main>
-            </div>
+            <AppShell>{children}</AppShell>
           </AuthSessionProvider>
         </div>
       </body>

@@ -11,7 +11,7 @@ function assertActionItemDelegate(client: PrismaClient): void {
   if (delegate == null || typeof delegate.findFirst !== "function") {
     throw new Error(
       "Prisma client is missing prisma.actionItem (ActionItem model). " +
-        "Stop the dev server, run `npx prisma generate`, then `npx prisma db push`, and restart. " +
+        "Stop the dev server, run `npx prisma generate`, apply migrations (`npx prisma migrate deploy` in prod / `migrate dev` locally), and restart. " +
         "On Windows, if generate shows EPERM, close anything using node_modules/.prisma (IDE, dev server, antivirus scan)."
     );
   }

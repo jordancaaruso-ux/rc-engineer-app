@@ -163,7 +163,7 @@ export function compareSetupField(input: {
     const aSet = new Set(aa.map((v) => v.toLowerCase()));
     const bSet = new Set(bb.map((v) => v.toLowerCase()));
     const same = aSet.size === bSet.size && [...aSet].every((x) => bSet.has(x));
-    const inter = aa.filter((x) => bSet.has(x)).length;
+    const inter = aa.filter((x) => bSet.has(x.toLowerCase())).length;
     const union = new Set([...aa, ...bb]).size;
     const overlap = union === 0 ? 1 : inter / union;
     const severity: CompareSeverity = same ? "same" : overlap >= 0.67 ? "minor" : overlap >= 0.34 ? "moderate" : "major";

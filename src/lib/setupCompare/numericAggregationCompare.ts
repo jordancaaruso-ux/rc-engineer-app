@@ -41,13 +41,15 @@ export function gradientIntensityFromIqrDelta(
 ): number | null {
   if (agg == null) return null;
   if (agg.sampleCount < MIN_AGGREGATION_SAMPLE_COUNT_FOR_IQR_COMPARE) return null;
-  if (!Number.isFinite(agg.iqr) || agg.iqr <= 0) return null;
   if (!Number.isFinite(deltaAbs) || deltaAbs <= 0) return null;
 
-  const baseThreshold = agg.iqr * IQR_THRESHOLD_MULTIPLIER;
-  const minThreshold = getIqrGradientMinThreshold(parameterKey);
-  const threshold = Math.max(baseThreshold, minThreshold);
-  if (!(threshold > 0)) return null;
+  let threshold: number | null = null;
+  if (Number.isFinite(agg.iqr) && agg.iqr > 0) {
+    threshold = Math.max(agg.iqr * IQR_THRESHOLD_MULTIPLIER, getIqrGradientMinThreshold(parameterKey));
+  } else if (Number.isFinite(agg.broadRange) && agg.broadRange > 0) {
+    threshold = Math.max(agg.broadRange * 0.25, getIqrGradientMinThreshold(parameterKey));
+  }
+  if (threshold == null || !(threshold > 0)) return null;
 
   const score = deltaAbs / threshold;
   const capped = Math.min(score, IQR_SCORE_CAP);

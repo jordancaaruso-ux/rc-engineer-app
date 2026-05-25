@@ -1,21 +1,36 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { parseTimingUrl } from "@/lib/lapUrlParsers/registry";
-import { validateTimingHttpUrl } from "@/lib/lapImport/service";
+import { validateTimingHttpUrlResolved } from "@/lib/lapImport/service";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
+
+const MAX_URLS_PER_REQUEST = 20;
+const MAX_URLS_ADMIN = 100;
 
 /** Parse-only preview (no persistence). Prefer POST /api/lap-time-sessions/import when storing. */
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
-    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
   const authUser = await getAuthenticatedApiUser();
   if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const rl = checkApiRateLimit({
+    key: `lap-parse-preview:${authUser.id}`,
+    limit: 60,
+    windowMs: 60 * 60 * 1000,
+    userEmail: authUser.email,
+  });
+  if (!rl.ok) return rateLimitResponse(rl.retryAfterSec);
+
   const body = (await request.json().catch(() => null)) as { url?: string } | null;
   const url = body?.url?.trim() ?? "";
-  const v = validateTimingHttpUrl(url);
+  const v = await validateTimingHttpUrlResolved(url, {
+    allowAnyPublicHost: isAuthAdminEmail(authUser.email),
+  });
   if (!v.ok) {
     return NextResponse.json({ error: v.error }, { status: 400 });
   }

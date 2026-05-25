@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-// Diagnostic-only endpoint. Measures raw DB round-trip time so we can tell
-// whether the "app is slow online" symptom is dominated by cross-region RTT
-// between the Vercel function and the Neon database.
-//
-// Hit it (while logged in via the access gate) at /api/_debug/db-ping and
-// share the JSON. `vercelRegion` + `perQueryMs[]` is what we need.
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const user = await getAuthenticatedApiUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAuthAdminEmail(user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const perQueryMs: number[] = [];
   const errors: string[] = [];
 

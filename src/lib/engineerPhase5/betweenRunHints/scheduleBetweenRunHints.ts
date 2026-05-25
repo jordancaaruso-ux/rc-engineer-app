@@ -7,5 +7,5 @@ import { getOrComputeBetweenRunHint } from "@/lib/engineerPhase5/betweenRunHints
  * Future: enqueue for push notifications using the same payload shape.
  */
 export function scheduleBetweenRunHintsRecompute(userId: string, primaryRunId: string): void {
-  void getOrComputeBetweenRunHint(userId, primaryRunId, { force: true }).catch(() => {});
+  void getOrComputeBetweenRunHint(userId, primaryRunId).catch(() => {});
 }

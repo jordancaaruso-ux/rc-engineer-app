@@ -27,6 +27,9 @@ import {
   parsePaceVsFieldRunDigestPayload,
   parsePaceVsFieldRunDigestSubsetPayload,
 } from "@/lib/engineerPhase5/paceVsFieldRunDigestParse";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
+
+const MAX_MESSAGE_CHARS = 4096;
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -232,12 +235,22 @@ export async function POST(request: Request) {
   try {
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const rl = checkApiRateLimit({
+      key: `engineer-chat:${user.id}`,
+      limit: 60,
+      windowMs: 60 * 60 * 1000,
+      userEmail: user.email,
+    });
+    if (!rl.ok) return rateLimitResponse(rl.retryAfterSec);
+
     const body = (await request.json().catch(() => null)) as ChatRequestBody | null;
     const raw = Array.isArray(body?.messages) ? body!.messages : [];
     const messages: EngineerChatMessage[] = raw
       .map((m) => {
         const role: EngineerChatMessage["role"] = m?.role === "assistant" ? "assistant" : "user";
-        const content = typeof m?.content === "string" ? m.content : "";
+        const content =
+          typeof m?.content === "string" ? m.content.slice(0, MAX_MESSAGE_CHARS) : "";
         return { role, content };
       })
       .filter((m) => m.content.trim().length > 0)

@@ -8,8 +8,8 @@ export const THEME_PREVIEW_OPTIONS: ReadonlyArray<{
   label: string;
   hint: string;
 }> = [
-  { id: "default", label: "A · Current", hint: "Baseline" },
-  { id: "carbon", label: "B · Carbon", hint: "Neutral near-black" },
+  { id: "default", label: "A · Carbon Light", hint: "Default — neutral lifted dark" },
+  { id: "carbon", label: "B · Carbon Dark", hint: "Deeper near-black" },
   { id: "forest", label: "C · Forest", hint: "Green-tinted black" },
   { id: "polar", label: "D · Polar", hint: "Blue-tinted black" },
   { id: "ember", label: "E · Ember", hint: "Warm brown-black" },

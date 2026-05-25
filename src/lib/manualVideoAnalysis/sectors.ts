@@ -1,5 +1,5 @@
 import type { ManualFrameMark, ManualVideoSessionV1 } from "./types";
-import { lapSfKey } from "./types";
+import { LAP_START_LINE_KEY, lapSfKey } from "./types";
 import { predictSfEndTime, predictSfStartTime } from "./sync";
 import { bestIncludedLapNumbers } from "./timing";
 
@@ -55,7 +55,7 @@ export function computeLapBreakdown(
   const sfKey = "sf";
 
   let lapStart =
-    getMark(session.marks, driverRole, lapNumber, "__lap_start__") ??
+    getMark(session.marks, driverRole, lapNumber, LAP_START_LINE_KEY) ??
     predictSfStartTime(driver, lapNumber, session.sync, session.drivers);
   let lapEnd =
     getMark(session.marks, driverRole, lapNumber, sfKey) ??

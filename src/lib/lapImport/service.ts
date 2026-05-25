@@ -3,21 +3,24 @@ import { prisma } from "@/lib/prisma";
 import type { LapUrlParseResult } from "@/lib/lapUrlParsers/types";
 import { parseTimingUrl } from "@/lib/lapUrlParsers/registry";
 import { computeImportedSessionFieldStatsFromParse } from "@/lib/lapImport/computeImportedSessionFieldStats";
+import {
+  validateTimingHttpUrlAsync,
+  validateTimingHttpUrlSync,
+  type ValidateTimingUrlOptions,
+} from "@/lib/http/timingUrlSafety";
 
 export function validateTimingHttpUrl(
-  url: string
+  url: string,
+  options?: ValidateTimingUrlOptions
 ): { ok: true; normalized: string } | { ok: false; error: string } {
-  const trimmed = url.trim();
-  if (!trimmed) return { ok: false, error: "url is required" };
-  try {
-    const u = new URL(trimmed);
-    if (u.protocol !== "http:" && u.protocol !== "https:") {
-      return { ok: false, error: "URL must be http(s)" };
-    }
-    return { ok: true, normalized: trimmed };
-  } catch {
-    return { ok: false, error: "Invalid URL" };
-  }
+  return validateTimingHttpUrlSync(url, options);
+}
+
+export async function validateTimingHttpUrlResolved(
+  url: string,
+  options?: ValidateTimingUrlOptions
+): Promise<{ ok: true; normalized: string } | { ok: false; error: string }> {
+  return validateTimingHttpUrlAsync(url, options);
 }
 
 export function inferSourceType(url: string): string {
@@ -85,9 +88,11 @@ export type ImportOneUrlResult = ImportOneUrlSuccess | ImportOneUrlFailure;
 export async function importOneTimingUrl(
   userId: string,
   url: string,
-  context?: { driverName?: string }
+  context?: { driverName?: string; allowAnyPublicHost?: boolean }
 ): Promise<ImportOneUrlResult> {
-  const v = validateTimingHttpUrl(url);
+  const v = await validateTimingHttpUrlResolved(url, {
+    allowAnyPublicHost: context?.allowAnyPublicHost,
+  });
   if (!v.ok) {
     return { url: url.trim(), success: false, error: v.error };
   }

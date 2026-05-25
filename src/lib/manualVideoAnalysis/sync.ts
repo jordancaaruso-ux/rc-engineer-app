@@ -16,14 +16,13 @@ export function predictSfEndTime(
 
   const anchorT = anchor.videoTimeSec + (sync.globalOffsetSec ?? 0);
   const anchorLap = anchor.lapNumber;
-  const clockDriver =
-    allDrivers.find((d) => d.role === anchor.driverRole) ?? driver;
 
   if (!driver.laps.some((l) => l.lapNumber === lapNumber)) return null;
 
+  /** Same heat: all drivers cross SF on the same lap number at roughly the same video time. */
   if (lapNumber === anchorLap) return anchorT;
 
-  const lapMap = new Map(clockDriver.laps.map((l) => [l.lapNumber, l.lapTimeSec]));
+  const lapMap = new Map(driver.laps.map((l) => [l.lapNumber, l.lapTimeSec]));
   if (!lapMap.has(anchorLap)) return null;
 
   if (lapNumber > anchorLap) {
@@ -51,11 +50,22 @@ export function predictSfStartTime(
   sync: ManualSyncState,
   allDrivers: ManualDriver[]
 ): number | null {
+  const end = predictSfEndTime(driver, lapNumber, sync, allDrivers);
+  if (end == null) return null;
+
+  const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
+  if (!lap || lap.lapTimeSec <= 0) return null;
+
   const prev = driver.laps
     .filter((l) => l.lapNumber < lapNumber)
     .sort((a, b) => b.lapNumber - a.lapNumber)[0];
-  if (!prev) return predictSfEndTime(driver, lapNumber, sync, allDrivers);
-  return predictSfEndTime(driver, prev.lapNumber, sync, allDrivers);
+
+  if (prev) {
+    return predictSfEndTime(driver, prev.lapNumber, sync, allDrivers);
+  }
+
+  /** No prior lap: start = finish − transponder time (e.g. anchored lap 1 finish). */
+  return end - lap.lapTimeSec;
 }
 
 export type LapSfPrediction = {

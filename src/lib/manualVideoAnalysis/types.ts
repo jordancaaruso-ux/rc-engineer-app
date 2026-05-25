@@ -2,6 +2,9 @@
 
 export const MANUAL_VIDEO_SESSION_VERSION = 1 as const;
 
+/** Mark key for calculated lap start (SF crossing). */
+export const LAP_START_LINE_KEY = "__lap_start__" as const;
+
 export type DriverRole = "me" | "competitor";
 
 export type ManualDriverLap = {
@@ -62,6 +65,10 @@ export function parseManualVideoSessionV1(raw: unknown): ManualVideoSessionV1 | 
   const o = raw as Record<string, unknown>;
   if (o.version !== MANUAL_VIDEO_SESSION_VERSION) return null;
   if (!Array.isArray(o.drivers) || !o.sync || !o.selectedLaps) return null;
+  if (o.drivers.length > 20 || (Array.isArray(o.marks) && o.marks.length > 5000)) return null;
+  if (!Array.isArray(o.marks)) return null;
+  const selected = o.selectedLaps as Record<string, unknown>;
+  if (!Array.isArray(selected.me) || !Array.isArray(selected.competitor)) return null;
   return o as unknown as ManualVideoSessionV1;
 }
 

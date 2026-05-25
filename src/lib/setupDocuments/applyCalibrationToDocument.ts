@@ -43,7 +43,10 @@ export async function applyCalibrationToSetupDocument(input: {
       },
     }),
     prisma.setupSheetCalibration.findFirst({
-      where: { id: input.calibrationId },
+      where: {
+        id: input.calibrationId,
+        OR: [{ userId: input.userId }, { communityShared: true }],
+      },
       select: { id: true, calibrationDataJson: true },
     }),
   ]);

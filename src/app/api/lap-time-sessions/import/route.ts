@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
 import { expandLiveRcEventHubForImport } from "@/lib/lapImport/expandLiveRcEventHub";
 import { isLiveRcEventHubUrl } from "@/lib/lapWatch/livercSessionIndexParsers";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
+
+const MAX_URLS_PER_REQUEST = 20;
+const MAX_URLS_ADMIN = 100;
 
 /**
  * Batch import timing URLs: each URL uses parseTimingUrl + persisted ImportedLapTimeSession.
@@ -15,10 +20,19 @@ import { isLiveRcEventHubUrl } from "@/lib/lapWatch/livercSessionIndexParsers";
  */
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
-    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const isAdmin = isAuthAdminEmail(user.email);
+  const rl = checkApiRateLimit({
+    key: `lap-import:${user.id}`,
+    limit: isAdmin ? 200 : 40,
+    windowMs: 60 * 60 * 1000,
+    userEmail: user.email,
+  });
+  if (!rl.ok) return rateLimitResponse(rl.retryAfterSec);
 
   const body = (await request.json().catch(() => null)) as
     | { urls?: unknown; url?: unknown; eventId?: unknown }
@@ -37,11 +51,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Provide url or urls[]" }, { status: 400 });
   }
 
+  const maxUrls = isAdmin ? MAX_URLS_ADMIN : MAX_URLS_PER_REQUEST;
+  if (rawList.length > maxUrls) {
+    return NextResponse.json(
+      { error: `Too many URLs (max ${maxUrls}${isAdmin ? "" : " — admin can import more"})` },
+      { status: 400 }
+    );
+  }
+
   const eventId =
     typeof body?.eventId === "string" && body.eventId.trim() ? body.eventId.trim() : undefined;
 
   const liveName = (await getLiveRcDriverNameSetting(user.id).catch(() => null))?.trim() ?? "";
-  const ctx = liveName ? { driverName: liveName } : undefined;
+  const ctx = {
+    ...(liveName ? { driverName: liveName } : {}),
+    allowAnyPublicHost: isAdmin,
+  };
 
   const results = [];
   for (const url of rawList) {

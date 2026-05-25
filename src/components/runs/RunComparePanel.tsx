@@ -34,7 +34,7 @@ export type CompareRunShape = {
   handlingProblems?: string | null;
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   tireRunNumber: number;
-  setupSnapshot?: { id: string; data: unknown } | null;
+  setupSnapshot?: { id: string; data?: unknown } | null;
   /** On-track session instant when known (import / timing). */
   sessionCompletedAt?: Date | string | null;
   /** First save as complete; see resolveRunDisplayInstant. */
