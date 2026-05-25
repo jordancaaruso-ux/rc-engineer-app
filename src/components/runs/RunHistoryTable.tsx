@@ -71,12 +71,11 @@ type Run = {
   driverNotes?: string | null;
   handlingProblems?: string | null;
   handlingAssessmentJson?: unknown;
-  suggestedChanges?: string | null;
   car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
   track?: { id: string; name: string } | null;
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   event?: { name: string; track?: { name: string } | null } | null;
-  setupSnapshot?: { id: string; data: unknown } | null;
+  setupSnapshot?: { id: string; data?: unknown } | null;
   lapSession?: unknown;
   importedLapSets?: Array<{
     id: string;
@@ -589,6 +588,11 @@ function RunDetail({
   const [runSessionSummaryErr, setRunSessionSummaryErr] = useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [setupDataByRunId, setSetupDataByRunId] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    setSetupDataByRunId({});
+  }, [run.id]);
 
   useEffect(() => {
     setRunSessionSummary(null);
@@ -681,14 +685,54 @@ function RunDetail({
     return pickerRunsSameCar[idx + 1] ?? null;
   }, [pickerRunsSameCar, run.id, run.carId]);
 
+  useEffect(() => {
+    const fetchIds: string[] = [];
+    if (run.setupSnapshot?.id && run.setupSnapshot.data === undefined) fetchIds.push(run.id);
+    if (
+      previousRunOnCar?.setupSnapshot?.id &&
+      previousRunOnCar.setupSnapshot.data === undefined
+    ) {
+      fetchIds.push(previousRunOnCar.id);
+    }
+    if (fetchIds.length === 0) return;
+    let alive = true;
+    for (const id of fetchIds) {
+      void fetch(`/api/runs/${encodeURIComponent(id)}/setup-snapshot`)
+        .then((res) => res.json())
+        .then((payload: { setupSnapshot?: { data?: unknown } }) => {
+          if (!alive) return;
+          setSetupDataByRunId((prev) => ({
+            ...prev,
+            [id]: payload.setupSnapshot?.data ?? {},
+          }));
+        })
+        .catch(() => {});
+    }
+    return () => {
+      alive = false;
+    };
+  }, [
+    run.id,
+    run.setupSnapshot?.id,
+    run.setupSnapshot?.data,
+    previousRunOnCar?.id,
+    previousRunOnCar?.setupSnapshot?.id,
+    previousRunOnCar?.setupSnapshot?.data,
+  ]);
+
+  const runSetupData = setupDataByRunId[run.id] ?? run.setupSnapshot?.data;
+  const prevSetupData =
+    previousRunOnCar != null
+      ? setupDataByRunId[previousRunOnCar.id] ?? previousRunOnCar.setupSnapshot?.data
+      : undefined;
+
   const setupPreview = useMemo(() => {
-    const prevData = previousRunOnCar?.setupSnapshot?.data;
-    if (!run.carId || !prevData) {
+    if (!run.carId || prevSetupData == null) {
       return { mode: "no_baseline" as const, rows: [] as ReturnType<typeof setupRows> };
     }
-    const changed = setupChangedRowsSincePrevious(run.setupSnapshot?.data, prevData);
+    const changed = setupChangedRowsSincePrevious(runSetupData, prevSetupData);
     return { mode: "diff" as const, rows: changed };
-  }, [run.carId, run.setupSnapshot?.data, previousRunOnCar]);
+  }, [run.carId, runSetupData, prevSetupData]);
   const ownRows = primaryLapRowsFromRun(run);
   const lapDash = getIncludedLapDashboardMetrics(ownRows);
   const fieldStats = runSessionSummary?.importedSessionFieldStats;
@@ -938,12 +982,6 @@ function RunDetail({
             emptyAsDash
           />
         ) : null}
-        <DetailRow
-          label="Things to try"
-          value={run.suggestedChanges?.trim() || "—"}
-          multiline
-          emptyAsDash
-        />
       </div>
 
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>

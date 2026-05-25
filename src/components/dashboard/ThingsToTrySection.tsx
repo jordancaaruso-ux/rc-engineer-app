@@ -15,7 +15,7 @@ export function ThingsToTrySection({
     <ActionItemListPanel
       list="try"
       title="Things to try"
-      hint="From logged runs and manual adds. Remove archives the item."
+      hint="Add items here; they stay until you remove them."
       addPlaceholder="Add an idea…"
       initialItems={initialItems}
       embedded={embedded}

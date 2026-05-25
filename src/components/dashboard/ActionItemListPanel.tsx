@@ -36,28 +36,8 @@ export function ActionItemListPanel({
   const listQuery = list === "do" ? "do" : "try";
 
   useEffect(() => {
-    let alive = true;
-    fetch(`/api/action-items?list=${encodeURIComponent(listQuery)}`)
-      .then((res) => res.json().catch(() => null))
-      .then((data: { items?: DashboardActionItemRow[] } | null) => {
-        if (!alive || !data?.items) return;
-        setItems(
-          data.items.map((i) => ({
-            id: i.id,
-            text: i.text,
-            sourceType: i.sourceType,
-            createdAt: typeof i.createdAt === "string" ? i.createdAt : String(i.createdAt),
-            sourceRunId: i.sourceRunId ?? null,
-          }))
-        );
-      })
-      .catch(() => {
-        if (!alive) return;
-      });
-    return () => {
-      alive = false;
-    };
-  }, [listQuery]);
+    setItems(initialItems);
+  }, [initialItems]);
 
   async function persistOrder(next: DashboardActionItemRow[]) {
     setReorderErr(null);
@@ -205,7 +185,7 @@ export function ActionItemListPanel({
       {reorderErr ? <p className="mt-1.5 text-[11px] text-destructive">{reorderErr}</p> : null}
 
       {items.length === 0 ? (
-        <p className="mt-2 text-[11px] text-muted-foreground">Nothing here yet — add above or from Log your run.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Nothing here yet — add above.</p>
       ) : (
         <ul className="mt-2 space-y-1">
           {items.map((i) => {

@@ -8,7 +8,6 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { buildLapSessionV1 } from "@/lib/lapSession/buildSession";
 import type { LapSourceKind } from "@/lib/lapSession/types";
 import { computePersistedRunLapSummary } from "@/lib/lapAnalysis";
-import { syncActionItemsFromRun } from "@/lib/actionItems";
 import {
   computeSetupDeltaForAudit,
   resolveSetupSnapshot,
@@ -499,13 +498,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       })),
     });
   }
-
-  await syncActionItemsFromRun({
-    userId: params.userId,
-    runId: run.id,
-    suggestedChanges: body.suggestedChanges?.trim() || null,
-    suggestedPreRun: body.suggestedPreRun?.trim() || null,
-  });
 
   const lapImportIds = Array.isArray(body.importedLapTimeSessionIds)
     ? body.importedLapTimeSessionIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)

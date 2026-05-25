@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -183,16 +183,6 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   }
 }
 
-/** Ensure Things to try behaves like a bullet list (first line starts with `• `). */
-function normalizeThingsToTryFromStorage(raw: string): string {
-  if (!raw) return "";
-  const nl = raw.indexOf("\n");
-  const first = nl === -1 ? raw : raw.slice(0, nl);
-  const rest = nl === -1 ? "" : raw.slice(nl);
-  if (first.startsWith("• ")) return raw;
-  return "• " + first.replace(/^\s*•\s?/, "") + rest;
-}
-
 function setupSnapshotWithDerived(raw: unknown): SetupSnapshotData {
   return applyDerivedFieldsToSnapshot(normalizeSetupData(raw));
 }
@@ -290,15 +280,12 @@ export function NewRunForm(props: {
   const [lapIngest, setLapIngest] = useState<LapIngestFormValue>(() => defaultLapIngestValue());
   const [notes, setNotes] = useState("");
   const [raceClass, setRaceClass] = useState("");
-  const [suggestedChanges, setSuggestedChanges] = useState("");
-  const [suggestedPreRun, setSuggestedPreRun] = useState("");
   const [setupChangesText, setSetupChangesText] = useState("");
   const [setupChangesBusy, setSetupChangesBusy] = useState(false);
   const [setupChangesError, setSetupChangesError] = useState<string | null>(null);
   const [setupChangesProposal, setSetupChangesProposal] = useState<
     Array<{ fieldKey: string; fieldLabel: string; fromValue: string; toValue: string; confidence: "low" | "medium" | "high"; note?: string | null }>
   >([]);
-  const [notesSubTab, setNotesSubTab] = useState<"notes" | "things" | "todo">("notes");
   const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
   const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
   /** Required 1-10 overall car rating; null until the driver sets one. Server enforces presence at "Run complete". */
@@ -307,13 +294,6 @@ export function NewRunForm(props: {
   const [trackSaveWarning, setTrackSaveWarning] = useState(false);
   const [trackGripTags, setTrackGripTags] = useState<string[]>([]);
   const [trackLayoutTags, setTrackLayoutTags] = useState<string[]>([]);
-  const thingsTryRef = useRef<HTMLTextAreaElement>(null);
-  const thingsTryCursorRef = useRef<number | null>(null);
-  const thingsDoRef = useRef<HTMLTextAreaElement>(null);
-  const thingsDoCursorRef = useRef<number | null>(null);
-  /** True after user edits “Things to try”; avoids syncing (or wiping) on initial API hydrate. */
-  const thingsToTryDirtyRef = useRef(false);
-  const thingsToDoDirtyRef = useRef(false);
 
   const [showNewTireSetPanel, setShowNewTireSetPanel] = useState(false);
   const [creatingTireSet, setCreatingTireSet] = useState(false);
@@ -538,8 +518,6 @@ export function NewRunForm(props: {
     setSetupBaselineData(cloneSetupSnapshot(nextSetup));
 
     setNotes((r.notes ?? "").trim());
-    setSuggestedChanges((r.suggestedChanges ?? "").trim());
-    setSuggestedPreRun((r.suggestedPreRun ?? "").trim());
     const parsedHandling = parseHandlingAssessmentJson(r.handlingAssessmentJson);
     setHandlingUi(uiStateFromParsed(parsedHandling));
     setHandlingDetailExpanded(isHandlingAssessmentMeaningful(r.handlingAssessmentJson));
@@ -859,29 +837,6 @@ export function NewRunForm(props: {
     migrateLegacyLoadedSetup();
   }, []);
 
-  /** Same lists as dashboard: ActionItem rows (order matches GET /api/action-items?list=…). */
-  useEffect(() => {
-    if (isEditing) return;
-    let alive = true;
-    Promise.all([
-      jsonFetch<{ items: Array<{ id: string; text: string }> }>("/api/action-items?list=try"),
-      jsonFetch<{ items: Array<{ id: string; text: string }> }>("/api/action-items?list=do"),
-    ])
-      .then(([tryRes, doRes]) => {
-        if (!alive) return;
-        const tlines = (tryRes.items ?? []).map((i) => `• ${i.text.trim()}`).filter((l) => l.length > 2);
-        setSuggestedChanges(tlines.length ? normalizeThingsToTryFromStorage(tlines.join("\n")) : "");
-        const dlines = (doRes.items ?? []).map((i) => `• ${i.text.trim()}`).filter((l) => l.length > 2);
-        setSuggestedPreRun(dlines.length ? normalizeThingsToTryFromStorage(dlines.join("\n")) : "");
-      })
-      .catch(() => {
-        if (!alive) return;
-      });
-    return () => {
-      alive = false;
-    };
-  }, [isEditing]);
-
   /** Authoritative list for run + event track pickers (matches /events and DB; avoids stale RSC-only props). */
   const tracksFingerprint = useMemo(() => tracks.map((t) => t.id).sort().join(","), [tracks]);
   useEffect(() => {
@@ -909,37 +864,6 @@ export function NewRunForm(props: {
       setTrackLayoutTags([]);
     }
   }, [trackId, tracksList]);
-
-  /** Persist bullets to ActionItem rows while typing (dashboard uses same table). */
-  useEffect(() => {
-    if (!thingsToTryDirtyRef.current && !thingsToDoDirtyRef.current) return;
-    const t = window.setTimeout(() => {
-      if (!thingsToTryDirtyRef.current && !thingsToDoDirtyRef.current) return;
-      const body: { suggestedChanges?: string | null; suggestedPreRun?: string | null } = {};
-      if (thingsToTryDirtyRef.current) {
-        body.suggestedChanges = suggestedChanges;
-      }
-      if (thingsToDoDirtyRef.current) {
-        body.suggestedPreRun = suggestedPreRun;
-      }
-      if (Object.keys(body).length === 0) return;
-      void fetch("/api/action-items/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-        .then((res) => {
-          if (res.ok) {
-            if ("suggestedChanges" in body) thingsToTryDirtyRef.current = false;
-            if ("suggestedPreRun" in body) thingsToDoDirtyRef.current = false;
-          }
-        })
-        .catch(() => {
-          /* keep dirty for retry on next edit */
-        });
-    }, 900);
-    return () => window.clearTimeout(t);
-  }, [suggestedChanges, suggestedPreRun]);
 
   /** Past-run + downloaded setup lists scoped to the selected car. */
   useEffect(() => {
@@ -1106,126 +1030,6 @@ export function NewRunForm(props: {
     }, 400);
     return () => window.clearTimeout(t);
   }, [setupData, carId]);
-
-  useLayoutEffect(() => {
-    const el = thingsTryRef.current;
-    const pos = thingsTryCursorRef.current;
-    if (pos != null && el) {
-      thingsTryCursorRef.current = null;
-      try {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [suggestedChanges]);
-
-  useLayoutEffect(() => {
-    const el = thingsDoRef.current;
-    const pos = thingsDoCursorRef.current;
-    if (pos != null && el) {
-      thingsDoCursorRef.current = null;
-      try {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [suggestedPreRun]);
-
-  function handleThingsToTryKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key !== "Enter" || e.shiftKey) return;
-    if (e.nativeEvent.isComposing) return;
-    thingsToTryDirtyRef.current = true;
-    e.preventDefault();
-    const el = e.currentTarget;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const v = suggestedChanges;
-    if (v.length === 0) {
-      const insert = "• ";
-      thingsTryCursorRef.current = insert.length;
-      setSuggestedChanges(insert);
-      return;
-    }
-    const insert = "\n• ";
-    const next = v.slice(0, start) + insert + v.slice(end);
-    thingsTryCursorRef.current = start + insert.length;
-    setSuggestedChanges(next);
-  }
-
-  function handleThingsToTryChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    thingsToTryDirtyRef.current = true;
-    const raw = e.target.value;
-    if (raw === "") {
-      setSuggestedChanges("");
-      return;
-    }
-    const nl = raw.indexOf("\n");
-    const firstRaw = nl === -1 ? raw : raw.slice(0, nl);
-    const afterFirst = nl === -1 ? "" : raw.slice(nl);
-    if (firstRaw.startsWith("• ")) {
-      setSuggestedChanges(raw);
-      return;
-    }
-    const fixedFirst = "• " + firstRaw.replace(/^\s*•\s?/, "");
-    const next = fixedFirst + afterFirst;
-    const delta = fixedFirst.length - firstRaw.length;
-    const start = e.target.selectionStart ?? 0;
-    const end = e.target.selectionEnd ?? 0;
-    const adjust = (pos: number) =>
-      pos <= firstRaw.length ? Math.min(pos + delta, fixedFirst.length) : pos + delta;
-    thingsTryCursorRef.current = start === end ? adjust(start) : adjust(Math.max(start, end));
-    setSuggestedChanges(next);
-  }
-
-  function handleThingsToDoKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key !== "Enter" || e.shiftKey) return;
-    if (e.nativeEvent.isComposing) return;
-    thingsToDoDirtyRef.current = true;
-    e.preventDefault();
-    const el = e.currentTarget;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const v = suggestedPreRun;
-    if (v.length === 0) {
-      const insert = "• ";
-      thingsDoCursorRef.current = insert.length;
-      setSuggestedPreRun(insert);
-      return;
-    }
-    const insert = "\n• ";
-    const next = v.slice(0, start) + insert + v.slice(end);
-    thingsDoCursorRef.current = start + insert.length;
-    setSuggestedPreRun(next);
-  }
-
-  function handleThingsToDoChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    thingsToDoDirtyRef.current = true;
-    const raw = e.target.value;
-    if (raw === "") {
-      setSuggestedPreRun("");
-      return;
-    }
-    const nl = raw.indexOf("\n");
-    const firstRaw = nl === -1 ? raw : raw.slice(0, nl);
-    const afterFirst = nl === -1 ? "" : raw.slice(nl);
-    if (firstRaw.startsWith("• ")) {
-      setSuggestedPreRun(raw);
-      return;
-    }
-    const fixedFirst = "• " + firstRaw.replace(/^\s*•\s?/, "");
-    const next = fixedFirst + afterFirst;
-    const delta = fixedFirst.length - firstRaw.length;
-    const start = e.target.selectionStart ?? 0;
-    const end = e.target.selectionEnd ?? 0;
-    const adjust = (pos: number) =>
-      pos <= firstRaw.length ? Math.min(pos + delta, fixedFirst.length) : pos + delta;
-    thingsDoCursorRef.current = start === end ? adjust(start) : adjust(Math.max(start, end));
-    setSuggestedPreRun(next);
-  }
 
   useEffect(() => {
     if (!carId) {
@@ -2071,8 +1875,8 @@ export function NewRunForm(props: {
             return null;
           })(),
           raceClass: raceClass.trim() || null,
-          suggestedChanges: suggestedChanges.trim() || null,
-          suggestedPreRun: suggestedPreRun.trim() || null,
+          suggestedChanges: isEditing ? (editRun?.suggestedChanges?.trim() || null) : null,
+          suggestedPreRun: isEditing ? (editRun?.suggestedPreRun?.trim() || null) : null,
           handlingAssessmentJson: persistedFromUiState(handlingUi),
           carRating,
           shareWithTeam,
@@ -3694,92 +3498,22 @@ export function NewRunForm(props: {
 
       <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3 text-sm">
         <div className="ui-title text-sm text-muted-foreground">Feedback</div>
-        <div
-          className="flex flex-wrap border-b border-border gap-x-0.5"
-          role="tablist"
-          aria-label="Notes, things to try, and pre-run reminders"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={notesSubTab === "notes"}
-            className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
-              notesSubTab === "notes"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setNotesSubTab("notes")}
-          >
-            Notes
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={notesSubTab === "things"}
-            className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
-              notesSubTab === "things"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setNotesSubTab("things")}
-          >
-            Things to try
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={notesSubTab === "todo"}
-            className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
-              notesSubTab === "todo"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setNotesSubTab("todo")}
-          >
-            Things to do
-          </button>
-        </div>
-        {notesSubTab === "notes" ? (
-          <textarea
-            className={cn(
-              "h-32 w-full resize-none rounded-md border bg-card px-3 py-2 text-sm outline-none",
-              isDraft && notes.trim().length === 0
-                ? "border-amber-500/50 ring-1 ring-amber-500/30"
-                : "border-border"
-            )}
-            placeholder={
-              isDraft && notes.trim().length === 0
-                ? "How did the run feel? Grip, balance, any issues, what you'd change…"
-                : "Session notes, handling, track conditions…"
-            }
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            aria-label="Session notes"
-          />
-        ) : notesSubTab === "things" ? (
-          <textarea
-            ref={thingsTryRef}
-            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            placeholder="First character becomes a bullet line. Enter: new • line. Shift+Enter: line break inside an item."
-            value={suggestedChanges}
-            onChange={handleThingsToTryChange}
-            onKeyDown={handleThingsToTryKeyDown}
-            aria-label="Things to try"
-          />
-        ) : (
-          <textarea
-            ref={thingsDoRef}
-            className="h-32 w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            placeholder="Double-check before the next run (droop screws, balance, a bolt…). Bullets and Enter work like Things to try."
-            value={suggestedPreRun}
-            onChange={handleThingsToDoChange}
-            onKeyDown={handleThingsToDoKeyDown}
-            aria-label="Things to do before next run"
-          />
-        )}
+        <textarea
+          className={cn(
+            "h-32 w-full resize-none rounded-md border bg-card px-3 py-2 text-sm outline-none",
+            isDraft && notes.trim().length === 0
+              ? "border-amber-500/50 ring-1 ring-amber-500/30"
+              : "border-border"
+          )}
+          placeholder={
+            isDraft && notes.trim().length === 0
+              ? "How did the run feel? Grip, balance, any issues, what you'd change…"
+              : "Session notes, handling, track conditions…"
+          }
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          aria-label="Session notes"
+        />
         <div className="pt-1">
           <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
