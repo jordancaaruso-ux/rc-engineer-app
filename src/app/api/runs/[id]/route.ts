@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -40,10 +40,7 @@ export async function DELETE(
 
   await prisma.run.delete({ where: { id: existing.id } });
 
-  revalidatePath("/runs/history");
-  revalidatePath("/");
-  revalidatePath("/engineer");
-  revalidatePath("/laps/import");
+  revalidateAfterRunMutation(user.id);
 
   return NextResponse.json({ ok: true });
 }

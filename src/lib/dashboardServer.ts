@@ -11,7 +11,7 @@ import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appS
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
-import { peekDashboardSuggestion } from "@/lib/engineerPhase5/dashboardSuggestions/getOrComputeDashboardSuggestion";
+import { perfSpan } from "@/lib/perfLog";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
@@ -372,6 +372,7 @@ export async function loadIncompleteRunsForImportChooser(
 }
 
 export async function loadDashboardHomeModel(userId: string): Promise<DashboardHomeModel> {
+  return perfSpan("loadDashboardHomeModel", async () => {
   const { start: todayStart, end: todayEnd } = localTodayBounds();
 
   // Fire-and-forget: LiveRC fetches + Prisma writes; can take 1–2s. Dashboard no
@@ -383,7 +384,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     prisma.event.findMany({
       where: { userId },
       orderBy: { startDate: "desc" },
-      take: 80,
+      take: 20,
       include: { track: { select: { id: true, name: true, location: true } } },
     }),
     prisma.run.findFirst({
@@ -605,16 +606,8 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
   const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
 
   const runLoggingComplete = Boolean(recent?.loggingCompletedAt) || recent?.loggingComplete === true;
-  let engineerSuggestionsPrimaryRunId: string | null = null;
-  let engineerSuggestionsInitial: DashboardEngineerSuggestionPayloadV1 | null = null;
-  if (recent?.carId && runLoggingComplete) {
-    engineerSuggestionsPrimaryRunId = recent.id;
-    try {
-      engineerSuggestionsInitial = await peekDashboardSuggestion(userId, recent.id);
-    } catch {
-      engineerSuggestionsInitial = null;
-    }
-  }
+  const engineerSuggestionsPrimaryRunId =
+    recent?.carId && runLoggingComplete ? recent.id : null;
 
   return {
     incompleteRuns,
@@ -649,7 +642,8 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
         .find((r) => r.loggingComplete === false)?.createdAt.toISOString() ?? null,
     todaysChanges,
     recentRun: recent,
-    engineerSuggestionsInitial,
+    engineerSuggestionsInitial: null,
     engineerSuggestionsPrimaryRunId,
   };
+  });
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateAfterActionItemMutation } from "@/lib/revalidateUser";
 import type { ActionItemListKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
@@ -90,9 +90,7 @@ export async function POST(request: Request) {
     },
   });
 
-  revalidatePath("/");
-  revalidatePath("/runs/new");
-  revalidatePath("/engineer");
+  revalidateAfterActionItemMutation(user.id);
 
   return NextResponse.json({
     item: {

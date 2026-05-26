@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
@@ -105,9 +105,7 @@ export async function POST(request: Request) {
     if (body.addToFavourites) {
       await addTrackToFavourites(user.id, track.id);
     }
-    revalidatePath("/tracks");
-    revalidatePath("/runs/new");
-    revalidatePath("/events");
+    revalidateAfterTrackMutation(user.id);
     return NextResponse.json({ track }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create track";

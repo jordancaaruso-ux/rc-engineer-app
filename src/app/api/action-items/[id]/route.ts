@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateAfterActionItemMutation } from "@/lib/revalidateUser";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -35,9 +35,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  revalidatePath("/");
-  revalidatePath("/runs/new");
-  revalidatePath("/engineer");
+  revalidateAfterActionItemMutation(user.id);
 
   return NextResponse.json({ ok: true });
 }

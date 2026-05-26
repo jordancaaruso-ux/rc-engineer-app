@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateAfterActionItemMutation } from "@/lib/revalidateUser";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseActionItemListQuery, reorderUserActionItems } from "@/lib/actionItems";
@@ -26,9 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  revalidatePath("/");
-  revalidatePath("/runs/new");
-  revalidatePath("/engineer");
+  revalidateAfterActionItemMutation(user.id);
 
   return NextResponse.json({ ok: true });
 }

@@ -16,7 +16,12 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { assertUserInTeam, listTeamMemberUserIds, listTeamsForUser } from "@/lib/teamAccess";
 import type { Prisma } from "@prisma/client";
 
-export const dynamic = "force-dynamic";
+import { perfSpan } from "@/lib/perfLog";
+
+/** Initial page size for Sessions — load more via future pagination if needed. */
+export const RUN_HISTORY_INITIAL_TAKE = 40;
+
+export const revalidate = 30;
 
 const runHistoryInclude = {
   car: { select: { id: true, name: true, setupSheetTemplate: true } },
@@ -60,12 +65,14 @@ function runSessionSortInstant(run: RunInGroup): Date {
 }
 
 async function fetchRunHistoryRows(where: Prisma.RunWhereInput, take: number): Promise<RunInGroup[]> {
-  return prisma.run.findMany({
-    where,
-    orderBy: { sortAt: "desc" },
-    take,
-    include: runHistoryInclude,
-  });
+  return perfSpan(`fetchRunHistoryRows(take=${take})`, () =>
+    prisma.run.findMany({
+      where,
+      orderBy: { sortAt: "desc" },
+      take,
+      include: runHistoryInclude,
+    })
+  );
 }
 
 // NOTE: A one-shot backfill for `carNameSnapshot`/`trackNameSnapshot` used to
@@ -192,7 +199,7 @@ export default async function RunHistoryPage({
       });
       teamTitle = teamRow?.name ?? "Team";
       const memberIds = await listTeamMemberUserIds(teamId);
-      const take = Math.min(600, Math.max(200, 200 * memberIds.length));
+      const take = Math.min(120, Math.max(RUN_HISTORY_INITIAL_TAKE, RUN_HISTORY_INITIAL_TAKE * memberIds.length));
       runs = await fetchRunHistoryRows(
         { userId: { in: memberIds }, shareWithTeam: true },
         take
@@ -209,7 +216,7 @@ export default async function RunHistoryPage({
       );
     }
   } else {
-    runs = await fetchRunHistoryRows({ userId: user.id }, 200);
+    runs = await fetchRunHistoryRows({ userId: user.id }, RUN_HISTORY_INITIAL_TAKE);
   }
 
   const groups = buildGroups(runs);

@@ -31,6 +31,8 @@ export type PrimaryNavItem = {
   center?: boolean;
   /** Resolve href from today's draft run when available. */
   smartDraft?: boolean;
+  /** Next.js Link prefetch — false for heavy routes. */
+  prefetch?: boolean;
 };
 
 /** Routes that render without sidebar or bottom nav chrome. */
@@ -110,6 +112,7 @@ const ADD_RUN: PrimaryNavItem = {
   icon: PlusCircle,
   center: true,
   smartDraft: true,
+  prefetch: false,
 };
 const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: BarChart3 };
 const GARAGE: PrimaryNavItem = { id: "garage", href: "/garage", label: "Garage", icon: Car };

@@ -5,8 +5,8 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { CarList } from "@/components/cars/CarList";
 import { ensureA800SetupSheetModelForUser } from "@/lib/setupSheetModels/seedA800Model";
 
-/** User-specific list — always read fresh (avoids stale tab vs /runs/new). */
-export const dynamic = "force-dynamic";
+/** User-specific list — revalidated on car mutations. */
+export const revalidate = 30;
 
 export default async function CarManagerPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {

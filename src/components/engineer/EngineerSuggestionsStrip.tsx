@@ -27,7 +27,6 @@ export function EngineerSuggestionsStrip({ className }: { className?: string }) 
     setError(null);
 
     const qs = new URLSearchParams();
-    qs.set("sync", "1");
     if (runId) qs.set("runId", runId);
     else qs.set("latest", "1");
 

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
-import { NewRunForm } from "@/components/runs/NewRunForm";
+import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getDashboardNewRunPrefill, loadIncompleteRunsForImportChooser } from "@/lib/dashboardServer";
 import { NewRunImportLinkChooser } from "@/components/runs/NewRunImportLinkChooser";

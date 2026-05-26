@@ -12,7 +12,7 @@ import { formatHandlingAssessmentDetailLines } from "@/lib/runHandlingAssessment
 import { formatLapSourceSummary, tryReadLapSourceUrl } from "@/lib/lapSession/display";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
-import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
+import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import {
   getAverageTopN,
   getBestLap,
@@ -20,7 +20,7 @@ import {
   getIncludedLapDashboardMetrics,
   primaryLapRowsFromRun,
 } from "@/lib/lapAnalysis";
-import { RunLapAnalysisModal } from "@/components/runs/RunLapAnalysisModal";
+import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";

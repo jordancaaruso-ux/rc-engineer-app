@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
-import { NewRunForm } from "@/components/runs/NewRunForm";
+import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import { RunVideoAnalysisSection } from "@/components/videoAnalysis/RunVideoAnalysisSection";
 import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 

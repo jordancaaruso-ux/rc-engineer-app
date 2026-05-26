@@ -4,7 +4,7 @@ import { CalibrationDeleteButton } from "@/components/setup-documents/Calibratio
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
-import { SetupCalibrationEditorClient } from "@/components/setup-documents/SetupCalibrationEditorClient";
+import { SetupCalibrationEditorClient } from "@/components/setup-documents/SetupCalibrationEditorLazy";
 
 export default async function SetupCalibrationDetailPage({
   params,

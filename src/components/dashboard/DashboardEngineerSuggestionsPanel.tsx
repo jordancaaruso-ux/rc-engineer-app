@@ -44,7 +44,6 @@ export function DashboardEngineerSuggestionsPanel({
     setErr(null);
     const qs = new URLSearchParams();
     qs.set("runId", runId);
-    qs.set("sync", "1");
     void fetch(`/api/engineer/dashboard-suggestions?${qs}`)
       .then(async (res) => {
         const data = (await res.json().catch(() => ({}))) as {

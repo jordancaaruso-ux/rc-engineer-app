@@ -80,6 +80,8 @@ export function ActionItemListPanel({
 
   async function archive(id: string) {
     setError(null);
+    const prev = items;
+    setItems((cur) => cur.filter((i) => i.id !== id));
     setBusy(true);
     try {
       const res = await fetch(`/api/action-items/${encodeURIComponent(id)}`, {
@@ -90,9 +92,9 @@ export function ActionItemListPanel({
       if (!res.ok) {
         const j = (await res.json().catch(() => null)) as { error?: string } | null;
         setError(j?.error ?? "Could not remove item");
+        setItems(prev);
         return;
       }
-      setItems((prev) => prev.filter((i) => i.id !== id));
     } finally {
       setBusy(false);
     }
@@ -103,6 +105,16 @@ export function ActionItemListPanel({
     const text = draft.trim();
     if (!text) return;
     setError(null);
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimistic: DashboardActionItemRow = {
+      id: optimisticId,
+      text,
+      sourceType: "MANUAL",
+      createdAt: new Date().toISOString(),
+      sourceRunId: null,
+    };
+    setItems((prev) => [...prev, optimistic]);
+    setDraft("");
     setBusy(true);
     try {
       const res = await fetch("/api/action-items", {
@@ -118,23 +130,25 @@ export function ActionItemListPanel({
         | { error?: string }
         | null;
       if (res.status === 409) {
-        setDraft("");
-        setError("That is already on your list.");
+        setItems((prev) => prev.filter((i) => i.id !== optimisticId));
+        setError("Already on your list.");
         return;
       }
       if (!res.ok || !j || !("item" in j) || !j.item) {
-        setError((j && "error" in j && j.error) || "Could not add item");
+        setItems((prev) => prev.filter((i) => i.id !== optimisticId));
+        setError(j && "error" in j ? (j.error ?? "Could not add item") : "Could not add item");
         return;
       }
-      const row: DashboardActionItemRow = {
-        id: j.item.id,
-        text: j.item.text,
-        sourceType: j.item.sourceType,
-        createdAt: j.item.createdAt,
-        sourceRunId: j.item.sourceRunId ?? null,
-      };
-      setItems((prev) => [...prev.filter((i) => i.id !== row.id), row]);
-      setDraft("");
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === optimisticId
+            ? { ...j.item!, createdAt: j.item!.createdAt }
+            : i
+        )
+      );
+    } catch {
+      setItems((prev) => prev.filter((i) => i.id !== optimisticId));
+      setError("Could not add item");
     } finally {
       setBusy(false);
     }

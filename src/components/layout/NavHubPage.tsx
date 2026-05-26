@@ -27,7 +27,7 @@ export function NavHubPage({
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className="group flex items-center gap-3 rounded-xl border border-border bg-card/80 px-4 py-3.5 transition hover:border-accent/30 hover:bg-card"
+                  className="group tap-active flex items-center gap-3 rounded-xl border border-border bg-card/80 px-4 py-3.5 transition hover:border-accent/30 hover:bg-card"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground group-hover:text-foreground">
                     <Icon className="h-5 w-5" aria-hidden />

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 import { Prisma } from "@prisma/client";
 import type { Prisma as PrismaTypes } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -510,10 +510,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     });
   }
 
-  revalidatePath("/runs/history");
-  revalidatePath("/");
-  revalidatePath("/engineer");
-  revalidatePath("/laps/import");
+  revalidateAfterRunMutation(params.userId);
 
   if (loggingComplete) {
     scheduleBetweenRunHintsRecompute(params.userId, run.id);

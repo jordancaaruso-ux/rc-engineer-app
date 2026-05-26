@@ -12,7 +12,7 @@ import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 const montserrat = Montserrat({
   subsets: ["latin"],
   variable: "--font-sans",
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "700"],
   style: ["normal", "italic"],
 });
 

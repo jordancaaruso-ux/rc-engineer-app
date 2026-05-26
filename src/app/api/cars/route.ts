@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -86,8 +86,7 @@ export async function POST(request: Request) {
         setupSheetModelId: true,
       },
     });
-    revalidatePath("/cars");
-    revalidatePath("/runs/new");
+    revalidateAfterCarMutation(user.id);
     return NextResponse.json({ car }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create car";

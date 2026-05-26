@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useTransition, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareAndPattern";
+import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareLazy";
 import { EngineerChatPanel } from "@/components/engineer/EngineerChatPanel";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 import { EngineerSuggestionsStrip } from "@/components/engineer/EngineerSuggestionsStrip";
@@ -16,6 +16,7 @@ export function EngineerPageClient() {
   const [mainTab, setMainTab] = useState<EngineerMainTab>(() =>
     tabParam === "compare" ? "compare" : "chat"
   );
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (tabParam === "compare") setMainTab("compare");
@@ -26,6 +27,10 @@ export function EngineerPageClient() {
     if (runId) persistEngineerSessionsTargetRunId(runId);
   }, [searchParams]);
 
+  function selectTab(tab: EngineerMainTab) {
+    startTransition(() => setMainTab(tab));
+  }
+
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6">
       <EngineerSuggestionsStrip />
@@ -34,55 +39,45 @@ export function EngineerPageClient() {
         <button
           type="button"
           className={cn(
-            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition",
+            "tap-active flex-1 rounded-md px-3 py-2 text-sm font-medium transition",
             mainTab === "chat" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
-          onClick={() => setMainTab("chat")}
+          onClick={() => selectTab("chat")}
         >
           Chat
         </button>
         <button
           type="button"
           className={cn(
-            "flex-1 rounded-md px-3 py-2 text-sm font-medium transition",
+            "tap-active flex-1 rounded-md px-3 py-2 text-sm font-medium transition",
             mainTab === "compare" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
-          onClick={() => setMainTab("compare")}
+          onClick={() => selectTab("compare")}
         >
           Compare &amp; trend
         </button>
       </div>
 
       {mainTab === "chat" ? (
-        <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <section
+          className={cn(
+            "rounded-xl border border-border bg-card shadow-sm overflow-hidden",
+            isPending && "opacity-90"
+          )}
+        >
           <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
             <h2 className="text-lg font-semibold text-foreground tracking-tight">Ask the Engineer</h2>
             <p className="text-xs text-muted-foreground mt-1 leading-snug">
-              Optional: set runs in <span className="font-medium text-foreground/90">Compare &amp; trend</span> so
-              answers anchor to URL context.
+              Grounded in your vehicle-dynamics knowledge base and recent runs.
             </p>
           </div>
-          <div className="p-4 md:p-5">
-            <EngineerChatPanel />
-          </div>
+          <EngineerChatPanel />
         </section>
-      ) : null}
-
-      {mainTab === "compare" ? (
-        <section className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-          <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
-            <h2 className="text-lg font-semibold text-foreground tracking-tight">Compare &amp; trend</h2>
-            <p className="text-xs text-muted-foreground mt-1 leading-snug">
-              Primary and compare runs use <span className="font-mono">runId</span> and{" "}
-              <span className="font-mono">compareRunId</span> in the URL. Load a trend digest when you want a
-              multi-session view for this car.
-            </p>
-          </div>
-          <div className="p-4 md:p-5">
-            <EngineerCompareAndPattern embedded />
-          </div>
+      ) : (
+        <section className={cn(isPending && "opacity-90")}>
+          <EngineerCompareAndPattern />
         </section>
-      ) : null}
+      )}
     </div>
   );
 }

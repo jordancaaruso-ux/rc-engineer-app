@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { readSetupField } from "@/lib/a800rrSetupRead";
@@ -9,10 +10,20 @@ import {
   type SetupSheetFieldDef,
   type SetupSheetTemplate,
 } from "@/lib/setupSheetTemplate";
-import { SetupSheetStructured } from "@/components/runs/SetupSheetStructured";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import type { CompareColumnRole } from "@/lib/setupCompare/compareHighlight";
 import { getDifferenceColor } from "@/lib/setupCompare/differenceColor";
+
+const SetupSheetStructured = dynamic(
+  () => import("@/components/runs/SetupSheetStructured").then((m) => ({ default: m.SetupSheetStructured })),
+  {
+    loading: () => (
+      <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
+        Loading setup sheet…
+      </div>
+    ),
+  }
+);
 
 export type SetupSheetViewProps = {
   value: SetupSnapshotData;

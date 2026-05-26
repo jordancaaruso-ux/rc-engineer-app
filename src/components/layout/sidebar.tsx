@@ -2,32 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
 import { DESKTOP_NAV, resolveActiveNavId } from "@/components/layout/navConfig";
-
-function addRunHref(draftRunId: string | null, fallback: string): string {
-  return draftRunId ? `/runs/${encodeURIComponent(draftRunId)}/edit` : fallback;
-}
+import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
 
 export function Sidebar() {
   const pathname = usePathname();
   const activeId = resolveActiveNavId(pathname ?? "");
-  const [draftRunId, setDraftRunId] = useState<string | null>(null);
-
-  const refreshDraft = useCallback(async () => {
-    try {
-      const res = await fetch("/api/runs/today-draft", { cache: "no-store" });
-      if (!res.ok) return;
-      const body = (await res.json()) as { draftRunId: string | null };
-      setDraftRunId(body.draftRunId ?? null);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshDraft();
-  }, [refreshDraft, pathname]);
+  const { addRunHref, refreshDraft } = useTodayDraftRun();
 
   return (
     <aside className="sidebar hidden md:flex">
@@ -35,18 +16,20 @@ export function Sidebar() {
         {DESKTOP_NAV.map((item) => {
           const active = activeId === item.id;
           const href =
-            item.smartDraft && item.id === "add-run" ? addRunHref(draftRunId, item.href) : item.href;
+            item.smartDraft && item.id === "add-run" ? addRunHref(item.href) : item.href;
           const Icon = item.icon;
+          const prefetch = item.prefetch !== false;
 
           return (
             <Link
               key={item.id}
               href={href}
+              prefetch={prefetch}
               onClick={() => {
                 if (item.smartDraft) void refreshDraft();
               }}
               data-active={active ? "true" : "false"}
-              className="group gap-2"
+              className="tap-active group gap-2"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />

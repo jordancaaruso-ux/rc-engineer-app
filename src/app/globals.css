@@ -405,10 +405,19 @@ body {
 
 .page-body {
   @apply flex-1 py-3 min-w-0;
-  /* Horizontal padding respects iOS/Android safe-area insets so content on
-     notched or rounded-corner screens isn't clipped at the far-left edge. */
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+
+/* Instant tap feedback on mobile nav, hub rows, and buttons */
+.tap-active {
+  @apply transition-transform duration-75 active:scale-[0.97] active:opacity-90;
+}
+
+@media (min-width: 768px) {
+  .tap-active {
+    @apply active:scale-100 active:opacity-100;
+  }
 }
 
 input[type="text"]:focus-visible,
