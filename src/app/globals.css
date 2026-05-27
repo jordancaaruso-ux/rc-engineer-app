@@ -445,3 +445,11 @@ select:focus-visible {
     display: none;
   }
 }
+
+html.video-overlay-fullscreen-active {
+  overflow: hidden;
+}
+
+html.video-overlay-fullscreen-active body {
+  overflow: hidden;
+}

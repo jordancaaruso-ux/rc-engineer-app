@@ -9,8 +9,8 @@ export default async function VideoOverlayPage(): Promise<ReactNode> {
         <div>
           <h1 className="page-title">Video overlay</h1>
           <p className="page-subtitle">
-            Pick two local video files, then blend them (opacity) and nudge time offset to compare lines. Works best
-            from the same camera position.
+            Pick two local video files, blend them, and align timelines up to ±5 minutes. Use rotate/skew controls
+            when camera angles differ. On mobile, tap Fullscreen for landscape viewing with overlay controls.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start">
