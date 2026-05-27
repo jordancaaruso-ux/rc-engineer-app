@@ -2,79 +2,15 @@
 
 import { useId, useMemo } from "react";
 import type { CornerPhase, HandlingIntensity1to5, PhaseBalance } from "@/lib/runHandlingAssessment";
-
-function phaseT(phase: CornerPhase): number {
-  switch (phase) {
-    case "entry":
-      return 0.22;
-    case "mid":
-      return 0.5;
-    case "exit":
-      return 0.78;
-    default:
-      return 0.5;
-  }
-}
-
-/** 180° hairpin: chute in → semicircle arc (constant radius) → chute out. C = (60, 50), R = 35. */
-const CX = 60;
-const CY = 50;
-const R = 35;
-const ENTRY_X = 25;
-const EXIT_X = 95;
-const TURN_T = Math.PI; /* semicircle */
-
-const L1 = 50; /* (25,100) → (25,50) */
-const L2 = R * TURN_T;
-const L3 = 50; /* (95,50) → (95,100) */
-const L_TOTAL = L1 + L2 + L3;
-
-const PATH_D = `M 25 100 L 25 50 A 35 35 0 1 1 95 50 L 95 100`;
-
-/**
- * t ∈ [0,1] is normalized distance along the centerline (entry → top of U → exit).
- * Semicircle uses θ: π → 0 so the bend opens downward (U points toward +y on screen).
- */
-function hairpinPointAndTangent(t: number): { x: number; y: number; tangentDeg: number } {
-  const u = Math.min(1, Math.max(0, t));
-  const s = u * L_TOTAL;
-  if (s <= L1) {
-    const p = s / L1; /* 0 at bottom, 1 at (25,50) */
-    const y = 100 - p * 50;
-    return { x: ENTRY_X, y, tangentDeg: -90 };
-  }
-  if (s <= L1 + L2) {
-    const sa = s - L1;
-    const p = sa / L2; /* 0..1 along 180° arc (left → over top → right) */
-    const theta = Math.PI * (1 - p);
-    const x = CX + R * Math.cos(theta);
-    const y = CY - R * Math.sin(theta);
-    const dxDtheta = -R * Math.sin(theta);
-    const dyDtheta = -R * Math.cos(theta);
-    return { x, y, tangentDeg: (Math.atan2(dyDtheta, dxDtheta) * 180) / Math.PI };
-  }
-  const s3 = s - L1 - L2;
-  const p = s3 / L3;
-  const y = 50 + p * 50;
-  return { x: EXIT_X, y, tangentDeg: 90 };
-}
-
-function sampleCenterline(n: number): { x: number; y: number }[] {
-  const out: { x: number; y: number }[] = [];
-  for (let i = 0; i < n; i++) {
-    const t = n <= 1 ? 0.5 : i / (n - 1);
-    const { x, y } = hairpinPointAndTangent(t);
-    out.push({ x, y });
-  }
-  return out;
-}
-
-function pathFromPoints(pts: { x: number; y: number }[]): string {
-  if (pts.length === 0) return "";
-  let d = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
-  for (let i = 1; i < pts.length; i++) d += ` L ${pts[i].x.toFixed(2)} ${pts[i].y.toFixed(2)}`;
-  return d;
-}
+import {
+  HAIRPIN_PATH_D,
+  hairpinPointAndTangent,
+  pathFromPoints,
+  phaseT,
+  sampleCenterline,
+  slipOffsetUnit,
+} from "@/components/runs/handlingCornerGeometry";
+import { HandlingTouringCarSilhouette } from "@/components/runs/HandlingTouringCarSilhouette";
 
 const GRASS = "#3d5c42";
 const ASPHALT = "#2a2e2c";
@@ -94,8 +30,8 @@ function balanceToIntensity(balance: PhaseBalance): HandlingIntensity1to5 {
 
 function intensityFactors(intensity: HandlingIntensity1to5): { slip: number; drift: number; duration: number } {
   const t = (Math.min(5, Math.max(1, intensity)) - 1) / 4;
-  const mild = { slip: 4, drift: 1.8, duration: 2.8 };
-  const strong = { slip: 15, drift: 7, duration: 1.95 };
+  const mild = { slip: 3.5, drift: 1.4, duration: 2.9 };
+  const strong = { slip: 11, drift: 5.5, duration: 2.1 };
   return {
     slip: mild.slip + t * (strong.slip - mild.slip),
     drift: mild.drift + t * (strong.drift - mild.drift),
@@ -104,7 +40,7 @@ function intensityFactors(intensity: HandlingIntensity1to5): { slip: number; dri
 }
 
 /**
- * 180° hairpin (rounded arc, not a cusp), G→Y→O line, boomerang “sway” for balance.
+ * 180° hairpin schematic with 1/10 touring top-down car; sway shows push vs tail-out.
  */
 export function HandlingCornerAnimation({ phase, balance }: { phase: CornerPhase; balance: PhaseBalance }) {
   const uid = useId().replace(/:/g, "");
@@ -115,30 +51,37 @@ export function HandlingCornerAnimation({ phase, balance }: { phase: CornerPhase
   const intensity = balanceToIntensity(balance);
   const slipSign = mode === "understeer" ? 1 : mode === "oversteer" ? -1 : 0;
   const { slip, drift, duration } =
-    mode === "neutral" ? { slip: 2, drift: 0.8, duration: 3.2 } : intensityFactors(intensity);
+    mode === "neutral" ? { slip: 1.5, drift: 0.5, duration: 3.4 } : intensityFactors(intensity);
 
+  const { ox, oy } = slipOffsetUnit(tangentDeg, mode);
   const carRotation = tangentDeg - slipSign * slip;
-  const rotPulse = slipSign * 3;
-  const tx0 = slipSign * drift * 0.35;
-  const tx1 = slipSign * drift;
+  const rotPulse = slipSign * 2.5;
+  const drift0 = drift * 0.4;
+  const drift1 = drift;
+  const tx0 = ox * drift0;
+  const ty0 = oy * drift0;
+  const tx1 = ox * drift1;
+  const ty1 = oy * drift1;
+
+  const tangentRad = (tangentDeg * Math.PI) / 180;
+  const idealLen = 9;
+  const idealX2 = Math.cos(tangentRad) * idealLen;
+  const idealY2 = Math.sin(tangentRad) * idealLen;
 
   const label =
     mode === "neutral"
-      ? `Schematic: neutral at ${phase} hairpin`
+      ? `Neutral balance at ${phase} of hairpin corner`
       : mode === "understeer"
-        ? `Schematic: understeer (${balance}) at ${phase} hairpin — nose pushes wide`
-        : `Schematic: oversteer (+${balance}) at ${phase} hairpin — rear steps out`;
+        ? `Understeer ${balance} at ${phase}: nose pushes wide on hairpin`
+        : `Oversteer plus ${balance} at ${phase}: rear steps out on hairpin`;
 
   const { dEntry, dMid, dExit } = useMemo(() => {
     const samples = sampleCenterline(64);
     const third = Math.max(1, Math.floor(samples.length / 3));
-    const pEntry = samples.slice(0, third + 1);
-    const pMid = samples.slice(third, 2 * third + 1);
-    const pExit = samples.slice(2 * third);
     return {
-      dEntry: pathFromPoints(pEntry),
-      dMid: pathFromPoints(pMid),
-      dExit: pathFromPoints(pExit),
+      dEntry: pathFromPoints(samples.slice(0, third + 1)),
+      dMid: pathFromPoints(samples.slice(third, 2 * third + 1)),
+      dExit: pathFromPoints(samples.slice(2 * third)),
     };
   }, []);
 
@@ -152,39 +95,21 @@ export function HandlingCornerAnimation({ phase, balance }: { phase: CornerPhase
         @keyframes handling-sway-${uid} {
           0%,
           100% {
-            transform: rotate(${carRotation}deg) translate(${tx0}px, 0px);
+            transform: rotate(${carRotation}deg) translate(${tx0}, ${ty0});
           }
           50% {
-            transform: rotate(${carRotation + rotPulse}deg) translate(${tx1}px, -1px);
+            transform: rotate(${carRotation + rotPulse}deg) translate(${tx1}, ${ty1});
           }
         }
         .handling-sway-${uid} {
           animation: handling-sway-${uid} ${duration}s ease-in-out infinite;
-          transform-origin: 0 0;
+          transform-origin: center;
           transform-box: fill-box;
         }
         @media (prefers-reduced-motion: reduce) {
           .handling-sway-${uid} {
             animation: none !important;
-            transform: rotate(${carRotation}deg) translate(${tx0}px, 0px);
-          }
-        }
-        @keyframes handling-smoke-${uid} {
-          0%,
-          100% {
-            opacity: 0.35;
-          }
-          50% {
-            opacity: 0.6;
-          }
-        }
-        .handling-smoke-${uid} {
-          animation: handling-smoke-${uid} 1.6s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .handling-smoke-${uid} {
-            animation: none;
-            opacity: 0.45;
+            transform: rotate(${carRotation}deg) translate(${tx0}, ${ty0});
           }
         }
       `}</style>
@@ -198,36 +123,36 @@ export function HandlingCornerAnimation({ phase, balance }: { phase: CornerPhase
           </radialGradient>
         </defs>
         <path
-          d={PATH_D}
+          d={HAIRPIN_PATH_D}
           fill="none"
           stroke={WHITE_EDGE}
-          strokeWidth="22"
+          strokeWidth="20"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         <path
-          d={PATH_D}
+          d={HAIRPIN_PATH_D}
           fill="none"
           stroke={ASPHALT}
-          strokeWidth="18"
+          strokeWidth="16"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         <path
-          d={PATH_D}
+          d={HAIRPIN_PATH_D}
           fill="none"
           stroke={ASPHALT_INNER}
-          strokeWidth="10"
+          strokeWidth="9"
           strokeLinecap="round"
           strokeLinejoin="round"
-          opacity={0.5}
+          opacity={0.45}
         />
         {dEntry ? (
           <path
             d={dEntry}
             fill="none"
             stroke={LINE_ENTRY}
-            strokeWidth="1.6"
+            strokeWidth="1.5"
             strokeDasharray="2.5 2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -239,7 +164,7 @@ export function HandlingCornerAnimation({ phase, balance }: { phase: CornerPhase
             d={dMid}
             fill="none"
             stroke={LINE_MID}
-            strokeWidth="1.6"
+            strokeWidth="1.5"
             strokeDasharray="2.5 2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -251,84 +176,42 @@ export function HandlingCornerAnimation({ phase, balance }: { phase: CornerPhase
             d={dExit}
             fill="none"
             stroke={LINE_EXIT}
-            strokeWidth="1.6"
+            strokeWidth="1.5"
             strokeDasharray="2.5 2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
             opacity={0.95}
           />
         ) : null}
+        <circle cx={x} cy={y} r={0.9} fill="#f0f2f0" opacity={0.35} />
         <g transform={`translate(${x}, ${y})`}>
-          <g className={`handling-sway-${uid}`} style={{ color: "inherit" }}>
-            <g>
-              <rect
-                x={-12}
-                y={-5.5}
-                width={20}
-                height={11}
-                rx={2.2}
-                fill="#e8a0bc"
-                stroke="#b8557a"
-                strokeWidth="0.6"
-              />
-              <polygon
-                points="8,-2.2 16,-0.1 8,1.1"
-                fill="#e8a0bc"
-                stroke="#b8557a"
-                strokeWidth="0.45"
-              />
-              <rect
-                x={-14.5}
-                y={-4}
-                width={2.2}
-                height={8}
-                rx={0.3}
-                fill="#1a1d1c"
-              />
-              <circle r="3.4" fill="#d4a524" />
-              <text
-                x="0"
-                y="1.2"
-                textAnchor="middle"
-                className="select-none"
-                fill="#1a1510"
-                style={{ fontSize: "3.2px", fontWeight: 700, fontFamily: "system-ui, sans-serif" }}
-              >
-                5
-              </text>
-              {mode === "oversteer" && (
-                <g
-                  className={`handling-smoke-${uid}`}
-                  style={{ mixBlendMode: "screen" }}
-                  opacity={0.45}
-                  aria-hidden
-                >
-                  <ellipse
-                    transform="translate(-9,2) rotate(18)"
-                    cx="0"
-                    cy="0"
-                    rx="4.5"
-                    ry="1.3"
-                    fill="white"
-                  />
-                  <ellipse
-                    transform="translate(-11,3) rotate(12)"
-                    cx="0"
-                    cy="0"
-                    rx="3"
-                    ry="0.8"
-                    fill="white"
-                  />
-                </g>
-              )}
-            </g>
+          {mode === "understeer" ? (
+            <line
+              x1={0}
+              y1={0}
+              x2={idealX2}
+              y2={idealY2}
+              stroke="#f0f2f0"
+              strokeWidth={0.7}
+              strokeDasharray="1.5 1.5"
+              opacity={0.4}
+            />
+          ) : null}
+          <g className={`handling-sway-${uid}`}>
+            <HandlingTouringCarSilhouette showRearSmear={mode === "oversteer"} />
           </g>
         </g>
       </svg>
       <div className="px-2 pb-2.5 pt-0 text-[9px] text-muted-foreground text-center leading-tight bg-card/30 border-t border-border/30">
-        {mode === "neutral" ? "Neutral" : mode === "understeer" ? "Push" : "Tail out"} · {phase} ·{" "}
+        {mode === "neutral" ? "Neutral" : mode === "understeer" ? "Push wide" : "Tail out"} · {phase} ·{" "}
         {balance === 0 ? "0" : balance > 0 ? `+${balance}` : balance}
-        <div className="text-[8px] opacity-80 mt-0.5">Line: entry → mid → exit</div>
+        <div className="text-[8px] opacity-80 mt-0.5">
+          {mode === "understeer"
+            ? "Dashed line: ideal path · car shows push wide"
+            : mode === "oversteer"
+              ? "Car shows tail-out vs corner line"
+              : "Line colours: entry → mid → exit"}
+        </div>
       </div>
     </div>
   );

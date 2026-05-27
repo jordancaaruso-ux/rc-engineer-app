@@ -1,0 +1,55 @@
+Info: Processing symbol 'C1:'.
+Info: Processing symbol 'R2:'.
+Info: Processing symbol 'C2:'.
+Info: Processing symbol 'R3:'.
+Info: Processing symbol 'C3:'.
+Info: Processing symbol 'R4:'.
+Info: Processing symbol 'C4:'.
+Info: Processing symbol 'R5:'.
+Info: Processing symbol 'C5:'.
+Info: Processing symbol 'R6:'.
+Info: Processing symbol 'C6:'.
+Info: Processing symbol 'R7:'.
+Info: Processing symbol 'D1:'.
+Info: Processing symbol 'R8:'.
+Info: Processing symbol 'F1:'.
+Info: Processing symbol 'R9:'.
+Info: Processing symbol 'J1:'.
+Info: Processing symbol 'TP1:'.
+Info: Processing symbol 'J2:'.
+Info: Processing symbol 'TP2:'.
+Info: Processing symbol 'J4:'.
+Info: Processing symbol 'TP3:'.
+Info: Processing symbol 'L1:'.
+Info: Processing symbol 'U1:'.
+Info: Processing symbol 'R1:'.
+Info: Processing symbol 'U2:'.
+Error: Cannot add C1 (no footprint assigned).
+Error: Cannot add C2 (no footprint assigned).
+Error: Cannot add C3 (no footprint assigned).
+Error: Cannot add C4 (no footprint assigned).
+Error: Cannot add C5 (no footprint assigned).
+Error: Cannot add C6 (no footprint assigned).
+Error: Cannot add D1 (no footprint assigned).
+Error: Cannot add F1 (no footprint assigned).
+Error: Cannot add J1 (no footprint assigned).
+Error: Cannot add J2 (no footprint assigned).
+Error: Cannot add J4 (no footprint assigned).
+Error: Cannot add L1 (no footprint assigned).
+Error: Cannot add R1 (no footprint assigned).
+Error: Cannot add R8 (no footprint assigned).
+Error: Cannot add R5 (no footprint assigned).
+Error: Cannot add R9 (no footprint assigned).
+Error: Cannot add R2 (no footprint assigned).
+Error: Cannot add TP1 (no footprint assigned).
+Error: Cannot add R6 (no footprint assigned).
+Error: Cannot add TP2 (no footprint assigned).
+Error: Cannot add R4 (no footprint assigned).
+Error: Cannot add TP3 (no footprint assigned).
+Error: Cannot add R7 (no footprint assigned).
+Error: Cannot add U1 (no footprint assigned).
+Error: Cannot add R3 (no footprint assigned).
+Error: Cannot add U2 (no footprint assigned).
+
+
+Info: Total warnings: 0, errors: 26.

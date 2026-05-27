@@ -4,7 +4,7 @@ Budget targets (prod, typical user):
 
 | Route | TTFB goal | Notes |
 |-------|-----------|--------|
-| `/` | <800ms | Hero sync; Engineer suggestions client-side |
+| `/` | <800ms | Hero sync; Engineer suggestions on-demand (peek only until user taps) |
 | `/runs/history` | <600ms | Initial 40 runs; expand lazy-loads |
 | `/runs/new` | skeleton <200ms | NewRunForm code-split |
 | `/engineer` | skeleton <200ms | Compare tab lazy |
@@ -37,10 +37,14 @@ Optional: `@next/bundle-analyzer` when investigating regressions.
 
 Never cache across users.
 
+## Engineer suggestions (LLM)
+
+Dashboard and `/engineer` strip call `GET /api/engineer/dashboard-suggestions` on mount (**peek only** — DB cache lookup, no OpenAI). LLM runs only when the user taps **Get suggestions** (`sync=1`). Engineer chat is a separate explicit AI path.
+
 ## Checklist (manual)
 
 - [ ] Bottom nav: one today-draft fetch, instant active state
-- [ ] Dashboard: loading skeleton, Engineer card non-blocking
+- [ ] Dashboard: loading skeleton, Engineer card shows CTA until user asks (cached shows instantly)
 - [ ] Sessions: first page fast, expand fetches engineer-summary
 - [ ] Log run: form skeleton then dynamic chunk
 - [ ] Engineer: Chat without Compare bundle until tab selected

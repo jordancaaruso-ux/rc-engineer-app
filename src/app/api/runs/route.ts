@@ -16,8 +16,7 @@ import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
-import { parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
-import { scheduleBetweenRunHintsRecompute } from "@/lib/engineerPhase5/betweenRunHints/scheduleBetweenRunHints";
+import { coerceFeelVsLastRunForCompleteRun, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 
 type RunUpsertBody = {
   runId?: string;
@@ -113,6 +112,22 @@ function prismaJsonFromHandlingBody(raw: unknown): Prisma.InputJsonValue | typeo
   return parsed === null ? Prisma.JsonNull : (parsed as Prisma.InputJsonValue);
 }
 
+async function userHasPriorCompletedRunOnCar(params: {
+  userId: string;
+  carId: string;
+  excludeRunId?: string;
+}): Promise<boolean> {
+  const count = await prisma.run.count({
+    where: {
+      userId: params.userId,
+      carId: params.carId,
+      loggingComplete: true,
+      ...(params.excludeRunId ? { id: { not: params.excludeRunId } } : {}),
+    },
+  });
+  return count > 0;
+}
+
 async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; mode: "create" | "update" }) {
   const body = params.body;
   const carId = body.carId;
@@ -163,6 +178,31 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       { error: "carRating (1-10) is required to mark a run complete" },
       { status: 400 }
     );
+  }
+
+  const excludeRunId =
+    params.mode === "update" && typeof body.runId === "string" ? body.runId.trim() : undefined;
+  const hasPriorRunOnCar =
+    loggingComplete &&
+    (await userHasPriorCompletedRunOnCar({
+      userId: params.userId,
+      carId,
+      excludeRunId: excludeRunId || undefined,
+    }));
+
+  let handlingAssessmentForSave: Prisma.InputJsonValue | typeof Prisma.JsonNull = Prisma.JsonNull;
+  if (loggingComplete) {
+    const resolved = coerceFeelVsLastRunForCompleteRun(
+      body.handlingAssessmentJson ?? null,
+      hasPriorRunOnCar
+    );
+    if (resolved.error) {
+      return NextResponse.json({ error: resolved.error }, { status: 400 });
+    }
+    handlingAssessmentForSave =
+      resolved.parsed === null ? Prisma.JsonNull : (resolved.parsed as Prisma.InputJsonValue);
+  } else if ("handlingAssessmentJson" in body) {
+    handlingAssessmentForSave = prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null);
   }
 
   const shareWithTeam = body.shareWithTeam === false ? false : true;
@@ -365,7 +405,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         notes: body.notes?.trim() || null,
         driverNotes: null,
         handlingProblems: null,
-        handlingAssessmentJson: prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null),
+        handlingAssessmentJson: handlingAssessmentForSave,
         carRating: carRatingNormalized,
         suggestedChanges: body.suggestedChanges?.trim() || null,
         suggestedPreRun: body.suggestedPreRun?.trim() || null,
@@ -420,7 +460,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       updateData.loggingCompletedAt = new Date();
     }
     if ("handlingAssessmentJson" in body) {
-      updateData.handlingAssessmentJson = prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null);
+      updateData.handlingAssessmentJson = loggingComplete
+        ? handlingAssessmentForSave
+        : prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null);
     }
     if ("carRating" in body) {
       updateData.carRating = carRatingNormalized;
@@ -511,10 +553,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   }
 
   revalidateAfterRunMutation(params.userId);
-
-  if (loggingComplete) {
-    scheduleBetweenRunHintsRecompute(params.userId, run.id);
-  }
 
   return NextResponse.json({ run }, { status: params.mode === "create" ? 201 : 200 });
 }

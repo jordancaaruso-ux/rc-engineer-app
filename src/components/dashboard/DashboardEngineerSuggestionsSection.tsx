@@ -1,7 +1,8 @@
 "use client";
 
-import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
-import { DashboardEngineerSuggestionsPanel } from "@/components/dashboard/DashboardEngineerSuggestionsPanel";
+import { useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { EngineerSuggestionsCard } from "@/components/engineer/EngineerSuggestionsCard";
 import { HeroPanel } from "@/components/ui/HeroPanel";
 import { SectionMetaInline, SectionTitle } from "@/components/ui/SectionTitle";
 import { cn } from "@/lib/utils";
@@ -14,25 +15,32 @@ function scopeLine(carName: string, trackName: string | null, eventName: string 
 }
 
 /**
- * Dashboard hero “Engineer suggestions” — same `/api/engineer/dashboard-suggestions` pipeline
- * as before on the Last run card, with optional SSR peek via `initialSuggestions`.
+ * Dashboard hero “Engineer suggestions” — on-demand peek / generate via shared card.
  */
 export function DashboardEngineerSuggestionsSection({
-  initialSuggestions,
   primaryRunId,
   carName,
   trackName,
   eventName,
   className,
 }: {
-  initialSuggestions: DashboardEngineerSuggestionPayloadV1 | null;
   primaryRunId: string | null;
   carName: string;
   trackName: string | null;
   eventName: string | null;
   className?: string;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const suggestRun = searchParams.get("suggestRun")?.trim() || null;
+
+  const clearPostRunPrompt = useCallback(() => {
+    if (suggestRun) router.replace("/", { scroll: false });
+  }, [router, suggestRun]);
+
   if (!primaryRunId) return null;
+
+  const emphasis = suggestRun === primaryRunId ? ("postRun" as const) : ("default" as const);
 
   return (
     <HeroPanel className={cn(className)}>
@@ -43,7 +51,12 @@ export function DashboardEngineerSuggestionsSection({
         <SectionMetaInline>{scopeLine(carName, trackName, eventName)}</SectionMetaInline>
       </div>
       <div className="mt-2">
-        <DashboardEngineerSuggestionsPanel runId={primaryRunId} initialSuggestions={initialSuggestions} />
+        <EngineerSuggestionsCard
+          runId={primaryRunId}
+          emphasis={emphasis}
+          layout="embedded"
+          onClearPostRunPrompt={clearPostRunPrompt}
+        />
       </div>
     </HeroPanel>
   );

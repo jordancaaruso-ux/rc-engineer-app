@@ -37,6 +37,7 @@ import {
 } from "@/components/runs/LapTimesIngestPanel";
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
+import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import { TrackMetaChipGroups } from "@/components/runs/TrackMetaChipGroups";
 import {
   emptyHandlingAssessmentUiState,
@@ -1750,6 +1751,10 @@ export function NewRunForm(props: {
       setInlineError("Rate the car 1–10 before marking the run complete.");
       return;
     }
+    if (intent === "completed" && feelVsLastRunEligible && handlingUi.feelVsLastRun == null) {
+      setInlineError("Pick how this run felt vs your last run on this car.");
+      return;
+    }
     // Surface unsaved setup edits before we write — the driver gets to review
     // exactly what they changed vs. the loaded baseline. Continuing from the
     // confirmation passes `bypassUnsavedSetupCheck: true` so we don't loop.
@@ -1877,7 +1882,11 @@ export function NewRunForm(props: {
           raceClass: raceClass.trim() || null,
           suggestedChanges: isEditing ? (editRun?.suggestedChanges?.trim() || null) : null,
           suggestedPreRun: isEditing ? (editRun?.suggestedPreRun?.trim() || null) : null,
-          handlingAssessmentJson: persistedFromUiState(handlingUi),
+          handlingAssessmentJson: persistedFromUiState(
+            intent === "completed" && !feelVsLastRunEligible && handlingUi.feelVsLastRun == null
+              ? { ...handlingUi, feelVsLastRun: 0 }
+              : handlingUi
+          ),
           carRating,
           shareWithTeam,
           sessionLabel: null,
@@ -1929,14 +1938,11 @@ export function NewRunForm(props: {
         }).catch(() => {});
       }
 
-      // Completing a run ships the driver over to Sessions with the newest
-      // test day pre-expanded — they can scan laps/notes for the session they
-      // just finished without first navigating away from a form that no
-      // longer has anything to do. Drafts stay put: editing goes back to the
-      // dashboard (or stays on the edit page to keep iterating).
+      // Completing a run sends the driver to the dashboard with a one-time
+      // prompt to generate Engineer suggestions for the session they just saved.
       if (intent === "completed") {
         setTimeout(() => {
-          router.push("/runs/history?expandLatest=1");
+          router.push(`/?suggestRun=${encodeURIComponent(run.id)}`);
         }, 600);
       } else if (isEditing) {
         const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
@@ -3498,27 +3504,12 @@ export function NewRunForm(props: {
 
       <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3 text-sm">
         <div className="ui-title text-sm text-muted-foreground">Feedback</div>
-        <textarea
-          className={cn(
-            "h-32 w-full resize-none rounded-md border bg-card px-3 py-2 text-sm outline-none",
-            isDraft && notes.trim().length === 0
-              ? "border-amber-500/50 ring-1 ring-amber-500/30"
-              : "border-border"
-          )}
-          placeholder={
-            isDraft && notes.trim().length === 0
-              ? "How did the run feel? Grip, balance, any issues, what you'd change…"
-              : "Session notes, handling, track conditions…"
-          }
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          aria-label="Session notes"
-        />
-        <div className="pt-1">
+        <div className="space-y-2 rounded-md border border-border/80 bg-card/40 p-3">
+          <div className="text-[11px] font-medium text-muted-foreground">Required to complete</div>
           <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div className="text-xs font-medium text-foreground">
-                Car rating <span className="text-[10px] font-normal text-muted-foreground">(required to complete · 1 awful → 10 perfect)</span>
+                Car rating <span className="text-[10px] font-normal text-muted-foreground">(1 awful → 10 perfect)</span>
               </div>
               <div className="text-[11px] text-muted-foreground">
                 {carRating == null ? "Not rated" : `${carRating} / 10`}
@@ -3551,10 +3542,33 @@ export function NewRunForm(props: {
               })}
             </div>
             <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-              The Engineer uses this as the anchor &quot;was the car good?&quot; signal alongside your handling chips when ranking past setups.
+              The Engineer uses this as the anchor &quot;was the car good?&quot; signal when ranking past setups.
             </p>
           </div>
+          <FeelVsLastRunQuickPick
+            value={handlingUi.feelVsLastRun}
+            onChange={(feelVsLastRun) =>
+              setHandlingUi((cur) => ({ ...cur, feelVsLastRun }))
+            }
+            eligible={feelVsLastRunEligible}
+          />
         </div>
+        <textarea
+          className={cn(
+            "h-32 w-full resize-none rounded-md border bg-card px-3 py-2 text-sm outline-none",
+            isDraft && notes.trim().length === 0
+              ? "border-amber-500/50 ring-1 ring-amber-500/30"
+              : "border-border"
+          )}
+          placeholder={
+            isDraft && notes.trim().length === 0
+              ? "How did the run feel? Grip, balance, any issues, what you'd change…"
+              : "Session notes, handling, track conditions…"
+          }
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          aria-label="Session notes"
+        />
         <div className="pt-1">
           <button
             type="button"
@@ -3567,11 +3581,7 @@ export function NewRunForm(props: {
           </button>
           {handlingDetailExpanded ? (
             <div className="mt-2">
-              <HandlingAssessmentFields
-                value={handlingUi}
-                onChange={setHandlingUi}
-                feelVsLastRunEligible={feelVsLastRunEligible}
-              />
+              <HandlingAssessmentFields value={handlingUi} onChange={setHandlingUi} />
             </div>
           ) : null}
         </div>

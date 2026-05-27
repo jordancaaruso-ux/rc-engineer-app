@@ -37,15 +37,12 @@ export async function GET(request: Request) {
 
   try {
     if (sync) {
-      const { suggestions } = await getOrComputeDashboardSuggestion(user.id, runId);
-      return NextResponse.json({ suggestions });
+      const { suggestions, cached } = await getOrComputeDashboardSuggestion(user.id, runId);
+      return NextResponse.json({ suggestions, runId, cached });
     }
 
     const peeked = await peekDashboardSuggestion(user.id, runId);
-    if (!peeked) {
-      void getOrComputeDashboardSuggestion(user.id, runId).catch(() => {});
-    }
-    return NextResponse.json({ suggestions: peeked });
+    return NextResponse.json({ suggestions: peeked, runId, cached: peeked != null });
   } catch {
     return NextResponse.json({ error: "Failed to load suggestions" }, { status: 500 });
   }

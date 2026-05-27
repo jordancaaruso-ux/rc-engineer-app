@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
@@ -33,7 +34,6 @@ export function DashboardHome({
     todayDraftRunId,
     todayDraftSavedAt,
     todaysChanges,
-    engineerSuggestionsInitial,
     engineerSuggestionsPrimaryRunId,
   } = model;
 
@@ -105,13 +105,23 @@ export function DashboardHome({
           </Link>
         </HeroPanel>
 
-        <DashboardEngineerSuggestionsSection
-          initialSuggestions={engineerSuggestionsInitial}
-          primaryRunId={engineerSuggestionsPrimaryRunId}
-          carName={recentRun?.carName ?? "Car"}
-          trackName={recentRun?.trackName ?? null}
-          eventName={recentRun?.eventName ?? null}
-        />
+        <Suspense
+          fallback={
+            <HeroPanel>
+              <SectionTitle as="div" className="text-sm">
+                Engineer suggestions
+              </SectionTitle>
+              <p className="mt-2 text-[11px] text-muted-foreground">Loading…</p>
+            </HeroPanel>
+          }
+        >
+          <DashboardEngineerSuggestionsSection
+            primaryRunId={engineerSuggestionsPrimaryRunId}
+            carName={recentRun?.carName ?? "Car"}
+            trackName={recentRun?.trackName ?? null}
+            eventName={recentRun?.eventName ?? null}
+          />
+        </Suspense>
 
         {activeEvent ? (
           <EventContextCard activeEvent={activeEvent} />

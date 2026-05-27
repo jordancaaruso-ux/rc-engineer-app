@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import {
   buildPrimaryFocusOptions,
   HANDLING_TRAIT_AXIS_UI,
-  type FeelVsLastRun,
   type HandlingAssessmentUiState,
   type HandlingTraitAxisKey,
   type PhaseBalance,
@@ -33,8 +32,6 @@ const TRAIT_AXIS_KEYS: HandlingTraitAxisKey[] = [
 
 const PHASE_BALANCE_LEVELS: PhaseBalance[] = [-3, -2, -1, 0, 1, 2, 3];
 
-const FEEL_VS_LAST_RUN_LEVELS: FeelVsLastRun[] = [-3, -2, -1, 0, 1, 2, 3];
-
 function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
   return sanitizeHandlingUiState(next);
 }
@@ -58,10 +55,6 @@ function phaseBalanceChipClass(n: PhaseBalance, current: PhaseBalance | null): s
   );
 }
 
-function feelVsLastRunButtonClass(n: FeelVsLastRun, current: FeelVsLastRun | null): string {
-  return phaseBalanceChipClass(n, current);
-}
-
 function primaryFocusSelectValue(ui: HandlingAssessmentUiState): string {
   if (!ui.primaryFocus) return "";
   const id = JSON.stringify(ui.primaryFocus);
@@ -72,10 +65,9 @@ function primaryFocusSelectValue(ui: HandlingAssessmentUiState): string {
 type Props = {
   value: HandlingAssessmentUiState;
   onChange: (next: HandlingAssessmentUiState) => void;
-  feelVsLastRunEligible?: boolean;
 };
 
-export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligible = false }: Props) {
+export function HandlingAssessmentFields({ value, onChange }: Props) {
   const primaryFocusOptions = useMemo(() => buildPrimaryFocusOptions(value), [value]);
   const primaryFocusValue = primaryFocusSelectValue(value);
 
@@ -104,41 +96,6 @@ export function HandlingAssessmentFields({ value, onChange, feelVsLastRunEligibl
 
   return (
     <div className="space-y-4 rounded-md border border-border/80 bg-muted/30 p-3">
-      {feelVsLastRunEligible ? (
-        <div className="space-y-2">
-          <div className="text-xs font-medium text-muted-foreground">
-            Compared to your last run on this car
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-[10px] text-red-600/90 dark:text-red-400/90 mr-0.5">Worse</span>
-            {FEEL_VS_LAST_RUN_LEVELS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                aria-pressed={value.feelVsLastRun === n}
-                className={feelVsLastRunButtonClass(n, value.feelVsLastRun)}
-                onClick={() =>
-                  emit({
-                    ...value,
-                    feelVsLastRun: value.feelVsLastRun === n ? null : n,
-                  })
-                }
-              >
-                {n > 0 ? `+${n}` : String(n)}
-              </button>
-            ))}
-            <span className="text-[10px] text-emerald-700/90 dark:text-emerald-400/90 ml-0.5">Better</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground">
-            Tap again to clear. 0 = same as last time on this car.
-          </p>
-        </div>
-      ) : (
-        <p className="text-[10px] text-muted-foreground">
-          Log at least one prior run on this car to rate feel vs last run.
-        </p>
-      )}
-
       <div className="space-y-3">
         <div className="text-xs font-medium text-muted-foreground">
           Corner balance (−3 push → +3 oversteer, per phase)

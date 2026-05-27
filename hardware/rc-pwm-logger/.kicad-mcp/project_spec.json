@@ -1,0 +1,59 @@
+{
+  "connector_refs": [
+    "J1",
+    "J2",
+    "J4"
+  ],
+  "decoupling_pairs": [],
+  "critical_nets": [
+    "SD_CLK",
+    "SD_CMD",
+    "SD_DAT0",
+    "SD_CS"
+  ],
+  "power_tree_refs": [
+    "J1",
+    "D1",
+    "F1",
+    "U2",
+    "U1",
+    "J4"
+  ],
+  "analog_refs": [],
+  "digital_refs": [
+    "U1"
+  ],
+  "sensor_cluster_refs": [],
+  "rf_keepout_regions": [],
+  "manufacturer": "",
+  "manufacturer_tier": "",
+  "functional_spacing_mm": 5.0,
+  "thermal_hotspots": [],
+  "critical_frequencies_mhz": [],
+  "power_rails": [],
+  "interfaces": [],
+  "mechanical": {
+    "outline_dxf_path": "",
+    "board_width_mm": null,
+    "board_height_mm": null,
+    "mount_holes": [],
+    "connector_placement": [],
+    "max_height_mm": null,
+    "enclosure_step_path": "",
+    "notes": ""
+  },
+  "compliance": [],
+  "cost": {
+    "unit_cost_usd_max": null,
+    "volume_units": 1,
+    "nre_budget_usd": null,
+    "prefer_jlcpcb_basic_parts": false
+  },
+  "thermal": {
+    "ambient_c": 25.0,
+    "max_component_c": 85.0,
+    "airflow": "natural",
+    "ambient_airflow_m_s": null,
+    "thermal_resistance_target_c_per_w": null
+  }
+}

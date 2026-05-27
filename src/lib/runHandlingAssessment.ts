@@ -17,6 +17,48 @@ export type PhaseBalance = -3 | -2 | -1 | 0 | 1 | 2 | 3;
 
 export type FeelVsLastRun = PhaseBalance;
 
+/** Five quick-pick values for required "vs last run" at Run complete. */
+export const FEEL_VS_LAST_RUN_QUICK_OPTIONS = [
+  { value: -3 as FeelVsLastRun, label: "Much worse" },
+  { value: -2 as FeelVsLastRun, label: "Worse" },
+  { value: 0 as FeelVsLastRun, label: "Similar" },
+  { value: 2 as FeelVsLastRun, label: "Better" },
+  { value: 3 as FeelVsLastRun, label: "Much better" },
+] as const;
+
+export function formatFeelVsLastRunQuickLabel(v: FeelVsLastRun): string {
+  const match = FEEL_VS_LAST_RUN_QUICK_OPTIONS.find((o) => o.value === v);
+  if (match) return match.label;
+  if (v === -1) return "Worse";
+  if (v === 1) return "Better";
+  if (v === 0) return "Similar";
+  const adv = adverbForMagnitude(v);
+  const direction = v < 0 ? "worse" : "better";
+  return `${adv ? `${adv} ` : ""}${direction}`.replace(/^\w/, (c) => c.toUpperCase());
+}
+
+export function coerceFeelVsLastRunForCompleteRun(
+  raw: unknown,
+  hasPriorRunOnCar: boolean
+): { parsed: RunHandlingAssessmentParsed | null; error?: string } {
+  const parsed = parseHandlingAssessmentJson(raw);
+  const feel = parsed?.feelVsLastRun ?? null;
+
+  if (hasPriorRunOnCar && feel == null) {
+    return {
+      parsed,
+      error: "Pick how this run felt vs your last run on this car before marking complete.",
+    };
+  }
+
+  if (!hasPriorRunOnCar && feel == null) {
+    if (!parsed) return { parsed: { version: 5, feelVsLastRun: 0 } };
+    return { parsed: { ...parsed, feelVsLastRun: 0 } };
+  }
+
+  return { parsed };
+}
+
 export type BalanceByPhaseMap = {
   entry?: PhaseBalance;
   mid?: PhaseBalance;
@@ -764,7 +806,7 @@ export function buildPrimaryFocusOptions(ui: HandlingAssessmentUiState): { id: s
     opts.push({
       id: JSON.stringify(f),
       focus: f,
-      label: `Feel vs last run: ${formatFeelVsLastRun(uiSan.feelVsLastRun)}`,
+      label: `Feel vs last run: ${formatFeelVsLastRunQuickLabel(uiSan.feelVsLastRun)}`,
     });
   }
   if (uiSan.feelSteering != null) {
@@ -850,7 +892,7 @@ export function persistedFromUiState(ui: HandlingAssessmentUiState): RunHandling
 }
 
 function formatFeelVsLastRun(v: FeelVsLastRun): string {
-  if (v === 0) return "same as previous run on this car (0)";
+  if (v === 0) return "similar to previous run on this car (0)";
   const adv = adverbForMagnitude(v);
   const direction = v < 0 ? "worse" : "better";
   return `${adv ? `${adv} ` : ""}${direction} than previous run on this car (${signedValue(v)})`;
@@ -903,7 +945,7 @@ export function formatHandlingAssessmentDetailLines(raw: unknown): string[] {
   if (!parsed) return [];
   const lines: string[] = [];
   if (parsed.feelVsLastRun != null && isPhaseBalance(parsed.feelVsLastRun)) {
-    lines.push(`Feel vs last run: ${sentenceCase(formatFeelVsLastRun(parsed.feelVsLastRun))}`);
+    lines.push(`Feel vs last run: ${formatFeelVsLastRunQuickLabel(parsed.feelVsLastRun)}`);
   }
   const b = parsed.balanceByPhase;
   if (b) {
