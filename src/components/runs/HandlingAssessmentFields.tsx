@@ -11,16 +11,14 @@ import {
   type PrimaryFocus,
   sanitizeHandlingUiState,
 } from "@/lib/runHandlingAssessment";
-import { HandlingCornerAnimation } from "@/components/runs/HandlingCornerAnimation";
 
 const PHASE_ROWS: {
   stateKey: "balanceEntry" | "balanceMid" | "balanceExit";
   label: string;
-  phase: "entry" | "mid" | "exit";
 }[] = [
-  { stateKey: "balanceEntry", label: "Entry", phase: "entry" },
-  { stateKey: "balanceMid", label: "Mid", phase: "mid" },
-  { stateKey: "balanceExit", label: "Exit", phase: "exit" },
+  { stateKey: "balanceEntry", label: "Entry" },
+  { stateKey: "balanceMid", label: "Mid" },
+  { stateKey: "balanceExit", label: "Exit" },
 ];
 
 const TRAIT_AXIS_KEYS: HandlingTraitAxisKey[] = [
@@ -100,35 +98,30 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
         <div className="text-xs font-medium text-muted-foreground">
           Corner balance (−3 push → +3 oversteer, per phase)
         </div>
-        {PHASE_ROWS.map(({ stateKey, label, phase }) => {
+        {PHASE_ROWS.map(({ stateKey, label }) => {
           const rowVal = value[stateKey];
           return (
             <div
               key={stateKey}
-              className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
+              className="flex flex-col gap-2 border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
             >
-              <div className="flex flex-col gap-2 min-w-0 flex-1">
-                <span className="text-[11px] font-medium text-foreground">{label}</span>
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-[10px] text-red-600/90 dark:text-red-400/90">Push</span>
-                  {PHASE_BALANCE_LEVELS.map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      aria-pressed={rowVal === n}
-                      className={phaseBalanceChipClass(n, rowVal)}
-                      onClick={() => setPhaseBalance(stateKey, n)}
-                    >
-                      {n > 0 ? `+${n}` : String(n)}
-                    </button>
-                  ))}
-                  <span className="text-[10px] text-emerald-700/90 dark:text-emerald-400/90">OS</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground">Tap again to clear this phase.</p>
+              <span className="text-[11px] font-medium text-foreground">{label}</span>
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-[10px] text-red-600/90 dark:text-red-400/90">Push</span>
+                {PHASE_BALANCE_LEVELS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-pressed={rowVal === n}
+                    className={phaseBalanceChipClass(n, rowVal)}
+                    onClick={() => setPhaseBalance(stateKey, n)}
+                  >
+                    {n > 0 ? `+${n}` : String(n)}
+                  </button>
+                ))}
+                <span className="text-[10px] text-emerald-700/90 dark:text-emerald-400/90">OS</span>
               </div>
-              {rowVal != null ? (
-                <HandlingCornerAnimation phase={phase} balance={rowVal} />
-              ) : null}
+              <p className="text-[10px] text-muted-foreground">Tap again to clear this phase.</p>
             </div>
           );
         })}
