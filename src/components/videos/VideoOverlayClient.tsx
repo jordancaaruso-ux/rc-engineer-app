@@ -57,8 +57,11 @@ export function VideoOverlayClient() {
   const [bottomCanPlay, setBottomCanPlay] = useState(false);
   const [topCanPlay, setTopCanPlay] = useState(false);
   const [bothReady, setBothReady] = useState(false);
-  const [bottomLoading, setBottomLoading] = useState(false);
-  const [topLoading, setTopLoading] = useState(false);
+  /** Full-screen overlay only while decoding the first frame (not during playback seeks). */
+  const [bottomInitialLoading, setBottomInitialLoading] = useState(false);
+  const [topInitialLoading, setTopInitialLoading] = useState(false);
+  const bottomHasFrameRef = useRef(false);
+  const topHasFrameRef = useRef(false);
   const [preloadMode, setPreloadMode] = useState<"none" | "metadata" | "auto">("metadata");
 
   const [topOpacity, setTopOpacity] = useState(0.45);
@@ -90,11 +93,12 @@ export function VideoOverlayClient() {
       topObjectUrlRef.current = null;
     }
     setTopCanPlay(false);
+    topHasFrameRef.current = false;
     const url = URL.createObjectURL(file);
     topObjectUrlRef.current = url;
     setTopSrc(url);
     setTopName(file.name || "top video");
-    setTopLoading(true);
+    setTopInitialLoading(true);
   }, []);
 
   const setBottomFile = useCallback((file: File | null) => {
@@ -108,14 +112,15 @@ export function VideoOverlayClient() {
     if (!file) {
       setBottomSrc("");
       setBottomName("");
-      setBottomLoading(false);
+      setBottomInitialLoading(false);
       return;
     }
+    bottomHasFrameRef.current = false;
     const url = URL.createObjectURL(file);
     bottomObjectUrlRef.current = url;
     setBottomSrc(url);
     setBottomName(file.name || "bottom video");
-    setBottomLoading(true);
+    setBottomInitialLoading(true);
     setPreloadMode("metadata");
   }, []);
 
@@ -131,7 +136,8 @@ export function VideoOverlayClient() {
         setTopSrc("");
         setTopName("");
         setTopCanPlay(false);
-        setTopLoading(false);
+        setTopInitialLoading(false);
+        topHasFrameRef.current = false;
         setBothReady(false);
         return;
       }
@@ -139,7 +145,7 @@ export function VideoOverlayClient() {
         loadTopFromFile(file);
       } else {
         setTopName(file.name || "top video");
-        setTopLoading(true);
+        setTopInitialLoading(true);
       }
     },
     [bottomCanPlay, loadTopFromFile]
@@ -237,6 +243,20 @@ export function VideoOverlayClient() {
     refreshReady();
   }, [refreshReady]);
 
+  const markBottomFrameReady = useCallback(() => {
+    bottomHasFrameRef.current = true;
+    setBottomInitialLoading(false);
+    setBottomCanPlay(true);
+    refreshReady();
+  }, [refreshReady]);
+
+  const markTopFrameReady = useCallback(() => {
+    topHasFrameRef.current = true;
+    setTopInitialLoading(false);
+    setTopCanPlay(true);
+    refreshReady();
+  }, [refreshReady]);
+
   const playerBlock = (
     <div
       className={cn(
@@ -251,16 +271,14 @@ export function VideoOverlayClient() {
         playsInline
         preload={preloadMode}
         className="absolute inset-0 h-full w-full object-contain"
-        onLoadStart={() => setBottomLoading(true)}
-        onWaiting={() => setBottomLoading(true)}
-        onCanPlay={() => {
-          setBottomLoading(false);
-          setBottomCanPlay(true);
-          refreshReady();
+        onLoadStart={() => {
+          if (!bottomHasFrameRef.current) setBottomInitialLoading(true);
         }}
+        onCanPlay={markBottomFrameReady}
         onCanPlayThrough={() => refreshReady()}
         onProgress={onVideoProgress}
-        onLoadedData={() => setBottomLoading(false)}
+        onLoadedData={markBottomFrameReady}
+        onSeeked={markBottomFrameReady}
       />
       <video
         ref={topRef}
@@ -274,19 +292,23 @@ export function VideoOverlayClient() {
           transform: topTransform,
           transformOrigin: topOrigin,
         }}
-        onLoadStart={() => setTopLoading(true)}
-        onWaiting={() => setTopLoading(true)}
-        onCanPlay={() => {
-          setTopLoading(false);
-          setTopCanPlay(true);
-          refreshReady();
+        onLoadStart={() => {
+          if (!topHasFrameRef.current) setTopInitialLoading(true);
         }}
+        onCanPlay={markTopFrameReady}
         onCanPlayThrough={() => refreshReady()}
         onProgress={onVideoProgress}
-        onLoadedData={() => setTopLoading(false)}
+        onLoadedData={markTopFrameReady}
+        onSeeked={markTopFrameReady}
       />
-      <VideoLoadingOverlay label={bottomName || "Loading bottom video…"} loading={bottomLoading && Boolean(bottomSrc)} />
-      <VideoLoadingOverlay label={topName || "Loading top video…"} loading={topLoading && Boolean(topSrc)} />
+      <VideoLoadingOverlay
+        label={bottomName || "Loading bottom video…"}
+        loading={bottomInitialLoading && Boolean(bottomSrc)}
+      />
+      <VideoLoadingOverlay
+        label={topName || "Loading top video…"}
+        loading={topInitialLoading && Boolean(topSrc)}
+      />
     </div>
   );
 
