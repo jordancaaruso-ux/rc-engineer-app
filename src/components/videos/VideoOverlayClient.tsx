@@ -9,6 +9,7 @@ import {
   type OverlayAlignment,
 } from "@/components/videos/videoOverlayAlignment";
 import { VideoOverlayAlignmentPanel } from "@/components/videos/VideoOverlayAlignmentPanel";
+import { VideoOverlayTransport } from "@/components/videos/VideoOverlayTransport";
 import {
   clamp,
   clampOffset,
@@ -17,9 +18,12 @@ import {
   isMobileOverlayUi,
   MAX_OFFSET_SEC,
   parseOffset,
+  type PlaybackRatePreset,
 } from "@/components/videos/videoOverlayConstants";
+import { syncBothPaused } from "@/components/videos/videoOverlayPlayback";
+import { isVideoBufferedForPlay } from "@/components/videos/videoOverlaySync";
 import { useVideoOverlayFullscreen } from "@/components/videos/useVideoOverlayFullscreen";
-import { useVideoOverlaySync } from "@/components/videos/useVideoOverlaySync";
+import { useVideoOverlayFrameLockSync } from "@/components/videos/useVideoOverlayFrameLockSync";
 
 function VideoLoadingOverlay({ label, loading }: { label: string; loading: boolean }) {
   if (!loading) return null;
@@ -29,6 +33,14 @@ function VideoLoadingOverlay({ label, loading }: { label: string; loading: boole
       <span className="mt-2 px-4 text-center text-[11px] opacity-90">{label}</span>
     </div>
   );
+}
+
+function updateBothReady(
+  bottom: HTMLVideoElement | null,
+  top: HTMLVideoElement | null
+): boolean {
+  if (!bottom || !top) return false;
+  return isVideoBufferedForPlay(bottom) && isVideoBufferedForPlay(top);
 }
 
 export function VideoOverlayClient() {
@@ -42,15 +54,19 @@ export function VideoOverlayClient() {
   const [topSrc, setTopSrc] = useState("");
   const [bottomName, setBottomName] = useState("");
   const [topName, setTopName] = useState("");
-  const [bottomReady, setBottomReady] = useState(false);
+  const [bottomCanPlay, setBottomCanPlay] = useState(false);
+  const [topCanPlay, setTopCanPlay] = useState(false);
+  const [bothReady, setBothReady] = useState(false);
   const [bottomLoading, setBottomLoading] = useState(false);
   const [topLoading, setTopLoading] = useState(false);
-  const [topPreload, setTopPreload] = useState<"none" | "metadata">("none");
+  const [preloadMode, setPreloadMode] = useState<"none" | "metadata" | "auto">("metadata");
 
   const [topOpacity, setTopOpacity] = useState(0.45);
   const [offsetSec, setOffsetSec] = useState(0);
   const [offsetInput, setOffsetInput] = useState("0:00.00");
   const [nudgeMs, setNudgeMs] = useState(20);
+  const [playbackRate, setPlaybackRate] = useState<PlaybackRatePreset>(1);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [alignment, setAlignment] = useState<OverlayAlignment>(DEFAULT_OVERLAY_ALIGNMENT);
   const [alignExpanded, setAlignExpanded] = useState(false);
   const [alignDrawerOpen, setAlignDrawerOpen] = useState(false);
@@ -58,10 +74,14 @@ export function VideoOverlayClient() {
 
   const { isFullscreen, enterFullscreen, exitFullscreen, showRotateHint } = useVideoOverlayFullscreen();
 
-  const canPlay = Boolean(bottomSrc && topSrc);
+  const canSync = Boolean(bottomSrc && topSrc);
 
   useEffect(() => {
     setIsMobile(isMobileOverlayUi());
+  }, []);
+
+  const refreshReady = useCallback(() => {
+    setBothReady(updateBothReady(bottomRef.current, topRef.current));
   }, []);
 
   const loadTopFromFile = useCallback((file: File) => {
@@ -69,11 +89,11 @@ export function VideoOverlayClient() {
       URL.revokeObjectURL(topObjectUrlRef.current);
       topObjectUrlRef.current = null;
     }
+    setTopCanPlay(false);
     const url = URL.createObjectURL(file);
     topObjectUrlRef.current = url;
     setTopSrc(url);
     setTopName(file.name || "top video");
-    setTopPreload("metadata");
     setTopLoading(true);
   }, []);
 
@@ -82,7 +102,9 @@ export function VideoOverlayClient() {
       URL.revokeObjectURL(bottomObjectUrlRef.current);
       bottomObjectUrlRef.current = null;
     }
-    setBottomReady(false);
+    setBottomCanPlay(false);
+    setBothReady(false);
+    setIsPlaying(false);
     if (!file) {
       setBottomSrc("");
       setBottomName("");
@@ -94,11 +116,13 @@ export function VideoOverlayClient() {
     setBottomSrc(url);
     setBottomName(file.name || "bottom video");
     setBottomLoading(true);
+    setPreloadMode("metadata");
   }, []);
 
   const setTopFile = useCallback(
     (file: File | null) => {
       pendingTopFileRef.current = file;
+      setIsPlaying(false);
       if (!file) {
         if (topObjectUrlRef.current) {
           URL.revokeObjectURL(topObjectUrlRef.current);
@@ -106,18 +130,19 @@ export function VideoOverlayClient() {
         }
         setTopSrc("");
         setTopName("");
+        setTopCanPlay(false);
         setTopLoading(false);
-        setTopPreload("none");
+        setBothReady(false);
         return;
       }
-      if (bottomReady) {
+      if (bottomCanPlay) {
         loadTopFromFile(file);
       } else {
         setTopName(file.name || "top video");
         setTopLoading(true);
       }
     },
-    [bottomReady, loadTopFromFile]
+    [bottomCanPlay, loadTopFromFile]
   );
 
   useEffect(() => {
@@ -128,37 +153,79 @@ export function VideoOverlayClient() {
   }, []);
 
   useEffect(() => {
-    if (!bottomReady || !pendingTopFileRef.current || topSrc) return;
+    if (!bottomCanPlay || !pendingTopFileRef.current || topSrc) return;
     loadTopFromFile(pendingTopFileRef.current);
-  }, [bottomReady, topSrc, loadTopFromFile]);
+  }, [bottomCanPlay, topSrc, loadTopFromFile]);
+
+  // Upgrade preload once both can play (avoid .load() — it resets timeline).
+  useEffect(() => {
+    if (!bottomCanPlay || !topCanPlay) return;
+    setPreloadMode("auto");
+  }, [bottomCanPlay, topCanPlay]);
 
   useEffect(() => {
     setOffsetInput(formatOffset(offsetSec));
   }, [offsetSec]);
 
-  useVideoOverlaySync({
+  useVideoOverlayFrameLockSync({
     bottomRef,
     topRef,
     offsetSec,
-    enabled: canPlay,
+    playbackRate,
+    enabled: canSync,
+    isPlaying,
   });
 
-  const applyOffset = useCallback((next: number) => {
-    setOffsetSec(clampOffset(next));
-  }, []);
+  // Track play state from bottom (master).
+  useEffect(() => {
+    const bottom = bottomRef.current;
+    if (!bottom) return;
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnded = () => setIsPlaying(false);
+    bottom.addEventListener("play", onPlay);
+    bottom.addEventListener("pause", onPause);
+    bottom.addEventListener("ended", onEnded);
+    return () => {
+      bottom.removeEventListener("play", onPlay);
+      bottom.removeEventListener("pause", onPause);
+      bottom.removeEventListener("ended", onEnded);
+    };
+  }, [canSync, bottomSrc]);
+
+  const applyOffset = useCallback(
+    (next: number) => {
+      const clamped = clampOffset(next);
+      setOffsetSec(clamped);
+      const bottom = bottomRef.current;
+      const top = topRef.current;
+      if (bottom && top && bottom.paused) {
+        syncBothPaused(bottom, top, clamped, playbackRate);
+      }
+    },
+    [playbackRate]
+  );
 
   const nudgeOffset = useCallback(
     (deltaSec: number) => {
-      setOffsetSec((s) => clampOffset(s + deltaSec));
+      setOffsetSec((s) => {
+        const clamped = clampOffset(s + deltaSec);
+        const bottom = bottomRef.current;
+        const top = topRef.current;
+        if (bottom && top && bottom.paused) {
+          syncBothPaused(bottom, top, clamped, playbackRate);
+        }
+        return clamped;
+      });
     },
-    []
+    [playbackRate]
   );
 
   const commitOffsetInput = useCallback(() => {
     const parsed = parseOffset(offsetInput);
-    if (parsed != null) setOffsetSec(parsed);
+    if (parsed != null) applyOffset(parsed);
     else setOffsetInput(formatOffset(offsetSec));
-  }, [offsetInput, offsetSec]);
+  }, [offsetInput, offsetSec, applyOffset]);
 
   const fineMin = clamp(offsetSec - FINE_OFFSET_RANGE_SEC, -MAX_OFFSET_SEC, MAX_OFFSET_SEC);
   const fineMax = clamp(offsetSec + FINE_OFFSET_RANGE_SEC, -MAX_OFFSET_SEC, MAX_OFFSET_SEC);
@@ -166,12 +233,9 @@ export function VideoOverlayClient() {
   const topTransform = buildOverlayTransform(alignment);
   const topOrigin = buildTransformOrigin(alignment);
 
-  const togglePlay = () => {
-    const bottom = bottomRef.current;
-    if (!bottom) return;
-    if (bottom.paused) bottom.play().catch(() => {});
-    else bottom.pause();
-  };
+  const onVideoProgress = useCallback(() => {
+    refreshReady();
+  }, [refreshReady]);
 
   const playerBlock = (
     <div
@@ -183,16 +247,19 @@ export function VideoOverlayClient() {
       <video
         ref={bottomRef}
         src={bottomSrc || undefined}
-        controls={!isFullscreen}
+        controls={false}
         playsInline
-        preload="metadata"
+        preload={preloadMode}
         className="absolute inset-0 h-full w-full object-contain"
         onLoadStart={() => setBottomLoading(true)}
         onWaiting={() => setBottomLoading(true)}
         onCanPlay={() => {
           setBottomLoading(false);
-          setBottomReady(true);
+          setBottomCanPlay(true);
+          refreshReady();
         }}
+        onCanPlayThrough={() => refreshReady()}
+        onProgress={onVideoProgress}
         onLoadedData={() => setBottomLoading(false)}
       />
       <video
@@ -200,7 +267,7 @@ export function VideoOverlayClient() {
         src={topSrc || undefined}
         muted
         playsInline
-        preload={topPreload}
+        preload={topSrc ? preloadMode : "none"}
         className="pointer-events-none absolute inset-0 h-full w-full object-contain"
         style={{
           opacity: topOpacity,
@@ -209,12 +276,33 @@ export function VideoOverlayClient() {
         }}
         onLoadStart={() => setTopLoading(true)}
         onWaiting={() => setTopLoading(true)}
-        onCanPlay={() => setTopLoading(false)}
+        onCanPlay={() => {
+          setTopLoading(false);
+          setTopCanPlay(true);
+          refreshReady();
+        }}
+        onCanPlayThrough={() => refreshReady()}
+        onProgress={onVideoProgress}
         onLoadedData={() => setTopLoading(false)}
       />
       <VideoLoadingOverlay label={bottomName || "Loading bottom video…"} loading={bottomLoading && Boolean(bottomSrc)} />
       <VideoLoadingOverlay label={topName || "Loading top video…"} loading={topLoading && Boolean(topSrc)} />
     </div>
+  );
+
+  const transport = (
+    <VideoOverlayTransport
+      bottomRef={bottomRef}
+      topRef={topRef}
+      offsetSec={offsetSec}
+      playbackRate={playbackRate}
+      onPlaybackRateChange={setPlaybackRate}
+      bothReady={bothReady}
+      isPlaying={isPlaying}
+      onPlayingChange={setIsPlaying}
+      compact={isFullscreen}
+      dark={isFullscreen}
+    />
   );
 
   const offsetControls = (
@@ -236,19 +324,17 @@ export function VideoOverlayClient() {
         <div className="text-xs text-muted-foreground">
           Time offset (top = bottom + offset): {formatOffset(offsetSec)}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            className="min-w-[7rem] flex-1 rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-            value={offsetInput}
-            onChange={(e) => setOffsetInput(e.target.value)}
-            onBlur={commitOffsetInput}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitOffsetInput();
-            }}
-            placeholder="m:ss.ss or seconds"
-            aria-label="Time offset"
-          />
-        </div>
+        <input
+          className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
+          value={offsetInput}
+          onChange={(e) => setOffsetInput(e.target.value)}
+          onBlur={commitOffsetInput}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitOffsetInput();
+          }}
+          placeholder="m:ss.ss or seconds"
+          aria-label="Time offset"
+        />
       </div>
 
       <label className="block text-xs">
@@ -278,53 +364,25 @@ export function VideoOverlayClient() {
             <option value={100}>100ms</option>
           </select>
         </label>
-        <button
-          type="button"
-          className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted"
-          onClick={() => nudgeOffset(-nudgeMs / 1000)}
-        >
+        <button type="button" className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted" onClick={() => nudgeOffset(-nudgeMs / 1000)}>
           −{nudgeMs}ms
         </button>
-        <button
-          type="button"
-          className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted"
-          onClick={() => nudgeOffset(nudgeMs / 1000)}
-        >
+        <button type="button" className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted" onClick={() => nudgeOffset(nudgeMs / 1000)}>
           +{nudgeMs}ms
         </button>
-        <button
-          type="button"
-          className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted"
-          onClick={() => nudgeOffset(-1)}
-        >
+        <button type="button" className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted" onClick={() => nudgeOffset(-1)}>
           −1s
         </button>
-        <button
-          type="button"
-          className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted"
-          onClick={() => nudgeOffset(1)}
-        >
+        <button type="button" className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted" onClick={() => nudgeOffset(1)}>
           +1s
         </button>
-        <button
-          type="button"
-          className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted"
-          onClick={() => nudgeOffset(-10)}
-        >
+        <button type="button" className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted" onClick={() => nudgeOffset(-10)}>
           −10s
         </button>
-        <button
-          type="button"
-          className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted"
-          onClick={() => nudgeOffset(10)}
-        >
+        <button type="button" className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted" onClick={() => nudgeOffset(10)}>
           +10s
         </button>
-        <button
-          type="button"
-          className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted"
-          onClick={() => applyOffset(0)}
-        >
+        <button type="button" className="rounded-md border border-border px-2 py-2 text-xs hover:bg-muted" onClick={() => applyOffset(0)}>
           Reset
         </button>
       </div>
@@ -337,7 +395,7 @@ export function VideoOverlayClient() {
         <div className="grid max-w-4xl gap-3">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block text-xs">
-              <span className="text-muted-foreground">Bottom (controls + audio)</span>
+              <span className="text-muted-foreground">Bottom (master + audio)</span>
               <input
                 className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
                 type="file"
@@ -357,7 +415,7 @@ export function VideoOverlayClient() {
               {topName ? (
                 <div className="mt-1 text-[11px] text-muted-foreground">
                   {topName}
-                  {!bottomReady && pendingTopFileRef.current ? " · waiting for bottom video" : ""}
+                  {!bottomCanPlay && pendingTopFileRef.current ? " · waiting for bottom video" : ""}
                 </div>
               ) : null}
             </label>
@@ -407,50 +465,27 @@ export function VideoOverlayClient() {
 
           {isFullscreen ? (
             <>
-              <div className="shrink-0 space-y-2 rounded-lg bg-black/80 p-2 text-white backdrop-blur-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-md border border-white/30 px-3 py-2 text-xs"
-                    onClick={togglePlay}
-                  >
-                    Play / Pause
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-white/30 px-2 py-2 text-xs"
-                    onClick={() => nudgeOffset(-1)}
-                  >
-                    −1s
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-white/30 px-2 py-2 text-xs"
-                    onClick={() => nudgeOffset(1)}
-                  >
-                    +1s
-                  </button>
-                  <span className="text-[11px] opacity-80">{formatOffset(offsetSec)}</span>
-                  <label className="ml-auto flex min-w-[8rem] flex-1 items-center gap-2 text-[10px]">
-                    Opacity
-                    <input
-                      className="flex-1"
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={topOpacity}
-                      onChange={(e) => setTopOpacity(Number(e.target.value))}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="rounded-md border border-white/30 px-2 py-2 text-xs"
-                    onClick={() => setAlignDrawerOpen((v) => !v)}
-                  >
-                    Align
-                  </button>
-                </div>
+              <div className="shrink-0 rounded-lg bg-black/80 p-2 backdrop-blur-sm">{transport}</div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <label className="ml-auto flex min-w-[8rem] flex-1 items-center gap-2 text-[10px] text-white">
+                  Opacity
+                  <input
+                    className="flex-1"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={topOpacity}
+                    onChange={(e) => setTopOpacity(Number(e.target.value))}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="rounded-md border border-white/30 px-2 py-2 text-xs text-white"
+                  onClick={() => setAlignDrawerOpen((v) => !v)}
+                >
+                  Align
+                </button>
               </div>
               {alignDrawerOpen ? (
                 <div className="max-h-[40vh] shrink-0 overflow-y-auto rounded-lg border border-white/20 bg-zinc-900/95 p-3 text-white">
@@ -465,15 +500,18 @@ export function VideoOverlayClient() {
               ) : null}
             </>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {offsetControls}
-              <VideoOverlayAlignmentPanel
-                alignment={alignment}
-                onChange={setAlignment}
-                expanded={alignExpanded}
-                onToggleExpanded={() => setAlignExpanded((v) => !v)}
-              />
-            </div>
+            <>
+              {transport}
+              <div className="grid gap-4 md:grid-cols-2">
+                {offsetControls}
+                <VideoOverlayAlignmentPanel
+                  alignment={alignment}
+                  onChange={setAlignment}
+                  expanded={alignExpanded}
+                  onToggleExpanded={() => setAlignExpanded((v) => !v)}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>

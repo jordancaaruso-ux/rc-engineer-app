@@ -1,6 +1,24 @@
 export const MAX_OFFSET_SEC = 300;
 export const FINE_OFFSET_RANGE_SEC = 2;
 
+/** HTMLMediaElement.HAVE_FUTURE_DATA — enough buffered to start without stall. */
+export const HAVE_FUTURE_DATA = 3;
+
+export const PLAYBACK_RATE_PRESETS = [1, 0.75, 0.5, 0.25] as const;
+export type PlaybackRatePreset = (typeof PLAYBACK_RATE_PRESETS)[number];
+
+export function formatClockTime(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 0) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+export function formatPlaybackRateLabel(rate: number): string {
+  if (rate === 1) return "1×";
+  return `${rate}×`;
+}
+
 export function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
