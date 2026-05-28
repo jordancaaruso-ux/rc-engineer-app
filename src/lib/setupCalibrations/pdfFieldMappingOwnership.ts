@@ -3,7 +3,11 @@
  * (field name + instance index). Used for conflict detection and safe detach before reassignment.
  */
 
-import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import type {
+  PdfFormFieldMappingRule,
+  PdfFormOptionFieldRef,
+  PdfFormWidgetInstanceRef,
+} from "@/lib/setupCalibrations/types";
 
 /** Minimal row shape for ownership checks (matches SetupCalibrationEditorClient PdfFormFieldRow). */
 export type PdfFieldRowForOwnership = {
@@ -228,26 +232,33 @@ export function pruneGroupedRuleOptionKeys(
   validOptionValues: ReadonlySet<string>
 ): PdfFormFieldMappingRule | null {
   if (!("mode" in rule)) return rule;
-  if (
-    rule.mode !== "singleChoiceNamedFields"
-    && rule.mode !== "multiSelectNamedFields"
-    && rule.mode !== "singleChoiceWidgetGroup"
-    && rule.mode !== "multiSelectWidgetGroup"
-  ) {
-    return rule;
-  }
-  const opts = { ...rule.options };
-  let changed = false;
-  for (const key of Object.keys(opts)) {
-    if (!validOptionValues.has(key)) {
-      delete opts[key];
-      changed = true;
+
+  switch (rule.mode) {
+    case "singleChoiceWidgetGroup":
+    case "multiSelectWidgetGroup": {
+      const opts: Record<string, PdfFormWidgetInstanceRef> = {};
+      let changed = false;
+      for (const [key, ref] of Object.entries(rule.options)) {
+        if (validOptionValues.has(key)) opts[key] = ref;
+        else changed = true;
+      }
+      if (Object.keys(opts).length === 0) return null;
+      if (!changed) return rule;
+      return { ...rule, options: opts };
     }
+    case "singleChoiceNamedFields":
+    case "multiSelectNamedFields": {
+      const opts: Record<string, PdfFormOptionFieldRef> = {};
+      let changed = false;
+      for (const [key, ref] of Object.entries(rule.options)) {
+        if (validOptionValues.has(key)) opts[key] = ref;
+        else changed = true;
+      }
+      if (Object.keys(opts).length === 0) return null;
+      if (!changed) return rule;
+      return { ...rule, options: opts };
+    }
+    default:
+      return rule;
   }
-  if (Object.keys(opts).length === 0) return null;
-  if (!changed) return rule;
-  if (rule.mode === "singleChoiceWidgetGroup" || rule.mode === "multiSelectWidgetGroup") {
-    return { ...rule, options: opts };
-  }
-  return { ...rule, options: opts };
 }
