@@ -189,7 +189,7 @@ model SetupSheetModel {
   setupDocuments SetupDocument[]
   calibrations   SetupSheetCalibration[]
   /** PDF calibration used for auto-pick and the car-page “Edit PDF calibration” link. */
-  defaultCalibrationId String?
+  defaultCalibrationId String?                @unique
   defaultCalibration   SetupSheetCalibration? @relation("ModelDefaultCalibration", fields: [defaultCalibrationId], references: [id], onDelete: SetNull)
 
   @@unique([userId, slug])
