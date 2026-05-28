@@ -23,7 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main
           className={cn(
             "page",
-            "pb-[calc(var(--mobile-tab-bar-height)+var(--mobile-tab-fab-overhang)+env(safe-area-inset-bottom))] md:pb-0"
+            "pb-[calc(var(--mobile-tab-bar-height)+env(safe-area-inset-bottom))] md:pb-0"
           )}
         >
           {children}

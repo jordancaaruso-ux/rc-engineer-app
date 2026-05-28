@@ -23,61 +23,32 @@ export function BottomNav() {
             const href =
               item.smartDraft && item.id === "add-run" ? addRunHref(item.href) : item.href;
             const Icon = item.icon;
-            const isCenter = Boolean(item.center);
             const prefetch = item.prefetch !== false;
-
-            if (isCenter) {
-              return (
-                <li key={item.id} className="relative flex flex-col items-center justify-end overflow-visible pb-1.5">
-                  <Link
-                    href={href}
-                    prefetch={prefetch}
-                    onClick={() => {
-                      if (item.smartDraft) void refreshDraft();
-                    }}
-                    aria-current={active ? "page" : undefined}
-                    aria-label={item.label}
-                    className="tap-active absolute -top-[var(--mobile-tab-fab-overhang)] flex flex-col items-center"
-                  >
-                    <span
-                      className={cn(
-                        "relative flex h-[var(--mobile-tab-fab-size)] w-[var(--mobile-tab-fab-size)] items-center justify-center rounded-full border-4 border-card bg-foreground text-background shadow-[0_4px_14px_rgb(0_0_0/0.35)] transition-transform active:scale-95",
-                        active && "ring-2 ring-accent/50"
-                      )}
-                    >
-                      <Icon className="h-6 w-6" aria-hidden />
-                      {item.smartDraft && draftRunId ? (
-                        <span
-                          className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-card"
-                          aria-hidden
-                        />
-                      ) : null}
-                    </span>
-                  </Link>
-                  <span
-                    className={cn(
-                      "ui-title truncate text-[10px] leading-none",
-                      active ? "text-foreground" : "text-muted-foreground"
-                    )}
-                  >
-                    {item.label}
-                  </span>
-                </li>
-              );
-            }
 
             return (
               <li key={item.id} className="flex flex-col items-center justify-end pb-1.5">
                 <Link
                   href={href}
                   prefetch={prefetch}
+                  onClick={() => {
+                    if (item.smartDraft) void refreshDraft();
+                  }}
                   aria-current={active ? "page" : undefined}
+                  aria-label={item.id === "add-run" ? item.label : undefined}
                   className={cn(
                     "tap-active flex min-w-0 flex-col items-center gap-1 px-1 transition-colors",
                     active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Icon className="h-5 w-5 shrink-0" aria-hidden />
+                  <span className="relative shrink-0">
+                    <Icon className="h-5 w-5" aria-hidden />
+                    {item.smartDraft && draftRunId ? (
+                      <span
+                        className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-card"
+                        aria-hidden
+                      />
+                    ) : null}
+                  </span>
                   <span className="ui-title truncate text-[10px] leading-none">{item.label}</span>
                   <span
                     className={cn(

@@ -27,8 +27,6 @@ export type PrimaryNavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
-  /** Center FAB-style tab on mobile bottom nav. */
-  center?: boolean;
   /** Resolve href from today's draft run when available. */
   smartDraft?: boolean;
   /** Next.js Link prefetch — false for heavy routes. */
@@ -110,7 +108,6 @@ const ADD_RUN: PrimaryNavItem = {
   href: "/runs/new",
   label: "Add run",
   icon: PlusCircle,
-  center: true,
   smartDraft: true,
   prefetch: false,
 };

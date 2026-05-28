@@ -53,8 +53,6 @@
 
   /* Mobile bottom tab bar (see BottomNav.tsx) */
   --mobile-tab-bar-height: 3.25rem;
-  --mobile-tab-fab-size: 3.25rem;
-  --mobile-tab-fab-overhang: 1.375rem;
 }
 
 /* Near-black previews: darker base + surfaces; slightly softer corner glow so hues stay subtle. */
