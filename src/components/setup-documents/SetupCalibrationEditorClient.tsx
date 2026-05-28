@@ -51,7 +51,7 @@ import {
   buildGroupedRuleFromAssignments,
   extractAssignmentsFromGroupedRule,
   groupedBehaviorForAssignments,
-  sanitizeFormFieldMappingsForSchema,
+  sanitizeFormFieldMappingsForPersistence,
   type ModelOptionAssignment,
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
 import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
@@ -75,7 +75,6 @@ import {
   findAppKeysForWidget,
   isToggleFieldType,
   listPdfWidgetOwnershipDetails,
-  pruneOrphanCalibrationMappingKeys,
   removePdfWidgetFromMappings,
   type PdfWidgetOwnershipDetail,
 } from "@/lib/setupCalibrations/pdfFieldMappingOwnership";
@@ -556,12 +555,56 @@ export function SetupCalibrationEditorClient({
     [setupSheetModelSchema]
   );
 
-  const calibrationDirty = useMemo(() => {
+  const calibrationPersistedSnapshot = useMemo(() => {
     const initial = normalizeCalibrationData(initialCalibrationData);
-    if (name.trim() !== (initialName ?? "").trim()) return true;
-    if (JSON.stringify(formFieldMappings) !== JSON.stringify(initial.formFieldMappings ?? {})) return true;
-    return false;
-  }, [formFieldMappings, initialCalibrationData, initialName, name]);
+    return JSON.stringify({
+      name: (initialName ?? "").trim(),
+      formFieldMappings: initial.formFieldMappings ?? {},
+      fieldMappings: initial.fieldMappings ?? {},
+      fields: initial.fields ?? {},
+      sheetFields: initial.sheetFields ?? [],
+      customFieldDefinitions: initial.customFieldDefinitions ?? [],
+      fieldDisplayOverrides: initial.fieldDisplayOverrides ?? {},
+    });
+  }, [initialCalibrationData, initialName]);
+
+  const [savedCalibrationSnapshot, setSavedCalibrationSnapshot] = useState<string | null>(null);
+
+  const calibrationDirtySnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        name: name.trim(),
+        formFieldMappings,
+        fieldMappings,
+        fields,
+        sheetFields,
+        customFieldDefinitions,
+        fieldDisplayOverrides,
+      }),
+    [
+      name,
+      formFieldMappings,
+      fieldMappings,
+      fields,
+      sheetFields,
+      customFieldDefinitions,
+      fieldDisplayOverrides,
+    ]
+  );
+
+  const calibrationDirty = useMemo(() => {
+    const baseline = savedCalibrationSnapshot ?? calibrationPersistedSnapshot;
+    return calibrationDirtySnapshot !== baseline;
+  }, [calibrationDirtySnapshot, calibrationPersistedSnapshot, savedCalibrationSnapshot]);
+
+  useEffect(() => {
+    if (!calibrationDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [calibrationDirty]);
 
   const loadPdfCandidates = useCallback(async () => {
     setAttachListLoading(true);
@@ -761,16 +804,6 @@ export function SetupCalibrationEditorClient({
     () => new Set(sortedCatalog.map((f) => f.key)),
     [sortedCatalog]
   );
-
-  useEffect(() => {
-    setFormFieldMappings((prev) => {
-      let next = pruneOrphanCalibrationMappingKeys(prev, knownCalibrationFieldKeys);
-      if (setupSheetModelSchema) {
-        next = sanitizeFormFieldMappingsForSchema(next, setupSheetModelSchema);
-      }
-      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-    });
-  }, [knownCalibrationFieldKeys, setupSheetModelSchema]);
 
   const pdfRowByName = useMemo(() => {
     const m = new Map<string, PdfFormFieldRow>();
@@ -2395,6 +2428,12 @@ export function SetupCalibrationEditorClient({
     const pageCount = structure?.pages.length ?? normalized.documentMeta?.pageCount ?? numPages;
     const trimmedName = name.trim() || "Setup sheet calibration";
     const parentCalibrationId = normalized.calibrationMeta?.parentCalibrationId ?? calibrationId;
+    const mappingsForSave = sanitizeFormFieldMappingsForPersistence(
+      formFieldMappings,
+      knownCalibrationFieldKeys,
+      setupSheetModelSchema,
+      customFieldDefinitions
+    );
     return {
       name: trimmedName,
       sourceType: sourceType.trim() || "awesomatix_pdf",
@@ -2413,7 +2452,7 @@ export function SetupCalibrationEditorClient({
           sourceWidthByPage: pdfPageSize ? { [String(currentPage)]: pdfPageSize.width } : normalized.documentMeta?.sourceWidthByPage,
           sourceHeightByPage: pdfPageSize ? { [String(currentPage)]: pdfPageSize.height } : normalized.documentMeta?.sourceHeightByPage,
         },
-        formFieldMappings,
+        formFieldMappings: mappingsForSave,
         fieldMappings,
         fields,
         sheetFields,
@@ -2438,7 +2477,17 @@ export function SetupCalibrationEditorClient({
         setStatus(data.error || "Failed to save calibration");
         return;
       }
+      setSavedCalibrationSnapshot(calibrationDirtySnapshot);
+      setFormFieldMappings(
+        sanitizeFormFieldMappingsForPersistence(
+          formFieldMappings,
+          knownCalibrationFieldKeys,
+          setupSheetModelSchema,
+          customFieldDefinitions
+        )
+      );
       setStatus("Calibration saved.");
+      router.refresh();
     } catch {
       setStatus("Failed to save calibration");
     } finally {
@@ -2785,6 +2834,11 @@ export function SetupCalibrationEditorClient({
             {formCount} form · {textCount} text · {regionCount} region
           </span>
           {status ? <span className="text-xs text-muted-foreground">{status}</span> : null}
+          {calibrationDirty ? (
+            <span className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-100">
+              Unsaved changes — save before leaving this page
+            </span>
+          ) : null}
         </div>
         <div
           ref={examplePdfSectionRef}

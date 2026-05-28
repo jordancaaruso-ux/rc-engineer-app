@@ -1,4 +1,4 @@
-import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import type { CustomSetupFieldDefinition, PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import { pruneGroupedRuleOptionKeys, pruneOrphanCalibrationMappingKeys } from "@/lib/setupCalibrations/pdfFieldMappingOwnership";
 import {
   isSingleSelectGroupedBehavior,
@@ -217,27 +217,60 @@ export function filterParametersForWidgetCount(
   return [];
 }
 
-/** Remove mappings for deleted parameters and stale option keys after schema edits. */
+function allowedOptionValuesForCalibrationKey(
+  key: string,
+  schema: SetupSheetModelSchema | null,
+  customByKey: ReadonlyMap<string, CustomSetupFieldDefinition>
+): ReadonlySet<string> | null {
+  const custom = customByKey.get(key);
+  if (custom?.groupedOptions && custom.groupedOptions.length >= 2) {
+    return new Set(custom.groupedOptions.map((o) => o.optionValue));
+  }
+  if (schema) {
+    const field = schema.fields.find((f) => f.key === key);
+    if (field) {
+      const opts = modelFieldOptionEntries(field);
+      if (opts.length >= 2) return new Set(opts.map((o) => o.value));
+    }
+  }
+  return null;
+}
+
+/**
+ * Clean mappings before save — never run on load (would wipe in-memory edits).
+ * Keeps custom calibration-only keys; option values follow custom defs, then schema.
+ */
+export function sanitizeFormFieldMappingsForPersistence(
+  mappings: Record<string, PdfFormFieldMappingRule>,
+  validCanonicalKeys: ReadonlySet<string>,
+  schema: SetupSheetModelSchema | null,
+  customFieldDefinitions: readonly CustomSetupFieldDefinition[]
+): Record<string, PdfFormFieldMappingRule> {
+  const customByKey = new Map(customFieldDefinitions.map((c) => [c.key, c] as const));
+  let next = pruneOrphanCalibrationMappingKeys(mappings, validCanonicalKeys);
+  for (const key of Object.keys(next)) {
+    const allowed = allowedOptionValuesForCalibrationKey(key, schema, customByKey);
+    if (!allowed) continue;
+    const rule = next[key]!;
+    const pruned = pruneGroupedRuleOptionKeys(rule, allowed);
+    if (pruned === null) {
+      const copy = { ...next };
+      delete copy[key];
+      next = copy;
+    } else if (pruned !== rule) {
+      next = { ...next, [key]: pruned };
+    }
+  }
+  return next;
+}
+
+/** @deprecated Use sanitizeFormFieldMappingsForPersistence — schema-only prune is unsafe on load. */
 export function sanitizeFormFieldMappingsForSchema(
   mappings: Record<string, PdfFormFieldMappingRule>,
   schema: SetupSheetModelSchema
 ): Record<string, PdfFormFieldMappingRule> {
   const validKeys = new Set(schema.fields.map((f) => f.key));
-  let next = pruneOrphanCalibrationMappingKeys(mappings, validKeys);
-  for (const field of schema.fields) {
-    const rule = next[field.key];
-    if (!rule) continue;
-    const allowed = new Set(modelFieldOptionEntries(field).map((o) => o.value));
-    const pruned = pruneGroupedRuleOptionKeys(rule, allowed);
-    if (pruned === null) {
-      const copy = { ...next };
-      delete copy[field.key];
-      next = copy;
-    } else if (pruned !== rule) {
-      next = { ...next, [field.key]: pruned };
-    }
-  }
-  return next;
+  return sanitizeFormFieldMappingsForPersistence(mappings, validKeys, schema, []);
 }
 
 /** Default option→widget assignment using click order. */
