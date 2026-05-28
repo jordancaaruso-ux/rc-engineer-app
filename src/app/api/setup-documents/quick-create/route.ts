@@ -14,11 +14,11 @@ import {
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
+import type { RepickOutcome } from "@/lib/setupCalibrations/autoPickCalibration";
 import {
-  buildCalibrationFingerprints,
-  repickCalibrationForBytes,
-  type RepickOutcome,
-} from "@/lib/setupCalibrations/autoPickCalibration";
+  applyPostFingerprintPickLinks,
+  pickCalibrationByFingerprint,
+} from "@/lib/setupCalibrations/fingerprintPick";
 import {
   buildImageCalibrationCandidates,
   repickImageCalibrationForBytes,
@@ -40,6 +40,9 @@ type QuickCreateResponse = {
   needsReviewReason: string | null;
   /** True when multiple calibrations matched the PDF fingerprint; a best guess was applied. */
   calibrationAmbiguous: boolean;
+  /** Plain-language auto-pick summary for the review screen. */
+  pickUserNote: string | null;
+  calibrationModelMismatch: boolean;
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -66,6 +69,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   let carId: string | null = null;
   let setupSheetTemplate: string | null = null;
   let setupSheetModelId: string | null = null;
+  let carSetupSheetModelName: string | null = null;
   if (explicitCarIdProvided) {
     const carResolved = await resolveOwnedCarId(user.id, explicitCarIdRaw);
     if (!carResolved.ok) {
@@ -74,9 +78,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     carId = carResolved.carId;
     const carRow = await prisma.car.findFirst({
       where: { id: carId, userId: user.id },
-      select: { setupSheetModelId: true, setupSheetTemplate: true },
+      select: {
+        setupSheetModelId: true,
+        setupSheetTemplate: true,
+        setupSheetModel: { select: { id: true, name: true } },
+      },
     });
     setupSheetModelId = carRow?.setupSheetModelId ?? null;
+    carSetupSheetModelName = carRow?.setupSheetModel?.name ?? null;
     setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carId);
   }
 
@@ -107,16 +116,27 @@ export async function POST(request: Request): Promise<NextResponse> {
     pickSource: "none",
     pickDebug: "quickCreate:auto skipped (unsupported mime)",
   };
+  let pickUserNote: string | null = null;
+  let calibrationModelMismatch = false;
   if (mimeType === PDF_MIME) {
     try {
-      const candidates = await buildCalibrationFingerprints({
+      const pick = await pickCalibrationByFingerprint({
         userId: user.id,
-        restrictToSetupSheetModelId: setupSheetModelId,
-      });
-      outcome = await repickCalibrationForBytes(bytes, candidates, {
+        bytes,
         debugPrefix: "quickCreate:auto",
-        suggestOnAmbiguous: true,
+        carSetupSheetModelId: setupSheetModelId,
+        carSetupSheetModelName: carSetupSheetModelName,
       });
+      outcome = pick;
+      pickUserNote = pick.userNote;
+      calibrationModelMismatch = pick.modelMismatch;
+      if (pick.pickedCalibrationId) {
+        await applyPostFingerprintPickLinks({
+          userId: user.id,
+          pickedCalibrationId: pick.pickedCalibrationId,
+          carSetupSheetModelId: setupSheetModelId,
+        });
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       outcome = {
@@ -125,6 +145,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         pickSource: "none",
         pickDebug: `quickCreate:auto fingerprint_error=${msg.slice(0, 200)}`,
       };
+      pickUserNote = "Fingerprint matching failed — pick a calibration manually.";
     }
   } else if (mimeType.startsWith("image/")) {
     try {
@@ -225,11 +246,15 @@ export async function POST(request: Request): Promise<NextResponse> {
             calibrationProfileId: pickedCalibrationId,
             calibrationResolvedProfileId: pickedCalibrationId,
             calibrationResolvedSource: outcome.pickSource,
-            calibrationResolvedDebug: outcome.pickDebug,
+            calibrationResolvedDebug: pickUserNote
+              ? `${outcome.pickDebug} | ${pickUserNote}`
+              : outcome.pickDebug,
           }
         : {
             calibrationResolvedSource: outcome.pickSource,
-            calibrationResolvedDebug: outcome.pickDebug,
+            calibrationResolvedDebug: pickUserNote
+              ? `${outcome.pickDebug} | ${pickUserNote}`
+              : outcome.pickDebug,
           }),
     },
     select: { id: true },
@@ -272,7 +297,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       needsReviewReason
       ?? (mimeType.startsWith("image/")
         ? "No image calibration matched — draw regions once to teach the app this sheet."
-        : "No calibration matched — pick one in review.");
+        : pickUserNote ?? "No calibration matched — pick one in review.");
+  }
+  if (calibrationModelMismatch && pickUserNote) {
+    needsReview = true;
+    needsReviewReason = pickUserNote;
   }
   if (parseStatus === "FAILED") {
     needsReview = true;
@@ -322,6 +351,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     needsReview,
     needsReviewReason,
     calibrationAmbiguous,
+    pickUserNote,
+    calibrationModelMismatch,
   };
   return NextResponse.json(payload, { status: 201 });
 }

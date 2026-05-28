@@ -87,11 +87,23 @@ export default async function SetupDocumentDetailPage({
         createdAt: true,
         communityShared: true,
         setupSheetModelId: true,
+        setupSheetModel: { select: { name: true } },
       },
     }),
   ]);
 
   if (!doc) notFound();
+
+  const linkedCar = doc.carId
+    ? await prisma.car.findFirst({
+        where: { id: doc.carId, userId: user.id },
+        select: {
+          name: true,
+          setupSheetModelId: true,
+          setupSheetModel: { select: { id: true, name: true, defaultCalibrationId: true } },
+        },
+      })
+    : null;
 
   let reviewSetupTemplate = null;
   let modelIdForTemplate = doc.setupSheetModelId;
@@ -102,11 +114,19 @@ export default async function SetupDocumentDetailPage({
     });
     modelIdForTemplate = carRow?.setupSheetModelId ?? null;
   }
+  let defaultCalibrationIdForDocModel: string | null = null;
+  let docSetupSheetModelName = doc.setupSheetModel?.name ?? linkedCar?.setupSheetModel?.name ?? null;
   if (modelIdForTemplate) {
     const model = await loadSetupSheetModelById(user.id, modelIdForTemplate);
     if (model) {
       reviewSetupTemplate = buildSetupSheetTemplateFromParsedSchema(model.id, model.name, model.schema);
+      docSetupSheetModelName = model.name;
     }
+    const modelRow = await prisma.setupSheetModel.findFirst({
+      where: { id: modelIdForTemplate, userId: user.id },
+      select: { defaultCalibrationId: true },
+    });
+    defaultCalibrationIdForDocModel = modelRow?.defaultCalibrationId ?? null;
   }
   // Resolve effective calibration without forcing defaults.
   const effectiveCalibration = await ensureSetupDocumentCalibrationProfileId({
@@ -166,8 +186,12 @@ export default async function SetupDocumentDetailPage({
         calibrations={calibrations.map((c) => ({
           ...c,
           createdAt: c.createdAt.toISOString(),
+          setupSheetModelName: c.setupSheetModel?.name ?? null,
         }))}
         reviewSetupTemplate={reviewSetupTemplate}
+        docSetupSheetModelName={docSetupSheetModelName}
+        docCarName={linkedCar?.name ?? null}
+        defaultCalibrationIdForDocModel={defaultCalibrationIdForDocModel}
       />
     </>
   );

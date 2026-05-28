@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalibrationDeleteButton } from "@/components/setup-documents/CalibrationDeleteButton";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -34,6 +35,7 @@ export default async function SetupCalibrationDetailPage({
       calibrationDataJson: true,
       exampleDocumentId: true,
       setupSheetModelId: true,
+      setupSheetModel: { select: { id: true, name: true } },
       exampleDocument: {
         select: { id: true, originalFilename: true },
       },
@@ -47,15 +49,24 @@ export default async function SetupCalibrationDetailPage({
           <div>
             <h1 className="page-title">Edit calibration</h1>
             <p className="page-subtitle">
-              {calibration.setupSheetModelId
-                ? "Click PDF controls, link them to parameters on your sheet model, and match each grouped option to the correct control."
-                : (
-                  <>
-                    Calibration is the source of truth for PDF-to-setup mapping. Use{" "}
-                    <span className="text-foreground">Quick add parameters</span> for a simple name → type → Acro widget
-                    flow, or the Form tab for full control.
-                  </>
-                )}
+              {calibration.name}
+              {calibration.setupSheetModel ? (
+                <>
+                  {" "}
+                  · Car type:{" "}
+                  <Link
+                    href={`/setup-sheet-models/${calibration.setupSheetModel.id}/schema`}
+                    className="text-sky-400 hover:underline"
+                  >
+                    {calibration.setupSheetModel.name}
+                  </Link>
+                </>
+              ) : (
+                <> · Unlinked — assign this calibration to a car type (e.g. Mugen MTC3) from setup review.</>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+              Uploads auto-select this profile when the PDF form layout matches the linked example PDF.
             </p>
           </div>
           <CalibrationDeleteButton

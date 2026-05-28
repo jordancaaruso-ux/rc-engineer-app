@@ -54,9 +54,43 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const body = (await request.json()) as { name?: string; schema?: unknown };
-  const data: { name?: string; schemaJson?: object } = {};
+  const body = (await request.json()) as {
+    name?: string;
+    schema?: unknown;
+    defaultCalibrationId?: string | null;
+  };
+  const data: { name?: string; schemaJson?: object; defaultCalibrationId?: string | null } = {};
   if (body.name?.trim()) data.name = body.name.trim();
+  if ("defaultCalibrationId" in body) {
+    const raw = body.defaultCalibrationId;
+    if (raw === null || raw === "") {
+      data.defaultCalibrationId = null;
+    } else if (typeof raw === "string" && raw.trim()) {
+      const calId = raw.trim();
+      const cal = await prisma.setupSheetCalibration.findFirst({
+        where: {
+          id: calId,
+          userId: user.id,
+          OR: [{ setupSheetModelId: id }, { setupSheetModelId: null }],
+        },
+        select: { id: true, setupSheetModelId: true },
+      });
+      if (!cal) {
+        return NextResponse.json(
+          { error: "Calibration not found or not for this sheet model" },
+          { status: 400 }
+        );
+      }
+      data.defaultCalibrationId = calId;
+      if (!cal.setupSheetModelId) {
+        await prisma.setupSheetCalibration.update({
+          where: { id: calId },
+          data: { setupSheetModelId: id },
+        });
+      }
+    }
+  }
+
   if (body.schema !== undefined) {
     const parsed = parseSetupSheetModelSchema(body.schema);
     if (!parsed) {

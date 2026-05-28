@@ -188,6 +188,9 @@ model SetupSheetModel {
   cars           Car[]
   setupDocuments SetupDocument[]
   calibrations   SetupSheetCalibration[]
+  /** PDF calibration used for auto-pick and the car-page “Edit PDF calibration” link. */
+  defaultCalibrationId String?
+  defaultCalibration   SetupSheetCalibration? @relation("ModelDefaultCalibration", fields: [defaultCalibrationId], references: [id], onDelete: SetNull)
 
   @@unique([userId, slug])
   @@index([userId, updatedAt])
@@ -578,6 +581,7 @@ model SetupSheetCalibration {
   userId String
 
   setupSheetModel SetupSheetModel? @relation(fields: [setupSheetModelId], references: [id], onDelete: SetNull)
+  defaultForModel SetupSheetModel? @relation("ModelDefaultCalibration")
   exampleDocument SetupDocument? @relation("CalibrationExampleDocument", fields: [exampleDocumentId], references: [id], onDelete: SetNull)
   runsUsingCalibration Run[] @relation("RunSetupPdfCalibration")
   documentsUsingCalibration SetupDocument[] @relation("SetupDocumentCalibration")

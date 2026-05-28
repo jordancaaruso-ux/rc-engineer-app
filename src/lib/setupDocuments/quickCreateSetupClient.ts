@@ -17,6 +17,8 @@ export type QuickCreateSetupResponse = {
   needsReview: boolean;
   needsReviewReason: string | null;
   calibrationAmbiguous: boolean;
+  pickUserNote?: string | null;
+  calibrationModelMismatch?: boolean;
 };
 
 export type PostQuickCreateSetupResult =

@@ -25,6 +25,8 @@ export async function GET() {
       updatedAt: true,
       userId: true,
       communityShared: true,
+      setupSheetModelId: true,
+      setupSheetModel: { select: { name: true } },
     },
   });
   return NextResponse.json({ calibrations });
@@ -78,6 +80,18 @@ export async function POST(request: Request) {
     },
     select: { id: true, name: true },
   });
+  if (setupSheetModelId) {
+    const model = await prisma.setupSheetModel.findFirst({
+      where: { id: setupSheetModelId, userId: user.id },
+      select: { defaultCalibrationId: true },
+    });
+    if (model && !model.defaultCalibrationId) {
+      await prisma.setupSheetModel.update({
+        where: { id: setupSheetModelId },
+        data: { defaultCalibrationId: created.id },
+      });
+    }
+  }
   return NextResponse.json({ id: created.id, calibration: { id: created.id, name: created.name } }, { status: 201 });
 }
 

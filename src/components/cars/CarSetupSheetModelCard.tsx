@@ -5,19 +5,33 @@ type Props = {
   carId: string;
   model: { id: string; name: string; slug: string };
   calibrationId: string | null;
+  calibrationName: string | null;
   exampleDocumentId: string | null;
 };
 
-export function CarSetupSheetModelCard({ carId, model, calibrationId, exampleDocumentId }: Props) {
+export function CarSetupSheetModelCard({
+  carId,
+  model,
+  calibrationId,
+  calibrationName,
+  exampleDocumentId,
+}: Props) {
   return (
     <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-3">
       <div>
         <div className="text-sm font-medium text-muted-foreground">Setup sheet model</div>
         <p className="mt-1 text-base font-medium text-foreground">{model.name}</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">
-          Shared by all cars of this type. Parameters, PDF calibration, and in-app setup layout come from this
-          model.
+          Shared by all cars of this type (e.g. all Mugen MTC3 cars). Parameters, PDF calibration, and in-app
+          layout come from this model. Uploads match calibrations by PDF form layout, not by car name.
         </p>
+        {calibrationName ? (
+          <p className="text-[11px] text-foreground/90 mt-1">
+            Default PDF calibration: <span className="font-medium">{calibrationName}</span>
+          </p>
+        ) : (
+          <p className="text-[11px] text-amber-200/90 mt-1">No default PDF calibration yet.</p>
+        )}
       </div>
       <ul className="flex flex-col gap-2 text-xs">
         <li>

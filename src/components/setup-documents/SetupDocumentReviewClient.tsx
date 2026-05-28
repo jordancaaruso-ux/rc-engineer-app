@@ -20,6 +20,7 @@ import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { computeA800rrDerived } from "@/lib/setupCalculations/a800rrDerived";
 import { computeDetailedDerivedFieldStatuses } from "@/lib/setup/derivedFields";
+import { buildDocumentCalibrationPickerOptions } from "@/lib/setupCalibrations/documentCalibrationPicker";
 
 function formatDerivedValidationLine(
   row: { status?: string; absDelta?: number | null } | undefined
@@ -42,6 +43,7 @@ type Calibration = {
   calibrationDataJson: unknown;
   createdAt: string | Date;
   setupSheetModelId?: string | null;
+  setupSheetModelName?: string | null;
 };
 
 type SetupDocumentDetail = {
@@ -96,12 +98,18 @@ export function SetupDocumentReviewClient({
   cars,
   calibrations,
   reviewSetupTemplate: reviewSetupTemplateProp = null,
+  docSetupSheetModelName = null,
+  docCarName = null,
+  defaultCalibrationIdForDocModel = null,
 }: {
   doc: SetupDocumentDetail;
   cars: CarOption[];
   calibrations: Calibration[];
   /** When set (per-model sheet), used instead of A800 layout for preview. */
   reviewSetupTemplate?: SetupSheetTemplate | null;
+  docSetupSheetModelName?: string | null;
+  docCarName?: string | null;
+  defaultCalibrationIdForDocModel?: string | null;
 }) {
   const useA800 = useA800SheetPostProcess(doc);
   const [liveDoc, setLiveDoc] = useState<SetupDocumentDetail>(doc);
@@ -120,7 +128,10 @@ export function SetupDocumentReviewClient({
   const [savingCalibration, setSavingCalibration] = useState(false);
   const [savingCalibrationSelection, setSavingCalibrationSelection] = useState(false);
   const [processingImport, setProcessingImport] = useState(false);
-  const [selectedCalibrationId, setSelectedCalibrationId] = useState("");
+  const [selectedCalibrationId, setSelectedCalibrationId] = useState(
+    () => doc.calibrationProfileId || doc.calibrationResolvedProfileId || ""
+  );
+  const [linkingCalibrationToModel, setLinkingCalibrationToModel] = useState(false);
   const [calibrationHighlightKeys, setCalibrationHighlightKeys] = useState<Set<string> | null>(null);
   const [formImportDebug, setFormImportDebug] = useState<
     | Array<{
@@ -180,10 +191,12 @@ export function SetupDocumentReviewClient({
     setSetupData(postProcessImportedSetup(normalizeSetupData(liveDoc.parsedDataJson), useA800SheetPostProcess(liveDoc)));
   }, [liveDoc.id, liveDoc.updatedAt, liveDoc.parsedDataJson, liveDoc.setupSheetModelId, liveDoc.setupSheetModelSlug]);
 
-  // Keep picker synced to the document's stored calibration selection.
+  // Keep picker synced to the document's stored or auto-resolved calibration.
   useEffect(() => {
-    setSelectedCalibrationId(liveDoc.calibrationProfileId || "");
-  }, [liveDoc.id, liveDoc.calibrationProfileId]);
+    const next =
+      liveDoc.calibrationProfileId || liveDoc.calibrationResolvedProfileId || "";
+    setSelectedCalibrationId(next);
+  }, [liveDoc.id, liveDoc.calibrationProfileId, liveDoc.calibrationResolvedProfileId]);
 
   useEffect(() => {
     // Poll only while processing (never auto-start processing).
@@ -217,23 +230,46 @@ export function SetupDocumentReviewClient({
 
   const filledCount = useMemo(() => mappedFieldKeys(setupData).length, [setupData]);
   const mappedKeys = useMemo(() => mappedFieldKeys(setupData), [setupData]);
-  const calibrationsForDoc = useMemo(() => {
-    const modelId = liveDoc.setupSheetModelId;
-    if (!modelId) return calibrations;
-    return calibrations.filter((c) => c.setupSheetModelId === modelId);
-  }, [calibrations, liveDoc.setupSheetModelId]);
+  const calibrationPicker = useMemo(
+    () =>
+      buildDocumentCalibrationPickerOptions({
+        calibrations: calibrations.map((c) => ({
+          id: c.id,
+          name: c.name,
+          setupSheetModelId: c.setupSheetModelId ?? null,
+          setupSheetModelName: c.setupSheetModelName ?? null,
+        })),
+        docSetupSheetModelId: liveDoc.setupSheetModelId ?? null,
+        docSetupSheetModelName: docSetupSheetModelName,
+        defaultCalibrationIdForDocModel,
+      }),
+    [
+      calibrations,
+      liveDoc.setupSheetModelId,
+      docSetupSheetModelName,
+      defaultCalibrationIdForDocModel,
+    ]
+  );
 
   const selectedCalibration = useMemo(
-    () => calibrationsForDoc.find((c) => c.id === selectedCalibrationId) ?? null,
-    [calibrationsForDoc, selectedCalibrationId]
+    () => calibrations.find((c) => c.id === selectedCalibrationId) ?? null,
+    [calibrations, selectedCalibrationId]
   );
   const storedCalibration = useMemo(
-    () => calibrationsForDoc.find((c) => c.id === (liveDoc.calibrationProfileId ?? "")) ?? null,
-    [calibrationsForDoc, liveDoc.calibrationProfileId]
+    () => calibrations.find((c) => c.id === (liveDoc.calibrationProfileId ?? "")) ?? null,
+    [calibrations, liveDoc.calibrationProfileId]
   );
-  const missingStoredCalibration = Boolean(
-    liveDoc.calibrationProfileId && !storedCalibration
+  const selectedCalibrationUnlinked = Boolean(
+    liveDoc.setupSheetModelId
+    && selectedCalibration
+    && !selectedCalibration.setupSheetModelId
   );
+  const autoPickUserNote = useMemo(() => {
+    const dbg = liveDoc.calibrationResolvedDebug ?? "";
+    const pipe = dbg.indexOf(" | ");
+    if (pipe >= 0) return dbg.slice(pipe + 3).trim();
+    return null;
+  }, [liveDoc.calibrationResolvedDebug]);
   const calibrationForView = storedCalibration ?? selectedCalibration;
   const selectedCalibrationNormalized = useMemo(() => {
     if (!calibrationForView?.calibrationDataJson) return null;
@@ -645,6 +681,39 @@ export function SetupDocumentReviewClient({
     }
   }
 
+  async function linkSelectedCalibrationToDocModel() {
+    if (!selectedCalibrationId || !liveDoc.setupSheetModelId) return;
+    setLinkingCalibrationToModel(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/setup-calibrations/${selectedCalibrationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setupSheetModelId: liveDoc.setupSheetModelId }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error || "Failed to link calibration to car type");
+        return;
+      }
+      if (defaultCalibrationIdForDocModel == null && liveDoc.setupSheetModelId) {
+        await fetch(`/api/setup-sheet-models/${liveDoc.setupSheetModelId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ defaultCalibrationId: selectedCalibrationId }),
+        });
+      }
+      setStatus(
+        `Linked “${selectedCalibration?.name ?? "calibration"}” to ${docSetupSheetModelName ?? "this car type"}.`
+      );
+      router.refresh();
+    } catch {
+      setError("Failed to link calibration to car type");
+    } finally {
+      setLinkingCalibrationToModel(false);
+    }
+  }
+
   async function processNow() {
     if (!liveDoc.calibrationProfileId) {
       setError("Select and save a calibration before processing.");
@@ -699,6 +768,29 @@ export function SetupDocumentReviewClient({
                 : reviewState}
           </span>
         </div>
+        {(docSetupSheetModelName || docCarName) ? (
+          <div className="mt-2 rounded border border-border/70 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground space-y-1">
+            {docCarName ? (
+              <div>
+                <span className="text-foreground">Car:</span> {docCarName}
+              </div>
+            ) : null}
+            {docSetupSheetModelName ? (
+              <div>
+                <span className="text-foreground">Car type (setup sheet model):</span>{" "}
+                {docSetupSheetModelName}
+              </div>
+            ) : null}
+            <div className="text-[10px] opacity-90">
+              Calibrations are matched by PDF form layout (fingerprint), then linked to this car type.
+            </div>
+          </div>
+        ) : null}
+        {autoPickUserNote ? (
+          <div className="mt-2 rounded border border-sky-500/35 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-100">
+            {autoPickUserNote}
+          </div>
+        ) : null}
         {shouldSuggestManual ? (
           <div className="mt-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
             Auto-parse is incomplete. You can apply an existing calibration, create a new calibration for this layout, or continue manually.
@@ -934,35 +1026,61 @@ export function SetupDocumentReviewClient({
           <p className="mt-1 text-[10px] text-muted-foreground">
             Saved templates map editable PDF text (and optional regions) to setup fields. Choose one and confirm to prefill.
           </p>
-          {missingStoredCalibration ? (
-            <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-200">
-              Selected calibration not found. Choose another calibration below.
-            </div>
-          ) : null}
-          {!liveDoc.calibrationProfileId ? (
+          {!liveDoc.calibrationProfileId && !liveDoc.calibrationResolvedProfileId ? (
             <div className="mt-2 rounded border border-blue-500/40 bg-blue-500/10 px-2 py-1.5 text-[11px] text-blue-100">
-              No calibration selected.
+              No calibration selected yet — pick one whose example PDF matches this form layout.
             </div>
           ) : null}
-          {calibrationsForDoc.length === 0 ? (
+          {calibrationPicker.totalCount === 0 ? (
             <div className="mt-2 rounded border border-border/70 bg-card/30 px-2 py-1.5 text-[11px] text-muted-foreground">
-              {liveDoc.setupSheetModelId
-                ? "No calibration for this setup sheet model yet. Finish mapping in the car wizard or create one."
-                : "No calibrations available yet. Create one to enable calibrated mapping."}
+              No calibrations saved yet. Create one in the car wizard or under Setup calibrations.
+            </div>
+          ) : liveDoc.setupSheetModelId && calibrationPicker.matchedForDocModelCount === 0 ? (
+            <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-200">
+              None linked to {docSetupSheetModelName ?? "this car type"} yet, but{" "}
+              {calibrationPicker.unlinkedCount + calibrationPicker.options.filter((o) => o.group === "other_model").length}{" "}
+              other calibration(s) may still match this PDF — check Unlinked or pick by name.
+            </div>
+          ) : null}
+          {selectedCalibrationUnlinked ? (
+            <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-200 flex flex-wrap items-center gap-2">
+              <span>
+                “{selectedCalibration?.name}” is not linked to {docSetupSheetModelName ?? "this car type"}.
+              </span>
+              <button
+                type="button"
+                className="rounded border border-amber-400/50 px-2 py-0.5 hover:bg-amber-500/20 disabled:opacity-60"
+                disabled={linkingCalibrationToModel}
+                onClick={() => void linkSelectedCalibrationToDocModel()}
+              >
+                {linkingCalibrationToModel ? "Linking…" : `Link to ${docSetupSheetModelName ?? "car type"}`}
+              </button>
             </div>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <select
-              className="rounded-md border border-border bg-card px-2 py-1.5 text-xs"
+              className="rounded-md border border-border bg-card px-2 py-1.5 text-xs max-w-full"
               value={selectedCalibrationId}
               onChange={(e) => setSelectedCalibrationId(e.target.value)}
             >
               <option value="">Select calibration…</option>
-              {calibrationsForDoc.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+              {(() => {
+                const byGroup = new Map<string, typeof calibrationPicker.options>();
+                for (const opt of calibrationPicker.options) {
+                  const list = byGroup.get(opt.groupLabel) ?? [];
+                  list.push(opt);
+                  byGroup.set(opt.groupLabel, list);
+                }
+                return [...byGroup.entries()].map(([label, opts]) => (
+                  <optgroup key={label} label={label}>
+                    {opts.map((o) => (
+                      <option key={o.calibration.id} value={o.calibration.id}>
+                        {o.optionLabel}
+                      </option>
+                    ))}
+                  </optgroup>
+                ));
+              })()}
             </select>
             <button
               type="button"

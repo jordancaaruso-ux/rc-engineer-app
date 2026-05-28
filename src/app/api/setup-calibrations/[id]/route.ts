@@ -42,6 +42,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     sourceType?: string;
     calibrationDataJson?: unknown;
     exampleDocumentId?: string | null;
+    setupSheetModelId?: string | null;
   };
   const existing = await prisma.setupSheetCalibration.findFirst({
     where: { id, userId: user.id },
@@ -54,6 +55,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     sourceType?: string;
     calibrationDataJson?: object;
     exampleDocumentId?: string | null;
+    setupSheetModelId?: string | null;
   } = {};
 
   if (body.name !== undefined) {
@@ -67,6 +69,23 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (body.calibrationDataJson !== undefined) {
     data.calibrationDataJson = (body.calibrationDataJson ?? {}) as object;
   }
+  if ("setupSheetModelId" in body) {
+    const raw = body.setupSheetModelId;
+    if (raw === null || raw === "") {
+      data.setupSheetModelId = null;
+    } else if (typeof raw === "string" && raw.trim()) {
+      const modelId = raw.trim();
+      const model = await prisma.setupSheetModel.findFirst({
+        where: { id: modelId, userId: user.id },
+        select: { id: true },
+      });
+      if (!model) {
+        return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
+      }
+      data.setupSheetModelId = modelId;
+    }
+  }
+
   if ("exampleDocumentId" in body) {
     const raw = body.exampleDocumentId;
     if (raw === null || raw === "") {

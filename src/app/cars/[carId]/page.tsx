@@ -132,13 +132,26 @@ export default async function CarDetailPage(props: {
     }
   }
 
-  const modelCalibration = car.setupSheetModelId
-    ? await prisma.setupSheetCalibration.findFirst({
-        where: { userId: user.id, setupSheetModelId: car.setupSheetModelId },
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, exampleDocumentId: true },
+  const modelRow = car.setupSheetModelId
+    ? await prisma.setupSheetModel.findFirst({
+        where: { id: car.setupSheetModelId, userId: user.id },
+        select: {
+          defaultCalibrationId: true,
+          defaultCalibration: {
+            select: { id: true, name: true, exampleDocumentId: true },
+          },
+        },
       })
     : null;
+  const modelCalibration =
+    modelRow?.defaultCalibration
+    ?? (car.setupSheetModelId
+      ? await prisma.setupSheetCalibration.findFirst({
+          where: { userId: user.id, setupSheetModelId: car.setupSheetModelId },
+          orderBy: { updatedAt: "desc" },
+          select: { id: true, name: true, exampleDocumentId: true },
+        })
+      : null);
 
   return (
     <>
@@ -174,6 +187,7 @@ export default async function CarDetailPage(props: {
               carId={car.id}
               model={car.setupSheetModel}
               calibrationId={modelCalibration?.id ?? null}
+              calibrationName={modelCalibration?.name ?? null}
               exampleDocumentId={modelCalibration?.exampleDocumentId ?? null}
             />
           ) : null}

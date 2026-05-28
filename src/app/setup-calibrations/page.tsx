@@ -34,6 +34,9 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
       createdAt: true,
       userId: true,
       communityShared: true,
+      setupSheetModelId: true,
+      exampleDocumentId: true,
+      setupSheetModel: { select: { name: true } },
     },
   });
   return (
@@ -59,8 +62,15 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
                   <div>
                     <div className="ui-title text-sm text-foreground normal-case">{c.name}</div>
                     <div className="text-xs text-muted-foreground">
+                      {c.setupSheetModel?.name
+                        ? `Car type: ${c.setupSheetModel.name}`
+                        : "Unlinked — not assigned to a car type"}
+                      {" · "}
                       {c.sourceType} · {formFields} form · {textFields} text · {regionFields} region ·{" "}
-                      {imageFields} image · {new Date(c.createdAt).toLocaleDateString()}
+                      {imageFields} image
+                      {c.exampleDocumentId ? "" : " · no example PDF"}
+                      {" · "}
+                      {new Date(c.createdAt).toLocaleDateString()}
                       {c.communityShared ? " · community" : ""}
                     </div>
                   </div>
