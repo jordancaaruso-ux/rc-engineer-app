@@ -133,6 +133,18 @@ export function formatRunDateCompact(d: string | Date, timeZone?: string | null)
 
 const MS_PER_DAY = 86_400_000;
 
+/** Calendar YYYY-MM-DD for an instant in an IANA timezone. */
+export function calendarYmdInTimeZone(d: string | Date, timeZone: string): string {
+  const dt = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(dt.getTime())) return "1970-01-01";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(dt);
+}
+
 /**
  * Calendar-day distance between two instants in `timeZone` (IANA), or the
  * runtime default zone when omitted. Non-negative when `a` is on or before `b`'s calendar day.
@@ -143,18 +155,59 @@ export function calendarDayDifference(a: Date, b: Date, timeZone?: string | null
     (typeof Intl !== "undefined"
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
       : "UTC");
-  const key = (d: Date) =>
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(d);
+  const key = (d: Date) => calendarYmdInTimeZone(d, tz);
   const [ya, ma, da] = key(a).split("-").map(Number);
   const [yb, mb, db] = key(b).split("-").map(Number);
   const tA = Date.UTC(ya, ma - 1, da);
   const tB = Date.UTC(yb, mb - 1, db);
   return Math.round((tB - tA) / MS_PER_DAY);
+}
+
+export function formatEventDateInZone(d: string | Date, timeZone: string): string {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  return new Intl.DateTimeFormat(LOCALE, { ...DATE_OPTIONS, timeZone }).format(dt);
+}
+
+/**
+ * Relative timing for events in a specific timezone.
+ */
+export function formatEventRelativeLabelInZone(
+  ev: { startDate: string | Date; endDate: string | Date },
+  timeZone: string,
+  now = new Date()
+): string {
+  const todayYmd = calendarYmdInTimeZone(now, timeZone);
+  const startYmd = calendarYmdInTimeZone(ev.startDate, timeZone);
+  const endYmd = calendarYmdInTimeZone(ev.endDate, timeZone);
+
+  if (endYmd < todayYmd) {
+    const daysAgo = calendarDayDifference(new Date(ev.endDate), now, timeZone);
+    if (daysAgo === 0) return "ended";
+    if (daysAgo === 1) return "ended 1 day ago";
+    return `ended ${daysAgo} days ago`;
+  }
+  if (startYmd > todayYmd) {
+    const days = calendarDayDifference(now, new Date(ev.startDate), timeZone);
+    if (days === 1) return "tomorrow";
+    return `in ${days} days`;
+  }
+  if (startYmd === todayYmd) return "starts today";
+  const dayNum = calendarDayDifference(new Date(ev.startDate), now, timeZone) + 1;
+  return dayNum === 1 ? "day 1 of event" : `day ${dayNum} of event`;
+}
+
+export function formatFeaturedEventDateLabel(
+  ev: { startDate: string | Date; endDate: string | Date },
+  timeZone: string,
+  now = new Date()
+): string {
+  const startYmd = calendarYmdInTimeZone(ev.startDate, timeZone);
+  const endYmd = calendarYmdInTimeZone(ev.endDate, timeZone);
+  const startStr = formatEventDateInZone(ev.startDate, timeZone);
+  const dateRange = startYmd === endYmd ? startStr : `${startStr} – ${formatEventDateInZone(ev.endDate, timeZone)}`;
+  const relative = formatEventRelativeLabelInZone(ev, timeZone, now);
+  return `${dateRange} · ${relative}`;
 }
 
 export function formatEventDate(d: string | Date): string {

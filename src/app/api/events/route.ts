@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
-import { hasDatabaseUrl } from "@/lib/env";
+import { parseEventDateYmd } from "@/lib/eventDateParse";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -90,8 +90,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Track not found" }, { status: 400 });
     }
 
-    const startDate = body.startDate ? new Date(body.startDate) : new Date();
-    const endDate = body.endDate ? new Date(body.endDate) : new Date(startDate);
+    const startDate = body.startDate ? parseEventDateYmd(body.startDate) : new Date();
+    const endDate = body.endDate ? parseEventDateYmd(body.endDate) : new Date(startDate);
 
     function utcYmd(d: Date): string {
       const y = d.getUTCFullYear();

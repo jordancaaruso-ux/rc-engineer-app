@@ -26,8 +26,8 @@ export default async function DashboardPage(): Promise<ReactNode> {
   }
 
   const user = await requireCurrentUser();
-  const model = await getCachedDashboardHomeModel(user.id);
   const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
+  const model = await getCachedDashboardHomeModel(user.id, displayTimeZone);
 
   return <DashboardHome model={model} displayTimeZone={displayTimeZone} />;
 }

@@ -39,15 +39,19 @@ export type ExactPickResult =
 export async function buildCalibrationFingerprints(input: {
   userId: string;
   restrictToNames?: readonly string[];
+  /** When set, only calibrations for this setup sheet model (plus none for community without model). */
+  restrictToSetupSheetModelId?: string | null;
   minNameCount?: number;
 }): Promise<CalibrationFingerprint[]> {
   const minNameCount = input.minNameCount ?? 8;
+  const modelId = input.restrictToSetupSheetModelId?.trim() || null;
   const calibrations = await prisma.setupSheetCalibration.findMany({
     where: {
       OR: [{ userId: input.userId }, { communityShared: true }],
       ...(input.restrictToNames && input.restrictToNames.length > 0
         ? { name: { in: [...input.restrictToNames] } }
         : {}),
+      ...(modelId ? { setupSheetModelId: modelId } : {}),
     },
     select: { id: true, name: true, exampleDocumentId: true, createdAt: true },
     orderBy: { createdAt: "desc" },

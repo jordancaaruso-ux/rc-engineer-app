@@ -65,12 +65,18 @@ export async function POST(request: Request): Promise<NextResponse> {
   const explicitCarIdProvided = typeof explicitCarIdRaw === "string" && explicitCarIdRaw.trim() !== "";
   let carId: string | null = null;
   let setupSheetTemplate: string | null = null;
+  let setupSheetModelId: string | null = null;
   if (explicitCarIdProvided) {
     const carResolved = await resolveOwnedCarId(user.id, explicitCarIdRaw);
     if (!carResolved.ok) {
       return NextResponse.json({ error: carResolved.message }, { status: 400 });
     }
     carId = carResolved.carId;
+    const carRow = await prisma.car.findFirst({
+      where: { id: carId, userId: user.id },
+      select: { setupSheetModelId: true, setupSheetTemplate: true },
+    });
+    setupSheetModelId = carRow?.setupSheetModelId ?? null;
     setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carId);
   }
 
@@ -103,7 +109,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   };
   if (mimeType === PDF_MIME) {
     try {
-      const candidates = await buildCalibrationFingerprints({ userId: user.id });
+      const candidates = await buildCalibrationFingerprints({
+        userId: user.id,
+        restrictToSetupSheetModelId: setupSheetModelId,
+      });
       outcome = await repickCalibrationForBytes(bytes, candidates, {
         debugPrefix: "quickCreate:auto",
         suggestOnAmbiguous: true,
@@ -200,6 +209,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       userId: user.id,
       carId,
       setupSheetTemplate,
+      setupSheetModelId,
       originalFilename: file.name || "upload",
       storagePath,
       mimeType,

@@ -14,6 +14,8 @@ type SetupPageSearchParams = {
   calibration?: string;
   /** "1" when fingerprint matched multiple calibrations; a best guess was applied. */
   calibrationAmbiguous?: string;
+  /** Pre-select car for New setup upload (must be user's car). */
+  carId?: string;
 };
 
 export default async function SetupPage({
@@ -36,6 +38,10 @@ export default async function SetupPage({
       : null;
   const calibrationAmbiguous =
     resolvedSearchParams.calibrationAmbiguous === "1" || resolvedSearchParams.calibrationAmbiguous === "true";
+  const preselectCarId =
+    typeof resolvedSearchParams.carId === "string" && resolvedSearchParams.carId.trim()
+      ? resolvedSearchParams.carId.trim()
+      : null;
 
   if (!hasDatabaseUrl()) {
     return (
@@ -94,7 +100,13 @@ export default async function SetupPage({
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, setupSheetTemplate: true },
+      select: {
+        id: true,
+        name: true,
+        setupSheetTemplate: true,
+        setupSheetModelId: true,
+        setupSheetModel: { select: { id: true, name: true } },
+      },
     }),
   ]);
 
@@ -105,6 +117,16 @@ export default async function SetupPage({
       })
     : null;
   const bannerSetupId = createdSetupId ?? createdDoc?.createdSetupId ?? null;
+
+  const carsForUpload = cars.map((c) => ({
+    id: c.id,
+    name: c.name,
+    setupSheetTemplate: c.setupSheetTemplate,
+    setupSheetModelId: c.setupSheetModelId,
+    setupSheetModelName: c.setupSheetModel?.name ?? null,
+  }));
+  const defaultCarIdForUpload =
+    preselectCarId && carsForUpload.some((c) => c.id === preselectCarId) ? preselectCarId : null;
 
   return (
     <>
@@ -197,7 +219,7 @@ export default async function SetupPage({
           <div className="flex items-center justify-between border-b border-border px-4 py-2">
             <div className="ui-title text-xs text-muted-foreground">Downloaded setups</div>
             <div className="flex items-center gap-2">
-              <NewSetupUploadButton cars={cars} />
+              <NewSetupUploadButton cars={carsForUpload} defaultCarId={defaultCarIdForUpload} />
               <Link href="/setup-documents" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
                 Open library
               </Link>

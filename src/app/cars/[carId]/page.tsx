@@ -5,6 +5,10 @@ import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { CarDeleteClient } from "@/components/cars/CarDeleteClient";
+import {
+  CarSetupSheetModelCard,
+  showLegacySetupSheetTemplateEdit,
+} from "@/components/cars/CarSetupSheetModelCard";
 import { CarSetupSheetTemplateEdit } from "@/components/cars/CarSetupSheetTemplateEdit";
 
 export default async function CarDetailPage(props: {
@@ -33,7 +37,16 @@ export default async function CarDetailPage(props: {
 
   const car = await prisma.car.findFirst({
     where: { id: carId, userId: user.id },
-    select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      chassis: true,
+      notes: true,
+      setupSheetTemplate: true,
+      setupSheetModelId: true,
+      createdAt: true,
+      setupSheetModel: { select: { id: true, name: true, slug: true } },
+    },
   });
 
   if (!car) {
@@ -119,6 +132,14 @@ export default async function CarDetailPage(props: {
     }
   }
 
+  const modelCalibration = car.setupSheetModelId
+    ? await prisma.setupSheetCalibration.findFirst({
+        where: { userId: user.id, setupSheetModelId: car.setupSheetModelId },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true, exampleDocumentId: true },
+      })
+    : null;
+
   return (
     <>
       <header className="page-header">
@@ -148,9 +169,20 @@ export default async function CarDetailPage(props: {
             </div>
           </div>
 
-          <CarSetupSheetTemplateEdit carId={car.id} currentTemplate={car.setupSheetTemplate} />
+          {car.setupSheetModel ? (
+            <CarSetupSheetModelCard
+              carId={car.id}
+              model={car.setupSheetModel}
+              calibrationId={modelCalibration?.id ?? null}
+              exampleDocumentId={modelCalibration?.exampleDocumentId ?? null}
+            />
+          ) : null}
 
-          {car.setupSheetTemplate ? (
+          {showLegacySetupSheetTemplateEdit(car.setupSheetModelId, car.setupSheetTemplate) ? (
+            <CarSetupSheetTemplateEdit carId={car.id} currentTemplate={car.setupSheetTemplate} />
+          ) : null}
+
+          {car.setupSheetTemplate && !car.setupSheetModelId ? (
             <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-2">
               <div className="ui-title text-sm text-muted-foreground">Community tuning archetypes</div>
               <p className="text-xs text-muted-foreground">

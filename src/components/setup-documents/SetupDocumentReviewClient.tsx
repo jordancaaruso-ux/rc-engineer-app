@@ -41,6 +41,7 @@ type Calibration = {
   sourceType: string;
   calibrationDataJson: unknown;
   createdAt: string | Date;
+  setupSheetModelId?: string | null;
 };
 
 type SetupDocumentDetail = {
@@ -216,13 +217,19 @@ export function SetupDocumentReviewClient({
 
   const filledCount = useMemo(() => mappedFieldKeys(setupData).length, [setupData]);
   const mappedKeys = useMemo(() => mappedFieldKeys(setupData), [setupData]);
+  const calibrationsForDoc = useMemo(() => {
+    const modelId = liveDoc.setupSheetModelId;
+    if (!modelId) return calibrations;
+    return calibrations.filter((c) => c.setupSheetModelId === modelId);
+  }, [calibrations, liveDoc.setupSheetModelId]);
+
   const selectedCalibration = useMemo(
-    () => calibrations.find((c) => c.id === selectedCalibrationId) ?? null,
-    [calibrations, selectedCalibrationId]
+    () => calibrationsForDoc.find((c) => c.id === selectedCalibrationId) ?? null,
+    [calibrationsForDoc, selectedCalibrationId]
   );
   const storedCalibration = useMemo(
-    () => calibrations.find((c) => c.id === (liveDoc.calibrationProfileId ?? "")) ?? null,
-    [calibrations, liveDoc.calibrationProfileId]
+    () => calibrationsForDoc.find((c) => c.id === (liveDoc.calibrationProfileId ?? "")) ?? null,
+    [calibrationsForDoc, liveDoc.calibrationProfileId]
   );
   const missingStoredCalibration = Boolean(
     liveDoc.calibrationProfileId && !storedCalibration
@@ -264,16 +271,24 @@ export function SetupDocumentReviewClient({
     () => [...(selectedCalibrationNormalized?.customFieldDefinitions ?? []), ...fallbackCustomFieldDefinitions],
     [selectedCalibrationNormalized, fallbackCustomFieldDefinitions]
   );
-  const reviewSetupTemplate = useMemo(
-    () =>
+  const reviewSetupTemplate = useMemo(() => {
+    if (liveDoc.setupSheetModelId) {
+      return reviewSetupTemplateProp ?? null;
+    }
+    return (
       reviewSetupTemplateProp
-        ?? getA800rrSetupSheetTemplateWithDisplayPreferences(
-          effectiveCustomFieldDefinitions,
-          selectedCalibrationNormalized?.fieldDisplayOverrides,
-          "setup"
-        ),
-    [reviewSetupTemplateProp, selectedCalibrationNormalized, effectiveCustomFieldDefinitions]
-  );
+      ?? getA800rrSetupSheetTemplateWithDisplayPreferences(
+        effectiveCustomFieldDefinitions,
+        selectedCalibrationNormalized?.fieldDisplayOverrides,
+        "setup"
+      )
+    );
+  }, [
+    liveDoc.setupSheetModelId,
+    reviewSetupTemplateProp,
+    selectedCalibrationNormalized,
+    effectiveCustomFieldDefinitions,
+  ]);
   const totalTrackedFields = useMemo(
     () => getEffectiveFieldCatalog(effectiveCustomFieldDefinitions).length,
     [effectiveCustomFieldDefinitions]
@@ -500,12 +515,96 @@ export function SetupDocumentReviewClient({
         }));
         setCalibrationHighlightKeys(imported);
         setFormImportDebug(Array.isArray(data.formImportDebug) && data.formImportDebug.length ? data.formImportDebug : null);
-        setStatus(
-          `Applied calibration: ${data.calibration?.name ?? selectedCalibration.name} (${data.importedCount ?? imported.size} fields prefilled).`
-        );
+        const count = data.importedCount ?? imported.size;
+        if (count === 0) {
+          setError(
+            "No PDF fields matched this calibration. Open the calibration editor and link each PDF control to a parameter on your sheet model."
+          );
+          setStatus(null);
+        } else {
+          setStatus(
+            `Applied calibration: ${data.calibration?.name ?? selectedCalibration.name} (${count} fields prefilled).`
+          );
+        }
       } catch {
         setError("Failed to apply calibration");
         setStatus(null);
+      }
+    })();
+  }
+
+  function applyCalibrationAndProcess() {
+    void (async () => {
+      if (!selectedCalibration) return;
+      setError(null);
+      setProcessingImport(true);
+      setStatus("Applying calibration and processing…");
+      try {
+        const applyRes = await fetch(`/api/setup-documents/${doc.id}/apply-calibration`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ calibrationId: selectedCalibration.id }),
+        });
+        const applyData = (await applyRes.json().catch(() => ({}))) as {
+          error?: string;
+          parsedData?: unknown;
+          importedKeys?: string[];
+          importedCount?: number;
+          calibration?: { name?: string };
+          formImportDebug?: Array<{
+            appKey: string;
+            pdfFieldName?: string;
+            rawExtracted?: string;
+            finalValue: string;
+            rawNote: string;
+            warning?: string;
+          }>;
+        };
+        if (!applyRes.ok) {
+          setError(applyData.error || "Failed to apply calibration");
+          setStatus(null);
+          return;
+        }
+        const imported = new Set(applyData.importedKeys ?? []);
+        const count = applyData.importedCount ?? imported.size;
+        const next = postProcessImportedSetup(
+          normalizeSetupData(applyData.parsedData ?? {}),
+          useA800SheetPostProcess(liveDoc)
+        );
+        setSetupData(next);
+        setLiveDoc((cur) => ({
+          ...cur,
+          calibrationProfileId: selectedCalibration.id,
+          parsedCalibrationProfileId: selectedCalibration.id,
+          parsedSetupManuallyEdited: false,
+        }));
+        setCalibrationHighlightKeys(imported);
+        setFormImportDebug(
+          Array.isArray(applyData.formImportDebug) && applyData.formImportDebug.length
+            ? applyData.formImportDebug
+            : null
+        );
+        if (count === 0) {
+          setError(
+            "No PDF fields matched. Map PDF controls in the calibration editor, then try again."
+          );
+          setStatus(null);
+          return;
+        }
+        const procRes = await fetch(`/api/setup-documents/${doc.id}/process`, { method: "POST" });
+        const procData = (await procRes.json().catch(() => ({}))) as { error?: string; status?: string };
+        if (!procRes.ok && procData.status !== "awaiting_calibration") {
+          setError(procData.error || "Processing failed after apply");
+          setStatus(`Applied ${count} fields; processing did not start.`);
+          return;
+        }
+        setLiveDoc((cur) => ({ ...cur, importStatus: "PROCESSING" }));
+        setStatus(`Applied ${count} fields and started processing.`);
+      } catch {
+        setError("Failed to apply calibration and process");
+        setStatus(null);
+      } finally {
+        setProcessingImport(false);
       }
     })();
   }
@@ -845,9 +944,11 @@ export function SetupDocumentReviewClient({
               No calibration selected.
             </div>
           ) : null}
-          {calibrations.length === 0 ? (
+          {calibrationsForDoc.length === 0 ? (
             <div className="mt-2 rounded border border-border/70 bg-card/30 px-2 py-1.5 text-[11px] text-muted-foreground">
-              No calibrations available yet. Create one to enable calibrated mapping.
+              {liveDoc.setupSheetModelId
+                ? "No calibration for this setup sheet model yet. Finish mapping in the car wizard or create one."
+                : "No calibrations available yet. Create one to enable calibrated mapping."}
             </div>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -857,7 +958,7 @@ export function SetupDocumentReviewClient({
               onChange={(e) => setSelectedCalibrationId(e.target.value)}
             >
               <option value="">Select calibration…</option>
-              {calibrations.map((c) => (
+              {calibrationsForDoc.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -865,11 +966,19 @@ export function SetupDocumentReviewClient({
             </select>
             <button
               type="button"
+              className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+              onClick={applyCalibrationAndProcess}
+              disabled={!selectedCalibration || processingImport}
+            >
+              {processingImport ? "Working…" : "Apply & process"}
+            </button>
+            <button
+              type="button"
               className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
               onClick={applyCalibration}
-              disabled={!selectedCalibration}
+              disabled={!selectedCalibration || processingImport}
             >
-              Apply template
+              Apply only
             </button>
             <button
               type="button"
@@ -1006,7 +1115,7 @@ export function SetupDocumentReviewClient({
             <SetupSheetView
               value={setupData}
               onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
-              template={reviewSetupTemplate}
+              template={reviewSetupTemplate ?? undefined}
               highlightChangedKeys={calibrationHighlightKeys}
               readOnly={mode === "review"}
             />

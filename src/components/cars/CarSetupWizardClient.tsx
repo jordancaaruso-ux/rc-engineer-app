@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
 import { buildGenericPresetSchema } from "@/lib/setupSheetModels/genericPresetSchema";
+import { customFieldDefinitionsFromModelSchema } from "@/lib/setupSheetModels/customFieldDefinitionsFromSchema";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
 
@@ -146,6 +147,8 @@ export function CarSetupWizardClient() {
       if (!docId) throw new Error("No document id returned");
       setDocumentId(docId);
 
+      const schemaForCal = schema ?? buildGenericPresetSchema(newModelName.trim() || carName.trim());
+      const fieldDefs = customFieldDefinitionsFromModelSchema(schemaForCal);
       const calRes = await fetch("/api/setup-calibrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -158,7 +161,7 @@ export function CarSetupWizardClient() {
             formFieldMappings: {},
             fieldMappings: {},
             fields: {},
-            customFieldDefinitions: [],
+            customFieldDefinitions: fieldDefs,
           },
         }),
       });

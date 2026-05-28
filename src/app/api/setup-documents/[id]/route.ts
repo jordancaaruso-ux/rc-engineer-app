@@ -49,10 +49,18 @@ export async function GET(_: Request, ctx: Ctx) {
       updatedAt: true,
       createdSetupId: true,
       carId: true,
+      setupSheetModelId: true,
+      setupSheetTemplate: true,
+      setupSheetModel: { select: { id: true, slug: true, name: true } },
     },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ document: doc });
+  return NextResponse.json({
+    document: {
+      ...doc,
+      setupSheetModelSlug: doc.setupSheetModel?.slug ?? null,
+    },
+  });
 }
 
 export async function PATCH(request: Request, ctx: Ctx) {

@@ -3,10 +3,10 @@ import { loadDashboardHomeModel } from "@/lib/dashboardServer";
 import { dashboardTag } from "@/lib/cacheTags";
 
 /** Cached dashboard payload — invalidated on run/action-item mutations. */
-export async function getCachedDashboardHomeModel(userId: string) {
+export async function getCachedDashboardHomeModel(userId: string, timeZone: string) {
   return unstable_cache(
-    async () => loadDashboardHomeModel(userId),
-    [`dashboard-home-v1-${userId}`],
+    async () => loadDashboardHomeModel(userId, timeZone),
+    [`dashboard-home-v2-${userId}-${timeZone}`],
     { tags: [dashboardTag(userId)], revalidate: 30 }
   )();
 }

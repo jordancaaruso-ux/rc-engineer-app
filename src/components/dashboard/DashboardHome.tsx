@@ -22,7 +22,7 @@ export function DashboardHome({
   displayTimeZone: string;
 }) {
   const {
-    activeEvent,
+    featuredEvent,
     recentRun,
     thingsToTry,
     thingsToDo,
@@ -123,8 +123,8 @@ export function DashboardHome({
           />
         </Suspense>
 
-        {activeEvent ? (
-          <EventContextCard activeEvent={activeEvent} />
+        {featuredEvent ? (
+          <FeaturedMeetingCard featuredEvent={featuredEvent} />
         ) : null}
 
         <DashboardPreviousRunCard recentRun={recentRun} displayTimeZone={displayTimeZone} />
@@ -158,7 +158,7 @@ export function DashboardHome({
           todayRunCount={todayRunCount}
           todaysChanges={todaysChanges}
           displayTimeZone={displayTimeZone}
-          hasActiveEvent={Boolean(activeEvent)}
+          hasActiveEvent={featuredEvent?.status === "active"}
         />
 
         <div className="rounded-xl border border-border bg-card/80 p-4 shadow-sm">
@@ -184,60 +184,78 @@ export function DashboardHome({
   );
 }
 
-function EventContextCard({
-  activeEvent,
+const FEATURED_MEETING_LABELS = {
+  active: "Active race meeting",
+  next: "Next race meeting",
+  last: "Last race meeting",
+} as const;
+
+function FeaturedMeetingCard({
+  featuredEvent,
 }: {
-  activeEvent: NonNullable<DashboardHomeModel["activeEvent"]>;
+  featuredEvent: NonNullable<DashboardHomeModel["featuredEvent"]>;
 }) {
+  const isActive = featuredEvent.status === "active";
+
   return (
     <CardPanel className="p-4">
       <div className="text-xs font-medium text-muted-foreground">
-        Active race meeting
+        {FEATURED_MEETING_LABELS[featuredEvent.status]}
       </div>
       <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-sm font-medium leading-tight text-foreground">{activeEvent.name}</h2>
+          <h2 className="text-sm font-medium leading-tight text-foreground">{featuredEvent.name}</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{featuredEvent.dateLabel}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {activeEvent.trackLabel ?? "Track not set — link one on the event"}
+            {featuredEvent.trackLabel ?? "Track not set — link one on the event"}
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-1.5">
-          {activeEvent.runCount > 0 ? (
-            <Link
-              href={`/runs/new?fromDashboard=continue&eventId=${encodeURIComponent(activeEvent.id)}`}
-              className={buttonLinkClassName("primary")}
-            >
-              Log next run
-            </Link>
+          {isActive ? (
+            featuredEvent.runCount > 0 ? (
+              <Link
+                href={`/runs/new?fromDashboard=continue&eventId=${encodeURIComponent(featuredEvent.id)}`}
+                className={buttonLinkClassName("primary")}
+              >
+                Log next run
+              </Link>
+            ) : (
+              <Link
+                href={`/runs/new?fromDashboard=first&eventId=${encodeURIComponent(featuredEvent.id)}`}
+                className={buttonLinkClassName("primary")}
+              >
+                Log first run today
+              </Link>
+            )
           ) : (
             <Link
-              href={`/runs/new?fromDashboard=first&eventId=${encodeURIComponent(activeEvent.id)}`}
-              className={buttonLinkClassName("primary")}
+              href={`/events/${encodeURIComponent(featuredEvent.id)}`}
+              className={buttonLinkClassName("outline")}
             >
-              Log first run today
+              View event →
             </Link>
           )}
         </div>
       </div>
 
-      {activeEvent.runCount > 0 ? (
+      {featuredEvent.runCount > 0 ? (
         <div className="mt-2.5 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-2.5 text-[11px]">
           <div className="flex items-baseline gap-2">
             <span className="text-[10px] ui-title text-muted-foreground">Best</span>
             <span className="font-mono tabular-nums text-foreground">
-              {formatLap(activeEvent.latest?.bestLap ?? null)}
+              {formatLap(featuredEvent.latest?.bestLap ?? null)}
             </span>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-[10px] ui-title text-muted-foreground">Avg 5</span>
             <span className="font-mono tabular-nums text-foreground">
-              {formatLap(activeEvent.latest?.avgTop5 ?? null)}
+              {formatLap(featuredEvent.latest?.avgTop5 ?? null)}
             </span>
           </div>
           <div className="min-w-0 flex-1 basis-full sm:basis-auto">
             <div className="text-[10px] ui-title text-muted-foreground">Notes</div>
             <div className="mt-0.5 line-clamp-2 break-words text-muted-foreground">
-              {activeEvent.latest?.notesPreview ?? "—"}
+              {featuredEvent.latest?.notesPreview ?? "—"}
             </div>
           </div>
         </div>

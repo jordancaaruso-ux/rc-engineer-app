@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { carTemplateSelectGroups, type CarForTemplateGroup } from "@/lib/cars/setupSheetTemplateCarGroups";
+import {
+  carTemplateSelectGroups,
+  shouldSkipSetupUploadCarPicker,
+  type CarForTemplateGroup,
+} from "@/lib/cars/setupSheetTemplateCarGroups";
 import {
   clipboardEventToImageFile,
   postQuickCreateSetup,
@@ -21,7 +25,13 @@ function stageLabel(stage: UploadStage): string {
   return "New setup";
 }
 
-export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
+export function NewSetupUploadButton({
+  cars,
+  defaultCarId = null,
+}: {
+  cars: CarOption[];
+  defaultCarId?: string | null;
+}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingFileRef = useRef<File | null>(null);
@@ -31,7 +41,12 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
   const [error, setError] = useState<string | null>(null);
   const [carPickerOpen, setCarPickerOpen] = useState(false);
   const templateGroups = useMemo(() => carTemplateSelectGroups(cars), [cars]);
-  const [selectedCarId, setSelectedCarId] = useState("");
+  const skipPicker = useMemo(() => shouldSkipSetupUploadCarPicker(cars), [cars]);
+  const [selectedCarId, setSelectedCarId] = useState(defaultCarId ?? "");
+
+  useEffect(() => {
+    if (defaultCarId) setSelectedCarId(defaultCarId);
+  }, [defaultCarId]);
 
   useEffect(() => {
     if (templateGroups.length === 1 && !selectedCarId) {
@@ -41,6 +56,14 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
 
   const noCars = cars.length === 0;
   const busy = stage !== "idle" && stage !== "done";
+
+  function resolveCarIdForUpload(): string | null {
+    if (selectedCarId && cars.some((c) => c.id === selectedCarId)) return selectedCarId;
+    if (defaultCarId && cars.some((c) => c.id === defaultCarId)) return defaultCarId;
+    if (templateGroups.length === 1) return templateGroups[0]!.defaultCarId;
+    if (cars.length === 1) return cars[0]!.id;
+    return null;
+  }
 
   function clearStageTimers() {
     for (const id of stageTimersRef.current) window.clearTimeout(id);
@@ -90,10 +113,23 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
       }
       setStage("idle");
     },
-    // scheduleStageHints/clearStageTimers close over stable refs; inlining would duplicate timer UX.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- router-only external dep
     [router]
   );
+
+  function beginUploadWithFile(f: File) {
+    pendingFileRef.current = f;
+    const carId = resolveCarIdForUpload();
+    if (!carId && !skipPicker) {
+      setCarPickerOpen(true);
+      return;
+    }
+    if (!carId) {
+      setCarPickerOpen(true);
+      return;
+    }
+    void upload(f, carId);
+  }
 
   function openPicker() {
     if (busy) return;
@@ -109,17 +145,7 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
     const f = ev.currentTarget.files?.[0] ?? null;
     ev.currentTarget.value = "";
     if (!f) return;
-    pendingFileRef.current = f;
-    if (templateGroups.length > 1 && !selectedCarId) {
-      setCarPickerOpen(true);
-      return;
-    }
-    const carId = selectedCarId || templateGroups[0]?.defaultCarId;
-    if (!carId) {
-      setCarPickerOpen(true);
-      return;
-    }
-    void upload(f, carId);
+    beginUploadWithFile(f);
   }
 
   function onPaste(ev: React.ClipboardEvent) {
@@ -127,17 +153,7 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
     const f = clipboardEventToImageFile(ev);
     if (!f) return;
     ev.preventDefault();
-    pendingFileRef.current = f;
-    if (templateGroups.length > 1 && !selectedCarId) {
-      setCarPickerOpen(true);
-      return;
-    }
-    const carId = selectedCarId || templateGroups[0]?.defaultCarId;
-    if (!carId) {
-      setCarPickerOpen(true);
-      return;
-    }
-    void upload(f, carId);
+    beginUploadWithFile(f);
   }
 
   function confirmCarPicker() {
@@ -205,16 +221,16 @@ export function NewSetupUploadButton({ cars }: { cars: CarOption[] }) {
           aria-modal="true"
           className="absolute right-0 top-full z-20 mt-2 w-64 rounded-md border border-border bg-card p-3 shadow-lg"
         >
-          <div className="text-xs font-medium text-foreground">Which setup sheet type is this for?</div>
+          <div className="text-xs font-medium text-foreground">Which setup sheet model is this for?</div>
           <p className="mt-1 text-[10px] text-muted-foreground">
-            Same type is shared for all cars of that type (e.g. two A800RR builds).
+            Same model is shared by all cars of that type (e.g. Mugen MTC3).
           </p>
           <select
             className="mt-2 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             value={selectedCarId}
             onChange={(e) => setSelectedCarId(e.target.value)}
           >
-            <option value="">Select type…</option>
+            <option value="">Select model…</option>
             {templateGroups.map((g) => (
               <option key={g.key} value={g.defaultCarId}>
                 {g.label}

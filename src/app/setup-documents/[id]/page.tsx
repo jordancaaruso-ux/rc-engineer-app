@@ -86,6 +86,7 @@ export default async function SetupDocumentDetailPage({
         calibrationDataJson: true,
         createdAt: true,
         communityShared: true,
+        setupSheetModelId: true,
       },
     }),
   ]);
@@ -93,8 +94,16 @@ export default async function SetupDocumentDetailPage({
   if (!doc) notFound();
 
   let reviewSetupTemplate = null;
-  if (doc.setupSheetModelId) {
-    const model = await loadSetupSheetModelById(user.id, doc.setupSheetModelId);
+  let modelIdForTemplate = doc.setupSheetModelId;
+  if (!modelIdForTemplate && doc.carId) {
+    const carRow = await prisma.car.findFirst({
+      where: { id: doc.carId, userId: user.id },
+      select: { setupSheetModelId: true },
+    });
+    modelIdForTemplate = carRow?.setupSheetModelId ?? null;
+  }
+  if (modelIdForTemplate) {
+    const model = await loadSetupSheetModelById(user.id, modelIdForTemplate);
     if (model) {
       reviewSetupTemplate = buildSetupSheetTemplateFromParsedSchema(model.id, model.name, model.schema);
     }

@@ -5,7 +5,8 @@ import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { eventIsActiveOnLocalToday, startOfLocalDay } from "@/lib/eventActive";
+import { pickFeaturedEvent } from "@/lib/eventActive";
+import { formatFeaturedEventDateLabel } from "@/lib/formatDate";
 import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
@@ -17,7 +18,13 @@ export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashb
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 
 /** @deprecated import from `@/lib/eventActive` */
-export { eventIsActiveOnLocalToday } from "@/lib/eventActive";
+export { eventIsActiveOnLocalToday, eventIsActiveOnCalendarDay } from "@/lib/eventActive";
+
+function startOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
 
 function localTodayBounds(): { start: Date; end: Date } {
   const start = startOfLocalDay(new Date());
@@ -215,10 +222,14 @@ export type DashboardHomeModel = {
   thingsToTry: DashboardActionItemRow[];
   /** Pre–next-run checks / reminders (same rows as `ActionItem` `THINGS_TO_DO`). */
   thingsToDo: DashboardActionItemRow[];
-  activeEvent: null | {
+  featuredEvent: null | {
     id: string;
     name: string;
     trackLabel: string | null;
+    status: "active" | "next" | "last";
+    startDate: string;
+    endDate: string;
+    dateLabel: string;
     runCount: number;
     latest: null | {
       bestLap: number | null;
@@ -371,7 +382,10 @@ export async function loadIncompleteRunsForImportChooser(
   return rows.map(toDashboardIncompleteRunRow);
 }
 
-export async function loadDashboardHomeModel(userId: string): Promise<DashboardHomeModel> {
+export async function loadDashboardHomeModel(
+  userId: string,
+  timeZone: string
+): Promise<DashboardHomeModel> {
   return perfSpan("loadDashboardHomeModel", async () => {
   const { start: todayStart, end: todayEnd } = localTodayBounds();
 
@@ -384,8 +398,11 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     prisma.event.findMany({
       where: { userId },
       orderBy: { startDate: "desc" },
-      take: 20,
-      include: { track: { select: { id: true, name: true, location: true } } },
+      take: 40,
+      include: {
+        track: { select: { id: true, name: true, location: true } },
+        _count: { select: { runs: true } },
+      },
     }),
     prisma.run.findFirst({
       where: { userId },
@@ -471,60 +488,71 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
     thingsToDoRows = [];
   }
 
-  const activeCandidates = events.filter(eventIsActiveOnLocalToday);
-  const activeEvent =
-    activeCandidates.length === 0
-      ? null
-      : activeCandidates.reduce((a, b) =>
-          new Date(a.startDate).getTime() >= new Date(b.startDate).getTime() ? a : b
-        );
+  const featuredPick = pickFeaturedEvent(
+    events.map((event) => ({
+      id: event.id,
+      name: event.name,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      runCount: event._count.runs,
+    })),
+    timeZone
+  );
 
-  let activeBlock: DashboardHomeModel["activeEvent"] = null;
-  if (activeEvent) {
-    const [runCount, latestRun] = await Promise.all([
-      prisma.run.count({ where: { userId, eventId: activeEvent.id } }),
-      prisma.run.findFirst({
-        where: { userId, eventId: activeEvent.id },
-        orderBy: { sortAt: "desc" },
-        select: {
-    lapTimes: true,
-    lapSession: true,
-    notes: true,
-    driverNotes: true,
-    handlingProblems: true,
-        },
-      }),
-    ]);
+  let featuredBlock: DashboardHomeModel["featuredEvent"] = null;
+  if (featuredPick) {
+    const featuredEvent = events.find((event) => event.id === featuredPick.id);
+    if (featuredEvent) {
+      const runCount = featuredEvent._count.runs;
+      const latestRun =
+        runCount > 0
+          ? await prisma.run.findFirst({
+              where: { userId, eventId: featuredEvent.id },
+              orderBy: { sortAt: "desc" },
+              select: {
+                lapTimes: true,
+                lapSession: true,
+                notes: true,
+                driverNotes: true,
+                handlingProblems: true,
+              },
+            })
+          : null;
 
-    const track = activeEvent.track;
-    const trackLabel = track
-      ? `${track.name}${track.location ? ` (${track.location})` : ""}`
-      : null;
+      const track = featuredEvent.track;
+      const trackLabel = track
+        ? `${track.name}${track.location ? ` (${track.location})` : ""}`
+        : null;
 
-    let latest: {
-      bestLap: number | null;
-      avgTop5: number | null;
-      notesPreview: string | null;
-    } | null = null;
-    if (latestRun) {
-      const m = computeIncludedLapMetricsFromRun(latestRun);
-      const fullNotes = displayRunNotes(latestRun);
-      const notesPreview =
-        fullNotes.length > 100 ? `${fullNotes.slice(0, 97).trimEnd()}…` : fullNotes || null;
-      latest = {
-        bestLap: m.bestLap,
-        avgTop5: m.averageTop5,
-        notesPreview,
+      let latest: {
+        bestLap: number | null;
+        avgTop5: number | null;
+        notesPreview: string | null;
+      } | null = null;
+      if (latestRun) {
+        const m = computeIncludedLapMetricsFromRun(latestRun);
+        const fullNotes = displayRunNotes(latestRun);
+        const notesPreview =
+          fullNotes.length > 100 ? `${fullNotes.slice(0, 97).trimEnd()}…` : fullNotes || null;
+        latest = {
+          bestLap: m.bestLap,
+          avgTop5: m.averageTop5,
+          notesPreview,
+        };
+      }
+
+      featuredBlock = {
+        id: featuredEvent.id,
+        name: featuredEvent.name,
+        trackLabel,
+        status: featuredPick.featuredStatus,
+        startDate: featuredEvent.startDate.toISOString(),
+        endDate: featuredEvent.endDate.toISOString(),
+        dateLabel: formatFeaturedEventDateLabel(featuredEvent, timeZone),
+        runCount,
+        latest,
       };
     }
-
-    activeBlock = {
-      id: activeEvent.id,
-      name: activeEvent.name,
-      trackLabel,
-      runCount,
-      latest,
-    };
   }
 
   let todayBestLap: number | null = null;
@@ -625,7 +653,7 @@ export async function loadDashboardHomeModel(userId: string): Promise<DashboardH
       createdAt: i.createdAt.toISOString(),
       sourceRunId: i.sourceRunId,
     })),
-    activeEvent: activeBlock,
+    featuredEvent: featuredBlock,
     hasRunToday,
     todayBestLap,
     todayBestAvgTop5,

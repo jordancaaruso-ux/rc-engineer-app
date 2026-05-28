@@ -122,6 +122,7 @@ export async function POST(request: Request) {
       userId: user.id,
       carId: carResolved.carId,
       setupSheetTemplate,
+      setupSheetModelId,
       originalFilename: file.name || "upload",
       storagePath,
       mimeType,

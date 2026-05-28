@@ -8,6 +8,7 @@ import { snapshotValueIsEffectivelyEmpty } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { computeA800rrDerived } from "@/lib/setupCalculations/a800rrDerived";
 import { computeDetailedDerivedFieldStatuses } from "@/lib/setup/derivedFields";
+import { documentUsesA800rrDerived } from "@/lib/setupSheetModels/a800DerivedGate";
 
 export type ApplyCalibrationToDocumentResult =
   | {
@@ -40,6 +41,8 @@ export async function applyCalibrationToSetupDocument(input: {
         mimeType: true,
         parsedDataJson: true,
         importDiagnosticJson: true,
+        setupSheetModelId: true,
+        setupSheetTemplate: true,
       },
     }),
     prisma.setupSheetCalibration.findFirst({
@@ -76,8 +79,40 @@ export async function applyCalibrationToSetupDocument(input: {
             return out;
           })();
     const mergedWithDerived = applyDerivedFieldsToSnapshot(merged);
-    const { diagnostics: derivedDiagnostics } = computeA800rrDerived(mergedWithDerived);
-    const derivedStatuses = computeDetailedDerivedFieldStatuses(mergedWithDerived, derivedDiagnostics);
+    const useA800Derived = await documentUsesA800rrDerived({
+      userId: input.userId,
+      setupSheetModelId: doc.setupSheetModelId,
+      setupSheetTemplate: doc.setupSheetTemplate,
+    });
+    const derivedDiagnostics = useA800Derived ? computeA800rrDerived(mergedWithDerived).diagnostics : null;
+    const derivedStatuses =
+      derivedDiagnostics != null
+        ? computeDetailedDerivedFieldStatuses(mergedWithDerived, derivedDiagnostics)
+        : {};
+
+    const priorDiag =
+      mergeMode === "replace"
+        ? {}
+        : doc.importDiagnosticJson && typeof doc.importDiagnosticJson === "object"
+          ? (doc.importDiagnosticJson as Record<string, unknown>)
+          : {};
+    const derivedBlock =
+      derivedDiagnostics != null
+        ? {
+            derivedFields: {
+              strategy: "a800rr_spring_lookup_table_v1",
+              formulaImplemented: true,
+              statuses: derivedStatuses,
+              validation: derivedDiagnostics.validation,
+              importedDisplay: derivedDiagnostics.importedDisplay,
+              computed: derivedDiagnostics.computed,
+              resolutionHints: derivedDiagnostics.resolutionHints,
+              springFrontResolution: derivedDiagnostics.springFrontResolution,
+              springRearResolution: derivedDiagnostics.springRearResolution,
+              inputs: derivedDiagnostics.inputs,
+            },
+          }
+        : {};
 
     await prisma.setupDocument.update({
       where: { id: doc.id },
@@ -88,25 +123,7 @@ export async function applyCalibrationToSetupDocument(input: {
         parsedCalibrationProfileId: input.calibrationId,
         parsedAt: new Date(),
         parsedSetupManuallyEdited: false,
-        importDiagnosticJson: {
-          ...(mergeMode === "replace"
-            ? {}
-            : doc.importDiagnosticJson && typeof doc.importDiagnosticJson === "object"
-              ? (doc.importDiagnosticJson as Record<string, unknown>)
-              : {}),
-          derivedFields: {
-            strategy: "a800rr_spring_lookup_table_v1",
-            formulaImplemented: true,
-            statuses: derivedStatuses,
-            validation: derivedDiagnostics.validation,
-            importedDisplay: derivedDiagnostics.importedDisplay,
-            computed: derivedDiagnostics.computed,
-            resolutionHints: derivedDiagnostics.resolutionHints,
-            springFrontResolution: derivedDiagnostics.springFrontResolution,
-            springRearResolution: derivedDiagnostics.springRearResolution,
-            inputs: derivedDiagnostics.inputs,
-          },
-        } as object,
+        importDiagnosticJson: { ...priorDiag, ...derivedBlock } as object,
       },
     });
 
