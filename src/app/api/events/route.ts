@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { hasDatabaseUrl } from "@/lib/env";
 import { parseEventDateYmd } from "@/lib/eventDateParse";
 
 export async function GET(request: Request) {
