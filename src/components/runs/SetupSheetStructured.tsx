@@ -43,6 +43,13 @@ import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericA
 import type { FieldCompareResult } from "@/lib/setupCompare/types";
 import type { SetupSheetFieldChipOptions } from "@/lib/setupSheetTemplate";
 import {
+  displayLabelForStoredChipValue,
+  normalizeChipOptionToken,
+  selectedChipLabelForStoredValue,
+  selectedChipLabelsForStoredMulti,
+  storedValueForChipLabel,
+} from "@/lib/setupSheetModels/chipOptionMatching";
+import {
   DERIVED_FRONT_SPRING_RATE_KEY,
   DERIVED_REAR_SPRING_RATE_KEY,
   isDerivedSetupKey,
@@ -401,7 +408,7 @@ function InlineValueCompare({
 }
 
 function normalizeOptionToken(v: string): string {
-  return v.trim().toLowerCase().replace(/\s+/g, " ");
+  return normalizeChipOptionToken(v);
 }
 
 function matchesAnyPreset(value: string, options: string[]): boolean {
@@ -421,7 +428,7 @@ function primaryDisplayForChipField(value: string, options: string[]): string | 
 function fieldOptionsForKey(
   key: string,
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null
-): { options: string[]; multi: boolean } | null {
+): SetupSheetFieldChipOptions | null {
   const modelOpts = fieldChipOptionsByKey?.[key];
   if (modelOpts && modelOpts.options.length > 0) return modelOpts;
   const multi = getVisualMultiOptions(key);
@@ -433,6 +440,20 @@ function fieldOptionsForKey(
   return null;
 }
 
+function fieldDisplayValue(
+  data: SetupSnapshotData,
+  key: string,
+  fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null
+): string {
+  const raw = fieldValue(data, key);
+  const chip = fieldChipOptionsByKey?.[key];
+  if (chip?.optionValues?.length) {
+    const label = displayLabelForStoredChipValue(raw, chip.options, chip.optionValues);
+    if (label) return label;
+  }
+  return raw;
+}
+
 /**
  * Which preset chip is selected. When `mapFreeTextToOtherChip` is false (preset + separate otherText),
  * unmatched text must not pretend to select an "Other" chip — other is not part of the chip group.
@@ -440,52 +461,42 @@ function fieldOptionsForKey(
 function selectedOptionForValue(
   rawValue: string,
   options: string[],
-  mapFreeTextToOtherChip = true
+  mapFreeTextToOtherChip = true,
+  optionValues?: readonly string[] | null
 ): string | null {
-  const raw = typeof rawValue === "string" ? rawValue : "";
-  const isBool =
-    options.length === 2
-    && options.some((o) => normalizeOptionToken(o) === "yes")
-    && options.some((o) => normalizeOptionToken(o) === "no");
-  if (isBool) return getBoolFromSetupString(raw) ? "yes" : "no";
-  const v = normalizeOptionToken(raw);
-  if (!v) return null;
-  for (const opt of options) {
-    if (normalizeOptionToken(opt) === v) return opt;
-  }
-  if (!mapFreeTextToOtherChip) return null;
-  const otherOpt = options.find((o) => normalizeOptionToken(o) === "other");
-  if (otherOpt && v) return otherOpt;
-  return null;
+  return selectedChipLabelForStoredValue(rawValue, options, optionValues, mapFreeTextToOtherChip);
 }
 
-function selectedOptionsForValue(rawValue: string, options: string[]): Set<string> {
-  const tokens = rawValue
-    .split(/[,;/+|]|\s+/)
-    .map((s) => normalizeOptionToken(s))
-    .filter(Boolean);
-  const tokenSet = new Set(tokens);
-  const out = new Set<string>();
-  for (const opt of options) {
-    if (tokenSet.has(normalizeOptionToken(opt))) out.add(opt);
-  }
-  return out;
+function selectedOptionsForValue(
+  rawValue: string,
+  options: string[],
+  optionValues?: readonly string[] | null
+): Set<string> {
+  return selectedChipLabelsForStoredMulti(rawValue, options, optionValues);
 }
 
-function commitOptionValue(option: string, options: string[]): string {
-  const isBool =
-    options.length === 2
-    && options.some((o) => normalizeOptionToken(o) === "yes")
-    && options.some((o) => normalizeOptionToken(o) === "no");
-  if (isBool) return normalizeOptionToken(option) === "yes" ? "1" : "";
-  return option;
+function commitOptionValue(
+  option: string,
+  options: string[],
+  optionValues?: readonly string[] | null
+): string {
+  return storedValueForChipLabel(option, options, optionValues);
 }
 
-function toggleOptionSelection(current: string, option: string, options: string[]): string[] {
-  const selected = selectedOptionsForValue(current, options);
+function toggleOptionSelection(
+  current: string,
+  option: string,
+  options: string[],
+  optionValues?: readonly string[] | null
+): string {
+  const selected = selectedOptionsForValue(current, options, optionValues);
   if (selected.has(option)) selected.delete(option);
   else selected.add(option);
-  return options.filter((o) => selected.has(o));
+  const ordered = options.filter((o) => selected.has(o));
+  if (!optionValues || optionValues.length !== options.length) {
+    return ordered.join(", ");
+  }
+  return ordered.map((label) => storedValueForChipLabel(label, options, optionValues)).join(", ");
 }
 
 function OptionSquareFieldDisplay({
@@ -494,6 +505,7 @@ function OptionSquareFieldDisplay({
   hasCompanionOther,
   baseline,
   options,
+  optionValues,
   multi,
   readOnly,
   onSelect,
@@ -506,6 +518,7 @@ function OptionSquareFieldDisplay({
   hasCompanionOther?: boolean;
   baseline: string;
   options: string[];
+  optionValues?: readonly string[] | null;
   multi: boolean;
   readOnly: boolean;
   /** `null` = clear single-select (click same chip again). Multi-select always passes the option. */
@@ -521,10 +534,10 @@ function OptionSquareFieldDisplay({
       : value;
   const selected = multi
     ? null
-    : selectedOptionForValue(chipSource, options, !hasCompanionOther);
+    : selectedOptionForValue(chipSource, options, !hasCompanionOther, optionValues);
   const valueStr = typeof value === "string" ? value : coerceSetupSheetDisplayString(value);
   const valueForMulti = valueStr;
-  const selectedMulti = multi ? selectedOptionsForValue(valueForMulti, options) : null;
+  const selectedMulti = multi ? selectedOptionsForValue(valueForMulti, options, optionValues) : null;
   const primaryExtra =
     !multi && !hasCompanionOther ? primaryDisplayForChipField(valueStr, options) : null;
   return (
@@ -575,6 +588,7 @@ function PresetWithOtherChipEditor({
   readOnly,
   onCommit,
   options,
+  optionValues,
   chipAccent = "sky",
 }: {
   fieldKey: string;
@@ -584,6 +598,7 @@ function PresetWithOtherChipEditor({
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   options: string[];
+  optionValues?: readonly string[] | null;
   chipAccent?: "sky" | "rose";
 }) {
   const catalogOpts = getSingleSelectChipOptions(fieldKey);
@@ -611,6 +626,7 @@ function PresetWithOtherChipEditor({
       hasCompanionOther
       baseline={b}
       options={options}
+      optionValues={optionValues}
       multi={false}
       readOnly={readOnly}
       chipAccent={chipAccent}
@@ -623,7 +639,7 @@ function PresetWithOtherChipEditor({
           return;
         }
         const next: PresetWithOtherValue = {
-          selectedPreset: commitOptionValue(opt, options),
+          selectedPreset: commitOptionValue(opt, options, optionValues),
           otherText: otherFocused ? localOther : otherRaw,
         };
         onCommit(fieldKey, next);
@@ -684,6 +700,7 @@ function LegacyCompanionOtherChipEditor({
   readOnly,
   onCommit,
   options,
+  optionValues,
   chipAccent = "sky",
 }: {
   fieldKey: string;
@@ -693,6 +710,7 @@ function LegacyCompanionOtherChipEditor({
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   options: string[];
+  optionValues?: readonly string[] | null;
   chipAccent?: "sky" | "rose";
 }) {
   const otherK = companionOtherTextKeyForSingleSelect(fieldKey);
@@ -717,10 +735,13 @@ function LegacyCompanionOtherChipEditor({
         value={v}
         baseline={b}
         options={options}
+        optionValues={optionValues}
         multi={false}
         readOnly={readOnly}
         chipAccent={chipAccent}
-        onSelect={(opt) => onCommit(fieldKey, opt === null ? "" : commitOptionValue(opt, options))}
+        onSelect={(opt) =>
+          onCommit(fieldKey, opt === null ? "" : commitOptionValue(opt, options, optionValues))
+        }
       />
     );
   }
@@ -760,10 +781,13 @@ function LegacyCompanionOtherChipEditor({
       hasCompanionOther
       baseline={b}
       options={options}
+      optionValues={optionValues}
       multi={false}
       readOnly={readOnly}
       chipAccent={chipAccent}
-      onSelect={(opt) => onCommit(fieldKey, opt === null ? "" : commitOptionValue(opt, options))}
+      onSelect={(opt) =>
+        onCommit(fieldKey, opt === null ? "" : commitOptionValue(opt, options, optionValues))
+      }
     />
   );
 
@@ -817,6 +841,7 @@ function SingleSelectChipWithOptionalOther(props: {
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   options: string[];
+  optionValues?: readonly string[] | null;
   chipAccent?: "sky" | "rose";
 }) {
   if (isPresetWithOtherFieldKey(props.fieldKey)) {
@@ -878,8 +903,11 @@ function EditableSingle({
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
   const chipAccent: "sky" | "rose" = compareColumnRole === "b" ? "rose" : "sky";
-  const v = fieldValue(value, fieldKey);
-  const b = baseline ? fieldValue(baseline, fieldKey) : "";
+  const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
+  const vRaw = fieldValue(value, fieldKey);
+  const v = fieldDisplayValue(value, fieldKey, fieldChipOptionsByKey);
+  const bRaw = baseline ? fieldValue(baseline, fieldKey) : "";
+  const b = baseline ? fieldDisplayValue(baseline, fieldKey, fieldChipOptionsByKey) : "";
   const [local, setLocal] = useState(v);
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -890,7 +918,6 @@ function EditableSingle({
 
   const showCompareEdit = hasBaseline && !focused;
   const effectiveReadOnly = readOnly || isDerivedSetupKey(fieldKey);
-  const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
   const beginEdit = () => {
     setFocused(true);
     setLocal(v);
@@ -920,15 +947,19 @@ function EditableSingle({
           {options ? (
             options.multi ? (
               <OptionSquareFieldDisplay
-                value={v}
-                baseline={b}
+                value={vRaw}
+                baseline={bRaw}
                 options={options.options}
+                optionValues={options.optionValues}
                 multi
                 readOnly={effectiveReadOnly}
                 chipAccent={chipAccent}
                 onSelect={(opt) => {
                   if (opt == null) return;
-                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options));
+                  onCommit(
+                    fieldKey,
+                    toggleOptionSelection(vRaw, opt, options.options, options.optionValues)
+                  );
                 }}
               />
             ) : (
@@ -940,6 +971,7 @@ function EditableSingle({
                 readOnly={effectiveReadOnly}
                 onCommit={onCommit}
                 options={options.options}
+                optionValues={options.optionValues}
                 chipAccent={chipAccent}
               />
             )
@@ -949,11 +981,11 @@ function EditableSingle({
                 type="button"
                 className={cn(
                   "rounded-md border border-border bg-muted/70 px-2 py-1 text-[11px] font-sans tabular-nums font-semibold",
-                  getBoolFromSetupString(v) && "border-accent/60 bg-accent/10"
+                  getBoolFromSetupString(vRaw) && "border-accent/60 bg-accent/10"
                 )}
-                onClick={() => onCommit(fieldKey, getBoolFromSetupString(v) ? "" : "1")}
+                onClick={() => onCommit(fieldKey, getBoolFromSetupString(vRaw) ? "" : "1")}
               >
-                {getBoolFromSetupString(v) ? "Yes" : "No"}
+                {getBoolFromSetupString(vRaw) ? "Yes" : "No"}
               </button>
               <BoolCompareTail value={v} baseline={b} hasBaseline={hasBaseline} />
             </div>
@@ -999,15 +1031,19 @@ function EditableSingle({
           <div className="px-1 py-1">
             {options.multi ? (
               <OptionSquareFieldDisplay
-                value={v}
-                baseline={b}
+                value={vRaw}
+                baseline={bRaw}
                 options={options.options}
+                optionValues={options.optionValues}
                 multi
                 readOnly={effectiveReadOnly}
                 chipAccent={chipAccent}
                 onSelect={(opt) => {
                   if (opt == null) return;
-                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options));
+                  onCommit(
+                    fieldKey,
+                    toggleOptionSelection(vRaw, opt, options.options, options.optionValues)
+                  );
                 }}
               />
             ) : (
@@ -1019,6 +1055,7 @@ function EditableSingle({
                 readOnly={effectiveReadOnly}
                 onCommit={onCommit}
                 options={options.options}
+                optionValues={options.optionValues}
                 chipAccent={chipAccent}
               />
             )}
@@ -1204,8 +1241,11 @@ function PairSideCell({
   compareValueColumnRole?: CompareColumnRole | null;
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
-  const v = fieldValue(value, fieldKey);
-  const b = baseline ? fieldValue(baseline, fieldKey) : "";
+  const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
+  const vRaw = fieldValue(value, fieldKey);
+  const v = fieldDisplayValue(value, fieldKey, fieldChipOptionsByKey);
+  const bRaw = baseline ? fieldValue(baseline, fieldKey) : "";
+  const b = baseline ? fieldDisplayValue(baseline, fieldKey, fieldChipOptionsByKey) : "";
   const cmp = keyFieldCompareResult(fieldKey, value, baseline, highlightChangedKeys, numericAggregationByKey);
   const role = compareValueColumnRole ?? undefined;
   const hl = compareResultToHighlight(cmp, role);
@@ -1220,7 +1260,6 @@ function PairSideCell({
   }, [v, focused]);
 
   const showCompareEdit = hasBaseline && !focused;
-  const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
   const beginEdit = () => {
     setFocused(true);
     setLocal(v);
@@ -1242,15 +1281,19 @@ function PairSideCell({
           {options ? (
             options.multi ? (
               <OptionSquareFieldDisplay
-                value={v}
-                baseline={b}
+                value={vRaw}
+                baseline={bRaw}
                 options={options.options}
+                optionValues={options.optionValues}
                 multi
                 readOnly={readOnly}
                 chipAccent={chipAccent}
                 onSelect={(opt) => {
                   if (opt == null) return;
-                  onCommit(fieldKey, toggleOptionSelection(v, opt, options.options));
+                  onCommit(
+                    fieldKey,
+                    toggleOptionSelection(vRaw, opt, options.options, options.optionValues)
+                  );
                 }}
               />
             ) : (
@@ -1262,6 +1305,7 @@ function PairSideCell({
                 readOnly={readOnly}
                 onCommit={onCommit}
                 options={options.options}
+                optionValues={options.optionValues}
                 chipAccent={chipAccent}
               />
             )
@@ -1270,11 +1314,11 @@ function PairSideCell({
               type="button"
               className={cn(
                 "rounded border border-border bg-muted/70 px-1.5 py-0.5 text-[11px] font-sans tabular-nums font-semibold",
-                getBoolFromSetupString(v) && "border-accent/60 bg-accent/10"
+                getBoolFromSetupString(vRaw) && "border-accent/60 bg-accent/10"
               )}
-              onClick={() => onCommit(fieldKey, getBoolFromSetupString(v) ? "" : "1")}
+              onClick={() => onCommit(fieldKey, getBoolFromSetupString(vRaw) ? "" : "1")}
             >
-              {getBoolFromSetupString(v) ? "Yes" : "No"}
+              {getBoolFromSetupString(vRaw) ? "Yes" : "No"}
             </button>
           ) : (
             <InlineValueCompare
@@ -1307,15 +1351,19 @@ function PairSideCell({
         <div>
           {options.multi ? (
             <OptionSquareFieldDisplay
-              value={v}
-              baseline={b}
+              value={vRaw}
+              baseline={bRaw}
               options={options.options}
+              optionValues={options.optionValues}
               multi
               readOnly={readOnly}
               chipAccent={chipAccent}
               onSelect={(opt) => {
                 if (opt == null) return;
-                onCommit(fieldKey, toggleOptionSelection(v, opt, options.options));
+                onCommit(
+                  fieldKey,
+                  toggleOptionSelection(vRaw, opt, options.options, options.optionValues)
+                );
               }}
             />
           ) : (
@@ -1327,6 +1375,7 @@ function PairSideCell({
               readOnly={readOnly}
               onCommit={onCommit}
               options={options.options}
+              optionValues={options.optionValues}
               chipAccent={chipAccent}
             />
           )}

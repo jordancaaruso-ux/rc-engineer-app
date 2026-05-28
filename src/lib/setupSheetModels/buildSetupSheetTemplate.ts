@@ -1,4 +1,5 @@
 import type { SetupSheetFieldChipOptions, SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { normalizeGroupedFieldOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import {
   modelLayoutToStructuredSections,
   parseSetupSheetModelSchema,
@@ -40,14 +41,18 @@ function buildFieldChipOptionsFromSchema(
 ): Record<string, SetupSheetFieldChipOptions> | undefined {
   const out: Record<string, SetupSheetFieldChipOptions> = {};
   for (const f of schema.fields) {
-    const labels = f.groupedOptionLabels?.map((l) => l.trim()).filter(Boolean) ?? [];
+    const normalized = normalizeGroupedFieldOnField(f);
+    const labels = normalized.groupedOptionLabels?.map((l) => l.trim()).filter(Boolean) ?? [];
     if (labels.length < 2) continue;
+    const values = normalized.groupedOptionValues?.map((v) => v.trim()).filter(Boolean);
+    const optionValues =
+      values && values.length === labels.length ? values : undefined;
     const multi =
-      f.uiType === "multiSelect"
-      || f.valueType === "multi"
-      || f.groupBehaviorType === "multiChoiceGroup"
-      || f.groupBehaviorType === "visualMulti";
-    out[f.key] = { options: labels, multi };
+      normalized.uiType === "multiSelect"
+      || normalized.valueType === "multi"
+      || normalized.groupBehaviorType === "multiChoiceGroup"
+      || normalized.groupBehaviorType === "visualMulti";
+    out[f.key] = { options: labels, ...(optionValues ? { optionValues } : {}), multi };
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }

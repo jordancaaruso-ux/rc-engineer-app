@@ -24,7 +24,13 @@ export type SetupSheetGroupDef = {
 };
 
 /** Chip / one-of-many options for model-defined fields (not in the A800 catalog). */
-export type SetupSheetFieldChipOptions = { options: string[]; multi: boolean };
+export type SetupSheetFieldChipOptions = {
+  /** Display labels on chips. */
+  options: string[];
+  /** Stored snapshot tokens aligned with `options` (PDF import / wizard schema). */
+  optionValues?: string[];
+  multi: boolean;
+};
 
 export type SetupSheetTemplate = {
   id: string;
