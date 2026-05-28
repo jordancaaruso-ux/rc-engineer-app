@@ -51,6 +51,7 @@ import {
   buildGroupedRuleFromAssignments,
   extractAssignmentsFromGroupedRule,
   groupedBehaviorForAssignments,
+  sanitizeFormFieldMappingsForSchema,
   type ModelOptionAssignment,
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
 import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
@@ -74,6 +75,7 @@ import {
   findAppKeysForWidget,
   isToggleFieldType,
   listPdfWidgetOwnershipDetails,
+  pruneOrphanCalibrationMappingKeys,
   removePdfWidgetFromMappings,
   type PdfWidgetOwnershipDetail,
 } from "@/lib/setupCalibrations/pdfFieldMappingOwnership";
@@ -754,6 +756,21 @@ export function SetupCalibrationEditorClient({
       return a.label.localeCompare(b.label);
     });
   }, [customFieldDefinitions, setupSheetModelSchema]);
+
+  const knownCalibrationFieldKeys = useMemo(
+    () => new Set(sortedCatalog.map((f) => f.key)),
+    [sortedCatalog]
+  );
+
+  useEffect(() => {
+    setFormFieldMappings((prev) => {
+      let next = pruneOrphanCalibrationMappingKeys(prev, knownCalibrationFieldKeys);
+      if (setupSheetModelSchema) {
+        next = sanitizeFormFieldMappingsForSchema(next, setupSheetModelSchema);
+      }
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
+  }, [knownCalibrationFieldKeys, setupSheetModelSchema]);
 
   const pdfRowByName = useMemo(() => {
     const m = new Map<string, PdfFormFieldRow>();
@@ -2112,15 +2129,10 @@ export function SetupCalibrationEditorClient({
     }
 
     const mappingKeys = findAppKeysForWidget(formFieldMappings, pdfFieldName, instanceIndex, row);
-    if (mappingKeys.length >= 1) {
-      const k0 = mappingKeys[0]!;
-      setActiveSetupFieldKey(k0);
-      setAcroSelection({ keys: [toggleKey], activeKey: toggleKey });
-      setStatus(`Mapped to ${setupSheetModelSchema?.fields.find((f) => f.key === k0)?.displayLabel ?? k0}.`);
-      return;
-    }
+    const knownMappingKeys = mappingKeys.filter((k) => knownCalibrationFieldKeys.has(k));
+    const orphanMappingKeys = mappingKeys.filter((k) => !knownCalibrationFieldKeys.has(k));
 
-    setActiveSetupFieldKey(null);
+    setActiveSetupFieldKey(knownMappingKeys[0] ?? null);
     setAcroSelection((prev) => {
       const removing = prev.keys.includes(toggleKey);
       const nextKeys = removing ? prev.keys.filter((k) => k !== toggleKey) : [...prev.keys, toggleKey];
@@ -2131,7 +2143,19 @@ export function SetupCalibrationEditorClient({
           : prev.activeKey;
       return { keys: nextKeys, activeKey: nextActive };
     });
-    setStatus(null);
+
+    if (orphanMappingKeys.length > 0) {
+      setStatus(
+        `Was mapped to removed parameter(s) (${orphanMappingKeys.join(", ")}). Select PDF controls, then Link to parameter.`
+      );
+    } else if (knownMappingKeys.length > 0) {
+      const k0 = knownMappingKeys[0]!;
+      setStatus(
+        `Mapped to ${setupSheetModelSchema?.fields.find((f) => f.key === k0)?.displayLabel ?? k0}. Click again to deselect, or Link to parameter to reassign.`
+      );
+    } else {
+      setStatus(null);
+    }
   }
 
   /** Mapped click → edit setup field + highlight PDF. Unmapped → source multi-select only (toggle); clears editor. */
@@ -2142,6 +2166,7 @@ export function SetupCalibrationEditorClient({
     }
     const row = pdfRowByName.get(pdfFieldName);
     const mappingKeys = findAppKeysForWidget(formFieldMappings, pdfFieldName, instanceIndex, row);
+    const knownMappingKeys = mappingKeys.filter((k) => knownCalibrationFieldKeys.has(k));
     const toggleKey = acroSourceKey({ pdfFieldName, instanceIndex });
     /** When a widget is part of a chip-mapped field, keep the corresponding chip selected (visual link feedback). */
     const syncPendingChipFromMappedWidget = (kFocus: string) => {
@@ -2192,10 +2217,10 @@ export function SetupCalibrationEditorClient({
      */
     const armed = activeSetupFieldKey;
     const preferAssignToArmedField =
-      armed != null && mappingKeys.length >= 1 && !mappingKeys.includes(armed);
+      armed != null && knownMappingKeys.length >= 1 && !knownMappingKeys.includes(armed);
 
-    if (mappingKeys.length >= 1 && !preferAssignToArmedField) {
-      const k0 = mappingKeys[0]!;
+    if (knownMappingKeys.length >= 1 && !preferAssignToArmedField) {
+      const k0 = knownMappingKeys[0]!;
       if (acroSelection.keys.includes(toggleKey) && acroSelection.activeKey === toggleKey) {
         setAcroSelection((prev) => {
           const nextKeys = prev.keys.filter((k) => k !== toggleKey);

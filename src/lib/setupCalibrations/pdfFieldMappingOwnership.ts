@@ -201,3 +201,53 @@ export function removePdfWidgetFromMappings(
 
   return next;
 }
+
+/**
+ * Drops calibration mapping entries whose canonical keys no longer exist
+ * (e.g. after removing custom fields or renaming parameters on the sheet model).
+ */
+export function pruneOrphanCalibrationMappingKeys(
+  mappings: Record<string, PdfFormFieldMappingRule>,
+  validCanonicalKeys: ReadonlySet<string>
+): Record<string, PdfFormFieldMappingRule> {
+  let changed = false;
+  const next: Record<string, PdfFormFieldMappingRule> = {};
+  for (const [appKey, rule] of Object.entries(mappings)) {
+    if (validCanonicalKeys.has(appKey)) {
+      next[appKey] = rule;
+    } else {
+      changed = true;
+    }
+  }
+  return changed ? next : mappings;
+}
+
+/** Remove grouped-rule option entries that are no longer defined on the parameter. */
+export function pruneGroupedRuleOptionKeys(
+  rule: PdfFormFieldMappingRule,
+  validOptionValues: ReadonlySet<string>
+): PdfFormFieldMappingRule | null {
+  if (!("mode" in rule)) return rule;
+  if (
+    rule.mode !== "singleChoiceNamedFields"
+    && rule.mode !== "multiSelectNamedFields"
+    && rule.mode !== "singleChoiceWidgetGroup"
+    && rule.mode !== "multiSelectWidgetGroup"
+  ) {
+    return rule;
+  }
+  const opts = { ...rule.options };
+  let changed = false;
+  for (const key of Object.keys(opts)) {
+    if (!validOptionValues.has(key)) {
+      delete opts[key];
+      changed = true;
+    }
+  }
+  if (Object.keys(opts).length === 0) return null;
+  if (!changed) return rule;
+  if (rule.mode === "singleChoiceWidgetGroup" || rule.mode === "multiSelectWidgetGroup") {
+    return { ...rule, options: opts };
+  }
+  return { ...rule, options: opts };
+}

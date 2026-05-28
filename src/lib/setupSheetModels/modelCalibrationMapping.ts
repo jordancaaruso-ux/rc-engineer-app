@@ -1,4 +1,5 @@
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import { pruneGroupedRuleOptionKeys, pruneOrphanCalibrationMappingKeys } from "@/lib/setupCalibrations/pdfFieldMappingOwnership";
 import {
   isSingleSelectGroupedBehavior,
   type GroupedFieldBehaviorType,
@@ -214,6 +215,29 @@ export function filterParametersForWidgetCount(
     });
   }
   return [];
+}
+
+/** Remove mappings for deleted parameters and stale option keys after schema edits. */
+export function sanitizeFormFieldMappingsForSchema(
+  mappings: Record<string, PdfFormFieldMappingRule>,
+  schema: SetupSheetModelSchema
+): Record<string, PdfFormFieldMappingRule> {
+  const validKeys = new Set(schema.fields.map((f) => f.key));
+  let next = pruneOrphanCalibrationMappingKeys(mappings, validKeys);
+  for (const field of schema.fields) {
+    const rule = next[field.key];
+    if (!rule) continue;
+    const allowed = new Set(modelFieldOptionEntries(field).map((o) => o.value));
+    const pruned = pruneGroupedRuleOptionKeys(rule, allowed);
+    if (pruned === null) {
+      const copy = { ...next };
+      delete copy[field.key];
+      next = copy;
+    } else if (pruned !== rule) {
+      next = { ...next, [field.key]: pruned };
+    }
+  }
+  return next;
 }
 
 /** Default option→widget assignment using click order. */
