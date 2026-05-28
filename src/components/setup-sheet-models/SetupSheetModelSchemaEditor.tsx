@@ -12,6 +12,10 @@ import {
 } from "@/lib/setupSheetModels/fieldParamTypes";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import {
+  inferStructuredLayoutFromFields,
+  rebuildSectionLayout,
+} from "@/lib/setupSheetModels/inferStructuredLayout";
+import {
   UNIVERSAL_TOURING_PARAMETERS,
   universalParameterIdForSnapshotKey,
 } from "@/lib/setupSheetModels/universalParameters";
@@ -72,21 +76,23 @@ export function SetupSheetModelSchemaEditor(props: {
   );
 
   const removeField = useCallback(
-    (key: string) => {
+    (removedKey: string) => {
+      const removed = schema.fields.find((f) => f.key === removedKey);
+      const nextFields = schema.fields.filter((f) => f.key !== removedKey);
+      const secId = removed?.sectionId ?? "other";
+      const secTitle = removed?.sectionTitle ?? sectionTitle(secId);
       onChange({
         ...schema,
-        fields: schema.fields.filter((f) => f.key !== key),
-        structuredSections: schema.structuredSections.map((sec) => ({
-          ...sec,
-          rows: sec.rows.filter((row) => {
-            if (row.type === "single") return row.key !== key;
-            if (row.type === "pair") return row.leftKey !== key && row.rightKey !== key;
-            return true;
-          }),
-        })),
+        fields: nextFields,
+        structuredSections: rebuildSectionLayout(
+          schema.structuredSections,
+          secId,
+          secTitle,
+          nextFields
+        ),
       });
     },
-    [schema, onChange]
+    [schema, onChange, sectionTitle]
   );
 
   const addField = useCallback(() => {
@@ -115,10 +121,16 @@ export function SetupSheetModelSchemaEditor(props: {
       setLocalError(`Key "${built.key}" already exists on this sheet model.`);
       return;
     }
+    const nextFields = [...schema.fields, built];
     onChange({
       ...schema,
-      fields: [...schema.fields, built],
-      structuredSections: appendSingleRow(schema.structuredSections, sec.id, sec.title, built),
+      fields: nextFields,
+      structuredSections: rebuildSectionLayout(
+        schema.structuredSections,
+        sec.id,
+        sec.title,
+        nextFields
+      ),
     });
     setLabel("");
     setKey("");
@@ -126,13 +138,39 @@ export function SetupSheetModelSchemaEditor(props: {
     setAddOpen(false);
   }, [schema, onChange, label, key, kind, sectionId, unit, optionLines]);
 
+  const rebuildLayout = useCallback(() => {
+    if (
+      !window.confirm(
+        "Rebuild sheet layout from field keys? FF/FR/RF/RR fields group into one row; front/rear into pairs."
+      )
+    ) {
+      return;
+    }
+    onChange({
+      ...schema,
+      structuredSections: inferStructuredLayoutFromFields(schema.fields, schema.structuredSections),
+    });
+  }, [schema, onChange]);
+
   return (
     <div className="space-y-4">
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         Define parameters for this sheet model (types and options are stored here — the source of truth for PDF
         calibration). Optionally link a field to a universal parameter for cross-car stats. Calibrate your PDF in the
-        next step.
+        next step. Corner fields (<span className="font-mono">*_ff</span>,{" "}
+        <span className="font-mono">*_fr</span>, …) and front/rear pairs are grouped automatically when you add or
+        remove parameters.
       </p>
+
+      {!readOnly ? (
+        <button
+          type="button"
+          className="rounded border border-border bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+          onClick={rebuildLayout}
+        >
+          Rebuild layout from fields
+        </button>
+      ) : null}
 
       {localError ? (
         <div className="rounded border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{localError}</div>
@@ -397,22 +435,3 @@ function FieldEditPanel(props: {
   );
 }
 
-function appendSingleRow(
-  sections: SetupSheetModelSchema["structuredSections"],
-  sectionId: string,
-  sectionTitle: string,
-  field: SetupSheetModelFieldDef
-): SetupSheetModelSchema["structuredSections"] {
-  const row = {
-    type: "single" as const,
-    key: field.key,
-    label: field.displayLabel,
-    unit: field.unit,
-    multiline: field.uiType === "textarea",
-  };
-  const existing = sections.find((s) => s.id === sectionId);
-  if (existing) {
-    return sections.map((s) => (s.id === sectionId ? { ...s, rows: [...s.rows, row] } : s));
-  }
-  return [...sections, { id: sectionId, title: sectionTitle, rows: [row] }];
-}
