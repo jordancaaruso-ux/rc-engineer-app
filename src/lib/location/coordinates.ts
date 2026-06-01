@@ -25,8 +25,8 @@ export function parseCoordinates(
 }
 
 export function trackHasMarkedLocation(track: {
-  latitude: number | null;
-  longitude: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }): boolean {
   return (
     track.latitude != null &&

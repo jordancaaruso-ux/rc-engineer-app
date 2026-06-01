@@ -7,8 +7,8 @@ export type TrackWithCoordinates = {
   id: string;
   name: string;
   location?: string | null;
-  latitude: number | null;
-  longitude: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type TrackNearPosition = {
