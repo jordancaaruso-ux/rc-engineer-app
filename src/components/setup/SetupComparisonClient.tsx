@@ -549,31 +549,33 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
       ) : null}
 
       {canCompare && selectionA.data && selectionB.data ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="text-xs font-medium text-muted-foreground mb-2">Setup A</div>
-            <SetupSheetView
-              value={selectionA.data}
-              onChange={() => {}}
-              readOnly
-              template={A800RR_SETUP_SHEET_V1}
-              baselineValue={selectionB.data}
-              numericAggregationByKey={numericAggregationByKey}
-              compareValueColumnRole="a"
-            />
+        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+          <div className="text-xs text-muted-foreground space-y-1">
+            <div>
+              <span className="font-medium text-foreground/90">Setup A</span>
+              <span className="mx-1">·</span>
+              {selectionA.label}
+            </div>
+            <div>
+              Compared to <span className="font-medium text-foreground/90">Setup B</span>
+              <span className="mx-1">·</span>
+              {selectionB.label}
+            </div>
+            <p className="text-[11px]">
+              Changed fields show <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
+              <span className="text-red-600/90 dark:text-red-400/90">Darker red</span> = larger difference vs community
+              spread; parameters without enough community samples use a fixed lighter red.
+            </p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="text-xs font-medium text-muted-foreground mb-2">Setup B</div>
-            <SetupSheetView
-              value={selectionB.data}
-              onChange={() => {}}
-              readOnly
-              template={A800RR_SETUP_SHEET_V1}
-              baselineValue={selectionA.data}
-              numericAggregationByKey={numericAggregationByKey}
-              compareValueColumnRole="b"
-            />
-          </div>
+          <SetupSheetView
+            value={selectionA.data}
+            onChange={() => {}}
+            readOnly
+            template={A800RR_SETUP_SHEET_V1}
+            baselineValue={selectionB.data}
+            numericAggregationByKey={numericAggregationByKey}
+            compareHighlightOnly
+          />
         </div>
       ) : null}
     </div>
