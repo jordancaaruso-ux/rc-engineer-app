@@ -12,13 +12,21 @@ type Props = {
   onChange: (next: FeelVsLastRun | null) => void;
   /** Prior run on this car exists — selection required at Run complete. */
   eligible: boolean;
+  /** Run complete was blocked — draw attention to this picker. */
+  highlightMissing?: boolean;
 };
 
-function quickPickButtonClass(selected: boolean, value: FeelVsLastRun): string {
+function quickPickButtonClass(
+  selected: boolean,
+  value: FeelVsLastRun,
+  highlightMissing: boolean
+): string {
   if (!selected) {
     return cn(
       "rounded-md border px-2 py-1.5 text-[11px] font-medium transition flex-1 min-w-0",
-      "border-border bg-card text-muted-foreground hover:text-foreground",
+      highlightMissing
+        ? "border-amber-500/50 bg-amber-500/5 text-foreground hover:bg-amber-500/10"
+        : "border-border bg-card text-muted-foreground hover:text-foreground",
       value < 0 && "hover:border-red-400/50 hover:bg-red-500/5",
       value === 0 && "hover:bg-muted/80",
       value > 0 && "hover:border-emerald-500/50 hover:bg-emerald-500/5"
@@ -32,21 +40,50 @@ function quickPickButtonClass(selected: boolean, value: FeelVsLastRun): string {
   );
 }
 
-export function FeelVsLastRunQuickPick({ value, onChange, eligible }: Props) {
+export function FeelVsLastRunQuickPick({
+  value,
+  onChange,
+  eligible,
+  highlightMissing = false,
+}: Props) {
   const displayValue = eligible ? value : value ?? 0;
+  const needsPick = eligible && value == null;
   const selectedLabel =
     displayValue != null ? formatFeelVsLastRunQuickLabel(displayValue) : "Not selected";
 
   return (
-    <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2">
+    <div
+      className={cn(
+        "rounded-md border px-3 py-2 transition-[box-shadow,border-color,background-color]",
+        highlightMissing && needsPick
+          ? "border-amber-500/70 bg-amber-500/10 ring-2 ring-amber-500/40"
+          : "border-border/80 bg-muted/20"
+      )}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="text-xs font-medium text-foreground">
           vs last run on this car{" "}
-          <span className="text-[10px] font-normal text-muted-foreground">
+          <span
+            className={cn(
+              "text-[10px] font-normal",
+              highlightMissing && needsPick
+                ? "font-medium text-amber-700 dark:text-amber-300"
+                : "text-muted-foreground"
+            )}
+          >
             (required to complete)
           </span>
         </div>
-        <div className="text-[11px] text-muted-foreground">{selectedLabel}</div>
+        <div
+          className={cn(
+            "text-[11px]",
+            highlightMissing && needsPick
+              ? "font-medium text-amber-700 dark:text-amber-300"
+              : "text-muted-foreground"
+          )}
+        >
+          {highlightMissing && needsPick ? "Pick one below" : selectedLabel}
+        </div>
       </div>
       <div
         role="radiogroup"
@@ -61,7 +98,7 @@ export function FeelVsLastRunQuickPick({ value, onChange, eligible }: Props) {
               type="button"
               role="radio"
               aria-checked={selected}
-              className={quickPickButtonClass(selected, n)}
+              className={quickPickButtonClass(selected, n, highlightMissing && needsPick)}
               onClick={() => onChange(eligible && value === n ? null : n)}
             >
               {label}

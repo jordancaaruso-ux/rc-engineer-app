@@ -315,6 +315,11 @@ export function NewRunForm(props: {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const [completeValidation, setCompleteValidation] = useState<{
+    show: boolean;
+    carRating: boolean;
+    feelVsLastRun: boolean;
+  }>({ show: false, carRating: false, feelVsLastRun: false });
 
   const [copyCarWarning, setCopyCarWarning] = useState<string | null>(null);
   const [copyTrackWarning, setCopyTrackWarning] = useState<string | null>(null);
@@ -403,6 +408,7 @@ export function NewRunForm(props: {
   >(null);
   const focusSection = props.focusSection ?? null;
   const setupSectionRef = useRef<HTMLDivElement>(null);
+  const feedbackRequiredRef = useRef<HTMLDivElement>(null);
   const focusAppliedRef = useRef(false);
 
   const dashboardPrefillAppliedRef = useRef(false);
@@ -793,6 +799,28 @@ export function NewRunForm(props: {
     }
     return pickerRuns.length > 0;
   }, [carId, isEditing, editRun?.id, pickerRuns]);
+
+  useEffect(() => {
+    setCompleteValidation((prev) => {
+      if (!prev.show) return prev;
+      const carOk = carRating != null && carRating >= 1 && carRating <= 10;
+      const feelOk = !feelVsLastRunEligible || handlingUi.feelVsLastRun != null;
+      if (carOk && feelOk) {
+        return { show: false, carRating: false, feelVsLastRun: false };
+      }
+      return {
+        show: true,
+        carRating: prev.carRating && !carOk,
+        feelVsLastRun: prev.feelVsLastRun && !feelOk,
+      };
+    });
+  }, [carRating, handlingUi.feelVsLastRun, feelVsLastRunEligible]);
+
+  useEffect(() => {
+    if (completeValidation.show) return;
+    setInlineError((err) => (err?.startsWith("Before Run complete:") ? null : err));
+  }, [completeValidation.show]);
+
   const loadSetupControlLabel = loadedSetupRun
     ? formatRunPickerLineRelativeWhen(loadedSetupRun)
     : "Load from past run";
@@ -1745,15 +1773,28 @@ export function NewRunForm(props: {
       setRunDetailsTab("track");
       return;
     }
-    // Car rating is required when completing a run so the Engineer always has an
-    // absolute "was the car good?" signal. Drafts can be saved without it.
-    if (intent === "completed" && (carRating == null || carRating < 1 || carRating > 10)) {
-      setInlineError("Rate the car 1–10 before marking the run complete.");
-      return;
-    }
-    if (intent === "completed" && feelVsLastRunEligible && handlingUi.feelVsLastRun == null) {
-      setInlineError("Pick how this run felt vs your last run on this car.");
-      return;
+    if (intent === "completed") {
+      const missingCarRating = carRating == null || carRating < 1 || carRating > 10;
+      const missingFeelVsLastRun =
+        feelVsLastRunEligible && handlingUi.feelVsLastRun == null;
+      if (missingCarRating || missingFeelVsLastRun) {
+        const parts: string[] = [];
+        if (missingCarRating) parts.push("rate the car 1–10");
+        if (missingFeelVsLastRun) {
+          parts.push("pick how this run felt vs your last run on this car");
+        }
+        setCompleteValidation({
+          show: true,
+          carRating: missingCarRating,
+          feelVsLastRun: missingFeelVsLastRun,
+        });
+        setInlineError(`Before Run complete: ${parts.join(" and ")}.`);
+        window.requestAnimationFrame(() => {
+          feedbackRequiredRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+        return;
+      }
+      setCompleteValidation({ show: false, carRating: false, feelVsLastRun: false });
     }
     // Surface unsaved setup edits before we write — the driver gets to review
     // exactly what they changed vs. the loaded baseline. Continuing from the
@@ -3504,15 +3545,75 @@ export function NewRunForm(props: {
 
       <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3 text-sm">
         <div className="ui-title text-sm text-muted-foreground">Feedback</div>
-        <div className="space-y-2 rounded-md border border-border/80 bg-card/40 p-3">
-          <div className="text-[11px] font-medium text-muted-foreground">Required to complete</div>
-          <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2">
+        <div
+          ref={feedbackRequiredRef}
+          className={cn(
+            "space-y-2 rounded-md border bg-card/40 p-3 transition-[box-shadow,border-color]",
+            completeValidation.show
+              ? "border-amber-500/60 ring-2 ring-amber-500/30"
+              : "border-border/80"
+          )}
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div
+              className={cn(
+                "text-[11px] font-medium",
+                completeValidation.show
+                  ? "text-amber-800 dark:text-amber-200"
+                  : "text-muted-foreground"
+              )}
+            >
+              Required to complete
+            </div>
+            {completeValidation.show ? (
+              <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                Fill highlighted fields
+              </span>
+            ) : null}
+          </div>
+          {completeValidation.show ? (
+            <div
+              role="alert"
+              className="rounded-md border border-amber-500/50 bg-amber-500/15 px-2.5 py-2 text-[11px] leading-snug text-amber-950 dark:text-amber-100"
+            >
+              {inlineError ?? "Complete the highlighted fields below before Run complete."}
+            </div>
+          ) : null}
+          <div
+            className={cn(
+              "rounded-md border px-3 py-2 transition-[box-shadow,border-color,background-color]",
+              completeValidation.carRating
+                ? "border-amber-500/70 bg-amber-500/10 ring-2 ring-amber-500/40"
+                : "border-border/80 bg-muted/20"
+            )}
+          >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div className="text-xs font-medium text-foreground">
-                Car rating <span className="text-[10px] font-normal text-muted-foreground">(1 awful → 10 perfect)</span>
+                Car rating{" "}
+                <span
+                  className={cn(
+                    "text-[10px] font-normal",
+                    completeValidation.carRating
+                      ? "font-medium text-amber-700 dark:text-amber-300"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  (1 awful → 10 perfect)
+                </span>
               </div>
-              <div className="text-[11px] text-muted-foreground">
-                {carRating == null ? "Not rated" : `${carRating} / 10`}
+              <div
+                className={cn(
+                  "text-[11px]",
+                  completeValidation.carRating
+                    ? "font-medium text-amber-700 dark:text-amber-300"
+                    : "text-muted-foreground"
+                )}
+              >
+                {carRating == null
+                  ? completeValidation.carRating
+                    ? "Pick a rating"
+                    : "Not rated"
+                  : `${carRating} / 10`}
               </div>
             </div>
             <div
@@ -3533,7 +3634,9 @@ export function NewRunForm(props: {
                       "rounded-md border px-0 py-1 text-xs font-medium tabular-nums transition",
                       selected
                         ? "border-accent bg-accent text-accent-foreground shadow-sm"
-                        : "border-border bg-card text-foreground hover:bg-muted/50"
+                        : completeValidation.carRating
+                          ? "border-amber-500/50 bg-amber-500/5 text-foreground hover:bg-amber-500/10"
+                          : "border-border bg-card text-foreground hover:bg-muted/50"
                     )}
                   >
                     {n}
@@ -3551,6 +3654,7 @@ export function NewRunForm(props: {
               setHandlingUi((cur) => ({ ...cur, feelVsLastRun }))
             }
             eligible={feelVsLastRunEligible}
+            highlightMissing={completeValidation.feelVsLastRun}
           />
         </div>
         <textarea
@@ -3588,7 +3692,7 @@ export function NewRunForm(props: {
       </div>
 
 
-      {inlineError ? (
+      {inlineError && !completeValidation.show ? (
         <div className="rounded-md border border-border bg-destructive/10 px-3 py-2 text-xs text-foreground">
           {inlineError}
         </div>
