@@ -22,7 +22,14 @@ export type CompareRunShape = {
   sessionLabel?: string | null;
   eventId?: string | null;
   event?: { name: string } | null;
-  car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
+  userId?: string | null;
+  carId?: string | null;
+  car?: {
+    id: string;
+    name: string;
+    setupSheetTemplate?: string | null;
+    setupSheetModelId?: string | null;
+  } | null;
   carNameSnapshot?: string | null;
   track?: { id: string; name: string } | null;
   trackNameSnapshot?: string | null;
@@ -134,7 +141,7 @@ export function RunComparePanel({
   const sourceNote =
     runListSource === "my_runs"
       ? "Compare this completed run to your working setup or another run."
-      : "Team context (future).";
+      : "Compare to your runs on the same setup sheet model, or other runs on this car.";
 
   const lapsRight =
     mode === "current_setup"

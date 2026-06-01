@@ -128,6 +128,19 @@ export function formatRunPickerLine(run: RunPickerRun): string {
   return appendBestLap(formatRunListScanLine(run), run.lapTimes);
 }
 
+/** Team Sessions: prefix picker line with driver name when `userId` is known. */
+export function formatRunPickerLineWithDriver(
+  run: RunPickerRun & { userId?: string | null },
+  memberDisplayByUserId?: Record<string, string> | null
+): string {
+  const base = formatRunPickerLine(run);
+  const uid = run.userId?.trim();
+  if (!uid || !memberDisplayByUserId) return base;
+  const label = memberDisplayByUserId[uid]?.trim();
+  if (!label) return base;
+  return `${label} · ${base}`;
+}
+
 /** Compact “when” segment using session time when set. */
 export function formatRunPickerWhenSegment(run: RunPickerRun): string {
   return formatRunCreatedRelativeWhen(pickRunInstant(run));

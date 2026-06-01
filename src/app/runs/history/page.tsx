@@ -24,7 +24,7 @@ export const RUN_HISTORY_INITIAL_TAKE = 40;
 export const revalidate = 30;
 
 const runHistoryInclude = {
-  car: { select: { id: true, name: true, setupSheetTemplate: true } },
+  car: { select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true } },
   track: { select: { id: true, name: true } },
   tireSet: { select: { id: true, label: true, setNumber: true } },
   event: { include: { track: { select: { name: true } } } },

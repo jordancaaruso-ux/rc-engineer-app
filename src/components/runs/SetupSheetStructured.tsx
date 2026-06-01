@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -98,7 +100,18 @@ type Props = {
    * Omit everywhere except the two Setup compare panels.
    */
   compareValueColumnRole?: CompareColumnRole | null;
+  /**
+   * Modal / single-sheet diff: red row tint on changes only — no inline “vs baseline” text
+   * and no second chip row. Omit on Engineer A|B side-by-side compare.
+   */
+  compareHighlightOnly?: boolean;
 };
+
+const CompareUiContext = createContext({ highlightOnly: false });
+
+function useCompareUi() {
+  return useContext(CompareUiContext);
+}
 
 /** Keys and labels for “find field” (mirrors row rendering, including top deck block). */
 function collectFieldSearchEntries(sections: StructuredSection[]): { key: string; label: string }[] {
@@ -388,7 +401,9 @@ function InlineValueCompare({
   };
   const pv = display(value);
   const bv = display(baseline);
+  const { highlightOnly } = useCompareUi();
   const showVs =
+    !highlightOnly &&
     hasBaseline &&
     baseline !== undefined &&
     value !== baseline &&
@@ -674,10 +689,14 @@ function PresetWithOtherChipEditor({
     />
   );
 
+  const { highlightOnly } = useCompareUi();
+
   if (readOnly) {
     return (
       <div className="flex min-w-0 flex-col gap-1">
-        <InlineValueCompare value={v} baseline={b} hasBaseline={hasBaseline} fieldKind="text" title={title} />
+        {!highlightOnly ? (
+          <InlineValueCompare value={v} baseline={b} hasBaseline={hasBaseline} fieldKind="text" title={title} />
+        ) : null}
         <div className="min-w-0">{chipBlock}</div>
       </div>
     );
@@ -860,7 +879,8 @@ function BoolCompareTail({
   baseline: string;
   hasBaseline: boolean;
 }) {
-  if (!hasBaseline) return null;
+  const { highlightOnly } = useCompareUi();
+  if (highlightOnly || !hasBaseline) return null;
   if (getBoolFromSetupString(value) === getBoolFromSetupString(baseline)) return null;
   const bv = formatBoolDisplay(baseline);
   return (
@@ -1839,10 +1859,11 @@ export function SetupSheetStructured({
   compareValueColumnRole = null,
   fieldKeyFilter,
   fieldChipOptionsByKey = null,
+  compareHighlightOnly = false,
 }: Props) {
   const baseline = baselineValue ?? null;
   const hasBaseline = baseline != null;
-  const compareRole = compareValueColumnRole ?? undefined;
+  const compareRole = compareHighlightOnly ? undefined : (compareValueColumnRole ?? undefined);
   const sheetRootRef = useRef<HTMLDivElement>(null);
   const sectionsFiltered = useMemo(() => {
     return fieldKeyFilter ? filterSectionsByFieldKey(sections, fieldKeyFilter) : sections;
@@ -1924,7 +1945,7 @@ export function SetupSheetStructured({
           onCommit={commit}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
-          compareValueColumnRole={compareValueColumnRole}
+          compareValueColumnRole={compareRole}
           fieldChipOptionsByKey={fieldChipOptionsByKey}
         />
       );
@@ -1941,7 +1962,7 @@ export function SetupSheetStructured({
           onCommit={commit}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
-          compareValueColumnRole={compareValueColumnRole}
+          compareValueColumnRole={compareRole}
         />
       );
     }
@@ -1957,7 +1978,7 @@ export function SetupSheetStructured({
           onScrewChange={commitScrews}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
-          compareValueColumnRole={compareValueColumnRole}
+          compareValueColumnRole={compareRole}
         />
       );
     }
@@ -1973,7 +1994,7 @@ export function SetupSheetStructured({
           onScrewChange={commitScrews}
           highlightChangedKeys={highlightChangedKeys}
           numericAggregationByKey={numericAggregationByKey}
-          compareValueColumnRole={compareValueColumnRole}
+          compareValueColumnRole={compareRole}
         />
       );
     }
@@ -1981,15 +2002,17 @@ export function SetupSheetStructured({
   };
 
   return (
-    <div ref={sheetRootRef} className="space-y-3">
-      {enableFieldSearch && !readOnly ? (
-        <SetupFieldJumpSearch entries={fieldSearchEntries} rootRef={sheetRootRef} />
-      ) : null}
-      {sectionsFiltered.map((sec) => (
-        <SectionCard key={sec.id} title={sec.title} showFrontRearHeader={sectionHasPairs(sec.rows)}>
-          {sec.rows.map((row) => renderRow(row))}
-        </SectionCard>
-      ))}
-    </div>
+    <CompareUiContext.Provider value={{ highlightOnly: compareHighlightOnly }}>
+      <div ref={sheetRootRef} className="space-y-3">
+        {enableFieldSearch && !readOnly ? (
+          <SetupFieldJumpSearch entries={fieldSearchEntries} rootRef={sheetRootRef} />
+        ) : null}
+        {sectionsFiltered.map((sec) => (
+          <SectionCard key={sec.id} title={sec.title} showFrontRearHeader={sectionHasPairs(sec.rows)}>
+            {sec.rows.map((row) => renderRow(row))}
+          </SectionCard>
+        ))}
+      </div>
+    </CompareUiContext.Provider>
   );
 }

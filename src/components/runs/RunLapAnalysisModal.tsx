@@ -33,6 +33,8 @@ type Props = {
   pickerRunsSameCar: CompareRunShape[];
   runListSource: RunCompareListSource;
   userDisplayName?: string | null;
+  viewerUserId?: string | null;
+  memberDisplayByUserId?: Record<string, string>;
 };
 
 export function RunLapAnalysisModal({
@@ -42,6 +44,8 @@ export function RunLapAnalysisModal({
   pickerRunsSameCar,
   runListSource,
   userDisplayName,
+  viewerUserId = null,
+  memberDisplayByUserId,
 }: Props) {
   const [importedLapSetsFull, setImportedLapSetsFull] = useState<RunWithImports["importedLapSets"] | null>(null);
   const [importedLapsLoading, setImportedLapsLoading] = useState(false);
@@ -190,6 +194,8 @@ export function RunLapAnalysisModal({
               pickerRunsForModal={pickerRunsSameCar}
               runListSource={runListSource}
               librarySessions={libraryLapSessions}
+              viewerUserId={viewerUserId}
+              memberDisplayByUserId={memberDisplayByUserId}
             />
           )}
         </div>

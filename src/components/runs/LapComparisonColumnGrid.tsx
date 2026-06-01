@@ -187,6 +187,8 @@ export function LapComparisonColumnGrid({
   pickerRunsForModal = [],
   runListSource = "my_runs",
   librarySessions = [],
+  viewerUserId = null,
+  memberDisplayByUserId,
 }: {
   myDisplayName?: string | null;
   run: {
@@ -206,6 +208,8 @@ export function LapComparisonColumnGrid({
   runListSource?: RunCompareListSource;
   /** User-owned imported lap-time library (any session from /laps/import or Log your run). */
   librarySessions?: Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }>;
+  viewerUserId?: string | null;
+  memberDisplayByUserId?: Record<string, string>;
 }) {
   const primaryRunLabel = myDisplayName?.trim() || "Me";
 
@@ -515,6 +519,8 @@ export function LapComparisonColumnGrid({
         run={(setupModalRun ?? compareAnchorRun) as SetupSheetModalRun}
         pickerRuns={modalRuns}
         runListSource={runListSource}
+        viewerUserId={viewerUserId}
+        memberDisplayByUserId={memberDisplayByUserId}
       />
 
       <div className="flex flex-wrap gap-4 items-end">

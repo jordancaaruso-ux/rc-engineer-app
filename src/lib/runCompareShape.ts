@@ -3,6 +3,7 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 /** Map a loaded run (analysis / history) into the compare / setup modal shape. */
 export function toCompareRunShape(run: {
   id: string;
+  userId?: string | null;
   createdAt: Date | string;
   sessionType: string;
   meetingSessionType?: string | null;
@@ -10,7 +11,13 @@ export function toCompareRunShape(run: {
   sessionLabel?: string | null;
   eventId?: string | null;
   event?: { name: string; track?: { name: string } | null } | null;
-  car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
+  car?: {
+    id: string;
+    name: string;
+    setupSheetTemplate?: string | null;
+    setupSheetModelId?: string | null;
+  } | null;
+  carId?: string | null;
   carNameSnapshot?: string | null;
   track?: { id: string; name: string } | null;
   trackNameSnapshot?: string | null;
@@ -28,6 +35,7 @@ export function toCompareRunShape(run: {
 }): CompareRunShape {
   return {
     id: run.id,
+    userId: run.userId ?? null,
     createdAt: run.createdAt,
     sessionCompletedAt: run.sessionCompletedAt ?? null,
     loggingCompletedAt: run.loggingCompletedAt ?? null,
@@ -43,8 +51,10 @@ export function toCompareRunShape(run: {
           id: run.car.id,
           name: run.car.name,
           setupSheetTemplate: run.car.setupSheetTemplate,
+          setupSheetModelId: run.car.setupSheetModelId ?? null,
         }
       : null,
+    carId: run.carId ?? run.car?.id ?? null,
     carNameSnapshot: run.carNameSnapshot,
     track: run.track,
     trackNameSnapshot: run.trackNameSnapshot,

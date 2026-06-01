@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
+import type { SetupSheetScope } from "@/lib/setupCompare/setupSheetScope";
 
 /**
  * Car rows that share the same setup sheet template (e.g. two A800RR builds) should share
@@ -28,6 +29,31 @@ export async function carIdsSharingSetupTemplate(userId: string, carId: string):
     select: { id: true },
   });
   return rows.map((r) => r.id);
+}
+
+/** All of a user's cars that share the same setup sheet model or template as `scope`. */
+export async function carIdsMatchingSetupSheetScopeForUser(
+  userId: string,
+  scope: SetupSheetScope
+): Promise<string[]> {
+  if (scope.setupSheetModelId) {
+    const rows = await prisma.car.findMany({
+      where: { userId, setupSheetModelId: scope.setupSheetModelId },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+  if (scope.setupSheetTemplate) {
+    const rows = await prisma.car.findMany({
+      where: {
+        userId,
+        setupSheetTemplate: { equals: scope.setupSheetTemplate, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+  return [];
 }
 
 /** Canonical `setupSheetTemplate` for an owned car, or null. */

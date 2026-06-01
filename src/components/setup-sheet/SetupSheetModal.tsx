@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
-import { formatRunPickerLine } from "@/lib/runPickerFormat";
+import {
+  formatRunPickerLine,
+  formatRunPickerLineWithDriver,
+  type RunPickerRun,
+} from "@/lib/runPickerFormat";
+import { filterRunsForTeamSetupComparePicker } from "@/lib/setupCompare/teamSetupComparePicker";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
@@ -23,6 +28,8 @@ import {
 
 export type SetupSheetModalRun = {
   id: string;
+  userId?: string | null;
+  carId?: string | null;
   createdAt: Date | string;
   sessionLabel?: string | null;
   sessionType: string;
@@ -32,7 +39,12 @@ export type SetupSheetModalRun = {
   carNameSnapshot?: string | null;
   trackNameSnapshot?: string | null;
   tireRunNumber: number;
-  car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
+  car?: {
+    id: string;
+    name: string;
+    setupSheetTemplate?: string | null;
+    setupSheetModelId?: string | null;
+  } | null;
   track?: { id: string; name: string } | null;
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   event?: { name: string; track?: { name: string } | null } | null;
@@ -48,16 +60,22 @@ export function SetupSheetModal({
   run,
   pickerRuns,
   runListSource = "my_runs",
+  viewerUserId = null,
+  memberDisplayByUserId,
 }: {
   open: boolean;
   onClose: () => void;
   run: SetupSheetModalRun | null;
-  /** All runs for "choose run" comparison (newest first). */
+  /** Fallback list (e.g. team page SSR) before API load; my_runs uses same-car filter. */
   pickerRuns?: SetupSheetModalRun[];
   runListSource?: RunCompareListSource;
+  viewerUserId?: string | null;
+  memberDisplayByUserId?: Record<string, string>;
 }) {
   const [mode, setMode] = useState<CompareMode>("this_run_only");
   const [otherRunId, setOtherRunId] = useState("");
+  const [comparePickerRuns, setComparePickerRuns] = useState<SetupSheetModalRun[]>([]);
+  const [comparePickerLoading, setComparePickerLoading] = useState(false);
   const [activeTick, setActiveTick] = useState(0);
   const [numericAggregationByKey, setNumericAggregationByKey] = useState<Map<
     string,
@@ -65,6 +83,8 @@ export function SetupSheetModal({
   > | null>(null);
   const [portalReady, setPortalReady] = useState(false);
   const [loadedSetupData, setLoadedSetupData] = useState<unknown>(null);
+  const [baselineSetupData, setBaselineSetupData] = useState<unknown | null>(null);
+  const [baselineSetupLoading, setBaselineSetupLoading] = useState(false);
 
   useEffect(() => {
     setPortalReady(true);
@@ -83,6 +103,8 @@ export function SetupSheetModal({
     if (!open) return;
     setMode("this_run_only");
     setOtherRunId("");
+    setBaselineSetupData(null);
+    setBaselineSetupLoading(false);
   }, [open, run?.id]);
 
   useEffect(() => {
@@ -146,7 +168,67 @@ export function SetupSheetModal({
     return getActiveSetupData();
   }, [activeTick]);
 
-  const runs = pickerRuns ?? [];
+  const fallbackPickerRuns = pickerRuns ?? [];
+
+  useEffect(() => {
+    if (!open || !run?.id) {
+      setComparePickerRuns([]);
+      setComparePickerLoading(false);
+      return;
+    }
+
+    if (runListSource === "team_runs") {
+      let alive = true;
+      setComparePickerLoading(true);
+      void fetch(`/api/runs/for-setup-compare?runId=${encodeURIComponent(run.id)}`, {
+        cache: "no-store",
+      })
+        .then(async (res) => {
+          const data = (await res.json().catch(() => ({}))) as {
+            runs?: SetupSheetModalRun[];
+            error?: string;
+          };
+          if (!res.ok) throw new Error(data.error ?? `Failed (${res.status})`);
+          return Array.isArray(data.runs) ? data.runs : [];
+        })
+        .then((runs) => {
+          if (!alive) return;
+          setComparePickerRuns(runs);
+        })
+        .catch(() => {
+          if (!alive) return;
+          if (viewerUserId) {
+            setComparePickerRuns(
+              filterRunsForTeamSetupComparePicker(run, fallbackPickerRuns, viewerUserId)
+            );
+          } else {
+            setComparePickerRuns(fallbackPickerRuns);
+          }
+        })
+        .finally(() => {
+          if (alive) setComparePickerLoading(false);
+        });
+      return () => {
+        alive = false;
+      };
+    }
+
+    const anchorCarId = run.car?.id ?? run.carId ?? null;
+    const sameCar = anchorCarId
+      ? fallbackPickerRuns.filter((r) => (r.car?.id ?? r.carId) === anchorCarId)
+      : fallbackPickerRuns;
+    setComparePickerRuns(sameCar);
+    setComparePickerLoading(false);
+  }, [open, run?.id, runListSource, viewerUserId, pickerRuns]);
+
+  const formatPickerLine = useMemo((): ((run: SetupSheetModalRun) => string) => {
+    if (runListSource !== "team_runs" || !memberDisplayByUserId) {
+      return (r) => formatRunPickerLine(r);
+    }
+    return (r) => formatRunPickerLineWithDriver(r, memberDisplayByUserId);
+  }, [runListSource, memberDisplayByUserId]);
+
+  const runs = comparePickerRuns;
   const otherRuns = useMemo(
     () => runs.filter((r) => r.id !== run?.id),
     [runs, run?.id]
@@ -156,6 +238,37 @@ export function SetupSheetModal({
     return runs.find((r) => r.id === otherRunId) ?? null;
   }, [mode, otherRunId, runs]);
 
+  useEffect(() => {
+    if (!open || mode !== "choose_run" || !otherRunId || !baselineRun) {
+      setBaselineSetupData(null);
+      setBaselineSetupLoading(false);
+      return;
+    }
+    setBaselineSetupData(null);
+    if (baselineRun.setupSnapshot?.data !== undefined) {
+      setBaselineSetupData(baselineRun.setupSnapshot.data);
+      setBaselineSetupLoading(false);
+      return;
+    }
+    let alive = true;
+    setBaselineSetupLoading(true);
+    void fetch(`/api/runs/${encodeURIComponent(baselineRun.id)}/setup-snapshot`)
+      .then((res) => res.json())
+      .then((payload: { setupSnapshot?: { data?: unknown } }) => {
+        if (!alive) return;
+        setBaselineSetupData(payload.setupSnapshot?.data ?? {});
+      })
+      .catch(() => {
+        if (alive) setBaselineSetupData({});
+      })
+      .finally(() => {
+        if (alive) setBaselineSetupLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, mode, otherRunId, baselineRun]);
+
   const runSetup = useMemo<SetupSnapshotData>(
     () => normalizeSetupData(loadedSetupData ?? run?.setupSnapshot?.data ?? {}),
     [loadedSetupData, run?.setupSnapshot?.data]
@@ -163,14 +276,17 @@ export function SetupSheetModal({
 
   const baselineValue = useMemo<SetupSnapshotData | null>(() => {
     if (mode === "this_run_only") return null;
-    if (mode === "choose_run" && baselineRun) {
-      return normalizeSetupData(baselineRun.setupSnapshot?.data ?? {});
+    if (mode === "choose_run") {
+      if (!otherRunId || baselineSetupLoading || baselineSetupData === null) return null;
+      return normalizeSetupData(baselineSetupData);
     }
     if (mode === "current_setup" && activeSetup) {
       return normalizeSetupData(activeSetup);
     }
     return null;
-  }, [mode, baselineRun, activeSetup]);
+  }, [mode, otherRunId, baselineSetupLoading, baselineSetupData, activeSetup]);
+
+  const compareActive = mode !== "this_run_only" && baselineValue != null;
 
   const template = useMemo(() => {
     if (isA800RRCar(run?.car?.setupSheetTemplate)) return A800RR_SETUP_SHEET_V1;
@@ -202,7 +318,7 @@ export function SetupSheetModal({
       >
         <div className="setup-sheet-modal-close sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-background/95">
           <div className="ui-title text-sm text-muted-foreground truncate min-w-0 normal-case">
-            {run ? formatRunPickerLine(run) : "Setup"}
+            {run ? formatPickerLine(run) : "Setup"}
           </div>
           <button
             type="button"
@@ -266,24 +382,43 @@ export function SetupSheetModal({
                     >
                       Choose run
                     </button>
-                    {mode === "choose_run" && otherRuns.length > 0 && (
+                    {mode === "choose_run" && comparePickerLoading && (
+                      <span className="text-[11px] text-muted-foreground">Loading runs…</span>
+                    )}
+                    {mode === "choose_run" && !comparePickerLoading && otherRuns.length > 0 && (
                       <div className="min-w-0 w-full max-w-md sm:w-auto sm:min-w-[12rem]">
                         <RunPickerSelect
                           label=""
-                          runs={otherRuns}
+                          runs={otherRuns as RunPickerRun[]}
                           value={otherRunId}
                           onChange={setOtherRunId}
                           placeholder="Select run…"
-                          formatLine={formatRunPickerLine}
+                          formatLine={formatPickerLine as (run: RunPickerRun) => string}
                         />
                       </div>
                     )}
                   </div>
+                  {mode === "choose_run" && !comparePickerLoading && otherRuns.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No other runs on this setup sheet yet. Log a run on your car with the same sheet model, or ask
+                      your teammate to share more sessions.
+                    </p>
+                  )}
+                  {mode === "choose_run" && otherRunId && baselineSetupLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading comparison setup…</p>
+                  ) : null}
                   {mode === "current_setup" && !hasActiveSetup && (
                     <p className="text-xs text-amber-600/90 dark:text-amber-400/90">
                       No current setup. Use the Setup page or Log your run to set one.
                     </p>
                   )}
+                  {compareActive && baselineRun ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Showing this run&apos;s setup.{" "}
+                      <span className="text-red-600/90 dark:text-red-400/90">Red</span> = different from{" "}
+                      {formatPickerLine(baselineRun)}.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col gap-1.5 sm:items-end sm:pl-2">
                   <a
@@ -309,7 +444,8 @@ export function SetupSheetModal({
                 readOnly
                 template={template}
                 baselineValue={baselineValue}
-                numericAggregationByKey={mode === "this_run_only" ? null : numericAggregationByKey}
+                compareHighlightOnly={compareActive}
+                numericAggregationByKey={null}
               />
             </>
           )}

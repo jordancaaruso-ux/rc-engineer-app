@@ -45,6 +45,8 @@ export type SetupSheetViewProps = {
   fieldKeyFilter?: (key: string) => boolean;
   /** Setup compare: tint changed value cells A=blue / B=red (labels stay neutral). */
   compareValueColumnRole?: CompareColumnRole | null;
+  /** Single-sheet diff (modal): red highlights only, no inline “vs” baseline text. */
+  compareHighlightOnly?: boolean;
 };
 
 function fieldValue(v: SetupSnapshotData, key: string): string {
@@ -214,6 +216,7 @@ export function SetupSheetView({
   enableFieldSearch = false,
   compareValueColumnRole = null,
   fieldKeyFilter,
+  compareHighlightOnly = false,
 }: SetupSheetViewProps) {
   const template = templateProp ?? getDefaultSetupSheetTemplate();
   const baseline = baselineValue ?? null;
@@ -282,6 +285,7 @@ export function SetupSheetView({
           numericAggregationByKey={numericAggregationByKey}
           enableFieldSearch={enableFieldSearch}
           compareValueColumnRole={compareValueColumnRole}
+          compareHighlightOnly={compareHighlightOnly}
           fieldKeyFilter={fieldKeyFilter}
           fieldChipOptionsByKey={template.fieldChipOptionsByKey ?? null}
         />

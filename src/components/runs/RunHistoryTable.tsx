@@ -321,9 +321,13 @@ export function RunHistoryTable({
     [runs, lapModalRunId]
   );
   const lapModalPickerRuns = useMemo(() => {
-    if (!lapModalRun?.carId) return allRunsDescending;
+    if (!lapModalRun) return allRunsDescending;
+    if (runListSource === "team_runs" && viewerUserId) {
+      return allRunsDescending;
+    }
+    if (!lapModalRun.carId) return allRunsDescending;
     return allRunsDescending.filter((r) => r.car?.id === lapModalRun.carId);
-  }, [allRunsDescending, lapModalRun]);
+  }, [allRunsDescending, lapModalRun, runListSource, viewerUserId]);
   const lapModalUserDisplayName = useMemo(() => {
     if (!lapModalRun) return userDisplayName;
     if (!viewerUserId || !lapModalRun.userId || !memberDisplayByUserId) return userDisplayName;
@@ -547,12 +551,10 @@ export function RunHistoryTable({
         open={setupModalRunId !== null}
         onClose={() => setSetupModalRunId(null)}
         run={setupModalRun as SetupSheetModalRun | null}
-        pickerRuns={
-          (setupModalRun?.carId
-            ? allRunsDescending.filter((r) => r.car?.id === setupModalRun.carId)
-            : allRunsDescending) as SetupSheetModalRun[]
-        }
+        pickerRuns={allRunsDescending as SetupSheetModalRun[]}
         runListSource={runListSource}
+        viewerUserId={viewerUserId}
+        memberDisplayByUserId={memberDisplayByUserId}
       />
       {lapModalRun ? (
         <RunLapAnalysisModal
@@ -562,6 +564,8 @@ export function RunHistoryTable({
           pickerRunsSameCar={lapModalPickerRuns}
           runListSource={runListSource}
           userDisplayName={lapModalUserDisplayName}
+          viewerUserId={viewerUserId}
+          memberDisplayByUserId={memberDisplayByUserId}
         />
       ) : null}
     </>
