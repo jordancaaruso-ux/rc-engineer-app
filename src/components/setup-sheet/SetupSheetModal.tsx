@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
@@ -430,20 +431,15 @@ export function SetupSheetModal({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col gap-1.5 sm:items-end sm:pl-2">
-                  <a
-                    href={`/api/runs/${encodeURIComponent(run.id)}/setup-pdf`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-md border border-border bg-card px-3 py-1.5 text-center text-xs font-medium hover:bg-muted/90 transition"
-                  >
-                    Turn into a PDF
-                  </a>
-                  <a
-                    href={`/api/runs/${encodeURIComponent(run.id)}/setup-pdf?download=1`}
-                    className="text-[11px] text-muted-foreground underline hover:text-foreground"
-                  >
-                    Download PDF
-                  </a>
+                  {run.userId && (!viewerUserId || run.userId === viewerUserId) ? (
+                    <Link
+                      href={`/setup?runId=${encodeURIComponent(run.id)}&pdfReview=1`}
+                      onClick={onClose}
+                      className="rounded-md border border-border bg-card px-3 py-1.5 text-center text-xs font-medium hover:bg-muted/90 transition"
+                    >
+                      Turn into a PDF
+                    </Link>
+                  ) : null}
                 </div>
               </div>
 

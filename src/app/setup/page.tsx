@@ -8,6 +8,8 @@ import { NewSetupUploadButton } from "@/components/setup/NewSetupUploadButton";
 import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 
+import { SetupRunPdfReviewClient } from "@/components/setup/SetupRunPdfReviewClient";
+
 type SetupPageSearchParams = {
   created?: string;
   setupId?: string;
@@ -16,6 +18,9 @@ type SetupPageSearchParams = {
   calibrationAmbiguous?: string;
   /** Pre-select car for New setup upload (must be user's car). */
   carId?: string;
+  /** Run id for PDF review flow (with pdfReview=1). */
+  runId?: string;
+  pdfReview?: string;
 };
 
 export default async function SetupPage({
@@ -42,6 +47,34 @@ export default async function SetupPage({
     typeof resolvedSearchParams.carId === "string" && resolvedSearchParams.carId.trim()
       ? resolvedSearchParams.carId.trim()
       : null;
+  const pdfReviewRunId =
+    (resolvedSearchParams.pdfReview === "1" || resolvedSearchParams.pdfReview === "true") &&
+    typeof resolvedSearchParams.runId === "string" &&
+    resolvedSearchParams.runId.trim()
+      ? resolvedSearchParams.runId.trim()
+      : null;
+
+  if (pdfReviewRunId) {
+    if (!hasDatabaseUrl()) {
+      return (
+        <>
+          <header className="page-header">
+            <div>
+              <h1 className="page-title">Review setup for PDF</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
+          </header>
+          <section className="page-body">
+            <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+              Set DATABASE_URL in .env.
+            </div>
+          </section>
+        </>
+      );
+    }
+    await requireCurrentUser();
+    return <SetupRunPdfReviewClient runId={pdfReviewRunId} />;
+  }
 
   if (!hasDatabaseUrl()) {
     return (
