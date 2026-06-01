@@ -416,7 +416,16 @@ export function SetupSheetModal({
                     <p className="text-[11px] text-muted-foreground">
                       Showing this run&apos;s setup.{" "}
                       <span className="text-red-600/90 dark:text-red-400/90">Red</span> = different from{" "}
-                      {formatPickerLine(baselineRun)}.
+                      {formatPickerLine(baselineRun)}. Changed fields show{" "}
+                      <span className="font-medium text-foreground/80">vs …</span> with the other value
+                      {mode === "current_setup" ? " (current setup)" : ""}; numbers include{" "}
+                      <span className="font-medium text-foreground/80">(+/−Δ)</span> when applicable.
+                    </p>
+                  ) : compareActive && mode === "current_setup" ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Compared to your current setup. Changed fields show{" "}
+                      <span className="font-medium text-foreground/80">vs …</span>
+                      {hasActiveSetup ? " and (+/−Δ) for numbers." : "."}
                     </p>
                   ) : null}
                 </div>

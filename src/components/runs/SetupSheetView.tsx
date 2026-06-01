@@ -45,7 +45,7 @@ export type SetupSheetViewProps = {
   fieldKeyFilter?: (key: string) => boolean;
   /** Setup compare: tint changed value cells A=blue / B=red (labels stay neutral). */
   compareValueColumnRole?: CompareColumnRole | null;
-  /** Single-sheet diff (modal): red highlights only, no inline “vs” baseline text. */
+  /** Single-sheet diff (modal): red highlights only; still shows inline “vs” on diffs. */
   compareHighlightOnly?: boolean;
 };
 

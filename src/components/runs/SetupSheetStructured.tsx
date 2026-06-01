@@ -37,6 +37,7 @@ import {
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { AwesomatixScrewStrip } from "@/components/setup-sheet/AwesomatixScrewStrip";
 import { compareSetupField, maxSeverity } from "@/lib/setupCompare/compare";
+import { formatSetupCompareDeltaSuffix } from "@/lib/setupCompare/compareInlineDisplay";
 import {
   compareResultToHighlight,
   type CompareColumnRole,
@@ -101,8 +102,8 @@ type Props = {
    */
   compareValueColumnRole?: CompareColumnRole | null;
   /**
-   * Modal / single-sheet diff: red row tint on changes only — no inline “vs baseline” text
-   * and no second chip row. Omit on Engineer A|B side-by-side compare.
+   * Modal / single-sheet diff: red row tint on changes only — still shows “vs baseline” on
+   * diffs, but no A|B column chip coloring. Omit on Engineer A|B side-by-side compare.
    */
   compareHighlightOnly?: boolean;
 };
@@ -383,12 +384,18 @@ function InlineValueCompare({
   hasBaseline,
   fieldKind,
   title,
+  compareSuffix,
+  hidePrimary = false,
 }: {
   value: unknown;
   baseline: unknown;
   hasBaseline: boolean;
   fieldKind?: "text" | "bool" | "multi";
   title?: string;
+  /** e.g. `(+0.3)` for numeric diffs */
+  compareSuffix?: string | null;
+  /** Chip fields in highlight-only mode: show baseline tail without repeating the value. */
+  hidePrimary?: boolean;
 }) {
   const value = coerceSetupSheetDisplayString(valueRaw);
   const baseline = coerceSetupSheetDisplayString(baselineRaw);
@@ -401,21 +408,36 @@ function InlineValueCompare({
   };
   const pv = display(value);
   const bv = display(baseline);
-  const { highlightOnly } = useCompareUi();
   const showVs =
-    !highlightOnly &&
     hasBaseline &&
     baseline !== undefined &&
     value !== baseline &&
     !(value === "" && baseline === "");
 
+  if (!hidePrimary && !showVs) {
+    return (
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0" title={title}>
+        <span className="text-sm font-sans tabular-nums font-semibold text-foreground">{pv}</span>
+      </div>
+    );
+  }
+
+  if (hidePrimary && !showVs) return null;
+
   return (
     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0" title={title}>
-      <span className="text-sm font-sans tabular-nums font-semibold text-foreground">{pv}</span>
+      {!hidePrimary ? (
+        <span className="text-sm font-sans tabular-nums font-semibold text-foreground">{pv}</span>
+      ) : null}
       {showVs ? (
         <>
-          <span className="text-muted-foreground select-none">·</span>
+          {!hidePrimary ? <span className="text-muted-foreground select-none">·</span> : null}
           <span className="text-sm font-sans tabular-nums font-semibold text-muted-foreground">vs {bv}</span>
+          {compareSuffix ? (
+            <span className="text-sm font-sans tabular-nums font-semibold text-muted-foreground/90">
+              {compareSuffix}
+            </span>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -690,14 +712,28 @@ function PresetWithOtherChipEditor({
   );
 
   const { highlightOnly } = useCompareUi();
+  const chipCompareSuffix =
+    hasBaseline && baseline
+      ? formatSetupCompareDeltaSuffix(
+          compareSetupField({ key: fieldKey, a: value[fieldKey], b: baseline[fieldKey] })
+        )
+      : null;
 
   if (readOnly) {
     return (
       <div className="flex min-w-0 flex-col gap-1">
-        {!highlightOnly ? (
-          <InlineValueCompare value={v} baseline={b} hasBaseline={hasBaseline} fieldKind="text" title={title} />
-        ) : null}
         <div className="min-w-0">{chipBlock}</div>
+        {hasBaseline ? (
+          <InlineValueCompare
+            value={v}
+            baseline={b}
+            hasBaseline={hasBaseline}
+            fieldKind="text"
+            title={title}
+            compareSuffix={chipCompareSuffix}
+            hidePrimary={highlightOnly}
+          />
+        ) : null}
       </div>
     );
   }
@@ -879,8 +915,7 @@ function BoolCompareTail({
   baseline: string;
   hasBaseline: boolean;
 }) {
-  const { highlightOnly } = useCompareUi();
-  if (highlightOnly || !hasBaseline) return null;
+  if (!hasBaseline) return null;
   if (getBoolFromSetupString(value) === getBoolFromSetupString(baseline)) return null;
   const bv = formatBoolDisplay(baseline);
   return (
@@ -903,6 +938,7 @@ function EditableSingle({
   changed,
   rowHighlight,
   compareColumnRole,
+  fieldCompare,
   readOnly,
   onCommit,
   fieldChipOptionsByKey,
@@ -918,11 +954,13 @@ function EditableSingle({
   changed: boolean;
   rowHighlight: { className: string; style?: CSSProperties };
   compareColumnRole?: CompareColumnRole;
+  fieldCompare?: FieldCompareResult | null;
   readOnly: boolean;
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
   const chipAccent: "sky" | "rose" = compareColumnRole === "b" ? "rose" : "sky";
+  const compareSuffix = formatSetupCompareDeltaSuffix(fieldCompare);
   const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
   const vRaw = fieldValue(value, fieldKey);
   const v = fieldDisplayValue(value, fieldKey, fieldChipOptionsByKey);
@@ -1016,6 +1054,7 @@ function EditableSingle({
               hasBaseline={hasBaseline}
               fieldKind="multi"
               title={springRateFieldTooltip(value, fieldKey)}
+              compareSuffix={compareSuffix}
             />
           ) : (
             <InlineValueCompare
@@ -1024,6 +1063,7 @@ function EditableSingle({
               hasBaseline={hasBaseline}
               fieldKind="text"
               title={springRateFieldTooltip(value, fieldKey)}
+              compareSuffix={compareSuffix}
             />
           )}
         </div>
@@ -1088,6 +1128,7 @@ function EditableSingle({
               hasBaseline={hasBaseline}
               fieldKind="text"
               title={springRateFieldTooltip(value, fieldKey)}
+              compareSuffix={compareSuffix}
             />
           ) : focused ? (
             <input
@@ -1208,6 +1249,7 @@ function EditableSingle({
               hasBaseline={hasBaseline}
               fieldKind="text"
               title={springRateFieldTooltip(value, fieldKey)}
+              compareSuffix={compareSuffix}
             />
           </button>
         ) : (
@@ -1269,6 +1311,7 @@ function PairSideCell({
   const cmp = keyFieldCompareResult(fieldKey, value, baseline, highlightChangedKeys, numericAggregationByKey);
   const role = compareValueColumnRole ?? undefined;
   const hl = compareResultToHighlight(cmp, role);
+  const compareSuffix = formatSetupCompareDeltaSuffix(cmp);
   const chipAccent: "sky" | "rose" = compareValueColumnRole === "b" ? "rose" : "sky";
   const c = !cmp.areEqual;
   const fk = fieldKind ?? "text";
@@ -1347,6 +1390,7 @@ function PairSideCell({
               hasBaseline={hasBaseline}
               fieldKind={fk}
               title={springRateFieldTooltip(value, fieldKey)}
+              compareSuffix={compareSuffix}
             />
           )}
           {fk === "bool" && !readOnly ? (
@@ -1927,6 +1971,7 @@ export function SetupSheetStructured({
           changed={!cmp.areEqual}
           rowHighlight={rowHl}
           compareColumnRole={compareRole}
+          fieldCompare={cmp}
           readOnly={readOnly}
           onCommit={commit}
           fieldChipOptionsByKey={fieldChipOptionsByKey}
