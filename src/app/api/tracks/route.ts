@@ -44,7 +44,16 @@ export async function GET(request: Request) {
             ? { ...whereBase, id: { in: [] } }
             : whereBase,
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, location: true, liveRcUrl: true, gripTags: true, layoutTags: true },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        latitude: true,
+        longitude: true,
+        liveRcUrl: true,
+        gripTags: true,
+        layoutTags: true,
+      },
     });
 
     if (favouritesFirst && favouriteTrackIds.length > 0) {

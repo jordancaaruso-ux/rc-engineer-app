@@ -17,6 +17,7 @@ import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
 import { coerceFeelVsLastRunForCompleteRun, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
+import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 
 type RunUpsertBody = {
   runId?: string;
@@ -554,7 +555,35 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
 
   revalidateAfterRunMutation(params.userId);
 
-  return NextResponse.json({ run }, { status: params.mode === "create" ? 201 : 200 });
+  const newlyCompleted =
+    loggingComplete &&
+    (params.mode === "create" || existingUpdate?.loggingComplete === false);
+
+  const promptMarkTrackLocation = await buildPromptMarkTrackLocation({
+    userId: params.userId,
+    trackId: body.trackId,
+    loggingComplete,
+    newlyCompleted,
+    countCompletedRunsAtTrack: (userId, trackId) =>
+      prisma.run.count({
+        where: { userId, trackId, loggingComplete: true },
+      }),
+    findTrack: (userId, trackId) =>
+      prisma.track.findFirst({
+        where: { id: trackId, userId },
+        select: {
+          id: true,
+          name: true,
+          latitude: true,
+          longitude: true,
+        },
+      }),
+  });
+
+  return NextResponse.json(
+    { run, promptMarkTrackLocation },
+    { status: params.mode === "create" ? 201 : 200 }
+  );
 }
 
 export async function POST(request: Request) {

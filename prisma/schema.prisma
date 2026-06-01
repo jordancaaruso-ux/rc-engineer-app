@@ -222,6 +222,12 @@ model Track {
   id        String   @id @default(cuid())
   name      String
   location  String?
+  /** GPS pin from “mark this location” when completing a run at the track. */
+  latitude  Float?
+  longitude Float?
+  locationMarkedAt DateTime?
+  /** How coordinates were set, e.g. `device`. */
+  locationSource String?
   /** LiveRC track root URL (e.g. https://tftr.liverc.com) for session discovery. */
   liveRcUrl String?
   /** Multi-select grip tags (e.g. MEDIUM + HIGH); see `trackMetaTags.ts` ids. */

@@ -59,7 +59,15 @@ export default async function NewRunPage({
     prisma.track.findMany({
       where: { userId: user.id },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        latitude: true,
+        longitude: true,
+        gripTags: true,
+        layoutTags: true,
+      },
     }),
     getFavouriteTrackIdsForUser(user.id),
   ]);

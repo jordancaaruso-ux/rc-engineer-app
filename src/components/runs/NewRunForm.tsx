@@ -39,6 +39,13 @@ import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSession
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
 import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import { TrackMetaChipGroups } from "@/components/runs/TrackMetaChipGroups";
+import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDialog";
+import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions";
+import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getCurrentPosition";
+import {
+  DEFAULT_TRACK_PROXIMITY_RADIUS_M,
+  findTracksNearPosition,
+} from "@/lib/location/trackProximity";
 import {
   emptyHandlingAssessmentUiState,
   isHandlingAssessmentMeaningful,
@@ -58,6 +65,8 @@ type TrackOption = {
   id: string;
   name: string;
   location?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   liveRcUrl?: string | null;
   gripTags?: string[];
   layoutTags?: string[];
@@ -360,6 +369,18 @@ export function NewRunForm(props: {
   const batteryRunUserTouchedRef = useRef(false);
   /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
   const pendingCompleteNavigationRef = useRef(false);
+  const [trackLocationPrompt, setTrackLocationPrompt] = useState<{
+    trackId: string;
+    trackName: string;
+    runId: string;
+  } | null>(null);
+  const [nearbyTrackSuggestions, setNearbyTrackSuggestions] = useState<
+    { trackId: string; trackName: string; distanceM: number }[]
+  >([]);
+  const [trackAutoDetectMessage, setTrackAutoDetectMessage] = useState<string | null>(null);
+  const [trackAutoDetectLoading, setTrackAutoDetectLoading] = useState(false);
+  const trackAutoDetectRanRef = useRef(false);
+  const trackPickedManuallyRef = useRef(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
   /** Race meeting only: event results/practice hub for lap scan fallback. Testing uses track LiveRC URL. */
@@ -810,6 +831,70 @@ export function NewRunForm(props: {
   );
   /** Race meeting + event with a track: run track follows the event (picker disabled). */
   const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
+
+  const runTrackAutoDetect = useCallback(async () => {
+    if (isEditing || trackLockedToEvent || trackPickedManuallyRef.current) return;
+    const marked = tracksList.filter(
+      (t) => t.latitude != null && t.longitude != null
+    );
+    if (marked.length === 0) {
+      setTrackAutoDetectMessage(
+        "No tracks with a saved location yet. Complete a run at a track and mark its location when prompted."
+      );
+      return;
+    }
+    setTrackAutoDetectLoading(true);
+    setTrackAutoDetectMessage(null);
+    setNearbyTrackSuggestions([]);
+    try {
+      const position = await getCurrentPosition();
+      const near = findTracksNearPosition(marked, position, DEFAULT_TRACK_PROXIMITY_RADIUS_M);
+      if (near.length === 1) {
+        setTrackId(near[0]!.track.id);
+        setCopyTrackWarning(null);
+        setTrackAutoDetectMessage(`Detected ${near[0]!.track.name}.`);
+        return;
+      }
+      if (near.length > 1) {
+        setNearbyTrackSuggestions(
+          near.map((n) => ({
+            trackId: n.track.id,
+            trackName: n.track.name,
+            distanceM: n.distanceM,
+          }))
+        );
+        setTrackAutoDetectMessage("Multiple tracks nearby — pick one below.");
+        return;
+      }
+      setTrackAutoDetectMessage("No saved track is near your current location.");
+    } catch (e) {
+      if (e instanceof GeolocationRequestError) {
+        setTrackAutoDetectMessage(e.message);
+      } else {
+        setTrackAutoDetectMessage(
+          e instanceof Error ? e.message : "Could not detect track from location."
+        );
+      }
+    } finally {
+      setTrackAutoDetectLoading(false);
+    }
+  }, [isEditing, trackLockedToEvent, tracksList]);
+
+  useEffect(() => {
+    if (isEditing || trackLockedToEvent || trackAutoDetectRanRef.current) return;
+    const t = window.setTimeout(() => {
+      if (trackId.trim() || trackPickedManuallyRef.current) return;
+      trackAutoDetectRanRef.current = true;
+      void runTrackAutoDetect();
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [isEditing, trackLockedToEvent, trackId, tracksList, runTrackAutoDetect]);
+
+  useEffect(() => {
+    if (trackId.trim()) {
+      setNearbyTrackSuggestions([]);
+    }
+  }, [trackId]);
 
   useEffect(() => {
     if (trackId.trim() || trackLockedToEvent) setTrackSaveWarning(false);
@@ -1804,7 +1889,10 @@ export function NewRunForm(props: {
         lapTimes = parseLapTimes(lapIngest.manualText);
       }
       const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
-      const { run } = await jsonFetch<{ run: { id: string; createdAt: string } }>("/api/runs", {
+      const { run, promptMarkTrackLocation } = await jsonFetch<{
+        run: { id: string; createdAt: string };
+        promptMarkTrackLocation?: { trackId: string; trackName: string } | null;
+      }>("/api/runs", {
         method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1906,6 +1994,18 @@ export function NewRunForm(props: {
         })
       });
 
+      if (intent === "completed" && promptMarkTrackLocation) {
+        setTrackLocationPrompt({
+          trackId: promptMarkTrackLocation.trackId,
+          trackName: promptMarkTrackLocation.trackName,
+          runId: run.id,
+        });
+        setSaveSuccess(true);
+        setStatus("Run saved.");
+        setSaving(false);
+        return;
+      }
+
       if (intent === "completed") {
         pendingCompleteNavigationRef.current = true;
       }
@@ -1941,9 +2041,7 @@ export function NewRunForm(props: {
       // Completing a run sends the driver to the dashboard with a one-time
       // prompt to generate Engineer suggestions for the session they just saved.
       if (intent === "completed") {
-        setTimeout(() => {
-          router.push(`/?suggestRun=${encodeURIComponent(run.id)}`);
-        }, 600);
+        navigateAfterRunComplete(run.id);
       } else if (isEditing) {
         const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
           `/api/runs/last?carId=${carId}`
@@ -1995,7 +2093,30 @@ export function NewRunForm(props: {
     }
   }
 
+  function navigateAfterRunComplete(runId: string) {
+    pendingCompleteNavigationRef.current = true;
+    setTimeout(() => {
+      router.push(`/?suggestRun=${encodeURIComponent(runId)}`);
+    }, 600);
+  }
+
   return (
+    <>
+    <TrackLocationMarkDialog
+      open={trackLocationPrompt != null}
+      trackId={trackLocationPrompt?.trackId ?? ""}
+      trackName={trackLocationPrompt?.trackName ?? ""}
+      onMarked={() => {
+        const runId = trackLocationPrompt?.runId;
+        setTrackLocationPrompt(null);
+        if (runId) navigateAfterRunComplete(runId);
+      }}
+      onSkip={() => {
+        const runId = trackLocationPrompt?.runId;
+        setTrackLocationPrompt(null);
+        if (runId) navigateAfterRunComplete(runId);
+      }}
+    />
     <form
       className="max-w-3xl space-y-4"
       onSubmit={(e) => e.preventDefault()}
@@ -2658,19 +2779,51 @@ export function NewRunForm(props: {
                   </p>
                 </div>
               ) : (
-                <TrackCombobox
-                  tracks={tracksList}
-                  value={trackId}
-                  onChange={(id) => {
-                    setTrackId(id);
-                    setCopyTrackWarning(null);
-                  }}
-                  lastRunTrackId={lastRun?.trackId ?? null}
-                  favouriteTrackIds={favouriteTrackIds}
-                  favouriteTracks={favouriteTracks}
-                  placeholder="Search or select track"
-                  aria-label="Track"
-                />
+                <div className="space-y-2">
+                  <TrackCombobox
+                    tracks={tracksList}
+                    value={trackId}
+                    onChange={(id) => {
+                      trackPickedManuallyRef.current = true;
+                      setTrackId(id);
+                      setCopyTrackWarning(null);
+                      setNearbyTrackSuggestions([]);
+                      setTrackAutoDetectMessage(null);
+                    }}
+                    lastRunTrackId={lastRun?.trackId ?? null}
+                    favouriteTrackIds={favouriteTrackIds}
+                    favouriteTracks={favouriteTracks}
+                    placeholder="Search or select track"
+                    aria-label="Track"
+                  />
+                  {!isEditing ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium hover:bg-muted/80 transition disabled:opacity-60"
+                        disabled={trackAutoDetectLoading}
+                        onClick={() => void runTrackAutoDetect()}
+                      >
+                        {trackAutoDetectLoading ? "Detecting…" : "Detect from location"}
+                      </button>
+                      {trackAutoDetectMessage ? (
+                        <span className="text-[11px] text-muted-foreground leading-snug">
+                          {trackAutoDetectMessage}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <TrackNearbySuggestions
+                    suggestions={nearbyTrackSuggestions}
+                    onSelect={(id) => {
+                      trackPickedManuallyRef.current = true;
+                      setTrackId(id);
+                      setCopyTrackWarning(null);
+                      setNearbyTrackSuggestions([]);
+                      setTrackAutoDetectMessage(null);
+                    }}
+                  />
+                </div>
               )}
             </div>
             {copyTrackWarning && (
@@ -3772,6 +3925,7 @@ export function NewRunForm(props: {
         )}
       </div>
     </form>
+    </>
   );
 }
 

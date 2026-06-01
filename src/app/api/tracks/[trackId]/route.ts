@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { parseCoordinates } from "@/lib/location/coordinates";
 import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 
@@ -22,7 +23,19 @@ export async function GET(
 
   const track = await prisma.track.findFirst({
     where: { id: trackId, userId: user.id },
-    select: { id: true, name: true, location: true, liveRcUrl: true, gripTags: true, layoutTags: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      location: true,
+      latitude: true,
+      longitude: true,
+      locationMarkedAt: true,
+      locationSource: true,
+      liveRcUrl: true,
+      gripTags: true,
+      layoutTags: true,
+      createdAt: true,
+    },
   });
 
   if (!track) {
@@ -50,6 +63,9 @@ export async function PATCH(
     gripTags?: unknown;
     layoutTags?: unknown;
     liveRcUrl?: string | null;
+    latitude?: unknown;
+    longitude?: unknown;
+    clearLocation?: boolean;
   } | null;
 
   const existing = await prisma.track.findFirst({
@@ -60,7 +76,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
 
-  const data: { gripTags?: string[]; layoutTags?: string[]; liveRcUrl?: string | null } = {};
+  const data: {
+    gripTags?: string[];
+    layoutTags?: string[];
+    liveRcUrl?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    locationMarkedAt?: Date | null;
+    locationSource?: string | null;
+  } = {};
   if (body && "gripTags" in body) {
     data.gripTags = normalizeGripTags(body.gripTags);
   }
@@ -76,6 +100,21 @@ export async function PATCH(
       data.liveRcUrl = v.normalized;
     }
   }
+  if (body?.clearLocation === true) {
+    data.latitude = null;
+    data.longitude = null;
+    data.locationMarkedAt = null;
+    data.locationSource = null;
+  } else if (body && ("latitude" in body || "longitude" in body)) {
+    const parsed = parseCoordinates(body.latitude, body.longitude);
+    if ("error" in parsed) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    data.latitude = parsed.latitude;
+    data.longitude = parsed.longitude;
+    data.locationMarkedAt = new Date();
+    data.locationSource = "device";
+  }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields" }, { status: 400 });
   }
@@ -83,7 +122,18 @@ export async function PATCH(
   const track = await prisma.track.update({
     where: { id: trackId },
     data,
-    select: { id: true, name: true, location: true, liveRcUrl: true, gripTags: true, layoutTags: true },
+    select: {
+      id: true,
+      name: true,
+      location: true,
+      latitude: true,
+      longitude: true,
+      locationMarkedAt: true,
+      locationSource: true,
+      liveRcUrl: true,
+      gripTags: true,
+      layoutTags: true,
+    },
   });
 
   return NextResponse.json({ track });
