@@ -941,7 +941,6 @@ export function LapTimesIngestPanel({
               </p>
             </div>
           ) : null}
-          {!hasTrackDiscovery ? (
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               id="url-import-input"
@@ -970,7 +969,6 @@ export function LapTimesIngestPanel({
               {urlBusy ? "Importing…" : "Import"}
             </button>
           </div>
-          ) : null}
 
           {value.urlImportBlocks.map((block, blockIndex) => (
             <div key={block.blockId} className="space-y-2 rounded-lg border border-border bg-surface-runna p-2" data-import-index={blockIndex}>
