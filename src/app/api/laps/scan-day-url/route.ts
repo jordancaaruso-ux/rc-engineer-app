@@ -99,7 +99,8 @@ export async function POST(request: Request) {
       trackLiveRcUrl: liveRcUrl,
       eventRaceClass,
     });
-    const candidates: ScanDayUrlCandidateRow[] = discovered.candidates.map((c) => ({
+    const displaySessions = discovered.unimportedCandidates;
+    const candidates: ScanDayUrlCandidateRow[] = displaySessions.map((c) => ({
       sessionId: c.sessionId,
       sessionUrl: c.sessionUrl,
       driverName: c.label,
@@ -115,14 +116,16 @@ export async function POST(request: Request) {
       indexKind: "practice" as ScanDayUrlIndexKind,
       liveRcDriverName,
       candidates,
-      totalCandidates: candidates.length,
-      matchedCount: candidates.length,
+      totalCandidates: discovered.candidates.length,
+      unimportedCount: discovered.unimportedCandidates.length,
+      matchedCount: displaySessions.length,
       hasDriverNameSetting: Boolean(liveRcDriverName?.trim()),
       driverFilterApplied: true,
       scanMessage: discovered.hint,
       discoveredFromTrack: true,
       mostRecentSessionUrl: discovered.mostRecentSession?.sessionUrl ?? null,
       activeRaceMeeting: discovered.activeRaceMeeting,
+      discoveryDebug: discovered.debug,
     });
   }
 

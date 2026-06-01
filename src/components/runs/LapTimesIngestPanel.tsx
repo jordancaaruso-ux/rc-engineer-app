@@ -137,6 +137,35 @@ type EventRaceSessionRow = {
   existingImportedSessionId: string | null;
 };
 
+type DiscoveryDebugPayload = {
+  trackOrigin: string | null;
+  liveRcDriverName: string | null;
+  liveRcDriverNameNormalized: string | null;
+  practice: {
+    resolveError: string | null;
+    indexUrl: string | null;
+    activityDate: string | null;
+    fetchError: string | null;
+    rowsOnPage: number;
+    rowsMatchingDriver: number;
+    sampleDriverNamesOnPage: string[];
+  };
+  race: {
+    resolveError: string | null;
+    hubUrl: string | null;
+    hubRows: number;
+    hubRowsAfterClassFilter: number;
+    resultPagesFetched: number;
+    canonicalDriverId: string | null;
+    sessionsWithDriverId: number;
+  };
+  summary: {
+    totalMatched: number;
+    alreadyImported: number;
+    unimported: number;
+  };
+};
+
 export function LapTimesIngestPanel({
   value,
   onChange,
@@ -172,6 +201,9 @@ export function LapTimesIngestPanel({
   const [dayScanCandidates, setDayScanCandidates] = useState<ScanDayCandidate[] | null>(null);
   const [dayScanIndexKind, setDayScanIndexKind] = useState<"practice" | "results" | null>(null);
   const [dayScanHasDriverName, setDayScanHasDriverName] = useState<boolean>(true);
+  const [discoveryDebug, setDiscoveryDebug] = useState<DiscoveryDebugPayload | null>(null);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [scanTotals, setScanTotals] = useState<{ total: number; unimported: number } | null>(null);
   /** `${blockId}:${driverId}` for lap preview */
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
 
@@ -239,12 +271,15 @@ export function LapTimesIngestPanel({
   }, []);
 
   useEffect(() => {
-    if (!hasUrlScan) return;
-    setTab((prev) => (prev === "manual" ? "url" : prev));
-  }, [hasUrlScan, practiceDayUrl, trackId, trackLiveRcUrl]);
+    if (hasTrackDiscovery) {
+      setTab((prev) => (prev === "manual" ? "url" : prev));
+    } else if ((practiceDayUrl ?? "").trim()) {
+      setTab((prev) => (prev === "manual" ? "url" : prev));
+    }
+  }, [hasTrackDiscovery, practiceDayUrl]);
 
   useEffect(() => {
-    if (!(practiceDayUrl ?? "").trim() && hasTrackDiscovery) {
+    if (hasTrackDiscovery) {
       void scanDayUrl();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
@@ -342,20 +377,22 @@ export function LapTimesIngestPanel({
   async function scanDayUrl() {
     const url = (practiceDayUrl ?? "").trim();
     const tid = trackId?.trim() ?? "";
-    if (!url && !tid) {
-      setDayScanMessage("Select a track with a LiveRC URL or add a timing index URL under Session type.");
+    const useTrack = hasTrackDiscovery;
+    if (!useTrack && !url) {
+      setDayScanMessage("Select a track with a LiveRC URL on the Tracks page.");
       return;
     }
     setDayScanBusy(true);
     setDayScanMessage(null);
     setDayScanIndexKind(null);
+    setDiscoveryDebug(null);
+    setScanTotals(null);
     try {
       const res = await fetch("/api/laps/scan-day-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(url ? { dayUrl: url } : {}),
-          ...(tid && !url ? { trackId: tid } : {}),
+          ...(useTrack ? { trackId: tid } : { dayUrl: url }),
           eventId: lapImportEventId?.trim() || undefined,
         }),
       });
@@ -374,11 +411,23 @@ export function LapTimesIngestPanel({
         typeof (data as { scanMessage?: unknown }).scanMessage === "string"
           ? ((data as { scanMessage: string }).scanMessage.trim() || null)
           : null;
+      const dbg = (data as { discoveryDebug?: DiscoveryDebugPayload }).discoveryDebug;
+      const totalCandidates =
+        typeof (data as { totalCandidates?: unknown }).totalCandidates === "number"
+          ? (data as { totalCandidates: number }).totalCandidates
+          : candidates.length;
+      const unimportedCount =
+        typeof (data as { unimportedCount?: unknown }).unimportedCount === "number"
+          ? (data as { unimportedCount: number }).unimportedCount
+          : candidates.length;
       setDayScanIndexKind(ik === "results" || ik === "practice" ? ik : null);
       setDayScanHasDriverName(hasDriver);
       setDayScanCandidates(candidates);
+      setDiscoveryDebug(dbg ?? null);
+      setScanTotals({ total: totalCandidates, unimported: unimportedCount });
       if (candidates.length === 0) {
-        setDayScanMessage(scanMessage ?? "No sessions found on that day page.");
+        setDayScanMessage(scanMessage ?? "No new sessions to import.");
+        setDebugOpen(Boolean(dbg));
       } else if (scanMessage) {
         setDayScanMessage(scanMessage);
       }
@@ -803,22 +852,18 @@ export function LapTimesIngestPanel({
               ) : null}
             </div>
           ) : null}
-          {hasUrlScan ? (
+          {hasTrackDiscovery ? (
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="ui-title text-[11px] text-muted-foreground">
-                    {hasTrackDiscovery && !(practiceDayUrl ?? "").trim()
-                      ? "LiveRC sessions at this track"
-                      : dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl ?? "")
-                        ? "Race / results index URL"
-                        : "Practice day URL"}
-                  </div>
-                  {(practiceDayUrl ?? "").trim() ? (
-                    <div className="text-[11px] text-muted-foreground break-all">{practiceDayUrl}</div>
-                  ) : hasTrackDiscovery ? (
-                    <div className="text-[11px] text-muted-foreground break-all">{trackLiveRcUrl}</div>
-                  ) : null}
+                  <div className="ui-title text-[11px] text-muted-foreground">Your LiveRC sessions at this track</div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {dayScanBusy
+                      ? "Checking LiveRC…"
+                      : dayScanCandidates && dayScanCandidates.length > 0
+                        ? `${dayScanCandidates.length} new session(s) to import`
+                        : "Newest unimported practice or race sessions (by completion time)"}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -829,34 +874,12 @@ export function LapTimesIngestPanel({
                   )}
                   onClick={() => void scanDayUrl()}
                 >
-                  {dayScanBusy
-                    ? "Scanning…"
-                    : dayScanCandidates
-                      ? "Rescan"
-                      : hasTrackDiscovery && !(practiceDayUrl ?? "").trim()
-                        ? "Find my sessions"
-                        : dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl ?? "")
-                          ? "Scan for sessions"
-                          : "Scan practice list"}
+                  {dayScanBusy ? "Refreshing…" : "Refresh"}
                 </button>
               </div>
-              {hasTrackDiscovery && !(practiceDayUrl ?? "").trim() ? (
-                <p className="ui-label-meta">
-                  Shows your most recent practice or race sessions at this track (by completion time). Does not change
-                  session type above.
-                </p>
-              ) : null}
-              {!dayScanHasDriverName &&
-              (dayScanIndexKind !== "results" && !/\/results\b/i.test(practiceDayUrl ?? "")) ? (
+              {!dayScanHasDriverName ? (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                  No LiveRC driver name set — Settings → LiveRC driver name helps filter practice list scans to
-                  only your sessions.
-                </p>
-              ) : null}
-              {dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl ?? "") ? (
-                <p className="ui-label-meta">
-                  Results pages list races by class or round — pick your session, then confirm your row on the
-                  timing page (your LiveRC driver name still applies there).
+                  Set your LiveRC driver name in Settings so we can find your sessions.
                 </p>
               ) : null}
               {dayScanCandidates && dayScanCandidates.length > 0 ? (
@@ -865,37 +888,60 @@ export function LapTimesIngestPanel({
                     <li key={c.sessionId}>
                       <button
                         type="button"
-                        disabled={urlBusy || c.alreadyImported}
-                          className={cn(
-                            "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
-                            c.alreadyImported
-                              ? "border-border bg-surface-runna opacity-60 cursor-not-allowed"
-                              : "border-border bg-surface-runna hover:bg-surface-runna-inset"
-                          )}
+                        disabled={urlBusy}
+                        className={cn(
+                          "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
+                          "border-border bg-surface-runna hover:bg-surface-runna-inset",
+                          urlBusy && "opacity-60 pointer-events-none"
+                        )}
                         onClick={() => void importFromDayCandidate(c)}
                       >
                         <span className="min-w-0">
                           <span className="block truncate font-medium text-foreground">
-                            {c.driverName || "Unnamed driver"}
+                            {c.driverName || "Session"}
                             {c.sessionTime ? ` · ${c.sessionTime}` : ""}
                           </span>
-                          <span className="block truncate text-[10px] text-muted-foreground">
-                            {c.sessionUrl}
-                          </span>
+                          <span className="block truncate text-[10px] text-muted-foreground">{c.sessionUrl}</span>
                         </span>
-                        <span className="shrink-0 ui-title text-[10px] text-muted-foreground">
-                          {c.alreadyImported ? (c.linkedRunId ? "Saved" : "Imported") : "Import"}
-                        </span>
+                        <span className="shrink-0 ui-title text-[10px] text-muted-foreground">Import</span>
                       </button>
                     </li>
                   ))}
                 </ul>
               ) : null}
-              {dayScanMessage ? (
+              {dayScanMessage && !dayScanBusy ? (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">{dayScanMessage}</p>
               ) : null}
+              {scanTotals && scanTotals.total > 0 && scanTotals.unimported === 0 && !dayScanBusy ? (
+                <p className="text-[11px] text-muted-foreground">
+                  LiveRC matched {scanTotals.total} session(s) for your driver — all are already imported.
+                </p>
+              ) : null}
+              {discoveryDebug ? (
+                <div className="border-t border-border pt-2">
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    onClick={() => setDebugOpen((v) => !v)}
+                  >
+                    {debugOpen ? "Hide import debug" : "Show import debug"}
+                  </button>
+                  {debugOpen ? (
+                    <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted/50 p-2 text-[10px] text-muted-foreground whitespace-pre-wrap break-all">
+                      {JSON.stringify(discoveryDebug, null, 2)}
+                    </pre>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : hasUrlScan ? (
+            <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
+              <p className="ui-label-meta">
+                Add a LiveRC URL on the Tracks page for this venue, or paste a session URL below.
+              </p>
             </div>
           ) : null}
+          {!hasTrackDiscovery ? (
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               id="url-import-input"
@@ -924,6 +970,7 @@ export function LapTimesIngestPanel({
               {urlBusy ? "Importing…" : "Import"}
             </button>
           </div>
+          ) : null}
 
           {value.urlImportBlocks.map((block, blockIndex) => (
             <div key={block.blockId} className="space-y-2 rounded-lg border border-border bg-surface-runna p-2" data-import-index={blockIndex}>

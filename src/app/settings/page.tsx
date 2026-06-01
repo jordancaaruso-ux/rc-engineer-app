@@ -1,6 +1,5 @@
 import { requireCurrentUser } from "@/lib/currentUser";
 import {
-  getCurrentPracticeDayUrlSetting,
   getLiveRcDriverIdSetting,
   getLiveRcDriverNameSetting,
   getMyNameSetting,
@@ -25,11 +24,10 @@ export default async function SettingsPage() {
     );
   }
   const user = await requireCurrentUser();
-  const [myName, liveRcDriverName, liveRcDriverId, currentPracticeDayUrl] = await Promise.all([
+  const [myName, liveRcDriverName, liveRcDriverId] = await Promise.all([
     getMyNameSetting(user.id),
     getLiveRcDriverNameSetting(user.id),
     getLiveRcDriverIdSetting(user.id),
-    getCurrentPracticeDayUrlSetting(user.id),
   ]);
 
   return (
@@ -48,7 +46,6 @@ export default async function SettingsPage() {
             myName: myName ?? "",
             liveRcDriverName: liveRcDriverName ?? "",
             liveRcDriverId: liveRcDriverId ?? "",
-            currentPracticeDayUrl: currentPracticeDayUrl ?? "",
           }}
         />
         <SettingsNavSection />

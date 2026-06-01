@@ -7,7 +7,6 @@ type InitialSettings = {
   liveRcDriverName: string;
   /** LiveRC `data-driver-id` when known; disambiguates same name on A/B/C mains. */
   liveRcDriverId: string;
-  currentPracticeDayUrl: string;
 };
 
 type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "ok" } | { kind: "error"; text: string };
@@ -16,11 +15,9 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
   const [myName, setMyName] = useState(initial.myName);
   const [liveRcDriverName, setLiveRcDriverName] = useState(initial.liveRcDriverName);
   const [liveRcDriverId, setLiveRcDriverId] = useState(initial.liveRcDriverId);
-  const [currentPracticeDayUrl, setCurrentPracticeDayUrl] = useState(initial.currentPracticeDayUrl);
   const [savingMyName, setSavingMyName] = useState<SaveState>({ kind: "idle" });
   const [savingDriver, setSavingDriver] = useState<SaveState>({ kind: "idle" });
   const [savingDriverId, setSavingDriverId] = useState<SaveState>({ kind: "idle" });
-  const [savingDayUrl, setSavingDayUrl] = useState<SaveState>({ kind: "idle" });
 
   async function postSetting(
     url: string,
@@ -112,25 +109,6 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
           ) : null}
         </div>
       </div>
-
-      <SettingField
-        label="Current practice day URL"
-        hint={
-          "Optional override — leave blank to use your track’s LiveRC URL (set on Tracks). " +
-          "When set, use a session list URL (/practice/?p=session_list&d=YYYY-MM-DD)."
-        }
-        value={currentPracticeDayUrl}
-        onChange={setCurrentPracticeDayUrl}
-        onSave={() =>
-          postSetting(
-            "/api/settings/current-practice-day-url",
-            { currentPracticeDayUrl: currentPracticeDayUrl.trim() || null },
-            setSavingDayUrl
-          )
-        }
-        state={savingDayUrl}
-        placeholder="https://example.liverc.com/…/practice/?p=session_list&d=2026-04-20"
-      />
     </div>
   );
 }

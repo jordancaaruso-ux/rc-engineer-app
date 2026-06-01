@@ -227,12 +227,7 @@ export function NewRunForm(props: {
   const [meetingSessionType, setMeetingSessionType] = useState<MeetingSessionType>("PRACTICE");
   const [meetingSessionCustom, setMeetingSessionCustom] = useState<string>(""); // when type is OTHER
   /**
-   * Practice-day results URL (LiveRC session list). Hydrates from editRun →
-   * copy-last-run → event `practiceSourceUrl` when empty → `currentPracticeDayUrl`
-   * (testing only). Shown for Testing; saved on the run. For Lap times scan in
-   * Testing, this is the index URL. Race meetings use `lapTimesLiveRcScanIndexUrl`
-   * (practice vs race event URLs + meeting session type).
-   * Testing-only: also POSTs to Settings `currentPracticeDayUrl` on save.
+   * Legacy run field; lap import uses track LiveRC URL. Kept for edit-run hydrate only.
    */
   const [practiceDayUrl, setPracticeDayUrl] = useState<string>("");
   const [carId, setCarId] = useState<string>(props.cars[0]?.id ?? "");
@@ -367,9 +362,9 @@ export function NewRunForm(props: {
   const pendingCompleteNavigationRef = useRef(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
-  /** LiveRC index page for Lap times → URL scan: practice `session_list` or any `/results/` session index. */
+  /** Race meeting only: event results/practice hub for lap scan fallback. Testing uses track LiveRC URL. */
   const lapTimesLiveRcScanIndexUrl = useMemo(() => {
-    if (sessionType === "TESTING") return practiceDayUrl.trim() || null;
+    if (sessionType === "TESTING") return null;
     if (sessionType === "RACE_MEETING" && eventId) {
       const p = eventPracticeTimingUrl.trim();
       const r = eventRaceTimingUrl.trim();
@@ -380,7 +375,6 @@ export function NewRunForm(props: {
   }, [
     sessionType,
     eventId,
-    practiceDayUrl,
     eventPracticeTimingUrl,
     eventRaceTimingUrl,
     meetingSessionType,
@@ -447,34 +441,9 @@ export function NewRunForm(props: {
     return () => cancelAnimationFrame(raf);
   }, [focusSection]);
 
-  // Hydrate user-level settings (current practice day URL + LiveRC driver name)
-  // on mount so the Testing session block can prefill the URL and the Lap
-  // Times URL picker has the name it needs to filter candidates.
+  // Hydrate LiveRC driver settings on mount (Settings page is source of truth).
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [dayRes, drvRes] = await Promise.all([
-          fetch("/api/settings/current-practice-day-url"),
-          fetch("/api/settings/live-rc-driver"),
-        ]);
-        if (!alive) return;
-        if (dayRes.ok) {
-          const json = (await dayRes.json().catch(() => ({}))) as { currentPracticeDayUrl?: string | null };
-          if (alive && !practiceDayUrl && typeof json.currentPracticeDayUrl === "string") {
-            setPracticeDayUrl(json.currentPracticeDayUrl);
-          }
-        }
-        // Touch drvRes to keep the settings fetch warm; Settings page is source of truth.
-        void drvRes.ok;
-      } catch {
-        // Best-effort hydrate; the Settings page is the source of truth.
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void fetch("/api/settings/live-rc-driver").catch(() => {});
   }, []);
 
   // Edit-run load must run before dashboard/import prefill so opening /runs/:id/edit?importedLapTimeSessionId=…
@@ -1914,13 +1883,10 @@ export function NewRunForm(props: {
             })(),
           },
           notes: notes.trim() || null,
-          practiceDayUrl: (() => {
-            if (sessionType === "TESTING" && practiceDayUrl.trim()) return practiceDayUrl.trim();
-            if (sessionType === "RACE_MEETING" && eventId && eventPracticeTimingUrl.trim()) {
-              return eventPracticeTimingUrl.trim();
-            }
-            return null;
-          })(),
+          practiceDayUrl:
+            sessionType === "RACE_MEETING" && eventId && eventPracticeTimingUrl.trim()
+              ? eventPracticeTimingUrl.trim()
+              : null,
           raceClass: raceClass.trim() || null,
           suggestedChanges: isEditing ? (editRun?.suggestedChanges?.trim() || null) : null,
           suggestedPreRun: isEditing ? (editRun?.suggestedPreRun?.trim() || null) : null,
@@ -1970,14 +1936,6 @@ export function NewRunForm(props: {
             );
           })
           .catch(() => {});
-      }
-
-      if (sessionType === "TESTING" && practiceDayUrl.trim()) {
-        void fetch("/api/settings/current-practice-day-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ currentPracticeDayUrl: practiceDayUrl.trim() }),
-        }).catch(() => {});
       }
 
       // Completing a run sends the driver to the dashboard with a one-time
@@ -2164,11 +2122,6 @@ export function NewRunForm(props: {
             {sessionType === "TESTING" ? (
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="font-medium">Testing</span>
-                {practiceDayUrl.trim() ? (
-                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-                    LiveRC index URL set
-                  </span>
-                ) : null}
               </div>
             ) : (
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -2231,23 +2184,9 @@ export function NewRunForm(props: {
               </label>
             </div>
             {sessionType === "TESTING" ? (
-              <div className="mt-3 space-y-1 text-sm">
-                <label
-                  htmlFor="practice-day-url-input"
-                  className="block text-xs font-medium text-muted-foreground"
-                >
-                  LiveRC timing index URL
-                </label>
-                <input
-                  id="practice-day-url-input"
-                  type="url"
-                  value={practiceDayUrl}
-                  onChange={(e) => setPracticeDayUrl(e.target.value)}
-                  placeholder="https://…/practice/?p=session_list&d=YYYY-MM-DD or …/results/?p=view_event&id=…"
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-accent/50"
-                  aria-label="LiveRC timing index URL for lap scan"
-                />
-              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Lap times are loaded from the track&apos;s LiveRC URL when you pick a track below.
+              </p>
             ) : null}
           </>
         )}
