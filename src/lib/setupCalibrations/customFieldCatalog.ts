@@ -279,6 +279,15 @@ function appendMissingCatalogRowsToSections(
   return result.filter((sec) => sec.rows.length > 0);
 }
 
+/** Append calibration catalog fields (motor, ESC, spur, etc.) missing from structured layout. */
+export function appendMissingCalibrationCatalogToStructuredSections(
+  sections: StructuredSection[],
+  view: "setup" | "analysis" = "setup",
+  hiddenKeys: Set<string> = new Set()
+): StructuredSection[] {
+  return appendMissingCatalogRowsToSections(sections, view, hiddenKeys);
+}
+
 function rowFullyHidden(row: StructuredRow, hiddenKeys: Set<string>): boolean {
   const keys = structuredRowKeys(row);
   if (keys.length === 0) return false;

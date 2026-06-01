@@ -111,7 +111,8 @@ export function EventLapSourcesPanel(props: {
     <div className="rounded-lg border border-border bg-card p-4 text-sm shadow-sm shadow-black/20">
       <h2 className="text-sm font-medium text-foreground">LiveRC lap detection</h2>
       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-        Paste practice list or results index URLs. The app matches your LiveRC driver name and surfaces prompts on the dashboard when new sessions appear. Use comma or semicolon between multiple race classes.
+        Optional overrides when track LiveRC URL is not enough. The app discovers your most recent sessions from the
+        track URL; paste here only to pin a specific index page. Use comma or semicolon between multiple race classes.
       </p>
       <div className="mt-3 grid gap-3">
         <label className="grid gap-1">

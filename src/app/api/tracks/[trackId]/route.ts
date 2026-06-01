@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
+import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 
 export async function GET(
   _request: Request,
@@ -21,7 +22,7 @@ export async function GET(
 
   const track = await prisma.track.findFirst({
     where: { id: trackId, userId: user.id },
-    select: { id: true, name: true, location: true, gripTags: true, layoutTags: true, createdAt: true },
+    select: { id: true, name: true, location: true, liveRcUrl: true, gripTags: true, layoutTags: true, createdAt: true },
   });
 
   if (!track) {
@@ -48,6 +49,7 @@ export async function PATCH(
   const body = (await request.json().catch(() => null)) as {
     gripTags?: unknown;
     layoutTags?: unknown;
+    liveRcUrl?: string | null;
   } | null;
 
   const existing = await prisma.track.findFirst({
@@ -58,12 +60,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
 
-  const data: { gripTags?: string[]; layoutTags?: string[] } = {};
+  const data: { gripTags?: string[]; layoutTags?: string[]; liveRcUrl?: string | null } = {};
   if (body && "gripTags" in body) {
     data.gripTags = normalizeGripTags(body.gripTags);
   }
   if (body && "layoutTags" in body) {
     data.layoutTags = normalizeLayoutTags(body.layoutTags);
+  }
+  if (body && "liveRcUrl" in body) {
+    if (body.liveRcUrl == null || (typeof body.liveRcUrl === "string" && !body.liveRcUrl.trim())) {
+      data.liveRcUrl = null;
+    } else if (typeof body.liveRcUrl === "string") {
+      const v = validateLiveRcTrackUrl(body.liveRcUrl);
+      if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+      data.liveRcUrl = v.normalized;
+    }
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields" }, { status: 400 });
@@ -72,7 +83,7 @@ export async function PATCH(
   const track = await prisma.track.update({
     where: { id: trackId },
     data,
-    select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
+    select: { id: true, name: true, location: true, liveRcUrl: true, gripTags: true, layoutTags: true },
   });
 
   return NextResponse.json({ track });

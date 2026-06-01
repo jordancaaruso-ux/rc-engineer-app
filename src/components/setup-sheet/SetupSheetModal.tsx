@@ -15,7 +15,12 @@ import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
-import { isA800RRCar } from "@/lib/setupSheetTemplateId";
+import {
+  canonicalSetupSheetTemplateId,
+  isA800RRCar,
+  SETUP_SHEET_TEMPLATE_A800RR,
+} from "@/lib/setupSheetTemplateId";
+import { GRIP_BUCKET_ANY } from "@/lib/setupAggregations/gripBuckets";
 import {
   getActiveSetupData,
   ACTIVE_SETUP_CHANGED_EVENT,
@@ -23,7 +28,7 @@ import {
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import {
-  buildNumericAggregationMapForCar,
+  buildNumericAggregationMapFromCommunity,
   type SetupAggApiRow,
 } from "@/lib/setupCompare/buildNumericAggregationMap";
 
@@ -138,21 +143,30 @@ export function SetupSheetModal({
     return () => window.removeEventListener(ACTIVE_SETUP_CHANGED_EVENT, bump);
   }, []);
 
-  const aggregationCarId = run?.car?.id?.trim() || null;
+  const communityTemplateKey = useMemo(() => {
+    return (
+      canonicalSetupSheetTemplateId(run?.car?.setupSheetTemplate ?? null) ??
+      SETUP_SHEET_TEMPLATE_A800RR
+    );
+  }, [run?.car?.setupSheetTemplate]);
 
   useEffect(() => {
-    if (!open || !aggregationCarId) {
+    if (!open) {
       setNumericAggregationByKey(null);
       return;
     }
     let alive = true;
-    const q = `?carId=${encodeURIComponent(aggregationCarId)}`;
-    fetch(`/api/setup-aggregations${q}`)
+    const q = new URLSearchParams({
+      setupSheetTemplate: communityTemplateKey,
+      trackSurface: "asphalt",
+      gripLevel: GRIP_BUCKET_ANY,
+    }).toString();
+    void fetch(`/api/setup-aggregations/community?${q}`)
       .then((res) => res.json())
       .then((data: { aggregations?: SetupAggApiRow[] }) => {
         if (!alive) return;
         const rows = Array.isArray(data.aggregations) ? data.aggregations : [];
-        setNumericAggregationByKey(buildNumericAggregationMapForCar(rows, aggregationCarId));
+        setNumericAggregationByKey(buildNumericAggregationMapFromCommunity(rows));
       })
       .catch(() => {
         if (alive) setNumericAggregationByKey(null);
@@ -160,7 +174,7 @@ export function SetupSheetModal({
     return () => {
       alive = false;
     };
-  }, [open, aggregationCarId]);
+  }, [open, communityTemplateKey]);
 
   // PDF viewer intentionally removed from Analyse run (Setup is app-native / parsed-first).
 
@@ -415,18 +429,18 @@ export function SetupSheetModal({
                   )}
                   {compareActive && baselineRun ? (
                     <p className="text-[11px] text-muted-foreground">
-                      Showing this run&apos;s setup.{" "}
-                      <span className="text-red-600/90 dark:text-red-400/90">Red</span> = different from{" "}
-                      {formatPickerLine(baselineRun)}. Changed fields show{" "}
-                      <span className="font-medium text-foreground/80">vs …</span> with the other value
-                      {mode === "current_setup" ? " (current setup)" : ""}; numbers include{" "}
-                      <span className="font-medium text-foreground/80">(+/−Δ)</span> when applicable.
+                      Showing this run&apos;s setup vs {formatPickerLine(baselineRun)}. Changed fields show{" "}
+                      <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
+                      <span className="text-red-600/90 dark:text-red-400/90">Darker red</span> = larger difference vs
+                      community spread for that parameter; parameters without enough community samples use a fixed
+                      lighter red.
                     </p>
                   ) : compareActive && mode === "current_setup" ? (
                     <p className="text-[11px] text-muted-foreground">
                       Compared to your current setup. Changed fields show{" "}
-                      <span className="font-medium text-foreground/80">vs …</span>
-                      {hasActiveSetup ? " and (+/−Δ) for numbers." : "."}
+                      <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
+                      <span className="text-red-600/90 dark:text-red-400/90">Darker red</span> = larger difference vs
+                      community spread{hasActiveSetup ? "." : " (no current setup loaded)."}
                     </p>
                   ) : null}
                 </div>
@@ -450,7 +464,7 @@ export function SetupSheetModal({
                 template={template}
                 baselineValue={baselineValue}
                 compareHighlightOnly={compareActive}
-                numericAggregationByKey={null}
+                numericAggregationByKey={compareActive ? numericAggregationByKey : null}
               />
             </>
           )}

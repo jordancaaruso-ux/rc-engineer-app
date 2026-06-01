@@ -12,6 +12,7 @@ import {
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
+import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
 
 export type ScanDayUrlIndexKind = "practice" | "results";
 
@@ -66,12 +67,67 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as
-    | { dayUrl?: string; eventId?: string | null }
+    | { dayUrl?: string; eventId?: string | null; trackId?: string | null }
     | null;
   const dayUrl = body?.dayUrl?.trim() ?? "";
   const eventId = typeof body?.eventId === "string" ? body.eventId.trim() : "";
+  const trackId = typeof body?.trackId === "string" ? body.trackId.trim() : "";
+
+  if (!dayUrl && trackId) {
+    const track = await prisma.track.findFirst({
+      where: { id: trackId, userId: user.id },
+      select: { liveRcUrl: true },
+    });
+    const liveRcUrl = track?.liveRcUrl?.trim() ?? "";
+    if (!liveRcUrl) {
+      return NextResponse.json(
+        { error: "This track has no LiveRC URL configured." },
+        { status: 400 }
+      );
+    }
+    let eventRaceClass: string | null = null;
+    if (eventId) {
+      const ev = await prisma.event.findFirst({
+        where: { id: eventId, userId: user.id },
+        select: { raceClass: true },
+      });
+      eventRaceClass = ev?.raceClass?.trim() || null;
+    }
+    const liveRcDriverName = await getLiveRcDriverNameSetting(user.id);
+    const discovered = await discoverLiveRcSessionsForUser({
+      userId: user.id,
+      trackLiveRcUrl: liveRcUrl,
+      eventRaceClass,
+    });
+    const candidates: ScanDayUrlCandidateRow[] = discovered.candidates.map((c) => ({
+      sessionId: c.sessionId,
+      sessionUrl: c.sessionUrl,
+      driverName: c.label,
+      sessionTime: null,
+      sessionCompletedAtIso: c.sessionCompletedAtIso,
+      matchesDriver: true,
+      alreadyImported: c.alreadyImported,
+      linkedRunId: c.linkedRunId,
+    }));
+    return NextResponse.json({
+      ok: true,
+      dayUrl: discovered.practiceIndexUrl ?? discovered.raceHubUrl ?? liveRcUrl,
+      indexKind: "practice" as ScanDayUrlIndexKind,
+      liveRcDriverName,
+      candidates,
+      totalCandidates: candidates.length,
+      matchedCount: candidates.length,
+      hasDriverNameSetting: Boolean(liveRcDriverName?.trim()),
+      driverFilterApplied: true,
+      scanMessage: discovered.hint,
+      discoveredFromTrack: true,
+      mostRecentSessionUrl: discovered.mostRecentSession?.sessionUrl ?? null,
+      activeRaceMeeting: discovered.activeRaceMeeting,
+    });
+  }
+
   if (!dayUrl) {
-    return NextResponse.json({ error: "dayUrl is required" }, { status: 400 });
+    return NextResponse.json({ error: "dayUrl or trackId is required" }, { status: 400 });
   }
   const isPractice = isLiveRcPracticeListUrl(dayUrl);
   const isResults = isLiveRcResultsDiscoveryUrl(dayUrl);

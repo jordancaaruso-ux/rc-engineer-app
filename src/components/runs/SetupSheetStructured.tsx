@@ -102,13 +102,13 @@ type Props = {
    */
   compareValueColumnRole?: CompareColumnRole | null;
   /**
-   * Modal / single-sheet diff: red row tint on changes only — still shows “vs baseline” on
-   * diffs, but no A|B column chip coloring. Omit on Engineer A|B side-by-side compare.
+   * Modal / single-sheet diff: IQR-scaled red row tint on changes, “vs baseline” on diffs,
+   * no bracket deltas and no A|B column chip coloring. Omit on Engineer side-by-side compare.
    */
   compareHighlightOnly?: boolean;
 };
 
-const CompareUiContext = createContext({ highlightOnly: false });
+const CompareUiContext = createContext({ highlightOnly: false, showDeltaSuffix: true });
 
 function useCompareUi() {
   return useContext(CompareUiContext);
@@ -408,6 +408,8 @@ function InlineValueCompare({
   };
   const pv = display(value);
   const bv = display(baseline);
+  const { showDeltaSuffix } = useCompareUi();
+  const suffix = showDeltaSuffix ? compareSuffix : null;
   const showVs =
     hasBaseline &&
     baseline !== undefined &&
@@ -433,9 +435,9 @@ function InlineValueCompare({
         <>
           {!hidePrimary ? <span className="text-muted-foreground select-none">·</span> : null}
           <span className="text-sm font-sans tabular-nums font-semibold text-muted-foreground">vs {bv}</span>
-          {compareSuffix ? (
+          {suffix ? (
             <span className="text-sm font-sans tabular-nums font-semibold text-muted-foreground/90">
-              {compareSuffix}
+              {suffix}
             </span>
           ) : null}
         </>
@@ -711,9 +713,9 @@ function PresetWithOtherChipEditor({
     />
   );
 
-  const { highlightOnly } = useCompareUi();
+  const { highlightOnly, showDeltaSuffix } = useCompareUi();
   const chipCompareSuffix =
-    hasBaseline && baseline
+    showDeltaSuffix && hasBaseline && baseline
       ? formatSetupCompareDeltaSuffix(
           compareSetupField({ key: fieldKey, a: value[fieldKey], b: baseline[fieldKey] })
         )
@@ -960,7 +962,8 @@ function EditableSingle({
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
   const chipAccent: "sky" | "rose" = compareColumnRole === "b" ? "rose" : "sky";
-  const compareSuffix = formatSetupCompareDeltaSuffix(fieldCompare);
+  const { showDeltaSuffix } = useCompareUi();
+  const compareSuffix = showDeltaSuffix ? formatSetupCompareDeltaSuffix(fieldCompare) : null;
   const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
   const vRaw = fieldValue(value, fieldKey);
   const v = fieldDisplayValue(value, fieldKey, fieldChipOptionsByKey);
@@ -1311,7 +1314,8 @@ function PairSideCell({
   const cmp = keyFieldCompareResult(fieldKey, value, baseline, highlightChangedKeys, numericAggregationByKey);
   const role = compareValueColumnRole ?? undefined;
   const hl = compareResultToHighlight(cmp, role);
-  const compareSuffix = formatSetupCompareDeltaSuffix(cmp);
+  const { showDeltaSuffix } = useCompareUi();
+  const compareSuffix = showDeltaSuffix ? formatSetupCompareDeltaSuffix(cmp) : null;
   const chipAccent: "sky" | "rose" = compareValueColumnRole === "b" ? "rose" : "sky";
   const c = !cmp.areEqual;
   const fk = fieldKind ?? "text";
@@ -2047,7 +2051,9 @@ export function SetupSheetStructured({
   };
 
   return (
-    <CompareUiContext.Provider value={{ highlightOnly: compareHighlightOnly }}>
+    <CompareUiContext.Provider
+      value={{ highlightOnly: compareHighlightOnly, showDeltaSuffix: !compareHighlightOnly }}
+    >
       <div ref={sheetRootRef} className="space-y-3">
         {enableFieldSearch && !readOnly ? (
           <SetupFieldJumpSearch entries={fieldSearchEntries} rootRef={sheetRootRef} />

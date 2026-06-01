@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 
-type Track = { id: string; name: string; location?: string | null };
+type Track = { id: string; name: string; location?: string | null; liveRcUrl?: string | null };
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
@@ -33,6 +33,7 @@ export function TrackList({
   }, [initialTracks]);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
+  const [liveRcUrl, setLiveRcUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -49,11 +50,16 @@ export function TrackList({
       const { track } = await jsonFetch<{ track: Track }>("/api/tracks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, location: location.trim() || null }),
+        body: JSON.stringify({
+          name: trimmed,
+          location: location.trim() || null,
+          liveRcUrl: liveRcUrl.trim() || null,
+        }),
       });
       setTracks((prev) => [track, ...prev]);
       setName("");
       setLocation("");
+      setLiveRcUrl("");
       setMessage("Track added.");
       router.refresh();
     } catch (err) {
@@ -87,6 +93,16 @@ export function TrackList({
               placeholder="e.g. UK"
             />
           </div>
+        </div>
+        <div>
+          <label className="block text-[11px] text-muted-foreground mb-1">LiveRC URL (optional)</label>
+          <input
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+            value={liveRcUrl}
+            onChange={(e) => setLiveRcUrl(e.target.value)}
+            placeholder="https://tftr.liverc.com/"
+            autoComplete="off"
+          />
         </div>
         <div className="flex items-center gap-2">
           <button

@@ -116,8 +116,8 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
       <SettingField
         label="Current practice day URL"
         hint={
-          "Paste the day's LiveRC session list (e.g. /practice/?p=session_list&d=YYYY-MM-DD). " +
-          "Log Your Run will pre-fill this under Testing sessions so Lap Times can pull your laps automatically."
+          "Optional override — leave blank to use your track’s LiveRC URL (set on Tracks). " +
+          "When set, use a session list URL (/practice/?p=session_list&d=YYYY-MM-DD)."
         }
         value={currentPracticeDayUrl}
         onChange={setCurrentPracticeDayUrl}

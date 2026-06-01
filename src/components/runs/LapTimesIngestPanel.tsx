@@ -142,18 +142,25 @@ export function LapTimesIngestPanel({
   onChange,
   practiceDayUrl,
   lapImportEventId,
+  trackId,
+  trackLiveRcUrl,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
   /**
    * LiveRC index URL for "scan" (practice `session_list` day page, or any `/results/` page that lists sessions).
-   * Enables the scan picker above the manual URL field.
+   * Optional override when track has `liveRcUrl` for automatic discovery.
    */
   practiceDayUrl?: string | null;
   /** When set, LiveRC event hub imports filter by this event's race class list. */
   lapImportEventId?: string | null;
+  /** When set with track LiveRC URL, scan finds your most recent sessions without a daily URL. */
+  trackId?: string | null;
+  trackLiveRcUrl?: string | null;
 }) {
-  const [tab, setTab] = useState<IngestTab>(() => ((practiceDayUrl ?? "").trim() ? "url" : "manual"));
+  const hasTrackDiscovery = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
+  const hasUrlScan = Boolean((practiceDayUrl ?? "").trim()) || hasTrackDiscovery;
+  const [tab, setTab] = useState<IngestTab>(() => (hasUrlScan ? "url" : "manual"));
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoNote, setPhotoNote] = useState<string | null>(null);
   const [photoConfidence, setPhotoConfidence] = useState<string | null>(null);
@@ -232,9 +239,16 @@ export function LapTimesIngestPanel({
   }, []);
 
   useEffect(() => {
-    if (!(practiceDayUrl ?? "").trim()) return;
+    if (!hasUrlScan) return;
     setTab((prev) => (prev === "manual" ? "url" : prev));
-  }, [practiceDayUrl]);
+  }, [hasUrlScan, practiceDayUrl, trackId, trackLiveRcUrl]);
+
+  useEffect(() => {
+    if (!(practiceDayUrl ?? "").trim() && hasTrackDiscovery) {
+      void scanDayUrl();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
+  }, [trackId, trackLiveRcUrl, lapImportEventId]);
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
   const manualMetrics = useMemo(() => {
@@ -327,8 +341,9 @@ export function LapTimesIngestPanel({
 
   async function scanDayUrl() {
     const url = (practiceDayUrl ?? "").trim();
-    if (!url) {
-      setDayScanMessage("Add a LiveRC timing index URL under Session type or Event first.");
+    const tid = trackId?.trim() ?? "";
+    if (!url && !tid) {
+      setDayScanMessage("Select a track with a LiveRC URL or add a timing index URL under Session type.");
       return;
     }
     setDayScanBusy(true);
@@ -339,7 +354,8 @@ export function LapTimesIngestPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dayUrl: url,
+          ...(url ? { dayUrl: url } : {}),
+          ...(tid && !url ? { trackId: tid } : {}),
           eventId: lapImportEventId?.trim() || undefined,
         }),
       });
@@ -787,16 +803,22 @@ export function LapTimesIngestPanel({
               ) : null}
             </div>
           ) : null}
-          {practiceDayUrl ? (
+          {hasUrlScan ? (
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="ui-title text-[11px] text-muted-foreground">
-                    {dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl)
-                      ? "Race / results index URL"
-                      : "Practice day URL"}
+                    {hasTrackDiscovery && !(practiceDayUrl ?? "").trim()
+                      ? "LiveRC sessions at this track"
+                      : dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl ?? "")
+                        ? "Race / results index URL"
+                        : "Practice day URL"}
                   </div>
-                  <div className="text-[11px] text-muted-foreground break-all">{practiceDayUrl}</div>
+                  {(practiceDayUrl ?? "").trim() ? (
+                    <div className="text-[11px] text-muted-foreground break-all">{practiceDayUrl}</div>
+                  ) : hasTrackDiscovery ? (
+                    <div className="text-[11px] text-muted-foreground break-all">{trackLiveRcUrl}</div>
+                  ) : null}
                 </div>
                 <button
                   type="button"
@@ -811,19 +833,27 @@ export function LapTimesIngestPanel({
                     ? "Scanning…"
                     : dayScanCandidates
                       ? "Rescan"
-                      : dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl)
-                        ? "Scan for sessions"
-                        : "Scan practice list"}
+                      : hasTrackDiscovery && !(practiceDayUrl ?? "").trim()
+                        ? "Find my sessions"
+                        : dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl ?? "")
+                          ? "Scan for sessions"
+                          : "Scan practice list"}
                 </button>
               </div>
+              {hasTrackDiscovery && !(practiceDayUrl ?? "").trim() ? (
+                <p className="ui-label-meta">
+                  Shows your most recent practice or race sessions at this track (by completion time). Does not change
+                  session type above.
+                </p>
+              ) : null}
               {!dayScanHasDriverName &&
-              (dayScanIndexKind !== "results" && !/\/results\b/i.test(practiceDayUrl)) ? (
+              (dayScanIndexKind !== "results" && !/\/results\b/i.test(practiceDayUrl ?? "")) ? (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">
                   No LiveRC driver name set — Settings → LiveRC driver name helps filter practice list scans to
                   only your sessions.
                 </p>
               ) : null}
-              {dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl) ? (
+              {dayScanIndexKind === "results" || /\/results\b/i.test(practiceDayUrl ?? "") ? (
                 <p className="ui-label-meta">
                   Results pages list races by class or round — pick your session, then confirm your row on the
                   timing page (your LiveRC driver name still applies there).

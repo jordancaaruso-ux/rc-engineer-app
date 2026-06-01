@@ -6,6 +6,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { TrackFavouriteClient } from "@/components/tracks/TrackFavouriteClient";
+import { TrackLiveRcUrlEditor } from "@/components/tracks/TrackLiveRcUrlEditor";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -32,7 +33,7 @@ export default async function TrackDetailPage(props: {
   const user = await requireCurrentUser();
   const track = await prisma.track.findFirst({
     where: { id: trackId, userId: user.id },
-    select: { id: true, name: true, location: true, createdAt: true },
+    select: { id: true, name: true, location: true, liveRcUrl: true, createdAt: true },
   });
 
   if (!track) {
@@ -84,6 +85,8 @@ export default async function TrackDetailPage(props: {
               ) : null}
             </div>
           </div>
+
+          <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />
 
           <TrackFavouriteClient trackId={track.id} trackName={track.name} isFavourite={isFavourite} />
         </div>

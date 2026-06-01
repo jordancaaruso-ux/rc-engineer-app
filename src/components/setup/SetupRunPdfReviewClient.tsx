@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
+import { buildCompletePdfReviewSetupTemplate } from "@/lib/setup/buildCompletePdfReviewSetupTemplate";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
@@ -63,17 +64,21 @@ export function SetupRunPdfReviewClient({ runId }: { runId: string }) {
       setSavedBaselineJson(stableSetupJson(normalized));
 
       const carId = json.run.car?.id;
+      let baseTemplate: SetupSheetTemplate = getDefaultSetupSheetTemplate();
       if (carId) {
         const tRes = await fetch(`/api/cars/${encodeURIComponent(carId)}/setup-sheet-template`);
         const tJson = (await tRes.json().catch(() => null)) as { template?: SetupSheetTemplate } | null;
         if (tRes.ok && tJson?.template) {
-          setTemplate(tJson.template);
-        } else {
-          setTemplate(getDefaultSetupSheetTemplate());
+          baseTemplate = tJson.template;
         }
-      } else {
-        setTemplate(getDefaultSetupSheetTemplate());
       }
+      setTemplate(
+        buildCompletePdfReviewSetupTemplate({
+          baseTemplate,
+          setupData: normalized,
+          carSetupSheetTemplate: json.run.car?.setupSheetTemplate ?? null,
+        })
+      );
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load setup");
       setPayload(null);

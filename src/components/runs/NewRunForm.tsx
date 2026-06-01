@@ -58,6 +58,7 @@ type TrackOption = {
   id: string;
   name: string;
   location?: string | null;
+  liveRcUrl?: string | null;
   gripTags?: string[];
   layoutTags?: string[];
 };
@@ -3525,6 +3526,8 @@ export function NewRunForm(props: {
         onChange={setLapIngest}
         practiceDayUrl={lapTimesLiveRcScanIndexUrl}
         lapImportEventId={sessionType === "RACE_MEETING" && eventId ? eventId : null}
+        trackId={trackId.trim() || null}
+        trackLiveRcUrl={tracksList.find((t) => t.id === trackId)?.liveRcUrl ?? null}
       />
 
       <label className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs cursor-pointer select-none">

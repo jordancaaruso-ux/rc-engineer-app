@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser, addTrackToFavourites } from "@/lib/track-favourites";
+import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
             ? { ...whereBase, id: { in: [] } }
             : whereBase,
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
+      select: { id: true, name: true, location: true, liveRcUrl: true, gripTags: true, layoutTags: true },
     });
 
     if (favouritesFirst && favouriteTrackIds.length > 0) {
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       name?: string;
       location?: string | null;
+      liveRcUrl?: string | null;
       addToFavourites?: boolean;
     };
     const name = body.name?.trim();
@@ -94,13 +96,22 @@ export async function POST(request: Request) {
     }
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    let liveRcUrl: string | null = null;
+    if (typeof body.liveRcUrl === "string" && body.liveRcUrl.trim()) {
+      const v = validateLiveRcTrackUrl(body.liveRcUrl);
+      if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+      liveRcUrl = v.normalized;
+    }
+
     const track = await prisma.track.create({
       data: {
         userId: user.id,
         name,
         location: body.location?.trim() || null,
+        liveRcUrl,
       },
-      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
+      select: { id: true, name: true, location: true, liveRcUrl: true, gripTags: true, layoutTags: true },
     });
     if (body.addToFavourites) {
       await addTrackToFavourites(user.id, track.id);

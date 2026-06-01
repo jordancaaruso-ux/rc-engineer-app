@@ -17,6 +17,7 @@ import { resolveImportedSessionDisplayTimeIso, resolveImportedSessionHasWallCloc
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 import { eventIsActiveOnLocalToday } from "@/lib/eventActive";
+import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
 
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 
@@ -108,15 +109,21 @@ export async function syncRecentEventLapSources(userId: string): Promise<void> {
       raceClass: true,
       practiceLastSeenSessionCompletedAt: true,
       resultsLastSeenSessionCompletedAt: true,
+      track: { select: { liveRcUrl: true } },
     },
   });
 
   for (const ev of scoped) {
+    const trackLiveRc = ev.track?.liveRcUrl?.trim() ?? "";
     if (ev.practiceSourceUrl?.trim() && liveNorm) {
       await syncPracticeForEvent(userId, ev, liveNorm, liveName);
+    } else if (trackLiveRc && liveNorm) {
+      await syncDiscoveredForEvent(userId, ev, trackLiveRc, liveNorm, liveName, "practice");
     }
     if (ev.resultsSourceUrl?.trim() && ev.raceClass?.trim() && liveName) {
       await syncResultsForEvent(userId, ev, liveNorm, liveName);
+    } else if (trackLiveRc && ev.raceClass?.trim() && liveName) {
+      await syncDiscoveredForEvent(userId, ev, trackLiveRc, liveNorm, liveName, "race");
     }
   }
 }
@@ -280,6 +287,81 @@ async function syncResultsForEvent(
     where: { id: ev.id },
     data: { resultsLastSeenSessionCompletedAt: maxSeen ?? undefined },
   });
+}
+
+async function syncDiscoveredForEvent(
+  userId: string,
+  ev: {
+    id: string;
+    raceClass: string | null;
+    practiceLastSeenSessionCompletedAt: Date | null;
+    resultsLastSeenSessionCompletedAt: Date | null;
+  },
+  trackLiveRcUrl: string,
+  liveNorm: string,
+  liveName: string,
+  kind: "practice" | "race"
+): Promise<void> {
+  const onlyNewSince =
+    kind === "practice" ? ev.practiceLastSeenSessionCompletedAt : ev.resultsLastSeenSessionCompletedAt;
+
+  const discovered = await discoverLiveRcSessionsForUser({
+    userId,
+    trackLiveRcUrl,
+    eventRaceClass: kind === "race" ? ev.raceClass : null,
+    onlyNewSince: onlyNewSince ?? undefined,
+  });
+
+  const targets = discovered.candidates.filter((c) => c.sourceKind === kind).slice(0, 10);
+  let maxSeen: Date | null = onlyNewSince ?? null;
+
+  for (const t of targets) {
+    const imported = await importOneTimingUrl(userId, t.sessionUrl, {
+      driverName: kind === "race" ? liveName : undefined,
+    });
+    if (imported.success !== true) continue;
+
+    const enriched = await enrichImportedSessionForWatch(userId, imported.importedSessionId, {
+      sessionCompletedAtIsoFromDiscovery: t.sessionCompletedAtIso,
+    });
+    if (!enriched) continue;
+
+    if (kind === "practice") {
+      const canonNorm = normalizeLiveRcDriverNameForMatch(enriched.displayDriverName);
+      if (canonNorm !== liveNorm) continue;
+    } else {
+      const canonNorm = normalizeLiveRcDriverNameForMatch(enriched.displayDriverName);
+      if (liveNorm && canonNorm !== liveNorm) continue;
+    }
+
+    const displayIso = enriched.sessionCompletedAtIso;
+    const when = displayIso ? new Date(displayIso) : null;
+    if (when && !Number.isNaN(when.getTime())) {
+      maxSeen = maxDate(maxSeen, when);
+    }
+
+    await prisma.importedLapTimeSession.update({
+      where: { id: imported.importedSessionId },
+      data: {
+        linkedEventId: ev.id,
+        eventDetectionSource: kind,
+        eventRaceClass: kind === "race" ? ev.raceClass!.trim() : null,
+        eventDetectionSessionLabel: t.label,
+      },
+    });
+  }
+
+  if (kind === "practice") {
+    await prisma.event.update({
+      where: { id: ev.id },
+      data: { practiceLastSeenSessionCompletedAt: maxSeen ?? undefined },
+    });
+  } else {
+    await prisma.event.update({
+      where: { id: ev.id },
+      data: { resultsLastSeenSessionCompletedAt: maxSeen ?? undefined },
+    });
+  }
 }
 
 function runIsIncomplete(run: { lapTimes: unknown; notes: string | null }): boolean {
