@@ -1,4 +1,4 @@
-import { validateTimingHttpUrlSync } from "@/lib/http/timingUrlSafety";
+import { validateTimingHttpUrlSync } from "@/lib/http/timingUrlSafetySync";
 
 /** Normalize a LiveRC URL to track origin: `https://{slug}.liverc.com` */
 export function normalizeLiveRcTrackOrigin(urlStr: string): string | null {

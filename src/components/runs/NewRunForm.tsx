@@ -47,7 +47,7 @@ import {
   LiveRcRaceMeetingPrompt,
   type LiveRcMeetingDetection,
 } from "@/components/runs/LiveRcRaceMeetingPrompt";
-import { defaultEventDatesForLiveRcDetection } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
+import { defaultEventDatesForLiveRcDetection } from "@/lib/lapWatch/liveRcMeetingDates";
 import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getCurrentPosition";
 import {
   DEFAULT_TRACK_PROXIMITY_RADIUS_M,

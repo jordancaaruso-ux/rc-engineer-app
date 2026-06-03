@@ -1,22 +1,16 @@
+import "server-only";
+
 import dns from "node:dns/promises";
 import net from "node:net";
+import {
+  isTimingHostnameAllowed,
+  isTimingHostnameBlocked,
+  validateTimingHttpUrlSync,
+  type ValidateTimingUrlOptions,
+} from "@/lib/http/timingUrlSafetySync";
 
-/** Known public timing hosts (hostname suffix match). */
-const TIMING_HOST_SUFFIXES = [
-  "liverc.com",
-  "live-rc.com",
-  "rcprotiming.com",
-  "mylaps.com",
-  "rctrack.info",
-];
-
-function hostnameAllowed(hostname: string, allowAnyPublicHost: boolean): boolean {
-  const h = hostname.toLowerCase();
-  if (TIMING_HOST_SUFFIXES.some((suffix) => h === suffix || h.endsWith(`.${suffix}`))) {
-    return true;
-  }
-  return allowAnyPublicHost;
-}
+export type { ValidateTimingUrlOptions } from "@/lib/http/timingUrlSafetySync";
+export { validateTimingHttpUrlSync } from "@/lib/http/timingUrlSafetySync";
 
 function isBlockedIp(ip: string): boolean {
   const kind = net.isIP(ip);
@@ -40,7 +34,7 @@ function isBlockedIp(ip: string): boolean {
 }
 
 async function resolveHostBlocked(hostname: string): Promise<boolean> {
-  if (hostname === "localhost" || hostname.endsWith(".local")) return true;
+  if (isTimingHostnameBlocked(hostname)) return true;
   if (net.isIP(hostname)) return isBlockedIp(hostname);
   try {
     const records = await dns.lookup(hostname, { all: true });
@@ -49,11 +43,6 @@ async function resolveHostBlocked(hostname: string): Promise<boolean> {
     return true;
   }
 }
-
-export type ValidateTimingUrlOptions = {
-  /** Admin bypass: allow any public http(s) host (private IPs still blocked). */
-  allowAnyPublicHost?: boolean;
-};
 
 export async function validateTimingHttpUrlAsync(
   url: string,
@@ -74,7 +63,7 @@ export async function validateTimingHttpUrlAsync(
     return { ok: false, error: "URL must not include credentials" };
   }
   const allowAny = options.allowAnyPublicHost === true;
-  if (!hostnameAllowed(u.hostname, allowAny)) {
+  if (!isTimingHostnameAllowed(u.hostname, allowAny)) {
     return {
       ok: false,
       error: allowAny
@@ -86,31 +75,4 @@ export async function validateTimingHttpUrlAsync(
     return { ok: false, error: "URL resolves to a blocked address" };
   }
   return { ok: true, normalized: trimmed };
-}
-
-/** Sync check for protocol/hostname only (use async for DNS when fetching). */
-export function validateTimingHttpUrlSync(
-  url: string,
-  options: ValidateTimingUrlOptions = {}
-): { ok: true; normalized: string } | { ok: false; error: string } {
-  const trimmed = url.trim();
-  if (!trimmed) return { ok: false, error: "url is required" };
-  try {
-    const u = new URL(trimmed);
-    if (u.protocol !== "http:" && u.protocol !== "https:") {
-      return { ok: false, error: "URL must be http(s)" };
-    }
-    if (u.username || u.password) {
-      return { ok: false, error: "URL must not include credentials" };
-    }
-    if (!hostnameAllowed(u.hostname, options.allowAnyPublicHost === true)) {
-      return { ok: false, error: "URL host not in allowed timing domains" };
-    }
-    if (u.hostname === "localhost" || net.isIP(u.hostname) && isBlockedIp(u.hostname)) {
-      return { ok: false, error: "URL host not permitted" };
-    }
-    return { ok: true, normalized: trimmed };
-  } catch {
-    return { ok: false, error: "Invalid URL" };
-  }
 }
