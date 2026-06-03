@@ -32,5 +32,13 @@ run(
   { allowFailure: true }
 );
 
+/** UTF-8 BOM in migration.sql caused first deploy to fail; allow re-apply after fix. */
+const FAILED_TRACK_LOCATION_DISMISSAL_MIGRATION =
+  "20260528140000_track_location_prompt_dismissal";
+run(
+  `npx prisma migrate resolve --rolled-back "${FAILED_TRACK_LOCATION_DISMISSAL_MIGRATION}"`,
+  { allowFailure: true }
+);
+
 run("npx prisma migrate deploy");
 run("npx next build");
