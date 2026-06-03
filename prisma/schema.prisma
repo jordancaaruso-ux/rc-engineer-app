@@ -1,4 +1,4 @@
-﻿// Migration history reset for Postgres deployment.
+// Migration history reset for Postgres deployment.
 // SQLite migrations removed. Fresh baseline will be generated after
 // provider switch in next step.
 
