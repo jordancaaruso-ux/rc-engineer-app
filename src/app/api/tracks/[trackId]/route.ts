@@ -143,3 +143,34 @@ export async function PATCH(
   revalidateAfterTrackMutation(user.id);
   return NextResponse.json({ track });
 }
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ trackId: string }> }
+) {
+  if (!hasDatabaseUrl()) {
+    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+  }
+
+  const { trackId } = await context.params;
+  const user = await getAuthenticatedApiUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const track = await prisma.track.findFirst({
+    where: communityTrackByIdWhere(trackId),
+    select: { id: true, userId: true },
+  });
+  if (!track) {
+    return NextResponse.json({ error: "Track not found" }, { status: 404 });
+  }
+  if (track.userId !== user.id) {
+    return NextResponse.json(
+      { error: "Only the user who added this track can delete it." },
+      { status: 403 }
+    );
+  }
+
+  await prisma.track.delete({ where: { id: trackId } });
+  revalidateAfterTrackMutation(user.id);
+  return NextResponse.json({ ok: true });
+}

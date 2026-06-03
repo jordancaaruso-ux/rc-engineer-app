@@ -9,6 +9,7 @@ import { TrackFavouriteClient } from "@/components/tracks/TrackFavouriteClient";
 import { TrackLiveRcUrlEditor } from "@/components/tracks/TrackLiveRcUrlEditor";
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
+import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -35,7 +36,17 @@ export default async function TrackDetailPage(props: {
   const user = await requireCurrentUser();
   const track = await prisma.track.findFirst({
     where: { id: trackId },
-    select: { id: true, name: true, location: true, liveRcUrl: true, createdAt: true, latitude: true, longitude: true, locationSource: true },
+    select: {
+      id: true,
+      name: true,
+      location: true,
+      liveRcUrl: true,
+      createdAt: true,
+      latitude: true,
+      longitude: true,
+      locationSource: true,
+      userId: true,
+    },
   });
 
   if (!track) {
@@ -57,10 +68,13 @@ export default async function TrackDetailPage(props: {
     );
   }
 
-  const [runCount, isFavourite] = await Promise.all([
+  const [runCount, totalRunCount, eventCount, isFavourite] = await Promise.all([
     prisma.run.count({ where: { trackId, userId: user.id } }),
+    prisma.run.count({ where: { trackId } }),
+    prisma.event.count({ where: { trackId } }),
     isTrackFavourite(user.id, trackId),
   ]);
+  const canDelete = track.userId === user.id;
 
   return (
     <>
@@ -110,6 +124,19 @@ export default async function TrackDetailPage(props: {
           <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />
 
           <TrackFavouriteClient trackId={track.id} trackName={track.name} isFavourite={isFavourite} />
+
+          {canDelete ? (
+            <TrackDeleteClient
+              trackId={track.id}
+              trackName={track.name}
+              runCount={totalRunCount}
+              eventCount={eventCount}
+            />
+          ) : (
+            <p className="text-xs text-muted-foreground leading-snug">
+              Only the user who added this track can delete it. Your runs at this venue: {runCount}.
+            </p>
+          )}
         </div>
       </section>
     </>

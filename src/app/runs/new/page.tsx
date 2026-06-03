@@ -52,12 +52,12 @@ export default async function NewRunPage({
 
   const [cars, allTracks, favouriteTrackIds] = await Promise.all([
     prisma.car.findMany({
-      where: {},
+      where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true },
     }),
     prisma.track.findMany({
-      where: { userId: user.id },
+      where: {},
       orderBy: { name: "asc" },
       select: {
         id: true,

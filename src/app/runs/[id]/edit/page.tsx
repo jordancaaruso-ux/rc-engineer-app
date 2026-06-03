@@ -106,14 +106,22 @@ export default async function EditRunPage({
 
   const [cars, allTracks, favouriteTrackIds] = await Promise.all([
     prisma.car.findMany({
-      where: {},
+      where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, setupSheetTemplate: true },
+      select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true },
     }),
     prisma.track.findMany({
-      where: { userId: user.id },
+      where: {},
       orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        latitude: true,
+        longitude: true,
+        gripTags: true,
+        layoutTags: true,
+      },
     }),
     getFavouriteTrackIdsForUser(user.id),
   ]);
