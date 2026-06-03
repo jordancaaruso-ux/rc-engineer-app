@@ -55,6 +55,7 @@ export function buildFieldDefFromKind(input: {
     sectionTitle: input.sectionTitle,
     showInSetupSheet: true,
     showInAnalysis: true,
+    showInLogRun: true,
     sortOrder: input.sortOrder,
     unit: input.unit?.trim() || undefined,
   };

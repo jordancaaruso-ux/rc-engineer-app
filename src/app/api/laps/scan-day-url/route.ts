@@ -11,8 +11,8 @@ import {
   raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
-import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
-import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
+import { getLiveRcDriverNameSetting, getSpeedhiveDriverNameForUser } from "@/lib/appSettings";
+import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
 
 export type ScanDayUrlIndexKind = "practice" | "results";
 
@@ -34,6 +34,7 @@ export type ScanDayUrlCandidateRow = {
   /** When already imported, set to the linkedRunId if the ImportedLapTimeSession
    *  is already attached to a run (so the user knows it's been saved). */
   linkedRunId: string | null;
+  timingSource?: "liverc" | "speedhive";
 };
 
 const RESULTS_SCAN_ROW_CAP = 80;
@@ -76,12 +77,19 @@ export async function POST(request: Request) {
   if (!dayUrl && trackId) {
     const track = await prisma.track.findFirst({
       where: { id: trackId },
-      select: { liveRcUrl: true },
+      select: { liveRcUrl: true, speedhiveUrl: true },
     });
-    const liveRcUrl = track?.liveRcUrl?.trim() ?? "";
-    if (!liveRcUrl) {
+    if (!track) {
+      return NextResponse.json({ error: "Track not found" }, { status: 404 });
+    }
+    const liveRcUrl = track.liveRcUrl?.trim() ?? "";
+    const speedhiveUrl = track.speedhiveUrl?.trim() ?? "";
+    if (!liveRcUrl && !speedhiveUrl) {
       return NextResponse.json(
-        { error: "This track has no LiveRC URL configured." },
+        {
+          error:
+            "This track has no LiveRC or Speedhive URL. Add at least one on the track page.",
+        },
         { status: 400 }
       );
     }
@@ -93,12 +101,19 @@ export async function POST(request: Request) {
       });
       eventRaceClass = ev?.raceClass?.trim() || null;
     }
-    const liveRcDriverName = await getLiveRcDriverNameSetting(user.id);
-    const discovered = await discoverLiveRcSessionsForUser({
-      userId: user.id,
-      trackLiveRcUrl: liveRcUrl,
-      eventRaceClass,
-    });
+    const [discovered, speedhiveDriverName] = await Promise.all([
+      discoverTrackTimingSessions({
+        userId: user.id,
+        liveRcUrl: liveRcUrl || null,
+        speedhiveUrl: speedhiveUrl || null,
+        eventRaceClass,
+      }),
+      speedhiveUrl ? getSpeedhiveDriverNameForUser(user.id) : Promise.resolve(null),
+    ]);
+    const hasDriverNameSetting = Boolean(
+      (liveRcUrl && discovered.liveRcDriverName?.trim()) ||
+        (speedhiveUrl && speedhiveDriverName?.trim())
+    );
     const displaySessions = discovered.unimportedCandidates;
     const candidates: ScanDayUrlCandidateRow[] = displaySessions.map((c) => ({
       sessionId: c.sessionId,
@@ -109,23 +124,26 @@ export async function POST(request: Request) {
       matchesDriver: true,
       alreadyImported: c.alreadyImported,
       linkedRunId: c.linkedRunId,
+      timingSource: c.timingSource,
     }));
     return NextResponse.json({
       ok: true,
-      dayUrl: discovered.practiceIndexUrl ?? discovered.raceHubUrl ?? liveRcUrl,
+      dayUrl: liveRcUrl || speedhiveUrl,
       indexKind: "practice" as ScanDayUrlIndexKind,
-      liveRcDriverName,
+      liveRcDriverName: discovered.liveRcDriverName,
       candidates,
       totalCandidates: discovered.candidates.length,
       unimportedCount: discovered.unimportedCandidates.length,
       matchedCount: displaySessions.length,
-      hasDriverNameSetting: Boolean(liveRcDriverName?.trim()),
+      hasDriverNameSetting,
       driverFilterApplied: true,
       scanMessage: discovered.hint,
       discoveredFromTrack: true,
       mostRecentSessionUrl: discovered.mostRecentSession?.sessionUrl ?? null,
       activeRaceMeeting: discovered.activeRaceMeeting,
-      discoveryDebug: discovered.debug,
+      discoveryDebug: discovered.liveRcDebug,
+      hasLiveRc: Boolean(liveRcUrl),
+      hasSpeedhive: Boolean(speedhiveUrl),
     });
   }
 

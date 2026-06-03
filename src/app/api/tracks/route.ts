@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser, addTrackToFavourites } from "@/lib/track-favourites";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
+import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 import { communityTrackListWhere } from "@/lib/tracks/communityTrackAccess";
 
 export async function GET(request: Request) {
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
         latitude: true,
         longitude: true,
         liveRcUrl: true,
+        speedhiveUrl: true,
         gripTags: true,
         layoutTags: true,
       },
@@ -85,6 +87,7 @@ export async function POST(request: Request) {
       name?: string;
       location?: string | null;
       liveRcUrl?: string | null;
+      speedhiveUrl?: string | null;
       addToFavourites?: boolean;
     };
     const name = body.name?.trim();
@@ -104,6 +107,13 @@ export async function POST(request: Request) {
       liveRcUrl = v.normalized;
     }
 
+    let speedhiveUrl: string | null = null;
+    if (typeof body.speedhiveUrl === "string" && body.speedhiveUrl.trim()) {
+      const v = validateSpeedhiveTrackUrl(body.speedhiveUrl);
+      if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+      speedhiveUrl = v.normalized;
+    }
+
     const existing = await prisma.track.findFirst({
       where: { name: { equals: name, mode: "insensitive" } },
       select: {
@@ -111,6 +121,7 @@ export async function POST(request: Request) {
         name: true,
         location: true,
         liveRcUrl: true,
+        speedhiveUrl: true,
         gripTags: true,
         layoutTags: true,
         latitude: true,
@@ -134,12 +145,14 @@ export async function POST(request: Request) {
         name,
         location: body.location?.trim() || null,
         liveRcUrl,
+        speedhiveUrl,
       },
       select: {
         id: true,
         name: true,
         location: true,
         liveRcUrl: true,
+        speedhiveUrl: true,
         gripTags: true,
         layoutTags: true,
         latitude: true,

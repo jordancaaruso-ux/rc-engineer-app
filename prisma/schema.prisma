@@ -1,4 +1,4 @@
-// Migration history reset for Postgres deployment.
+﻿// Migration history reset for Postgres deployment.
 // SQLite migrations removed. Fresh baseline will be generated after
 // provider switch in next step.
 
@@ -231,6 +231,8 @@ model Track {
   locationSource String?
   /** LiveRC track root URL (e.g. https://tftr.liverc.com) for session discovery. */
   liveRcUrl String?
+  /** MYLAPS Speedhive organization page URL for session discovery. */
+  speedhiveUrl String?
   /** Multi-select grip tags (e.g. MEDIUM + HIGH); see `trackMetaTags.ts` ids. */
   gripTags   String[] @default([])
   /** Multi-select layout tags (e.g. TECHNICAL + FAST). */

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { TrackFavouriteClient } from "@/components/tracks/TrackFavouriteClient";
 import { TrackLiveRcUrlEditor } from "@/components/tracks/TrackLiveRcUrlEditor";
+import { TrackSpeedhiveUrlEditor } from "@/components/tracks/TrackSpeedhiveUrlEditor";
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
@@ -41,6 +42,7 @@ export default async function TrackDetailPage(props: {
       name: true,
       location: true,
       liveRcUrl: true,
+      speedhiveUrl: true,
       createdAt: true,
       latitude: true,
       longitude: true,
@@ -122,6 +124,8 @@ export default async function TrackDetailPage(props: {
           </div>
 
           <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />
+
+          <TrackSpeedhiveUrlEditor trackId={track.id} initialSpeedhiveUrl={track.speedhiveUrl} />
 
           <TrackFavouriteClient trackId={track.id} trackName={track.name} isFavourite={isFavourite} />
 

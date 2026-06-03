@@ -84,6 +84,7 @@ export function buildA800SeedSchema(): SetupSheetModelSchema {
         unit: meta.unit,
         showInSetupSheet: true,
         showInAnalysis: true,
+        showInLogRun: true,
         sortOrder: order++,
       })
     );

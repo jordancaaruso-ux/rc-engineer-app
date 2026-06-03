@@ -157,7 +157,9 @@ export function SetupSheetModelSchemaEditor(props: {
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         Define parameters for this sheet model (types and options are stored here — the source of truth for PDF
         calibration). Optionally link a field to a universal parameter for cross-car stats. Calibrate your PDF in the
-        next step. Corner fields (<span className="font-mono">*_ff</span>,{" "}
+        next step. Use <span className="font-medium text-foreground">Show on sheet</span> for the full setup page and
+        PDF review; use <span className="font-medium text-foreground">Show in log run</span> for fields visible when
+        logging a run. Corner fields (<span className="font-mono">*_ff</span>,{" "}
         <span className="font-mono">*_fr</span>, …) and front/rear pairs are grouped automatically when you add or
         remove parameters.
       </p>
@@ -184,7 +186,9 @@ export function SetupSheetModelSchemaEditor(props: {
               <li
                 key={f.key}
                 className={`flex flex-wrap items-center gap-2 rounded border px-2 py-1.5 text-xs ${
-                  f.showInSetupSheet ? "border-border/70 bg-muted/30" : "border-dashed border-border/50 opacity-60"
+                  f.showInSetupSheet && f.showInLogRun
+                    ? "border-border/70 bg-muted/30"
+                    : "border-dashed border-border/50 opacity-60"
                 }`}
               >
                 <span className="font-medium text-foreground">{f.displayLabel}</span>
@@ -204,6 +208,13 @@ export function SetupSheetModelSchemaEditor(props: {
                       onClick={() => updateField(f.key, { showInSetupSheet: !f.showInSetupSheet })}
                     >
                       {f.showInSetupSheet ? "Hide on sheet" : "Show on sheet"}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-[10px] text-muted-foreground hover:text-foreground"
+                      onClick={() => updateField(f.key, { showInLogRun: !f.showInLogRun })}
+                    >
+                      {f.showInLogRun ? "Hide from log run" : "Show in log run"}
                     </button>
                     <button
                       type="button"

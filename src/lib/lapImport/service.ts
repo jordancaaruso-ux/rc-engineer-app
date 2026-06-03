@@ -26,6 +26,7 @@ export async function validateTimingHttpUrlResolved(
 export function inferSourceType(url: string): string {
   const u = url.toLowerCase();
   if (u.includes("liverc") || u.includes("live-rc")) return "liverc";
+  if (u.includes("speedhive") || u.includes("api2.mylaps.com")) return "speedhive";
   return "timing_url";
 }
 

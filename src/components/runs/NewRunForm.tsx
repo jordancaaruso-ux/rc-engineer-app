@@ -10,7 +10,6 @@ import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshot
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
-import { isLogRunSetupGlanceKey } from "@/lib/logRunSetupGlanceKeys";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
@@ -75,6 +74,7 @@ type TrackOption = {
   latitude?: number | null;
   longitude?: number | null;
   liveRcUrl?: string | null;
+  speedhiveUrl?: string | null;
   gripTags?: string[];
   layoutTags?: string[];
 };
@@ -344,8 +344,6 @@ export function NewRunForm(props: {
   const [otherSetupSource, setOtherSetupSource] = useState<"downloaded_setups">("downloaded_setups");
   const [downloadedSetups, setDownloadedSetups] = useState<DownloadedSetupOption[]>([]);
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
-  /** When the setup sheet is expanded, start in tuning glance unless the driver opens the full sheet. */
-  const [setupSheetGlanceOnly, setSetupSheetGlanceOnly] = useState(true);
   /**
    * When editing a saved run (including drafts being finished), the setup the
    * run was logged with is already nailed down. Forcing the user through the
@@ -740,12 +738,12 @@ export function NewRunForm(props: {
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
 
   useEffect(() => {
-    if (!carId || !selectedCar?.setupSheetModelId) {
+    if (!carId) {
       setModelTemplate(null);
       return;
     }
     let cancelled = false;
-    fetch(`/api/cars/${carId}/setup-sheet-template`)
+    fetch(`/api/cars/${carId}/setup-sheet-template?view=logRun`)
       .then((r) => r.json())
       .then((d: { template?: SetupSheetTemplate }) => {
         if (!cancelled && d.template) setModelTemplate(d.template);
@@ -756,21 +754,13 @@ export function NewRunForm(props: {
     return () => {
       cancelled = true;
     };
-  }, [carId, selectedCar?.setupSheetModelId]);
+  }, [carId]);
 
   const setupTemplate = useMemo(() => {
+    if (modelTemplate) return modelTemplate;
     if (isA800RRCar(selectedCar?.setupSheetTemplate)) {
-      if (modelTemplate?.fieldChipOptionsByKey) {
-        return {
-          ...A800RR_SETUP_SHEET_V1,
-          id: modelTemplate.id,
-          label: modelTemplate.label || A800RR_SETUP_SHEET_V1.label,
-          fieldChipOptionsByKey: modelTemplate.fieldChipOptionsByKey,
-        } satisfies SetupSheetTemplate;
-      }
       return A800RR_SETUP_SHEET_V1;
     }
-    if (modelTemplate) return modelTemplate;
     return getDefaultSetupSheetTemplate();
   }, [modelTemplate, selectedCar?.setupSheetTemplate]);
 
@@ -1302,14 +1292,20 @@ export function NewRunForm(props: {
     setSetupBaselineData(cloneSetupSnapshot(next));
   }
 
+  const refreshDownloadedSetups = useCallback(async () => {
+    if (!carId) return [] as DownloadedSetupOption[];
+    const dlRes = await jsonFetch<{ downloadedSetups: DownloadedSetupOption[] }>(
+      `/api/setup/options?carId=${encodeURIComponent(carId)}`
+    );
+    const list = Array.isArray(dlRes.downloadedSetups) ? dlRes.downloadedSetups : [];
+    setDownloadedSetups(list);
+    return list;
+  }, [carId]);
+
   const handleQuickSetupImported = useCallback(
     async (documentId: string) => {
       if (!carId) return;
-      const dlRes = await jsonFetch<{ downloadedSetups: DownloadedSetupOption[] }>(
-        `/api/setup/options?carId=${encodeURIComponent(carId)}`
-      );
-      const list = Array.isArray(dlRes.downloadedSetups) ? dlRes.downloadedSetups : [];
-      setDownloadedSetups(list);
+      const list = await refreshDownloadedSetups();
       const picked = list.find((x) => x.id === documentId);
       if (!picked) return;
       setSetupSource("other");
@@ -1321,7 +1317,7 @@ export function NewRunForm(props: {
       setSetupBaselineData(cloneSetupSnapshot(next));
       setSetupSectionExpanded(true);
     },
-    [carId]
+    [carId, refreshDownloadedSetups]
   );
 
   useEffect(() => {
@@ -3562,6 +3558,14 @@ export function NewRunForm(props: {
                           ))}
                         </select>
                       </div>
+                      {carId ? (
+                        <RunLogQuickSetupUpload
+                          carId={carId}
+                          onImported={handleQuickSetupImported}
+                          onRefetchList={() => refreshDownloadedSetups()}
+                          variant={downloadedSetups.length === 0 ? "banner" : "inline"}
+                        />
+                      ) : null}
                     </div>
                   ) : (
                     <p className="text-[11px] text-muted-foreground">
@@ -3614,13 +3618,6 @@ export function NewRunForm(props: {
                 to start from a blank sheet.
               </p>
             ) : null}
-            {setupSource === "other" && downloadedSetups.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">
-                No parsed setups available for this car (or parse not run). Parse a PDF under Setup → Downloaded setups
-                or bulk import, or pick a car that matches the setup’s assigned car when one is set. You can choose{" "}
-                <span className="font-medium">New</span> to start blank.
-              </p>
-            ) : null}
           </div>
           )
         ) : (
@@ -3632,7 +3629,6 @@ export function NewRunForm(props: {
               <button
                 type="button"
                 onClick={() => {
-                  setSetupSheetGlanceOnly(true);
                   setSetupSectionExpanded(false);
                 }}
                 className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground transition"
@@ -3708,6 +3704,14 @@ export function NewRunForm(props: {
                       ))}
                     </select>
                   </div>
+                  {carId ? (
+                    <RunLogQuickSetupUpload
+                      carId={carId}
+                      onImported={handleQuickSetupImported}
+                      onRefetchList={() => refreshDownloadedSetups()}
+                      variant={downloadedSetups.length === 0 ? "banner" : "inline"}
+                    />
+                  ) : null}
                 </div>
               ) : (
                 <p className="text-[11px] text-muted-foreground">
@@ -3715,26 +3719,11 @@ export function NewRunForm(props: {
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 max-w-2xl">
-              <p className="text-[11px] text-muted-foreground min-w-0">
-                {setupSheetGlanceOnly
-                  ? "Showing a quick tuning glance — expand for every field."
-                  : "Full setup sheet."}
-              </p>
-              <button
-                type="button"
-                className="shrink-0 rounded-md border border-border bg-card/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-muted/70 hover:text-foreground transition"
-                onClick={() => setSetupSheetGlanceOnly((v) => !v)}
-              >
-                {setupSheetGlanceOnly ? "Expand full setup sheet" : "Show tuning glance only"}
-              </button>
-            </div>
             <SetupSheetView
               value={setupData}
               onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
               template={setupTemplate}
-              enableFieldSearch={!setupSheetGlanceOnly}
-              fieldKeyFilter={setupSheetGlanceOnly ? isLogRunSetupGlanceKey : undefined}
+              enableFieldSearch
             />
             {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
@@ -3742,15 +3731,16 @@ export function NewRunForm(props: {
                 to start from a blank sheet.
               </p>
             ) : null}
-            {setupSource === "other" && downloadedSetups.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">
-                No parsed setups available for this car (or parse not run). Parse a PDF under Setup → Downloaded setups
-                or bulk import, or pick a car that matches the setup’s assigned car when one is set. You can choose{" "}
-                <span className="font-medium">New</span> to start blank.
-              </p>
-            ) : null}
-            {carId && pickerRuns.length === 0 && downloadedSetups.length === 0 ? (
-              <RunLogQuickSetupUpload carId={carId} onImported={handleQuickSetupImported} />
+            {carId &&
+            downloadedSetups.length === 0 &&
+            setupSource !== "other" &&
+            (pickerRuns.length === 0 || setupSource === "new") ? (
+              <RunLogQuickSetupUpload
+                carId={carId}
+                onImported={handleQuickSetupImported}
+                onRefetchList={() => refreshDownloadedSetups()}
+                variant="banner"
+              />
             ) : null}
             <div className="flex flex-col gap-2 max-w-2xl border-t border-border/70 pt-3">
               {(isEditing && editRun?.id) || setupBaselineSnapshotId ? (
@@ -3876,6 +3866,7 @@ export function NewRunForm(props: {
         lapImportEventId={sessionType === "RACE_MEETING" && eventId ? eventId : null}
         trackId={trackId.trim() || null}
         trackLiveRcUrl={tracksList.find((t) => t.id === trackId)?.liveRcUrl ?? null}
+        trackSpeedhiveUrl={tracksList.find((t) => t.id === trackId)?.speedhiveUrl ?? null}
       />
 
       <label className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs cursor-pointer select-none">

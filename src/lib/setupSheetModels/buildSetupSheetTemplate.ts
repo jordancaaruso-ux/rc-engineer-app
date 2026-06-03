@@ -1,30 +1,44 @@
 import type { SetupSheetFieldChipOptions, SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { normalizeGroupedFieldOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { filterModelLayoutSectionsByKeys } from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
 import {
   modelLayoutToStructuredSections,
   parseSetupSheetModelSchema,
   type SetupSheetModelSchema,
 } from "@/lib/setupSheetModels/types";
 
+export type SetupSheetTemplateView = "setup" | "logRun";
+
 export function buildSetupSheetTemplateFromModel(
   modelId: string,
   modelName: string,
-  schemaJson: unknown
+  schemaJson: unknown,
+  view: SetupSheetTemplateView = "setup"
 ): SetupSheetTemplate | null {
   const schema = parseSetupSheetModelSchema(schemaJson);
   if (!schema) return null;
-  return buildSetupSheetTemplateFromParsedSchema(modelId, modelName, schema);
+  return buildSetupSheetTemplateFromParsedSchema(modelId, modelName, schema, view);
 }
 
 export function buildSetupSheetTemplateFromParsedSchema(
   modelId: string,
   modelName: string,
-  schema: SetupSheetModelSchema
+  schema: SetupSheetModelSchema,
+  view: SetupSheetTemplateView = "setup"
 ): SetupSheetTemplate {
-  const structuredSections = modelLayoutToStructuredSections(schema);
-  const visibleFields = schema.fields.filter((f) => f.showInSetupSheet);
+  const fieldVisible = (f: SetupSheetModelSchema["fields"][0]) =>
+    view === "logRun" ? f.showInLogRun : f.showInSetupSheet;
+  const visibleFields = schema.fields.filter(fieldVisible);
+  const visibleKeys = new Set(visibleFields.map((f) => f.key));
+  const filteredLayoutSections = filterModelLayoutSectionsByKeys(schema.structuredSections, (key) =>
+    visibleKeys.has(key)
+  );
+  const layoutSchema: SetupSheetModelSchema = {
+    ...schema,
+    structuredSections: filteredLayoutSections,
+  };
+  const structuredSections = modelLayoutToStructuredSections(layoutSchema);
   const groups = groupFieldsBySection(visibleFields);
-
   const fieldChipOptionsByKey = buildFieldChipOptionsFromSchema(schema);
 
   return {

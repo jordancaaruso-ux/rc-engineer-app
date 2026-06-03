@@ -6,6 +6,8 @@ export const APP_SETTING_KEYS = {
   liveRcDriverName: "liveRcDriverName",
   /** LiveRC `data-driver-id` for this account — used to disambiguate same-name drivers across mains. */
   liveRcDriverId: "liveRcDriverId",
+  /** Display name on Speedhive results (optional; falls back to liveRcDriverName). */
+  speedhiveDriverName: "speedhiveDriverName",
   /**
    * Current practice day timing-URL (e.g. LiveRC day results page) the driver
    * is working from. Persists across `New Run` forms so "copy last run" / fresh
@@ -87,6 +89,20 @@ export async function getLiveRcDriverIdSetting(userId: string): Promise<string |
 
 export async function setLiveRcDriverIdSetting(userId: string, value: string | null): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.liveRcDriverId, value);
+}
+
+export async function getSpeedhiveDriverNameSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.speedhiveDriverName);
+}
+
+export async function setSpeedhiveDriverNameSetting(userId: string, value: string | null): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.speedhiveDriverName, value);
+}
+
+export async function getSpeedhiveDriverNameForUser(userId: string): Promise<string | null> {
+  const sh = (await getSpeedhiveDriverNameSetting(userId))?.trim();
+  if (sh) return sh;
+  return (await getLiveRcDriverNameSetting(userId))?.trim() || null;
 }
 
 export async function getCurrentPracticeDayUrlSetting(userId: string): Promise<string | null> {

@@ -16,6 +16,8 @@ export type SetupSheetModelFieldDef = {
   unit?: string;
   showInSetupSheet: boolean;
   showInAnalysis: boolean;
+  /** When false, hidden on Log your run (independent of full setup sheet visibility). */
+  showInLogRun: boolean;
   sortOrder: number;
   /** For one-of-many / many-of-many: option labels and stored values. */
   groupBehaviorType?: GroupedFieldBehaviorType;
@@ -134,6 +136,8 @@ function parseFieldDef(raw: unknown): SetupSheetModelFieldDef | null {
     unit: typeof r.unit === "string" ? r.unit.trim() || undefined : undefined,
     showInSetupSheet: r.showInSetupSheet !== false,
     showInAnalysis: r.showInAnalysis !== false,
+    showInLogRun:
+      typeof r.showInLogRun === "boolean" ? r.showInLogRun : r.showInSetupSheet !== false,
     sortOrder,
     groupBehaviorType,
     groupedOptionLabels,

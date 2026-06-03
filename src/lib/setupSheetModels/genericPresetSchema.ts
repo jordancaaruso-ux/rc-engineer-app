@@ -66,6 +66,7 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
       unit: meta.unit,
       showInSetupSheet: true,
       showInAnalysis: !isSession || sessionInAnalysis,
+      showInLogRun: true,
       sortOrder: order++,
       ...(sessionFieldExtras
         ? {

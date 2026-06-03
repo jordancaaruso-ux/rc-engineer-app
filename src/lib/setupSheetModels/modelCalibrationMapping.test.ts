@@ -22,6 +22,7 @@ function screwFieldWithoutOptions(): SetupSheetModelFieldDef {
     uiType: "multiSelect",
     showInSetupSheet: true,
     showInAnalysis: true,
+    showInLogRun: true,
     sortOrder: 0,
   };
 }
@@ -39,6 +40,7 @@ function customFourField(): SetupSheetModelFieldDef {
     groupedOptionValues: ["1", "2", "3", "4"],
     showInSetupSheet: true,
     showInAnalysis: true,
+    showInLogRun: true,
     sortOrder: 1,
   };
 }

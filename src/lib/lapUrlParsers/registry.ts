@@ -2,9 +2,10 @@ import type { LapUrlParseContext, LapUrlParser } from "./types";
 import { stubUrlParser } from "./stubParser";
 import { httpTimingParser } from "./httpTimingParser";
 import { liveRcParser } from "./liveRcParser";
+import { speedhiveParser } from "./speedhiveParser";
 
 /** Order: specific parsers first; stub last. */
-const parsers: LapUrlParser[] = [liveRcParser, httpTimingParser, stubUrlParser];
+const parsers: LapUrlParser[] = [liveRcParser, speedhiveParser, httpTimingParser, stubUrlParser];
 
 export function selectUrlParser(url: string): LapUrlParser {
   const u = url.trim();

@@ -25,6 +25,7 @@ test("normalizeGroupedFieldOnField does not inject Awesomatix options by key", (
     uiType: "multiSelect",
     showInSetupSheet: true,
     showInAnalysis: true,
+    showInLogRun: true,
     sortOrder: 0,
   };
   const out = normalizeGroupedFieldOnField(field);
@@ -42,6 +43,7 @@ test("normalizeGroupedFieldOnField keeps wizard-defined four options", () => {
     groupedOptionLabels: ["1", "2", "3", "4"],
     showInSetupSheet: true,
     showInAnalysis: true,
+    showInLogRun: true,
     sortOrder: 0,
   };
   const out = normalizeGroupedFieldOnField(field);
@@ -60,6 +62,7 @@ test("materializeAwesomatixTemplateDefaultsOnField applies catalog only for plat
     uiType: "multiSelect",
     showInSetupSheet: true,
     showInAnalysis: true,
+    showInLogRun: true,
     sortOrder: 0,
   };
   const out = materializeAwesomatixTemplateDefaultsOnField(field);

@@ -1,4 +1,5 @@
-"use client";
+﻿const fs = require("fs");
+const trackList = `"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -14,7 +15,6 @@ type Track = {
   name: string;
   location?: string | null;
   liveRcUrl?: string | null;
-  speedhiveUrl?: string | null;
   latitude?: number | null;
   longitude?: number | null;
 };
@@ -23,7 +23,7 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   const res = await fetch(input, init);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((data as { error?: string })?.error || `Request failed (${res.status})`);
+    throw new Error((data as { error?: string })?.error || \`Request failed (\${res.status})\`);
   }
   return data as T;
 }
@@ -43,7 +43,6 @@ export function TrackList({
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [liveRcUrl, setLiveRcUrl] = useState("");
-  const [speedhiveUrl, setSpeedhiveUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [existingTrackId, setExistingTrackId] = useState<string | null>(null);
@@ -85,7 +84,6 @@ export function TrackList({
           name: trimmed,
           location: location.trim() || null,
           liveRcUrl: liveRcUrl.trim() || null,
-          speedhiveUrl: speedhiveUrl.trim() || null,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -99,14 +97,13 @@ export function TrackList({
         return;
       }
       if (!res.ok) {
-        throw new Error(data.error ?? `Request failed (${res.status})`);
+        throw new Error(data.error ?? \`Request failed (\${res.status})\`);
       }
       if (data.track) {
         setTracks((prev) => [data.track!, ...prev]);
         setName("");
         setLocation("");
         setLiveRcUrl("");
-        setSpeedhiveUrl("");
         setShowAddForm(false);
         setMessage("Track added.");
         router.refresh();
@@ -166,16 +163,6 @@ export function TrackList({
               autoComplete="off"
             />
           </div>
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Speedhive URL (optional)</label>
-            <input
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={speedhiveUrl}
-              onChange={(e) => setSpeedhiveUrl(e.target.value)}
-              placeholder="https://speedhive.mylaps.com/…/organizations/12345"
-              autoComplete="off"
-            />
-          </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="submit"
@@ -202,7 +189,7 @@ export function TrackList({
                 {existingTrackId ? (
                   <>
                     {" "}
-                    <Link href={`/tracks/${existingTrackId}`} className="underline font-medium">
+                    <Link href={\`/tracks/\${existingTrackId}\`} className="underline font-medium">
                       Open existing track
                     </Link>
                   </>
@@ -242,7 +229,7 @@ export function TrackList({
                       </span>
                     )}
                     <div>
-                      <Link href={`/tracks/${t.id}`} className="font-medium hover:underline">
+                      <Link href={\`/tracks/\${t.id}\`} className="font-medium hover:underline">
                         {t.name}
                       </Link>
                       {t.location ? (
@@ -273,4 +260,61 @@ export function TrackList({
       </div>
     </div>
   );
+}
+`;
+fs.writeFileSync("src/components/tracks/TrackList.tsx", trackList);
+console.log("TrackList written");
+
+let nf = fs.readFileSync("src/components/runs/NewRunForm.tsx", "utf8");
+if (!nf.includes("TrackLocationNotSetBanner")) {
+  nf = nf.replace(
+    'import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDialog";',
+    'import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDialog";\nimport { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";\nimport { trackHasMarkedLocation } from "@/lib/location/coordinates";'
+  );
+  nf = nf.replace(
+    `<TrackNearbySuggestions
+                    suggestions={nearbyTrackSuggestions}
+                    onSelect={(id) => {
+                      trackPickedManuallyRef.current = true;
+                      setTrackId(id);
+                      setCopyTrackWarning(null);
+                      setNearbyTrackSuggestions([]);
+                      setTrackAutoDetectMessage(null);
+                    }}
+                  />
+                </div>
+              )}`,
+    `<TrackNearbySuggestions
+                    suggestions={nearbyTrackSuggestions}
+                    onSelect={(id) => {
+                      trackPickedManuallyRef.current = true;
+                      setTrackId(id);
+                      setCopyTrackWarning(null);
+                      setNearbyTrackSuggestions([]);
+                      setTrackAutoDetectMessage(null);
+                    }}
+                  />
+                  {(() => {
+                    const t = tracksList.find((x) => x.id === trackId);
+                    if (!t || trackHasMarkedLocation(t)) return null;
+                    return (
+                      <TrackLocationNotSetBanner
+                        trackId={t.id}
+                        trackName={t.name}
+                        location={t.location}
+                        initial={{ latitude: t.latitude, longitude: t.longitude }}
+                        showCurrentLocation
+                        onSaved={(saved) => {
+                          setTracksList((prev) =>
+                            prev.map((x) => (x.id === t.id ? { ...x, ...saved } : x))
+                          );
+                        }}
+                      />
+                    );
+                  })()}
+                </div>
+              )}`
+  );
+  fs.writeFileSync("src/components/runs/NewRunForm.tsx", nf);
+  console.log("NewRunForm patched");
 }

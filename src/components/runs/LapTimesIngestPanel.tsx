@@ -125,6 +125,7 @@ type ScanDayCandidate = {
   matchesDriver: boolean | null;
   alreadyImported: boolean;
   linkedRunId: string | null;
+  timingSource?: "liverc" | "speedhive";
 };
 
 /** Server: `/api/events/[eventId]/my-race-sessions` — driver verified on each race page. */
@@ -173,6 +174,7 @@ export function LapTimesIngestPanel({
   lapImportEventId,
   trackId,
   trackLiveRcUrl,
+  trackSpeedhiveUrl,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
@@ -183,11 +185,14 @@ export function LapTimesIngestPanel({
   practiceDayUrl?: string | null;
   /** When set, LiveRC event hub imports filter by this event's race class list. */
   lapImportEventId?: string | null;
-  /** When set with track LiveRC URL, scan finds your most recent sessions without a daily URL. */
+  /** When set with a track timing URL, scan finds your most recent sessions without a daily URL. */
   trackId?: string | null;
   trackLiveRcUrl?: string | null;
+  trackSpeedhiveUrl?: string | null;
 }) {
-  const hasTrackDiscovery = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
+  const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
+  const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
+  const hasTrackDiscovery = hasLiveRcTrack || hasSpeedhiveTrack;
   const hasUrlScan = Boolean((practiceDayUrl ?? "").trim()) || hasTrackDiscovery;
   const [tab, setTab] = useState<IngestTab>(() => (hasUrlScan ? "url" : "manual"));
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -283,7 +288,7 @@ export function LapTimesIngestPanel({
       void scanDayUrl();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
-  }, [trackId, trackLiveRcUrl, lapImportEventId]);
+  }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, lapImportEventId]);
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
   const manualMetrics = useMemo(() => {
@@ -379,7 +384,7 @@ export function LapTimesIngestPanel({
     const tid = trackId?.trim() ?? "";
     const useTrack = hasTrackDiscovery;
     if (!useTrack && !url) {
-      setDayScanMessage("Select a track with a LiveRC URL on the Tracks page.");
+      setDayScanMessage("Select a track with a LiveRC or Speedhive URL on the Tracks page.");
       return;
     }
     setDayScanBusy(true);
@@ -856,13 +861,19 @@ export function LapTimesIngestPanel({
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="ui-title text-[11px] text-muted-foreground">Your LiveRC sessions at this track</div>
+                  <div className="ui-title text-[11px] text-muted-foreground">
+                    Your timing sessions at this track
+                  </div>
                   <p className="text-[11px] text-muted-foreground">
                     {dayScanBusy
-                      ? "Checking LiveRC…"
+                      ? hasLiveRcTrack && hasSpeedhiveTrack
+                        ? "Checking LiveRC and Speedhive…"
+                        : hasSpeedhiveTrack
+                          ? "Checking Speedhive…"
+                          : "Checking LiveRC…"
                       : dayScanCandidates && dayScanCandidates.length > 0
                         ? `${dayScanCandidates.length} new session(s) to import`
-                        : "Newest unimported practice or race sessions (by completion time)"}
+                        : "Newest unimported sessions (LiveRC and Speedhive, by completion time)"}
                   </p>
                 </div>
                 <button
@@ -879,7 +890,9 @@ export function LapTimesIngestPanel({
               </div>
               {!dayScanHasDriverName ? (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                  Set your LiveRC driver name in Settings so we can find your sessions.
+                  {hasSpeedhiveTrack && !hasLiveRcTrack
+                    ? "Set your Speedhive driver name in Settings (or LiveRC name as fallback) so we can find your sessions."
+                    : "Set your driver name in Settings (LiveRC and/or Speedhive) so we can find your sessions."}
                 </p>
               ) : null}
               {dayScanCandidates && dayScanCandidates.length > 0 ? (
@@ -903,7 +916,21 @@ export function LapTimesIngestPanel({
                           </span>
                           <span className="block truncate text-[10px] text-muted-foreground">{c.sessionUrl}</span>
                         </span>
-                        <span className="shrink-0 ui-title text-[10px] text-muted-foreground">Import</span>
+                        <span className="shrink-0 flex flex-col items-end gap-0.5">
+                          {c.timingSource ? (
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide",
+                                c.timingSource === "speedhive"
+                                  ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                                  : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                              )}
+                            >
+                              {c.timingSource === "speedhive" ? "Speedhive" : "LiveRC"}
+                            </span>
+                          ) : null}
+                          <span className="ui-title text-[10px] text-muted-foreground">Import</span>
+                        </span>
                       </button>
                     </li>
                   ))}
@@ -914,7 +941,7 @@ export function LapTimesIngestPanel({
               ) : null}
               {scanTotals && scanTotals.total > 0 && scanTotals.unimported === 0 && !dayScanBusy ? (
                 <p className="text-[11px] text-muted-foreground">
-                  LiveRC matched {scanTotals.total} session(s) for your driver — all are already imported.
+                  Found {scanTotals.total} session(s) for your driver — all are already imported.
                 </p>
               ) : null}
               {discoveryDebug ? (
@@ -937,7 +964,7 @@ export function LapTimesIngestPanel({
           ) : hasUrlScan ? (
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <p className="ui-label-meta">
-                Add a LiveRC URL on the Tracks page for this venue, or paste a session URL below.
+                Add a LiveRC or Speedhive URL on the Tracks page for this venue, or paste a session URL below.
               </p>
             </div>
           ) : null}

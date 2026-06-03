@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
-import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
+import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Discover the user's most recent LiveRC sessions at a track (practice + race, unified by time).
+ * Discover the user's most recent timing sessions at a track (LiveRC and/or Speedhive).
  * Does not set run type — lap import only.
  */
 export async function POST(request: Request) {
@@ -28,17 +28,19 @@ export async function POST(request: Request) {
 
   const track = await prisma.track.findFirst({
     where: { id: trackId },
-    select: { liveRcUrl: true },
+    select: { liveRcUrl: true, speedhiveUrl: true },
   });
   if (!track) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
   const liveRcUrl = track.liveRcUrl?.trim() ?? "";
-  if (!liveRcUrl) {
+  const speedhiveUrl = track.speedhiveUrl?.trim() ?? "";
+  if (!liveRcUrl && !speedhiveUrl) {
     return NextResponse.json(
       {
-        error: "This track has no LiveRC URL. Add one on the Tracks page.",
-        code: "missing_live_rc_url",
+        error:
+          "This track has no LiveRC or Speedhive URL. Add at least one on the Tracks page.",
+        code: "missing_timing_url",
       },
       { status: 400 }
     );
@@ -60,12 +62,26 @@ export async function POST(request: Request) {
     if (!Number.isNaN(d.getTime())) referenceDate = d;
   }
 
-  const result = await discoverLiveRcSessionsForUser({
+  const result = await discoverTrackTimingSessions({
     userId: user.id,
-    trackLiveRcUrl: liveRcUrl,
+    liveRcUrl: liveRcUrl || null,
+    speedhiveUrl: speedhiveUrl || null,
     eventRaceClass,
     referenceDate,
   });
 
-  return NextResponse.json({ ok: true, trackId, ...result });
+  return NextResponse.json({
+    ok: true,
+    trackId,
+    candidates: result.candidates,
+    unimportedCandidates: result.unimportedCandidates,
+    mostRecentSession: result.mostRecentSession,
+    hint: result.hint,
+    liveRcDriverName: result.liveRcDriverName,
+    debug: result.liveRcDebug,
+    speedhiveOrganizationId: result.speedhiveOrganizationId,
+    activeRaceMeeting: result.activeRaceMeeting,
+    hasLiveRc: Boolean(liveRcUrl),
+    hasSpeedhive: Boolean(speedhiveUrl),
+  });
 }

@@ -7,6 +7,8 @@ type InitialSettings = {
   liveRcDriverName: string;
   /** LiveRC `data-driver-id` when known; disambiguates same name on A/B/C mains. */
   liveRcDriverId: string;
+  /** Speedhive display name; empty uses LiveRC driver name when set. */
+  speedhiveDriverName: string;
 };
 
 type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "ok" } | { kind: "error"; text: string };
@@ -15,9 +17,11 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
   const [myName, setMyName] = useState(initial.myName);
   const [liveRcDriverName, setLiveRcDriverName] = useState(initial.liveRcDriverName);
   const [liveRcDriverId, setLiveRcDriverId] = useState(initial.liveRcDriverId);
+  const [speedhiveDriverName, setSpeedhiveDriverName] = useState(initial.speedhiveDriverName);
   const [savingMyName, setSavingMyName] = useState<SaveState>({ kind: "idle" });
   const [savingDriver, setSavingDriver] = useState<SaveState>({ kind: "idle" });
   const [savingDriverId, setSavingDriverId] = useState<SaveState>({ kind: "idle" });
+  const [savingSpeedhiveDriver, setSavingSpeedhiveDriver] = useState<SaveState>({ kind: "idle" });
 
   async function postSetting(
     url: string,
@@ -71,6 +75,22 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
           )
         }
         state={savingDriver}
+        placeholder="e.g. Jordan Smith"
+      />
+
+      <SettingField
+        label="Speedhive driver name"
+        hint="How your name appears on Speedhive / MYLAPS results. Leave blank to use your LiveRC driver name above."
+        value={speedhiveDriverName}
+        onChange={setSpeedhiveDriverName}
+        onSave={() =>
+          postSetting(
+            "/api/settings/speedhive-driver",
+            { speedhiveDriverName: speedhiveDriverName.trim() || null },
+            setSavingSpeedhiveDriver
+          )
+        }
+        state={savingSpeedhiveDriver}
         placeholder="e.g. Jordan Smith"
       />
 

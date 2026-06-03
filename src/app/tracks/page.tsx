@@ -32,7 +32,15 @@ export default async function TracksPage(): Promise<ReactNode> {
     prisma.track.findMany({
       where: {},
       orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true, liveRcUrl: true, latitude: true, longitude: true },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        liveRcUrl: true,
+        speedhiveUrl: true,
+        latitude: true,
+        longitude: true,
+      },
     }),
     getFavouriteTrackIdsForUser(user.id),
   ]);

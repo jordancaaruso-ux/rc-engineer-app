@@ -19,6 +19,7 @@ function field(
     uiType: "text",
     showInSetupSheet: true,
     showInAnalysis: true,
+    showInLogRun: true,
     sortOrder: 0,
     ...partial,
   };

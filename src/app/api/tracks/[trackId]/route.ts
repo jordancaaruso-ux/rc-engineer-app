@@ -7,6 +7,7 @@ import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
 import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
 import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
+import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 
 export async function GET(
   _request: Request,
@@ -34,6 +35,7 @@ export async function GET(
       locationMarkedAt: true,
       locationSource: true,
       liveRcUrl: true,
+      speedhiveUrl: true,
       gripTags: true,
       layoutTags: true,
       createdAt: true,
@@ -65,6 +67,7 @@ export async function PATCH(
     gripTags?: unknown;
     layoutTags?: unknown;
     liveRcUrl?: string | null;
+    speedhiveUrl?: string | null;
     latitude?: unknown;
     longitude?: unknown;
     locationSource?: string | null;
@@ -83,6 +86,7 @@ export async function PATCH(
     gripTags?: string[];
     layoutTags?: string[];
     liveRcUrl?: string | null;
+    speedhiveUrl?: string | null;
     latitude?: number | null;
     longitude?: number | null;
     locationMarkedAt?: Date | null;
@@ -101,6 +105,18 @@ export async function PATCH(
       const v = validateLiveRcTrackUrl(body.liveRcUrl);
       if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
       data.liveRcUrl = v.normalized;
+    }
+  }
+  if (body && "speedhiveUrl" in body) {
+    if (
+      body.speedhiveUrl == null ||
+      (typeof body.speedhiveUrl === "string" && !body.speedhiveUrl.trim())
+    ) {
+      data.speedhiveUrl = null;
+    } else if (typeof body.speedhiveUrl === "string") {
+      const v = validateSpeedhiveTrackUrl(body.speedhiveUrl);
+      if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+      data.speedhiveUrl = v.normalized;
     }
   }
   if (body?.clearLocation === true) {
@@ -135,6 +151,7 @@ export async function PATCH(
       locationMarkedAt: true,
       locationSource: true,
       liveRcUrl: true,
+      speedhiveUrl: true,
       gripTags: true,
       layoutTags: true,
     },

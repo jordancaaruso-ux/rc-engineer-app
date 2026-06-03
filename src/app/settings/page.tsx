@@ -3,6 +3,7 @@ import {
   getLiveRcDriverIdSetting,
   getLiveRcDriverNameSetting,
   getMyNameSetting,
+  getSpeedhiveDriverNameSetting,
 } from "@/lib/appSettings";
 import { SettingsClient } from "@/components/settings/SettingsClient";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
@@ -24,10 +25,11 @@ export default async function SettingsPage() {
     );
   }
   const user = await requireCurrentUser();
-  const [myName, liveRcDriverName, liveRcDriverId] = await Promise.all([
+  const [myName, liveRcDriverName, liveRcDriverId, speedhiveDriverName] = await Promise.all([
     getMyNameSetting(user.id),
     getLiveRcDriverNameSetting(user.id),
     getLiveRcDriverIdSetting(user.id),
+    getSpeedhiveDriverNameSetting(user.id),
   ]);
 
   return (
@@ -46,6 +48,7 @@ export default async function SettingsPage() {
             myName: myName ?? "",
             liveRcDriverName: liveRcDriverName ?? "",
             liveRcDriverId: liveRcDriverId ?? "",
+            speedhiveDriverName: speedhiveDriverName ?? "",
           }}
         />
         <SettingsNavSection />
