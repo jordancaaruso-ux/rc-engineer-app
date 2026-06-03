@@ -38,6 +38,8 @@ export default async function TracksPage(): Promise<ReactNode> {
         location: true,
         liveRcUrl: true,
         speedhiveUrl: true,
+        gripTags: true,
+        layoutTags: true,
         latitude: true,
         longitude: true,
       },

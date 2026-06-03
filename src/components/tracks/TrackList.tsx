@@ -8,6 +8,7 @@ import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
+import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
 
 type Track = {
   id: string;
@@ -15,6 +16,8 @@ type Track = {
   location?: string | null;
   liveRcUrl?: string | null;
   speedhiveUrl?: string | null;
+  gripTags?: string[];
+  layoutTags?: string[];
   latitude?: number | null;
   longitude?: number | null;
 };
@@ -252,6 +255,21 @@ export function TrackList({
                   </div>
                   <span className="text-[11px] text-muted-foreground font-mono shrink-0">{t.id.slice(0, 8)}</span>
                 </div>
+                <TrackMetaTagsEditor
+                  trackId={t.id}
+                  initialGripTags={t.gripTags ?? []}
+                  initialLayoutTags={t.layoutTags ?? []}
+                  compact
+                  onSaved={(saved) => {
+                    setTracks((prev) =>
+                      prev.map((x) =>
+                        x.id === t.id
+                          ? { ...x, gripTags: saved.gripTags, layoutTags: saved.layoutTags }
+                          : x
+                      )
+                    );
+                  }}
+                />
                 {!trackHasMarkedLocation(t) ? (
                   <TrackLocationNotSetBanner
                     trackId={t.id}

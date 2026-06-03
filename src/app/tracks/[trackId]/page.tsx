@@ -11,6 +11,7 @@ import { TrackSpeedhiveUrlEditor } from "@/components/tracks/TrackSpeedhiveUrlEd
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
+import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -43,6 +44,8 @@ export default async function TrackDetailPage(props: {
       location: true,
       liveRcUrl: true,
       speedhiveUrl: true,
+      gripTags: true,
+      layoutTags: true,
       createdAt: true,
       latitude: true,
       longitude: true,
@@ -122,6 +125,12 @@ export default async function TrackDetailPage(props: {
               showCurrentLocation
             />
           </div>
+
+          <TrackMetaTagsEditor
+            trackId={track.id}
+            initialGripTags={track.gripTags}
+            initialLayoutTags={track.layoutTags}
+          />
 
           <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />
 
