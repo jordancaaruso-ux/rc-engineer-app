@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseEventDateYmd } from "@/lib/eventDateParse";
+import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -111,14 +112,44 @@ export async function POST(request: Request) {
       typeof body.practiceSourceUrl === "string" && body.practiceSourceUrl.trim()
         ? body.practiceSourceUrl.trim()
         : null;
-    const resultsSourceUrl =
+    const resultsSourceUrlRaw =
       typeof body.resultsSourceUrl === "string" && body.resultsSourceUrl.trim()
         ? body.resultsSourceUrl.trim()
         : null;
+    const resultsSourceUrl = resultsSourceUrlRaw
+      ? normalizeLiveRcEventHubUrl(resultsSourceUrlRaw) ?? resultsSourceUrlRaw
+      : null;
     const controlledTireLabel =
       typeof body.controlledTireLabel === "string" && body.controlledTireLabel.trim()
         ? body.controlledTireLabel.trim()
         : null;
+
+    if (resultsSourceUrl) {
+      const existing = await prisma.event.findFirst({
+        where: { userId: user.id, trackId, resultsSourceUrl },
+        select: {
+          id: true,
+          name: true,
+          trackId: true,
+          startDate: true,
+          endDate: true,
+          notes: true,
+          practiceSourceUrl: true,
+          resultsSourceUrl: true,
+          controlledTireLabel: true,
+        },
+      });
+      if (existing) {
+        return NextResponse.json(
+          {
+            error: "An event with this LiveRC results URL already exists.",
+            existingEventId: existing.id,
+            event: existing,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     const event = await prisma.event.create({
       data: {

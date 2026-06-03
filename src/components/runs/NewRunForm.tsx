@@ -43,6 +43,11 @@ import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDi
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions";
+import {
+  LiveRcRaceMeetingPrompt,
+  type LiveRcMeetingDetection,
+} from "@/components/runs/LiveRcRaceMeetingPrompt";
+import { defaultEventDatesForLiveRcDetection } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
 import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getCurrentPosition";
 import {
   DEFAULT_TRACK_PROXIMITY_RADIUS_M,
@@ -383,6 +388,9 @@ export function NewRunForm(props: {
   const [trackAutoDetectLoading, setTrackAutoDetectLoading] = useState(false);
   const trackTabAutoDetectDoneRef = useRef(false);
   const trackPickedManuallyRef = useRef(false);
+  const [liveRcMeeting, setLiveRcMeeting] = useState<LiveRcMeetingDetection | null>(null);
+  const [liveRcMeetingBusy, setLiveRcMeetingBusy] = useState(false);
+  const dismissedLiveRcMeetingRef = useRef<Set<string>>(new Set());
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
   /** Race meeting only: event results/practice hub for lap scan fallback. Testing uses track LiveRC URL. */
@@ -922,6 +930,181 @@ export function NewRunForm(props: {
     trackTabAutoDetectDoneRef.current = true;
     void runTrackAutoDetect();
   }, [runDetailsTab, isEditing, trackLockedToEvent, trackId, runTrackAutoDetect]);
+
+  function applyEventOption(ev: EventOption) {
+    setEventId(ev.id);
+    setEventError(null);
+    if (ev.trackId) {
+      setTrackId(ev.trackId);
+      setCopyTrackWarning(null);
+    }
+    setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
+    setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
+    setEventControlledTireLabel(ev.controlledTireLabel?.trim() ?? "");
+  }
+
+  function parseEventFromApi(raw: Record<string, unknown>): EventOption {
+    const start =
+      typeof raw.startDate === "string"
+        ? raw.startDate
+        : raw.startDate instanceof Date
+          ? raw.startDate.toISOString()
+          : new Date(String(raw.startDate)).toISOString();
+    const end =
+      typeof raw.endDate === "string"
+        ? raw.endDate
+        : raw.endDate instanceof Date
+          ? raw.endDate.toISOString()
+          : new Date(String(raw.endDate)).toISOString();
+    return {
+      id: String(raw.id),
+      name: String(raw.name),
+      trackId: (raw.trackId as string | null) ?? null,
+      startDate: start,
+      endDate: end,
+      notes: (raw.notes as string | null) ?? null,
+      practiceSourceUrl: (raw.practiceSourceUrl as string | null) ?? null,
+      resultsSourceUrl: (raw.resultsSourceUrl as string | null) ?? null,
+      controlledTireLabel: (raw.controlledTireLabel as string | null) ?? null,
+      track: (raw.track as EventOption["track"]) ?? null,
+    };
+  }
+
+  async function confirmLiveRcMeeting() {
+    if (!liveRcMeeting || !trackId.trim()) return;
+    setLiveRcMeetingBusy(true);
+    setEventError(null);
+    try {
+      const det = liveRcMeeting;
+      if (det.matchedEventId) {
+        let ev = events.find((e) => e.id === det.matchedEventId);
+        if (!ev) {
+          const listRes = await fetch("/api/events");
+          const listData = (await listRes.json().catch(() => ({}))) as {
+            events?: Record<string, unknown>[];
+          };
+          const list = (listData.events ?? []).map(parseEventFromApi);
+          setEvents(list);
+          ev = list.find((e) => e.id === det.matchedEventId);
+        }
+        if (!ev) throw new Error("Could not find the matching event.");
+        applyEventOption(ev);
+      } else {
+        const { startYmd, endYmd } = defaultEventDatesForLiveRcDetection();
+        const res = await fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: det.eventLabel,
+            trackId: trackId.trim(),
+            startDate: startYmd,
+            endDate: endYmd,
+            resultsSourceUrl: det.eventHubUrl,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          existingEventId?: string;
+          event?: Record<string, unknown>;
+        };
+        if (res.status === 409 && data.existingEventId && data.event) {
+          const existing = parseEventFromApi(data.event);
+          setEvents((prev) => {
+            if (prev.some((e) => e.id === existing.id)) return prev;
+            return [existing, ...prev];
+          });
+          applyEventOption(existing);
+        } else if (!res.ok) {
+          throw new Error(data.error ?? `Could not create event (${res.status})`);
+        } else if (data.event) {
+          const created = parseEventFromApi(data.event);
+          setEvents((prev) => [created, ...prev]);
+          applyEventOption(created);
+          setStatus("Event created from LiveRC — selected.");
+        } else {
+          throw new Error("Invalid response when creating event.");
+        }
+      }
+      dismissedLiveRcMeetingRef.current.add(`${trackId.trim()}|${det.eventHubUrl}`);
+      setLiveRcMeeting(null);
+    } finally {
+      setLiveRcMeetingBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (editingCompletedRun || trackLockedToEvent) {
+      setLiveRcMeeting(null);
+      return;
+    }
+    const tid = trackId.trim();
+    if (!tid) {
+      setLiveRcMeeting(null);
+      return;
+    }
+    const track = tracksList.find((t) => t.id === tid);
+    if (!track?.liveRcUrl?.trim()) {
+      setLiveRcMeeting(null);
+      return;
+    }
+    const selected = eventId ? events.find((e) => e.id === eventId) : null;
+    if (selected?.trackId === tid && selected.resultsSourceUrl?.trim()) {
+      setLiveRcMeeting(null);
+      return;
+    }
+
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/events/detect-live-rc-meeting", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ trackId: tid }),
+          });
+          const data = (await res.json().catch(() => ({}))) as {
+            detected?: boolean;
+            eventLabel?: string;
+            eventHubUrl?: string;
+            matchedEventId?: string | null;
+            trackName?: string;
+          };
+          if (!alive) return;
+          if (!res.ok || !data.detected || !data.eventHubUrl) {
+            setLiveRcMeeting(null);
+            return;
+          }
+          const hubUrl = data.eventHubUrl.trim();
+          const dismissKey = `${tid}|${hubUrl}`;
+          if (dismissedLiveRcMeetingRef.current.has(dismissKey)) {
+            setLiveRcMeeting(null);
+            return;
+          }
+          setSessionType("RACE_MEETING");
+          setLiveRcMeeting({
+            eventLabel: data.eventLabel?.trim() || "Race meeting",
+            eventHubUrl: hubUrl,
+            matchedEventId: data.matchedEventId ?? null,
+            trackName: data.trackName ?? track.name,
+          });
+        } catch {
+          if (alive) setLiveRcMeeting(null);
+        }
+      })();
+    }, 500);
+
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [
+    trackId,
+    tracksList,
+    editingCompletedRun,
+    trackLockedToEvent,
+    eventId,
+    events,
+  ]);
 
   useEffect(() => {
     if (trackId.trim()) {
@@ -2345,6 +2528,20 @@ export function NewRunForm(props: {
           </>
         )}
       </div>
+
+      {liveRcMeeting && !editingCompletedRun && !trackLockedToEvent ? (
+        <LiveRcRaceMeetingPrompt
+          detection={liveRcMeeting}
+          busy={liveRcMeetingBusy}
+          onConfirm={() => confirmLiveRcMeeting()}
+          onDismiss={() => {
+            dismissedLiveRcMeetingRef.current.add(
+              `${trackId.trim()}|${liveRcMeeting.eventHubUrl}`
+            );
+            setLiveRcMeeting(null);
+          }}
+        />
+      ) : null}
 
       {needsEvent && (sessionExpanded || !isDraft) ? (
         <div className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
