@@ -13,6 +13,7 @@ import {
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { getLiveRcDriverNameSetting, getSpeedhiveDriverNameForUser } from "@/lib/appSettings";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
+import { hasMylapsConnection } from "@/lib/mylaps/mylapsConnection";
 
 export type ScanDayUrlIndexKind = "practice" | "results";
 
@@ -84,11 +85,12 @@ export async function POST(request: Request) {
     }
     const liveRcUrl = track.liveRcUrl?.trim() ?? "";
     const speedhiveUrl = track.speedhiveUrl?.trim() ?? "";
-    if (!liveRcUrl && !speedhiveUrl) {
+    const mylapsLinked = await hasMylapsConnection(user.id);
+    if (!liveRcUrl && !speedhiveUrl && !mylapsLinked) {
       return NextResponse.json(
         {
           error:
-            "This track has no LiveRC or Speedhive URL. Add at least one on the track page.",
+            "Link your MYLAPS account in Settings, or add a LiveRC / Speedhive URL on the track page.",
         },
         { status: 400 }
       );
@@ -111,7 +113,8 @@ export async function POST(request: Request) {
       speedhiveUrl ? getSpeedhiveDriverNameForUser(user.id) : Promise.resolve(null),
     ]);
     const hasDriverNameSetting = Boolean(
-      (liveRcUrl && discovered.liveRcDriverName?.trim()) ||
+      mylapsLinked ||
+        (liveRcUrl && discovered.liveRcDriverName?.trim()) ||
         (speedhiveUrl && speedhiveDriverName?.trim())
     );
     const displaySessions = discovered.unimportedCandidates;
@@ -144,6 +147,7 @@ export async function POST(request: Request) {
       discoveryDebug: discovered.liveRcDebug,
       hasLiveRc: Boolean(liveRcUrl),
       hasSpeedhive: Boolean(speedhiveUrl),
+      hasMylapsLinked: mylapsLinked,
     });
   }
 

@@ -190,9 +190,10 @@ export function LapTimesIngestPanel({
   trackLiveRcUrl?: string | null;
   trackSpeedhiveUrl?: string | null;
 }) {
+  const [mylapsLinked, setMylapsLinked] = useState(false);
   const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
-  const hasTrackDiscovery = hasLiveRcTrack || hasSpeedhiveTrack;
+  const hasTrackDiscovery = hasLiveRcTrack || hasSpeedhiveTrack || mylapsLinked;
   const hasUrlScan = Boolean((practiceDayUrl ?? "").trim()) || hasTrackDiscovery;
   const [tab, setTab] = useState<IngestTab>(() => (hasUrlScan ? "url" : "manual"));
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -258,6 +259,22 @@ export function LapTimesIngestPanel({
     let cancelled = false;
     void (async () => {
       try {
+        const res = await fetch("/api/mylaps/status", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as { connected?: boolean } | null;
+        if (!cancelled && res.ok) setMylapsLinked(Boolean(data?.connected));
+      } catch {
+        if (!cancelled) setMylapsLinked(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
         const res = await fetch("/api/settings/live-rc-driver");
         const data = (await res.json().catch(() => null)) as {
           liveRcDriverName?: string | null;
@@ -288,7 +305,7 @@ export function LapTimesIngestPanel({
       void scanDayUrl();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
-  }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, lapImportEventId]);
+  }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, mylapsLinked, lapImportEventId]);
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
   const manualMetrics = useMemo(() => {
@@ -866,11 +883,21 @@ export function LapTimesIngestPanel({
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {dayScanBusy
-                      ? hasLiveRcTrack && hasSpeedhiveTrack
-                        ? "Checking LiveRC and Speedhive…"
-                        : hasSpeedhiveTrack
-                          ? "Checking Speedhive…"
-                          : "Checking LiveRC…"
+                      ? [
+                          hasLiveRcTrack && "LiveRC",
+                          hasSpeedhiveTrack && "Speedhive",
+                          mylapsLinked && "MYLAPS",
+                        ]
+                          .filter(Boolean)
+                          .join(", ")
+                          ? `Checking ${[
+                              hasLiveRcTrack && "LiveRC",
+                              hasSpeedhiveTrack && "Speedhive",
+                              mylapsLinked && "MYLAPS",
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}…`
+                          : "Checking timing sources…"
                       : dayScanCandidates && dayScanCandidates.length > 0
                         ? `${dayScanCandidates.length} new session(s) to import`
                         : "Newest unimported sessions (LiveRC and Speedhive, by completion time)"}

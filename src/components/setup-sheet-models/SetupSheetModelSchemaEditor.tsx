@@ -15,6 +15,7 @@ import {
   inferStructuredLayoutFromFields,
   rebuildSectionLayout,
 } from "@/lib/setupSheetModels/inferStructuredLayout";
+import { collectModelLayoutKeys } from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
 import {
   UNIVERSAL_TOURING_PARAMETERS,
   universalParameterIdForSnapshotKey,
@@ -64,6 +65,11 @@ export function SetupSheetModelSchemaEditor(props: {
     }
     return map;
   }, [schema.fields]);
+
+  const layoutKeys = useMemo(
+    () => collectModelLayoutKeys(schema.structuredSections),
+    [schema.structuredSections]
+  );
 
   const updateField = useCallback(
     (key: string, patch: Partial<SetupSheetModelFieldDef>) => {
@@ -159,7 +165,9 @@ export function SetupSheetModelSchemaEditor(props: {
         calibration). Optionally link a field to a universal parameter for cross-car stats. Calibrate your PDF in the
         next step. Use <span className="font-medium text-foreground">Show on sheet</span> for the full setup page and
         PDF review; use <span className="font-medium text-foreground">Show in log run</span> for fields visible when
-        logging a run. Corner fields (<span className="font-mono">*_ff</span>,{" "}
+        logging a run. Parameters marked <span className="font-medium text-foreground">Not in layout</span> are in the
+        catalog but not on the structured sheet — run <span className="font-medium text-foreground">Rebuild layout from
+        fields</span> to add them. Corner fields (<span className="font-mono">*_ff</span>,{" "}
         <span className="font-mono">*_fr</span>, …) and front/rear pairs are grouped automatically when you add or
         remove parameters.
       </p>
@@ -200,6 +208,11 @@ export function SetupSheetModelSchemaEditor(props: {
                   </span>
                 ) : null}
                 {f.unit ? <span className="text-[10px] text-muted-foreground">{f.unit}</span> : null}
+                {!layoutKeys.has(f.key) ? (
+                  <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200">
+                    Not in layout
+                  </span>
+                ) : null}
                 {!readOnly ? (
                   <>
                     <button

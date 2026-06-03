@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
 import {
   getLiveRcDriverIdSetting,
@@ -6,6 +7,7 @@ import {
   getSpeedhiveDriverNameSetting,
 } from "@/lib/appSettings";
 import { SettingsClient } from "@/components/settings/SettingsClient";
+import { MylapsLinkSection } from "@/components/settings/MylapsLinkSection";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
@@ -51,6 +53,9 @@ export default async function SettingsPage() {
             speedhiveDriverName: speedhiveDriverName ?? "",
           }}
         />
+        <Suspense fallback={null}>
+          <MylapsLinkSection />
+        </Suspense>
         <SettingsNavSection />
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (

@@ -26,13 +26,17 @@ export function buildSetupSheetTemplateFromParsedSchema(
   schema: SetupSheetModelSchema,
   view: SetupSheetTemplateView = "setup"
 ): SetupSheetTemplate {
-  const fieldVisible = (f: SetupSheetModelSchema["fields"][0]) =>
-    view === "logRun" ? f.showInLogRun : f.showInSetupSheet;
-  const visibleFields = schema.fields.filter(fieldVisible);
-  const visibleKeys = new Set(visibleFields.map((f) => f.key));
-  const filteredLayoutSections = filterModelLayoutSectionsByKeys(schema.structuredSections, (key) =>
-    visibleKeys.has(key)
+  const fieldByKey = new Map(schema.fields.map((f) => [f.key, f]));
+  const isKeyVisible = (key: string): boolean => {
+    const f = fieldByKey.get(key);
+    if (f) return view === "logRun" ? f.showInLogRun : f.showInSetupSheet;
+    // Layout row keys with no field def (legacy gaps) stay visible unless explicitly modeled.
+    return true;
+  };
+  const visibleFields = schema.fields.filter((f) =>
+    view === "logRun" ? f.showInLogRun : f.showInSetupSheet
   );
+  const filteredLayoutSections = filterModelLayoutSectionsByKeys(schema.structuredSections, isKeyVisible);
   const layoutSchema: SetupSheetModelSchema = {
     ...schema,
     structuredSections: filteredLayoutSections,

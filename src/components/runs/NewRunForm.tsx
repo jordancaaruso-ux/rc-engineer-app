@@ -743,7 +743,7 @@ export function NewRunForm(props: {
       return;
     }
     let cancelled = false;
-    fetch(`/api/cars/${carId}/setup-sheet-template?view=logRun`)
+    fetch(`/api/cars/${carId}/setup-sheet-template?view=logRun`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { template?: SetupSheetTemplate }) => {
         if (!cancelled && d.template) setModelTemplate(d.template);
@@ -754,7 +754,7 @@ export function NewRunForm(props: {
     return () => {
       cancelled = true;
     };
-  }, [carId]);
+  }, [carId, setupSectionExpanded]);
 
   const setupTemplate = useMemo(() => {
     if (modelTemplate) return modelTemplate;

@@ -108,3 +108,20 @@ test("logRun view filters structured sections by showInLogRun", () => {
   assert.equal(logRunTpl.groups?.[0]?.fields.length, 1);
   assert.equal(logRunTpl.groups?.[0]?.fields[0]?.key, "camber_front");
 });
+
+test("logRun view keeps layout rows whose keys lack field defs", () => {
+  const schema: SetupSheetModelSchema = {
+    version: 1,
+    label: "Test",
+    structuredSections: [
+      {
+        id: "geo",
+        title: "Geometry",
+        rows: [{ type: "single", key: "orphan_layout_key", label: "Orphan" }],
+      },
+    ],
+    fields: [],
+  };
+  const logRunTpl = buildSetupSheetTemplateFromParsedSchema("m1", "Test", schema, "logRun");
+  assert.equal(logRunTpl.structuredSections?.[0]?.rows.length, 1);
+});

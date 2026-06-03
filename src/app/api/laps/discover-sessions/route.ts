@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
+import { hasMylapsConnection } from "@/lib/mylaps/mylapsConnection";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +36,12 @@ export async function POST(request: Request) {
   }
   const liveRcUrl = track.liveRcUrl?.trim() ?? "";
   const speedhiveUrl = track.speedhiveUrl?.trim() ?? "";
-  if (!liveRcUrl && !speedhiveUrl) {
+  const mylapsLinked = await hasMylapsConnection(user.id);
+  if (!liveRcUrl && !speedhiveUrl && !mylapsLinked) {
     return NextResponse.json(
       {
         error:
-          "This track has no LiveRC or Speedhive URL. Add at least one on the Tracks page.",
+          "Link your MYLAPS account in Settings, or add a LiveRC / Speedhive URL on the Tracks page.",
         code: "missing_timing_url",
       },
       { status: 400 }
@@ -83,5 +85,6 @@ export async function POST(request: Request) {
     activeRaceMeeting: result.activeRaceMeeting,
     hasLiveRc: Boolean(liveRcUrl),
     hasSpeedhive: Boolean(speedhiveUrl),
+    hasMylapsLinked: mylapsLinked,
   });
 }

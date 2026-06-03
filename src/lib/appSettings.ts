@@ -8,6 +8,15 @@ export const APP_SETTING_KEYS = {
   liveRcDriverId: "liveRcDriverId",
   /** Display name on Speedhive results (optional; falls back to liveRcDriverName). */
   speedhiveDriverName: "speedhiveDriverName",
+  /** MYLAPS / Speedhive account id (from linked login). */
+  mylapsAccountId: "mylapsAccountId",
+  /** Bearer access token for usersandproducts-api (server only). */
+  mylapsAccessToken: "mylapsAccessToken",
+  mylapsRefreshToken: "mylapsRefreshToken",
+  /** ISO expiry for access token when known. */
+  mylapsTokenExpiresAt: "mylapsTokenExpiresAt",
+  /** JSON array of chip numbers from linked account. */
+  mylapsChipNumbersJson: "mylapsChipNumbersJson",
   /**
    * Current practice day timing-URL (e.g. LiveRC day results page) the driver
    * is working from. Persists across `New Run` forms so "copy last run" / fresh

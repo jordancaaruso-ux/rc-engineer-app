@@ -31,3 +31,16 @@ export function filterModelLayoutSectionsByKeys(
     }))
     .filter((sec) => sec.rows.length > 0);
 }
+
+/** All stable keys referenced by the structured layout rows. */
+export function collectModelLayoutKeys(
+  sections: SetupSheetModelSchema["structuredSections"]
+): Set<string> {
+  const keys = new Set<string>();
+  for (const sec of sections) {
+    for (const row of sec.rows) {
+      for (const k of modelLayoutRowKeys(row)) keys.add(k);
+    }
+  }
+  return keys;
+}

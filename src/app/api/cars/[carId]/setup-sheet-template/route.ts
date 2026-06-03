@@ -28,5 +28,8 @@ export async function GET(request: Request, ctx: RouteCtx) {
   if (!car) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const template = await getSetupSheetTemplateForCar(user.id, car, view);
-  return NextResponse.json({ template });
+  return NextResponse.json(
+    { template },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
