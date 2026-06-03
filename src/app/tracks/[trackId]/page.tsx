@@ -7,6 +7,8 @@ import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { TrackFavouriteClient } from "@/components/tracks/TrackFavouriteClient";
 import { TrackLiveRcUrlEditor } from "@/components/tracks/TrackLiveRcUrlEditor";
+import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
+import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -32,8 +34,8 @@ export default async function TrackDetailPage(props: {
   const { trackId } = await props.params;
   const user = await requireCurrentUser();
   const track = await prisma.track.findFirst({
-    where: { id: trackId, userId: user.id },
-    select: { id: true, name: true, location: true, liveRcUrl: true, createdAt: true },
+    where: { id: trackId },
+    select: { id: true, name: true, location: true, liveRcUrl: true, createdAt: true, latitude: true, longitude: true, locationSource: true },
   });
 
   if (!track) {
@@ -84,6 +86,25 @@ export default async function TrackDetailPage(props: {
                 <div><span className="text-sm font-medium text-muted-foreground">Location</span> <span className="ml-2">{track.location}</span></div>
               ) : null}
             </div>
+          </div>
+
+          <TrackLocationNotSetBanner
+            trackId={track.id}
+            trackName={track.name}
+            location={track.location}
+            initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
+            showCurrentLocation
+          />
+
+          <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
+            <div className="ui-title text-sm text-muted-foreground mb-2">GPS location</div>
+            <TrackLocationEditor
+              trackId={track.id}
+              trackName={track.name}
+              location={track.location}
+              initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
+              showCurrentLocation
+            />
           </div>
 
           <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />

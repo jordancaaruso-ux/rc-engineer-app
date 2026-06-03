@@ -30,9 +30,9 @@ export default async function TracksPage(): Promise<ReactNode> {
   const user = await requireCurrentUser();
   const [tracks, favouriteTrackIds] = await Promise.all([
     prisma.track.findMany({
-      where: { userId: user.id },
+      where: {},
       orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true, liveRcUrl: true },
+      select: { id: true, name: true, location: true, liveRcUrl: true, latitude: true, longitude: true },
     }),
     getFavouriteTrackIdsForUser(user.id),
   ]);
@@ -51,7 +51,7 @@ export default async function TracksPage(): Promise<ReactNode> {
         <div>
           <h1 className="page-title">Tracks</h1>
           <p className="page-subtitle">
-            Add and manage tracks. Use them when logging runs or creating events.
+            Search the community track catalog. Add a track only if you cannot find it.
           </p>
         </div>
       </header>

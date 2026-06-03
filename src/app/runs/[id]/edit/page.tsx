@@ -106,7 +106,7 @@ export default async function EditRunPage({
 
   const [cars, allTracks, favouriteTrackIds] = await Promise.all([
     prisma.car.findMany({
-      where: { userId: user.id },
+      where: {},
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, setupSheetTemplate: true },
     }),

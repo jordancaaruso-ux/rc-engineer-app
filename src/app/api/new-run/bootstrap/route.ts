@@ -20,9 +20,17 @@ export async function GET() {
       select: { id: true, name: true }
     }),
     prisma.track.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, location: true, liveRcUrl: true }
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        liveRcUrl: true,
+        latitude: true,
+        longitude: true,
+        gripTags: true,
+        layoutTags: true,
+      },
     })
   ]);
 

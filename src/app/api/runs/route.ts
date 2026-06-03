@@ -18,6 +18,7 @@ import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
 import { coerceFeelVsLastRunForCompleteRun, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
+import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
 
 type RunUpsertBody = {
   runId?: string;
@@ -345,7 +346,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
 
   const track = body.trackId
     ? await prisma.track.findFirst({
-        where: { id: body.trackId, userId: params.userId },
+        where: communityTrackByIdWhere(body.trackId),
         select: { name: true },
       })
     : null;
@@ -564,13 +565,15 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     trackId: body.trackId,
     loggingComplete,
     newlyCompleted,
-    countCompletedRunsAtTrack: (userId, trackId) =>
-      prisma.run.count({
-        where: { userId, trackId, loggingComplete: true },
-      }),
-    findTrack: (userId, trackId) =>
+    hasDismissedRunLocationPrompt: async (userId, trackId) => {
+      const row = await prisma.trackLocationRunPromptDismissal.findUnique({
+        where: { userId_trackId: { userId, trackId } },
+      });
+      return row != null;
+    },
+    findTrack: (trackId) =>
       prisma.track.findFirst({
-        where: { id: trackId, userId },
+        where: communityTrackByIdWhere(trackId),
         select: {
           id: true,
           name: true,

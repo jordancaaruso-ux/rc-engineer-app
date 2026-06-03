@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "trackId is required" }, { status: 400 });
     }
     const track = await prisma.track.findFirst({
-      where: { id: trackId, userId: user.id },
+      where: { id: trackId },
       select: { id: true },
     });
     if (!track) {

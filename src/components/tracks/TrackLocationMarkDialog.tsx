@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "@/lib/utils";
-import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getCurrentPosition";
+import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 
 export function TrackLocationMarkDialog({
   open,
@@ -18,39 +16,17 @@ export function TrackLocationMarkDialog({
   onMarked: () => void;
   onSkip: () => void;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   if (!open || typeof document === "undefined") return null;
 
-  async function markLocation() {
-    setBusy(true);
-    setError(null);
+  async function dismissAndSkip() {
     try {
-      const position = await getCurrentPosition();
-      const res = await fetch(`/api/tracks/${encodeURIComponent(trackId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          latitude: position.latitude,
-          longitude: position.longitude,
-        }),
+      await fetch(`/api/tracks/${encodeURIComponent(trackId)}/location-prompt-dismiss`, {
+        method: "POST",
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(data.error ?? `Could not save location (${res.status})`);
-        return;
-      }
-      onMarked();
-    } catch (e) {
-      if (e instanceof GeolocationRequestError) {
-        setError(e.message);
-      } else {
-        setError(e instanceof Error ? e.message : "Could not save location");
-      }
-    } finally {
-      setBusy(false);
+    } catch {
+      /* still skip */
     }
+    onSkip();
   }
 
   return createPortal(
@@ -60,45 +36,37 @@ export function TrackLocationMarkDialog({
       aria-modal="true"
       aria-labelledby="track-location-mark-title"
       onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onSkip();
+        if (e.target === e.currentTarget) void dismissAndSkip();
       }}
     >
       <div
-        className="w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl"
+        className="w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="track-location-mark-title" className="ui-title text-sm text-foreground">
-          Save track location?
+          Set track GPS location
         </h2>
         <p className="mt-2 text-sm text-muted-foreground leading-snug">
-          You just completed your first run at{" "}
-          <span className="font-medium text-foreground">{trackName}</span>. Mark where you are now so
-          we can recognize this track when you return.
+          <span className="font-medium text-foreground">{trackName}</span> does not have GPS saved yet.
+          Paste coordinates from Google Maps, or use your current location if you are at the track. This helps
+          everyone find the venue on Log run.
         </p>
-        {error ? (
-          <p className="mt-2 text-xs text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
+        <div className="mt-4">
+          <TrackLocationEditor
+            trackId={trackId}
+            trackName={trackName}
+            initial={{}}
+            showCurrentLocation
+            onSaved={() => onMarked()}
+          />
+        </div>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
             type="button"
             className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted/80 transition"
-            disabled={busy}
-            onClick={onSkip}
+            onClick={() => void dismissAndSkip()}
           >
             Not now
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "rounded-md border border-accent bg-accent/15 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent/25 transition",
-              busy && "opacity-70 pointer-events-none"
-            )}
-            disabled={busy}
-            onClick={() => void markLocation()}
-          >
-            {busy ? "Getting location…" : "Mark this location"}
           </button>
         </div>
       </div>

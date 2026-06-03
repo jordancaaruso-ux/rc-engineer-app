@@ -18,8 +18,8 @@ export default async function VideoAnalysisPage(): Promise<ReactNode> {
 
   const user = await requireCurrentUser();
   const tracks = await prisma.track.findMany({
-    where: { userId: user.id },
-    orderBy: { name: "asc" },
+    where: {},
+      orderBy: { name: "asc" },
     select: { id: true, name: true, location: true },
   });
 

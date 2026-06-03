@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { parseCoordinates } from "@/lib/location/coordinates";
+import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
+import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
 import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 
@@ -22,7 +24,7 @@ export async function GET(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const track = await prisma.track.findFirst({
-    where: { id: trackId, userId: user.id },
+    where: communityTrackByIdWhere(trackId),
     select: {
       id: true,
       name: true,
@@ -65,11 +67,12 @@ export async function PATCH(
     liveRcUrl?: string | null;
     latitude?: unknown;
     longitude?: unknown;
+    locationSource?: string | null;
     clearLocation?: boolean;
   } | null;
 
   const existing = await prisma.track.findFirst({
-    where: { id: trackId, userId: user.id },
+    where: communityTrackByIdWhere(trackId),
     select: { id: true },
   });
   if (!existing) {
@@ -113,7 +116,8 @@ export async function PATCH(
     data.latitude = parsed.latitude;
     data.longitude = parsed.longitude;
     data.locationMarkedAt = new Date();
-    data.locationSource = "device";
+    const src = typeof body.locationSource === "string" ? body.locationSource.trim() : "";
+    data.locationSource = src === "manual_paste" || src === "device" ? src : "device";
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields" }, { status: 400 });
@@ -136,5 +140,6 @@ export async function PATCH(
     },
   });
 
+  revalidateAfterTrackMutation(user.id);
   return NextResponse.json({ track });
 }

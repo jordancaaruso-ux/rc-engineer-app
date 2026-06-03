@@ -86,7 +86,7 @@ export async function POST(request: Request) {
   }
   if (trackId) {
     const ownedTrack = await prisma.track.findFirst({
-      where: { id: trackId, userId: user.id },
+      where: { id: trackId },
       select: { id: true },
     });
     if (!ownedTrack) {

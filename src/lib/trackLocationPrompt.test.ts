@@ -1,17 +1,17 @@
 /**
- * Run: `npx tsx src/lib/trackLocationPrompt.test.ts`
+ * Run: npx tsx src/lib/trackLocationPrompt.test.ts
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 
-test("prompts on first completed run when track has no coordinates", async () => {
+test("prompts when track has no coordinates and not dismissed", async () => {
   const prompt = await buildPromptMarkTrackLocation({
     userId: "u1",
     trackId: "t1",
     loggingComplete: true,
     newlyCompleted: true,
-    countCompletedRunsAtTrack: async () => 1,
+    hasDismissedRunLocationPrompt: async () => false,
     findTrack: async () => ({
       id: "t1",
       name: "Test Track",
@@ -28,7 +28,7 @@ test("skips when track already has coordinates", async () => {
     trackId: "t1",
     loggingComplete: true,
     newlyCompleted: true,
-    countCompletedRunsAtTrack: async () => 1,
+    hasDismissedRunLocationPrompt: async () => false,
     findTrack: async () => ({
       id: "t1",
       name: "Test Track",
@@ -39,13 +39,13 @@ test("skips when track already has coordinates", async () => {
   assert.equal(prompt, null);
 });
 
-test("skips when not first completed run at track", async () => {
+test("skips when user dismissed modal for this track", async () => {
   const prompt = await buildPromptMarkTrackLocation({
     userId: "u1",
     trackId: "t1",
     loggingComplete: true,
     newlyCompleted: true,
-    countCompletedRunsAtTrack: async () => 2,
+    hasDismissedRunLocationPrompt: async () => true,
     findTrack: async () => ({
       id: "t1",
       name: "Test Track",
@@ -54,4 +54,21 @@ test("skips when not first completed run at track", async () => {
     }),
   });
   assert.equal(prompt, null);
+});
+
+test("prompts on later complete when still unmarked and not dismissed", async () => {
+  const prompt = await buildPromptMarkTrackLocation({
+    userId: "u1",
+    trackId: "t1",
+    loggingComplete: true,
+    newlyCompleted: true,
+    hasDismissedRunLocationPrompt: async () => false,
+    findTrack: async () => ({
+      id: "t1",
+      name: "Test Track",
+      latitude: null,
+      longitude: null,
+    }),
+  });
+  assert.ok(prompt);
 });

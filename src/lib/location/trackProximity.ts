@@ -49,8 +49,64 @@ export function findTracksNearPosition(
       hits.push({ track, distanceM });
     }
   }
-  hits.sort((a, b) => a.distanceM - b.distanceM);
-  return hits;
+  return sortNearbyTracks(hits, []);
+}
+
+/** Favourites first, then by ascending distance within each group. */
+export function sortNearbyTracks(
+  nearby: readonly TrackNearPosition[],
+  favouriteTrackIds: readonly string[] = []
+): TrackNearPosition[] {
+  const favSet = new Set(favouriteTrackIds);
+  return [...nearby].sort((a, b) => {
+    const aFav = favSet.has(a.track.id);
+    const bFav = favSet.has(b.track.id);
+    if (aFav !== bFav) return aFav ? -1 : 1;
+    return a.distanceM - b.distanceM;
+  });
+}
+
+export type TrackPickFromPositionResult =
+  | { kind: "no_marked_tracks" }
+  | { kind: "none_nearby" }
+  | { kind: "single"; track: TrackWithCoordinates; distanceM: number }
+  | { kind: "multiple"; nearby: TrackNearPosition[] };
+
+/**
+ * Decide how to set the track from device GPS: auto-select only when exactly one
+ * track is within radius; otherwise return sorted nearby list for manual pick.
+ */
+export function pickTrackFromPosition(
+  tracks: readonly TrackWithCoordinates[],
+  position: GeoPosition,
+  options?: {
+    radiusMeters?: number;
+    favouriteTrackIds?: readonly string[];
+  }
+): TrackPickFromPositionResult {
+  const marked = tracks.filter(trackHasMarkedLocation);
+  if (marked.length === 0) {
+    return { kind: "no_marked_tracks" };
+  }
+
+  const radiusMeters = options?.radiusMeters ?? DEFAULT_TRACK_PROXIMITY_RADIUS_M;
+  const favouriteTrackIds = options?.favouriteTrackIds ?? [];
+  const nearby = sortNearbyTracks(
+    findTracksNearPosition(tracks, position, radiusMeters),
+    favouriteTrackIds
+  );
+
+  if (nearby.length === 0) {
+    return { kind: "none_nearby" };
+  }
+  if (nearby.length === 1) {
+    return {
+      kind: "single",
+      track: nearby[0]!.track,
+      distanceM: nearby[0]!.distanceM,
+    };
+  }
+  return { kind: "multiple", nearby };
 }
 
 export function formatDistanceMeters(m: number): string {

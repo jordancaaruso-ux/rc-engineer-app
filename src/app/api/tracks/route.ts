@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser, addTrackToFavourites } from "@/lib/track-favourites";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
+import { communityTrackListWhere } from "@/lib/tracks/communityTrackAccess";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -24,17 +25,7 @@ export async function GET(request: Request) {
     const favouriteTrackIds =
       favouritesOnly || favouritesFirst ? await getFavouriteTrackIdsForUser(user.id) : [];
 
-    const whereBase = {
-      userId: user.id,
-      ...(q
-        ? {
-            OR: [
-              { name: { contains: q } },
-              { location: { contains: q } },
-            ],
-          }
-        : {}),
-    };
+    const whereBase = communityTrackListWhere(q);
 
     const tracks = await prisma.track.findMany({
       where:
@@ -113,6 +104,30 @@ export async function POST(request: Request) {
       liveRcUrl = v.normalized;
     }
 
+    const existing = await prisma.track.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        liveRcUrl: true,
+        gripTags: true,
+        layoutTags: true,
+        latitude: true,
+        longitude: true,
+      },
+    });
+    if (existing) {
+      return NextResponse.json(
+        {
+          error: "A track with this name already exists in the community catalog.",
+          existingTrackId: existing.id,
+          track: existing,
+        },
+        { status: 409 }
+      );
+    }
+
     const track = await prisma.track.create({
       data: {
         userId: user.id,
@@ -120,7 +135,16 @@ export async function POST(request: Request) {
         location: body.location?.trim() || null,
         liveRcUrl,
       },
-      select: { id: true, name: true, location: true, liveRcUrl: true, gripTags: true, layoutTags: true },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        liveRcUrl: true,
+        gripTags: true,
+        layoutTags: true,
+        latitude: true,
+        longitude: true,
+      },
     });
     if (body.addToFavourites) {
       await addTrackToFavourites(user.id, track.id);

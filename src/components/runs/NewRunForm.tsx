@@ -40,11 +40,13 @@ import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFi
 import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import { TrackMetaChipGroups } from "@/components/runs/TrackMetaChipGroups";
 import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDialog";
+import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
+import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions";
 import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getCurrentPosition";
 import {
   DEFAULT_TRACK_PROXIMITY_RADIUS_M,
-  findTracksNearPosition,
+  pickTrackFromPosition,
 } from "@/lib/location/trackProximity";
 import {
   emptyHandlingAssessmentUiState,
@@ -375,11 +377,11 @@ export function NewRunForm(props: {
     runId: string;
   } | null>(null);
   const [nearbyTrackSuggestions, setNearbyTrackSuggestions] = useState<
-    { trackId: string; trackName: string; distanceM: number }[]
+    { trackId: string; trackName: string; distanceM: number; isFavourite?: boolean }[]
   >([]);
   const [trackAutoDetectMessage, setTrackAutoDetectMessage] = useState<string | null>(null);
   const [trackAutoDetectLoading, setTrackAutoDetectLoading] = useState(false);
-  const trackAutoDetectRanRef = useRef(false);
+  const trackTabAutoDetectDoneRef = useRef(false);
   const trackPickedManuallyRef = useRef(false);
 
   const canSave = useMemo(() => Boolean(carId), [carId]);
@@ -832,14 +834,21 @@ export function NewRunForm(props: {
   /** Race meeting + event with a track: run track follows the event (picker disabled). */
   const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
 
+  const tracksGpsFingerprint = useMemo(
+    () =>
+      tracksList
+        .filter((t) => trackHasMarkedLocation(t))
+        .map((t) => `${t.id}:${t.latitude!.toFixed(5)},${t.longitude!.toFixed(5)}`)
+        .sort()
+        .join("|"),
+    [tracksList]
+  );
+
   const runTrackAutoDetect = useCallback(async () => {
     if (isEditing || trackLockedToEvent || trackPickedManuallyRef.current) return;
-    const marked = tracksList.filter(
-      (t) => t.latitude != null && t.longitude != null
-    );
-    if (marked.length === 0) {
+    if (tracksList.filter((t) => trackHasMarkedLocation(t)).length === 0) {
       setTrackAutoDetectMessage(
-        "No tracks with a saved location yet. Complete a run at a track and mark its location when prompted."
+        "No tracks have GPS saved yet. Open Track library to paste coordinates from Google Maps, then try again."
       );
       return;
     }
@@ -848,28 +857,45 @@ export function NewRunForm(props: {
     setNearbyTrackSuggestions([]);
     try {
       const position = await getCurrentPosition();
-      const near = findTracksNearPosition(marked, position, DEFAULT_TRACK_PROXIMITY_RADIUS_M);
-      if (near.length === 1) {
-        setTrackId(near[0]!.track.id);
-        setCopyTrackWarning(null);
-        setTrackAutoDetectMessage(`Detected ${near[0]!.track.name}.`);
+      const pick = pickTrackFromPosition(tracksList, position, {
+        radiusMeters: DEFAULT_TRACK_PROXIMITY_RADIUS_M,
+        favouriteTrackIds,
+      });
+      if (pick.kind === "no_marked_tracks") {
+        setTrackAutoDetectMessage(
+          "No tracks have GPS saved yet. Open Track library to paste coordinates from Google Maps, then try again."
+        );
         return;
       }
-      if (near.length > 1) {
+      if (pick.kind === "single") {
+        setTrackId(pick.track.id);
+        setCopyTrackWarning(null);
+        setTrackAutoDetectMessage(`Detected ${pick.track.name} (${Math.round(pick.distanceM)} m away).`);
+        return;
+      }
+      if (pick.kind === "multiple") {
+        const favSet = new Set(favouriteTrackIds);
         setNearbyTrackSuggestions(
-          near.map((n) => ({
+          pick.nearby.map((n) => ({
             trackId: n.track.id,
             trackName: n.track.name,
             distanceM: n.distanceM,
+            isFavourite: favSet.has(n.track.id),
           }))
         );
-        setTrackAutoDetectMessage("Multiple tracks nearby — pick one below.");
+        setTrackAutoDetectMessage("Multiple tracks nearby — pick one below (favourites listed first).");
         return;
       }
-      setTrackAutoDetectMessage("No saved track is near your current location.");
+      setTrackAutoDetectMessage(
+        "No saved track is within 800 m. Select manually or set GPS on a track in Track library."
+      );
     } catch (e) {
       if (e instanceof GeolocationRequestError) {
-        setTrackAutoDetectMessage(e.message);
+        const hint =
+          e.code === "denied"
+            ? " Enable location in browser settings, then tap Detect from location."
+            : "";
+        setTrackAutoDetectMessage(e.message + hint);
       } else {
         setTrackAutoDetectMessage(
           e instanceof Error ? e.message : "Could not detect track from location."
@@ -878,17 +904,24 @@ export function NewRunForm(props: {
     } finally {
       setTrackAutoDetectLoading(false);
     }
-  }, [isEditing, trackLockedToEvent, tracksList]);
+  }, [isEditing, trackLockedToEvent, tracksList, favouriteTrackIds]);
 
   useEffect(() => {
-    if (isEditing || trackLockedToEvent || trackAutoDetectRanRef.current) return;
+    if (isEditing || trackLockedToEvent) return;
+    if (trackId.trim() || trackPickedManuallyRef.current) return;
     const t = window.setTimeout(() => {
-      if (trackId.trim() || trackPickedManuallyRef.current) return;
-      trackAutoDetectRanRef.current = true;
       void runTrackAutoDetect();
     }, 800);
     return () => window.clearTimeout(t);
-  }, [isEditing, trackLockedToEvent, trackId, tracksList, runTrackAutoDetect]);
+  }, [isEditing, trackLockedToEvent, trackId, tracksGpsFingerprint, runTrackAutoDetect]);
+
+  useEffect(() => {
+    if (runDetailsTab !== "track") return;
+    if (isEditing || trackLockedToEvent || trackPickedManuallyRef.current || trackId.trim()) return;
+    if (trackTabAutoDetectDoneRef.current) return;
+    trackTabAutoDetectDoneRef.current = true;
+    void runTrackAutoDetect();
+  }, [runDetailsTab, isEditing, trackLockedToEvent, trackId, runTrackAutoDetect]);
 
   useEffect(() => {
     if (trackId.trim()) {
@@ -2809,6 +2842,14 @@ export function NewRunForm(props: {
                       {trackAutoDetectMessage ? (
                         <span className="text-[11px] text-muted-foreground leading-snug">
                           {trackAutoDetectMessage}
+                          {trackAutoDetectMessage.includes("Track library") ? (
+                            <>
+                              {" "}
+                              <Link href="/tracks" className="font-medium text-foreground underline">
+                                Track library
+                              </Link>
+                            </>
+                          ) : null}
                         </span>
                       ) : null}
                     </div>
@@ -2823,6 +2864,24 @@ export function NewRunForm(props: {
                       setTrackAutoDetectMessage(null);
                     }}
                   />
+                  {(() => {
+                    const t = tracksList.find((x) => x.id === trackId);
+                    if (!t || trackHasMarkedLocation(t)) return null;
+                    return (
+                      <TrackLocationNotSetBanner
+                        trackId={t.id}
+                        trackName={t.name}
+                        location={t.location}
+                        initial={{ latitude: t.latitude, longitude: t.longitude }}
+                        showCurrentLocation
+                        onSaved={(saved) => {
+                          setTracksList((prev) =>
+                            prev.map((x) => (x.id === t.id ? { ...x, ...saved } : x))
+                          );
+                        }}
+                      />
+                    );
+                  })()}
                 </div>
               )}
             </div>

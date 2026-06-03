@@ -31,6 +31,7 @@ model User {
   snapshots       SetupSnapshot[]
   events          Event[]
   favouriteTracks FavouriteTrack[]
+  trackLocationRunPromptDismissals TrackLocationRunPromptDismissal[]
   appSettings     AppSetting[]
   actionItems     ActionItem[]
   setupDocuments  SetupDocument[]
@@ -68,7 +69,7 @@ model TeamMembership {
   joinedAt DateTime @default(now())
   teamId   String
   userId   String
-  /** `admin` \| `member` — pilot uses `member` for everyone unless you promote in DB. */
+  /** `admin` \| `member` â€” pilot uses `member` for everyone unless you promote in DB. */
   role     String   @default("member")
 
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -86,7 +87,7 @@ model AuthAllowedEmail {
   createdAt DateTime @default(now())
 }
 
-/** Auth.js / NextAuth — OAuth-style account linkage (email magic link uses this). */
+/** Auth.js / NextAuth â€” OAuth-style account linkage (email magic link uses this). */
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -188,7 +189,7 @@ model SetupSheetModel {
   cars           Car[]
   setupDocuments SetupDocument[]
   calibrations   SetupSheetCalibration[]
-  /** PDF calibration used for auto-pick and the car-page “Edit PDF calibration” link. */
+  /** PDF calibration used for auto-pick and the car-page â€œEdit PDF calibrationâ€ link. */
   defaultCalibrationId String?                @unique
   defaultCalibration   SetupSheetCalibration? @relation("ModelDefaultCalibration", fields: [defaultCalibrationId], references: [id], onDelete: SetNull)
 
@@ -222,7 +223,7 @@ model Track {
   id        String   @id @default(cuid())
   name      String
   location  String?
-  /** GPS pin from “mark this location” when completing a run at the track. */
+  /** GPS pin from â€œmark this locationâ€ when completing a run at the track. */
   latitude  Float?
   longitude Float?
   locationMarkedAt DateTime?
@@ -245,6 +246,20 @@ model Track {
   cameraProfiles  TrackCameraProfile[]
   videoAssets     VideoAsset[]
   videoAnalysisJobs VideoAnalysisJob[]
+  locationRunPromptDismissals TrackLocationRunPromptDismissal[]
+}
+
+/** Per-user: do not show the Run-complete GPS modal again for this track. */
+model TrackLocationRunPromptDismissal {
+  userId      String
+  trackId     String
+  dismissedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([userId, trackId])
+  @@index([trackId])
 }
 
 model FavouriteTrack {
@@ -397,7 +412,7 @@ enum SetupAggregationValueType {
 
 /**
  * Materialized stats from normalized SetupSnapshot.data (via SetupDocument.createdSetup).
- * No document ids, filenames, or user ids — scoped by carId (user-owned car).
+ * No document ids, filenames, or user ids â€” scoped by carId (user-owned car).
  */
 model SetupParameterAggregation {
   id        String   @id @default(cuid())
@@ -436,7 +451,7 @@ model CommunitySetupParameterAggregation {
   trackSurface String
   /**
    * Grip-level bucket derived from the doc's `traction` multi-select tag.
-   * Values: `any` (always emitted — all eligible docs for the surface),
+   * Values: `any` (always emitted â€” all eligible docs for the surface),
    * `low` / `medium` / `high` (one row per grip tag the doc claims; multi-tag docs land in multiple buckets).
    */
   gripLevel String @default("any")
@@ -581,7 +596,7 @@ model SetupSheetCalibration {
   setupSheetModelId String?
   /**
    * True when this row is one of the top calibrations (by use on aggregation-eligible uploads), recomputed
-   * on community rebuild—readable and applicable by all authenticated users for setup uploads.
+   * on community rebuildâ€”readable and applicable by all authenticated users for setup uploads.
    */
   communityShared Boolean @default(false)
 
@@ -646,7 +661,7 @@ model Run {
   setupSnapshot   SetupSnapshot @relation(fields: [setupSnapshotId], references: [id])
   setupSnapshotId String
 
-  /** Base uploaded PDF used to render this run’s setup sheet (derived PDF is separate). */
+  /** Base uploaded PDF used to render this runâ€™s setup sheet (derived PDF is separate). */
   sourceSetupDocumentId String?
   sourceSetupDocument   SetupDocument? @relation("RunSetupPdfSource", fields: [sourceSetupDocumentId], references: [id], onDelete: SetNull)
   /** Calibration / mapping profile used with the base PDF. */
@@ -659,7 +674,7 @@ model Run {
   setupPdfRenderVersion     Int      @default(1)
 
   // Store raw lap times as JSON array (SQLite-compatible; was Float[] for PostgreSQL).
-  // Primary (self) laps — kept in sync with lapSession.entries[primary] when lapSession is set.
+  // Primary (self) laps â€” kept in sync with lapSession.entries[primary] when lapSession is set.
   lapTimes Json @default("[]")
 
   // Structured lap ingestion: source, metrics, multi-driver/field-ready entries (see src/lib/lapSession/types.ts).
@@ -669,7 +684,7 @@ model Run {
    * Materialized lap summary metrics computed from `lapTimes` / `lapSession` at
    * save time. List views (Sessions / dashboard) read these instead of
    * recomputing from the JSON lap arrays for every row. Nullable for legacy
-   * runs written before the column existed — callers fall back to computing
+   * runs written before the column existed â€” callers fall back to computing
    * from the lap arrays in that case.
    */
   bestLapSeconds   Float?
@@ -681,13 +696,13 @@ model Run {
   /** Optional structured handling tags / balance / prompts (see runHandlingAssessment). */
   handlingAssessmentJson Json?
   /**
-   * Required 1–10 overall car rating captured at "Run complete". Nullable in DB so legacy and
+   * Required 1â€“10 overall car rating captured at "Run complete". Nullable in DB so legacy and
    * draft runs aren't broken, but the run-complete API path enforces it. Drives the
    * Engineer's `runQuality` signal + known-good / known-bad history mining.
    */
   carRating Int?
   suggestedChanges String?
-  /** Pre–next-run reminders; same bullet format as `suggestedChanges` (ActionItem `THINGS_TO_DO`). */
+  /** Preâ€“next-run reminders; same bullet format as `suggestedChanges` (ActionItem `THINGS_TO_DO`). */
   suggestedPreRun  String?
   appliedChanges   String?
 
@@ -710,7 +725,7 @@ model Run {
   loggingComplete  Boolean  @default(false)
   /**
    * First server time when this run was saved with `loggingComplete` true (non-draft).
-   * Immutable after set. Used for list timestamps so they stay on “when I finished logging”
+   * Immutable after set. Used for list timestamps so they stay on â€œwhen I finished loggingâ€
    * rather than re-imported session wall clock.
    *
    * Legacy completed rows may still be null; display falls back to `sessionCompletedAt` then
@@ -763,7 +778,7 @@ model Run {
   @@index([userId, carId, carRating])
 }
 
-/** Cached proactive “next session” hints for Dashboard / Engineer (LLM + fingerprint invalidation). */
+/** Cached proactive â€œnext sessionâ€ hints for Dashboard / Engineer (LLM + fingerprint invalidation). */
 model EngineerBetweenRunHint {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -784,7 +799,7 @@ model EngineerBetweenRunHint {
   @@index([userId, updatedAt])
 }
 
-/** Cached handling/setup-oriented suggestions for Dashboard “Engineer suggestions” tab. */
+/** Cached handling/setup-oriented suggestions for Dashboard â€œEngineer suggestionsâ€ tab. */
 model EngineerDashboardSuggestion {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -821,12 +836,12 @@ model ImportedLapTimeSession {
   /** e.g. liverc, timing_url */
   sourceType String   @default("timing_url")
 
-  /** Snapshot of LapUrlParseResult fields for rehydration (laps, sessionDrivers, sessionHint, …). */
+  /** Snapshot of LapUrlParseResult fields for rehydration (laps, sessionDrivers, sessionHint, â€¦). */
   parsedPayload Json
 
   /**
    * Per-driver + field aggregates from `parsedPayload` (every entrant when present): best / avgTop5 / avgTop10,
-   * median field pace, ranks. Written on import/backfill — see ImportedSessionFieldStatsV1 (version 1).
+   * median field pace, ranks. Written on import/backfill â€” see ImportedSessionFieldStatsV1 (version 1).
    */
   fieldStatsJson Json?
 
@@ -952,7 +967,7 @@ enum VideoAnalysisJobStatus {
   FAILED
 }
 
-/** Fisheye (or fixed) camera setup for a track layout — reference frame + sector lines. */
+/** Fisheye (or fixed) camera setup for a track layout â€” reference frame + sector lines. */
 model TrackCameraProfile {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -1033,7 +1048,7 @@ model VideoAsset {
   @@index([trackId])
 }
 
-/** Video sector analysis job — results imported from Python worker JSON. */
+/** Video sector analysis job â€” results imported from Python worker JSON. */
 model VideoAnalysisJob {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -1067,7 +1082,7 @@ model VideoAnalysisJob {
 
   /** `worker` = Python JSON import; `manual` = user frame marks + transponder sync. */
   analysisMode String @default("worker")
-  /** ManualVideoSessionV1 — sync anchors, sector frame marks, driver selection. */
+  /** ManualVideoSessionV1 â€” sync anchors, sector frame marks, driver selection. */
   manualJson Json?
 
   @@index([userId, createdAt])

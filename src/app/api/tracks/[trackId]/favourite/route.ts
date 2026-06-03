@@ -24,7 +24,7 @@ export async function POST(
   const { trackId } = await context.params;
   const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const track = await prisma.track.findFirst({ where: { id: trackId, userId: user.id }, select: { id: true } });
+  const track = await prisma.track.findFirst({ where: { id: trackId }, select: { id: true } });
   if (!track) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }

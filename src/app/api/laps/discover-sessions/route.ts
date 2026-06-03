@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   const track = await prisma.track.findFirst({
-    where: { id: trackId, userId: user.id },
+    where: { id: trackId },
     select: { liveRcUrl: true },
   });
   if (!track) {

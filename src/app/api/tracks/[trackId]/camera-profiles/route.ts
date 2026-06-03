@@ -14,7 +14,7 @@ export async function GET(_request: Request, { params }: Params) {
   const { trackId } = await params;
 
   const track = await prisma.track.findFirst({
-    where: { id: trackId, userId: user.id },
+    where: { id: trackId },
     select: { id: true, name: true },
   });
   if (!track) return NextResponse.json({ error: "Track not found" }, { status: 404 });
@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: Params) {
   const { trackId } = await params;
 
   const track = await prisma.track.findFirst({
-    where: { id: trackId, userId: user.id },
+    where: { id: trackId },
     select: { id: true },
   });
   if (!track) return NextResponse.json({ error: "Track not found" }, { status: 404 });
