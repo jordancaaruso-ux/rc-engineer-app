@@ -3562,7 +3562,7 @@ export function NewRunForm(props: {
                         <RunLogQuickSetupUpload
                           carId={carId}
                           onImported={handleQuickSetupImported}
-                          onRefetchList={() => refreshDownloadedSetups()}
+                          onRefetchList={() => void refreshDownloadedSetups()}
                           variant={downloadedSetups.length === 0 ? "banner" : "inline"}
                         />
                       ) : null}
@@ -3708,7 +3708,7 @@ export function NewRunForm(props: {
                     <RunLogQuickSetupUpload
                       carId={carId}
                       onImported={handleQuickSetupImported}
-                      onRefetchList={() => refreshDownloadedSetups()}
+                      onRefetchList={() => void refreshDownloadedSetups()}
                       variant={downloadedSetups.length === 0 ? "banner" : "inline"}
                     />
                   ) : null}
@@ -3738,7 +3738,7 @@ export function NewRunForm(props: {
               <RunLogQuickSetupUpload
                 carId={carId}
                 onImported={handleQuickSetupImported}
-                onRefetchList={() => refreshDownloadedSetups()}
+                onRefetchList={() => void refreshDownloadedSetups()}
                 variant="banner"
               />
             ) : null}
