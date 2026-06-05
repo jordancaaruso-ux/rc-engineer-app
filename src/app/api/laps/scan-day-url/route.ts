@@ -13,6 +13,8 @@ import {
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
+import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import { hasSpeedhiveIdentityForUser } from "@/lib/speedhive/speedhiveDriverSettings";
 
 export type ScanDayUrlIndexKind = "practice" | "results";
@@ -40,6 +42,62 @@ export type ScanDayUrlCandidateRow = {
 };
 
 const RESULTS_SCAN_ROW_CAP = 80;
+
+function timingSourceFromParserId(parserId: string): "liverc" | "speedhive" | undefined {
+  const id = parserId.toLowerCase();
+  if (id.includes("speedhive")) return "speedhive";
+  if (id.includes("liverc")) return "liverc";
+  return undefined;
+}
+
+async function linkedScanCandidatesForRun(
+  userId: string,
+  runId: string
+): Promise<ScanDayUrlCandidateRow[]> {
+  const rows = await prisma.importedLapTimeSession.findMany({
+    where: { userId, linkedRunId: runId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      sourceUrl: true,
+      parserId: true,
+      sessionCompletedAt: true,
+      parsedPayload: true,
+    },
+  });
+
+  return rows.map((sess) => {
+    const drivers = rawSessionDriversFromImportedPayload(sess.parsedPayload) ?? [];
+    const primary = drivers[0];
+    const laps = primary?.laps ?? [];
+    const bestLapSeconds =
+      laps.length > 0 ? Math.min(...laps.filter((n) => Number.isFinite(n) && n > 0)) : null;
+    const sessionCompletedAtIso =
+      sess.sessionCompletedAt?.toISOString() ??
+      sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload);
+    return {
+      sessionId: sess.id,
+      sessionUrl: sess.sourceUrl,
+      driverName: primary?.driverName?.trim() || sess.sourceUrl,
+      sessionTime: null,
+      sessionCompletedAtIso,
+      matchesDriver: true,
+      alreadyImported: true,
+      linkedRunId: runId,
+      timingSource: timingSourceFromParserId(sess.parserId),
+      bestLapSeconds: Number.isFinite(bestLapSeconds) ? bestLapSeconds : null,
+    };
+  });
+}
+
+function mergeLinkedScanCandidates(
+  linked: ScanDayUrlCandidateRow[],
+  discovered: ScanDayUrlCandidateRow[]
+): ScanDayUrlCandidateRow[] {
+  const linkedUrls = new Set(linked.map((c) => c.sessionUrl.trim()));
+  const others = discovered.filter((c) => !linkedUrls.has(c.sessionUrl.trim()));
+  return [...linked, ...others];
+}
 
 /** True when every normalized token (length ≥2) from the setting appears in the row string (order-independent). */
 function practiceRowMatchesDriverRelaxed(normRow: string, driverNorm: string): boolean {
@@ -70,11 +128,12 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as
-    | { dayUrl?: string; eventId?: string | null; trackId?: string | null }
+    | { dayUrl?: string; eventId?: string | null; trackId?: string | null; runId?: string | null }
     | null;
   const dayUrl = body?.dayUrl?.trim() ?? "";
   const eventId = typeof body?.eventId === "string" ? body.eventId.trim() : "";
   const trackId = typeof body?.trackId === "string" ? body.trackId.trim() : "";
+  const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
 
   if (!dayUrl && trackId) {
     const track = await prisma.track.findFirst({
@@ -115,7 +174,7 @@ export async function POST(request: Request) {
       (liveRcUrl && discovered.liveRcDriverName?.trim()) || (speedhiveUrl && speedhiveIdentity)
     );
     const displaySessions = discovered.unimportedCandidates;
-    const candidates: ScanDayUrlCandidateRow[] = displaySessions.map((c) => ({
+    const discoveredCandidates: ScanDayUrlCandidateRow[] = displaySessions.map((c) => ({
       sessionId: c.sessionId,
       sessionUrl: c.sessionUrl,
       driverName: c.label,
@@ -127,6 +186,11 @@ export async function POST(request: Request) {
       timingSource: c.timingSource,
       bestLapSeconds: c.bestLapSeconds ?? null,
     }));
+    const linkedCandidates =
+      runId && (await prisma.run.findFirst({ where: { id: runId, userId: user.id }, select: { id: true } }))
+        ? await linkedScanCandidatesForRun(user.id, runId)
+        : [];
+    const candidates = mergeLinkedScanCandidates(linkedCandidates, discoveredCandidates);
     return NextResponse.json({
       ok: true,
       dayUrl: liveRcUrl || speedhiveUrl,
@@ -135,7 +199,7 @@ export async function POST(request: Request) {
       candidates,
       totalCandidates: discovered.candidates.length,
       unimportedCount: discovered.unimportedTotal,
-      matchedCount: displaySessions.length,
+      matchedCount: candidates.length,
       hasDriverNameSetting,
       driverFilterApplied: true,
       scanMessage: discovered.hint,

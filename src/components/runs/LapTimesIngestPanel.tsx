@@ -179,6 +179,8 @@ export function LapTimesIngestPanel({
   trackId,
   trackLiveRcUrl,
   trackSpeedhiveUrl,
+  editingRunId,
+  isDraftResume,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
@@ -193,6 +195,10 @@ export function LapTimesIngestPanel({
   trackId?: string | null;
   trackLiveRcUrl?: string | null;
   trackSpeedhiveUrl?: string | null;
+  /** When editing a run, linked timing imports stay visible in discovery even if already imported. */
+  editingRunId?: string | null;
+  /** Draft being finished — show saved lap import with emerald styling like other draft sections. */
+  isDraftResume?: boolean;
 }) {
   const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
@@ -289,19 +295,38 @@ export function LapTimesIngestPanel({
   }, [hasTrackDiscovery, practiceDayUrl]);
 
   useEffect(() => {
+    if (value.sourceKind === "url" && value.urlImportBlocks.length > 0) {
+      setTab("url");
+    }
+  }, [value.sourceKind, value.urlImportBlocks.length]);
+
+  useEffect(() => {
     if (hasTrackDiscovery) {
       void scanDayUrl();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
-  }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, lapImportEventId]);
+  }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, lapImportEventId, editingRunId]);
+
+  const importedSourceUrls = useMemo(
+    () => new Set(value.urlImportBlocks.map((b) => b.sourceUrl.trim()).filter(Boolean)),
+    [value.urlImportBlocks]
+  );
+
+  const hasLinkedLapImport = value.urlImportBlocks.length > 0;
+  const showDraftLapSavedStyle = Boolean(isDraftResume && hasLinkedLapImport);
+
+  const scanCandidatesExcludingLinked = useMemo(() => {
+    if (!dayScanCandidates?.length) return [];
+    return dayScanCandidates.filter((c) => !importedSourceUrls.has(c.sessionUrl.trim()));
+  }, [dayScanCandidates, importedSourceUrls]);
 
   const visibleDayScanCandidates = useMemo(() => {
-    if (!dayScanCandidates?.length) return [];
+    if (!scanCandidatesExcludingLinked.length) return [];
     const limit = showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED;
-    return dayScanCandidates.slice(0, limit);
-  }, [dayScanCandidates, showAllRecentRuns]);
+    return scanCandidatesExcludingLinked.slice(0, limit);
+  }, [scanCandidatesExcludingLinked, showAllRecentRuns]);
 
-  const canExpandRecentRuns = (dayScanCandidates?.length ?? 0) > RECENT_RUNS_COLLAPSED;
+  const canExpandRecentRuns = scanCandidatesExcludingLinked.length > RECENT_RUNS_COLLAPSED;
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
   const manualMetrics = useMemo(() => {
@@ -413,6 +438,7 @@ export function LapTimesIngestPanel({
         body: JSON.stringify({
           ...(useTrack ? { trackId: tid } : { dayUrl: url }),
           eventId: lapImportEventId?.trim() || undefined,
+          runId: editingRunId?.trim() || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -689,6 +715,31 @@ export function LapTimesIngestPanel({
     };
   }
 
+  const linkedRunRows = useMemo(() => {
+    return value.urlImportBlocks.map((block) => {
+      const primaryId = block.selectedDriverIds?.[0] ?? block.sessionDrivers[0]?.driverId ?? null;
+      const driver = primaryId
+        ? block.sessionDrivers.find((d) => d.driverId === primaryId) ?? null
+        : null;
+      const stats = driver ? statsForDriver(block, driver) : null;
+      const label = driver
+        ? formatDriverSessionLabel(driver.driverName, blockLabelTimeIso(block))
+        : block.sourceUrl;
+      const timingSource = block.parserId.toLowerCase().includes("speedhive")
+        ? ("speedhive" as const)
+        : block.parserId.toLowerCase().includes("liverc")
+          ? ("liverc" as const)
+          : undefined;
+      return {
+        key: block.blockId,
+        label,
+        when: formatRunCreatedAtDateTime(blockLabelTimeIso(block)),
+        bestLapSeconds: stats?.bestLap ?? null,
+        timingSource,
+      };
+    });
+  }, [value.urlImportBlocks]);
+
   function toggleLapInclusion(blockId: string, driverId: string, lapIndex: number) {
     const blocks = value.urlImportBlocks.map((b) => {
       if (b.blockId !== blockId) return b;
@@ -727,8 +778,26 @@ export function LapTimesIngestPanel({
   }, [value.urlImportBlocks]);
 
   return (
-    <div className="rounded-lg border border-border bg-surface-runna-deep p-4 space-y-3">
-      <div className="ui-title text-sm text-muted-foreground">Lap times</div>
+    <div
+      className={cn(
+        "rounded-lg border p-4 space-y-3",
+        showDraftLapSavedStyle
+          ? "border-emerald-500/40 bg-emerald-500/5"
+          : "border-border bg-surface-runna-deep"
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="ui-title text-sm text-muted-foreground">Lap times</div>
+        {showDraftLapSavedStyle ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+            title="Lap times were saved when this draft was logged."
+          >
+            <span aria-hidden>✓</span>
+            <span>Saved from draft</span>
+          </span>
+        ) : null}
+      </div>
       <div
         className="flex flex-wrap border-b border-border gap-x-0.5"
         role="tablist"
@@ -872,7 +941,14 @@ export function LapTimesIngestPanel({
             </div>
           ) : null}
           {hasTrackDiscovery ? (
-            <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
+            <div
+              className={cn(
+                "space-y-2 rounded-md border p-2",
+                showDraftLapSavedStyle
+                  ? "border-emerald-500/35 bg-emerald-500/5"
+                  : "border-border bg-surface-runna"
+              )}
+            >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="ui-title text-[11px] text-muted-foreground">
@@ -893,11 +969,17 @@ export function LapTimesIngestPanel({
                               .filter(Boolean)
                               .join(", ")}…`
                           : "Checking timing sources…"
-                      : dayScanCandidates && dayScanCandidates.length > 0
-                        ? scanTotals && scanTotals.unimported > dayScanCandidates.length
-                          ? `Showing ${visibleDayScanCandidates.length} of ${scanTotals.unimported} unimported runs (newest first)`
-                          : `${dayScanCandidates.length} recent run${dayScanCandidates.length === 1 ? "" : "s"} to import`
-                        : "Your 3 most recent unimported runs (expand to 10)"}
+                      : linkedRunRows.length > 0
+                        ? `${linkedRunRows.length} run${linkedRunRows.length === 1 ? "" : "s"} linked to this draft${
+                            visibleDayScanCandidates.length > 0
+                              ? ` · ${visibleDayScanCandidates.length} more to import`
+                              : ""
+                          }`
+                        : dayScanCandidates && dayScanCandidates.length > 0
+                          ? scanTotals && scanTotals.unimported > dayScanCandidates.length
+                            ? `Showing ${visibleDayScanCandidates.length} of ${scanTotals.unimported} unimported runs (newest first)`
+                            : `${dayScanCandidates.length} recent run${dayScanCandidates.length === 1 ? "" : "s"} to import`
+                          : "Your 3 most recent unimported runs (expand to 10)"}
                   </p>
                 </div>
                 <button
@@ -919,9 +1001,54 @@ export function LapTimesIngestPanel({
                     : "Set your driver name in Settings (LiveRC and/or Speedhive transponder / name) so we can find your sessions."}
                 </p>
               ) : null}
-              {visibleDayScanCandidates.length > 0 ? (
+              {linkedRunRows.length > 0 || visibleDayScanCandidates.length > 0 ? (
                 <div className="space-y-1">
                   <ul className="space-y-1">
+                    {linkedRunRows.map((row) => (
+                      <li key={row.key}>
+                        <div
+                          className={cn(
+                            "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs",
+                            "border-emerald-500/45 bg-emerald-500/10"
+                          )}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-foreground">{row.label}</span>
+                            {row.when ? (
+                              <span className="block truncate text-[10px] text-muted-foreground">{row.when}</span>
+                            ) : null}
+                          </span>
+                          <span className="shrink-0 flex flex-col items-end gap-0.5">
+                            {row.bestLapSeconds != null ? (
+                              <span className="flex flex-col items-end leading-tight">
+                                <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Best
+                                </span>
+                                <span className="text-[12px] font-semibold tabular-nums text-foreground">
+                                  {formatLap(row.bestLapSeconds)}
+                                </span>
+                              </span>
+                            ) : null}
+                            {row.timingSource ? (
+                              <span
+                                className={cn(
+                                  "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide",
+                                  row.timingSource === "speedhive"
+                                    ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                                    : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                                )}
+                              >
+                                {row.timingSource === "speedhive" ? "Speedhive" : "LiveRC"}
+                              </span>
+                            ) : null}
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                              <span aria-hidden>✓</span>
+                              Linked
+                            </span>
+                          </span>
+                        </div>
+                      </li>
+                    ))}
                     {visibleDayScanCandidates.map((c) => {
                       const when = c.timingSource
                         ? null
@@ -987,7 +1114,7 @@ export function LapTimesIngestPanel({
                     >
                       {showAllRecentRuns
                         ? "Show fewer runs"
-                        : `Show more runs (${Math.min(RECENT_RUNS_MAX, dayScanCandidates!.length) - RECENT_RUNS_COLLAPSED} more)`}
+                        : `Show more runs (${Math.min(RECENT_RUNS_MAX, scanCandidatesExcludingLinked.length) - RECENT_RUNS_COLLAPSED} more)`}
                     </button>
                   ) : null}
                 </div>

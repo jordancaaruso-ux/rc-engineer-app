@@ -28,6 +28,8 @@ const config: CapacitorConfig = {
      * `env(safe-area-inset-top)` in CSS (see `.page` and the mobile menu button).
      */
     contentInset: "never",
+    /** Match `--color-background` so rubber-band overscroll is not true black. */
+    backgroundColor: "#0c0c0e",
   },
   plugins: {
     SplashScreen: {

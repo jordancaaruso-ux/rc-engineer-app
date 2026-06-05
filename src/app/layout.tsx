@@ -31,12 +31,13 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#0c0c0e",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }): ReactNode {
   return (
     <html lang="en" className={montserrat.variable}>
-      <body className="min-h-screen font-sans font-normal antialiased">
+      <body className="min-h-[100dvh] font-sans font-normal antialiased">
         {/*
          * Fixed page wash sits at z-index 0 (never negative): in WKWebView a
          * negative z-index can paint under `html`’s canvas background, which

@@ -28,6 +28,7 @@ import { primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
+import { buildLapIngestFromEditRun } from "@/lib/lapImport/buildLapIngestFromEditRun";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import {
   LapTimesIngestPanel,
@@ -135,7 +136,18 @@ type LastRun = {
     driverName: string;
     displayName: string | null;
     isPrimaryUser: boolean;
+    sourceUrl?: string | null;
+    driverId?: string | null;
+    sessionCompletedAt?: string | null;
     laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
+  }>;
+  linkedImportedSessions?: Array<{
+    id: string;
+    sourceUrl: string;
+    parserId: string;
+    createdAt: string;
+    sessionCompletedAt: string | null;
+    parsedPayload: unknown;
   }>;
   /** Optional practice-day results URL saved with this run. */
   practiceDayUrl?: string | null;
@@ -533,22 +545,14 @@ export function NewRunForm(props: {
         : null
     );
 
-    const existingLaps = normalizeLapTimes(r.lapTimes ?? []);
-    const existingText = existingLaps.length ? existingLaps.map((n) => n.toFixed(3)).join("\n") : "";
-    const existingLapRows = primaryLapRowsFromRun({
-      lapTimes: r.lapTimes ?? [],
-      lapSession: r.lapSession,
-    });
-    setLapIngest({
-      ...defaultLapIngestValue(),
-      manualText: existingText,
-      manualLapRows: existingLapRows.length ? existingLapRows : null,
-      sourceKind: existingText ? "manual" : "manual",
-      sourceDetail: r.lapSession ? "Existing laps loaded (edit)" : null,
-      parserId: null,
-      urlLapRows: null,
-      urlImportBlocks: [],
-    });
+    setLapIngest(
+      buildLapIngestFromEditRun({
+        lapTimes: r.lapTimes ?? [],
+        lapSession: r.lapSession,
+        importedLapSets: r.importedLapSets,
+        linkedImportedSessions: r.linkedImportedSessions,
+      })
+    );
 
     setReplicateLast(false);
     setShareWithTeam(r.shareWithTeam !== false);
@@ -2201,7 +2205,9 @@ export function NewRunForm(props: {
           importedLapSets,
           importedLapTimeSessionIds:
             lapIngest.sourceKind === "url"
-              ? lapIngest.urlImportBlocks.map((b) => b.importedSessionId)
+              ? lapIngest.urlImportBlocks
+                  .map((b) => b.importedSessionId.trim())
+                  .filter(Boolean)
               : [],
         })
       });
@@ -3867,6 +3873,8 @@ export function NewRunForm(props: {
         trackId={trackId.trim() || null}
         trackLiveRcUrl={tracksList.find((t) => t.id === trackId)?.liveRcUrl ?? null}
         trackSpeedhiveUrl={tracksList.find((t) => t.id === trackId)?.speedhiveUrl ?? null}
+        editingRunId={isEditing ? editRun?.id ?? null : null}
+        isDraftResume={isDraft}
       />
 
       <label className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs cursor-pointer select-none">
