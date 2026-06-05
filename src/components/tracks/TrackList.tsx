@@ -175,7 +175,7 @@ export function TrackList({
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={speedhiveUrl}
               onChange={(e) => setSpeedhiveUrl(e.target.value)}
-              placeholder="https://speedhive.mylaps.com/…/organizations/12345"
+              placeholder="https://speedhive.mylaps.com/practice/4591"
               autoComplete="off"
             />
           </div>

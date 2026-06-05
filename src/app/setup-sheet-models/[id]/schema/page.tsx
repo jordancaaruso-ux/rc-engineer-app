@@ -8,7 +8,7 @@ import { SetupSheetModelSchemaPageClient } from "@/components/setup-sheet-models
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; tab?: string }>;
 };
 
 export default async function SetupSheetModelSchemaPage({ params, searchParams }: Props) {
@@ -25,6 +25,7 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
   const { id } = await params;
   const sp = await searchParams;
   const returnTo = typeof sp.returnTo === "string" ? sp.returnTo.trim() : null;
+  const initialTab = sp.tab === "parameters" ? "parameters" : "layout";
   const model = await prisma.setupSheetModel.findFirst({
     where: { id, userId: user.id },
     select: { id: true, name: true, slug: true, schemaJson: true },
@@ -50,7 +51,7 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
   }
 
   return (
-    <section className="page-body space-y-4 max-w-3xl">
+    <section className="page-body space-y-4 max-w-6xl">
       <div>
         <Link href="/cars" className="text-xs text-muted-foreground hover:text-foreground">
           ← Cars
@@ -62,6 +63,7 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
         modelId={model.id}
         modelName={model.name}
         initialSchema={schema}
+        initialTab={initialTab}
         returnTo={returnTo}
       />
     </section>

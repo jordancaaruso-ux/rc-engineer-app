@@ -16,6 +16,7 @@ import {
   rebuildSectionLayout,
 } from "@/lib/setupSheetModels/inferStructuredLayout";
 import { collectModelLayoutKeys } from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
+import { addFieldToLayout } from "@/lib/setupSheetModels/layoutEditorOps";
 import {
   UNIVERSAL_TOURING_PARAMETERS,
   universalParameterIdForSnapshotKey,
@@ -164,12 +165,13 @@ export function SetupSheetModelSchemaEditor(props: {
         Define parameters for this sheet model (types and options are stored here — the source of truth for PDF
         calibration). Optionally link a field to a universal parameter for cross-car stats. Calibrate your PDF in the
         next step. Use <span className="font-medium text-foreground">Show on sheet</span> for the full setup page and
-        PDF review; use <span className="font-medium text-foreground">Show in log run</span> for fields visible when
-        logging a run. Parameters marked <span className="font-medium text-foreground">Not in layout</span> are in the
-        catalog but not on the structured sheet — run <span className="font-medium text-foreground">Rebuild layout from
-        fields</span> to add them. Corner fields (<span className="font-mono">*_ff</span>,{" "}
-        <span className="font-mono">*_fr</span>, …) and front/rear pairs are grouped automatically when you add or
-        remove parameters.
+        PDF review; use <span className="font-medium text-foreground">Show in log run</span> for logging a run;
+        use <span className="font-medium text-foreground">Show in analysis</span> for compare / analysis views.
+        Parameters marked <span className="font-medium text-foreground">Not in layout</span> need{" "}
+        <span className="font-medium text-foreground">Add to sheet</span> or the{" "}
+        <span className="font-medium text-foreground">Layout</span> tab. Corner fields (
+        <span className="font-mono">*_ff</span>, <span className="font-mono">*_fr</span>, …) and front/rear pairs are
+        grouped automatically when you add or remove parameters.
       </p>
 
       {!readOnly ? (
@@ -194,7 +196,7 @@ export function SetupSheetModelSchemaEditor(props: {
               <li
                 key={f.key}
                 className={`flex flex-wrap items-center gap-2 rounded border px-2 py-1.5 text-xs ${
-                  f.showInSetupSheet && f.showInLogRun
+                  f.showInSetupSheet && f.showInLogRun && f.showInAnalysis
                     ? "border-border/70 bg-muted/30"
                     : "border-dashed border-border/50 opacity-60"
                 }`}
@@ -215,6 +217,22 @@ export function SetupSheetModelSchemaEditor(props: {
                 ) : null}
                 {!readOnly ? (
                   <>
+                    {!layoutKeys.has(f.key) ? (
+                      <button
+                        type="button"
+                        className="text-[10px] text-amber-200 hover:underline"
+                        onClick={() => {
+                          const next = addFieldToLayout(schema, f.key);
+                          if ("error" in next) setLocalError(next.error);
+                          else {
+                            setLocalError(null);
+                            onChange(next);
+                          }
+                        }}
+                      >
+                        Add to sheet
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="ml-auto text-[10px] text-muted-foreground hover:text-foreground"
@@ -228,6 +246,13 @@ export function SetupSheetModelSchemaEditor(props: {
                       onClick={() => updateField(f.key, { showInLogRun: !f.showInLogRun })}
                     >
                       {f.showInLogRun ? "Hide from log run" : "Show in log run"}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-[10px] text-muted-foreground hover:text-foreground"
+                      onClick={() => updateField(f.key, { showInAnalysis: !f.showInAnalysis })}
+                    >
+                      {f.showInAnalysis ? "Hide from analysis" : "Show in analysis"}
                     </button>
                     <button
                       type="button"

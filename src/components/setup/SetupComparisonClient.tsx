@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
-import { getActiveSetupData } from "@/lib/activeSetupContext";
+import { getActiveSetupCarId, getActiveSetupData } from "@/lib/activeSetupContext";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
+import { type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import {
   SETUP_SHEET_TEMPLATE_A800RR,
   canonicalSetupSheetTemplateId,
@@ -85,6 +86,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   const [bKind, setBKind] = useState<SetupSourceKind>("none");
   const [aId, setAId] = useState<string>("");
   const [bId, setBId] = useState<string>("");
+  const [compareTemplate, setCompareTemplate] = useState<SetupSheetTemplate>(A800RR_SETUP_SHEET_V1);
 
   const reloadSources = useCallback(async () => {
     if (!dbReady) return;
@@ -165,6 +167,38 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   }, [bKind, bId, runs, downloaded]);
 
   const canCompare = Boolean(selectionA.data && selectionB.data);
+
+  const compareCarId = useMemo(() => {
+    if (aKind === "run") {
+      return runs.find((r) => r.id === aId)?.carId ?? null;
+    }
+    if (aKind === "current_setup") {
+      return getActiveSetupCarId();
+    }
+    if (aKind === "downloaded_setup") {
+      return downloaded.find((d) => d.id === aId)?.carId ?? null;
+    }
+    return null;
+  }, [aKind, aId, runs, downloaded]);
+
+  useEffect(() => {
+    if (!compareCarId) {
+      setCompareTemplate(A800RR_SETUP_SHEET_V1);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/cars/${compareCarId}/setup-sheet-template?view=analysis`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d: { template?: SetupSheetTemplate }) => {
+        if (!cancelled && d.template) setCompareTemplate(d.template);
+      })
+      .catch(() => {
+        if (!cancelled) setCompareTemplate(A800RR_SETUP_SHEET_V1);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [compareCarId]);
 
   // Engineer-compare button is only meaningful when both selections are saved runs — the Engineer
   // backend resolves the pair from runId + compareRunId URL params today. If either side is the
@@ -571,7 +605,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             value={selectionA.data}
             onChange={() => {}}
             readOnly
-            template={A800RR_SETUP_SHEET_V1}
+            template={compareTemplate}
             baselineValue={selectionB.data}
             numericAggregationByKey={numericAggregationByKey}
             compareHighlightOnly

@@ -18,6 +18,8 @@ import {
 import {
   normalizeSpeedhiveDriverNameForMatch,
 } from "@/lib/speedhive/speedhiveNameNormalize";
+import { discoverSpeedhivePracticeSessionsForUser } from "@/lib/speedhive/discoverSpeedhivePracticeSessionsForUser";
+import { practiceLocationIdFromTrackUrl } from "@/lib/speedhive/speedhivePracticeUrl";
 import { organizationIdFromTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 
 const MAX_EVENTS = 12;
@@ -39,6 +41,7 @@ export type DiscoverSpeedhiveSessionsResult = {
   unimportedCandidates: SpeedhiveDiscoveredSession[];
   mostRecentSession: SpeedhiveDiscoveredSession | null;
   organizationId: number | null;
+  practiceLocationId: number | null;
   hint: string | null;
 };
 
@@ -54,6 +57,30 @@ export async function discoverSpeedhiveSessionsForUser(input: {
   trackSpeedhiveUrl: string;
   eventRaceClass?: string | null;
 }): Promise<DiscoverSpeedhiveSessionsResult> {
+  const practiceLocationId = practiceLocationIdFromTrackUrl(input.trackSpeedhiveUrl);
+  if (practiceLocationId) {
+    const practice = await discoverSpeedhivePracticeSessionsForUser({
+      userId: input.userId,
+      trackSpeedhiveUrl: input.trackSpeedhiveUrl,
+    });
+    return {
+      candidates: practice.candidates,
+      unimportedCandidates: practice.unimportedCandidates,
+      mostRecentSession: practice.mostRecentSession,
+      organizationId: null,
+      practiceLocationId: practice.practiceLocationId,
+      hint: practice.hint,
+    };
+  }
+
+  return discoverSpeedhiveOrganizationSessionsForUser(input);
+}
+
+async function discoverSpeedhiveOrganizationSessionsForUser(input: {
+  userId: string;
+  trackSpeedhiveUrl: string;
+  eventRaceClass?: string | null;
+}): Promise<DiscoverSpeedhiveSessionsResult> {
   const organizationId = organizationIdFromTrackUrl(input.trackSpeedhiveUrl);
   if (!organizationId) {
     return {
@@ -61,7 +88,9 @@ export async function discoverSpeedhiveSessionsForUser(input: {
       unimportedCandidates: [],
       mostRecentSession: null,
       organizationId: null,
-      hint: "Invalid Speedhive track URL — add an organization link on the track page.",
+      practiceLocationId: null,
+      hint:
+        "Invalid Speedhive track URL — use a practice link (…/practice/4591) or an organization page (…/organizations/123).",
     };
   }
 
@@ -77,6 +106,7 @@ export async function discoverSpeedhiveSessionsForUser(input: {
       unimportedCandidates: [],
       mostRecentSession: null,
       organizationId,
+      practiceLocationId: null,
       hint:
         "Set your MYLAPS transponder number or Speedhive driver name in Settings to find sessions at this track.",
     };
@@ -149,6 +179,7 @@ export async function discoverSpeedhiveSessionsForUser(input: {
       unimportedCandidates: [],
       mostRecentSession: null,
       organizationId,
+      practiceLocationId: null,
       hint: e instanceof Error ? e.message : "Speedhive discovery failed.",
     };
   }
@@ -187,6 +218,7 @@ export async function discoverSpeedhiveSessionsForUser(input: {
     unimportedCandidates: unimported,
     mostRecentSession: unimported[0] ?? sorted[0] ?? null,
     organizationId,
+    practiceLocationId: null,
     hint:
       unimported.length > 0
         ? null

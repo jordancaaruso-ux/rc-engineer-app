@@ -4,6 +4,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  parseSpeedhivePracticeLocationId,
+  parseSpeedhivePracticeActivityRef,
+} from "./speedhivePracticeUrl";
+import {
   isSpeedhiveOrApiUrl,
   organizationIdFromTrackUrl,
   parseSpeedhiveOrganizationId,
@@ -38,9 +42,38 @@ test("validateSpeedhiveTrackUrl accepts organization page", () => {
   );
   assert.equal(v.ok, true);
   if (v.ok) {
+    assert.equal(v.kind, "organization");
     assert.equal(v.organizationId, 4242);
+    assert.equal(v.practiceLocationId, null);
     assert.match(v.normalized, /organizations\/4242/i);
   }
+});
+
+test("parseSpeedhivePracticeLocationId from practice track page", () => {
+  assert.equal(
+    parseSpeedhivePracticeLocationId("https://speedhive.mylaps.com/practice/4591"),
+    4591
+  );
+});
+
+test("validateSpeedhiveTrackUrl accepts practice track page", () => {
+  const v = validateSpeedhiveTrackUrl("https://speedhive.mylaps.com/practice/4591");
+  assert.equal(v.ok, true);
+  if (v.ok) {
+    assert.equal(v.kind, "practice");
+    assert.equal(v.practiceLocationId, 4591);
+    assert.equal(v.organizationId, null);
+    assert.equal(v.normalized, "https://speedhive.mylaps.com/practice/4591");
+  }
+});
+
+test("parseSpeedhivePracticeActivityRef", () => {
+  const ref = parseSpeedhivePracticeActivityRef(
+    "https://speedhive.mylaps.com/practice/4591/activities/7875691978"
+  );
+  assert.ok(ref);
+  assert.equal(ref.locationId, 4591);
+  assert.equal(ref.activityId, 7875691978);
 });
 
 test("organizationIdFromTrackUrl returns null for empty", () => {

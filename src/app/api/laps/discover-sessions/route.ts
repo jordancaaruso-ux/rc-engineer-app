@@ -79,6 +79,7 @@ export async function POST(request: Request) {
     liveRcDriverName: result.liveRcDriverName,
     debug: result.liveRcDebug,
     speedhiveOrganizationId: result.speedhiveOrganizationId,
+    speedhivePracticeLocationId: result.speedhivePracticeLocationId,
     activeRaceMeeting: result.activeRaceMeeting,
     hasLiveRc: Boolean(liveRcUrl),
     hasSpeedhive: Boolean(speedhiveUrl),

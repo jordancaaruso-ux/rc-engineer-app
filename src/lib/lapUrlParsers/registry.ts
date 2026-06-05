@@ -3,9 +3,16 @@ import { stubUrlParser } from "./stubParser";
 import { httpTimingParser } from "./httpTimingParser";
 import { liveRcParser } from "./liveRcParser";
 import { speedhiveParser } from "./speedhiveParser";
+import { speedhivePracticeParser } from "./speedhivePracticeParser";
 
 /** Order: specific parsers first; stub last. */
-const parsers: LapUrlParser[] = [liveRcParser, speedhiveParser, httpTimingParser, stubUrlParser];
+const parsers: LapUrlParser[] = [
+  liveRcParser,
+  speedhivePracticeParser,
+  speedhiveParser,
+  httpTimingParser,
+  stubUrlParser,
+];
 
 export function selectUrlParser(url: string): LapUrlParser {
   const u = url.trim();

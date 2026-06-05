@@ -3,17 +3,24 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { SetupSheetModelLayoutEditor } from "@/components/setup-sheet-models/SetupSheetModelLayoutEditor";
 import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+
+export type SetupSheetModelEditorTab = "parameters" | "layout";
 
 export function SetupSheetModelSchemaPageClient(props: {
   modelId: string;
   modelName: string;
   initialSchema: SetupSheetModelSchema;
+  initialTab?: SetupSheetModelEditorTab;
   returnTo?: string | null;
 }) {
   const router = useRouter();
   const returnTo = props.returnTo?.trim() || null;
+  const [tab, setTab] = useState<SetupSheetModelEditorTab>(
+    props.initialTab === "layout" ? "layout" : "parameters"
+  );
   const [schema, setSchema] = useState(props.initialSchema);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -46,11 +53,47 @@ export function SetupSheetModelSchemaPageClient(props: {
             ← Back to calibration
           </Link>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Add parameters here, save, then return to continue mapping PDF controls.
+            Edit the sheet layout and parameters here, save, then return to continue mapping PDF controls.
           </p>
         </div>
       ) : null}
-      <SetupSheetModelSchemaEditor schema={schema} onChange={setSchema} />
+
+      <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-muted/30 p-1">
+        <button
+          type="button"
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+            tab === "layout"
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          onClick={() => setTab("layout")}
+        >
+          Layout
+        </button>
+        <button
+          type="button"
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+            tab === "parameters"
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          onClick={() => setTab("parameters")}
+        >
+          Parameters
+        </button>
+      </div>
+
+      {tab === "layout" ? (
+        <SetupSheetModelLayoutEditor
+          modelId={props.modelId}
+          modelName={props.modelName}
+          schema={schema}
+          onChange={setSchema}
+        />
+      ) : (
+        <SetupSheetModelSchemaEditor schema={schema} onChange={setSchema} />
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -58,7 +101,7 @@ export function SetupSheetModelSchemaPageClient(props: {
           onClick={save}
           disabled={saving}
         >
-          {saving ? "Saving…" : "Save parameters"}
+          {saving ? "Saving…" : "Save setup sheet"}
         </button>
         {status ? <span className="text-xs text-muted-foreground">{status}</span> : null}
         {returnTo ? (

@@ -28,6 +28,7 @@ export async function discoverTrackTimingSessions(input: {
   hint: string | null;
   liveRcDebug: unknown;
   speedhiveOrganizationId: number | null;
+  speedhivePracticeLocationId: number | null;
   activeRaceMeeting: {
     detected: boolean;
     eventHubUrl: string | null;
@@ -46,6 +47,7 @@ export async function discoverTrackTimingSessions(input: {
       hint: "Add a LiveRC or Speedhive organization URL on the track page.",
       liveRcDebug: null,
       speedhiveOrganizationId: null,
+      speedhivePracticeLocationId: null,
       activeRaceMeeting: { detected: false, eventHubUrl: null, eventLabel: null },
     };
   }
@@ -100,6 +102,7 @@ export async function discoverTrackTimingSessions(input: {
     hint: unimported.length > 0 ? null : hints[0] ?? null,
     liveRcDebug: lr?.debug ?? null,
     speedhiveOrganizationId: sh?.organizationId ?? null,
+    speedhivePracticeLocationId: sh?.practiceLocationId ?? null,
     activeRaceMeeting: lr?.activeRaceMeeting ?? {
       detected: false,
       eventHubUrl: null,

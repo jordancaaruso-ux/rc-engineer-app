@@ -1,4 +1,5 @@
 import { validateTimingHttpUrlSync } from "@/lib/http/timingUrlSafetySync";
+import { parseSpeedhivePracticeLocationId } from "@/lib/speedhive/speedhivePracticeUrl";
 
 const SPEEDHIVE_HOSTS = /(?:^|\.)((?:speedhive\.)?mylaps\.com|sporthive\.com)$/i;
 const API2_HOST = /^api2\.mylaps\.com$/i;
@@ -87,9 +88,17 @@ export function parseSpeedhiveSessionRef(urlStr: string): ParsedSpeedhiveSession
   }
 }
 
-export function validateSpeedhiveTrackUrl(
-  url: string
-): { ok: true; normalized: string; organizationId: number } | { ok: false; error: string } {
+export type SpeedhiveTrackUrlKind = "practice" | "organization";
+
+export function validateSpeedhiveTrackUrl(url: string):
+  | {
+      ok: true;
+      normalized: string;
+      kind: SpeedhiveTrackUrlKind;
+      organizationId: number | null;
+      practiceLocationId: number | null;
+    }
+  | { ok: false; error: string } {
   const trimmed = url.trim();
   if (!trimmed) {
     return { ok: false, error: "Speedhive URL is required." };
@@ -101,21 +110,40 @@ export function validateSpeedhiveTrackUrl(
     if (!isSpeedhiveHostname(u.hostname) && !API2_HOST.test(u.hostname)) {
       return {
         ok: false,
-        error: "URL must be a speedhive.mylaps.com or sporthive.com organization page.",
+        error: "URL must be a speedhive.mylaps.com or sporthive.com track page.",
       };
     }
   } catch {
     return { ok: false, error: "Invalid URL" };
   }
+
+  const practiceLocationId = parseSpeedhivePracticeLocationId(v.normalized);
+  if (practiceLocationId) {
+    const normalized = `https://speedhive.mylaps.com/practice/${practiceLocationId}`;
+    return {
+      ok: true,
+      normalized,
+      kind: "practice",
+      organizationId: null,
+      practiceLocationId,
+    };
+  }
+
   const organizationId = parseSpeedhiveOrganizationId(v.normalized);
   if (!organizationId) {
     return {
       ok: false,
       error:
-        "Could not find an organization id in this URL. Paste the Speedhive organization page (URL should contain /organizations/123).",
+        "Could not parse this Speedhive URL. Paste a practice track link (…/practice/4591) or an organization page (…/organizations/123).",
     };
   }
-  return { ok: true, normalized: v.normalized, organizationId };
+  return {
+    ok: true,
+    normalized: v.normalized,
+    kind: "organization",
+    organizationId,
+    practiceLocationId: null,
+  };
 }
 
 export function organizationIdFromTrackUrl(speedhiveUrl: string | null | undefined): number | null {

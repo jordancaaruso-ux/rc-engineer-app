@@ -5,12 +5,14 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   ACTIVE_SETUP_CHANGED_EVENT,
+  getActiveSetupCarId,
   getActiveSetupData,
   setActiveSetupData,
 } from "@/lib/activeSetupContext";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
+import { type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 
 function hasAnyValue(v: SetupSnapshotData): boolean {
   return Object.keys(v).some((k) => {
@@ -23,6 +25,8 @@ export function SetupPageClient() {
   const [tick, setTick] = useState(0);
   const [setupData, setSetupData] = useState<SetupSnapshotData>({});
   const [savedToast, setSavedToast] = useState<string | null>(null);
+  const [activeCarId, setActiveCarId] = useState<string | null>(null);
+  const [setupTemplate, setSetupTemplate] = useState<SetupSheetTemplate>(A800RR_SETUP_SHEET_V1);
 
   useEffect(() => {
     const bump = () => setTick((t) => t + 1);
@@ -34,7 +38,27 @@ export function SetupPageClient() {
     void tick;
     const active = getActiveSetupData();
     setSetupData(normalizeSetupData(active ?? {}));
+    setActiveCarId(getActiveSetupCarId());
   }, [tick]);
+
+  useEffect(() => {
+    if (!activeCarId) {
+      setSetupTemplate(A800RR_SETUP_SHEET_V1);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/cars/${activeCarId}/setup-sheet-template?view=setup`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d: { template?: SetupSheetTemplate }) => {
+        if (!cancelled && d.template) setSetupTemplate(d.template);
+      })
+      .catch(() => {
+        if (!cancelled) setSetupTemplate(A800RR_SETUP_SHEET_V1);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCarId]);
 
   // Persist changes back to active setup (source of truth for "current setup" compare)
   useEffect(() => {
@@ -98,7 +122,7 @@ export function SetupPageClient() {
         <SetupSheetView
           value={setupData}
           onChange={setSetupData}
-          template={A800RR_SETUP_SHEET_V1}
+          template={setupTemplate}
         />
       </section>
     </>

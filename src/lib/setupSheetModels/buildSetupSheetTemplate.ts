@@ -7,7 +7,7 @@ import {
   type SetupSheetModelSchema,
 } from "@/lib/setupSheetModels/types";
 
-export type SetupSheetTemplateView = "setup" | "logRun";
+export type SetupSheetTemplateView = "setup" | "logRun" | "analysis";
 
 export function buildSetupSheetTemplateFromModel(
   modelId: string,
@@ -29,13 +29,18 @@ export function buildSetupSheetTemplateFromParsedSchema(
   const fieldByKey = new Map(schema.fields.map((f) => [f.key, f]));
   const isKeyVisible = (key: string): boolean => {
     const f = fieldByKey.get(key);
-    if (f) return view === "logRun" ? f.showInLogRun : f.showInSetupSheet;
-    // Layout row keys with no field def (legacy gaps) stay visible unless explicitly modeled.
+    if (f) {
+      if (view === "logRun") return f.showInLogRun;
+      if (view === "analysis") return f.showInAnalysis;
+      return f.showInSetupSheet;
+    }
     return true;
   };
-  const visibleFields = schema.fields.filter((f) =>
-    view === "logRun" ? f.showInLogRun : f.showInSetupSheet
-  );
+  const visibleFields = schema.fields.filter((f) => {
+    if (view === "logRun") return f.showInLogRun;
+    if (view === "analysis") return f.showInAnalysis;
+    return f.showInSetupSheet;
+  });
   const filteredLayoutSections = filterModelLayoutSectionsByKeys(schema.structuredSections, isKeyVisible);
   const layoutSchema: SetupSheetModelSchema = {
     ...schema,

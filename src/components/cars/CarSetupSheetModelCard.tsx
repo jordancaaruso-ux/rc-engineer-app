@@ -36,10 +36,10 @@ export function CarSetupSheetModelCard({
       <ul className="flex flex-col gap-2 text-xs">
         <li>
           <Link
-            href={`/setup-sheet-models/${model.id}/schema`}
+            href={`/setup-sheet-models/${model.id}/schema?tab=layout`}
             className="text-sky-400 hover:text-sky-300 hover:underline"
           >
-            Edit parameters
+            Edit setup sheet
           </Link>
         </li>
         {calibrationId ? (

@@ -11,6 +11,9 @@ import {
   getCalibrationFieldKind,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { materializeAwesomatixTemplateDefaultsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { countCatalogFieldsMissingFromLayout } from "@/lib/setupSheetModels/layoutEditorOps";
+import { inferStructuredLayoutFromFields } from "@/lib/setupSheetModels/inferStructuredLayout";
+import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import type {
   SetupSheetModelFieldDef,
   SetupSheetModelLayoutRow,
@@ -90,13 +93,16 @@ export function buildA800SeedSchema(): SetupSheetModelSchema {
     );
   }
 
-  const structuredSections = A800RR_STRUCTURED_SECTIONS.map((sec) => ({
-    id: sec.id,
-    title: sec.title,
-    rows: sec.rows
-      .map((row) => structuredRowToModelLayout(row))
-      .filter((row): row is SetupSheetModelLayoutRow => row != null),
-  }));
+  const structuredSections = inferStructuredLayoutFromFields(
+    fields,
+    A800RR_STRUCTURED_SECTIONS.map((sec) => ({
+      id: sec.id,
+      title: sec.title,
+      rows: sec.rows
+        .map((row) => structuredRowToModelLayout(row))
+        .filter((row): row is SetupSheetModelLayoutRow => row != null),
+    }))
+  );
 
   return {
     version: 1,
@@ -108,16 +114,27 @@ export function buildA800SeedSchema(): SetupSheetModelSchema {
 
 /** Ensure user has built-in A800 model; link legacy A800 cars. */
 export async function ensureA800SetupSheetModelForUser(userId: string): Promise<string> {
-  const schema = buildA800SeedSchema();
+  const seedSchema = buildA800SeedSchema();
   const existing = await prisma.setupSheetModel.findUnique({
     where: { userId_slug: { userId, slug: SETUP_SHEET_MODEL_SLUG_A800RR } },
-    select: { id: true },
+    select: { id: true, schemaJson: true },
   });
   if (existing) {
-    await prisma.setupSheetModel.update({
-      where: { id: existing.id },
-      data: { schemaJson: schema as object, name: "Awesomatix A800RR" },
-    });
+    const parsed = parseSetupSheetModelSchema(existing.schemaJson);
+    if (parsed && countCatalogFieldsMissingFromLayout(parsed) > 5) {
+      await prisma.setupSheetModel.update({
+        where: { id: existing.id },
+        data: {
+          schemaJson: {
+            ...parsed,
+            structuredSections: inferStructuredLayoutFromFields(
+              parsed.fields,
+              seedSchema.structuredSections
+            ),
+          } as object,
+        },
+      });
+    }
     await linkLegacyA800Cars(userId, existing.id);
     return existing.id;
   }
@@ -126,7 +143,7 @@ export async function ensureA800SetupSheetModelForUser(userId: string): Promise<
       userId,
       name: "Awesomatix A800RR",
       slug: SETUP_SHEET_MODEL_SLUG_A800RR,
-      schemaJson: schema as object,
+      schemaJson: seedSchema as object,
     },
     select: { id: true },
   });

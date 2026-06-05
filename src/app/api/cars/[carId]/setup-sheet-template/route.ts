@@ -9,6 +9,7 @@ type RouteCtx = { params: Promise<{ carId: string }> };
 
 function parseTemplateView(raw: string | null): SetupSheetTemplateView {
   if (raw === "logRun") return "logRun";
+  if (raw === "analysis") return "analysis";
   return "setup";
 }
 

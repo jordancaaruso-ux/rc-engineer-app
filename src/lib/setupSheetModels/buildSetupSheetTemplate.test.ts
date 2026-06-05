@@ -125,3 +125,48 @@ test("logRun view keeps layout rows whose keys lack field defs", () => {
   const logRunTpl = buildSetupSheetTemplateFromParsedSchema("m1", "Test", schema, "logRun");
   assert.equal(logRunTpl.structuredSections?.[0]?.rows.length, 1);
 });
+
+test("analysis view filters by showInAnalysis", () => {
+  const schema: SetupSheetModelSchema = {
+    version: 1,
+    label: "Test",
+    structuredSections: [
+      {
+        id: "session",
+        title: "Session",
+        rows: [
+          { type: "single", key: "track_surface", label: "Surface" },
+          { type: "single", key: "driver_notes", label: "Notes" },
+        ],
+      },
+    ],
+    fields: [
+      {
+        key: "track_surface",
+        displayLabel: "Surface",
+        sectionId: "session",
+        sectionTitle: "Session",
+        valueType: "string",
+        uiType: "text",
+        showInSetupSheet: true,
+        showInAnalysis: true,
+        showInLogRun: false,
+        sortOrder: 0,
+      },
+      {
+        key: "driver_notes",
+        displayLabel: "Notes",
+        sectionId: "session",
+        sectionTitle: "Session",
+        valueType: "string",
+        uiType: "textarea",
+        showInSetupSheet: true,
+        showInAnalysis: false,
+        showInLogRun: false,
+        sortOrder: 1,
+      },
+    ],
+  };
+  const analysisTpl = buildSetupSheetTemplateFromParsedSchema("m1", "Test", schema, "analysis");
+  assert.equal(analysisTpl.structuredSections?.[0]?.rows.length, 1);
+});
