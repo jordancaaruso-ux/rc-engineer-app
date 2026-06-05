@@ -6,6 +6,7 @@ import {
   fetchEventSessions,
   fetchOrganizationEvents,
   fetchSessionClassification,
+  parseSpeedhiveLapTimeSeconds,
 } from "@/lib/speedhive/speedhiveClient";
 import {
   classificationRowMatchesUser,
@@ -31,6 +32,8 @@ export type SpeedhiveDiscoveredSession = {
   sessionCompletedAtIso: string | null;
   sourceKind: "practice" | "race";
   label: string;
+  /** Fastest lap in seconds, when known at discovery time. */
+  bestLapSeconds?: number | null;
   alreadyImported: boolean;
   linkedRunId: string | null;
   timingSource: "speedhive";
@@ -167,6 +170,9 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
           sessionCompletedAtIso: completedIso,
           sourceKind: kind,
           label: [sess.name, match.name, event.name].filter(Boolean).join(" · "),
+          bestLapSeconds: match.bestTime
+            ? parseSpeedhiveLapTimeSeconds(match.bestTime)
+            : null,
           alreadyImported: false,
           linkedRunId: null,
           timingSource: "speedhive",

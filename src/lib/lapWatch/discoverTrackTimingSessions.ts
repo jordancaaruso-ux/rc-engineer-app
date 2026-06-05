@@ -9,6 +9,7 @@ export type TrackTimingDiscoveredSession = {
   sessionUrl: string;
   sessionCompletedAtIso: string | null;
   label: string;
+  bestLapSeconds?: number | null;
   alreadyImported: boolean;
   linkedRunId: string | null;
   timingSource: "liverc" | "speedhive";
@@ -80,6 +81,7 @@ export async function discoverTrackTimingSessions(input: {
       sessionUrl: c.sessionUrl,
       sessionCompletedAtIso: c.sessionCompletedAtIso,
       label: c.label,
+      bestLapSeconds: null,
       alreadyImported: c.alreadyImported,
       linkedRunId: c.linkedRunId,
       timingSource: "liverc" as const,

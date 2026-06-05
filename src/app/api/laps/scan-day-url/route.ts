@@ -36,6 +36,7 @@ export type ScanDayUrlCandidateRow = {
    *  is already attached to a run (so the user knows it's been saved). */
   linkedRunId: string | null;
   timingSource?: "liverc" | "speedhive";
+  bestLapSeconds?: number | null;
 };
 
 const RESULTS_SCAN_ROW_CAP = 80;
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
       alreadyImported: c.alreadyImported,
       linkedRunId: c.linkedRunId,
       timingSource: c.timingSource,
+      bestLapSeconds: c.bestLapSeconds ?? null,
     }));
     return NextResponse.json({
       ok: true,

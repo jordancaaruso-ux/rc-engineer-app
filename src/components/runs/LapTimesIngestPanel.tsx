@@ -126,6 +126,7 @@ type ScanDayCandidate = {
   alreadyImported: boolean;
   linkedRunId: string | null;
   timingSource?: "liverc" | "speedhive";
+  bestLapSeconds?: number | null;
 };
 
 const RECENT_RUNS_COLLAPSED = 3;
@@ -949,6 +950,16 @@ export function LapTimesIngestPanel({
                               ) : null}
                             </span>
                             <span className="shrink-0 flex flex-col items-end gap-0.5">
+                              {c.bestLapSeconds != null ? (
+                                <span className="flex flex-col items-end leading-tight">
+                                  <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                                    Best
+                                  </span>
+                                  <span className="text-[12px] font-semibold tabular-nums text-foreground">
+                                    {formatLap(c.bestLapSeconds)}
+                                  </span>
+                                </span>
+                              ) : null}
                               {c.timingSource ? (
                                 <span
                                   className={cn(

@@ -72,6 +72,15 @@ function countIncludedLaps(block: SpeedhivePracticeTrainingSession): number {
   return n;
 }
 
+function bestLapSecondsFromBlock(block: SpeedhivePracticeTrainingSession): number | null {
+  let best: number | null = null;
+  for (const lap of block.laps ?? []) {
+    const sec = parseLapDurationSeconds(lap.duration);
+    if (sec != null && (best == null || sec < best)) best = sec;
+  }
+  return best;
+}
+
 async function runsFromActivity(
   locationId: number,
   locationLabel: string,
@@ -83,6 +92,7 @@ async function runsFromActivity(
   for (const block of trainingSessions) {
     const lapCount = countIncludedLaps(block);
     if (lapCount === 0) continue;
+    const bestLapSeconds = bestLapSecondsFromBlock(block);
     const completedIso = trainingSessionCompletedIso(block) ?? activityCompletedIso;
     const when = completedIso ? formatRunCreatedAtDateTime(completedIso) : null;
     out.push({
@@ -93,6 +103,7 @@ async function runsFromActivity(
       label: [locationLabel, when, `${lapCount} lap${lapCount === 1 ? "" : "s"}`]
         .filter(Boolean)
         .join(" · "),
+      bestLapSeconds,
       alreadyImported: false,
       linkedRunId: null,
       timingSource: "speedhive",
