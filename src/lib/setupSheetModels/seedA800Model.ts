@@ -11,8 +11,8 @@ import {
   getCalibrationFieldKind,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { materializeAwesomatixTemplateDefaultsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
-import { countCatalogFieldsMissingFromLayout } from "@/lib/setupSheetModels/layoutEditorOps";
 import { inferStructuredLayoutFromFields } from "@/lib/setupSheetModels/inferStructuredLayout";
+import { mergeMissingA800CatalogFields } from "@/lib/setupSheetModels/mergeA800CatalogFields";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import type {
   SetupSheetModelFieldDef,
@@ -121,19 +121,14 @@ export async function ensureA800SetupSheetModelForUser(userId: string): Promise<
   });
   if (existing) {
     const parsed = parseSetupSheetModelSchema(existing.schemaJson);
-    if (parsed && countCatalogFieldsMissingFromLayout(parsed) > 5) {
-      await prisma.setupSheetModel.update({
-        where: { id: existing.id },
-        data: {
-          schemaJson: {
-            ...parsed,
-            structuredSections: inferStructuredLayoutFromFields(
-              parsed.fields,
-              seedSchema.structuredSections
-            ),
-          } as object,
-        },
-      });
+    if (parsed) {
+      const merged = mergeMissingA800CatalogFields(parsed, seedSchema);
+      if (merged) {
+        await prisma.setupSheetModel.update({
+          where: { id: existing.id },
+          data: { schemaJson: merged as object },
+        });
+      }
     }
     await linkLegacyA800Cars(userId, existing.id);
     return existing.id;

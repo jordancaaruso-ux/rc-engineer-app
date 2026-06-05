@@ -14,7 +14,7 @@ import { filterRunsForTeamSetupComparePicker } from "@/lib/setupCompare/teamSetu
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import {
   canonicalSetupSheetTemplateId,
   isA800RRCar,
@@ -91,6 +91,7 @@ export function SetupSheetModal({
   const [loadedSetupData, setLoadedSetupData] = useState<unknown>(null);
   const [baselineSetupData, setBaselineSetupData] = useState<unknown | null>(null);
   const [baselineSetupLoading, setBaselineSetupLoading] = useState(false);
+  const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
 
   useEffect(() => {
     setPortalReady(true);
@@ -142,6 +143,30 @@ export function SetupSheetModal({
     window.addEventListener(ACTIVE_SETUP_CHANGED_EVENT, bump);
     return () => window.removeEventListener(ACTIVE_SETUP_CHANGED_EVENT, bump);
   }, []);
+
+  const carId = run?.car?.id ?? run?.carId ?? null;
+
+  useEffect(() => {
+    if (!open || !carId) {
+      setModelTemplate(null);
+      return;
+    }
+    let alive = true;
+    void fetch(`/api/cars/${encodeURIComponent(carId)}/setup-sheet-template?view=setup`, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data: { template?: SetupSheetTemplate }) => {
+        if (!alive) return;
+        setModelTemplate(data.template ?? null);
+      })
+      .catch(() => {
+        if (alive) setModelTemplate(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, carId]);
 
   const communityTemplateKey = useMemo(() => {
     return (
@@ -304,9 +329,10 @@ export function SetupSheetModal({
   const compareActive = mode !== "this_run_only" && baselineValue != null;
 
   const template = useMemo(() => {
+    if (modelTemplate) return modelTemplate;
     if (isA800RRCar(run?.car?.setupSheetTemplate)) return A800RR_SETUP_SHEET_V1;
     return getDefaultSetupSheetTemplate();
-  }, [run?.car?.setupSheetTemplate]);
+  }, [modelTemplate, run?.car?.setupSheetTemplate]);
 
   const hasActiveSetup = useMemo(() => {
     if (!activeSetup) return false;
@@ -458,6 +484,7 @@ export function SetupSheetModal({
               </div>
 
               <SetupSheetView
+                key={template.id}
                 value={runSetup}
                 onChange={() => {}}
                 readOnly

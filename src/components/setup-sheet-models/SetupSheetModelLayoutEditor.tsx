@@ -1,11 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { SetupSheetView } from "@/components/runs/SetupSheetView";
-import {
-  buildSetupSheetTemplateFromParsedSchema,
-  type SetupSheetTemplateView,
-} from "@/lib/setupSheetModels/buildSetupSheetTemplate";
 import { inferStructuredLayoutFromFields } from "@/lib/setupSheetModels/inferStructuredLayout";
 import {
   addFieldToLayout,
@@ -30,21 +25,12 @@ function parseRowDragId(id: RowDragId): { sectionId: string; rowIndex: number } 
   return { sectionId, rowIndex };
 }
 
-const PREVIEW_MODES: { value: SetupSheetTemplateView; label: string }[] = [
-  { value: "setup", label: "Setup page" },
-  { value: "logRun", label: "Log run" },
-  { value: "analysis", label: "Analysis" },
-];
-
 export function SetupSheetModelLayoutEditor(props: {
-  modelId: string;
-  modelName: string;
   schema: SetupSheetModelSchema;
   onChange: (schema: SetupSheetModelSchema) => void;
   readOnly?: boolean;
 }) {
-  const { modelId, modelName, schema, onChange, readOnly } = props;
-  const [previewMode, setPreviewMode] = useState<SetupSheetTemplateView>("setup");
+  const { schema, onChange, readOnly } = props;
   const [draggingRow, setDraggingRow] = useState<RowDragId | null>(null);
   const [rowDropTarget, setRowDropTarget] = useState<{ id: RowDragId; edge: "above" | "below" } | null>(null);
   const [draggingSection, setDraggingSection] = useState<SectionDragId | null>(null);
@@ -56,11 +42,6 @@ export function SetupSheetModelLayoutEditor(props: {
   const [localError, setLocalError] = useState<string | null>(null);
 
   const notInLayout = useMemo(() => fieldsNotInLayout(schema), [schema]);
-
-  const previewTemplate = useMemo(
-    () => buildSetupSheetTemplateFromParsedSchema(modelId, modelName, schema, previewMode),
-    [modelId, modelName, schema, previewMode]
-  );
 
   const applySchema = useCallback(
     (next: SetupSheetModelSchema | { error: string }) => {
@@ -118,8 +99,9 @@ export function SetupSheetModelLayoutEditor(props: {
   return (
     <div className="space-y-4">
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Drag sections and rows to match how drivers see the sheet. Removing a row only hides it from the layout — the
-        parameter stays in the <span className="font-medium text-foreground">Parameters</span> tab.
+        Drag sections and rows to match how drivers see the sheet. The live preview on the right updates as you edit.
+        Removing a row only hides it from the layout — the parameter stays in the{" "}
+        <span className="font-medium text-foreground">Parameters</span> tab.
       </p>
 
       {localError ? (
@@ -128,8 +110,7 @@ export function SetupSheetModelLayoutEditor(props: {
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="space-y-3 min-w-0">
+      <div className="space-y-3 min-w-0">
           {!readOnly ? (
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -314,33 +295,6 @@ export function SetupSheetModelLayoutEditor(props: {
               );
             })}
           </div>
-        </div>
-
-        <div className="min-w-0 space-y-2 xl:sticky xl:top-4 xl:self-start">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-muted-foreground">Preview as</span>
-            {PREVIEW_MODES.map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                className={`rounded-md border px-2 py-1 text-[11px] transition ${
-                  previewMode === m.value
-                    ? "border-sky-500/50 bg-sky-500/15 text-foreground"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setPreviewMode(m.value)}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-          <SetupSheetView
-            value={{}}
-            onChange={() => {}}
-            readOnly
-            template={previewTemplate}
-          />
-        </div>
       </div>
     </div>
   );

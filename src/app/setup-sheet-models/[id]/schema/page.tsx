@@ -6,6 +6,8 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { SetupSheetModelSchemaPageClient } from "@/components/setup-sheet-models/SetupSheetModelSchemaPageClient";
 
+export const dynamic = "force-dynamic";
+
 type Props = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ returnTo?: string; tab?: string }>;

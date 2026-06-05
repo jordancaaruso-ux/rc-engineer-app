@@ -23,6 +23,7 @@ export async function discoverTrackTimingSessions(input: {
 }): Promise<{
   candidates: TrackTimingDiscoveredSession[];
   unimportedCandidates: TrackTimingDiscoveredSession[];
+  unimportedTotal: number;
   mostRecentSession: TrackTimingDiscoveredSession | null;
   liveRcDriverName: string | null;
   hint: string | null;
@@ -42,6 +43,7 @@ export async function discoverTrackTimingSessions(input: {
     return {
       candidates: [],
       unimportedCandidates: [],
+      unimportedTotal: 0,
       mostRecentSession: null,
       liveRcDriverName: null,
       hint: "Add a LiveRC or Speedhive organization URL on the track page.",
@@ -92,14 +94,17 @@ export async function discoverTrackTimingSessions(input: {
   });
 
   const unimported = merged.filter((c) => !c.alreadyImported);
+  const MAX_RECENT_RUNS = 10;
+  const unimportedRecent = unimported.slice(0, MAX_RECENT_RUNS);
   const hints = [lr?.hint, sh?.hint].filter(Boolean) as string[];
 
   return {
     candidates: merged,
-    unimportedCandidates: unimported,
-    mostRecentSession: unimported[0] ?? merged[0] ?? null,
+    unimportedCandidates: unimportedRecent,
+    unimportedTotal: unimported.length,
+    mostRecentSession: unimportedRecent[0] ?? merged[0] ?? null,
     liveRcDriverName,
-    hint: unimported.length > 0 ? null : hints[0] ?? null,
+    hint: unimportedRecent.length > 0 ? null : hints[0] ?? null,
     liveRcDebug: lr?.debug ?? null,
     speedhiveOrganizationId: sh?.organizationId ?? null,
     speedhivePracticeLocationId: sh?.practiceLocationId ?? null,

@@ -107,7 +107,8 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
 
   const schema = normalizeSchema(parseSetupSheetModelSchema(model.schemaJson));
   revalidatePath("/cars");
-  revalidatePath(`/setup-sheet-models/${id}`);
+  revalidatePath(`/setup-sheet-models/${id}/schema`);
+  revalidatePath("/setup");
   return NextResponse.json({
     model: {
       id: model.id,

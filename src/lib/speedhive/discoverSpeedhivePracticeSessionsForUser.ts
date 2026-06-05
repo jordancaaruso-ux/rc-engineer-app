@@ -1,13 +1,18 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import {
   fetchPracticeLocation,
   fetchPracticeLocationActivities,
   fetchPracticeSessionsForChipAtLocation,
+  fetchPracticeTrainingSessions,
   practiceTimestampToIso,
+  type SpeedhivePracticeTrainingSession,
 } from "@/lib/speedhive/speedhivePracticeClient";
-import { buildSpeedhivePracticeActivityUrl } from "@/lib/speedhive/speedhivePracticeUrl";
+import {
+  buildSpeedhivePracticeRunUrl,
+} from "@/lib/speedhive/speedhivePracticeUrl";
 import type { SpeedhiveDiscoveredSession } from "@/lib/speedhive/discoverSpeedhiveSessionsForUser";
 import {
   getSpeedhiveDriverNameForUser,
@@ -20,8 +25,8 @@ import {
 import { normalizeSpeedhiveTransponderNumber } from "@/lib/speedhive/speedhiveTransponder";
 import { practiceLocationIdFromTrackUrl } from "@/lib/speedhive/speedhivePracticeUrl";
 
-const MAX_PRACTICE_ACTIVITIES = 40;
-const MAX_CHIP_SESSIONS = 30;
+const MAX_ACTIVITIES_TO_EXPAND = 15;
+const MAX_DISCOVERY_RUNS = 10;
 
 function sessionSortKey(iso: string | null): number {
   if (!iso?.trim()) return 0;
@@ -36,6 +41,64 @@ function chipCodesForUser(transponders: number[]): string[] {
     if (norm) codes.add(norm);
   }
   return [...codes];
+}
+
+function parseLapDurationSeconds(duration: string | undefined): number | null {
+  const t = duration?.trim();
+  if (!t || t === "-") return null;
+  const n = Number(t.replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function trainingSessionCompletedIso(block: SpeedhivePracticeTrainingSession): string | null {
+  const start = block.dateTimeStart?.trim();
+  if (start && !Number.isNaN(new Date(start).getTime())) {
+    return new Date(start).toISOString();
+  }
+  const laps = block.laps ?? [];
+  const last = laps[laps.length - 1];
+  const lastStart = last?.dateTimeStart?.trim();
+  if (lastStart && !Number.isNaN(new Date(lastStart).getTime())) {
+    return new Date(lastStart).toISOString();
+  }
+  return null;
+}
+
+function countIncludedLaps(block: SpeedhivePracticeTrainingSession): number {
+  let n = 0;
+  for (const lap of block.laps ?? []) {
+    if (parseLapDurationSeconds(lap.duration) != null) n++;
+  }
+  return n;
+}
+
+async function runsFromActivity(
+  locationId: number,
+  locationLabel: string,
+  activityId: number,
+  activityCompletedIso: string | null
+): Promise<SpeedhiveDiscoveredSession[]> {
+  const trainingSessions = await fetchPracticeTrainingSessions(activityId);
+  const out: SpeedhiveDiscoveredSession[] = [];
+  for (const block of trainingSessions) {
+    const lapCount = countIncludedLaps(block);
+    if (lapCount === 0) continue;
+    const completedIso = trainingSessionCompletedIso(block) ?? activityCompletedIso;
+    const when = completedIso ? formatRunCreatedAtDateTime(completedIso) : null;
+    out.push({
+      sessionUrl: buildSpeedhivePracticeRunUrl(locationId, activityId, block.id),
+      sessionId: `${activityId}-${block.id}`,
+      sessionCompletedAtIso: completedIso,
+      sourceKind: "practice",
+      label: [locationLabel, when, `${lapCount} lap${lapCount === 1 ? "" : "s"}`]
+        .filter(Boolean)
+        .join(" · "),
+      alreadyImported: false,
+      linkedRunId: null,
+      timingSource: "speedhive",
+    });
+  }
+  return out;
 }
 
 export async function discoverSpeedhivePracticeSessionsForUser(input: {
@@ -79,38 +142,32 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
 
   const location = await fetchPracticeLocation(locationId);
   const locationLabel = location?.name?.trim() || `Track ${locationId}`;
-  const discovered = new Map<number, SpeedhiveDiscoveredSession>();
+  const activityIds = new Map<number, string | null>();
+  let discovered: SpeedhiveDiscoveredSession[] = [];
 
   try {
     if (chipCodes.length > 0) {
       for (const chipCode of chipCodes) {
-        const sessions = (await fetchPracticeSessionsForChipAtLocation(locationId, chipCode)).slice(
-          0,
-          MAX_CHIP_SESSIONS
+        const sessions = await fetchPracticeSessionsForChipAtLocation(locationId, chipCode);
+        const sorted = [...sessions].sort(
+          (a, b) =>
+            sessionSortKey(practiceTimestampToIso(b.endtimeutc ?? b.starttimeutc)) -
+            sessionSortKey(practiceTimestampToIso(a.endtimeutc ?? a.starttimeutc))
         );
-        for (const sess of sessions) {
-          const activityId = sess.id;
-          if (!activityId || discovered.has(activityId)) continue;
-          const completedIso =
+        for (const sess of sorted.slice(0, MAX_ACTIVITIES_TO_EXPAND)) {
+          if (!sess.id || activityIds.has(sess.id)) continue;
+          activityIds.set(
+            sess.id,
             practiceTimestampToIso(sess.endtimeutc) ??
-            practiceTimestampToIso(sess.starttimeutc);
-          discovered.set(activityId, {
-            sessionUrl: buildSpeedhivePracticeActivityUrl(locationId, activityId),
-            sessionId: String(activityId),
-            sessionCompletedAtIso: completedIso,
-            sourceKind: "practice",
-            label: [locationLabel, `Transponder ${chipCode}`].filter(Boolean).join(" · "),
-            alreadyImported: false,
-            linkedRunId: null,
-            timingSource: "speedhive",
-          });
+              practiceTimestampToIso(sess.starttimeutc)
+          );
         }
       }
     }
 
-    if (driverNorm && discovered.size === 0) {
+    if (activityIds.size === 0 && driverNorm) {
       const activities = await fetchPracticeLocationActivities(locationId, {
-        count: MAX_PRACTICE_ACTIVITIES,
+        count: MAX_ACTIVITIES_TO_EXPAND,
         sport: location?.sport ?? "RC",
       });
       for (const act of activities) {
@@ -126,17 +183,13 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
           : act.startTime
             ? new Date(act.startTime).toISOString()
             : null;
-        discovered.set(act.id, {
-          sessionUrl: buildSpeedhivePracticeActivityUrl(locationId, act.id),
-          sessionId: String(act.id),
-          sessionCompletedAtIso: completedIso,
-          sourceKind: "practice",
-          label: [locationLabel, label, act.name].filter(Boolean).join(" · "),
-          alreadyImported: false,
-          linkedRunId: null,
-          timingSource: "speedhive",
-        });
+        if (!activityIds.has(act.id)) activityIds.set(act.id, completedIso);
       }
+    }
+
+    for (const [activityId, activityIso] of activityIds) {
+      const runs = await runsFromActivity(locationId, locationLabel, activityId, activityIso);
+      discovered.push(...runs);
     }
   } catch (e) {
     return {
@@ -148,8 +201,12 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
     };
   }
 
-  const list = [...discovered.values()];
-  const urls = list.map((d) => d.sessionUrl);
+  const sorted = [...discovered].sort(
+    (a, b) => sessionSortKey(b.sessionCompletedAtIso) - sessionSortKey(a.sessionCompletedAtIso)
+  );
+  const capped = sorted.slice(0, MAX_DISCOVERY_RUNS);
+
+  const urls = capped.map((d) => d.sessionUrl);
   const imports =
     urls.length > 0
       ? await prisma.importedLapTimeSession.findMany({
@@ -159,30 +216,27 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
       : [];
   const importByUrl = new Map(imports.map((i) => [i.sourceUrl, i.linkedRunId]));
 
-  for (const d of list) {
+  for (const d of capped) {
     if (importByUrl.has(d.sessionUrl)) {
       d.alreadyImported = true;
       d.linkedRunId = importByUrl.get(d.sessionUrl) ?? null;
     }
   }
 
-  const sorted = [...list].sort(
-    (a, b) => sessionSortKey(b.sessionCompletedAtIso) - sessionSortKey(a.sessionCompletedAtIso)
-  );
-  const unimported = sorted.filter((d) => !d.alreadyImported);
+  const unimported = capped.filter((d) => !d.alreadyImported);
 
   return {
-    candidates: sorted,
+    candidates: capped,
     unimportedCandidates: unimported,
-    mostRecentSession: unimported[0] ?? sorted[0] ?? null,
+    mostRecentSession: unimported[0] ?? capped[0] ?? null,
     practiceLocationId: locationId,
     hint:
       unimported.length > 0
         ? null
-        : sorted.length > 0
-          ? "All matching Speedhive practice sessions are already imported."
+        : capped.length > 0
+          ? "All matching Speedhive practice runs are already imported."
           : chipCodes.length > 0
-            ? "No practice sessions matched your transponder at this track."
-            : "No practice sessions matched your name at this track.",
+            ? "No practice runs matched your transponder at this track."
+            : "No practice runs matched your name at this track.",
   };
 }

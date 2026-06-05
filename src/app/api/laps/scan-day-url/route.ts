@@ -132,7 +132,7 @@ export async function POST(request: Request) {
       liveRcDriverName: discovered.liveRcDriverName,
       candidates,
       totalCandidates: discovered.candidates.length,
-      unimportedCount: discovered.unimportedCandidates.length,
+      unimportedCount: discovered.unimportedTotal,
       matchedCount: displaySessions.length,
       hasDriverNameSetting,
       driverFilterApplied: true,

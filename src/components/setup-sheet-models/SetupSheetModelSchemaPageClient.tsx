@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SetupSheetModelLayoutEditor } from "@/components/setup-sheet-models/SetupSheetModelLayoutEditor";
+import { SetupSheetModelLivePreview } from "@/components/setup-sheet-models/SetupSheetModelLivePreview";
 import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
@@ -34,8 +35,12 @@ export function SetupSheetModelSchemaPageClient(props: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ schema }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Save failed");
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        model?: { schema?: SetupSheetModelSchema };
+      };
+      if (!res.ok) throw new Error(data.error || "Save failed");
+      if (data.model?.schema) setSchema(data.model.schema);
       setStatus("Saved.");
       router.refresh();
     } catch (e) {
@@ -83,16 +88,20 @@ export function SetupSheetModelSchemaPageClient(props: {
         </button>
       </div>
 
-      {tab === "layout" ? (
-        <SetupSheetModelLayoutEditor
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="min-w-0 space-y-4">
+          {tab === "layout" ? (
+            <SetupSheetModelLayoutEditor schema={schema} onChange={setSchema} />
+          ) : (
+            <SetupSheetModelSchemaEditor schema={schema} onChange={setSchema} />
+          )}
+        </div>
+        <SetupSheetModelLivePreview
           modelId={props.modelId}
           modelName={props.modelName}
           schema={schema}
-          onChange={setSchema}
         />
-      ) : (
-        <SetupSheetModelSchemaEditor schema={schema} onChange={setSchema} />
-      )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <button

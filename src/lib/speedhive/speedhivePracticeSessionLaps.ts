@@ -59,8 +59,13 @@ export async function importSpeedhivePracticeActivity(
       };
     }
 
+    const blocks =
+      ref.trainingSessionId != null
+        ? trainingSessions.filter((b) => b.id === ref.trainingSessionId)
+        : trainingSessions;
+
     const sessionDrivers: LapUrlSessionDriver[] = [];
-    for (const block of trainingSessions) {
+    for (const block of blocks) {
       const lapsRaw = block.laps ?? [];
       const laps: number[] = [];
       for (const lap of lapsRaw) {
@@ -70,11 +75,16 @@ export async function importSpeedhivePracticeActivity(
       if (laps.length === 0) continue;
 
       const driverId = `sh-practice-${ref.activityId}-${block.id}`;
+      const when = block.dateTimeStart?.trim();
+      const whenLabel =
+        when && !Number.isNaN(new Date(when).getTime())
+          ? new Date(when).toLocaleString()
+          : `Run ${block.id}`;
       sessionDrivers.push({
         id: driverId,
         driverId,
-        driverName: `Session ${block.id}`,
-        normalizedName: `session ${block.id}`,
+        driverName: whenLabel,
+        normalizedName: whenLabel.toLowerCase(),
         laps,
         lapCount: laps.length,
       });
@@ -85,15 +95,20 @@ export async function importSpeedhivePracticeActivity(
         parserId: PARSER_ID,
         laps: [],
         candidates: [],
-        message: "No lap times found for this Speedhive practice activity.",
+        message: ref.trainingSessionId
+          ? "No lap times found for this practice run."
+          : "No lap times found for this Speedhive practice activity.",
         errorCode: "empty_session",
       };
     }
 
-    const primary = sessionDrivers.reduce((best, cur) =>
-      (cur.laps.length > best.laps.length ? cur : best)
-    );
-    const startIso = trainingSessions[0]?.dateTimeStart?.trim();
+    const primary =
+      ref.trainingSessionId != null
+        ? sessionDrivers[0]!
+        : sessionDrivers.reduce((best, cur) =>
+            cur.laps.length > best.laps.length ? cur : best
+          );
+    const startIso = blocks[0]?.dateTimeStart?.trim();
     const sessionCompletedAtIso =
       startIso && !Number.isNaN(new Date(startIso).getTime())
         ? new Date(startIso).toISOString()

@@ -128,6 +128,9 @@ type ScanDayCandidate = {
   timingSource?: "liverc" | "speedhive";
 };
 
+const RECENT_RUNS_COLLAPSED = 3;
+const RECENT_RUNS_MAX = 10;
+
 /** Server: `/api/events/[eventId]/my-race-sessions` — driver verified on each race page. */
 type EventRaceSessionRow = {
   sessionUrl: string;
@@ -209,6 +212,7 @@ export function LapTimesIngestPanel({
   const [discoveryDebug, setDiscoveryDebug] = useState<DiscoveryDebugPayload | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const [scanTotals, setScanTotals] = useState<{ total: number; unimported: number } | null>(null);
+  const [showAllRecentRuns, setShowAllRecentRuns] = useState(false);
   /** `${blockId}:${driverId}` for lap preview */
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
 
@@ -289,6 +293,14 @@ export function LapTimesIngestPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
   }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, lapImportEventId]);
+
+  const visibleDayScanCandidates = useMemo(() => {
+    if (!dayScanCandidates?.length) return [];
+    const limit = showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED;
+    return dayScanCandidates.slice(0, limit);
+  }, [dayScanCandidates, showAllRecentRuns]);
+
+  const canExpandRecentRuns = (dayScanCandidates?.length ?? 0) > RECENT_RUNS_COLLAPSED;
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
   const manualMetrics = useMemo(() => {
@@ -392,6 +404,7 @@ export function LapTimesIngestPanel({
     setDayScanIndexKind(null);
     setDiscoveryDebug(null);
     setScanTotals(null);
+    setShowAllRecentRuns(false);
     try {
       const res = await fetch("/api/laps/scan-day-url", {
         method: "POST",
@@ -862,7 +875,7 @@ export function LapTimesIngestPanel({
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="ui-title text-[11px] text-muted-foreground">
-                    Your timing sessions at this track
+                    Recent runs at this track
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {dayScanBusy
@@ -880,8 +893,10 @@ export function LapTimesIngestPanel({
                               .join(", ")}…`
                           : "Checking timing sources…"
                       : dayScanCandidates && dayScanCandidates.length > 0
-                        ? `${dayScanCandidates.length} new session(s) to import`
-                        : "Newest unimported sessions (LiveRC and Speedhive, by completion time)"}
+                        ? scanTotals && scanTotals.unimported > dayScanCandidates.length
+                          ? `Showing ${visibleDayScanCandidates.length} of ${scanTotals.unimported} unimported runs (newest first)`
+                          : `${dayScanCandidates.length} recent run${dayScanCandidates.length === 1 ? "" : "s"} to import`
+                        : "Your 3 most recent unimported runs (expand to 10)"}
                   </p>
                 </div>
                 <button
@@ -903,46 +918,68 @@ export function LapTimesIngestPanel({
                     : "Set your driver name in Settings (LiveRC and/or Speedhive transponder / name) so we can find your sessions."}
                 </p>
               ) : null}
-              {dayScanCandidates && dayScanCandidates.length > 0 ? (
-                <ul className="space-y-1">
-                  {dayScanCandidates.map((c) => (
-                    <li key={c.sessionId}>
-                      <button
-                        type="button"
-                        disabled={urlBusy}
-                        className={cn(
-                          "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
-                          "border-border bg-surface-runna hover:bg-surface-runna-inset",
-                          urlBusy && "opacity-60 pointer-events-none"
-                        )}
-                        onClick={() => void importFromDayCandidate(c)}
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium text-foreground">
-                            {c.driverName || "Session"}
-                            {c.sessionTime ? ` · ${c.sessionTime}` : ""}
-                          </span>
-                          <span className="block truncate text-[10px] text-muted-foreground">{c.sessionUrl}</span>
-                        </span>
-                        <span className="shrink-0 flex flex-col items-end gap-0.5">
-                          {c.timingSource ? (
-                            <span
-                              className={cn(
-                                "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide",
-                                c.timingSource === "speedhive"
-                                  ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
-                                  : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
-                              )}
-                            >
-                              {c.timingSource === "speedhive" ? "Speedhive" : "LiveRC"}
+              {visibleDayScanCandidates.length > 0 ? (
+                <div className="space-y-1">
+                  <ul className="space-y-1">
+                    {visibleDayScanCandidates.map((c) => {
+                      const when = c.timingSource
+                        ? null
+                        : c.sessionTime ??
+                          (c.sessionCompletedAtIso
+                            ? formatRunCreatedAtDateTime(c.sessionCompletedAtIso)
+                            : null);
+                      return (
+                        <li key={c.sessionId}>
+                          <button
+                            type="button"
+                            disabled={urlBusy}
+                            className={cn(
+                              "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
+                              "border-border bg-surface-runna hover:bg-surface-runna-inset",
+                              urlBusy && "opacity-60 pointer-events-none"
+                            )}
+                            onClick={() => void importFromDayCandidate(c)}
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium text-foreground">
+                                {c.driverName || "Run"}
+                              </span>
+                              {when ? (
+                                <span className="block truncate text-[10px] text-muted-foreground">{when}</span>
+                              ) : null}
                             </span>
-                          ) : null}
-                          <span className="ui-title text-[10px] text-muted-foreground">Import</span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                            <span className="shrink-0 flex flex-col items-end gap-0.5">
+                              {c.timingSource ? (
+                                <span
+                                  className={cn(
+                                    "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide",
+                                    c.timingSource === "speedhive"
+                                      ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                                      : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                                  )}
+                                >
+                                  {c.timingSource === "speedhive" ? "Speedhive" : "LiveRC"}
+                                </span>
+                              ) : null}
+                              <span className="ui-title text-[10px] text-muted-foreground">Import</span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {canExpandRecentRuns ? (
+                    <button
+                      type="button"
+                      className="w-full rounded-md border border-dashed border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-surface-runna-inset transition"
+                      onClick={() => setShowAllRecentRuns((prev) => !prev)}
+                    >
+                      {showAllRecentRuns
+                        ? "Show fewer runs"
+                        : `Show more runs (${Math.min(RECENT_RUNS_MAX, dayScanCandidates!.length) - RECENT_RUNS_COLLAPSED} more)`}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
               {dayScanMessage && !dayScanBusy ? (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">{dayScanMessage}</p>
