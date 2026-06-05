@@ -7,10 +7,8 @@ import {
   fetchSessionClassification,
   parseSpeedhiveLapTimeSeconds,
 } from "@/lib/speedhive/speedhiveClient";
-import {
-  normalizeSpeedhiveDriverNameForMatch,
-  speedhiveDriverNameMatches,
-} from "@/lib/speedhive/speedhiveNameNormalize";
+import { classificationRowMatchesUser } from "@/lib/speedhive/speedhiveClassificationMatch";
+import { normalizeSpeedhiveDriverNameForMatch } from "@/lib/speedhive/speedhiveNameNormalize";
 import { parseSpeedhiveSessionRef } from "@/lib/speedhive/speedhiveUrl";
 
 const PARSER_ID = "speedhive_api_v1";
@@ -21,8 +19,16 @@ export function isSpeedhiveSessionUrl(url: string): boolean {
 
 export async function importSpeedhiveSession(
   urlOrSessionId: string | { sessionId: number; eventId?: number },
-  driverName?: string | null
+  identity?: { driverName?: string | null; transponderNumbers?: number[] } | string | null
 ): Promise<LapUrlParseResult> {
+  const driverName =
+    typeof identity === "string" || identity == null
+      ? identity
+      : identity.driverName;
+  const transponderNumbers =
+    typeof identity === "object" && identity != null && !Array.isArray(identity)
+      ? (identity.transponderNumbers ?? [])
+      : [];
   const ref =
     typeof urlOrSessionId === "string"
       ? parseSpeedhiveSessionRef(urlOrSessionId)
@@ -48,16 +54,18 @@ export async function importSpeedhiveSession(
       fetchSessionAllLapTimes(ref.sessionId),
     ]);
 
+    const rowByPosition = new Map<number, (typeof classification)[number]>();
     const nameByPosition = new Map<number, string>();
     for (const row of classification) {
-      if (row.position && row.name?.trim()) {
-        nameByPosition.set(row.position, row.name.trim());
-      }
+      if (!row.position) continue;
+      rowByPosition.set(row.position, row);
+      if (row.name?.trim()) nameByPosition.set(row.position, row.name.trim());
     }
 
     const driverNorm = driverName?.trim()
       ? normalizeSpeedhiveDriverNameForMatch(driverName)
       : "";
+    const userTransponders = transponderNumbers.filter((n) => Number.isFinite(n) && n > 0);
 
     const sessionDrivers: LapUrlSessionDriver[] = [];
 
@@ -94,12 +102,18 @@ export async function importSpeedhiveSession(
     }
 
     let primary = sessionDrivers[0]!;
-    if (driverNorm) {
-      const match = sessionDrivers.find((d) =>
-        speedhiveDriverNameMatches(d.driverName, driverNorm)
-      );
-      if (match) primary = match;
-    }
+    const matched = sessionDrivers.find((d) => {
+      const pos = Number(d.driverId.split("-").pop());
+      const row = Number.isFinite(pos) ? rowByPosition.get(pos) : undefined;
+      if (!row) return false;
+      return classificationRowMatchesUser({
+        row,
+        userTransponders,
+        driverNorm,
+        raceClassFilter: null,
+      });
+    });
+    if (matched) primary = matched;
 
     const sessionMeta = classification[0] as { startTime?: string } | undefined;
     const sessionCompletedAtIso =

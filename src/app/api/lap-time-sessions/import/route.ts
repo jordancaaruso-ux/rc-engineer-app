@@ -4,6 +4,10 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
+import {
+  getSpeedhiveDriverNameForUser,
+  getSpeedhiveTransponderNumbersForUser,
+} from "@/lib/speedhive/speedhiveDriverSettings";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
 import { expandLiveRcEventHubForImport } from "@/lib/lapImport/expandLiveRcEventHub";
 import { isLiveRcEventHubUrl } from "@/lib/lapWatch/livercSessionIndexParsers";
@@ -62,9 +66,17 @@ export async function POST(request: Request) {
   const eventId =
     typeof body?.eventId === "string" && body.eventId.trim() ? body.eventId.trim() : undefined;
 
-  const liveName = (await getLiveRcDriverNameSetting(user.id).catch(() => null))?.trim() ?? "";
+  const [liveName, speedhiveName, transponderNumbers] = await Promise.all([
+    getLiveRcDriverNameSetting(user.id).catch(() => null),
+    getSpeedhiveDriverNameForUser(user.id).catch(() => null),
+    getSpeedhiveTransponderNumbersForUser(user.id).catch(() => [] as number[]),
+  ]);
+  const driverName = (speedhiveName ?? liveName)?.trim() ?? "";
   const ctx = {
-    ...(liveName ? { driverName: liveName } : {}),
+    ...(driverName ? { driverName } : {}),
+    ...(transponderNumbers.length > 0
+      ? { speedhiveTransponderNumbers: transponderNumbers }
+      : {}),
     allowAnyPublicHost: isAdmin,
   };
 

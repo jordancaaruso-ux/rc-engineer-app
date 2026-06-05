@@ -2,8 +2,6 @@ import "server-only";
 
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
-import { discoverMylapsLinkedSessions } from "@/lib/mylaps/discoverMylapsLinkedSessions";
-import { hasMylapsConnection } from "@/lib/mylaps/mylapsConnection";
 import { discoverSpeedhiveSessionsForUser } from "@/lib/speedhive/discoverSpeedhiveSessionsForUser";
 
 export type TrackTimingDiscoveredSession = {
@@ -38,16 +36,14 @@ export async function discoverTrackTimingSessions(input: {
 }> {
   const liveRc = input.liveRcUrl?.trim() ?? "";
   const speedhive = input.speedhiveUrl?.trim() ?? "";
-  const mylapsLinked = await hasMylapsConnection(input.userId);
 
-  if (!liveRc && !speedhive && !mylapsLinked) {
+  if (!liveRc && !speedhive) {
     return {
       candidates: [],
       unimportedCandidates: [],
       mostRecentSession: null,
       liveRcDriverName: null,
-      hint:
-        "Link your MYLAPS account in Settings, or add a LiveRC / Speedhive URL on the track page.",
+      hint: "Add a LiveRC or Speedhive organization URL on the track page.",
       liveRcDebug: null,
       speedhiveOrganizationId: null,
       activeRaceMeeting: { detected: false, eventHubUrl: null, eventLabel: null },
@@ -56,7 +52,7 @@ export async function discoverTrackTimingSessions(input: {
 
   const liveRcDriverName = await getLiveRcDriverNameSetting(input.userId);
 
-  const [lr, sh, ml] = await Promise.all([
+  const [lr, sh] = await Promise.all([
     liveRc
       ? discoverLiveRcSessionsForUser({
           userId: input.userId,
@@ -69,12 +65,6 @@ export async function discoverTrackTimingSessions(input: {
       ? discoverSpeedhiveSessionsForUser({
           userId: input.userId,
           trackSpeedhiveUrl: speedhive,
-          eventRaceClass: input.eventRaceClass,
-        })
-      : null,
-    mylapsLinked
-      ? discoverMylapsLinkedSessions({
-          userId: input.userId,
           eventRaceClass: input.eventRaceClass,
         })
       : null,
@@ -91,7 +81,6 @@ export async function discoverTrackTimingSessions(input: {
       timingSource: "liverc" as const,
     })) ?? []),
     ...(sh?.candidates ?? []),
-    ...(ml?.candidates ?? []),
   ];
 
   merged.sort((a, b) => {
@@ -101,7 +90,7 @@ export async function discoverTrackTimingSessions(input: {
   });
 
   const unimported = merged.filter((c) => !c.alreadyImported);
-  const hints = [lr?.hint, sh?.hint, ml?.hint].filter(Boolean) as string[];
+  const hints = [lr?.hint, sh?.hint].filter(Boolean) as string[];
 
   return {
     candidates: merged,

@@ -24,6 +24,15 @@ export type SpeedhiveClassificationRow = {
   name: string;
   resultClass?: string;
   bestTime?: string;
+  /** Present on some timing feeds — used for transponder-based matching. */
+  transponder?: string | number;
+  transponderId?: string | number;
+  transponderNumber?: string | number;
+  chip?: string | number;
+  chipNumber?: string | number;
+  codeNr?: string | number;
+  nr?: string | number;
+  competitor?: Record<string, unknown>;
 };
 
 export type SpeedhiveLapRow = {

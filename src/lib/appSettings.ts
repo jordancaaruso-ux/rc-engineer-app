@@ -8,6 +8,8 @@ export const APP_SETTING_KEYS = {
   liveRcDriverId: "liveRcDriverId",
   /** Display name on Speedhive results (optional; falls back to liveRcDriverName). */
   speedhiveDriverName: "speedhiveDriverName",
+  /** Comma-separated or JSON array of MYLAPS transponder numbers for Speedhive discovery. */
+  speedhiveTransponderNumbersJson: "speedhiveTransponderNumbersJson",
   /** MYLAPS / Speedhive account id (from linked login). */
   mylapsAccountId: "mylapsAccountId",
   /** Bearer access token for usersandproducts-api (server only). */
@@ -106,6 +108,17 @@ export async function getSpeedhiveDriverNameSetting(userId: string): Promise<str
 
 export async function setSpeedhiveDriverNameSetting(userId: string, value: string | null): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.speedhiveDriverName, value);
+}
+
+export async function getSpeedhiveTransponderNumbersSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderNumbersJson);
+}
+
+export async function setSpeedhiveTransponderNumbersSetting(
+  userId: string,
+  value: string | null
+): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderNumbersJson, value);
 }
 
 export async function getSpeedhiveDriverNameForUser(userId: string): Promise<string | null> {

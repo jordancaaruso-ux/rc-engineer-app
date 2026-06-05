@@ -49,7 +49,7 @@ export function TrackSpeedhiveUrlEditor(props: {
         Paste the track or club organization page from{" "}
         <span className="font-medium text-foreground">speedhive.mylaps.com</span> (URL should
         include <span className="font-mono text-foreground/90">/organizations/…</span>). Used to
-        find your sessions when the track does not use LiveRC.
+        find your sessions by transponder or name (set in Settings) when the track does not use LiveRC.
       </p>
       <input
         className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"

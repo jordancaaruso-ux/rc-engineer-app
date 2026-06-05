@@ -13,6 +13,9 @@ export const speedhiveParser: LapUrlParser = {
   },
 
   async parse(url: string, context?: LapUrlParseContext): Promise<LapUrlParseResult> {
-    return importSpeedhiveSession(url, context?.driverName ?? null);
+    return importSpeedhiveSession(url, {
+      driverName: context?.driverName ?? null,
+      transponderNumbers: context?.speedhiveTransponderNumbers ?? [],
+    });
   },
 };

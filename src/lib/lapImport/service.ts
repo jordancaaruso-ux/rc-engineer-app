@@ -89,7 +89,11 @@ export type ImportOneUrlResult = ImportOneUrlSuccess | ImportOneUrlFailure;
 export async function importOneTimingUrl(
   userId: string,
   url: string,
-  context?: { driverName?: string; allowAnyPublicHost?: boolean }
+  context?: {
+    driverName?: string;
+    speedhiveTransponderNumbers?: number[];
+    allowAnyPublicHost?: boolean;
+  }
 ): Promise<ImportOneUrlResult> {
   const v = await validateTimingHttpUrlResolved(url, {
     allowAnyPublicHost: context?.allowAnyPublicHost,
@@ -98,7 +102,17 @@ export async function importOneTimingUrl(
     return { url: url.trim(), success: false, error: v.error };
   }
   const normalized = v.normalized;
-  const parsed = await parseTimingUrl(normalized, context?.driverName ? { driverName: context.driverName } : undefined);
+  const parseContext =
+    context &&
+    (context.driverName || (context.speedhiveTransponderNumbers?.length ?? 0) > 0)
+      ? {
+          ...(context.driverName ? { driverName: context.driverName } : {}),
+          ...(context.speedhiveTransponderNumbers?.length
+            ? { speedhiveTransponderNumbers: context.speedhiveTransponderNumbers }
+            : {}),
+        }
+      : undefined;
+  const parsed = await parseTimingUrl(normalized, parseContext);
   if (!isImportableParse(parsed)) {
     return {
       url: normalized,

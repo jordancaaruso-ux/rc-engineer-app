@@ -11,9 +11,9 @@ import {
   raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
-import { getLiveRcDriverNameSetting, getSpeedhiveDriverNameForUser } from "@/lib/appSettings";
+import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
-import { hasMylapsConnection } from "@/lib/mylaps/mylapsConnection";
+import { hasSpeedhiveIdentityForUser } from "@/lib/speedhive/speedhiveDriverSettings";
 
 export type ScanDayUrlIndexKind = "practice" | "results";
 
@@ -85,12 +85,10 @@ export async function POST(request: Request) {
     }
     const liveRcUrl = track.liveRcUrl?.trim() ?? "";
     const speedhiveUrl = track.speedhiveUrl?.trim() ?? "";
-    const mylapsLinked = await hasMylapsConnection(user.id);
-    if (!liveRcUrl && !speedhiveUrl && !mylapsLinked) {
+    if (!liveRcUrl && !speedhiveUrl) {
       return NextResponse.json(
         {
-          error:
-            "Link your MYLAPS account in Settings, or add a LiveRC / Speedhive URL on the track page.",
+          error: "Add a LiveRC or Speedhive organization URL on the track page.",
         },
         { status: 400 }
       );
@@ -103,19 +101,17 @@ export async function POST(request: Request) {
       });
       eventRaceClass = ev?.raceClass?.trim() || null;
     }
-    const [discovered, speedhiveDriverName] = await Promise.all([
+    const [discovered, speedhiveIdentity] = await Promise.all([
       discoverTrackTimingSessions({
         userId: user.id,
         liveRcUrl: liveRcUrl || null,
         speedhiveUrl: speedhiveUrl || null,
         eventRaceClass,
       }),
-      speedhiveUrl ? getSpeedhiveDriverNameForUser(user.id) : Promise.resolve(null),
+      speedhiveUrl ? hasSpeedhiveIdentityForUser(user.id) : Promise.resolve(false),
     ]);
     const hasDriverNameSetting = Boolean(
-      mylapsLinked ||
-        (liveRcUrl && discovered.liveRcDriverName?.trim()) ||
-        (speedhiveUrl && speedhiveDriverName?.trim())
+      (liveRcUrl && discovered.liveRcDriverName?.trim()) || (speedhiveUrl && speedhiveIdentity)
     );
     const displaySessions = discovered.unimportedCandidates;
     const candidates: ScanDayUrlCandidateRow[] = displaySessions.map((c) => ({
@@ -147,7 +143,6 @@ export async function POST(request: Request) {
       discoveryDebug: discovered.liveRcDebug,
       hasLiveRc: Boolean(liveRcUrl),
       hasSpeedhive: Boolean(speedhiveUrl),
-      hasMylapsLinked: mylapsLinked,
     });
   }
 

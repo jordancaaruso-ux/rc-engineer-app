@@ -190,10 +190,9 @@ export function LapTimesIngestPanel({
   trackLiveRcUrl?: string | null;
   trackSpeedhiveUrl?: string | null;
 }) {
-  const [mylapsLinked, setMylapsLinked] = useState(false);
   const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
-  const hasTrackDiscovery = hasLiveRcTrack || hasSpeedhiveTrack || mylapsLinked;
+  const hasTrackDiscovery = hasLiveRcTrack || hasSpeedhiveTrack;
   const hasUrlScan = Boolean((practiceDayUrl ?? "").trim()) || hasTrackDiscovery;
   const [tab, setTab] = useState<IngestTab>(() => (hasUrlScan ? "url" : "manual"));
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -259,22 +258,6 @@ export function LapTimesIngestPanel({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/mylaps/status", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as { connected?: boolean } | null;
-        if (!cancelled && res.ok) setMylapsLinked(Boolean(data?.connected));
-      } catch {
-        if (!cancelled) setMylapsLinked(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
         const res = await fetch("/api/settings/live-rc-driver");
         const data = (await res.json().catch(() => null)) as {
           liveRcDriverName?: string | null;
@@ -305,7 +288,7 @@ export function LapTimesIngestPanel({
       void scanDayUrl();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
-  }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, mylapsLinked, lapImportEventId]);
+  }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, lapImportEventId]);
 
   const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
   const manualMetrics = useMemo(() => {
@@ -886,14 +869,12 @@ export function LapTimesIngestPanel({
                       ? [
                           hasLiveRcTrack && "LiveRC",
                           hasSpeedhiveTrack && "Speedhive",
-                          mylapsLinked && "MYLAPS",
                         ]
                           .filter(Boolean)
                           .join(", ")
                           ? `Checking ${[
                               hasLiveRcTrack && "LiveRC",
                               hasSpeedhiveTrack && "Speedhive",
-                              mylapsLinked && "MYLAPS",
                             ]
                               .filter(Boolean)
                               .join(", ")}…`
@@ -918,8 +899,8 @@ export function LapTimesIngestPanel({
               {!dayScanHasDriverName ? (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">
                   {hasSpeedhiveTrack && !hasLiveRcTrack
-                    ? "Set your Speedhive driver name in Settings (or LiveRC name as fallback) so we can find your sessions."
-                    : "Set your driver name in Settings (LiveRC and/or Speedhive) so we can find your sessions."}
+                    ? "Set your MYLAPS transponder number and/or Speedhive driver name in Settings so we can find your sessions at this track."
+                    : "Set your driver name in Settings (LiveRC and/or Speedhive transponder / name) so we can find your sessions."}
                 </p>
               ) : null}
               {dayScanCandidates && dayScanCandidates.length > 0 ? (

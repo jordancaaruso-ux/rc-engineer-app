@@ -9,6 +9,8 @@ type InitialSettings = {
   liveRcDriverId: string;
   /** Speedhive display name; empty uses LiveRC driver name when set. */
   speedhiveDriverName: string;
+  /** Comma-separated MYLAPS transponder numbers for Speedhive discovery at a track. */
+  speedhiveTransponderNumbers: string;
 };
 
 type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "ok" } | { kind: "error"; text: string };
@@ -18,10 +20,16 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
   const [liveRcDriverName, setLiveRcDriverName] = useState(initial.liveRcDriverName);
   const [liveRcDriverId, setLiveRcDriverId] = useState(initial.liveRcDriverId);
   const [speedhiveDriverName, setSpeedhiveDriverName] = useState(initial.speedhiveDriverName);
+  const [speedhiveTransponderNumbers, setSpeedhiveTransponderNumbers] = useState(
+    initial.speedhiveTransponderNumbers
+  );
   const [savingMyName, setSavingMyName] = useState<SaveState>({ kind: "idle" });
   const [savingDriver, setSavingDriver] = useState<SaveState>({ kind: "idle" });
   const [savingDriverId, setSavingDriverId] = useState<SaveState>({ kind: "idle" });
   const [savingSpeedhiveDriver, setSavingSpeedhiveDriver] = useState<SaveState>({ kind: "idle" });
+  const [savingSpeedhiveTransponder, setSavingSpeedhiveTransponder] = useState<SaveState>({
+    kind: "idle",
+  });
 
   async function postSetting(
     url: string,
@@ -79,8 +87,26 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
       />
 
       <SettingField
+        label="MYLAPS transponder number(s)"
+        hint="Used with each track’s Speedhive organization URL to find your sessions (no MYLAPS login). Separate multiple chips with commas."
+        value={speedhiveTransponderNumbers}
+        onChange={setSpeedhiveTransponderNumbers}
+        onSave={() =>
+          postSetting(
+            "/api/settings/speedhive-driver",
+            {
+              speedhiveTransponderNumbers: speedhiveTransponderNumbers.trim() || null,
+            },
+            setSavingSpeedhiveTransponder
+          )
+        }
+        state={savingSpeedhiveTransponder}
+        placeholder="e.g. 1234567"
+      />
+
+      <SettingField
         label="Speedhive driver name"
-        hint="How your name appears on Speedhive / MYLAPS results. Leave blank to use your LiveRC driver name above."
+        hint="Fallback when public results do not list transponder numbers. Leave blank to use your LiveRC driver name above."
         value={speedhiveDriverName}
         onChange={setSpeedhiveDriverName}
         onSave={() =>

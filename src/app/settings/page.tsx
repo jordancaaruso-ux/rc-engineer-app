@@ -1,13 +1,16 @@
-import { Suspense } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
 import {
   getLiveRcDriverIdSetting,
   getLiveRcDriverNameSetting,
   getMyNameSetting,
   getSpeedhiveDriverNameSetting,
+  getSpeedhiveTransponderNumbersSetting,
 } from "@/lib/appSettings";
 import { SettingsClient } from "@/components/settings/SettingsClient";
-import { MylapsLinkSection } from "@/components/settings/MylapsLinkSection";
+import {
+  formatSpeedhiveTransponderNumbersForSetting,
+  parseSpeedhiveTransponderNumbersSetting,
+} from "@/lib/speedhive/speedhiveTransponder";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
@@ -27,12 +30,17 @@ export default async function SettingsPage() {
     );
   }
   const user = await requireCurrentUser();
-  const [myName, liveRcDriverName, liveRcDriverId, speedhiveDriverName] = await Promise.all([
-    getMyNameSetting(user.id),
-    getLiveRcDriverNameSetting(user.id),
-    getLiveRcDriverIdSetting(user.id),
-    getSpeedhiveDriverNameSetting(user.id),
-  ]);
+  const [myName, liveRcDriverName, liveRcDriverId, speedhiveDriverName, speedhiveTransponderRaw] =
+    await Promise.all([
+      getMyNameSetting(user.id),
+      getLiveRcDriverNameSetting(user.id),
+      getLiveRcDriverIdSetting(user.id),
+      getSpeedhiveDriverNameSetting(user.id),
+      getSpeedhiveTransponderNumbersSetting(user.id),
+    ]);
+  const speedhiveTransponderNumbersText = formatSpeedhiveTransponderNumbersForSetting(
+    parseSpeedhiveTransponderNumbersSetting(speedhiveTransponderRaw)
+  );
 
   return (
     <>
@@ -51,11 +59,9 @@ export default async function SettingsPage() {
             liveRcDriverName: liveRcDriverName ?? "",
             liveRcDriverId: liveRcDriverId ?? "",
             speedhiveDriverName: speedhiveDriverName ?? "",
+            speedhiveTransponderNumbers: speedhiveTransponderNumbersText,
           }}
         />
-        <Suspense fallback={null}>
-          <MylapsLinkSection />
-        </Suspense>
         <SettingsNavSection />
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (

@@ -8,11 +8,15 @@ import {
   fetchSessionClassification,
 } from "@/lib/speedhive/speedhiveClient";
 import {
+  classificationRowMatchesUser,
+  sessionClassificationHasTransponderFields,
+} from "@/lib/speedhive/speedhiveClassificationMatch";
+import {
   getSpeedhiveDriverNameForUser,
+  getSpeedhiveTransponderNumbersForUser,
 } from "@/lib/speedhive/speedhiveDriverSettings";
 import {
   normalizeSpeedhiveDriverNameForMatch,
-  speedhiveDriverNameMatches,
 } from "@/lib/speedhive/speedhiveNameNormalize";
 import { organizationIdFromTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 
@@ -61,21 +65,26 @@ export async function discoverSpeedhiveSessionsForUser(input: {
     };
   }
 
-  const driverName = await getSpeedhiveDriverNameForUser(input.userId);
+  const [driverName, userTransponders] = await Promise.all([
+    getSpeedhiveDriverNameForUser(input.userId),
+    getSpeedhiveTransponderNumbersForUser(input.userId),
+  ]);
   const driverNorm = driverName ? normalizeSpeedhiveDriverNameForMatch(driverName) : "";
 
-  if (!driverNorm) {
+  if (!driverNorm && userTransponders.length === 0) {
     return {
       candidates: [],
       unimportedCandidates: [],
       mostRecentSession: null,
       organizationId,
-      hint: "Set your Speedhive driver name in Settings (or LiveRC driver name) to find sessions.",
+      hint:
+        "Set your MYLAPS transponder number or Speedhive driver name in Settings to find sessions at this track.",
     };
   }
 
   const raceClassFilter = input.eventRaceClass?.trim().toLowerCase() ?? null;
   const discovered: SpeedhiveDiscoveredSession[] = [];
+  let sawTransponderFields = false;
 
   try {
     const events = await fetchOrganizationEvents(organizationId, MAX_EVENTS);
@@ -98,13 +107,18 @@ export async function discoverSpeedhiveSessionsForUser(input: {
           continue;
         }
 
-        const match = classification.find((row) => {
-          if (!row.name?.trim()) return false;
-          if (raceClassFilter && row.resultClass?.trim().toLowerCase() !== raceClassFilter) {
-            return false;
-          }
-          return speedhiveDriverNameMatches(row.name, driverNorm);
-        });
+        if (!sawTransponderFields && sessionClassificationHasTransponderFields(classification)) {
+          sawTransponderFields = true;
+        }
+
+        const match = classification.find((row) =>
+          classificationRowMatchesUser({
+            row,
+            userTransponders,
+            driverNorm,
+            raceClassFilter,
+          })
+        );
 
         if (!match) continue;
 
@@ -161,6 +175,13 @@ export async function discoverSpeedhiveSessionsForUser(input: {
   );
   const unimported = sorted.filter((d) => !d.alreadyImported);
 
+  const noMatchHint =
+    userTransponders.length > 0 && !sawTransponderFields && !driverNorm
+      ? "No Speedhive sessions matched your transponder at this organization. Public results here may not include transponder numbers — add your Speedhive driver name in Settings as a fallback."
+      : userTransponders.length > 0 && !sawTransponderFields && driverNorm
+        ? "No sessions matched at this organization. Public results may not list transponder numbers; matching used your driver name where possible."
+        : "No Speedhive sessions matched your transponder or driver name at this organization.";
+
   return {
     candidates: sorted,
     unimportedCandidates: unimported,
@@ -171,6 +192,6 @@ export async function discoverSpeedhiveSessionsForUser(input: {
         ? null
         : sorted.length > 0
           ? "All matching Speedhive sessions are already imported."
-          : "No Speedhive sessions matched your driver name at this organization.",
+          : noMatchHint,
   };
 }

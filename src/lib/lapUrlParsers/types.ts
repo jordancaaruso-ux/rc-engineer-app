@@ -58,6 +58,8 @@ export interface LapUrlParseResult {
 export type LapUrlParseContext = {
   /** Optional explicit driver override (e.g. user typed a name). */
   driverName?: string;
+  /** MYLAPS transponder numbers for Speedhive session row matching. */
+  speedhiveTransponderNumbers?: number[];
 };
 
 export interface LapUrlParser {
