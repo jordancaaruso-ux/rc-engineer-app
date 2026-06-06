@@ -170,3 +170,52 @@ test("analysis view filters by showInAnalysis", () => {
   const analysisTpl = buildSetupSheetTemplateFromParsedSchema("m1", "Test", schema, "analysis");
   assert.equal(analysisTpl.structuredSections?.[0]?.rows.length, 1);
 });
+
+test("model template always scopes chip options to schema (no Awesomatix key fallback)", () => {
+  const schema: SetupSheetModelSchema = {
+    version: 1,
+    label: "Mugen MTC3",
+    structuredSections: [
+      {
+        id: "suspension",
+        title: "Suspension",
+        rows: [
+          {
+            type: "pair",
+            label: "Spring",
+            leftKey: "spring_front",
+            rightKey: "spring_rear",
+          },
+        ],
+      },
+    ],
+    fields: [
+      {
+        key: "spring_front",
+        displayLabel: "Spring (Front)",
+        sectionId: "suspension",
+        sectionTitle: "Suspension",
+        valueType: "number",
+        uiType: "text",
+        showInSetupSheet: true,
+        showInAnalysis: true,
+        showInLogRun: true,
+        sortOrder: 0,
+      },
+      {
+        key: "spring_rear",
+        displayLabel: "Spring (Rear)",
+        sectionId: "suspension",
+        sectionTitle: "Suspension",
+        valueType: "number",
+        uiType: "text",
+        showInSetupSheet: true,
+        showInAnalysis: true,
+        showInLogRun: true,
+        sortOrder: 1,
+      },
+    ],
+  };
+  const tpl = buildSetupSheetTemplateFromParsedSchema("m1", "Mugen MTC3", schema);
+  assert.deepEqual(tpl.fieldChipOptionsByKey, {});
+});

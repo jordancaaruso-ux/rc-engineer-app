@@ -42,6 +42,11 @@
   --body-stripe-blue: 0.028;
   /* boxShadow.glow / glow-sm (override per theme preview when primary feels too loud) */
   --glow-shadow-rgb: 201 42 42;
+  /*
+   * Safari `theme-color` + html overscroll fallback — tinted like the top-left mesh,
+   * not flat #0c0c0e (reads as black above the island).
+   */
+  --page-top-theme: #2a1520;
 
   /*
    * Cool neutral flats (runna.com-style: --black #161616, inner panels ~#161616 / #333 border).
@@ -196,8 +201,8 @@ html[data-theme-preview="runna"] {
 html {
   min-height: 100%;
   min-height: 100dvh;
-  /* Solid fallback for iOS overscroll only — wash is a single layer on `.page-bg`. */
-  background-color: rgb(var(--color-background));
+  /* Overscroll / gap fallback — tinted to match top mesh, not flat black. */
+  background-color: var(--page-top-theme);
 }
 
 body {
@@ -219,27 +224,42 @@ body {
 }
 
 /*
- * Single fixed wash (see `layout.tsx`). One layer avoids iOS Safari seams where
- * `html { background-attachment: fixed }` and a fixed div stack with different
- * scroll behavior. Negative inset extends into safe areas behind the island.
+ * Single fixed wash (see `layout.tsx`). Full viewport height on iOS (`lvh` +
+ * `-webkit-fill-available`). Corner origins pulled above y=0 so red/blue meet
+ * behind the Dynamic Island instead of leaving flat base color there.
  */
 .page-bg {
   position: fixed;
-  inset: calc(0px - env(safe-area-inset-top, 0px)) calc(0px - env(safe-area-inset-right, 0px))
-    calc(0px - env(safe-area-inset-bottom, 0px)) calc(0px - env(safe-area-inset-left, 0px));
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  min-height: 100lvh;
+  min-height: -webkit-fill-available;
   z-index: 0;
   pointer-events: none;
   background-color: rgb(var(--color-background));
   background-image:
     radial-gradient(
-      ellipse 140% 110% at 0% 0%,
+      ellipse 130% 100% at 0% -25%,
       rgb(var(--color-primary) / var(--body-glow-red-strong)),
-      transparent 58%
+      transparent 62%
     ),
     radial-gradient(
-      ellipse 140% 110% at 100% 0%,
+      ellipse 130% 100% at 100% -25%,
       rgb(var(--color-accent) / var(--body-glow-blue)),
-      transparent 58%
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 85% 90% at 50% -35%,
+      rgb(var(--color-primary) / calc(var(--body-glow-red-strong) * 0.5)),
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 85% 90% at 50% -35%,
+      rgb(var(--color-accent) / calc(var(--body-glow-blue) * 0.65)),
+      transparent 70%
     ),
     radial-gradient(
       ellipse 120% 90% at 0% 100%,

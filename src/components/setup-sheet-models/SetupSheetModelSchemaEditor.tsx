@@ -22,6 +22,7 @@ import {
   universalParameterIdForSnapshotKey,
 } from "@/lib/setupSheetModels/universalParameters";
 import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { awesomatixFieldKeyCollisionWarning } from "@/lib/setupSheetModels/awesomatixFieldKeyCollision";
 
 const KIND_OPTIONS: { value: SchemaParameterKind; label: string }[] = [
   { value: "number", label: "Number" },
@@ -70,6 +71,16 @@ export function SetupSheetModelSchemaEditor(props: {
   const layoutKeys = useMemo(
     () => collectModelLayoutKeys(schema.structuredSections),
     [schema.structuredSections]
+  );
+
+  const addFieldKeyPreview = useMemo(() => {
+    const trimmed = key.trim();
+    return trimmed || (label.trim() ? suggestKeyFromPdfFieldName(label.trim()) : "");
+  }, [key, label]);
+
+  const addFieldCollisionWarning = useMemo(
+    () => awesomatixFieldKeyCollisionWarning(addFieldKeyPreview, kind),
+    [addFieldKeyPreview, kind]
   );
 
   const updateField = useCallback(
@@ -126,6 +137,11 @@ export function SetupSheetModelSchemaEditor(props: {
     }
     if (schema.fields.some((f) => f.key === built.key)) {
       setLocalError(`Key "${built.key}" already exists on this sheet model.`);
+      return;
+    }
+    const collision = awesomatixFieldKeyCollisionWarning(built.key, kind);
+    if (collision) {
+      setLocalError(collision);
       return;
     }
     const nextFields = [...schema.fields, built];
@@ -371,6 +387,11 @@ export function SetupSheetModelSchemaEditor(props: {
                   />
                 </label>
               )}
+              {addFieldCollisionWarning ? (
+                <div className="rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
+                  {addFieldCollisionWarning}
+                </div>
+              ) : null}
               <div className="flex gap-2">
                 <button
                   type="button"

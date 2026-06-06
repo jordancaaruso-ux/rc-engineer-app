@@ -56,6 +56,13 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
             }
           : null;
 
+    const universalParameterId =
+      key === "spring_rate_front"
+        ? "spring_front"
+        : key === "spring_rate_rear"
+          ? "spring_rear"
+          : undefined;
+
     fields.push({
       key,
       displayLabel: meta.label,
@@ -68,6 +75,7 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
       showInAnalysis: !isSession || sessionInAnalysis,
       showInLogRun: true,
       sortOrder: order++,
+      ...(universalParameterId ? { universalParameterId } : {}),
       ...(sessionFieldExtras
         ? {
             groupBehaviorType: sessionFieldExtras.groupBehaviorType,

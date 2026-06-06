@@ -61,7 +61,7 @@ export function buildSetupSheetTemplateFromParsedSchema(
 
 function buildFieldChipOptionsFromSchema(
   schema: SetupSheetModelSchema
-): Record<string, SetupSheetFieldChipOptions> | undefined {
+): Record<string, SetupSheetFieldChipOptions> {
   const out: Record<string, SetupSheetFieldChipOptions> = {};
   for (const f of schema.fields) {
     const normalized = normalizeGroupedFieldOnField(f);
@@ -77,7 +77,7 @@ function buildFieldChipOptionsFromSchema(
       || normalized.groupBehaviorType === "visualMulti";
     out[f.key] = { options: labels, ...(optionValues ? { optionValues } : {}), multi };
   }
-  return Object.keys(out).length > 0 ? out : undefined;
+  return out;
 }
 
 function groupFieldsBySection(

@@ -32,8 +32,6 @@ import {
 import {
   companionOtherTextKeyForSingleSelect,
   getCalibrationFieldKind,
-  getSingleSelectChipOptions,
-  getVisualMultiOptions,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { AwesomatixScrewStrip } from "@/components/setup-sheet/AwesomatixScrewStrip";
 import { compareSetupField, maxSeverity } from "@/lib/setupCompare/compare";
@@ -45,6 +43,7 @@ import {
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import type { FieldCompareResult } from "@/lib/setupCompare/types";
 import type { SetupSheetFieldChipOptions } from "@/lib/setupSheetTemplate";
+import { resolveFieldChipOptionsForKey } from "@/lib/setupSheetModels/resolveFieldChipOptions";
 import {
   displayLabelForStoredChipValue,
   normalizeChipOptionToken,
@@ -468,15 +467,7 @@ function fieldOptionsForKey(
   key: string,
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null
 ): SetupSheetFieldChipOptions | null {
-  const modelOpts = fieldChipOptionsByKey?.[key];
-  if (modelOpts && modelOpts.options.length > 0) return modelOpts;
-  const multi = getVisualMultiOptions(key);
-  if (multi && multi.length > 0) return { options: multi, multi: true };
-  const single = getSingleSelectChipOptions(key);
-  if (single && single.length > 0) return { options: single, multi: false };
-  const kind = getCalibrationFieldKind(key);
-  if (kind === "boolean") return { options: ["yes", "no"], multi: false };
-  return null;
+  return resolveFieldChipOptionsForKey(key, fieldChipOptionsByKey);
 }
 
 function fieldDisplayValue(
