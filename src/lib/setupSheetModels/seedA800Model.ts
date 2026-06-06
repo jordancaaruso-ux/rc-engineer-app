@@ -11,7 +11,7 @@ import {
   getCalibrationFieldKind,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { materializeAwesomatixTemplateDefaultsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
-import { inferStructuredLayoutFromFields } from "@/lib/setupSheetModels/inferStructuredLayout";
+import { inferStructuredLayoutFromFields } from "@/lib/setupSheetModels/layoutGroupOps";
 import { mergeMissingA800CatalogFields } from "@/lib/setupSheetModels/mergeA800CatalogFields";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import type {

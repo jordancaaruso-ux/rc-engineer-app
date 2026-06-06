@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { inferStructuredLayoutFromFields } from "@/lib/setupSheetModels/inferStructuredLayout";
+import {
+  groupLayoutRows,
+  inferStructuredLayoutFromFields,
+  ungroupLayoutRow,
+  updateLayoutGroupLabel,
+} from "@/lib/setupSheetModels/layoutGroupOps";
 import {
   addFieldToLayout,
   fieldsNotInLayout,
@@ -40,6 +45,7 @@ export function SetupSheetModelLayoutEditor(props: {
   } | null>(null);
   const [addFieldKey, setAddFieldKey] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<RowDragId>>(new Set());
 
   const notInLayout = useMemo(() => fieldsNotInLayout(schema), [schema]);
 
@@ -91,7 +97,11 @@ export function SetupSheetModelLayoutEditor(props: {
     }
     onChange({
       ...schema,
-      structuredSections: inferStructuredLayoutFromFields(schema.fields, schema.structuredSections),
+      structuredSections: inferStructuredLayoutFromFields(
+        schema.fields,
+        schema.structuredSections,
+        schema.layoutGroups
+      ),
     });
     setLocalError(null);
   }, [onChange, schema]);
@@ -101,7 +111,8 @@ export function SetupSheetModelLayoutEditor(props: {
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         Drag sections and rows to match how drivers see the sheet. The live preview on the right updates as you edit.
         Removing a row only hides it from the layout — the parameter stays in the{" "}
-        <span className="font-medium text-foreground">Parameters</span> tab.
+        <span className="font-medium text-foreground">Parameters</span> tab. Select single rows to
+        group manually; edit labels on grouped rows.
       </p>
 
       {localError ? (
@@ -152,8 +163,11 @@ export function SetupSheetModelLayoutEditor(props: {
           ) : null}
 
           <div className="space-y-3">
-            {schema.structuredSections.map((sec, secIdx) => {
+            {schema.structuredSections.map((sec) => {
               const sectionDragId: SectionDragId = `section:${sec.id}`;
+              const sectionSelected = [...selectedRows]
+                .map((id) => parseRowDragId(id))
+                .filter((p): p is { sectionId: string; rowIndex: number } => p != null && p.sectionId === sec.id);
               const showSecAbove =
                 sectionDropTarget?.id === sectionDragId && sectionDropTarget.edge === "above";
               const showSecBelow =
@@ -211,6 +225,47 @@ export function SetupSheetModelLayoutEditor(props: {
                         <span className="ui-title text-xs text-muted-foreground">{sec.title}</span>
                       )}
                       <span className="font-mono text-[10px] text-muted-foreground">{sec.id}</span>
+                      {!readOnly && sectionSelected.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] w-full">
+                          <span className="text-muted-foreground">{sectionSelected.length} selected</span>
+                          {sectionSelected.length === 2 ? (
+                            <button
+                              type="button"
+                              className="rounded border border-sky-500/50 bg-sky-500/10 px-2 py-0.5 text-sky-200"
+                              onClick={() => {
+                                const next = groupLayoutRows(
+                                  schema,
+                                  sec.id,
+                                  sectionSelected.map((r) => r.rowIndex),
+                                  "pair"
+                                );
+                                applySchema(next);
+                                setSelectedRows(new Set());
+                              }}
+                            >
+                              Group as Front / Rear
+                            </button>
+                          ) : null}
+                          {sectionSelected.length === 4 ? (
+                            <button
+                              type="button"
+                              className="rounded border border-sky-500/50 bg-sky-500/10 px-2 py-0.5 text-sky-200"
+                              onClick={() => {
+                                const next = groupLayoutRows(
+                                  schema,
+                                  sec.id,
+                                  sectionSelected.map((r) => r.rowIndex),
+                                  "corner4"
+                                );
+                                applySchema(next);
+                                setSelectedRows(new Set());
+                              }}
+                            >
+                              Group as FF / FR / RF / RR
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                     <ul className="space-y-1">
                       {sec.rows.map((row, rowIdx) => {
@@ -266,18 +321,60 @@ export function SetupSheetModelLayoutEditor(props: {
                               <span className="cursor-grab text-muted-foreground select-none shrink-0">
                                 ⠿
                               </span>
-                              <span className="font-medium min-w-0 truncate">{rowLabel(row)}</span>
+                              {!readOnly && row.type === "single" ? (
+                                <input
+                                  type="checkbox"
+                                  className="shrink-0"
+                                  checked={selectedRows.has(rowDragId)}
+                                  onChange={(e) => {
+                                    setSelectedRows((prev) => {
+                                      const next = new Set(prev);
+                                      if (e.target.checked) next.add(rowDragId);
+                                      else next.delete(rowDragId);
+                                      return next;
+                                    });
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`Select ${rowLabel(row)}`}
+                                />
+                              ) : null}
+                              {(row.type === "pair" || row.type === "corner4") && !readOnly ? (
+                                <input
+                                  className="min-w-0 flex-1 rounded border border-border bg-card px-1.5 py-0.5 text-xs font-medium"
+                                  value={row.label}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => {
+                                    if (!row.layoutGroupId) return;
+                                    applySchema(
+                                      updateLayoutGroupLabel(schema, row.layoutGroupId, e.target.value)
+                                    );
+                                  }}
+                                />
+                              ) : (
+                                <span className="font-medium min-w-0 truncate">{rowLabel(row)}</span>
+                              )}
                               <span className="font-mono text-[10px] text-muted-foreground shrink-0">
                                 {row.type}
                               </span>
                               {!readOnly ? (
-                                <button
-                                  type="button"
-                                  className="ml-auto text-[10px] text-rose-300 hover:underline shrink-0"
-                                  onClick={() => applySchema(removeRowFromLayout(schema, sec.id, rowIdx))}
-                                >
-                                  Remove
-                                </button>
+                                <>
+                                  {row.layoutGroupId ? (
+                                    <button
+                                      type="button"
+                                      className="text-[10px] text-violet-200 hover:underline shrink-0"
+                                      onClick={() => applySchema(ungroupLayoutRow(schema, sec.id, rowIdx))}
+                                    >
+                                      Ungroup
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className="ml-auto text-[10px] text-rose-300 hover:underline shrink-0"
+                                    onClick={() => applySchema(removeRowFromLayout(schema, sec.id, rowIdx))}
+                                  >
+                                    Remove
+                                  </button>
+                                </>
                               ) : null}
                             </div>
                             {showBelow ? (

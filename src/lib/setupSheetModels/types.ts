@@ -5,6 +5,19 @@ import type {
   GroupedFieldBehaviorType,
 } from "@/lib/setupCalibrations/types";
 
+export type LayoutGroupKind = "pair" | "corner4";
+export type LayoutGroupRole = "front" | "rear" | "ff" | "fr" | "rf" | "rr";
+
+/** Manual layout grouping metadata (pair / corner4 rows). */
+export type SetupSheetLayoutGroup = {
+  id: string;
+  kind: LayoutGroupKind;
+  label: string;
+  /** When true, auto-group / rebuild keeps this group intact. */
+  manual: boolean;
+  sectionId: string;
+};
+
 /** One parameter on a setup sheet model (schema-first). */
 export type SetupSheetModelFieldDef = {
   key: string;
@@ -29,6 +42,9 @@ export type SetupSheetModelFieldDef = {
    * (e.g. `droop_front` even if this sheet labels the row "Downstop").
    */
   universalParameterId?: string;
+  /** Links field to a manual pair / corner4 layout group. */
+  layoutGroupId?: string;
+  layoutGroupRole?: LayoutGroupRole;
 };
 
 export type SetupSheetModelLayoutRow =
@@ -39,6 +55,7 @@ export type SetupSheetModelLayoutRow =
       unit?: string;
       leftKey: string;
       rightKey: string;
+      layoutGroupId?: string;
     }
   | {
       type: "corner4";
@@ -48,6 +65,7 @@ export type SetupSheetModelLayoutRow =
       rr: string;
       label: string;
       unit?: string;
+      layoutGroupId?: string;
     }
   | {
       type: "screw_strip";
@@ -66,6 +84,8 @@ export type SetupSheetModelSchema = {
     rows: SetupSheetModelLayoutRow[];
   }>;
   fields: SetupSheetModelFieldDef[];
+  /** Manual layout groups keyed by group id. */
+  layoutGroups?: Record<string, SetupSheetLayoutGroup>;
 };
 
 export function parseSetupSheetModelSchema(raw: unknown): SetupSheetModelSchema | null {
@@ -94,12 +114,36 @@ export function parseSetupSheetModelSchema(raw: unknown): SetupSheetModelSchema 
     }
     structuredSections.push({ id, title: title || id, rows });
   }
+  const layoutGroups = parseLayoutGroups(r.layoutGroups);
+
   return {
     version: 1,
     label,
     structuredSections,
     fields,
+    ...(layoutGroups ? { layoutGroups } : {}),
   };
+}
+
+function parseLayoutGroups(raw: unknown): Record<string, SetupSheetLayoutGroup> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, SetupSheetLayoutGroup> = {};
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const g = value as Record<string, unknown>;
+    const kind = g.kind === "pair" || g.kind === "corner4" ? g.kind : null;
+    const label = typeof g.label === "string" ? g.label.trim() : "";
+    const sectionId = typeof g.sectionId === "string" ? g.sectionId.trim() : "";
+    if (!kind || !label || !sectionId) continue;
+    out[id] = {
+      id,
+      kind,
+      label,
+      sectionId,
+      manual: g.manual !== false,
+    };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function parseFieldDef(raw: unknown): SetupSheetModelFieldDef | null {
@@ -147,7 +191,17 @@ function parseFieldDef(raw: unknown): SetupSheetModelFieldDef | null {
       typeof r.universalParameterId === "string" && r.universalParameterId.trim()
         ? r.universalParameterId.trim()
         : undefined,
+    layoutGroupId:
+      typeof r.layoutGroupId === "string" && r.layoutGroupId.trim() ? r.layoutGroupId.trim() : undefined,
+    layoutGroupRole: parseLayoutGroupRole(r.layoutGroupRole),
   };
+}
+
+function parseLayoutGroupRole(raw: unknown): LayoutGroupRole | undefined {
+  if (raw === "front" || raw === "rear" || raw === "ff" || raw === "fr" || raw === "rf" || raw === "rr") {
+    return raw;
+  }
+  return undefined;
 }
 
 function parseLayoutRow(raw: unknown): SetupSheetModelLayoutRow | null {
@@ -177,6 +231,8 @@ function parseLayoutRow(raw: unknown): SetupSheetModelLayoutRow | null {
       unit: typeof r.unit === "string" ? r.unit.trim() || undefined : undefined,
       leftKey,
       rightKey,
+      layoutGroupId:
+        typeof r.layoutGroupId === "string" && r.layoutGroupId.trim() ? r.layoutGroupId.trim() : undefined,
     };
   }
   if (type === "corner4") {
@@ -194,6 +250,8 @@ function parseLayoutRow(raw: unknown): SetupSheetModelLayoutRow | null {
       rr,
       label: label || "Corner",
       unit: typeof r.unit === "string" ? r.unit.trim() || undefined : undefined,
+      layoutGroupId:
+        typeof r.layoutGroupId === "string" && r.layoutGroupId.trim() ? r.layoutGroupId.trim() : undefined,
     };
   }
   if (type === "screw_strip") {

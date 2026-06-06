@@ -12,9 +12,13 @@ import {
 } from "@/lib/setupSheetModels/fieldParamTypes";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import {
+  assignFieldsToManualLayoutGroup,
+  fieldsInSameManualGroup,
   inferStructuredLayoutFromFields,
   rebuildSectionLayout,
-} from "@/lib/setupSheetModels/inferStructuredLayout";
+  ungroupLayoutGroup,
+  updateLayoutGroupLabel,
+} from "@/lib/setupSheetModels/layoutGroupOps";
 import { collectModelLayoutKeys } from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
 import { addFieldToLayout } from "@/lib/setupSheetModels/layoutEditorOps";
 import {
@@ -51,6 +55,7 @@ export function SetupSheetModelSchemaEditor(props: {
   const [optionLines, setOptionLines] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [selectedFieldKeys, setSelectedFieldKeys] = useState<Set<string>>(new Set());
 
   const sectionTitle = useMemo(() => {
     const m = new Map(SECTION_PRESETS.map((p) => [p.id, p.title] as const));
@@ -106,7 +111,8 @@ export function SetupSheetModelSchemaEditor(props: {
           schema.structuredSections,
           secId,
           secTitle,
-          nextFields
+          nextFields,
+          schema.layoutGroups
         ),
       });
     },
@@ -152,7 +158,8 @@ export function SetupSheetModelSchemaEditor(props: {
         schema.structuredSections,
         sec.id,
         sec.title,
-        nextFields
+        nextFields,
+        schema.layoutGroups
       ),
     });
     setLabel("");
@@ -171,7 +178,11 @@ export function SetupSheetModelSchemaEditor(props: {
     }
     onChange({
       ...schema,
-      structuredSections: inferStructuredLayoutFromFields(schema.fields, schema.structuredSections),
+      structuredSections: inferStructuredLayoutFromFields(
+        schema.fields,
+        schema.structuredSections,
+        schema.layoutGroups
+      ),
     });
   }, [schema, onChange]);
 
@@ -187,7 +198,10 @@ export function SetupSheetModelSchemaEditor(props: {
         <span className="font-medium text-foreground">Add to sheet</span> or the{" "}
         <span className="font-medium text-foreground">Layout</span> tab. Corner fields (
         <span className="font-mono">*_ff</span>, <span className="font-mono">*_fr</span>, …) and front/rear pairs are
-        grouped automatically when you add or remove parameters.
+        grouped automatically when keys end in <span className="font-mono">_front</span> /{" "}
+        <span className="font-mono">_rear</span> or corner suffixes. Select parameters below to{" "}
+        <span className="font-medium text-foreground">group manually</span> when auto-group misses a
+        pair or corner row (e.g. clip / o-ring — front &amp; rear).
       </p>
 
       {!readOnly ? (
@@ -204,19 +218,101 @@ export function SetupSheetModelSchemaEditor(props: {
         <div className="rounded border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{localError}</div>
       ) : null}
 
-      {[...fieldsBySection.entries()].map(([secId, fields]) => (
+      {[...fieldsBySection.entries()].map(([secId, fields]) => {
+        const sectionSelected = fields.filter((f) => selectedFieldKeys.has(f.key));
+        return (
         <div key={secId} className="rounded-lg border border-border bg-card/80 p-3">
-          <div className="ui-title text-xs text-muted-foreground">{sectionTitle(secId)}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="ui-title text-xs text-muted-foreground">{sectionTitle(secId)}</div>
+            {!readOnly && sectionSelected.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                <span className="text-muted-foreground">{sectionSelected.length} selected</span>
+                {sectionSelected.length === 2 ? (
+                  <button
+                    type="button"
+                    className="rounded border border-sky-500/50 bg-sky-500/10 px-2 py-0.5 text-sky-200"
+                    onClick={() => {
+                      const next = assignFieldsToManualLayoutGroup(
+                        schema,
+                        sectionSelected.map((f) => f.key),
+                        "pair"
+                      );
+                      if ("error" in next) setLocalError(next.error);
+                      else {
+                        setLocalError(null);
+                        onChange(next);
+                        setSelectedFieldKeys(new Set());
+                      }
+                    }}
+                  >
+                    Group as Front / Rear
+                  </button>
+                ) : null}
+                {sectionSelected.length === 4 ? (
+                  <button
+                    type="button"
+                    className="rounded border border-sky-500/50 bg-sky-500/10 px-2 py-0.5 text-sky-200"
+                    onClick={() => {
+                      const next = assignFieldsToManualLayoutGroup(
+                        schema,
+                        sectionSelected.map((f) => f.key),
+                        "corner4"
+                      );
+                      if ("error" in next) setLocalError(next.error);
+                      else {
+                        setLocalError(null);
+                        onChange(next);
+                        setSelectedFieldKeys(new Set());
+                      }
+                    }}
+                  >
+                    Group as FF / FR / RF / RR
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    setSelectedFieldKeys((prev) => {
+                      const next = new Set(prev);
+                      for (const f of sectionSelected) next.delete(f.key);
+                      return next;
+                    })
+                  }
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
+          </div>
           <ul className="mt-2 space-y-1.5">
-            {fields.map((f) => (
+            {fields.map((f) => {
+              const layoutGroup = fieldsInSameManualGroup(schema, f.key);
+              return (
               <li
                 key={f.key}
                 className={`flex flex-wrap items-center gap-2 rounded border px-2 py-1.5 text-xs ${
                   f.showInSetupSheet && f.showInLogRun && f.showInAnalysis
                     ? "border-border/70 bg-muted/30"
                     : "border-dashed border-border/50 opacity-60"
-                }`}
+                } ${selectedFieldKeys.has(f.key) ? "ring-1 ring-sky-500/50" : ""}`}
               >
+                {!readOnly ? (
+                  <input
+                    type="checkbox"
+                    className="shrink-0"
+                    checked={selectedFieldKeys.has(f.key)}
+                    onChange={(e) => {
+                      setSelectedFieldKeys((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(f.key);
+                        else next.delete(f.key);
+                        return next;
+                      });
+                    }}
+                    aria-label={`Select ${f.displayLabel}`}
+                  />
+                ) : null}
                 <span className="font-medium text-foreground">{f.displayLabel}</span>
                 <span className="font-mono text-[10px] text-muted-foreground">{f.key}</span>
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{schemaKindFromField(f)}</span>
@@ -226,6 +322,11 @@ export function SetupSheetModelSchemaEditor(props: {
                   </span>
                 ) : null}
                 {f.unit ? <span className="text-[10px] text-muted-foreground">{f.unit}</span> : null}
+                {layoutGroup ? (
+                  <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-200">
+                    {layoutGroup.kind === "pair" ? "F/R" : "4-corner"} · {layoutGroup.label}
+                  </span>
+                ) : null}
                 {!layoutKeys.has(f.key) ? (
                   <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200">
                     Not in layout
@@ -270,6 +371,22 @@ export function SetupSheetModelSchemaEditor(props: {
                     >
                       {f.showInAnalysis ? "Hide from analysis" : "Show in analysis"}
                     </button>
+                    {layoutGroup ? (
+                      <button
+                        type="button"
+                        className="text-[10px] text-violet-200 hover:underline"
+                        onClick={() => {
+                          const next = ungroupLayoutGroup(schema, layoutGroup.id);
+                          if ("error" in next) setLocalError(next.error);
+                          else {
+                            setLocalError(null);
+                            onChange(next);
+                          }
+                        }}
+                      >
+                        Ungroup
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="text-[10px] text-sky-300 hover:underline"
@@ -291,18 +408,33 @@ export function SetupSheetModelSchemaEditor(props: {
                 {editingKey === f.key && !readOnly ? (
                   <FieldEditPanel
                     field={f}
+                    layoutGroup={layoutGroup}
                     onSave={(patch) => {
                       updateField(f.key, patch);
                       setEditingKey(null);
                     }}
+                    onSaveGroupLabel={
+                      layoutGroup
+                        ? (label) => {
+                            const next = updateLayoutGroupLabel(schema, layoutGroup.id, label);
+                            if ("error" in next) setLocalError(next.error);
+                            else {
+                              setLocalError(null);
+                              onChange(next);
+                            }
+                          }
+                        : undefined
+                    }
                     onCancel={() => setEditingKey(null)}
                   />
                 ) : null}
               </li>
-            ))}
+            );
+            })}
           </ul>
         </div>
-      ))}
+      );
+      })}
 
       {!readOnly ? (
         <div className="rounded-lg border border-sky-500/35 bg-sky-500/5 p-3">
@@ -421,7 +553,9 @@ export function SetupSheetModelSchemaEditor(props: {
 
 function FieldEditPanel(props: {
   field: SetupSheetModelFieldDef;
+  layoutGroup?: { id: string; label: string } | null;
   onSave: (patch: Partial<SetupSheetModelFieldDef>) => void;
+  onSaveGroupLabel?: (label: string) => void;
   onCancel: () => void;
 }) {
   const [displayLabel, setDisplayLabel] = useState(props.field.displayLabel);
@@ -430,6 +564,7 @@ function FieldEditPanel(props: {
     (props.field.groupedOptionLabels ?? []).join("\n")
   );
   const [universalId, setUniversalId] = useState(props.field.universalParameterId ?? "");
+  const [groupLabel, setGroupLabel] = useState(props.layoutGroup?.label ?? "");
   const kind = schemaKindFromField(props.field);
 
   return (
@@ -450,6 +585,16 @@ function FieldEditPanel(props: {
           onChange={(e) => setUnit(e.target.value)}
         />
       </label>
+      {props.layoutGroup && props.onSaveGroupLabel ? (
+        <label className="block text-[10px] text-muted-foreground">
+          Layout group label
+          <input
+            className="mt-0.5 w-full rounded border border-border bg-muted/40 px-2 py-1"
+            value={groupLabel}
+            onChange={(e) => setGroupLabel(e.target.value)}
+          />
+        </label>
+      ) : null}
       <label className="block text-[10px] text-muted-foreground">
         Universal parameter (cross-car stats)
         <select
@@ -493,6 +638,9 @@ function FieldEditPanel(props: {
               }
             }
             props.onSave(patch);
+            if (props.layoutGroup && props.onSaveGroupLabel && groupLabel.trim()) {
+              props.onSaveGroupLabel(groupLabel);
+            }
           }}
         >
           Save

@@ -150,49 +150,6 @@ export function inferSectionLayoutRows(fields: SetupSheetModelFieldDef[]): Setup
   return rows;
 }
 
-/**
- * Rebuild structuredSections from field defs. Preserves special rows (screw_strip, top_deck_block)
- * from existing layout when their keys are still present in the section.
- */
-export function inferStructuredLayoutFromFields(
-  fields: SetupSheetModelFieldDef[],
-  existingSections: SetupSheetModelSchema["structuredSections"] = []
-): SetupSheetModelSchema["structuredSections"] {
-  const fieldsBySection = new Map<string, { title: string; fields: SetupSheetModelFieldDef[] }>();
-  for (const f of fields) {
-    let g = fieldsBySection.get(f.sectionId);
-    if (!g) {
-      g = { title: f.sectionTitle, fields: [] };
-      fieldsBySection.set(f.sectionId, g);
-    }
-    g.fields.push(f);
-    g.title = f.sectionTitle;
-  }
-
-  const existingById = new Map(existingSections.map((s) => [s.id, s] as const));
-  const sectionOrder: string[] = [];
-  for (const sec of existingSections) {
-    if (!sectionOrder.includes(sec.id)) sectionOrder.push(sec.id);
-  }
-  for (const id of fieldsBySection.keys()) {
-    if (!sectionOrder.includes(id)) sectionOrder.push(id);
-  }
-
-  return sectionOrder
-    .filter((id) => fieldsBySection.has(id))
-    .map((id) => {
-      const { title, fields: secFields } = fieldsBySection.get(id)!;
-      const existing = existingById.get(id);
-      const inferred = inferSectionLayoutRows(secFields);
-      const specialRows = (existing?.rows ?? []).filter(isSpecialLayoutRow);
-      return {
-        id,
-        title: existing?.title ?? title,
-        rows: mergeSpecialRows(inferred, specialRows),
-      };
-    });
-}
-
 /** Insert special rows after the row that references their anchor key, or append. */
 function mergeSpecialRows(
   inferred: SetupSheetModelLayoutRow[],
@@ -248,20 +205,3 @@ function layoutRowsEqual(a: SetupSheetModelLayoutRow, b: SetupSheetModelLayoutRo
   return true;
 }
 
-/** Rebuild layout for one section after add/remove. */
-export function rebuildSectionLayout(
-  sections: SetupSheetModelSchema["structuredSections"],
-  sectionId: string,
-  sectionTitle: string,
-  fields: SetupSheetModelFieldDef[]
-): SetupSheetModelSchema["structuredSections"] {
-  const secFields = fields.filter((f) => f.sectionId === sectionId);
-  const existing = sections.find((s) => s.id === sectionId);
-  const specialRows = (existing?.rows ?? []).filter(isSpecialLayoutRow);
-  const rows = mergeSpecialRows(inferSectionLayoutRows(secFields), specialRows);
-
-  if (existing) {
-    return sections.map((s) => (s.id === sectionId ? { ...s, title: sectionTitle, rows } : s));
-  }
-  return [...sections, { id: sectionId, title: sectionTitle, rows }];
-}

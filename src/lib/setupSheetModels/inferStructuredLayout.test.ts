@@ -3,10 +3,8 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  inferSectionLayoutRows,
-  inferStructuredLayoutFromFields,
-} from "@/lib/setupSheetModels/inferStructuredLayout";
+import { inferSectionLayoutRows } from "@/lib/setupSheetModels/inferStructuredLayout";
+import { inferStructuredLayoutFromFields } from "@/lib/setupSheetModels/layoutGroupOps";
 import type { SetupSheetModelFieldDef } from "@/lib/setupSheetModels/types";
 
 function field(
