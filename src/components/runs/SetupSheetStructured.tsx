@@ -32,6 +32,7 @@ import {
 import {
   companionOtherTextKeyForSingleSelect,
   getCalibrationFieldKind,
+  getSingleSelectChipOptions,
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { AwesomatixScrewStrip } from "@/components/setup-sheet/AwesomatixScrewStrip";
 import { compareSetupField, maxSeverity } from "@/lib/setupCompare/compare";
