@@ -39,9 +39,8 @@ export default function RootLayout({ children }: { children: ReactNode }): React
     <html lang="en" className={montserrat.variable}>
       <body className="min-h-[100dvh] font-sans font-normal antialiased">
         {/*
-         * Fixed page wash sits at z-index 0 (never negative): in WKWebView a
-         * negative z-index can paint under `html`’s canvas background, which
-         * reads as a flat band from the physical top down to the Dynamic Island.
+         * Single fixed wash at z-index 0 (never negative): duplicate fixed layers on
+         * `html` + a div caused a visible seam below the island on iOS Safari.
          * `.app-root` stacks all UI above it so modals/portals still work.
          */}
         <div className="page-bg" aria-hidden="true" />
