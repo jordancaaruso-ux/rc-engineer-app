@@ -270,6 +270,8 @@ export function SetupSheetModelLayoutEditor(props: {
                     <ul className="space-y-1">
                       {sec.rows.map((row, rowIdx) => {
                         const rowDragId: RowDragId = `${sec.id}:${rowIdx}`;
+                        const layoutGroupId =
+                          row.type === "pair" || row.type === "corner4" ? row.layoutGroupId : undefined;
                         const showAbove =
                           rowDropTarget?.id === rowDragId && rowDropTarget.edge === "above";
                         const showBelow =
@@ -344,9 +346,9 @@ export function SetupSheetModelLayoutEditor(props: {
                                   value={row.label}
                                   onClick={(e) => e.stopPropagation()}
                                   onChange={(e) => {
-                                    if (!row.layoutGroupId) return;
+                                    if (!layoutGroupId) return;
                                     applySchema(
-                                      updateLayoutGroupLabel(schema, row.layoutGroupId, e.target.value)
+                                      updateLayoutGroupLabel(schema, layoutGroupId, e.target.value)
                                     );
                                   }}
                                 />
@@ -358,7 +360,7 @@ export function SetupSheetModelLayoutEditor(props: {
                               </span>
                               {!readOnly ? (
                                 <>
-                                  {row.layoutGroupId ? (
+                                  {layoutGroupId ? (
                                     <button
                                       type="button"
                                       className="text-[10px] text-violet-200 hover:underline shrink-0"

@@ -235,7 +235,7 @@ export function ungroupLayoutGroup(
   const nextSections = schema.structuredSections.map((sec) => ({
     ...sec,
     rows: sec.rows.flatMap((row): SetupSheetModelLayoutRow[] => {
-      if (row.layoutGroupId !== groupId) return [row];
+      if (layoutGroupIdForRow(row) !== groupId) return [row];
       const keys =
         row.type === "pair"
           ? [row.leftKey, row.rightKey]
@@ -298,9 +298,12 @@ export function updateLayoutGroupLabel(
 
   const nextSections = schema.structuredSections.map((sec) => ({
     ...sec,
-    rows: sec.rows.map((row) =>
-      row.layoutGroupId === groupId ? { ...row, label: trimmed } : row
-    ),
+    rows: sec.rows.map((row) => {
+      if ((row.type === "pair" || row.type === "corner4") && row.layoutGroupId === groupId) {
+        return { ...row, label: trimmed };
+      }
+      return row;
+    }),
   }));
 
   return { ...schema, layoutGroups: nextGroups, structuredSections: nextSections };
@@ -359,7 +362,7 @@ function mergeSectionRows(
   }
 
   const autoRows = inferredRows.filter((row) => {
-    if (row.layoutGroupId) return false;
+    if (layoutGroupIdForRow(row)) return false;
     return !layoutRowFieldKeys(row).some((key) => manualKeys.has(key));
   });
 
@@ -375,6 +378,11 @@ function layoutRowFieldKeys(row: SetupSheetModelLayoutRow): string[] {
   if (row.type === "pair") return [row.leftKey, row.rightKey];
   if (row.type === "corner4") return [row.ff, row.fr, row.rf, row.rr];
   return [];
+}
+
+function layoutGroupIdForRow(row: SetupSheetModelLayoutRow): string | undefined {
+  if (row.type === "pair" || row.type === "corner4") return row.layoutGroupId;
+  return undefined;
 }
 
 export function syncLayoutSectionsForGroups(
