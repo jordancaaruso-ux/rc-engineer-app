@@ -78,6 +78,7 @@ export function DualPlayheadVideo({
   const bottomRef = videoRef ?? internalBottomRef;
   const topRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const showGhost =
     ghostCompareActive && offsetSec != null && Number.isFinite(offsetSec) && Boolean(videoSrc);
 
@@ -85,10 +86,17 @@ export function DualPlayheadVideo({
     bottomRef,
     topRef,
     offsetSec: offsetSec ?? 0,
-    playbackRate: 1,
+    playbackRate,
     enabled: showGhost,
     isPlaying,
   });
+
+  const syncGhostToBottom = useCallback(() => {
+    const bottom = bottomRef.current;
+    const top = topRef.current;
+    if (!bottom || !top || offsetSec == null) return;
+    hardSeekTop(bottom, top, offsetSec);
+  }, [bottomRef, offsetSec]);
 
   const syncBothNow = useCallback(
     (bottomTime: number) => {
@@ -123,7 +131,7 @@ export function DualPlayheadVideo({
       setIsPlaying(false);
       return;
     }
-    await playBothSynced(bottom, top, offsetSec, 1);
+    await playBothSynced(bottom, top, offsetSec, playbackRate);
     setIsPlaying(true);
   }
 
@@ -139,7 +147,12 @@ export function DualPlayheadVideo({
             videoRef={singleRef}
           />
         </VideoViewTransform>
-        <VideoFrameControls videoRef={singleRef} active={!!videoSrc} />
+        <VideoFrameControls
+          videoRef={singleRef}
+          active={!!videoSrc}
+          playbackRate={playbackRate}
+          onPlaybackRateChange={setPlaybackRate}
+        />
       </div>
     );
   }
@@ -151,7 +164,8 @@ export function DualPlayheadVideo({
           <video
             ref={bottomRef}
             src={videoSrc ?? undefined}
-            className="absolute inset-0 h-full w-full object-contain"
+            className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+            style={{ opacity: 0.5 }}
             playsInline
             preload="metadata"
           />
@@ -159,11 +173,7 @@ export function DualPlayheadVideo({
             ref={topRef}
             src={videoSrc ?? undefined}
             className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-            style={{
-              opacity: 0.55,
-              mixBlendMode: "screen",
-              filter: "hue-rotate(155deg) saturate(1.35) contrast(1.05)",
-            }}
+            style={{ opacity: 0.5 }}
             playsInline
             muted
             preload="metadata"
@@ -172,16 +182,24 @@ export function DualPlayheadVideo({
           <div className="absolute bottom-1 left-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
             {bottomLabel}
           </div>
-          <div className="absolute bottom-1 right-1 z-20 rounded bg-cyan-950/80 px-1.5 py-0.5 text-[10px] text-cyan-100 border border-cyan-500/40">
+          <div className="absolute bottom-1 right-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
             {topLabel} · ghost
           </div>
         </div>
       </VideoViewTransform>
       <p className="text-[10px] text-muted-foreground">
-        Cyan ghost = competitor lap at SF. Solid = your lap at SF. Play both to scrub in sync.
+        Both layers at 50% — bottom is your lap at SF, top is competitor at SF. Play both to scrub
+        in sync.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <VideoFrameControls videoRef={bottomRef} active={!!videoSrc} />
+        <VideoFrameControls
+          videoRef={bottomRef}
+          secondaryVideoRef={topRef}
+          active={!!videoSrc}
+          playbackRate={playbackRate}
+          onPlaybackRateChange={setPlaybackRate}
+          afterStep={syncGhostToBottom}
+        />
         <button
           type="button"
           className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"

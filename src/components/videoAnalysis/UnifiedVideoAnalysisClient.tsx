@@ -373,7 +373,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
       setActiveLine("sf");
       seekTo(alignment.bottomSec);
       setMsg(
-        `Ghost compare at SF ${kindLabel}: your L${compare.my!.lapNumber} (solid) vs ${driverName} L${compare.competitor!.lapNumber} (cyan) · offset ${alignment.offsetSec >= 0 ? "+" : ""}${alignment.offsetSec.toFixed(2)}s`
+        `Ghost compare at SF ${kindLabel}: your L${compare.my!.lapNumber} vs ${driverName} L${compare.competitor!.lapNumber} (both 50%) · offset ${alignment.offsetSec >= 0 ? "+" : ""}${alignment.offsetSec.toFixed(2)}s`
       );
       return;
     }
@@ -591,7 +591,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
               </li>
               <li>
                 <strong className="text-foreground">Pick one of your laps + one competitor lap</strong>{" "}
-                — ghost overlay aligns both at SF (solid = you, cyan = them).
+                — ghost overlay aligns both at SF (50% each, original colour).
               </li>
             </ol>
           </div>
@@ -723,10 +723,10 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
             <p className="font-medium text-sm">Step 3 — Laps & ghost compare</p>
             <p className="text-muted-foreground">
               Click one of <strong>your</strong> laps, then one <strong>competitor</strong> lap.
-              Video shows both at the SF line — solid layer is you, cyan ghost is them.
+              Video shows both at the SF line — bottom is you, top is competitor (50% each).
             </p>
             {ghostCompareActive && (
-              <p className="text-cyan-600 dark:text-cyan-400 font-medium">
+              <p className="text-primary font-medium">
                 Ghost compare active · offset {compareOffset! >= 0 ? "+" : ""}
                 {compareOffset!.toFixed(2)}s
               </p>
