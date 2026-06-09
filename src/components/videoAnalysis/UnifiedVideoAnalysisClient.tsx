@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { VideoWithLineOverlay } from "./VideoWithLineOverlay";
-import { VideoFrameControls } from "./VideoFrameControls";
-import { VideoViewTransform } from "./VideoViewTransform";
+import { DualPlayheadVideo } from "./DualPlayheadVideo";
 import type { SectorLineNorm } from "./SectorLineCanvas";
 import type { DriverRole, ManualDriverLap, ManualVideoSessionV2 } from "@/lib/manualVideoAnalysis/types";
 import { normalizeManualSession } from "@/lib/manualVideoAnalysis/timing";
 import {
   findTimingSession,
+  getCompareSfAlignment,
   referenceAnchoredSession,
   updateTimingSession,
   videoTimeAtLapSf,
@@ -46,6 +45,10 @@ function formatLap(sec: number): string {
   return sec.toFixed(3);
 }
 
+function driverColumnKey(col: Pick<DriverColumn, "sessionId" | "role">): string {
+  return `${col.sessionId}-${col.role}`;
+}
+
 function collectDriverColumns(session: ManualVideoSessionV2): DriverColumn[] {
   const cols: DriverColumn[] = [];
   for (const ts of session.timingSessions) {
@@ -61,6 +64,41 @@ function collectDriverColumns(session: ManualVideoSessionV2): DriverColumn[] {
   return cols;
 }
 
+function compareLapsFromSession(session: ManualVideoSessionV2): Record<string, number> {
+  const out: Record<string, number> = {};
+  const { my, competitor } = session.compare;
+  if (my) out[`${my.sessionId}-${my.role}`] = my.lapNumber;
+  if (competitor) out[`${competitor.sessionId}-${competitor.role}`] = competitor.lapNumber;
+  return out;
+}
+
+function sessionWithCompareLaps(
+  session: ManualVideoSessionV2,
+  columns: DriverColumn[],
+  compareLaps: Record<string, number>
+): ManualVideoSessionV2 {
+  const col0 = columns[0];
+  const col1 = columns[1];
+  const lap0 = col0 ? compareLaps[driverColumnKey(col0)] : undefined;
+  const lap1 = col1 ? compareLaps[driverColumnKey(col1)] : undefined;
+
+  return {
+    ...session,
+    compare: {
+      ...session.compare,
+      alignAt: "sf_start",
+      my:
+        col0 && lap0 != null
+          ? { sessionId: col0.sessionId, role: col0.role, lapNumber: lap0 }
+          : null,
+      competitor:
+        col1 && lap1 != null
+          ? { sessionId: col1.sessionId, role: col1.role, lapNumber: lap1 }
+          : null,
+    },
+  };
+}
+
 function isAnchoredLap(
   session: ManualVideoSessionV2,
   sessionId: string,
@@ -72,6 +110,15 @@ function isAnchoredLap(
   return Boolean(a && a.driverRole === role && a.lapNumber === lapNumber && a.anchorKind === "sf_start");
 }
 
+function compareSlotLabel(
+  session: ManualVideoSessionV2,
+  col: DriverColumn | undefined,
+  lapNumber: number | undefined
+): string {
+  if (!col || lapNumber == null) return "—";
+  return `${col.driverName} L${lapNumber}`;
+}
+
 export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoObjectUrlRef = useRef<string | null>(null);
@@ -79,9 +126,9 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   const [session, setSession] = useState<ManualVideoSessionV2 | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [selectedLap, setSelectedLap] = useState<SelectedLap | null>(null);
+  const [compareLaps, setCompareLaps] = useState<Record<string, number>>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lines: SectorLineNorm[] =
@@ -101,7 +148,9 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     const json = (await res.json()) as JobData;
     setData(json);
     if (json.manual?.session) {
-      setSession(normalizeManualSession(json.manual.session));
+      const normalized = normalizeManualSession(json.manual.session);
+      setSession(normalized);
+      setCompareLaps(compareLapsFromSession(normalized));
     }
   }, [jobId]);
 
@@ -165,7 +214,26 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     videoRef.current.pause();
   }
 
+  const driverColumns = useMemo(
+    () => (session ? collectDriverColumns(session) : []),
+    [session]
+  );
+
+  const compareSfAlignment = useMemo(() => {
+    if (!session || driverColumns.length < 2) return null;
+    const withCompare = sessionWithCompareLaps(session, driverColumns, compareLaps);
+    const col0 = driverColumns[0]!;
+    const col1 = driverColumns[1]!;
+    const lap0 = compareLaps[driverColumnKey(col0)];
+    const lap1 = compareLaps[driverColumnKey(col1)];
+    if (lap0 == null || lap1 == null) return null;
+    return getCompareSfAlignment(withCompare, withCompare.compare);
+  }, [session, driverColumns, compareLaps]);
+
+  const ghostCompareActive = compareSfAlignment != null;
+
   function onLapClick(col: DriverColumn, lapNumber: number) {
+    const key = driverColumnKey(col);
     setSelectedLap({
       sessionId: col.sessionId,
       role: col.role,
@@ -180,11 +248,37 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
       return;
     }
 
+    const nextCompareLaps = { ...compareLaps, [key]: lapNumber };
+    setCompareLaps(nextCompareLaps);
+    const nextSession = sessionWithCompareLaps(session, driverColumns, nextCompareLaps);
+    setSession(nextSession);
+    schedulePersist(nextSession);
+
     const t = videoTimeAtLapSf(session, col.sessionId, col.role, lapNumber, "sf_start");
     if (t == null) {
       setMsg(`Could not map ${col.driverName} lap ${lapNumber} to video.`);
       return;
     }
+
+    const col0 = driverColumns[0];
+    const col1 = driverColumns[1];
+    const bothSelected =
+      col0 &&
+      col1 &&
+      nextCompareLaps[driverColumnKey(col0)] != null &&
+      nextCompareLaps[driverColumnKey(col1)] != null;
+
+    if (bothSelected) {
+      const alignment = getCompareSfAlignment(nextSession, nextSession.compare);
+      if (alignment) {
+        seekTo(alignment.bottomSec);
+        setMsg(
+          `Comparing ${compareSlotLabel(session, col0, nextCompareLaps[driverColumnKey(col0)!])} vs ${compareSlotLabel(session, col1, nextCompareLaps[driverColumnKey(col1)!])} at lap start.`
+        );
+        return;
+      }
+    }
+
     seekTo(t);
     setMsg(`${col.driverName} lap ${lapNumber} start @ ${t.toFixed(2)}s`);
   }
@@ -213,14 +307,14 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     );
   }
 
-  const driverColumns = useMemo(
-    () => (session ? collectDriverColumns(session) : []),
-    [session]
-  );
-
   if (!data || !session) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
+
+  const col0 = driverColumns[0];
+  const col1 = driverColumns[1];
+  const compareLap0 = col0 ? compareLaps[driverColumnKey(col0)] : undefined;
+  const compareLap1 = col1 ? compareLaps[driverColumnKey(col1)] : undefined;
 
   return (
     <div className="flex flex-col gap-3 max-w-6xl">
@@ -253,7 +347,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           <p className="text-sm font-medium">Drivers</p>
           <div className="flex gap-4">
             {driverColumns.map((col) => (
-              <div key={`${col.sessionId}-${col.role}`} className="flex flex-col gap-1">
+              <div key={driverColumnKey(col)} className="flex flex-col gap-1">
                 <p className="text-xs font-medium truncate max-w-[120px]" title={col.driverName}>
                   {col.driverName}
                 </p>
@@ -265,6 +359,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                         selectedLap?.sessionId === col.sessionId &&
                         selectedLap.role === col.role &&
                         selectedLap.lapNumber === lap.lapNumber;
+                      const isCompare =
+                        compareLaps[driverColumnKey(col)] === lap.lapNumber;
                       const isAnchor = isAnchoredLap(
                         session,
                         col.sessionId,
@@ -278,14 +374,16 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                             className={`w-full text-left rounded px-1.5 py-0.5 font-mono text-[11px] border ${
                               isAnchor
                                 ? "border-green-600/60 bg-green-500/15"
-                                : isSelected
-                                  ? "border-primary bg-primary/15"
-                                  : "border-transparent hover:bg-muted/50"
+                                : isCompare
+                                  ? "border-amber-500/60 bg-amber-500/15"
+                                  : isSelected
+                                    ? "border-primary bg-primary/15"
+                                    : "border-transparent hover:bg-muted/50"
                             }`}
                             onClick={() => onLapClick(col, lap.lapNumber)}
                             title={
                               referenceAnchoredSession(session)
-                                ? "Jump to lap start"
+                                ? "Jump to lap start · pick one lap per driver to compare"
                                 : "Select lap, then anchor at playhead"
                             }
                           >
@@ -312,24 +410,25 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
               Lap {selectedLap.lapNumber} · {selectedLap.driverName}
             </p>
           )}
+          {ghostCompareActive && (
+            <p className="text-[10px] text-amber-600 dark:text-amber-400">
+              Overlay: {compareSlotLabel(session, col0, compareLap0)} vs{" "}
+              {compareSlotLabel(session, col1, compareLap1)}
+            </p>
+          )}
         </div>
 
-        <div className="flex flex-col gap-2 min-w-0">
-          <VideoViewTransform>
-            <VideoWithLineOverlay
-              videoSrc={videoSrc}
-              lines={lines}
-              activeLineKey="sf"
-              videoRef={videoRef}
-            />
-          </VideoViewTransform>
-          <VideoFrameControls
-            videoRef={videoRef}
-            active={!!videoSrc}
-            playbackRate={playbackRate}
-            onPlaybackRateChange={setPlaybackRate}
-          />
-        </div>
+        <DualPlayheadVideo
+          videoSrc={videoSrc}
+          lines={lines}
+          activeLineKey="sf"
+          offsetSec={compareSfAlignment?.offsetSec ?? null}
+          ghostCompareActive={ghostCompareActive}
+          alignBottomSec={ghostCompareActive ? compareSfAlignment?.bottomSec : null}
+          bottomLabel={compareSlotLabel(session, col0, compareLap0)}
+          topLabel={compareSlotLabel(session, col1, compareLap1)}
+          videoRef={videoRef}
+        />
       </div>
 
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
