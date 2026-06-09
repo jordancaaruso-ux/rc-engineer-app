@@ -10,26 +10,65 @@ import {
   playBothSynced,
   seekBottomAndSync,
 } from "@/components/videos/videoOverlayPlayback";
+import { hardSeekTop, seekVideoTo } from "@/components/videos/videoOverlaySync";
 import { VideoViewTransform } from "./VideoViewTransform";
 
 type Props = {
   videoSrc: string | null;
   lines: SectorLineNorm[];
   activeLineKey: string | null;
-  /** Ghost (top) leads bottom by this many seconds — same video src, offset timeline. */
+  /** Ghost (top) = bottom + offsetSec when both compare laps are selected. */
   offsetSec: number | null;
+  /** True when my + competitor laps are picked — show dual-layer ghost view. */
+  ghostCompareActive?: boolean;
+  /** Snap bottom playhead here when compare alignment updates. */
+  alignBottomSec?: number | null;
   bottomLabel?: string;
   topLabel?: string;
-  /** Master timeline (bottom layer in compare mode). */
   videoRef?: RefObject<HTMLVideoElement | null>;
   onBottomTimeChange?: (sec: number) => void;
 };
+
+function SectorLinesSvg({
+  lines,
+  activeLineKey,
+}: {
+  lines: SectorLineNorm[];
+  activeLineKey: string | null;
+}) {
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full pointer-events-none z-10"
+      viewBox="0 0 1000 562.5"
+      preserveAspectRatio="none"
+    >
+      {lines.map((ln) => {
+        const active = ln.lineKey === activeLineKey;
+        const color = ln.lineKey === "sf" ? "#22c55e" : active ? "#f97316" : "#60a5fa";
+        return (
+          <line
+            key={ln.lineKey}
+            x1={ln.x1 * 1000}
+            y1={ln.y1 * 562.5}
+            x2={ln.x2 * 1000}
+            y2={ln.y2 * 562.5}
+            stroke={color}
+            strokeWidth={active ? 3 : 2}
+            strokeDasharray={ln.lineKey === "sf" ? undefined : "6 4"}
+          />
+        );
+      })}
+    </svg>
+  );
+}
 
 export function DualPlayheadVideo({
   videoSrc,
   lines,
   activeLineKey,
   offsetSec,
+  ghostCompareActive = false,
+  alignBottomSec = null,
   bottomLabel = "Reference",
   topLabel = "Compare",
   videoRef,
@@ -39,31 +78,33 @@ export function DualPlayheadVideo({
   const bottomRef = videoRef ?? internalBottomRef;
   const topRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const compareEnabled = offsetSec != null && Number.isFinite(offsetSec);
+  const showGhost =
+    ghostCompareActive && offsetSec != null && Number.isFinite(offsetSec) && Boolean(videoSrc);
 
   useVideoOverlayFrameLockSync({
     bottomRef,
     topRef,
     offsetSec: offsetSec ?? 0,
     playbackRate: 1,
-    enabled: compareEnabled && Boolean(videoSrc),
+    enabled: showGhost,
     isPlaying,
   });
 
-  const syncPaused = useCallback(() => {
-    const bottom = bottomRef.current;
-    const top = topRef.current;
-    if (!bottom || !top || offsetSec == null) return;
-    bottom.pause();
-    top.pause();
-    setIsPlaying(false);
-    seekBottomAndSync(bottom, top, bottom.currentTime, offsetSec, 1);
-  }, [offsetSec]);
+  const syncBothNow = useCallback(
+    (bottomTime: number) => {
+      const bottom = bottomRef.current;
+      const top = topRef.current;
+      if (!bottom || !top || offsetSec == null) return;
+      seekVideoTo(bottom, bottomTime);
+      hardSeekTop(bottom, top, offsetSec);
+    },
+    [bottomRef, offsetSec]
+  );
 
   useEffect(() => {
-    if (!compareEnabled) return;
-    syncPaused();
-  }, [compareEnabled, offsetSec, syncPaused, videoSrc]);
+    if (!showGhost || alignBottomSec == null || !Number.isFinite(alignBottomSec)) return;
+    syncBothNow(alignBottomSec);
+  }, [showGhost, alignBottomSec, offsetSec, syncBothNow, videoSrc]);
 
   useEffect(() => {
     const bottom = bottomRef.current;
@@ -71,7 +112,7 @@ export function DualPlayheadVideo({
     const onTime = () => onBottomTimeChange(bottom.currentTime);
     bottom.addEventListener("timeupdate", onTime);
     return () => bottom.removeEventListener("timeupdate", onTime);
-  }, [onBottomTimeChange, videoSrc]);
+  }, [bottomRef, onBottomTimeChange, videoSrc]);
 
   async function togglePlay() {
     const bottom = bottomRef.current;
@@ -86,7 +127,7 @@ export function DualPlayheadVideo({
     setIsPlaying(true);
   }
 
-  if (!compareEnabled) {
+  if (!showGhost) {
     const singleRef = bottomRef;
     return (
       <div className="flex flex-col gap-2 min-w-0">
@@ -106,7 +147,7 @@ export function DualPlayheadVideo({
   return (
     <div className="flex flex-col gap-2 min-w-0">
       <VideoViewTransform>
-        <div className="relative aspect-video w-full bg-black rounded-md overflow-hidden">
+        <div className="relative aspect-video w-full bg-black rounded-md overflow-hidden border border-border">
           <video
             ref={bottomRef}
             src={videoSrc ?? undefined}
@@ -117,19 +158,28 @@ export function DualPlayheadVideo({
           <video
             ref={topRef}
             src={videoSrc ?? undefined}
-            className="absolute inset-0 h-full w-full object-contain opacity-45 mix-blend-screen pointer-events-none"
+            className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+            style={{
+              opacity: 0.55,
+              mixBlendMode: "screen",
+              filter: "hue-rotate(155deg) saturate(1.35) contrast(1.05)",
+            }}
             playsInline
             muted
             preload="metadata"
           />
-          <div className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+          <SectorLinesSvg lines={lines} activeLineKey={activeLineKey} />
+          <div className="absolute bottom-1 left-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
             {bottomLabel}
           </div>
-          <div className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-            {topLabel} (ghost)
+          <div className="absolute bottom-1 right-1 z-20 rounded bg-cyan-950/80 px-1.5 py-0.5 text-[10px] text-cyan-100 border border-cyan-500/40">
+            {topLabel} · ghost
           </div>
         </div>
       </VideoViewTransform>
+      <p className="text-[10px] text-muted-foreground">
+        Cyan ghost = competitor lap at SF. Solid = your lap at SF. Play both to scrub in sync.
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <VideoFrameControls videoRef={bottomRef} active={!!videoSrc} />
         <button

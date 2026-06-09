@@ -22,10 +22,10 @@ import {
 } from "@/lib/manualVideoAnalysis/predictSectors";
 import { normalizeManualSession, setLapIncluded } from "@/lib/manualVideoAnalysis/timing";
 import {
-  computeCompareOffsetSec,
   findDriverInSession,
   findTimingSession,
   primaryTimingSession,
+  getCompareSfAlignment,
   referenceAnchoredSession,
   updateTimingSession,
   videoTimeAtLapSf,
@@ -352,7 +352,6 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   }
 
   function onLapClick(
-    e: React.MouseEvent,
     sessionId: string,
     role: DriverRole,
     lapNumber: number,
@@ -360,24 +359,37 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   ) {
     if (!session) return;
     const alignAt = jumpAlignAt();
-    const t = seekToLapSf(sessionId, role, lapNumber);
     const kindLabel = alignAt === "sf_finish" ? "finish" : "start";
+    const slot: ManualCompareSlot = { sessionId, role, lapNumber };
+    const compare = { ...session.compare };
+    if (role === "me") compare.my = slot;
+    else compare.competitor = slot;
+    const next = { ...session, compare };
+    setSession(next);
+    schedulePersist(next);
 
-    if (e.shiftKey) {
-      const slot: ManualCompareSlot = { sessionId, role, lapNumber };
-      const compare = { ...session.compare };
-      if (role === "me") compare.my = slot;
-      else compare.competitor = slot;
-      const next = { ...session, compare };
-      setSession(next);
-      schedulePersist(next);
+    const alignment = getCompareSfAlignment(next, compare);
+    if (alignment) {
+      setActiveLine("sf");
+      seekTo(alignment.bottomSec);
+      setMsg(
+        `Ghost compare at SF ${kindLabel}: your L${compare.my!.lapNumber} (solid) vs ${driverName} L${compare.competitor!.lapNumber} (cyan) · offset ${alignment.offsetSec >= 0 ? "+" : ""}${alignment.offsetSec.toFixed(2)}s`
+      );
+      return;
     }
 
+    const t = videoTimeAtLapSf(next, sessionId, role, lapNumber, alignAt);
     if (t != null) {
+      setActiveLine("sf");
+      seekTo(t);
       setMsg(
         `${driverName} lap ${lapNumber} · SF ${kindLabel} @ ${t.toFixed(2)}s` +
-          (e.shiftKey ? " (added to ghost compare)" : "")
+          (role === "me"
+            ? " — now pick a competitor lap for ghost overlay."
+            : " — pick one of your laps to enable ghost compare.")
       );
+    } else {
+      setMsg("Set your video anchor first.");
     }
   }
 
@@ -472,10 +484,15 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
         )
       : activePreview?.crossings.find((c) => c.lineKey === currentAlignStep.lineKey)?.confirmed);
 
-  const compareOffset = useMemo(
-    () => (session ? computeCompareOffsetSec(session, session.compare) : null),
+  const compareSfAlignment = useMemo(
+    () =>
+      session?.compare.my && session?.compare.competitor
+        ? getCompareSfAlignment(session, session.compare)
+        : null,
     [session]
   );
+  const ghostCompareActive = compareSfAlignment != null;
+  const compareOffset = compareSfAlignment?.offsetSec ?? null;
 
   if (!data || !session) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -496,15 +513,26 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   const avgComp = averageSectorSplits(sess, sectorLinesForCompute, primaryId, "competitor");
 
   function setAlignAt(alignAt: CompareAlignAt) {
-    void saveSession({ ...sess, compare: { ...sess.compare, alignAt } });
+    const next = { ...sess, compare: { ...sess.compare, alignAt } };
+    setSession(next);
+    schedulePersist(next);
+    const alignment = getCompareSfAlignment(next, next.compare);
+    if (alignment) {
+      setActiveLine("sf");
+      seekTo(alignment.bottomSec);
+    }
   }
 
   function nudgeCompareOffset(delta: number) {
     const cur = sess.compare.offsetNudgeSec ?? 0;
-    void saveSession({
+    const next = {
       ...sess,
       compare: { ...sess.compare, offsetNudgeSec: cur + delta },
-    });
+    };
+    setSession(next);
+    schedulePersist(next);
+    const alignment = getCompareSfAlignment(next, next.compare);
+    if (alignment) seekTo(alignment.bottomSec);
   }
 
   return (
@@ -545,6 +573,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           lines={lines}
           activeLineKey={activeLine}
           offsetSec={compareOffset}
+          ghostCompareActive={ghostCompareActive}
+          alignBottomSec={compareSfAlignment?.bottomSec ?? null}
           videoRef={videoRef}
           bottomLabel={slotLabel(sess, sess.compare.my)}
           topLabel={slotLabel(sess, sess.compare.competitor)}
@@ -560,8 +590,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                 when a driver crosses the line on a lap you know from transponder, then click Mark.
               </li>
               <li>
-                <strong className="text-foreground">Click any lap</strong> — video jumps to that
-                SF crossing. Shift+click to add ghost compare.
+                <strong className="text-foreground">Pick one of your laps + one competitor lap</strong>{" "}
+                — ghost overlay aligns both at SF (solid = you, cyan = them).
               </li>
             </ol>
           </div>
@@ -690,11 +720,17 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           </div>
 
           <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-            <p className="font-medium text-sm">Step 3 — Jump to SF / ghost compare</p>
+            <p className="font-medium text-sm">Step 3 — Laps & ghost compare</p>
             <p className="text-muted-foreground">
-              Click a lap to jump video to that SF crossing. Shift+click to pick ghost compare
-              laps.
+              Click one of <strong>your</strong> laps, then one <strong>competitor</strong> lap.
+              Video shows both at the SF line — solid layer is you, cyan ghost is them.
             </p>
+            {ghostCompareActive && (
+              <p className="text-cyan-600 dark:text-cyan-400 font-medium">
+                Ghost compare active · offset {compareOffset! >= 0 ? "+" : ""}
+                {compareOffset!.toFixed(2)}s
+              </p>
+            )}
             <div className="flex flex-wrap gap-1 items-center">
               <span className="text-muted-foreground">Jump to</span>
               <button
@@ -804,8 +840,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                                     ? "border-border hover:bg-muted/50"
                                     : "border-border opacity-50"
                             }`}
-                            onClick={(e) =>
-                              onLapClick(e, ts.sessionId, d.role, l.lapNumber, d.driverName)
+                            onClick={() =>
+                              onLapClick(ts.sessionId, d.role, l.lapNumber, d.driverName)
                             }
                             onContextMenu={(e) => {
                               e.preventDefault();
@@ -813,7 +849,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                             }}
                             title={
                               canSeek
-                                ? `Jump to SF @ ${predicted!.toFixed(2)}s · Shift+click for ghost`
+                                ? `Select for ${d.role === "me" ? "solid" : "ghost"} compare · SF @ ${predicted!.toFixed(2)}s`
                                 : "Set video anchor first"
                             }
                           >

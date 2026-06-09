@@ -88,18 +88,42 @@ export function videoTimeAtLapSf(
   return anchorVideoT + (targetTrans - anchorTrans);
 }
 
+export type CompareSfAlignment = {
+  bottomSec: number;
+  ghostSec: number;
+  offsetSec: number;
+};
+
+/** Bottom = my lap at SF; ghost = competitor lap at SF; offset = ghost − bottom. */
+export function getCompareSfAlignment(
+  session: ManualVideoSessionV2,
+  compare: ManualCompareState
+): CompareSfAlignment | null {
+  const { my, competitor, alignAt = "sf_finish", offsetNudgeSec = 0 } = compare;
+  if (!my || !competitor) return null;
+
+  const bottomSec = videoTimeAtLapSf(session, my.sessionId, my.role, my.lapNumber, alignAt);
+  const ghostSec = videoTimeAtLapSf(
+    session,
+    competitor.sessionId,
+    competitor.role,
+    competitor.lapNumber,
+    alignAt
+  );
+  if (bottomSec == null || ghostSec == null) return null;
+
+  return {
+    bottomSec,
+    ghostSec,
+    offsetSec: ghostSec - bottomSec + offsetNudgeSec,
+  };
+}
+
 export function computeCompareOffsetSec(
   session: ManualVideoSessionV2,
   compare: ManualCompareState
 ): number | null {
-  const { my, competitor, alignAt = "sf_finish", offsetNudgeSec = 0 } = compare;
-  if (!my || !competitor) return null;
-
-  const tA = videoTimeAtLapSf(session, my.sessionId, my.role, my.lapNumber, alignAt);
-  const tB = videoTimeAtLapSf(session, competitor.sessionId, competitor.role, competitor.lapNumber, alignAt);
-  if (tA == null || tB == null) return null;
-
-  return tB - tA + offsetNudgeSec;
+  return getCompareSfAlignment(session, compare)?.offsetSec ?? null;
 }
 
 export function updateTimingSession(

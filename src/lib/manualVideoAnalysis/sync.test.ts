@@ -9,7 +9,7 @@ import {
 import { emptyManualSession, newTimingSessionId } from "./types";
 import type { ManualDriver, ManualTimingSession } from "./types";
 import { getLapAlignmentPreview, getLapAlignSteps } from "./predictSectors";
-import { videoTimeAtLapSf } from "./sessionModel";
+import { getCompareSfAlignment, videoTimeAtLapSf } from "./sessionModel";
 import type { ManualVideoSessionV2 } from "./types";
 
 const me: ManualDriver = {
@@ -201,6 +201,15 @@ if (rivalL3 == null || Math.abs(rivalL3 - 111.5) > 0.01) {
 const myL3 = videoTimeAtLapSf(offVideoSession, "on_vid", "me", 3, "sf_finish");
 if (myL3 == null || Math.abs(myL3 - 112.4) > 0.01) {
   throw new Error(`on-video lap 3 should be ~112.4s, got ${myL3}`);
+}
+
+const align = getCompareSfAlignment(offVideoSession, {
+  my: { sessionId: "on_vid", role: "me", lapNumber: 2 },
+  competitor: { sessionId: "off_vid", role: "competitor", lapNumber: 3 },
+  alignAt: "sf_finish",
+});
+if (!align || Math.abs(align.offsetSec - (111.5 - 100)) > 0.5) {
+  throw new Error(`compare offset should be ghost-bottom, got ${align?.offsetSec}`);
 }
 
 console.log("manualVideoAnalysis sync.test.ts OK");
