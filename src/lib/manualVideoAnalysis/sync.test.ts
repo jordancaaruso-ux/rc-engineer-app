@@ -4,6 +4,7 @@ import {
   applyTop3LapSelection,
   setLapIncluded,
   pickBestNLapNumbers,
+  namespaceSessionDriverKeys,
 } from "./timing";
 import { emptyManualSession, newTimingSessionId } from "./types";
 import type { ManualDriver, ManualTimingSession } from "./types";
@@ -147,6 +148,18 @@ const tEnd1 = predictSfEndTime(me, 1, anchorL1Session);
 const tStart1 = predictSfStartTime(me, 1, anchorL1Session);
 if (tEnd1 !== 50 || tStart1 == null || Math.abs(tStart1 - (50 - 12.5)) > 0.01) {
   throw new Error(`lap 1 start should be finish - lap time, got start=${tStart1} end=${tEnd1}`);
+}
+
+const practiceDupes = namespaceSessionDriverKeys("sess_a", [
+  { key: "liverc_practice_session", driverName: "A", normalizedName: "a", role: "me", laps: [] },
+]);
+const practiceDupesB = namespaceSessionDriverKeys("sess_b", [
+  { key: "liverc_practice_session", driverName: "B", normalizedName: "b", role: "competitor", laps: [] },
+]);
+const merged = [...practiceDupes, ...practiceDupesB];
+const dupKeys = defaultDriverKeys(merged);
+if (dupKeys.meKey === dupKeys.competitorKey) {
+  throw new Error("practice session drivers must have distinct keys after namespacing");
 }
 
 console.log("manualVideoAnalysis sync.test.ts OK");

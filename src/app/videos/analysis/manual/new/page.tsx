@@ -108,14 +108,25 @@ function NewManualAnalysisForm() {
     }
   }
 
+  function driverPickerLabel(d: ManualDriver): string {
+    const session = timingSessions.find((ts) => ts.drivers.some((x) => x.key === d.key));
+    const sessionPrefix =
+      timingSessions.length > 1 && session ? `${session.label}: ` : "";
+    return `${sessionPrefix}${d.driverName} (${d.laps.length} laps)`;
+  }
+
   function applyLoadedDrivers(
     list: ManualDriver[],
     defaults?: { meKey: string; competitorKey: string }
   ) {
     setDrivers(list);
     const keys = defaults ?? defaultDriverKeys(list);
+    let nextCompetitorKey = keys.competitorKey;
+    if (keys.meKey && keys.meKey === nextCompetitorKey) {
+      nextCompetitorKey = list.find((d) => d.key !== keys.meKey)?.key ?? "";
+    }
     setMeKey(keys.meKey);
-    setCompetitorKey(keys.competitorKey);
+    setCompetitorKey(nextCompetitorKey);
     if (list.length < 2) {
       setMsg("Need at least two drivers in the timing data to compare.");
     } else if (!keys.meKey || !keys.competitorKey) {
@@ -293,11 +304,18 @@ function NewManualAnalysisForm() {
             <select
               className="mt-1 w-full rounded-md border border-border px-2 py-1"
               value={meKey}
-              onChange={(e) => setMeKey(e.target.value)}
+              onChange={(e) => {
+                const nextMe = e.target.value;
+                setMeKey(nextMe);
+                if (competitorKey === nextMe) {
+                  const alt = drivers.find((d) => d.key !== nextMe);
+                  setCompetitorKey(alt?.key ?? "");
+                }
+              }}
             >
               {drivers.map((d) => (
-                <option key={d.key} value={d.key}>
-                  {d.driverName} ({d.laps.length} laps)
+                <option key={d.key} value={d.key} disabled={d.key === competitorKey}>
+                  {driverPickerLabel(d)}
                 </option>
               ))}
             </select>
@@ -310,8 +328,8 @@ function NewManualAnalysisForm() {
               onChange={(e) => setCompetitorKey(e.target.value)}
             >
               {drivers.map((d) => (
-                <option key={d.key} value={d.key}>
-                  {d.driverName} ({d.laps.length} laps)
+                <option key={d.key} value={d.key} disabled={d.key === meKey}>
+                  {driverPickerLabel(d)}
                 </option>
               ))}
             </select>

@@ -58,15 +58,30 @@ export function driversFromParseResult(
   });
 }
 
+/** LiveRC practice pages reuse the same parser driver id — scope keys per timing session. */
+export function namespaceSessionDriverKeys(
+  sessionId: string,
+  drivers: ManualDriver[]
+): ManualDriver[] {
+  return drivers.map((d) => ({
+    ...d,
+    key: `${sessionId}::${d.key}`,
+  }));
+}
+
 export function timingSessionFromParseResult(
   parsed: LapUrlParseResult,
   sourceUrl: string,
   primaryDriverName?: string | null,
   label?: string
 ): ManualTimingSession {
-  const drivers = driversFromParseResult(parsed, primaryDriverName);
+  const sessionId = newTimingSessionId();
+  const drivers = namespaceSessionDriverKeys(
+    sessionId,
+    driversFromParseResult(parsed, primaryDriverName)
+  );
   return {
-    sessionId: newTimingSessionId(),
+    sessionId,
     label: label ?? sessionLabelFromUrl(sourceUrl),
     sourceUrl,
     isOnVideo: true,
@@ -94,7 +109,9 @@ export function defaultDriverKeys(drivers: ManualDriver[]): {
   const competitor = drivers.find((d) => d.role === "competitor" && d.key !== me?.key);
   if (me && competitor) return { meKey: me.key, competitorKey: competitor.key };
   if (drivers.length >= 2) {
-    return { meKey: drivers[0]!.key, competitorKey: drivers[1]!.key };
+    const meKey = drivers[0]!.key;
+    const competitorDriver = drivers.find((d) => d.key !== meKey);
+    return { meKey, competitorKey: competitorDriver?.key ?? drivers[1]!.key };
   }
   return { meKey: drivers[0]!.key, competitorKey: "" };
 }
@@ -165,6 +182,7 @@ export function timingSessionsFromRunImportedLapSets(
 
   return [...byUrl.entries()].map(([key, group]) => {
     const first = group[0]!;
+    const sessionId = newTimingSessionId();
     const completed =
       first.sessionCompletedAt instanceof Date
         ? first.sessionCompletedAt.toISOString()
@@ -172,12 +190,12 @@ export function timingSessionsFromRunImportedLapSets(
           ? first.sessionCompletedAt
           : null;
     return {
-      sessionId: newTimingSessionId(),
+      sessionId,
       label: first.sourceUrl ? sessionLabelFromUrl(first.sourceUrl) : "Run session",
       sourceUrl: first.sourceUrl ?? null,
       sessionCompletedAtIso: completed,
       isOnVideo: true,
-      drivers: driversFromRunImportedLapSets(group),
+      drivers: namespaceSessionDriverKeys(sessionId, driversFromRunImportedLapSets(group)),
       sync: {},
     };
   });
