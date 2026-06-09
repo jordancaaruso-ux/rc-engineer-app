@@ -45,6 +45,7 @@ type JobData = {
 };
 
 type ActiveLap = { sessionId: string; role: DriverRole; lapNumber: number };
+type SyncMode = "anchor" | "compare";
 
 function formatLap(sec: number): string {
   return sec.toFixed(3);
@@ -79,6 +80,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   const [anchorLapInput, setAnchorLapInput] = useState("1");
   const [anchorKind, setAnchorKind] = useState<AnchorKind>("sf_finish");
   const [anchorDriverRole, setAnchorDriverRole] = useState<DriverRole>("me");
+  const [syncMode, setSyncMode] = useState<SyncMode>("anchor");
+  const [ghostPreviewActive, setGhostPreviewActive] = useState(false);
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPersistRef = useRef<ManualVideoSessionV2 | null>(null);
 
@@ -205,37 +208,109 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     if (pause) videoRef.current.pause();
   }
 
-  function setAnchor() {
-    if (!session || !activeSessionId) return;
-    const ts = findTimingSession(session, activeSessionId);
+  function anchorAtPlayhead(
+    sessionId: string,
+    role: DriverRole,
+    lapNumber: number,
+    driverName: string,
+    opts?: { videoTimeSec?: number }
+  ) {
+    if (!session) return;
+    const ts = findTimingSession(session, sessionId);
     if (!ts) return;
-    if (!ts.isOnVideo) {
-      setMsg("This timing session is not on your video — enable “on video” or anchor your session instead.");
-      return;
-    }
-    const lapNumber = parseInt(anchorLapInput, 10);
-    if (!Number.isFinite(lapNumber) || lapNumber < 1) return;
-    const driver = findDriverInSession(ts, anchorDriverRole);
-    if (!driver) {
-      setMsg("Pick which driver crosses the line in this clip.");
-      return;
-    }
-    const t = currentVideoTime();
-    const next = updateTimingSession(session, activeSessionId, {
+    const t = opts?.videoTimeSec ?? currentVideoTime();
+    const next = updateTimingSession(session, sessionId, {
+      isOnVideo: true,
       sync: {
         ...ts.sync,
         anchor: {
           videoTimeSec: t,
           lapNumber,
-          driverRole: anchorDriverRole,
+          driverRole: role,
           anchorKind,
         },
       },
     });
-    void saveSession(next);
+    setAnchorLapInput(String(lapNumber));
+    setAnchorDriverRole(role);
+    setSession(next);
+    schedulePersist(next);
+    setGhostPreviewActive(false);
     const kindLabel = anchorKind === "sf_start" ? "start" : "finish";
     setMsg(
-      `${driver.driverName} lap ${lapNumber} SF ${kindLabel} = ${t.toFixed(2)}s on video. Click laps below to jump to SF.`
+      `Anchor: ${driverName} lap ${lapNumber} SF ${kindLabel} = ${t.toFixed(3)}s. Scrub, click lap again or edit time below to refine.`
+    );
+  }
+
+  function setAnchorFromForm() {
+    if (!session || !activeSessionId) return;
+    const lapNumber = parseInt(anchorLapInput, 10);
+    if (!Number.isFinite(lapNumber) || lapNumber < 1) return;
+    const driver = findDriverInSession(
+      findTimingSession(session, activeSessionId)!,
+      anchorDriverRole
+    );
+    if (!driver) return;
+    anchorAtPlayhead(activeSessionId, anchorDriverRole, lapNumber, driver.driverName);
+  }
+
+  function updateAnchorVideoTime(sessionId: string, videoTimeSec: number) {
+    if (!session || !Number.isFinite(videoTimeSec) || videoTimeSec < 0) return;
+    const ts = findTimingSession(session, sessionId);
+    const anchor = ts?.sync.anchor;
+    if (!ts || !anchor) return;
+    const next = updateTimingSession(session, sessionId, {
+      sync: {
+        ...ts.sync,
+        anchor: { ...anchor, videoTimeSec },
+      },
+    });
+    setSession(next);
+    schedulePersist(next);
+    setGhostPreviewActive(false);
+  }
+
+  function nudgeAnchorTime(sessionId: string, deltaSec: number) {
+    const ts = session ? findTimingSession(session, sessionId) : undefined;
+    const anchor = ts?.sync.anchor;
+    if (!anchor) return;
+    updateAnchorVideoTime(sessionId, anchor.videoTimeSec + deltaSec);
+  }
+
+  function clearAnchor(sessionId: string) {
+    if (!session) return;
+    const ts = findTimingSession(session, sessionId);
+    if (!ts?.sync.anchor) return;
+    const next = updateTimingSession(session, sessionId, {
+      sync: { ...ts.sync, anchor: undefined, perLapSfEnd: undefined },
+    });
+    setSession(next);
+    schedulePersist(next);
+    setGhostPreviewActive(false);
+    setMsg("Anchor cleared — scrub video and click a lap to set again.");
+  }
+
+  function seekToAnchorSession(sessionId: string) {
+    const ts = session ? findTimingSession(session, sessionId) : undefined;
+    const t = ts?.sync.anchor?.videoTimeSec;
+    if (t == null) return;
+    setActiveLine("sf");
+    seekTo(t);
+  }
+
+  function previewGhostCompare(s?: ManualVideoSessionV2) {
+    const base = s ?? session;
+    if (!base) return;
+    const alignment = getCompareSfAlignment(base, base.compare);
+    if (!alignment) {
+      setMsg("Pick one of your laps and one competitor lap in Compare mode first.");
+      return;
+    }
+    setGhostPreviewActive(true);
+    setActiveLine("sf");
+    seekTo(alignment.bottomSec);
+    setMsg(
+      `Ghost preview at SF — bottom L${base.compare.my!.lapNumber}, ghost L${base.compare.competitor!.lapNumber}. Switch to Anchor mode to fix timing.`
     );
   }
 
@@ -358,8 +433,18 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     driverName: string
   ) {
     if (!session) return;
-    const alignAt = jumpAlignAt();
-    const kindLabel = alignAt === "sf_finish" ? "finish" : "start";
+
+    if (syncMode === "anchor") {
+      if (sessionId !== activeSessionId) {
+        setActiveSessionId(sessionId);
+        syncAnchorFieldsFromSession(sessionId, session);
+        setMsg(`Switched to ${driverName}'s session — scrub to SF crossing, then click lap ${lapNumber} again.`);
+        return;
+      }
+      anchorAtPlayhead(sessionId, role, lapNumber, driverName);
+      return;
+    }
+
     const slot: ManualCompareSlot = { sessionId, role, lapNumber };
     const compare = { ...session.compare };
     if (role === "me") compare.my = slot;
@@ -367,29 +452,25 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     const next = { ...session, compare };
     setSession(next);
     schedulePersist(next);
+    setGhostPreviewActive(false);
 
-    const alignment = getCompareSfAlignment(next, compare);
-    if (alignment) {
-      setActiveLine("sf");
-      seekTo(alignment.bottomSec);
+    if (compare.my && compare.competitor) {
       setMsg(
-        `Ghost compare at SF ${kindLabel}: your L${compare.my!.lapNumber} vs ${driverName} L${compare.competitor!.lapNumber} (both 50%) · offset ${alignment.offsetSec >= 0 ? "+" : ""}${alignment.offsetSec.toFixed(2)}s`
-      );
-      return;
-    }
-
-    const t = videoTimeAtLapSf(next, sessionId, role, lapNumber, alignAt);
-    if (t != null) {
-      setActiveLine("sf");
-      seekTo(t);
-      setMsg(
-        `${driverName} lap ${lapNumber} · SF ${kindLabel} @ ${t.toFixed(2)}s` +
-          (role === "me"
-            ? " — now pick a competitor lap for ghost overlay."
-            : " — pick one of your laps to enable ghost compare.")
+        `Compare: your L${compare.my.lapNumber} vs ${driverName} L${compare.competitor.lapNumber}. Click Preview ghost when ready.`
       );
     } else {
-      setMsg("Set your video anchor first.");
+      setMsg(
+        role === "me"
+          ? `Your lap ${lapNumber} selected — pick a competitor lap.`
+          : `Competitor lap ${lapNumber} selected — pick one of your laps.`
+      );
+    }
+  }
+
+  function previewJumpToLap(sessionId: string, role: DriverRole, lapNumber: number) {
+    const t = seekToLapSf(sessionId, role, lapNumber);
+    if (t != null) {
+      setMsg(`Jumped to predicted SF @ ${t.toFixed(2)}s (from anchor math).`);
     }
   }
 
@@ -491,7 +572,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
         : null,
     [session]
   );
-  const ghostCompareActive = compareSfAlignment != null;
+  const ghostCompareActive =
+    syncMode === "compare" && compareSfAlignment != null;
   const compareOffset = compareSfAlignment?.offsetSec ?? null;
 
   if (!data || !session) {
@@ -516,11 +598,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     const next = { ...sess, compare: { ...sess.compare, alignAt } };
     setSession(next);
     schedulePersist(next);
-    const alignment = getCompareSfAlignment(next, next.compare);
-    if (alignment) {
-      setActiveLine("sf");
-      seekTo(alignment.bottomSec);
-    }
+    if (ghostPreviewActive) previewGhostCompare(next);
   }
 
   function nudgeCompareOffset(delta: number) {
@@ -531,8 +609,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     };
     setSession(next);
     schedulePersist(next);
-    const alignment = getCompareSfAlignment(next, next.compare);
-    if (alignment) seekTo(alignment.bottomSec);
+    if (ghostPreviewActive) previewGhostCompare(next);
   }
 
   return (
@@ -574,7 +651,9 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           activeLineKey={activeLine}
           offsetSec={compareOffset}
           ghostCompareActive={ghostCompareActive}
-          alignBottomSec={compareSfAlignment?.bottomSec ?? null}
+          alignBottomSec={
+            ghostPreviewActive ? (compareSfAlignment?.bottomSec ?? null) : null
+          }
           videoRef={videoRef}
           bottomLabel={slotLabel(sess, sess.compare.my)}
           topLabel={slotLabel(sess, sess.compare.competitor)}
@@ -586,12 +665,12 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
             <ol className="list-decimal list-inside text-muted-foreground space-y-1">
               <li>Load your video above.</li>
               <li>
-                <strong className="text-foreground">Mark a known SF crossing</strong> — scrub to
-                when a driver crosses the line on a lap you know from transponder, then click Mark.
+                <strong className="text-foreground">Anchor mode</strong> — select session, scrub to
+                SF crossing, click that lap time (sets anchor at playhead; editable below).
               </li>
               <li>
-                <strong className="text-foreground">Pick one of your laps + one competitor lap</strong>{" "}
-                — ghost overlay aligns both at SF (50% each, original colour).
+                <strong className="text-foreground">Compare mode</strong> — pick your lap +
+                competitor lap, then Preview ghost.
               </li>
             </ol>
           </div>
@@ -644,22 +723,43 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           )}
 
           <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-            <p className="font-medium text-sm">Step 2 — Mark known SF crossing</p>
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="font-medium text-sm">Mode</span>
+              <button
+                type="button"
+                className={`rounded px-2 py-0.5 border text-xs ${
+                  syncMode === "anchor" ? "border-primary bg-primary/15" : "border-border"
+                }`}
+                onClick={() => {
+                  setSyncMode("anchor");
+                  setGhostPreviewActive(false);
+                }}
+              >
+                Anchor (scrub + click lap)
+              </button>
+              <button
+                type="button"
+                className={`rounded px-2 py-0.5 border text-xs ${
+                  syncMode === "compare" ? "border-primary bg-primary/15" : "border-border"
+                }`}
+                onClick={() => setSyncMode("compare")}
+              >
+                Compare (ghost laps)
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+            <p className="font-medium text-sm">Step 2 — Anchor video to transponder</p>
             <p className="text-muted-foreground">
-              Scrub the video to the exact frame when{" "}
+              Select a timing session above, scrub to when{" "}
               <strong>
                 {(activeTs && findDriverInSession(activeTs, anchorDriverRole)?.driverName) ??
                   "this driver"}
               </strong>{" "}
-              crosses the start/finish line on a lap listed in transponder data for{" "}
-              <strong>{activeTs?.label ?? "this session"}</strong>.
+              crosses SF on lap #…, then <strong>click that lap</strong> (or use Mark at playhead).
+              Repeat per session if both drivers are on this video.
             </p>
-            {!activeTs?.isOnVideo && (
-              <p className="text-amber-600 dark:text-amber-400">
-                This session is timing-only (not on video). Anchor the session that was filmed, or
-                check “on video” if this clip includes it.
-              </p>
-            )}
             <div className="flex flex-wrap gap-2 items-center">
               {activeTs && activeTs.drivers.length > 1 && (
                 <label className="flex items-center gap-1">
@@ -690,40 +790,92 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                 value={anchorKind}
                 onChange={(e) => setAnchorKind(e.target.value as AnchorKind)}
               >
-                <option value="sf_finish">Finish line crossing</option>
-                <option value="sf_start">Start line crossing</option>
+                <option value="sf_finish">Finish crossing</option>
+                <option value="sf_start">Start crossing</option>
               </select>
               <button
                 type="button"
                 className="rounded-md bg-primary px-2.5 py-1 text-primary-foreground"
-                disabled={!anchorLapValid || !activeTs?.isOnVideo}
-                onClick={setAnchor}
+                disabled={!anchorLapValid || syncMode !== "anchor"}
+                onClick={setAnchorFromForm}
               >
-                Mark crossing at playhead
+                Mark at playhead
               </button>
             </div>
             {hasAnchor && activeTs?.sync.anchor ? (
-              <p className="text-muted-foreground font-mono">
-                ✓ {findDriverInSession(activeTs, activeTs.sync.anchor.driverRole)?.driverName} lap{" "}
-                {activeTs.sync.anchor.lapNumber}{" "}
-                {activeTs.sync.anchor.anchorKind === "sf_start" ? "start" : "finish"} @{" "}
-                {activeTs.sync.anchor.videoTimeSec.toFixed(2)}s
-              </p>
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2">
+                <p className="font-mono text-[11px]">
+                  ✓ {findDriverInSession(activeTs, activeTs.sync.anchor.driverRole)?.driverName}{" "}
+                  lap {activeTs.sync.anchor.lapNumber}{" "}
+                  {activeTs.sync.anchor.anchorKind === "sf_start" ? "start" : "finish"}
+                </p>
+                <label className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted-foreground">Video time (s)</span>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min={0}
+                    className="w-28 rounded border border-border px-1.5 py-0.5 font-mono"
+                    value={activeTs.sync.anchor.videoTimeSec}
+                    onChange={(e) =>
+                      updateAnchorVideoTime(activeSessionId, parseFloat(e.target.value))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="rounded border border-border px-1.5 py-0.5 hover:bg-muted"
+                    onClick={() => updateAnchorVideoTime(activeSessionId, currentVideoTime())}
+                  >
+                    Use playhead
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-border px-1.5 py-0.5 hover:bg-muted"
+                    onClick={() => seekToAnchorSession(activeSessionId)}
+                  >
+                    Seek
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-border px-1.5 py-0.5 hover:bg-muted"
+                    onClick={() => nudgeAnchorTime(activeSessionId, -0.05)}
+                  >
+                    −50ms
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-border px-1.5 py-0.5 hover:bg-muted"
+                    onClick={() => nudgeAnchorTime(activeSessionId, 0.05)}
+                  >
+                    +50ms
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-border px-1.5 py-0.5 text-muted-foreground hover:bg-muted"
+                    onClick={() => clearAnchor(activeSessionId)}
+                  >
+                    Clear
+                  </button>
+                </label>
+              </div>
             ) : (
-              <p className="text-muted-foreground">No anchor yet for this session.</p>
+              <p className="text-muted-foreground">No anchor for this session yet.</p>
             )}
-            {referenceAnchoredSession(sess) && !hasAnchor && (
-              <p className="text-muted-foreground text-[10px]">
-                Another session is anchored — timing-only laps map relative to that anchor.
-              </p>
-            )}
+            {sess.timingSessions
+              .filter((ts) => ts.sessionId !== activeSessionId && ts.sync.anchor)
+              .map((ts) => (
+                <p key={ts.sessionId} className="text-[10px] text-muted-foreground font-mono">
+                  {ts.label}: anchored lap {ts.sync.anchor!.lapNumber} @{" "}
+                  {ts.sync.anchor!.videoTimeSec.toFixed(3)}s
+                </p>
+              ))}
           </div>
 
           <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-            <p className="font-medium text-sm">Step 3 — Laps & ghost compare</p>
+            <p className="font-medium text-sm">Step 3 — Ghost compare</p>
             <p className="text-muted-foreground">
-              Click one of <strong>your</strong> laps, then one <strong>competitor</strong> lap.
-              Video shows both at the SF line — bottom is you, top is competitor (50% each).
+              Switch to <strong>Compare</strong> mode, pick one of your laps and one competitor lap,
+              then Preview ghost. Switch back to Anchor mode anytime to fix timing.
             </p>
             {ghostCompareActive && (
               <p className="text-primary font-medium">
@@ -756,6 +908,14 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
               <p>Bottom: {slotLabel(sess, sess.compare.my)}</p>
               <p>Ghost: {slotLabel(sess, sess.compare.competitor)}</p>
             </div>
+            <button
+              type="button"
+              className="rounded-md bg-primary px-2.5 py-1 text-primary-foreground disabled:opacity-50"
+              disabled={!ghostCompareActive}
+              onClick={() => previewGhostCompare()}
+            >
+              Preview ghost at SF
+            </button>
             <div className="flex flex-wrap gap-1 items-center">
               <button
                 type="button"
@@ -774,18 +934,21 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
               <button
                 type="button"
                 className="rounded border border-border px-1 py-0.5 text-muted-foreground"
-                onClick={() =>
-                  void saveSession({
+                onClick={() => {
+                  const next = {
                     ...sess,
                     compare: {
                       my: null,
                       competitor: null,
                       alignAt: sess.compare.alignAt,
                     },
-                  })
-                }
+                  };
+                  setSession(next);
+                  schedulePersist(next);
+                  setGhostPreviewActive(false);
+                }}
               >
-                Clear
+                Clear compare
               </button>
             </div>
             {compareOffset != null && (
@@ -808,6 +971,9 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                     {d.laps
                       .filter((l) => l.isIncluded !== false)
                       .map((l) => {
+                        const isAnchor =
+                          ts.sync.anchor?.driverRole === d.role &&
+                          ts.sync.anchor.lapNumber === l.lapNumber;
                         const isCompare =
                           (sess.compare.my?.sessionId === ts.sessionId &&
                             sess.compare.my.role === d.role &&
@@ -832,25 +998,29 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                             key={l.lapNumber}
                             type="button"
                             className={`rounded-md border px-1.5 py-0.5 font-mono text-[11px] ${
-                              isCompare
-                                ? "border-amber-500/60 bg-amber-500/10"
-                                : isSector
-                                  ? "border-primary bg-primary/15"
-                                  : canSeek
-                                    ? "border-border hover:bg-muted/50"
-                                    : "border-border opacity-50"
+                              isAnchor
+                                ? "border-green-600/60 bg-green-500/10"
+                                : isCompare
+                                  ? "border-amber-500/60 bg-amber-500/10"
+                                  : isSector
+                                    ? "border-primary bg-primary/15"
+                                    : "border-border hover:bg-muted/50"
                             }`}
                             onClick={() =>
                               onLapClick(ts.sessionId, d.role, l.lapNumber, d.driverName)
                             }
                             onContextMenu={(e) => {
                               e.preventDefault();
-                              selectLapForSectors(ts.sessionId, d.role, l.lapNumber);
+                              if (syncMode === "anchor") {
+                                previewJumpToLap(ts.sessionId, d.role, l.lapNumber);
+                              } else {
+                                selectLapForSectors(ts.sessionId, d.role, l.lapNumber);
+                              }
                             }}
                             title={
-                              canSeek
-                                ? `Select for ${d.role === "me" ? "solid" : "ghost"} compare · SF @ ${predicted!.toFixed(2)}s`
-                                : "Set video anchor first"
+                              syncMode === "anchor"
+                                ? `Click: set anchor at playhead · Right-click: jump to predicted SF`
+                                : `Click: select for ghost compare`
                             }
                           >
                             L{l.lapNumber} {formatLap(l.lapTimeSec)}
