@@ -201,6 +201,17 @@ export function timingSessionsFromRunImportedLapSets(
   });
 }
 
+/** Multi-URL practice: only the session with "me" is on this video by default. */
+export function applyDefaultIsOnVideo(sessions: ManualTimingSession[]): ManualTimingSession[] {
+  let placedMeOnVideo = false;
+  return sessions.map((ts) => {
+    const hasMe = ts.drivers.some((d) => d.role === "me");
+    const onVideo = hasMe && !placedMeOnVideo;
+    if (onVideo) placedMeOnVideo = true;
+    return { ...ts, isOnVideo: onVideo };
+  });
+}
+
 export function setDriverRoles(
   drivers: ManualDriver[],
   meKey: string,

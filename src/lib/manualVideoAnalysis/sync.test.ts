@@ -9,6 +9,8 @@ import {
 import { emptyManualSession, newTimingSessionId } from "./types";
 import type { ManualDriver, ManualTimingSession } from "./types";
 import { getLapAlignmentPreview, getLapAlignSteps } from "./predictSectors";
+import { videoTimeAtLapSf } from "./sessionModel";
+import type { ManualVideoSessionV2 } from "./types";
 
 const me: ManualDriver = {
   key: "me",
@@ -160,6 +162,45 @@ const merged = [...practiceDupes, ...practiceDupesB];
 const dupKeys = defaultDriverKeys(merged);
 if (dupKeys.meKey === dupKeys.competitorKey) {
   throw new Error("practice session drivers must have distinct keys after namespacing");
+}
+
+const offVideoSession: ManualVideoSessionV2 = {
+  version: 2,
+  timingSource: "url",
+  timingSessions: [
+    {
+      sessionId: "on_vid",
+      label: "My practice",
+      isOnVideo: true,
+      drivers: [me],
+      sync: {
+        anchor: {
+          videoTimeSec: 100,
+          lapNumber: 2,
+          driverRole: "me",
+          anchorKind: "sf_finish",
+        },
+      },
+    },
+    {
+      sessionId: "off_vid",
+      label: "Rival practice",
+      isOnVideo: false,
+      drivers: [comp],
+      sync: {},
+    },
+  ],
+  compare: { my: null, competitor: null, alignAt: "sf_finish" },
+  selectedLaps: { me: [], competitor: [] },
+  marks: [],
+};
+const rivalL3 = videoTimeAtLapSf(offVideoSession, "off_vid", "competitor", 3, "sf_finish");
+if (rivalL3 == null || Math.abs(rivalL3 - 111.5) > 0.01) {
+  throw new Error(`off-video lap 3 should map to ~111.5s, got ${rivalL3}`);
+}
+const myL3 = videoTimeAtLapSf(offVideoSession, "on_vid", "me", 3, "sf_finish");
+if (myL3 == null || Math.abs(myL3 - 112.4) > 0.01) {
+  throw new Error(`on-video lap 3 should be ~112.4s, got ${myL3}`);
 }
 
 console.log("manualVideoAnalysis sync.test.ts OK");

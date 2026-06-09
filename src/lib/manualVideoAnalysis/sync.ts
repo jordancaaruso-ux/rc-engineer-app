@@ -11,6 +11,50 @@ function lapTimeMap(driver: ManualDriver): Map<number, number> {
   return new Map(driver.laps.map((l) => [l.lapNumber, l.lapTimeSec]));
 }
 
+function orderedLaps(driver: ManualDriver): ManualDriver["laps"] {
+  return [...driver.laps].sort((a, b) => a.lapNumber - b.lapNumber);
+}
+
+/** Transponder-only: seconds from session start to SF at end of lapNumber. */
+export function transponderSfEndSec(
+  driver: ManualDriver,
+  lapNumber: number
+): number | null {
+  if (!driver.laps.some((l) => l.lapNumber === lapNumber)) return null;
+  let sum = 0;
+  for (const l of orderedLaps(driver)) {
+    if (l.lapNumber > lapNumber) break;
+    if (l.lapTimeSec <= 0) return null;
+    sum += l.lapTimeSec;
+  }
+  return sum;
+}
+
+/** Transponder-only: seconds from session start to SF at start of lapNumber. */
+export function transponderSfStartSec(
+  driver: ManualDriver,
+  lapNumber: number
+): number | null {
+  if (!driver.laps.some((l) => l.lapNumber === lapNumber)) return null;
+  let sum = 0;
+  for (const l of orderedLaps(driver)) {
+    if (l.lapNumber >= lapNumber) break;
+    if (l.lapTimeSec <= 0) return null;
+    sum += l.lapTimeSec;
+  }
+  return sum;
+}
+
+export function transponderSfSec(
+  driver: ManualDriver,
+  lapNumber: number,
+  kind: AnchorKind
+): number | null {
+  return kind === "sf_finish"
+    ? transponderSfEndSec(driver, lapNumber)
+    : transponderSfStartSec(driver, lapNumber);
+}
+
 function anchorBaseTime(sync: ManualSessionSync): number | null {
   const anchor = sync.anchor;
   if (!anchor) return null;
@@ -128,7 +172,7 @@ export function predictSfEndTime(
   if (sync.perLapSfEnd?.[key] != null) return sync.perLapSfEnd[key]!;
 
   const anchor = sync.anchor;
-  if (!anchor) return null;
+  if (!anchor) return transponderSfEndSec(driver, lapNumber);
 
   const same = sameHeatTimeAtAnchorLap(driver, lapNumber, sync, "end");
   if (same != null) return same;
@@ -151,7 +195,7 @@ export function predictSfStartTime(
 ): number | null {
   const sync = timingSession.sync;
   const anchor = sync.anchor;
-  if (!anchor) return null;
+  if (!anchor) return transponderSfStartSec(driver, lapNumber);
 
   const same = sameHeatTimeAtAnchorLap(driver, lapNumber, sync, "start");
   if (same != null) return same;

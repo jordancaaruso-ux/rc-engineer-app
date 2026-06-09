@@ -148,7 +148,7 @@ function parseV1(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
         sync,
       },
     ],
-    compare: { my: null, competitor: null, alignAt: "sf_start" },
+    compare: { my: null, competitor: null, alignAt: "sf_finish" },
     selectedLaps: {
       me: selected.me as number[],
       competitor: selected.competitor as number[],
@@ -184,7 +184,7 @@ function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
     compare: {
       my: parseSlot(compareRaw.my),
       competitor: parseSlot(compareRaw.competitor),
-      alignAt: compareRaw.alignAt === "sf_finish" ? "sf_finish" : "sf_start",
+      alignAt: compareRaw.alignAt === "sf_start" ? "sf_start" : "sf_finish",
       offsetNudgeSec:
         typeof compareRaw.offsetNudgeSec === "number" ? compareRaw.offsetNudgeSec : undefined,
     },
@@ -206,7 +206,7 @@ export function emptyManualSession(): ManualVideoSessionV2 {
     version: MANUAL_VIDEO_SESSION_VERSION,
     timingSource: "run",
     timingSessions: [],
-    compare: { my: null, competitor: null, alignAt: "sf_start" },
+    compare: { my: null, competitor: null, alignAt: "sf_finish" },
     selectedLaps: { me: [], competitor: [] },
     marks: [],
   };

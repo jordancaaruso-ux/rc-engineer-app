@@ -26,9 +26,10 @@ import {
   findDriverInSession,
   findTimingSession,
   primaryTimingSession,
+  referenceAnchoredSession,
   updateTimingSession,
+  videoTimeAtLapSf,
 } from "@/lib/manualVideoAnalysis/sessionModel";
-import { predictSfEndTime, predictSfStartTime } from "@/lib/manualVideoAnalysis/sync";
 
 type SectorLineApi = SectorLineNorm & { sortOrder: number };
 
@@ -77,6 +78,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   const [alignStepIndex, setAlignStepIndex] = useState(0);
   const [anchorLapInput, setAnchorLapInput] = useState("1");
   const [anchorKind, setAnchorKind] = useState<AnchorKind>("sf_finish");
+  const [anchorDriverRole, setAnchorDriverRole] = useState<DriverRole>("me");
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPersistRef = useRef<ManualVideoSessionV2 | null>(null);
 
@@ -107,12 +109,27 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
       const normalized = normalizeManualSession(json.manual.session);
       setSession(normalized);
       const primary = primaryTimingSession(normalized);
-      setActiveSessionId(primary?.sessionId ?? normalized.timingSessions[0]?.sessionId ?? "");
-      const anchor = primary?.sync.anchor;
+      const initialId = primary?.sessionId ?? normalized.timingSessions[0]?.sessionId ?? "";
+      setActiveSessionId(initialId);
+      const initialTs = normalized.timingSessions.find((s) => s.sessionId === initialId);
+      const anchor = initialTs?.sync.anchor;
       if (anchor?.lapNumber) setAnchorLapInput(String(anchor.lapNumber));
       if (anchor?.anchorKind) setAnchorKind(anchor.anchorKind);
+      if (anchor?.driverRole) setAnchorDriverRole(anchor.driverRole);
+      else if (initialTs?.drivers.some((d) => d.role === "me")) setAnchorDriverRole("me");
     }
   }, [jobId]);
+
+  function syncAnchorFieldsFromSession(sessionId: string, s: ManualVideoSessionV2) {
+    const ts = findTimingSession(s, sessionId);
+    const anchor = ts?.sync.anchor;
+    if (anchor?.lapNumber) setAnchorLapInput(String(anchor.lapNumber));
+    else setAnchorLapInput("1");
+    setAnchorKind(anchor?.anchorKind ?? "sf_finish");
+    if (anchor?.driverRole) setAnchorDriverRole(anchor.driverRole);
+    else if (ts?.drivers.some((d) => d.role === "me")) setAnchorDriverRole("me");
+    else if (ts?.drivers[0]) setAnchorDriverRole(ts.drivers[0].role);
+  }
 
   useEffect(() => {
     void load();
@@ -192,22 +209,34 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     if (!session || !activeSessionId) return;
     const ts = findTimingSession(session, activeSessionId);
     if (!ts) return;
+    if (!ts.isOnVideo) {
+      setMsg("This timing session is not on your video — enable “on video” or anchor your session instead.");
+      return;
+    }
     const lapNumber = parseInt(anchorLapInput, 10);
     if (!Number.isFinite(lapNumber) || lapNumber < 1) return;
+    const driver = findDriverInSession(ts, anchorDriverRole);
+    if (!driver) {
+      setMsg("Pick which driver crosses the line in this clip.");
+      return;
+    }
+    const t = currentVideoTime();
     const next = updateTimingSession(session, activeSessionId, {
       sync: {
         ...ts.sync,
         anchor: {
-          videoTimeSec: currentVideoTime(),
+          videoTimeSec: t,
           lapNumber,
-          driverRole: "me",
+          driverRole: anchorDriverRole,
           anchorKind,
         },
       },
     });
     void saveSession(next);
     const kindLabel = anchorKind === "sf_start" ? "start" : "finish";
-    setMsg(`Baseline: your lap ${lapNumber} SF ${kindLabel} at ${currentVideoTime().toFixed(2)}s`);
+    setMsg(
+      `${driver.driverName} lap ${lapNumber} SF ${kindLabel} = ${t.toFixed(2)}s on video. Click laps below to jump to SF.`
+    );
   }
 
   function applyMarkAtPlayhead(
@@ -298,22 +327,58 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     setMsg(`Lap ${lapNumber}: align sectors from lap start.`);
   }
 
-  function setCompareSlot(role: DriverRole, sessionId: string, lapNumber: number) {
+  function jumpAlignAt(): CompareAlignAt {
+    return session?.compare.alignAt ?? "sf_finish";
+  }
+
+  function seekToLapSf(sessionId: string, role: DriverRole, lapNumber: number): number | null {
+    if (!session) return null;
+    const alignAt = jumpAlignAt();
+    const t = videoTimeAtLapSf(session, sessionId, role, lapNumber, alignAt);
+    if (t == null) {
+      const ref = referenceAnchoredSession(session);
+      if (!ref) {
+        setMsg(
+          "Set your video anchor first: scrub to a known SF crossing, then click “Mark crossing at playhead”."
+        );
+      } else {
+        setMsg("Could not map this lap to video — check anchor lap number and driver.");
+      }
+      return null;
+    }
+    setActiveLine("sf");
+    seekTo(t);
+    return t;
+  }
+
+  function onLapClick(
+    e: React.MouseEvent,
+    sessionId: string,
+    role: DriverRole,
+    lapNumber: number,
+    driverName: string
+  ) {
     if (!session) return;
-    const slot: ManualCompareSlot = { sessionId, role, lapNumber };
-    const compare = { ...session.compare };
-    if (role === "me") compare.my = slot;
-    else compare.competitor = slot;
+    const alignAt = jumpAlignAt();
+    const t = seekToLapSf(sessionId, role, lapNumber);
+    const kindLabel = alignAt === "sf_finish" ? "finish" : "start";
 
-    const ts = findTimingSession(session, sessionId);
-    const driver = ts ? findDriverInSession(ts, role) : undefined;
-    const alignAt = session.compare.alignAt ?? "sf_start";
-    const predict = alignAt === "sf_finish" ? predictSfEndTime : predictSfStartTime;
-    const t = driver && ts ? predict(driver, lapNumber, ts) : null;
-    if (t != null) seekTo(t);
+    if (e.shiftKey) {
+      const slot: ManualCompareSlot = { sessionId, role, lapNumber };
+      const compare = { ...session.compare };
+      if (role === "me") compare.my = slot;
+      else compare.competitor = slot;
+      const next = { ...session, compare };
+      setSession(next);
+      schedulePersist(next);
+    }
 
-    void saveSession({ ...session, compare });
-    setMsg(`Compare: ${role} lap ${lapNumber}${t != null ? ` @ ${t.toFixed(2)}s` : ""}`);
+    if (t != null) {
+      setMsg(
+        `${driverName} lap ${lapNumber} · SF ${kindLabel} @ ${t.toFixed(2)}s` +
+          (e.shiftKey ? " (added to ghost compare)" : "")
+      );
+    }
   }
 
   function advanceAlignStep(applyPlayhead: boolean) {
@@ -486,9 +551,27 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
         />
 
         <div className="flex flex-col gap-3 text-xs max-h-[min(75vh,800px)] overflow-y-auto pr-1">
+          <div className="rounded-lg border border-primary/30 bg-card p-3 space-y-1">
+            <p className="font-medium text-sm">How to sync</p>
+            <ol className="list-decimal list-inside text-muted-foreground space-y-1">
+              <li>Load your video above.</li>
+              <li>
+                <strong className="text-foreground">Mark a known SF crossing</strong> — scrub to
+                when a driver crosses the line on a lap you know from transponder, then click Mark.
+              </li>
+              <li>
+                <strong className="text-foreground">Click any lap</strong> — video jumps to that
+                SF crossing. Shift+click to add ghost compare.
+              </li>
+            </ol>
+          </div>
+
           {sess.timingSessions.length > 1 && (
             <div className="rounded-lg border border-border bg-card p-3 space-y-2">
               <p className="font-medium text-sm">Timing sessions</p>
+              <p className="text-muted-foreground text-[10px]">
+                Check “on video” only for sessions filmed in this clip. Other URLs are timing-only.
+              </p>
               {sess.timingSessions.map((ts) => (
                 <label
                   key={ts.sessionId}
@@ -500,19 +583,23 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                     type="radio"
                     name="activeSession"
                     checked={activeSessionId === ts.sessionId}
-                    onChange={() => setActiveSessionId(ts.sessionId)}
+                    onChange={() => {
+                      setActiveSessionId(ts.sessionId);
+                      syncAnchorFieldsFromSession(ts.sessionId, sess);
+                    }}
                   />
                   <span className="flex-1 min-w-0">
                     <span className="font-medium block truncate">{ts.label}</span>
                     <span className="text-muted-foreground text-[10px]">
-                      {ts.drivers.length} drivers ·{" "}
-                      {ts.sync.anchor ? "anchored" : "no anchor"}
+                      {ts.drivers.map((d) => d.driverName).join(", ")} ·{" "}
+                      {ts.sync.anchor ? "anchored" : "needs anchor"}
+                      {!ts.isOnVideo ? " · timing only" : ""}
                     </span>
                   </span>
                   <input
                     type="checkbox"
                     checked={ts.isOnVideo}
-                    title="Session appears on this video"
+                    title="This session was filmed in the uploaded video"
                     onChange={(e) => {
                       void saveSession(
                         updateTimingSession(sess, ts.sessionId, {
@@ -527,14 +614,41 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           )}
 
           <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-            <p className="font-medium text-sm">SF anchor</p>
+            <p className="font-medium text-sm">Step 2 — Mark known SF crossing</p>
             <p className="text-muted-foreground">
-              Scrub to when <strong>you</strong> cross SF on a known lap in{" "}
-              <strong>{activeTs?.label ?? "session"}</strong>.
+              Scrub the video to the exact frame when{" "}
+              <strong>
+                {(activeTs && findDriverInSession(activeTs, anchorDriverRole)?.driverName) ??
+                  "this driver"}
+              </strong>{" "}
+              crosses the start/finish line on a lap listed in transponder data for{" "}
+              <strong>{activeTs?.label ?? "this session"}</strong>.
             </p>
+            {!activeTs?.isOnVideo && (
+              <p className="text-amber-600 dark:text-amber-400">
+                This session is timing-only (not on video). Anchor the session that was filmed, or
+                check “on video” if this clip includes it.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2 items-center">
+              {activeTs && activeTs.drivers.length > 1 && (
+                <label className="flex items-center gap-1">
+                  Driver
+                  <select
+                    className="rounded border border-border px-1 py-0.5 max-w-[120px]"
+                    value={anchorDriverRole}
+                    onChange={(e) => setAnchorDriverRole(e.target.value as DriverRole)}
+                  >
+                    {activeTs.drivers.map((d) => (
+                      <option key={d.key} value={d.role}>
+                        {d.driverName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="flex items-center gap-1">
-                Lap
+                Lap #
                 <input
                   className="w-12 rounded border border-border px-1 py-0.5 font-mono"
                   value={anchorLapInput}
@@ -546,58 +660,67 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                 value={anchorKind}
                 onChange={(e) => setAnchorKind(e.target.value as AnchorKind)}
               >
-                <option value="sf_finish">Finish crossing</option>
-                <option value="sf_start">Start crossing</option>
+                <option value="sf_finish">Finish line crossing</option>
+                <option value="sf_start">Start line crossing</option>
               </select>
               <button
                 type="button"
                 className="rounded-md bg-primary px-2.5 py-1 text-primary-foreground"
-                disabled={!anchorLapValid}
+                disabled={!anchorLapValid || !activeTs?.isOnVideo}
                 onClick={setAnchor}
               >
-                Set anchor here
+                Mark crossing at playhead
               </button>
             </div>
             {hasAnchor && activeTs?.sync.anchor ? (
               <p className="text-muted-foreground font-mono">
-                ✓ Lap {activeTs.sync.anchor.lapNumber}{" "}
+                ✓ {findDriverInSession(activeTs, activeTs.sync.anchor.driverRole)?.driverName} lap{" "}
+                {activeTs.sync.anchor.lapNumber}{" "}
                 {activeTs.sync.anchor.anchorKind === "sf_start" ? "start" : "finish"} @{" "}
                 {activeTs.sync.anchor.videoTimeSec.toFixed(2)}s
               </p>
-            ) : null}
+            ) : (
+              <p className="text-muted-foreground">No anchor yet for this session.</p>
+            )}
+            {referenceAnchoredSession(sess) && !hasAnchor && (
+              <p className="text-muted-foreground text-[10px]">
+                Another session is anchored — timing-only laps map relative to that anchor.
+              </p>
+            )}
           </div>
 
           <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-            <p className="font-medium text-sm">Lap compare</p>
+            <p className="font-medium text-sm">Step 3 — Jump to SF / ghost compare</p>
             <p className="text-muted-foreground">
-              Click a lap to assign ghost overlay (me = bottom, competitor = ghost).
+              Click a lap to jump video to that SF crossing. Shift+click to pick ghost compare
+              laps.
             </p>
-            <div className="text-[10px] space-y-0.5 font-mono">
-              <p>Me: {slotLabel(sess, sess.compare.my)}</p>
-              <p>Vs: {slotLabel(sess, sess.compare.competitor)}</p>
-            </div>
             <div className="flex flex-wrap gap-1 items-center">
-              <span className="text-muted-foreground">Align at</span>
+              <span className="text-muted-foreground">Jump to</span>
               <button
                 type="button"
                 className={`rounded px-1.5 py-0.5 border ${
-                  (sess.compare.alignAt ?? "sf_start") === "sf_start"
-                    ? "border-primary"
-                    : "border-border"
-                }`}
-                onClick={() => setAlignAt("sf_start")}
-              >
-                SF start
-              </button>
-              <button
-                type="button"
-                className={`rounded px-1.5 py-0.5 border ${
-                  sess.compare.alignAt === "sf_finish" ? "border-primary" : "border-border"
+                  jumpAlignAt() === "sf_finish" ? "border-primary" : "border-border"
                 }`}
                 onClick={() => setAlignAt("sf_finish")}
               >
                 SF finish
               </button>
+              <button
+                type="button"
+                className={`rounded px-1.5 py-0.5 border ${
+                  jumpAlignAt() === "sf_start" ? "border-primary" : "border-border"
+                }`}
+                onClick={() => setAlignAt("sf_start")}
+              >
+                SF start
+              </button>
+            </div>
+            <div className="text-[10px] space-y-0.5 font-mono">
+              <p>Bottom: {slotLabel(sess, sess.compare.my)}</p>
+              <p>Ghost: {slotLabel(sess, sess.compare.competitor)}</p>
+            </div>
+            <div className="flex flex-wrap gap-1 items-center">
               <button
                 type="button"
                 className="rounded border border-border px-1 py-0.5"
@@ -660,6 +783,14 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                           activeLap?.sessionId === ts.sessionId &&
                           activeLap.role === d.role &&
                           activeLap.lapNumber === l.lapNumber;
+                        const predicted = videoTimeAtLapSf(
+                          sess,
+                          ts.sessionId,
+                          d.role,
+                          l.lapNumber,
+                          jumpAlignAt()
+                        );
+                        const canSeek = predicted != null;
                         return (
                           <button
                             key={l.lapNumber}
@@ -669,16 +800,29 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                                 ? "border-amber-500/60 bg-amber-500/10"
                                 : isSector
                                   ? "border-primary bg-primary/15"
-                                  : "border-border"
+                                  : canSeek
+                                    ? "border-border hover:bg-muted/50"
+                                    : "border-border opacity-50"
                             }`}
-                            onClick={() => setCompareSlot(d.role, ts.sessionId, l.lapNumber)}
+                            onClick={(e) =>
+                              onLapClick(e, ts.sessionId, d.role, l.lapNumber, d.driverName)
+                            }
                             onContextMenu={(e) => {
                               e.preventDefault();
                               selectLapForSectors(ts.sessionId, d.role, l.lapNumber);
                             }}
-                            title="Click: compare · Right-click: sector align"
+                            title={
+                              canSeek
+                                ? `Jump to SF @ ${predicted!.toFixed(2)}s · Shift+click for ghost`
+                                : "Set video anchor first"
+                            }
                           >
                             L{l.lapNumber} {formatLap(l.lapTimeSec)}
+                            {canSeek ? (
+                              <span className="text-muted-foreground ml-1">
+                                @{predicted!.toFixed(1)}s
+                              </span>
+                            ) : null}
                           </button>
                         );
                       })}

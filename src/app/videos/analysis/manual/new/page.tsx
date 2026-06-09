@@ -10,6 +10,7 @@ import {
 } from "@/lib/manualVideoAnalysis/types";
 import {
   applyTop3LapSelection,
+  applyDefaultIsOnVideo,
   defaultDriverKeys,
   setDriverRoles,
 } from "@/lib/manualVideoAnalysis/timing";
@@ -162,10 +163,12 @@ function NewManualAnalysisForm() {
       return;
     }
 
-    const sessionsWithRoles = timingSessions.map((ts) => ({
-      ...ts,
-      drivers: setDriverRoles(ts.drivers, meKey, competitorKey),
-    }));
+    const sessionsWithRoles = applyDefaultIsOnVideo(
+      timingSessions.map((ts) => ({
+        ...ts,
+        drivers: setDriverRoles(ts.drivers, meKey, competitorKey),
+      }))
+    );
 
     const urlList = timingUrls
       .split(/\n/)
@@ -177,7 +180,7 @@ function NewManualAnalysisForm() {
       timingSource: useRun && runId.trim() ? "run" : "url",
       timingUrls: useRun ? [] : urlList,
       timingSessions: sessionsWithRoles,
-      compare: { my: null, competitor: null, alignAt: "sf_start" },
+      compare: { my: null, competitor: null, alignAt: "sf_finish" },
     });
 
     const res = await fetch("/api/video-analysis/jobs", {
