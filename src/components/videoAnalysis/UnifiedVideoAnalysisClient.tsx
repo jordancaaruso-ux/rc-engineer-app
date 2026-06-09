@@ -8,7 +8,12 @@ import { VideoViewTransform } from "./VideoViewTransform";
 import type { SectorLineNorm } from "./SectorLineCanvas";
 import type { DriverRole, ManualDriverLap, ManualVideoSessionV2 } from "@/lib/manualVideoAnalysis/types";
 import { normalizeManualSession } from "@/lib/manualVideoAnalysis/timing";
-import { findTimingSession, updateTimingSession } from "@/lib/manualVideoAnalysis/sessionModel";
+import {
+  findTimingSession,
+  referenceAnchoredSession,
+  updateTimingSession,
+  videoTimeAtLapSf,
+} from "@/lib/manualVideoAnalysis/sessionModel";
 
 type SectorLineApi = SectorLineNorm & { sortOrder: number };
 
@@ -154,16 +159,34 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     return videoRef.current?.currentTime ?? 0;
   }
 
-  function selectLap(col: DriverColumn, lapNumber: number) {
+  function seekTo(sec: number) {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = Math.max(0, sec);
+    videoRef.current.pause();
+  }
+
+  function onLapClick(col: DriverColumn, lapNumber: number) {
     setSelectedLap({
       sessionId: col.sessionId,
       role: col.role,
       lapNumber,
       driverName: col.driverName,
     });
-    setMsg(
-      `Lap ${lapNumber} selected for ${col.driverName}. Scrub to lap start on video, then Select as anchor.`
-    );
+
+    if (!session || !referenceAnchoredSession(session)) {
+      setMsg(
+        `Lap ${lapNumber} selected for ${col.driverName}. Scrub to lap start on video, then Select as anchor.`
+      );
+      return;
+    }
+
+    const t = videoTimeAtLapSf(session, col.sessionId, col.role, lapNumber, "sf_start");
+    if (t == null) {
+      setMsg(`Could not map ${col.driverName} lap ${lapNumber} to video.`);
+      return;
+    }
+    seekTo(t);
+    setMsg(`${col.driverName} lap ${lapNumber} start @ ${t.toFixed(2)}s`);
   }
 
   function setAnchorAtPlayhead() {
@@ -259,8 +282,12 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                                   ? "border-primary bg-primary/15"
                                   : "border-transparent hover:bg-muted/50"
                             }`}
-                            onClick={() => selectLap(col, lap.lapNumber)}
-                            title="Select this lap"
+                            onClick={() => onLapClick(col, lap.lapNumber)}
+                            title={
+                              referenceAnchoredSession(session)
+                                ? "Jump to lap start"
+                                : "Select lap, then anchor at playhead"
+                            }
                           >
                             {lap.lapNumber}{" "}
                             <span className="text-muted-foreground">{formatLap(lap.lapTimeSec)}</span>
