@@ -18,8 +18,11 @@ export default async function VideosPage(): Promise<ReactNode> {
           >
             Video analysis
           </Link>
-          <Link href="/videos/overlay" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted">
-            Overlay compare
+          <Link
+            href="/videos/analysis/manual/new"
+            className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted"
+          >
+            Lap sync
           </Link>
           <Link href="/" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted">
             Home

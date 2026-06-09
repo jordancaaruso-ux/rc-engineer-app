@@ -1,32 +1,68 @@
-import type { DriverRole, ManualDriver, ManualSyncState } from "./types";
+import type {
+  AnchorKind,
+  DriverRole,
+  ManualDriver,
+  ManualSessionSync,
+  ManualTimingSession,
+} from "./types";
 import { lapSfKey } from "./types";
 
-/** Predicted video time (sec) when driver crosses SF at end of lapNumber. */
-export function predictSfEndTime(
-  driver: ManualDriver,
-  lapNumber: number,
-  sync: ManualSyncState,
-  allDrivers: ManualDriver[]
-): number | null {
-  const key = lapSfKey(driver.role, lapNumber);
-  if (sync.perLapSfEnd?.[key] != null) return sync.perLapSfEnd[key]!;
+function lapTimeMap(driver: ManualDriver): Map<number, number> {
+  return new Map(driver.laps.map((l) => [l.lapNumber, l.lapTimeSec]));
+}
 
+function anchorBaseTime(sync: ManualSessionSync): number | null {
   const anchor = sync.anchor;
   if (!anchor) return null;
+  return anchor.videoTimeSec + (sync.globalOffsetSec ?? 0);
+}
 
-  const anchorT = anchor.videoTimeSec + (sync.globalOffsetSec ?? 0);
+/** Same-heat shortcut: at anchor lap, all drivers share SF time for finish or start anchor. */
+function sameHeatTimeAtAnchorLap(
+  driver: ManualDriver,
+  lapNumber: number,
+  sync: ManualSessionSync,
+  kind: "start" | "end"
+): number | null {
+  const anchor = sync.anchor;
+  const base = anchorBaseTime(sync);
+  if (!anchor || base == null) return null;
+  if (lapNumber !== anchor.lapNumber) return null;
+
+  const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
+  if (!lap) return null;
+
+  if (anchor.anchorKind === "sf_finish" && kind === "end") return base;
+  if (anchor.anchorKind === "sf_start" && kind === "start") return base;
+  if (anchor.anchorKind === "sf_finish" && kind === "start") {
+    return base - lap.lapTimeSec;
+  }
+  if (anchor.anchorKind === "sf_start" && kind === "end") {
+    return base + lap.lapTimeSec;
+  }
+  return null;
+}
+
+function walkFromAnchorFinish(
+  driver: ManualDriver,
+  lapNumber: number,
+  sync: ManualSessionSync
+): number | null {
+  const anchor = sync.anchor;
+  const base = anchorBaseTime(sync);
+  if (!anchor || base == null || anchor.anchorKind !== "sf_finish") return null;
+
+  const lapMap = lapTimeMap(driver);
   const anchorLap = anchor.lapNumber;
+  if (!lapMap.has(lapNumber)) return null;
 
-  if (!driver.laps.some((l) => l.lapNumber === lapNumber)) return null;
+  const same = sameHeatTimeAtAnchorLap(driver, lapNumber, sync, "end");
+  if (same != null) return same;
 
-  /** Same heat: all drivers cross SF on the same lap number at roughly the same video time. */
-  if (lapNumber === anchorLap) return anchorT;
-
-  const lapMap = new Map(driver.laps.map((l) => [l.lapNumber, l.lapTimeSec]));
   if (!lapMap.has(anchorLap)) return null;
 
   if (lapNumber > anchorLap) {
-    let t = anchorT;
+    let t = base;
     for (let n = anchorLap + 1; n <= lapNumber; n++) {
       const dt = lapMap.get(n);
       if (dt == null) return null;
@@ -35,7 +71,7 @@ export function predictSfEndTime(
     return t;
   }
 
-  let t = anchorT;
+  let t = base;
   for (let n = anchorLap; n > lapNumber; n--) {
     const dt = lapMap.get(n);
     if (dt == null) return null;
@@ -44,15 +80,88 @@ export function predictSfEndTime(
   return t;
 }
 
+function walkFromAnchorStart(
+  driver: ManualDriver,
+  lapNumber: number,
+  sync: ManualSessionSync
+): number | null {
+  const anchor = sync.anchor;
+  const base = anchorBaseTime(sync);
+  if (!anchor || base == null || anchor.anchorKind !== "sf_start") return null;
+
+  const lapMap = lapTimeMap(driver);
+  const anchorLap = anchor.lapNumber;
+  if (!lapMap.has(lapNumber)) return null;
+
+  const same = sameHeatTimeAtAnchorLap(driver, lapNumber, sync, "start");
+  if (same != null) return same;
+
+  if (!lapMap.has(anchorLap)) return null;
+
+  if (lapNumber > anchorLap) {
+    let t = base;
+    for (let n = anchorLap; n < lapNumber; n++) {
+      const dt = lapMap.get(n);
+      if (dt == null) return null;
+      t += dt;
+    }
+    return t;
+  }
+
+  let t = base;
+  for (let n = anchorLap - 1; n >= lapNumber; n--) {
+    const dt = lapMap.get(n);
+    if (dt == null) return null;
+    t -= dt;
+  }
+  return t;
+}
+
+/** Predicted video time (sec) when driver crosses SF at end of lapNumber. */
+export function predictSfEndTime(
+  driver: ManualDriver,
+  lapNumber: number,
+  timingSession: ManualTimingSession
+): number | null {
+  const sync = timingSession.sync;
+  const key = lapSfKey(driver.role, lapNumber);
+  if (sync.perLapSfEnd?.[key] != null) return sync.perLapSfEnd[key]!;
+
+  const anchor = sync.anchor;
+  if (!anchor) return null;
+
+  const same = sameHeatTimeAtAnchorLap(driver, lapNumber, sync, "end");
+  if (same != null) return same;
+
+  if (anchor.anchorKind === "sf_finish") {
+    return walkFromAnchorFinish(driver, lapNumber, sync);
+  }
+
+  const start = walkFromAnchorStart(driver, lapNumber, sync);
+  if (start == null) return null;
+  const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
+  if (!lap || lap.lapTimeSec <= 0) return null;
+  return start + lap.lapTimeSec;
+}
+
 export function predictSfStartTime(
   driver: ManualDriver,
   lapNumber: number,
-  sync: ManualSyncState,
-  allDrivers: ManualDriver[]
+  timingSession: ManualTimingSession
 ): number | null {
-  const end = predictSfEndTime(driver, lapNumber, sync, allDrivers);
-  if (end == null) return null;
+  const sync = timingSession.sync;
+  const anchor = sync.anchor;
+  if (!anchor) return null;
 
+  const same = sameHeatTimeAtAnchorLap(driver, lapNumber, sync, "start");
+  if (same != null) return same;
+
+  if (anchor.anchorKind === "sf_start") {
+    return walkFromAnchorStart(driver, lapNumber, sync);
+  }
+
+  const end = walkFromAnchorFinish(driver, lapNumber, sync);
+  if (end == null) return null;
   const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
   if (!lap || lap.lapTimeSec <= 0) return null;
 
@@ -61,14 +170,14 @@ export function predictSfStartTime(
     .sort((a, b) => b.lapNumber - a.lapNumber)[0];
 
   if (prev) {
-    return predictSfEndTime(driver, prev.lapNumber, sync, allDrivers);
+    return predictSfEndTime(driver, prev.lapNumber, timingSession);
   }
 
-  /** No prior lap: start = finish − transponder time (e.g. anchored lap 1 finish). */
   return end - lap.lapTimeSec;
 }
 
 export type LapSfPrediction = {
+  sessionId: string;
   driverRole: DriverRole;
   lapNumber: number;
   lapTimeSec: number;
@@ -78,28 +187,61 @@ export type LapSfPrediction = {
 };
 
 export function buildSfPredictions(
-  drivers: ManualDriver[],
-  sync: ManualSyncState,
-  selectedLaps: { me: number[]; competitor: number[] }
+  timingSession: ManualTimingSession,
+  lapNumbers: { role: DriverRole; lapNumber: number }[]
 ): LapSfPrediction[] {
   const out: LapSfPrediction[] = [];
-  for (const role of ["me", "competitor"] as DriverRole[]) {
-    const driver = drivers.find((d) => d.role === role);
+  const sync = timingSession.sync;
+  for (const { role, lapNumber } of lapNumbers) {
+    const driver = timingSession.drivers.find((d) => d.role === role);
     if (!driver) continue;
-    const laps = role === "me" ? selectedLaps.me : selectedLaps.competitor;
-    for (const lapNumber of laps) {
-      const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
-      if (!lap) continue;
-      const key = lapSfKey(role, lapNumber);
-      out.push({
-        driverRole: role,
-        lapNumber,
-        lapTimeSec: lap.lapTimeSec,
-        predictedEndSec: predictSfEndTime(driver, lapNumber, sync, drivers),
-        predictedStartSec: predictSfStartTime(driver, lapNumber, sync, drivers),
-        overridden: sync.perLapSfEnd?.[key] != null,
-      });
-    }
+    const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
+    if (!lap) continue;
+    const key = lapSfKey(role, lapNumber);
+    out.push({
+      sessionId: timingSession.sessionId,
+      driverRole: role,
+      lapNumber,
+      lapTimeSec: lap.lapTimeSec,
+      predictedEndSec: predictSfEndTime(driver, lapNumber, timingSession),
+      predictedStartSec: predictSfStartTime(driver, lapNumber, timingSession),
+      overridden: sync.perLapSfEnd?.[key] != null,
+    });
   }
   return out;
+}
+
+/** @deprecated use session-scoped predictSfEndTime */
+export function predictSfEndTimeLegacy(
+  driver: ManualDriver,
+  lapNumber: number,
+  sync: ManualSessionSync,
+  _allDrivers: ManualDriver[]
+): number | null {
+  const timingSession: ManualTimingSession = {
+    sessionId: "legacy",
+    label: "",
+    isOnVideo: true,
+    drivers: _allDrivers,
+    sync,
+  };
+  return predictSfEndTime(driver, lapNumber, timingSession);
+}
+
+/** @deprecated use session-scoped predictSfStartTime */
+export function predictSfStartTimeLegacy(
+  driver: ManualDriver,
+  lapNumber: number,
+  sync: ManualSessionSync,
+  allDrivers: ManualDriver[]
+): number | null {
+  return predictSfEndTimeLegacy(driver, lapNumber, sync, allDrivers) != null
+    ? predictSfStartTime(driver, lapNumber, {
+        sessionId: "legacy",
+        label: "",
+        isOnVideo: true,
+        drivers: allDrivers,
+        sync,
+      })
+    : null;
 }

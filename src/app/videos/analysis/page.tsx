@@ -34,10 +34,10 @@ export default async function VideoAnalysisPage(): Promise<ReactNode> {
         </div>
         <div className="flex flex-wrap gap-2 self-start">
           <Link
-            href="/videos/overlay"
+            href="/videos/analysis/manual/new"
             className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted"
           >
-            Overlay compare
+            New lap sync
           </Link>
         </div>
       </header>

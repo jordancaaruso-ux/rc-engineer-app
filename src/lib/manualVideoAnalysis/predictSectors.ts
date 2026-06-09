@@ -1,5 +1,6 @@
-import type { DriverRole, ManualVideoSessionV1 } from "./types";
+import type { DriverRole, ManualVideoSessionV2 } from "./types";
 import { LAP_START_LINE_KEY, lapSfKey } from "./types";
+import { findTimingSession } from "./sessionModel";
 import { predictSfEndTime, predictSfStartTime } from "./sync";
 import type { SectorLineInfo } from "./sectors";
 
@@ -7,11 +8,11 @@ export type PredictedCrossing = {
   lineKey: string;
   label: string;
   videoTimeSec: number;
-  /** True when saved in session.marks */
   confirmed: boolean;
 };
 
 export type LapAlignmentPreview = {
+  sessionId: string;
   driverRole: DriverRole;
   lapNumber: number;
   lapTimeSec: number;
@@ -41,7 +42,6 @@ export function isValidLapSpan(start: number | null, end: number | null): boolea
   return parseValidLapSpan(start, end) != null;
 }
 
-/** Chronological: lap start (SF) → sectors → lap finish (SF). */
 export function getLapAlignSteps(preview: LapAlignmentPreview): LapAlignStep[] {
   const span = parseValidLapSpan(preview.lapStartSec, preview.lapEndSec);
   if (!span) return [];
@@ -87,17 +87,21 @@ export function getLapAlignSteps(preview: LapAlignmentPreview): LapAlignStep[] {
 }
 
 function getMarkTime(
-  session: ManualVideoSessionV1,
+  session: ManualVideoSessionV2,
+  sessionId: string,
   role: DriverRole,
   lapNumber: number,
   lineKey: string
 ): number | undefined {
   return session.marks.find(
-    (m) => m.driverRole === role && m.lapNumber === lapNumber && m.lineKey === lineKey
+    (m) =>
+      m.sessionId === sessionId &&
+      m.driverRole === role &&
+      m.lapNumber === lapNumber &&
+      m.lineKey === lineKey
   )?.videoTimeSec;
 }
 
-/** Equal split of lap span across sector lines (non-SF) then finish at lap end. */
 export function predictEqualSplitCrossings(
   lapStartSec: number,
   lapEndSec: number,
@@ -127,26 +131,32 @@ export function predictEqualSplitCrossings(
 }
 
 export function getLapAlignmentPreview(
-  session: ManualVideoSessionV1,
+  session: ManualVideoSessionV2,
   sectorLines: SectorLineInfo[],
+  sessionId: string,
   role: DriverRole,
   lapNumber: number
 ): LapAlignmentPreview | null {
-  const driver = session.drivers.find((d) => d.role === role);
+  const timingSession = findTimingSession(session, sessionId);
+  if (!timingSession) return null;
+  const driver = timingSession.drivers.find((d) => d.role === role);
   if (!driver) return null;
   const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
   if (!lap) return null;
 
+  const sync = timingSession.sync;
+
   const lapStartSec =
-    getMarkTime(session, role, lapNumber, LAP_START_LINE_KEY) ??
-    predictSfStartTime(driver, lapNumber, session.sync, session.drivers);
+    getMarkTime(session, sessionId, role, lapNumber, LAP_START_LINE_KEY) ??
+    predictSfStartTime(driver, lapNumber, timingSession);
   const lapEndSec =
-    getMarkTime(session, role, lapNumber, "sf") ??
-    session.sync.perLapSfEnd?.[lapSfKey(role, lapNumber)] ??
-    predictSfEndTime(driver, lapNumber, session.sync, session.drivers);
+    getMarkTime(session, sessionId, role, lapNumber, "sf") ??
+    sync.perLapSfEnd?.[lapSfKey(role, lapNumber)] ??
+    predictSfEndTime(driver, lapNumber, timingSession);
 
   if (!parseValidLapSpan(lapStartSec, lapEndSec)) {
     return {
+      sessionId,
       driverRole: role,
       lapNumber,
       lapTimeSec: lap.lapTimeSec,
@@ -159,11 +169,12 @@ export function getLapAlignmentPreview(
   const span = parseValidLapSpan(lapStartSec, lapEndSec)!;
   const predicted = predictEqualSplitCrossings(span.start, span.end, sectorLines);
   const crossings: PredictedCrossing[] = predicted.map((p) => {
-    const marked = getMarkTime(session, role, lapNumber, p.lineKey);
+    const marked = getMarkTime(session, sessionId, role, lapNumber, p.lineKey);
     return { ...p, videoTimeSec: marked ?? p.videoTimeSec, confirmed: marked != null };
   });
 
   return {
+    sessionId,
     driverRole: role,
     lapNumber,
     lapTimeSec: lap.lapTimeSec,
@@ -173,21 +184,27 @@ export function getLapAlignmentPreview(
   };
 }
 
-/** Write predicted alignment (marks at current preview times) for a lap. */
 export function confirmLapAlignmentMarks(
-  session: ManualVideoSessionV1,
+  session: ManualVideoSessionV2,
   sectorLines: SectorLineInfo[],
+  sessionId: string,
   role: DriverRole,
   lapNumber: number
-): ManualVideoSessionV1 {
-  const preview = getLapAlignmentPreview(session, sectorLines, role, lapNumber);
+): ManualVideoSessionV2 {
+  const preview = getLapAlignmentPreview(session, sectorLines, sessionId, role, lapNumber);
   if (!preview || preview.crossings.length === 0) return session;
 
   const marks = session.marks.filter(
-    (m) => !(m.driverRole === role && m.lapNumber === lapNumber)
+    (m) =>
+      !(
+        m.sessionId === sessionId &&
+        m.driverRole === role &&
+        m.lapNumber === lapNumber
+      )
   );
   if (preview.lapStartSec != null) {
     marks.push({
+      sessionId,
       driverRole: role,
       lapNumber,
       lineKey: LAP_START_LINE_KEY,
@@ -196,6 +213,7 @@ export function confirmLapAlignmentMarks(
   }
   for (const c of preview.crossings) {
     marks.push({
+      sessionId,
       driverRole: role,
       lapNumber,
       lineKey: c.lineKey,

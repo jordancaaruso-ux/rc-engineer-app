@@ -96,10 +96,10 @@ export function VideoAnalysisHub({ tracks }: { tracks: Track[] }) {
         <code className="block text-[10px] bg-muted/30 p-2 rounded">
           cd video-analysis && pip install -r requirements.txt
         </code>
-        <Link href="/videos/overlay" className="underline">
-          Video overlay
+        <Link href="/videos/analysis/manual/new" className="underline">
+          Lap sync & compare
         </Link>{" "}
-        — compare two clips visually.
+        — single video, ghost overlay at SF.
       </section>
     </div>
   );

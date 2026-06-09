@@ -1,5 +1,6 @@
-import type { ManualFrameMark, ManualVideoSessionV1 } from "./types";
+import type { ManualFrameMark, ManualVideoSessionV2 } from "./types";
 import { LAP_START_LINE_KEY, lapSfKey } from "./types";
+import { findTimingSession, primaryTimingSession } from "./sessionModel";
 import { predictSfEndTime, predictSfStartTime } from "./sync";
 import { bestIncludedLapNumbers } from "./timing";
 
@@ -18,6 +19,7 @@ export type ComputedSectorSplit = {
 };
 
 export type LapSectorBreakdown = {
+  sessionId: string;
   driverRole: "me" | "competitor";
   lapNumber: number;
   lapTimeSec: number;
@@ -29,23 +31,31 @@ export type LapSectorBreakdown = {
 
 function getMark(
   marks: ManualFrameMark[],
+  sessionId: string,
   role: "me" | "competitor",
   lapNumber: number,
   lineKey: string
 ): number | undefined {
   const m = marks.find(
-    (x) => x.driverRole === role && x.lapNumber === lapNumber && x.lineKey === lineKey
+    (x) =>
+      x.sessionId === sessionId &&
+      x.driverRole === role &&
+      x.lapNumber === lapNumber &&
+      x.lineKey === lineKey
   );
   return m?.videoTimeSec;
 }
 
 export function computeLapBreakdown(
-  session: ManualVideoSessionV1,
+  session: ManualVideoSessionV2,
   sectorLines: SectorLineInfo[],
+  sessionId: string,
   driverRole: "me" | "competitor",
   lapNumber: number
 ): LapSectorBreakdown | null {
-  const driver = session.drivers.find((d) => d.role === driverRole);
+  const timingSession = findTimingSession(session, sessionId);
+  if (!timingSession) return null;
+  const driver = timingSession.drivers.find((d) => d.role === driverRole);
   if (!driver) return null;
   const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
   if (!lap) return null;
@@ -53,20 +63,21 @@ export function computeLapBreakdown(
   const ordered = [...sectorLines].sort((a, b) => a.sortOrder - b.sortOrder);
   const nonSf = ordered.filter((l) => l.lineKey !== "sf");
   const sfKey = "sf";
+  const sync = timingSession.sync;
 
   let lapStart =
-    getMark(session.marks, driverRole, lapNumber, LAP_START_LINE_KEY) ??
-    predictSfStartTime(driver, lapNumber, session.sync, session.drivers);
+    getMark(session.marks, sessionId, driverRole, lapNumber, LAP_START_LINE_KEY) ??
+    predictSfStartTime(driver, lapNumber, timingSession);
   let lapEnd =
-    getMark(session.marks, driverRole, lapNumber, sfKey) ??
-    session.sync.perLapSfEnd?.[lapSfKey(driverRole, lapNumber)] ??
-    predictSfEndTime(driver, lapNumber, session.sync, session.drivers);
+    getMark(session.marks, sessionId, driverRole, lapNumber, sfKey) ??
+    sync.perLapSfEnd?.[lapSfKey(driverRole, lapNumber)] ??
+    predictSfEndTime(driver, lapNumber, timingSession);
 
   const sectors: ComputedSectorSplit[] = [];
   let prev = lapStart;
 
   for (const line of nonSf) {
-    const t = getMark(session.marks, driverRole, lapNumber, line.lineKey);
+    const t = getMark(session.marks, sessionId, driverRole, lapNumber, line.lineKey);
     if (t == null || prev == null) {
       sectors.push({
         lineKey: line.lineKey,
@@ -99,10 +110,17 @@ export function computeLapBreakdown(
   }
 
   const requiredKeys = [...nonSf.map((l) => l.lineKey), sfKey];
-  const complete = requiredKeys.every((k) => getMark(session.marks, driverRole, lapNumber, k) != null) ||
-    (nonSf.every((l) => getMark(session.marks, driverRole, lapNumber, l.lineKey) != null) && lapEnd != null);
+  const complete =
+    requiredKeys.every(
+      (k) => getMark(session.marks, sessionId, driverRole, lapNumber, k) != null
+    ) ||
+    (nonSf.every(
+      (l) => getMark(session.marks, sessionId, driverRole, lapNumber, l.lineKey) != null
+    ) &&
+      lapEnd != null);
 
   return {
+    sessionId,
     driverRole,
     lapNumber,
     lapTimeSec: lap.lapTimeSec,
@@ -122,26 +140,48 @@ export type SectorCompareRow = {
 };
 
 export function compareBestLaps(
-  session: ManualVideoSessionV1,
+  session: ManualVideoSessionV2,
   sectorLines: SectorLineInfo[]
 ): SectorCompareRow[] {
+  const primary = primaryTimingSession(session);
+  if (!primary) return [];
+  const sessionId = primary.sessionId;
+
   const meLaps = session.selectedLaps.me;
   const compLaps = session.selectedLaps.competitor;
   if (!meLaps.length || !compLaps.length) return [];
 
-  const meBest = Math.min(...meLaps.map((n) => session.drivers.find((d) => d.role === "me")!.laps.find((l) => l.lapNumber === n)!.lapTimeSec));
+  const meDriver = primary.drivers.find((d) => d.role === "me");
+  const compDriver = primary.drivers.find((d) => d.role === "competitor");
+  if (!meDriver || !compDriver) return [];
+
+  const meBest = Math.min(
+    ...meLaps.map(
+      (n) => meDriver.laps.find((l) => l.lapNumber === n)!.lapTimeSec
+    )
+  );
   const meLapNum = meLaps.find((n) => {
-    const l = session.drivers.find((d) => d.role === "me")!.laps.find((x) => x.lapNumber === n);
+    const l = meDriver.laps.find((x) => x.lapNumber === n);
     return l && l.lapTimeSec === meBest;
   })!;
-  const compBest = Math.min(...compLaps.map((n) => session.drivers.find((d) => d.role === "competitor")!.laps.find((l) => l.lapNumber === n)!.lapTimeSec));
+  const compBest = Math.min(
+    ...compLaps.map(
+      (n) => compDriver.laps.find((l) => l.lapNumber === n)!.lapTimeSec
+    )
+  );
   const compLapNum = compLaps.find((n) => {
-    const l = session.drivers.find((d) => d.role === "competitor")!.laps.find((x) => x.lapNumber === n);
+    const l = compDriver.laps.find((x) => x.lapNumber === n);
     return l && l.lapTimeSec === compBest;
   })!;
 
-  const meBd = computeLapBreakdown(session, sectorLines, "me", meLapNum);
-  const compBd = computeLapBreakdown(session, sectorLines, "competitor", compLapNum);
+  const meBd = computeLapBreakdown(session, sectorLines, sessionId, "me", meLapNum);
+  const compBd = computeLapBreakdown(
+    session,
+    sectorLines,
+    sessionId,
+    "competitor",
+    compLapNum
+  );
   if (!meBd || !compBd) return [];
 
   const keys = new Set([
@@ -168,14 +208,15 @@ export function compareBestLaps(
 }
 
 export function averageSectorSplits(
-  session: ManualVideoSessionV1,
+  session: ManualVideoSessionV2,
   sectorLines: SectorLineInfo[],
+  sessionId: string,
   role: "me" | "competitor"
 ): Map<string, number> {
-  const laps = bestIncludedLapNumbers(session, role, 3);
+  const laps = bestIncludedLapNumbers(session, sessionId, role, 3);
   const sums = new Map<string, { sum: number; count: number }>();
   for (const lapNumber of laps) {
-    const bd = computeLapBreakdown(session, sectorLines, role, lapNumber);
+    const bd = computeLapBreakdown(session, sectorLines, sessionId, role, lapNumber);
     if (!bd) continue;
     for (const s of bd.sectors) {
       if (s.splitSec <= 0) continue;

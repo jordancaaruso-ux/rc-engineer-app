@@ -6,9 +6,10 @@ import { parseVideoAnalysisResultV1 } from "@/lib/videoAnalysis/types";
 import { computeSectorMatrix } from "@/lib/videoAnalysis/sectorStats";
 import type { MotIdCorrection } from "@/lib/videoAnalysis/types";
 import { compareVideoToTransponder } from "@/lib/videoAnalysis/compareTransponder";
-import { parseManualVideoSessionV1 } from "@/lib/manualVideoAnalysis/types";
+import { parseManualVideoSession } from "@/lib/manualVideoAnalysis/types";
 import { normalizeManualSession } from "@/lib/manualVideoAnalysis/timing";
 import { buildSfPredictions } from "@/lib/manualVideoAnalysis/sync";
+import { primaryTimingSession } from "@/lib/manualVideoAnalysis/sessionModel";
 import {
   compareBestLaps,
   averageSectorSplits,
@@ -49,7 +50,7 @@ export async function GET(_request: Request, { params }: Params) {
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const manualSession =
-    job.analysisMode === "manual" ? parseManualVideoSessionV1(job.manualJson) : null;
+    job.analysisMode === "manual" ? parseManualVideoSession(job.manualJson) : null;
 
   const sectorLineInfos =
     job.profile.sectorLines.map((l) => ({
@@ -64,20 +65,28 @@ export async function GET(_request: Request, { params }: Params) {
 
   let manualPayload: Record<string, unknown> | null = null;
   if (manualSession) {
-    const sfPredictions = buildSfPredictions(
-      manualSession.drivers,
-      manualSession.sync,
-      manualSession.selectedLaps
-    );
+    const primary = primaryTimingSession(manualSession);
+    const lapNums: { role: "me" | "competitor"; lapNumber: number }[] = [
+      ...manualSession.selectedLaps.me.map((lapNumber) => ({
+        role: "me" as const,
+        lapNumber,
+      })),
+      ...manualSession.selectedLaps.competitor.map((lapNumber) => ({
+        role: "competitor" as const,
+        lapNumber,
+      })),
+    ];
+    const sfPredictions = primary ? buildSfPredictions(primary, lapNums) : [];
+    const primaryId = primary?.sessionId ?? "";
     manualPayload = {
       session: manualSession,
       sfPredictions,
       compareBest: compareBestLaps(manualSession, sectorLineInfos),
       avgSectorsMe: Object.fromEntries(
-        averageSectorSplits(manualSession, sectorLineInfos, "me")
+        averageSectorSplits(manualSession, sectorLineInfos, primaryId, "me")
       ),
       avgSectorsCompetitor: Object.fromEntries(
-        averageSectorSplits(manualSession, sectorLineInfos, "competitor")
+        averageSectorSplits(manualSession, sectorLineInfos, primaryId, "competitor")
       ),
     };
   }
@@ -135,7 +144,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   let manualJsonUpdate: object | undefined;
   if (body?.manualJson !== undefined) {
-    const parsed = parseManualVideoSessionV1(body.manualJson);
+    const parsed = parseManualVideoSession(body.manualJson);
     if (!parsed) {
       return NextResponse.json({ error: "Invalid manualJson" }, { status: 400 });
     }

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   emptyManualSession,
-  type ManualVideoSessionV1,
   type ManualDriver,
+  type ManualTimingSession,
 } from "@/lib/manualVideoAnalysis/types";
 import {
   applyTop3LapSelection,
@@ -26,8 +26,9 @@ function NewManualAnalysisForm() {
   const [trackId, setTrackId] = useState(presetTrackId);
   const [profileId, setProfileId] = useState(presetProfileId);
   const [runId, setRunId] = useState(presetRunId);
-  const [timingUrl, setTimingUrl] = useState("");
+  const [timingUrls, setTimingUrls] = useState("");
   const [useRun, setUseRun] = useState(Boolean(presetRunId));
+  const [timingSessions, setTimingSessions] = useState<ManualTimingSession[]>([]);
   const [drivers, setDrivers] = useState<ManualDriver[]>([]);
   const [meKey, setMeKey] = useState("");
   const [competitorKey, setCompetitorKey] = useState("");
@@ -75,18 +76,23 @@ function NewManualAnalysisForm() {
         return;
       }
       const d = await res.json();
+      setTimingSessions(d.sessions ?? []);
       applyLoadedDrivers(d.drivers ?? [], d.defaults);
       return;
     }
-    if (!timingUrl.trim()) {
+    const urls = timingUrls
+      .split(/\n/)
+      .map((u) => u.trim())
+      .filter(Boolean);
+    if (urls.length === 0) {
       setLoading(false);
-      setMsg("Enter timing URL or link a Run");
+      setMsg("Enter one or more timing URLs (one per line) or link a Run");
       return;
     }
     const res = await fetch("/api/video-analysis/manual/parse-url", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: timingUrl.trim() }),
+      body: JSON.stringify({ urls }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -95,7 +101,11 @@ function NewManualAnalysisForm() {
       return;
     }
     const d = await res.json();
+    setTimingSessions(d.sessions ?? []);
     applyLoadedDrivers(d.drivers ?? [], d.defaults);
+    if (d.errors?.length) {
+      setMsg(`Some URLs failed: ${(d.errors as string[]).join("; ")}`);
+    }
   }
 
   function applyLoadedDrivers(
@@ -110,7 +120,7 @@ function NewManualAnalysisForm() {
       setMsg("Need at least two drivers in the timing data to compare.");
     } else if (!keys.meKey || !keys.competitorKey) {
       setMsg("Select yourself (Me) and a competitor in the dropdowns below.");
-    } else {
+    } else if (!msg?.startsWith("Some URLs")) {
       setMsg(null);
     }
   }
@@ -136,13 +146,28 @@ function NewManualAnalysisForm() {
       setMsg("Me and competitor must be different drivers.");
       return;
     }
-    let session: ManualVideoSessionV1 = {
+    if (timingSessions.length === 0) {
+      setMsg("Load drivers & laps first.");
+      return;
+    }
+
+    const sessionsWithRoles = timingSessions.map((ts) => ({
+      ...ts,
+      drivers: setDriverRoles(ts.drivers, meKey, competitorKey),
+    }));
+
+    const urlList = timingUrls
+      .split(/\n/)
+      .map((u) => u.trim())
+      .filter(Boolean);
+
+    let session = applyTop3LapSelection({
       ...emptyManualSession(),
       timingSource: useRun && runId.trim() ? "run" : "url",
-      timingUrl: useRun ? null : timingUrl.trim(),
-      drivers: setDriverRoles(drivers, meKey, competitorKey),
-    };
-    session = applyTop3LapSelection(session);
+      timingUrls: useRun ? [] : urlList,
+      timingSessions: sessionsWithRoles,
+      compare: { my: null, competitor: null, alignAt: "sf_start" },
+    });
 
     const res = await fetch("/api/video-analysis/jobs", {
       method: "POST",
@@ -174,6 +199,7 @@ function NewManualAnalysisForm() {
             setTrackId(e.target.value);
             setProfileId("");
             setDrivers([]);
+            setTimingSessions([]);
             setMeKey("");
             setCompetitorKey("");
           }}
@@ -219,7 +245,7 @@ function NewManualAnalysisForm() {
         </label>
         <label className="flex items-center gap-1">
           <input type="radio" checked={!useRun} onChange={() => setUseRun(false)} />
-          Timing URL
+          Timing URL(s)
         </label>
       </div>
 
@@ -235,12 +261,12 @@ function NewManualAnalysisForm() {
         </label>
       ) : (
         <label className="text-xs">
-          LiveRC / timing URL
-          <input
-            className="mt-1 w-full rounded-md border border-border px-2 py-1"
-            value={timingUrl}
-            onChange={(e) => setTimingUrl(e.target.value)}
-            placeholder="https://..."
+          LiveRC / timing URLs
+          <textarea
+            className="mt-1 w-full rounded-md border border-border px-2 py-1 min-h-[72px] font-mono text-xs"
+            value={timingUrls}
+            onChange={(e) => setTimingUrls(e.target.value)}
+            placeholder={"https://...\nhttps://... (one per line for multi-session)"}
           />
         </label>
       )}
@@ -253,6 +279,12 @@ function NewManualAnalysisForm() {
       >
         {loading ? "Loading…" : "Load drivers & laps"}
       </button>
+
+      {timingSessions.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {timingSessions.length} timing session{timingSessions.length === 1 ? "" : "s"} loaded
+        </p>
+      )}
 
       {drivers.length > 0 && (
         <>
@@ -284,9 +316,6 @@ function NewManualAnalysisForm() {
               ))}
             </select>
           </label>
-          <p className="text-xs text-muted-foreground">
-            Top 3 laps per driver are picked automatically; discard outliers on the analysis page.
-          </p>
         </>
       )}
 
@@ -295,7 +324,7 @@ function NewManualAnalysisForm() {
         className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground w-fit"
         onClick={() => void createJob()}
       >
-        Start manual analysis
+        Start video analysis
       </button>
 
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
@@ -311,9 +340,9 @@ export default function NewManualVideoAnalysisPage() {
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">Manual sector analysis</h1>
+          <h1 className="page-title">Video lap sync</h1>
           <p className="page-subtitle">
-            Sync SF to transponder, mark sector crossings on video, compare best laps.
+            Load transponder laps, anchor SF on video, compare laps with ghost overlay, mark sectors.
           </p>
         </div>
       </header>

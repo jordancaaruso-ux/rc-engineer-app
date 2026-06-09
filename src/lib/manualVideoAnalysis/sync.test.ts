@@ -5,8 +5,8 @@ import {
   setLapIncluded,
   pickBestNLapNumbers,
 } from "./timing";
-import { emptyManualSession } from "./types";
-import type { ManualDriver, ManualSyncState } from "./types";
+import { emptyManualSession, newTimingSessionId } from "./types";
+import type { ManualDriver, ManualTimingSession } from "./types";
 import { getLapAlignmentPreview, getLapAlignSteps } from "./predictSectors";
 
 const me: ManualDriver = {
@@ -33,22 +33,36 @@ const comp: ManualDriver = {
   ],
 };
 
-const sync: ManualSyncState = {
-  anchor: { videoTimeSec: 100, lapNumber: 2, driverRole: "me" },
+const timingSession: ManualTimingSession = {
+  sessionId: "test",
+  label: "Test",
+  isOnVideo: true,
+  drivers: [me, comp],
+  sync: {
+    anchor: {
+      videoTimeSec: 100,
+      lapNumber: 2,
+      driverRole: "me",
+      anchorKind: "sf_finish",
+    },
+  },
 };
 
-const drivers = [me, comp];
-const t3me = predictSfEndTime(me, 3, sync, drivers);
+const t3me = predictSfEndTime(me, 3, timingSession);
 if (t3me == null || Math.abs(t3me - 112.4) > 0.01) {
   throw new Error(`expected lap 3 me at 112.4, got ${t3me}`);
 }
 
-const t3comp = predictSfEndTime(comp, 3, sync, drivers);
+const t3comp = predictSfEndTime(comp, 3, timingSession);
 if (t3comp == null || Math.abs(t3comp - 112) > 0.01) {
   throw new Error(`expected comp lap 3 at 112 (anchor + comp lap 3), got ${t3comp}`);
 }
 
-const preds = buildSfPredictions(drivers, sync, { me: [2, 3], competitor: [3] });
+const preds = buildSfPredictions(timingSession, [
+  { role: "me", lapNumber: 2 },
+  { role: "me", lapNumber: 3 },
+  { role: "competitor", lapNumber: 3 },
+]);
 if (preds.length < 3) throw new Error("predictions missing");
 
 const allComp: ManualDriver[] = [
@@ -60,9 +74,10 @@ if (keys.meKey !== "a" || keys.competitorKey !== "b") {
   throw new Error(`expected a/b keys, got ${keys.meKey}/${keys.competitorKey}`);
 }
 
+const sessionId = newTimingSessionId();
 let session = applyTop3LapSelection({
   ...emptyManualSession(),
-  drivers: [me, comp],
+  timingSessions: [{ ...timingSession, sessionId, drivers: [me, comp] }],
 });
 const meTop = pickBestNLapNumbers(me.laps, 3);
 if (
@@ -71,7 +86,7 @@ if (
 ) {
   throw new Error("expected top 3 fastest laps selected");
 }
-session = setLapIncluded(session, "me", 2, false);
+session = setLapIncluded(session, sessionId, "me", 2, false);
 if (session.selectedLaps.me.includes(2)) {
   throw new Error("discarded lap 2 should leave top 3");
 }
@@ -86,10 +101,23 @@ const lines = [
 ];
 const sess = applyTop3LapSelection({
   ...emptyManualSession(),
-  drivers: [me, comp],
-  sync: { anchor: { videoTimeSec: 100, lapNumber: 2, driverRole: "me" } },
+  timingSessions: [
+    {
+      ...timingSession,
+      sessionId: "align",
+      drivers: [me, comp],
+      sync: {
+        anchor: {
+          videoTimeSec: 100,
+          lapNumber: 2,
+          driverRole: "me",
+          anchorKind: "sf_finish",
+        },
+      },
+    },
+  ],
 });
-const prev = getLapAlignmentPreview(sess, lines, "me", 3);
+const prev = getLapAlignmentPreview(sess, lines, "align", "me", 3);
 if (!prev?.lapEndSec || prev.lapEndSec < 112) {
   throw new Error(`lap 3 end should be ~112.4, got ${prev?.lapEndSec}`);
 }
@@ -101,11 +129,22 @@ if (!steps[steps.length - 1]?.isLapFinish) {
   throw new Error("last step should be lap finish SF");
 }
 
-const anchorL1 = {
-  anchor: { videoTimeSec: 50, lapNumber: 1, driverRole: "me" as const },
+const anchorL1Session: ManualTimingSession = {
+  sessionId: "l1",
+  label: "L1",
+  isOnVideo: true,
+  drivers: [me],
+  sync: {
+    anchor: {
+      videoTimeSec: 50,
+      lapNumber: 1,
+      driverRole: "me",
+      anchorKind: "sf_finish",
+    },
+  },
 };
-const tEnd1 = predictSfEndTime(me, 1, anchorL1, [me]);
-const tStart1 = predictSfStartTime(me, 1, anchorL1, [me]);
+const tEnd1 = predictSfEndTime(me, 1, anchorL1Session);
+const tStart1 = predictSfStartTime(me, 1, anchorL1Session);
 if (tEnd1 !== 50 || tStart1 == null || Math.abs(tStart1 - (50 - 12.5)) > 0.01) {
   throw new Error(`lap 1 start should be finish - lap time, got start=${tStart1} end=${tEnd1}`);
 }

@@ -3,7 +3,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
-import { loadDriversFromTimingUrl } from "@/lib/manualVideoAnalysis/loadTiming";
+import { loadTimingSessionFromUrl } from "@/lib/manualVideoAnalysis/loadTiming";
 import { defaultDriverKeys } from "@/lib/manualVideoAnalysis/timing";
 
 export async function POST(request: Request) {
@@ -15,29 +15,56 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as {
     url?: string;
+    urls?: string[];
     primaryDriverName?: string | null;
   } | null;
 
-  if (!body?.url?.trim()) {
-    return NextResponse.json({ error: "url required" }, { status: 400 });
+  const urlList = [
+    ...(Array.isArray(body?.urls) ? body.urls : []),
+    ...(body?.url?.trim() ? [body.url.trim()] : []),
+  ]
+    .map((u) => u.trim())
+    .filter(Boolean);
+
+  if (urlList.length === 0) {
+    return NextResponse.json({ error: "url or urls required" }, { status: 400 });
   }
 
   const primaryDriverName =
-    body.primaryDriverName?.trim() ||
+    body?.primaryDriverName?.trim() ||
     (await getLiveRcDriverNameSetting(user.id)) ||
     null;
 
-  const result = await loadDriversFromTimingUrl(body.url.trim(), primaryDriverName, {
-    allowAnyPublicHost: isAuthAdminEmail(user.email),
-  });
-  if ("error" in result) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+  const allowAnyPublicHost = isAuthAdminEmail(user.email);
+  const sessions = [];
+  const errors: string[] = [];
+
+  for (const url of urlList) {
+    const result = await loadTimingSessionFromUrl(url, primaryDriverName, {
+      allowAnyPublicHost,
+    });
+    if ("error" in result) {
+      errors.push(`${url}: ${result.error}`);
+      continue;
+    }
+    sessions.push(result.session);
   }
 
+  if (sessions.length === 0) {
+    return NextResponse.json(
+      { error: errors.join("; ") || "No sessions parsed" },
+      { status: 400 }
+    );
+  }
+
+  const allDrivers = sessions.flatMap((s) => s.drivers);
+
   return NextResponse.json({
-    drivers: result.drivers,
-    parserId: result.parserId,
-    defaults: defaultDriverKeys(result.drivers),
+    sessions,
+    drivers: allDrivers,
+    parserId: "batch",
+    defaults: defaultDriverKeys(allDrivers),
     primaryDriverName,
+    errors: errors.length > 0 ? errors : undefined,
   });
 }

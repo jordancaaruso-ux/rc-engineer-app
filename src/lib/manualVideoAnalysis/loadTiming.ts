@@ -1,13 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import { parseTimingUrl } from "@/lib/lapUrlParsers/registry";
 import { validateTimingHttpUrlResolved } from "@/lib/lapImport/service";
-import { driversFromParseResult, driversFromRunImportedLapSets } from "./timing";
-import type { ManualDriver } from "./types";
+import {
+  driversFromParseResult,
+  driversFromRunImportedLapSets,
+  timingSessionFromParseResult,
+  timingSessionsFromRunImportedLapSets,
+} from "./timing";
+import type { ManualDriver, ManualTimingSession } from "./types";
 
-export async function loadDriversFromRun(
+export async function loadTimingSessionsFromRun(
   runId: string,
   userId: string
-): Promise<ManualDriver[] | null> {
+): Promise<ManualTimingSession[] | null> {
   const run = await prisma.run.findFirst({
     where: { id: runId, userId },
     include: {
@@ -17,14 +22,24 @@ export async function loadDriversFromRun(
     },
   });
   if (!run?.importedLapSets.length) return null;
-  return driversFromRunImportedLapSets(run.importedLapSets);
+  return timingSessionsFromRunImportedLapSets(run.importedLapSets);
 }
 
-export async function loadDriversFromTimingUrl(
+/** @deprecated use loadTimingSessionsFromRun */
+export async function loadDriversFromRun(
+  runId: string,
+  userId: string
+): Promise<ManualDriver[] | null> {
+  const sessions = await loadTimingSessionsFromRun(runId, userId);
+  if (!sessions?.length) return null;
+  return sessions[0]!.drivers;
+}
+
+export async function loadTimingSessionFromUrl(
   url: string,
   primaryDriverName?: string | null,
   options?: { allowAnyPublicHost?: boolean }
-): Promise<{ drivers: ManualDriver[]; parserId: string } | { error: string }> {
+): Promise<{ session: ManualTimingSession; parserId: string } | { error: string }> {
   const v = await validateTimingHttpUrlResolved(url, {
     allowAnyPublicHost: options?.allowAnyPublicHost,
   });
@@ -37,7 +52,18 @@ export async function loadDriversFromTimingUrl(
     return { error: parsed.message ?? "No laps found at URL" };
   }
   return {
-    drivers: driversFromParseResult(parsed, primaryDriverName),
+    session: timingSessionFromParseResult(parsed, v.normalized, primaryDriverName),
     parserId: parsed.parserId,
   };
+}
+
+/** @deprecated use loadTimingSessionFromUrl */
+export async function loadDriversFromTimingUrl(
+  url: string,
+  primaryDriverName?: string | null,
+  options?: { allowAnyPublicHost?: boolean }
+): Promise<{ drivers: ManualDriver[]; parserId: string } | { error: string }> {
+  const result = await loadTimingSessionFromUrl(url, primaryDriverName, options);
+  if ("error" in result) return result;
+  return { drivers: result.session.drivers, parserId: result.parserId };
 }

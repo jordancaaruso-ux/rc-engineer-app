@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { loadDriversFromRun } from "@/lib/manualVideoAnalysis/loadTiming";
+import { loadTimingSessionsFromRun } from "@/lib/manualVideoAnalysis/loadTiming";
 import { defaultDriverKeys } from "@/lib/manualVideoAnalysis/timing";
 
 export async function GET(request: Request) {
@@ -14,13 +14,19 @@ export async function GET(request: Request) {
   const runId = new URL(request.url).searchParams.get("runId");
   if (!runId) return NextResponse.json({ error: "runId required" }, { status: 400 });
 
-  const drivers = await loadDriversFromRun(runId, user.id);
-  if (!drivers?.length) {
+  const sessions = await loadTimingSessionsFromRun(runId, user.id);
+  if (!sessions?.length) {
     return NextResponse.json(
       { error: "No imported lap sets on this run" },
       { status: 404 }
     );
   }
 
-  return NextResponse.json({ drivers, defaults: defaultDriverKeys(drivers) });
+  const drivers = sessions.flatMap((s) => s.drivers);
+
+  return NextResponse.json({
+    sessions,
+    drivers,
+    defaults: defaultDriverKeys(drivers),
+  });
 }
