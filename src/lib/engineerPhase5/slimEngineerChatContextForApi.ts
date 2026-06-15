@@ -292,7 +292,7 @@ function openAiErrorMessage(data: Record<string, unknown> | undefined): string {
   return (data?.error as { message?: string } | undefined)?.message ?? "";
 }
 
-function isContextTooLargeOpenAiError(data: Record<string, unknown> | undefined): boolean {
+export function isContextTooLargeOpenAiError(data: Record<string, unknown> | undefined): boolean {
   const msg = openAiErrorMessage(data);
   return /tokens per min|Request too large|maximum context length|rate_limit_exceeded/i.test(msg);
 }
