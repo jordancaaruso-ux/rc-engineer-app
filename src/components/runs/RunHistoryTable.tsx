@@ -129,7 +129,7 @@ function CompactField({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 max-w-[min(100%,220px)] sm:min-w-[5.5rem] sm:max-w-[220px] shrink">
+    <div className="min-w-0 max-w-full sm:max-w-[220px] sm:min-w-[5.5rem]">
       <div className="ui-label-caps">{label}</div>
       <div className="ui-body-tight break-words">{children ?? value ?? "—"}</div>
     </div>
@@ -507,7 +507,7 @@ export function RunHistoryTable({
                   {memberLabel}
                 </td>
               ) : null}
-              <td className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs text-foreground leading-snug tabular-nums whitespace-nowrap">
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs text-foreground leading-snug tabular-nums max-md:whitespace-normal md:whitespace-nowrap">
                 <span title={formatRunCreatedAtDateTime(runInstant, displayTimeZone)}>
                   {formatRunDateCompact(runInstant, displayTimeZone)}
                 </span>
@@ -529,39 +529,41 @@ export function RunHistoryTable({
                   </div>
                 </td>
               ) : null}
-              <td className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {bestLapDisplay}
               </td>
-              <td className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {avg5Display}
               </td>
-              <td className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+              <td className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
                 {medianLapDisplay}
               </td>
               <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
                 {carDisplay}
               </td>
               <td
-                className="px-2 py-1.5 md:px-2 md:py-2 align-middle"
+                className="px-1 py-1.5 md:px-2 md:py-2 align-middle max-md:w-[26%]"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <div className="flex flex-wrap items-center justify-end gap-1">
+                <div className="flex flex-col items-stretch gap-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-1">
                   <button
                     type="button"
                     onClick={() => setSetupModalRunId(run.id)}
-                    className="ui-strong rounded-md border border-border bg-background px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition whitespace-nowrap"
+                    className="ui-strong rounded-md border border-border bg-background px-1 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition max-md:leading-tight"
                     title="View setup sheet for this run; compare to another run from the modal"
                   >
-                    View setup
+                    <span className="md:hidden">Setup</span>
+                    <span className="hidden md:inline">View setup</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setLapModalRunId(run.id)}
-                    className="ui-strong rounded-md border border-border bg-background px-1.5 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition whitespace-nowrap"
+                    className="ui-strong rounded-md border border-border bg-background px-1 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition max-md:leading-tight"
                     title="Open lap column compare for this run"
                   >
-                    Lap times
+                    <span className="md:hidden">Laps</span>
+                    <span className="hidden md:inline">Lap times</span>
                   </button>
                 </div>
               </td>
@@ -575,14 +577,16 @@ export function RunHistoryTable({
             </tr>
             {isExpanded && (
               <tr className="border-b border-border/80 bg-muted/40">
-                <td colSpan={totalCols} className="px-4 py-4">
-                  <RunDetail
-                    run={run}
-                    pickerRuns={allRunsDescending}
-                    runListSource={runListSource}
-                    displayTimeZone={displayTimeZone}
-                    allowRunMutations={allowRunMutations}
-                  />
+                <td colSpan={totalCols} className="px-2 py-3 md:px-4 md:py-4 max-w-0">
+                  <div className="min-w-0 max-w-full">
+                    <RunDetail
+                      run={run}
+                      pickerRuns={allRunsDescending}
+                      runListSource={runListSource}
+                      displayTimeZone={displayTimeZone}
+                      allowRunMutations={allowRunMutations}
+                    />
+                  </div>
                 </td>
               </tr>
             )}
@@ -850,7 +854,7 @@ function RunDetail({
   const dateTimeLabel = formatRunCreatedAtDateTime(runInstant, displayTimeZone);
 
   return (
-    <CardPanel className="bg-muted/40 space-y-3 text-sm">
+    <CardPanel className="bg-muted/40 space-y-3 text-sm min-w-0 max-w-full overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
         <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3 min-w-0 flex-1">
           <CompactField label="Date / time" value={dateTimeLabel} />
@@ -936,7 +940,7 @@ function RunDetail({
               />
             </div>
             {expandedLapStat && expandedLapStatDetail ? (
-              <p className="text-[10px] font-mono text-muted-foreground leading-snug">
+              <p className="text-[10px] font-mono text-muted-foreground leading-snug break-words">
                 {expandedLapStatDetail}
               </p>
             ) : null}
@@ -1136,7 +1140,7 @@ function DetailRow({
   return (
     <div>
       <span className="ui-title text-[11px] text-muted-foreground">{label}</span>
-      <div className={multiline ? "mt-0.5 whitespace-pre-wrap text-foreground" : "mt-0.5 text-foreground"}>{show}</div>
+      <div className={multiline ? "mt-0.5 whitespace-pre-wrap break-words text-foreground" : "mt-0.5 break-words text-foreground"}>{show}</div>
     </div>
   );
 }

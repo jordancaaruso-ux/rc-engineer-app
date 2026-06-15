@@ -306,7 +306,7 @@ export default async function RunHistoryPage({
     return (
       <details
         key={group.id}
-        className="rounded-xl border border-border bg-muted/70 overflow-hidden group/details"
+        className="rounded-xl border border-border bg-muted/70 min-w-0 max-w-full overflow-x-clip group/details"
         open={
           focusRunId
             ? group.runs.some((r) => r.id === focusRunId)
@@ -330,9 +330,9 @@ export default async function RunHistoryPage({
             </span>
           </div>
         </summary>
-        <div className="border-t border-border bg-muted/40">
-          <div className="max-md:overflow-x-visible md:overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="min-w-0 max-w-full border-t border-border bg-muted/40">
+          <div className="min-w-0 max-w-full">
+            <table className="w-full min-w-0 max-w-full text-sm max-md:table-fixed">
               <thead>
                 <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
                   {!teamMode ? (
@@ -355,17 +355,18 @@ export default async function RunHistoryPage({
                       Session
                     </th>
                   ) : null}
-                  <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                  <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
                     Best
                   </th>
-                  <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                    Avg top 5
+                  <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                    <span className="md:hidden">Top 5</span>
+                    <span className="hidden md:inline">Avg top 5</span>
                   </th>
-                  <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                  <th className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
                     Median
                   </th>
                   <th className="hidden md:table-cell px-4 py-2">Car</th>
-                  <th className="px-2 py-1.5 md:px-2 md:py-2 w-[4.5rem] md:w-auto whitespace-nowrap">
+                  <th className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px]">
                     Setup
                   </th>
                   <th className="hidden md:table-cell px-4 py-2">Track</th>
@@ -407,7 +408,7 @@ export default async function RunHistoryPage({
             <p className="page-subtitle">{pageSubtitle}</p>
           </div>
         </header>
-        <section className="page-body space-y-3">
+        <section className="page-body space-y-3 min-w-0 max-w-full">
           <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             <Link href="/runs/history" className="text-accent underline">
               Back to my sessions
@@ -426,7 +427,7 @@ export default async function RunHistoryPage({
           {pageSubtitle ? <p className="page-subtitle">{pageSubtitle}</p> : null}
         </div>
       </header>
-      <section className="page-body space-y-3">
+      <section className="page-body space-y-3 min-w-0 max-w-full">
         {teamsForUser.length > 0 ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="font-medium text-foreground/80">View:</span>
