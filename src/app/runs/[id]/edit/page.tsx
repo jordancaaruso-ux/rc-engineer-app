@@ -232,7 +232,7 @@ export default async function EditRunPage({
           }}
         />
         <div className="mt-8 max-w-2xl rounded-lg border border-border bg-card p-4">
-          <h2 className="text-sm font-medium mb-2">Video sector analysis</h2>
+          <h2 className="text-sm font-medium mb-2">Video lap sync</h2>
           <RunVideoAnalysisSection runId={run.id} trackId={run.trackId} />
         </div>
       </section>

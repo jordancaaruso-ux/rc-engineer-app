@@ -28,7 +28,7 @@ export function RunVideoAnalysisSection({
   if (!trackId) {
     return (
       <p className="text-xs text-muted-foreground">
-        Set a track on this run to use video sector analysis.
+        Set a track on this run to use video lap sync.
       </p>
     );
   }
@@ -46,7 +46,7 @@ export function RunVideoAnalysisSection({
           href={`/videos/analysis/manual/new?trackId=${trackId}&runId=${runId}`}
           className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
         >
-          Manual sector analysis
+          Lap sync
         </Link>
       </div>
       {jobs.length === 0 ? (

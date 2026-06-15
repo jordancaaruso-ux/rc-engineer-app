@@ -11,7 +11,8 @@ import {
   seekBottomAndSync,
 } from "@/components/videos/videoOverlayPlayback";
 import { hardSeekTop, seekVideoTo } from "@/components/videos/videoOverlaySync";
-import { VideoViewTransform } from "./VideoViewTransform";
+
+const SYNC_NUDGE_SEC = [0.05, 0.1, 0.2] as const;
 
 type Props = {
   videoSrc: string | null;
@@ -21,8 +22,11 @@ type Props = {
   offsetSec: number | null;
   /** True when my + competitor laps are picked — show dual-layer ghost view. */
   ghostCompareActive?: boolean;
-  /** Snap bottom playhead here when compare alignment updates. */
+  /** Snap bottom playhead here when compare laps are first picked. */
   alignBottomSec?: number | null;
+  /** Fine-tune ghost layer relative to transponder alignment (seconds). */
+  syncNudgeSec?: number;
+  onSyncNudge?: (deltaSec: number) => void;
   bottomLabel?: string;
   topLabel?: string;
   videoRef?: RefObject<HTMLVideoElement | null>;
@@ -69,6 +73,8 @@ export function DualPlayheadVideo({
   offsetSec,
   ghostCompareActive = false,
   alignBottomSec = null,
+  syncNudgeSec = 0,
+  onSyncNudge,
   bottomLabel = "Reference",
   topLabel = "Compare",
   videoRef,
@@ -139,14 +145,12 @@ export function DualPlayheadVideo({
     const singleRef = bottomRef;
     return (
       <div className="flex flex-col gap-2 min-w-0">
-        <VideoViewTransform>
-          <VideoWithLineOverlay
-            videoSrc={videoSrc}
-            lines={lines}
-            activeLineKey={activeLineKey}
-            videoRef={singleRef}
-          />
-        </VideoViewTransform>
+        <VideoWithLineOverlay
+          videoSrc={videoSrc}
+          lines={lines}
+          activeLineKey={activeLineKey}
+          videoRef={singleRef}
+        />
         <VideoFrameControls
           videoRef={singleRef}
           active={!!videoSrc}
@@ -159,47 +163,42 @@ export function DualPlayheadVideo({
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
-      <VideoViewTransform>
-        <div className="relative aspect-video w-full bg-black rounded-md overflow-hidden border border-border">
-          <video
-            ref={bottomRef}
-            src={videoSrc ?? undefined}
-            className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-            style={{ opacity: 0.5 }}
-            playsInline
-            preload="metadata"
-          />
-          <video
-            ref={topRef}
-            src={videoSrc ?? undefined}
-            className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-            style={{ opacity: 0.5 }}
-            playsInline
-            muted
-            preload="metadata"
-          />
-          <SectorLinesSvg lines={lines} activeLineKey={activeLineKey} />
-          <div className="absolute bottom-1 left-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
-            {bottomLabel}
-          </div>
-          <div className="absolute bottom-1 right-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
-            {topLabel} · ghost
-          </div>
-        </div>
-      </VideoViewTransform>
-      <p className="text-[10px] text-muted-foreground">
-        Both layers at 50% — bottom is your lap at SF, top is competitor at SF. Play both to scrub
-        in sync.
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <VideoFrameControls
-          videoRef={bottomRef}
-          secondaryVideoRef={topRef}
-          active={!!videoSrc}
-          playbackRate={playbackRate}
-          onPlaybackRateChange={setPlaybackRate}
-          afterStep={syncGhostToBottom}
+      <div className="relative aspect-video w-full bg-black rounded-md overflow-hidden border border-border">
+        <video
+          ref={bottomRef}
+          src={videoSrc ?? undefined}
+          className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+          style={{ opacity: 0.5 }}
+          playsInline
+          preload="metadata"
         />
+        <video
+          ref={topRef}
+          src={videoSrc ?? undefined}
+          className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+          style={{ opacity: 0.5 }}
+          playsInline
+          muted
+          preload="metadata"
+        />
+        <SectorLinesSvg lines={lines} activeLineKey={activeLineKey} />
+        <div className="absolute bottom-1 left-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
+          {bottomLabel}
+        </div>
+        <div className="absolute bottom-1 right-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
+          {topLabel} · ghost
+        </div>
+      </div>
+      <VideoFrameControls
+        videoRef={bottomRef}
+        secondaryVideoRef={topRef}
+        active={!!videoSrc}
+        playbackRate={playbackRate}
+        onPlaybackRateChange={setPlaybackRate}
+        afterStep={syncGhostToBottom}
+        compareScrub
+      />
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
@@ -209,6 +208,55 @@ export function DualPlayheadVideo({
           {isPlaying ? "Pause both" : "Play both"}
         </button>
       </div>
+      {onSyncNudge && (
+        <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
+          <p className="text-xs font-medium">Change sync</p>
+          <p className="text-[10px] text-muted-foreground">
+            Nudge {topLabel} earlier or later vs {bottomLabel}
+            {syncNudgeSec !== 0 && (
+              <span className="font-mono">
+                {" "}
+                ({syncNudgeSec >= 0 ? "+" : ""}
+                {syncNudgeSec.toFixed(2)}s)
+              </span>
+            )}
+          </p>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] text-muted-foreground mr-0.5">Earlier</span>
+            {[...SYNC_NUDGE_SEC].reverse().map((sec) => (
+              <button
+                key={`nudge-${sec}`}
+                type="button"
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+                onClick={() => onSyncNudge(-sec)}
+              >
+                −{sec}s
+              </button>
+            ))}
+            <span className="text-muted-foreground mx-0.5">|</span>
+            <span className="text-[10px] text-muted-foreground mr-0.5">Later</span>
+            {SYNC_NUDGE_SEC.map((sec) => (
+              <button
+                key={`nudge+${sec}`}
+                type="button"
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+                onClick={() => onSyncNudge(sec)}
+              >
+                +{sec}s
+              </button>
+            ))}
+            {syncNudgeSec !== 0 && (
+              <button
+                type="button"
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted ml-1"
+                onClick={() => onSyncNudge(-syncNudgeSec)}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

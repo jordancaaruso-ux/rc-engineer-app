@@ -59,6 +59,20 @@ export function getAverageTopN(laps: LapRow[], n: number): number | null {
   return slice.reduce((a, b) => a + b, 0) / slice.length;
 }
 
+/** Fastest N included laps (lap #0 and excluded omitted), sorted fastest-first. */
+export function getFastestIncludedLaps(laps: LapRow[], n: number): LapRow[] {
+  if (n < 1) return [];
+  return [...getIncludedLaps(laps)]
+    .filter((l) => l.lapTimeSeconds > 0)
+    .sort((a, b) => a.lapTimeSeconds - b.lapTimeSeconds)
+    .slice(0, n);
+}
+
+export function formatLapRowBreakdown(laps: LapRow[]): string {
+  if (laps.length === 0) return "—";
+  return laps.map((l) => `L${l.lapNumber} ${l.lapTimeSeconds.toFixed(3)}s`).join(" · ");
+}
+
 export function buildComparisonSeries(
   id: string,
   label: string,
@@ -383,4 +397,142 @@ export function compareLapSeries(base: LapSeriesAnalysis, other: LapSeriesAnalys
     deltaAverageLap: delta(base.averageLap, other.averageLap),
     deltaAverageTop5: delta(base.averageTop5, other.averageTop5),
   };
+}
+
+/** Minimum included laps before showing mistake count (display-only metric). */
+export const MIN_LAPS_FOR_MISTAKES = 6;
+
+/** Floor for mistake threshold (seconds slower than median). */
+export const MISTAKE_MIN_ABSOLUTE_SEC = 0.5;
+
+/** Scale session IQR into the adaptive threshold — loose stints need a larger gap. */
+export const MISTAKE_IQR_MULTIPLIER = 2;
+
+export type LapMistake = {
+  lapNumber: number;
+  lapTimeSeconds: number;
+  /** Seconds slower than session median (included laps). */
+  deltaSec: number;
+};
+
+export type MistakeLapAnalysis = {
+  eligible: boolean;
+  mistakeCount: number;
+  mistakes: LapMistake[];
+  medianSec: number | null;
+  thresholdSec: number | null;
+  iqrSec: number | null;
+};
+
+function percentileSorted(sorted: number[], p: number): number {
+  if (sorted.length === 0) return NaN;
+  if (sorted.length === 1) return sorted[0]!;
+  const idx = (sorted.length - 1) * p;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo]!;
+  const w = idx - lo;
+  return sorted[lo]! * (1 - w) + sorted[hi]! * w;
+}
+
+function medianSorted(sorted: number[]): number {
+  if (sorted.length === 0) return NaN;
+  const mid = sorted.length / 2;
+  return sorted.length % 2 === 1
+    ? sorted[Math.floor(mid)]!
+    : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+function iqrSorted(sorted: number[]): number {
+  if (sorted.length < 2) return 0;
+  const p25 = percentileSorted(sorted, 0.25);
+  const p75 = percentileSorted(sorted, 0.75);
+  if (!Number.isFinite(p25) || !Number.isFinite(p75)) return 0;
+  return Math.max(0, p75 - p25);
+}
+
+/**
+ * Slow-only “mistake” laps for session view: slower than median by more than
+ * max(0.5s, 2× IQR of included laps). Display-only — does not change best/avg.
+ */
+export function computeMistakeLaps(
+  laps: LapRow[],
+  opts?: {
+    minLaps?: number;
+    minAbsoluteSec?: number;
+    iqrMultiplier?: number;
+  }
+): MistakeLapAnalysis {
+  const minLaps = opts?.minLaps ?? MIN_LAPS_FOR_MISTAKES;
+  const minAbsoluteSec = opts?.minAbsoluteSec ?? MISTAKE_MIN_ABSOLUTE_SEC;
+  const iqrMultiplier = opts?.iqrMultiplier ?? MISTAKE_IQR_MULTIPLIER;
+
+  const included = getIncludedLaps(laps);
+  if (included.length < minLaps) {
+    return {
+      eligible: false,
+      mistakeCount: 0,
+      mistakes: [],
+      medianSec: null,
+      thresholdSec: null,
+      iqrSec: null,
+    };
+  }
+
+  const sortedTimes = [...included.map((l) => l.lapTimeSeconds)].sort((a, b) => a - b);
+  const medianSec = medianSorted(sortedTimes);
+  const iqrSec = iqrSorted(sortedTimes);
+  if (!Number.isFinite(medianSec)) {
+    return {
+      eligible: true,
+      mistakeCount: 0,
+      mistakes: [],
+      medianSec: null,
+      thresholdSec: null,
+      iqrSec,
+    };
+  }
+
+  const thresholdSec = Math.max(minAbsoluteSec, iqrMultiplier * iqrSec);
+  const mistakes: LapMistake[] = [];
+
+  for (const lap of included) {
+    const deltaSec = lap.lapTimeSeconds - medianSec;
+    if (deltaSec > thresholdSec) {
+      mistakes.push({
+        lapNumber: lap.lapNumber,
+        lapTimeSeconds: lap.lapTimeSeconds,
+        deltaSec,
+      });
+    }
+  }
+
+  mistakes.sort((a, b) => a.lapNumber - b.lapNumber);
+
+  return {
+    eligible: true,
+    mistakeCount: mistakes.length,
+    mistakes,
+    medianSec,
+    thresholdSec,
+    iqrSec,
+  };
+}
+
+export function formatMistakeLapDetail(m: LapMistake): string {
+  return `L${m.lapNumber} +${m.deltaSec.toFixed(2)}s`;
+}
+
+export function formatMistakeAnalysisSummary(analysis: MistakeLapAnalysis): string {
+  if (!analysis.eligible) {
+    return `Need at least ${MIN_LAPS_FOR_MISTAKES} included laps`;
+  }
+  if (analysis.thresholdSec == null || analysis.medianSec == null) {
+    return "Could not compute mistake threshold";
+  }
+  if (analysis.mistakeCount === 0) {
+    return `No laps slower than median + ${analysis.thresholdSec.toFixed(2)}s (median ${analysis.medianSec.toFixed(3)}s)`;
+  }
+  const list = analysis.mistakes.map(formatMistakeLapDetail).join(" · ");
+  return `${list} — slower than median ${analysis.medianSec.toFixed(3)}s (threshold +${analysis.thresholdSec.toFixed(2)}s)`;
 }

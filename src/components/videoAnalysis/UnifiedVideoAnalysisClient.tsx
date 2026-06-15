@@ -4,8 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { DualPlayheadVideo } from "./DualPlayheadVideo";
 import type { SectorLineNorm } from "./SectorLineCanvas";
-import type { DriverRole, ManualDriverLap, ManualVideoSessionV2 } from "@/lib/manualVideoAnalysis/types";
-import { normalizeManualSession } from "@/lib/manualVideoAnalysis/timing";
+import type {
+  DriverRole,
+  ManualDriver,
+  ManualDriverLap,
+  ManualTimingSession,
+  ManualVideoSessionV2,
+} from "@/lib/manualVideoAnalysis/types";
+import {
+  applyDefaultIsOnVideo,
+  applyTop3LapSelection,
+  defaultDriverKeys,
+  normalizeManualSession,
+  setDriverRoles,
+} from "@/lib/manualVideoAnalysis/timing";
 import {
   findTimingSession,
   getCompareSfAlignment,
@@ -127,20 +139,28 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [selectedLap, setSelectedLap] = useState<SelectedLap | null>(null);
   const [compareLaps, setCompareLaps] = useState<Record<string, number>>({});
+  const [compareSnapSec, setCompareSnapSec] = useState<number | null>(null);
+  const [timingUrls, setTimingUrls] = useState("");
+  const [pickerDrivers, setPickerDrivers] = useState<ManualDriver[]>([]);
+  const [meKey, setMeKey] = useState("");
+  const [competitorKey, setCompetitorKey] = useState("");
+  const [timingLoading, setTimingLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lines: SectorLineNorm[] =
-    data?.sectorLines.map((l) => ({
-      lineKey: l.lineKey,
-      label: l.label,
-      x1: l.x1,
-      y1: l.y1,
-      x2: l.x2,
-      y2: l.y2,
-      sortOrder: l.sortOrder,
-    })) ?? [];
+    data?.sectorLines
+      .filter((l) => l.lineKey === "sf")
+      .map((l) => ({
+        lineKey: l.lineKey,
+        label: l.label,
+        x1: l.x1,
+        y1: l.y1,
+        x2: l.x2,
+        y2: l.y2,
+        sortOrder: l.sortOrder,
+      })) ?? [];
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/video-analysis/jobs/${jobId}`);
@@ -151,6 +171,12 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
       const normalized = normalizeManualSession(json.manual.session);
       setSession(normalized);
       setCompareLaps(compareLapsFromSession(normalized));
+      setTimingUrls((normalized.timingUrls ?? []).join("\n"));
+      const flat = normalized.timingSessions.flatMap((ts) => ts.drivers);
+      setPickerDrivers(flat);
+      const defaults = defaultDriverKeys(flat);
+      setMeKey(defaults.meKey);
+      setCompetitorKey(defaults.competitorKey);
     }
   }, [jobId]);
 
@@ -232,6 +258,11 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
 
   const ghostCompareActive = compareSfAlignment != null;
 
+  useEffect(() => {
+    if (!ghostCompareActive || compareSnapSec != null || !compareSfAlignment) return;
+    setCompareSnapSec(compareSfAlignment.bottomSec);
+  }, [ghostCompareActive, compareSnapSec, compareSfAlignment]);
+
   function onLapClick(col: DriverColumn, lapNumber: number) {
     const key = driverColumnKey(col);
     setSelectedLap({
@@ -251,6 +282,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     const nextCompareLaps = { ...compareLaps, [key]: lapNumber };
     setCompareLaps(nextCompareLaps);
     const nextSession = sessionWithCompareLaps(session, driverColumns, nextCompareLaps);
+    nextSession.compare = { ...nextSession.compare, offsetNudgeSec: 0 };
     setSession(nextSession);
     schedulePersist(nextSession);
 
@@ -271,16 +303,126 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     if (bothSelected) {
       const alignment = getCompareSfAlignment(nextSession, nextSession.compare);
       if (alignment) {
-        seekTo(alignment.bottomSec);
+        setCompareSnapSec(alignment.bottomSec);
         setMsg(
-          `Comparing ${compareSlotLabel(session, col0, nextCompareLaps[driverColumnKey(col0)!])} vs ${compareSlotLabel(session, col1, nextCompareLaps[driverColumnKey(col1)!])} at lap start.`
+          `Comparing ${compareSlotLabel(session, col0, nextCompareLaps[driverColumnKey(col0)!])} vs ${compareSlotLabel(session, col1, nextCompareLaps[driverColumnKey(col1)!])} at lap start. Scrub or nudge sync to align.`
         );
         return;
       }
     }
 
+    setCompareSnapSec(null);
+
     seekTo(t);
     setMsg(`${col.driverName} lap ${lapNumber} start @ ${t.toFixed(2)}s`);
+  }
+
+  function nudgeCompareSync(deltaSec: number) {
+    if (!session) return;
+    const cur = session.compare.offsetNudgeSec ?? 0;
+    const next = {
+      ...session,
+      compare: { ...session.compare, offsetNudgeSec: cur + deltaSec },
+    };
+    setSession(next);
+    schedulePersist(next);
+  }
+
+  function driverPickerLabel(d: ManualDriver): string {
+    if (!session) return d.driverName;
+    const ts = session.timingSessions.find((s) => s.drivers.some((x) => x.key === d.key));
+    const prefix =
+      session.timingSessions.length > 1 && ts ? `${ts.label}: ` : "";
+    return `${prefix}${d.driverName} (${d.laps.length} laps)`;
+  }
+
+  function sessionsWithRoles(
+    sessions: ManualTimingSession[],
+    nextMeKey: string,
+    nextCompetitorKey: string
+  ): ManualTimingSession[] {
+    return applyDefaultIsOnVideo(
+      sessions.map((ts) => ({
+        ...ts,
+        drivers: setDriverRoles(ts.drivers, nextMeKey, nextCompetitorKey),
+      }))
+    );
+  }
+
+  function applyDriverRolesToSession(nextMeKey: string, nextCompetitorKey: string) {
+    if (!session) return;
+    const timingSessions = sessionsWithRoles(
+      session.timingSessions,
+      nextMeKey,
+      nextCompetitorKey
+    );
+    let next = applyTop3LapSelection({
+      ...session,
+      timingSessions,
+    });
+    setSession(next);
+    schedulePersist(next);
+  }
+
+  async function loadTimingUrls() {
+    if (!session) return;
+    const urls = timingUrls
+      .split(/\n/)
+      .map((u) => u.trim())
+      .filter(Boolean);
+    if (urls.length === 0) {
+      setMsg("Paste one or more LiveRC / timing URLs (one per line).");
+      return;
+    }
+
+    setTimingLoading(true);
+    setMsg(null);
+    const res = await fetch("/api/video-analysis/manual/parse-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls }),
+    });
+    setTimingLoading(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setMsg((err as { error?: string }).error ?? "Could not load timing");
+      return;
+    }
+
+    const d = await res.json();
+    const loadedSessions = (d.sessions ?? []) as ManualTimingSession[];
+    const drivers = (d.drivers ?? []) as ManualDriver[];
+    const defaults = (d.defaults ?? defaultDriverKeys(drivers)) as {
+      meKey: string;
+      competitorKey: string;
+    };
+    let nextMe = defaults.meKey;
+    let nextComp = defaults.competitorKey;
+    if (nextMe && nextMe === nextComp) {
+      nextComp = drivers.find((x) => x.key !== nextMe)?.key ?? "";
+    }
+
+    const timingSessions = sessionsWithRoles(loadedSessions, nextMe, nextComp);
+    let next = applyTop3LapSelection({
+      ...session,
+      timingSource: "url",
+      timingUrls: urls,
+      timingSessions,
+      compare: { ...session.compare, my: null, competitor: null, offsetNudgeSec: 0 },
+    });
+    next = normalizeManualSession(next);
+    setPickerDrivers(drivers);
+    setMeKey(nextMe);
+    setCompetitorKey(nextComp);
+    setCompareLaps({});
+    setCompareSnapSec(null);
+    setSession(next);
+    await persistSession(next);
+    setMsg(
+      d.errors?.length
+        ? `Loaded ${timingSessions.length} session(s). Some URLs failed: ${(d.errors as string[]).join("; ")}`
+        : `Loaded ${timingSessions.length} timing session(s). Pick laps to anchor and compare.`
+    );
   }
 
   function setAnchorAtPlayhead() {
@@ -319,8 +461,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   return (
     <div className="flex flex-col gap-3 max-w-6xl">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Link href="/videos/analysis" className="underline text-muted-foreground">
-          ← Hub
+        <Link href="/videos/analysis/manual/new" className="underline text-muted-foreground">
+          ← New session
         </Link>
         <span className="text-muted-foreground">/</span>
         <span>
@@ -342,7 +484,83 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
         )}
       </label>
 
-      <div className="grid gap-4 lg:grid-cols-[auto_minmax(0,1fr)]">
+      <div className="max-w-xl flex flex-col gap-2 text-xs">
+        <label>
+          LiveRC / timing URLs <span className="text-muted-foreground">(optional)</span>
+          <textarea
+            className="mt-0.5 w-full rounded-md border border-border px-2 py-1 min-h-[72px] font-mono text-xs"
+            value={timingUrls}
+            onChange={(e) => setTimingUrls(e.target.value)}
+            placeholder={"https://...\nhttps://... (one per line)"}
+          />
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-1.5 hover:bg-muted disabled:opacity-50"
+            disabled={timingLoading}
+            onClick={() => void loadTimingUrls()}
+          >
+            {timingLoading ? "Loading…" : "Load laps"}
+          </button>
+          {session.timingSessions.length > 0 && (
+            <span className="text-muted-foreground">
+              {session.timingSessions.length} session
+              {session.timingSessions.length === 1 ? "" : "s"} linked
+            </span>
+          )}
+        </div>
+        {pickerDrivers.length >= 2 && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label>
+              Me
+              <select
+                className="mt-0.5 w-full rounded-md border border-border px-2 py-1"
+                value={meKey}
+                onChange={(e) => {
+                  const nextMe = e.target.value;
+                  setMeKey(nextMe);
+                  let nextComp = competitorKey;
+                  if (nextComp === nextMe) {
+                    nextComp = pickerDrivers.find((d) => d.key !== nextMe)?.key ?? "";
+                    setCompetitorKey(nextComp);
+                  }
+                  applyDriverRolesToSession(nextMe, nextComp);
+                }}
+              >
+                {pickerDrivers.map((d) => (
+                  <option key={d.key} value={d.key} disabled={d.key === competitorKey}>
+                    {driverPickerLabel(d)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Competitor
+              <select
+                className="mt-0.5 w-full rounded-md border border-border px-2 py-1"
+                value={competitorKey}
+                onChange={(e) => {
+                  const nextComp = e.target.value;
+                  setCompetitorKey(nextComp);
+                  applyDriverRolesToSession(meKey, nextComp);
+                }}
+              >
+                {pickerDrivers.map((d) => (
+                  <option key={d.key} value={d.key} disabled={d.key === meKey}>
+                    {driverPickerLabel(d)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+      </div>
+
+      <div
+        className={`grid gap-4 ${driverColumns.length > 0 ? "lg:grid-cols-[auto_minmax(0,1fr)]" : ""}`}
+      >
+        {driverColumns.length > 0 && (
         <div className="flex flex-col gap-3 min-w-[140px]">
           <p className="text-sm font-medium">Drivers</p>
           <div className="flex gap-4">
@@ -417,6 +635,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
             </p>
           )}
         </div>
+        )}
 
         <DualPlayheadVideo
           videoSrc={videoSrc}
@@ -424,7 +643,9 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           activeLineKey="sf"
           offsetSec={compareSfAlignment?.offsetSec ?? null}
           ghostCompareActive={ghostCompareActive}
-          alignBottomSec={ghostCompareActive ? compareSfAlignment?.bottomSec : null}
+          alignBottomSec={compareSnapSec}
+          syncNudgeSec={session.compare.offsetNudgeSec ?? 0}
+          onSyncNudge={ghostCompareActive ? nudgeCompareSync : undefined}
           bottomLabel={compareSlotLabel(session, col0, compareLap0)}
           topLabel={compareSlotLabel(session, col1, compareLap1)}
           videoRef={videoRef}

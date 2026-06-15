@@ -8,19 +8,13 @@ export default async function VideosPage(): Promise<ReactNode> {
         <div>
           <h1 className="page-title">Videos</h1>
           <p className="page-subtitle">
-            Sector timing from fisheye heat video, or overlay two clips to compare lines.
+            Sync onboard video to LiveRC laps and compare two drivers on one clip.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start">
           <Link
-            href="/videos/analysis"
-            className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground"
-          >
-            Video analysis
-          </Link>
-          <Link
             href="/videos/analysis/manual/new"
-            className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted"
+            className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground"
           >
             Lap sync
           </Link>
@@ -32,17 +26,11 @@ export default async function VideosPage(): Promise<ReactNode> {
       <section className="page-body">
         <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-3">
           <p>
-            <strong className="text-foreground">Video analysis</strong> — draw sector lines on a reference
-            frame, run the local Python worker on 1080p60 heat footage, import JSON for sector matrix and
-            fastest-in-sector stats. Link results to a Run to compare against LiveRC transponder laps.
-          </p>
-          <p>
-            <strong className="text-foreground">Overlay compare</strong> — pick two local files in the browser
-            (no upload) to blend and nudge timing.
+            Upload a heat or practice video, optionally paste LiveRC timing URLs, anchor start/finish
+            on the video, then overlay two laps at 50% to compare lines.
           </p>
           <p className="text-xs">
-            Large video uploads work in local dev (up to 512 MB). On Vercel, use the Python worker with a
-            local file path and import JSON only.
+            Video stays in your browser — only timing links and sync marks are saved to your account.
           </p>
         </div>
       </section>

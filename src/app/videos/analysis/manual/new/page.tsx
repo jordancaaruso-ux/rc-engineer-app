@@ -3,19 +3,9 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  emptyManualSession,
-  type ManualDriver,
-  type ManualTimingSession,
-} from "@/lib/manualVideoAnalysis/types";
-import {
-  applyTop3LapSelection,
-  applyDefaultIsOnVideo,
-  defaultDriverKeys,
-  setDriverRoles,
-} from "@/lib/manualVideoAnalysis/timing";
+import { emptyManualSession } from "@/lib/manualVideoAnalysis/types";
 
-function NewManualAnalysisForm() {
+function NewLapSyncForm() {
   const router = useRouter();
   const sp = useSearchParams();
   const presetTrackId = sp.get("trackId") ?? "";
@@ -26,15 +16,9 @@ function NewManualAnalysisForm() {
   const [profiles, setProfiles] = useState<Array<{ id: string; name: string }>>([]);
   const [trackId, setTrackId] = useState(presetTrackId);
   const [profileId, setProfileId] = useState(presetProfileId);
-  const [runId, setRunId] = useState(presetRunId);
-  const [timingUrls, setTimingUrls] = useState("");
-  const [useRun, setUseRun] = useState(Boolean(presetRunId));
-  const [timingSessions, setTimingSessions] = useState<ManualTimingSession[]>([]);
-  const [drivers, setDrivers] = useState<ManualDriver[]>([]);
-  const [meKey, setMeKey] = useState("");
-  const [competitorKey, setCompetitorKey] = useState("");
+  const [runId] = useState(presetRunId);
   const [msg, setMsg] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     void fetch("/api/tracks")
@@ -64,79 +48,6 @@ function NewManualAnalysisForm() {
       });
   }, [trackId]);
 
-  async function loadDrivers() {
-    setLoading(true);
-    setMsg(null);
-    if (useRun && runId.trim()) {
-      const res = await fetch(
-        `/api/video-analysis/manual/session-drivers?runId=${encodeURIComponent(runId.trim())}`
-      );
-      setLoading(false);
-      if (!res.ok) {
-        setMsg("Could not load laps from run (need imported lap sets)");
-        return;
-      }
-      const d = await res.json();
-      setTimingSessions(d.sessions ?? []);
-      applyLoadedDrivers(d.drivers ?? [], d.defaults);
-      return;
-    }
-    const urls = timingUrls
-      .split(/\n/)
-      .map((u) => u.trim())
-      .filter(Boolean);
-    if (urls.length === 0) {
-      setLoading(false);
-      setMsg("Enter one or more timing URLs (one per line) or link a Run");
-      return;
-    }
-    const res = await fetch("/api/video-analysis/manual/parse-url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls }),
-    });
-    setLoading(false);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setMsg((err as { error?: string }).error ?? "Parse failed");
-      return;
-    }
-    const d = await res.json();
-    setTimingSessions(d.sessions ?? []);
-    applyLoadedDrivers(d.drivers ?? [], d.defaults);
-    if (d.errors?.length) {
-      setMsg(`Some URLs failed: ${(d.errors as string[]).join("; ")}`);
-    }
-  }
-
-  function driverPickerLabel(d: ManualDriver): string {
-    const session = timingSessions.find((ts) => ts.drivers.some((x) => x.key === d.key));
-    const sessionPrefix =
-      timingSessions.length > 1 && session ? `${session.label}: ` : "";
-    return `${sessionPrefix}${d.driverName} (${d.laps.length} laps)`;
-  }
-
-  function applyLoadedDrivers(
-    list: ManualDriver[],
-    defaults?: { meKey: string; competitorKey: string }
-  ) {
-    setDrivers(list);
-    const keys = defaults ?? defaultDriverKeys(list);
-    let nextCompetitorKey = keys.competitorKey;
-    if (keys.meKey && keys.meKey === nextCompetitorKey) {
-      nextCompetitorKey = list.find((d) => d.key !== keys.meKey)?.key ?? "";
-    }
-    setMeKey(keys.meKey);
-    setCompetitorKey(nextCompetitorKey);
-    if (list.length < 2) {
-      setMsg("Need at least two drivers in the timing data to compare.");
-    } else if (!keys.meKey || !keys.competitorKey) {
-      setMsg("Select yourself (Me) and a competitor in the dropdowns below.");
-    } else if (!msg?.startsWith("Some URLs")) {
-      setMsg(null);
-    }
-  }
-
   async function createJob() {
     if (!trackId) {
       setMsg("Select a track.");
@@ -146,42 +57,15 @@ function NewManualAnalysisForm() {
       setMsg("Select a camera profile (or create one for this track).");
       return;
     }
-    if (!meKey) {
-      setMsg("Select yourself in the Me dropdown.");
-      return;
-    }
-    if (!competitorKey) {
-      setMsg("Select a competitor in the Competitor dropdown.");
-      return;
-    }
-    if (meKey === competitorKey) {
-      setMsg("Me and competitor must be different drivers.");
-      return;
-    }
-    if (timingSessions.length === 0) {
-      setMsg("Load drivers & laps first.");
-      return;
-    }
 
-    const sessionsWithRoles = applyDefaultIsOnVideo(
-      timingSessions.map((ts) => ({
-        ...ts,
-        drivers: setDriverRoles(ts.drivers, meKey, competitorKey),
-      }))
-    );
+    setCreating(true);
+    setMsg(null);
 
-    const urlList = timingUrls
-      .split(/\n/)
-      .map((u) => u.trim())
-      .filter(Boolean);
-
-    let session = applyTop3LapSelection({
+    const session = {
       ...emptyManualSession(),
-      timingSource: useRun && runId.trim() ? "run" : "url",
-      timingUrls: useRun ? [] : urlList,
-      timingSessions: sessionsWithRoles,
-      compare: { my: null, competitor: null, alignAt: "sf_finish" },
-    });
+      timingSource: runId.trim() ? ("run" as const) : ("url" as const),
+      compare: { my: null, competitor: null, alignAt: "sf_start" as const },
+    };
 
     const res = await fetch("/api/video-analysis/jobs", {
       method: "POST",
@@ -194,6 +78,7 @@ function NewManualAnalysisForm() {
         manualJson: session,
       }),
     });
+    setCreating(false);
     if (!res.ok) {
       setMsg("Failed to create session");
       return;
@@ -212,10 +97,6 @@ function NewManualAnalysisForm() {
           onChange={(e) => {
             setTrackId(e.target.value);
             setProfileId("");
-            setDrivers([]);
-            setTimingSessions([]);
-            setMeKey("");
-            setCompetitorKey("");
           }}
         >
           <option value="">Select track</option>
@@ -252,105 +133,23 @@ function NewManualAnalysisForm() {
         )}
       </label>
 
-      <div className="flex gap-4 text-xs">
-        <label className="flex items-center gap-1">
-          <input type="radio" checked={useRun} onChange={() => setUseRun(true)} />
-          Linked Run
-        </label>
-        <label className="flex items-center gap-1">
-          <input type="radio" checked={!useRun} onChange={() => setUseRun(false)} />
-          Timing URL(s)
-        </label>
-      </div>
-
-      {useRun ? (
-        <label className="text-xs">
-          Run id
-          <input
-            className="mt-1 w-full rounded-md border border-border px-2 py-1 font-mono text-xs"
-            value={runId}
-            onChange={(e) => setRunId(e.target.value)}
-            placeholder="From run edit page"
-          />
-        </label>
-      ) : (
-        <label className="text-xs">
-          LiveRC / timing URLs
-          <textarea
-            className="mt-1 w-full rounded-md border border-border px-2 py-1 min-h-[72px] font-mono text-xs"
-            value={timingUrls}
-            onChange={(e) => setTimingUrls(e.target.value)}
-            placeholder={"https://...\nhttps://... (one per line for multi-session)"}
-          />
-        </label>
-      )}
+      <p className="text-xs text-muted-foreground">
+        Upload your video on the next screen. LiveRC timing links are optional — add them there when
+        you want lap sync and compare.
+      </p>
 
       <button
         type="button"
-        className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted w-fit"
-        disabled={loading}
-        onClick={() => void loadDrivers()}
-      >
-        {loading ? "Loading…" : "Load drivers & laps"}
-      </button>
-
-      {timingSessions.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {timingSessions.length} timing session{timingSessions.length === 1 ? "" : "s"} loaded
-        </p>
-      )}
-
-      {drivers.length > 0 && (
-        <>
-          <label className="text-xs">
-            Me
-            <select
-              className="mt-1 w-full rounded-md border border-border px-2 py-1"
-              value={meKey}
-              onChange={(e) => {
-                const nextMe = e.target.value;
-                setMeKey(nextMe);
-                if (competitorKey === nextMe) {
-                  const alt = drivers.find((d) => d.key !== nextMe);
-                  setCompetitorKey(alt?.key ?? "");
-                }
-              }}
-            >
-              {drivers.map((d) => (
-                <option key={d.key} value={d.key} disabled={d.key === competitorKey}>
-                  {driverPickerLabel(d)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs">
-            Competitor
-            <select
-              className="mt-1 w-full rounded-md border border-border px-2 py-1"
-              value={competitorKey}
-              onChange={(e) => setCompetitorKey(e.target.value)}
-            >
-              {drivers.map((d) => (
-                <option key={d.key} value={d.key} disabled={d.key === meKey}>
-                  {driverPickerLabel(d)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </>
-      )}
-
-      <button
-        type="button"
-        className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground w-fit"
+        className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground w-fit disabled:opacity-50"
+        disabled={creating}
         onClick={() => void createJob()}
       >
-        Start video analysis
+        {creating ? "Starting…" : "Start video analysis"}
       </button>
 
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
-      <Link href="/videos/analysis" className="text-xs underline">
-        ← Hub
+      <Link href="/videos" className="text-xs underline">
+        ← Videos
       </Link>
     </div>
   );
@@ -363,13 +162,13 @@ export default function NewManualVideoAnalysisPage() {
         <div>
           <h1 className="page-title">Video lap sync</h1>
           <p className="page-subtitle">
-            Load transponder laps, anchor SF on video, compare laps with ghost overlay, mark sectors.
+            Watch your video, optionally link LiveRC laps, anchor SF, and compare drivers.
           </p>
         </div>
       </header>
       <section className="page-body">
         <Suspense>
-          <NewManualAnalysisForm />
+          <NewLapSyncForm />
         </Suspense>
       </section>
     </>

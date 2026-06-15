@@ -126,8 +126,8 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
   return (
     <div className="flex flex-col gap-6 max-w-4xl">
       <div className="text-sm">
-        <Link href="/videos/analysis" className="underline text-muted-foreground">
-          ← Video analysis
+        <Link href="/videos/analysis/manual/new" className="underline text-muted-foreground">
+          ← Lap sync
         </Link>
         <p className="mt-1">
           <span className="font-medium">{data.job.track.name}</span>

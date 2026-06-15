@@ -43,7 +43,7 @@ export default function TrackVideoAnalysisPage() {
           <h1 className="page-title">{trackName || "Track"}</h1>
           <p className="page-subtitle">Camera profile & sector lines</p>
         </div>
-        <Link href="/videos/analysis" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted self-start">
+        <Link href="/videos/analysis/manual/new" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted self-start">
           ← Hub
         </Link>
       </header>

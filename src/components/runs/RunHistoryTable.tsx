@@ -14,8 +14,14 @@ import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import {
+  computeMistakeLaps,
+  formatMistakeAnalysisSummary,
+  formatMistakeLapDetail,
+  formatLapRowBreakdown,
   getAverageTopN,
   getBestLap,
+  getFastestIncludedLaps,
+  getIncludedLaps,
   formatConsistencyScorePercent,
   getIncludedLapDashboardMetrics,
   primaryLapRowsFromRun,
@@ -30,8 +36,6 @@ import type {
   PaceVsFieldMetricId,
 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
-import { SessionsEngineerPairLinks } from "@/components/runs/SessionsEngineerPairLinks";
-import { RelativeTime } from "@/components/ui/RelativeTime";
 import { CardPanel } from "@/components/ui/CardPanel";
 
 type Run = {
@@ -132,17 +136,55 @@ function CompactField({
   );
 }
 
-function LapStatChip({ label, value, title }: { label: string; value: string; title?: string }) {
-  return (
-    <div
-      className="rounded border border-border bg-muted/80 px-1.5 py-0.5 md:px-2 md:py-1 min-w-0 md:min-w-[4.5rem]"
-      title={title}
-    >
+function LapStatChip({
+  label,
+  value,
+  title,
+  expanded,
+  expandable,
+  onToggle,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+  expanded?: boolean;
+  expandable?: boolean;
+  onToggle?: () => void;
+}) {
+  const className = cn(
+    "rounded border border-border bg-muted/80 px-1.5 py-0.5 md:px-2 md:py-1 min-w-0 md:min-w-[4.5rem] text-left",
+    expandable && "cursor-pointer hover:bg-muted active:bg-muted/90 transition-colors",
+    expanded && "ring-1 ring-primary border-primary/50 bg-primary/5"
+  );
+  const inner = (
+    <>
       <div className={cn("ui-label-caps", "text-[9px] leading-none mb-0.5")}>{label}</div>
       <div className="ui-body-tight tabular-nums tracking-tight leading-tight">{value}</div>
+    </>
+  );
+  if (expandable && onToggle) {
+    return (
+      <button
+        type="button"
+        className={className}
+        title={title ?? "Tap for lap breakdown"}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <div className={className} title={title}>
+      {inner}
     </div>
   );
 }
+
+type ExpandedLapStat = "best" | "avg5" | "avg10" | "mistakes" | null;
 
 /** Main sessions grid columns (excluding drag handle, member, compare pair). */
 const SESSION_TABLE_BODY_COLS_WITHOUT_SESSION = 8;
@@ -593,6 +635,11 @@ function RunDetail({
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [setupDataByRunId, setSetupDataByRunId] = useState<Record<string, unknown>>({});
+  const [expandedLapStat, setExpandedLapStat] = useState<ExpandedLapStat>(null);
+
+  useEffect(() => {
+    setExpandedLapStat(null);
+  }, [run.id]);
 
   useEffect(() => {
     setSetupDataByRunId({});
@@ -739,6 +786,55 @@ function RunDetail({
   }, [run.carId, runSetupData, prevSetupData]);
   const ownRows = primaryLapRowsFromRun(run);
   const lapDash = getIncludedLapDashboardMetrics(ownRows);
+  const mistakeAnalysis = useMemo(() => computeMistakeLaps(ownRows), [ownRows]);
+  const mistakeLapNumbers = useMemo(
+    () => new Set(mistakeAnalysis.mistakes.map((m) => m.lapNumber)),
+    [mistakeAnalysis.mistakes]
+  );
+  const mistakeSummary = formatMistakeAnalysisSummary(mistakeAnalysis);
+  const bestLapRows = useMemo(() => getFastestIncludedLaps(ownRows, 1), [ownRows]);
+  const top5LapRows = useMemo(() => getFastestIncludedLaps(ownRows, 5), [ownRows]);
+  const top10LapRows = useMemo(() => getFastestIncludedLaps(ownRows, 10), [ownRows]);
+  const bestLapNumbers = useMemo(() => {
+    if (lapDash.bestLap == null) return new Set<number>();
+    const eps = 0.0005;
+    return new Set(
+      getIncludedLaps(ownRows)
+        .filter((l) => Math.abs(l.lapTimeSeconds - lapDash.bestLap!) <= eps)
+        .map((l) => l.lapNumber)
+    );
+  }, [ownRows, lapDash.bestLap]);
+
+  function toggleLapStat(key: ExpandedLapStat) {
+    setExpandedLapStat((cur) => (cur === key ? null : key));
+  }
+
+  const expandedLapStatDetail = useMemo(() => {
+    switch (expandedLapStat) {
+      case "best":
+        return formatLapRowBreakdown(bestLapRows);
+      case "avg5":
+        return top5LapRows.length > 0
+          ? `${formatLapRowBreakdown(top5LapRows)} → avg ${formatLap(lapDash.avgTop5)}`
+          : "—";
+      case "avg10":
+        return top10LapRows.length > 0
+          ? `${formatLapRowBreakdown(top10LapRows)} → avg ${formatLap(lapDash.avgTop10)}`
+          : "—";
+      case "mistakes":
+        return mistakeSummary;
+      default:
+        return null;
+    }
+  }, [
+    expandedLapStat,
+    bestLapRows,
+    top5LapRows,
+    top10LapRows,
+    lapDash.avgTop5,
+    lapDash.avgTop10,
+    mistakeSummary,
+  ]);
   const fieldStats = runSessionSummary?.importedSessionFieldStats;
   const showFieldMetricRow = Boolean(
     fieldStats &&
@@ -748,227 +844,219 @@ function RunDetail({
   );
   const sourceUrl = tryReadLapSourceUrl(run.lapSession);
   const sourceSummary = formatLapSourceSummary(run.lapSession);
-  const uploadedLapSetCount = run.importedLapSets?.length ?? 0;
-  const uploadedLapSetsLine =
-    uploadedLapSetCount === 0
-      ? "No additional driver lap sets uploaded"
-      : uploadedLapSetCount === 1
-        ? "1 driver lap set uploaded"
-        : `${uploadedLapSetCount} driver lap sets uploaded`;
   const handlingDetailsText = handlingDetails(run);
 
-  const engineerThisRunHref = `/engineer?runId=${encodeURIComponent(run.id)}`;
-  const engineerVsPreviousHref =
-    previousRunOnCar &&
-    `/engineer?runId=${encodeURIComponent(run.id)}&compareRunId=${encodeURIComponent(previousRunOnCar.id)}`;
+  const runInstant = resolveRunDisplayInstant(run);
+  const dateTimeLabel = formatRunCreatedAtDateTime(runInstant, displayTimeZone);
 
   return (
-    <CardPanel className="bg-muted/40 space-y-4 text-sm">
-      <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1" onClick={(e) => e.stopPropagation()}>
-        <div className="min-w-0 text-[11px] text-muted-foreground leading-snug">
-          <span className="text-foreground font-medium">{carDisplay}</span>
-          <span className="text-muted-foreground"> · </span>
-          <span>{trackDisplay}</span>
-        </div>
-        {allowRunMutations ? (
+    <CardPanel className="bg-muted/40 space-y-3 text-sm">
+      {allowRunMutations ? (
+        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
           <Link
             href={`/runs/${encodeURIComponent(run.id)}/edit`}
             className={cn(buttonLinkClassName("primary"), "no-underline shrink-0 text-xs")}
-            onClick={(e) => e.stopPropagation()}
           >
             Edit run
           </Link>
-        ) : null}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3">
+        <CompactField label="Date / time" value={dateTimeLabel} />
+        <CompactField
+          label="Session type"
+          value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}
+        />
+        {hasMeetingType ? <CompactField label="Meeting session" value={meetingType} /> : null}
+        <CompactField label="Label" value={run.sessionLabel?.trim() || "—"} />
+        <CompactField label="Car" value={carDisplay} />
+        <CompactField label="Track" value={trackDisplay} />
+        <CompactField
+          label="Tire set"
+          value={
+            run.tireSet
+              ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
+              : "—"
+          }
+        />
       </div>
 
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-5">
-        <div className="min-w-0 space-y-2 xl:max-w-[min(100%,28rem)]">
-          <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3">
-            <CompactField label="Date / time">
-              <RelativeTime
-                iso={resolveRunDisplayInstant(run)}
-                fallback={formatRunCreatedAtDateTime(resolveRunDisplayInstant(run), displayTimeZone)}
-                display="combo"
+      <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-4 min-w-0">
+        <div className="shrink-0 space-y-2 min-w-0">
+          <div className="space-y-1">
+            <div className="ui-label-caps">You</div>
+            <div className="flex flex-wrap gap-1 md:gap-1.5">
+              <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
+              <LapStatChip
+                label="Stint"
+                title="Sum of included lap times"
+                value={lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"}
               />
-            </CompactField>
-            <CompactField
-              label="Session type"
-              value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}
-            />
-            {hasMeetingType ? <CompactField label="Meeting session" value={meetingType} /> : null}
-            <CompactField label="Label" value={run.sessionLabel?.trim() || "—"} />
-            <CompactField label="Car" value={carDisplay} />
-            <CompactField label="Track" value={trackDisplay} />
-            <CompactField
-              label="Tire set"
-              value={
-                run.tireSet
-                  ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
-                  : "—"
-              }
-            />
-          </div>
-        </div>
-
-        <div className="min-w-0 flex-1 space-y-2 border-t border-border pt-3 xl:border-t-0 xl:border-l xl:border-border xl:pt-0 xl:pl-5">
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <div className="ui-label-caps">You</div>
-              <div className="flex flex-wrap gap-1 md:gap-1.5">
-                <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
-                <LapStatChip
-                  label="Stint"
-                  title="Sum of included lap times"
-                  value={
-                    lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"
-                  }
-                />
-                <LapStatChip label="Best lap" value={formatLap(lapDash.bestLap)} />
-                <LapStatChip label="Avg top 5" value={formatLap(lapDash.avgTop5)} />
-                <LapStatChip label="Avg top 10" value={formatLap(lapDash.avgTop10)} />
-                <LapStatChip label="Median" value={formatLap(lapDash.median)} />
-                <LapStatChip
-                  label="Consistency"
-                  title="100 − CV; higher = more consistent laps"
-                  value={
-                    lapDash.consistencyScore != null
-                      ? formatConsistencyScorePercent(lapDash.consistencyScore)
-                      : "—"
-                  }
-                />
-              </div>
+              <LapStatChip
+                label="Best lap"
+                value={formatLap(lapDash.bestLap)}
+                expandable={bestLapRows.length > 0}
+                expanded={expandedLapStat === "best"}
+                onToggle={() => toggleLapStat("best")}
+              />
+              <LapStatChip
+                label="Avg top 5"
+                value={formatLap(lapDash.avgTop5)}
+                expandable={top5LapRows.length > 0}
+                expanded={expandedLapStat === "avg5"}
+                onToggle={() => toggleLapStat("avg5")}
+              />
+              <LapStatChip
+                label="Avg top 10"
+                value={formatLap(lapDash.avgTop10)}
+                expandable={top10LapRows.length > 0}
+                expanded={expandedLapStat === "avg10"}
+                onToggle={() => toggleLapStat("avg10")}
+              />
+              <LapStatChip label="Median" value={formatLap(lapDash.median)} />
+              <LapStatChip
+                label="Consistency"
+                title="100 − CV; higher = more consistent laps"
+                value={
+                  lapDash.consistencyScore != null
+                    ? formatConsistencyScorePercent(lapDash.consistencyScore)
+                    : "—"
+                }
+              />
+              <LapStatChip
+                label="Mistakes"
+                title={mistakeSummary}
+                value={
+                  mistakeAnalysis.eligible ? String(mistakeAnalysis.mistakeCount) : "—"
+                }
+                expandable={mistakeAnalysis.eligible}
+                expanded={expandedLapStat === "mistakes"}
+                onToggle={() => toggleLapStat("mistakes")}
+              />
             </div>
-
-            {runSessionSummaryLoading ? (
-              <p className="text-[10px] text-muted-foreground">Loading session field data…</p>
-            ) : null}
-            {runSessionSummaryErr ? (
-              <p className="text-[10px] text-muted-foreground">
-                Field averages unavailable ({runSessionSummaryErr}).
+            {expandedLapStat && expandedLapStatDetail ? (
+              <p className="text-[10px] font-mono text-muted-foreground leading-snug">
+                {expandedLapStatDetail}
               </p>
             ) : null}
+          </div>
 
-            {showFieldMetricRow && fieldStats ? (
-              <div className="space-y-1">
-                <div className="ui-label-caps">Others (session average)</div>
-                <div className="flex flex-wrap gap-1 md:gap-1.5">
-                  <LapStatChip label="Laps" value="—" title="Not aggregated for the field" />
-                  <LapStatChip label="Stint" value="—" title="Not aggregated for the field" />
-                  <LapStatChip
-                    label="Best lap"
-                    value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "best"))}
-                  />
-                  <LapStatChip
-                    label="Avg top 5"
-                    value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "avg_top_5"))}
-                  />
-                  <LapStatChip
-                    label="Avg top 10"
-                    value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "avg_top_10"))}
-                  />
-                  <LapStatChip
-                    label="Median"
-                    title="Median of entrants’ avg top 10 (typical sustained pace in session)"
-                    value={formatLap(fieldStats.fieldMedianAvgTop10Seconds)}
-                  />
-                  <LapStatChip label="Consistency" value="—" title="Not aggregated for the field" />
-                </div>
+          {runSessionSummaryLoading ? (
+            <p className="text-[10px] text-muted-foreground">Loading session field data…</p>
+          ) : null}
+          {runSessionSummaryErr ? (
+            <p className="text-[10px] text-muted-foreground">
+              Field averages unavailable ({runSessionSummaryErr}).
+            </p>
+          ) : null}
+
+          {showFieldMetricRow && fieldStats ? (
+            <div className="space-y-1">
+              <div className="ui-label-caps">Others (session average)</div>
+              <div className="flex flex-wrap gap-1 md:gap-1.5">
+                <LapStatChip label="Laps" value="—" title="Not aggregated for the field" />
+                <LapStatChip label="Stint" value="—" title="Not aggregated for the field" />
+                <LapStatChip
+                  label="Best lap"
+                  value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "best"))}
+                />
+                <LapStatChip
+                  label="Avg top 5"
+                  value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "avg_top_5"))}
+                />
+                <LapStatChip
+                  label="Avg top 10"
+                  value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "avg_top_10"))}
+                />
+                <LapStatChip
+                  label="Median"
+                  title="Median of entrants’ avg top 10 (typical sustained pace in session)"
+                  value={formatLap(fieldStats.fieldMedianAvgTop10Seconds)}
+                />
+                <LapStatChip label="Consistency" value="—" title="Not aggregated for the field" />
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
+        </div>
 
-          <div className="space-y-1">
-            <div className="ui-label-caps">All laps ({laps.length})</div>
-            {laps.length > 0 ? (
-              <ul className="font-mono text-[11px] grid grid-cols-[auto_1fr_auto] gap-x-2 gap-y-0.5 max-h-32 overflow-y-auto rounded border border-border bg-muted/60 px-2 py-1.5">
-                {(ownRows.length === laps.length ? ownRows : laps.map((t, i) => ({
-                  lapNumber: i + 1,
-                  lapTimeSeconds: t,
-                  isIncluded: true,
-                }))).map((r, i) => (
-                  <React.Fragment key={i}>
-                    <span
-                      className={cn(
-                        "text-muted-foreground",
-                        !r.isIncluded && "opacity-50 line-through"
-                      )}
-                    >
-                      {r.lapNumber}.
-                    </span>
-                    <span className={cn(!r.isIncluded && "opacity-50 line-through")}>
-                      {r.lapTimeSeconds.toFixed(3)}s
-                    </span>
-                    {!r.isIncluded ? (
-                      <span className="ui-title text-[9px] text-muted-foreground">Excluded</span>
-                    ) : (
-                      <span />
-                    )}
-                  </React.Fragment>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-xs text-muted-foreground">—</div>
-            )}
-          </div>
-
-          <div className="pt-1 border-t border-border/60 border-dashed">
-            <details className="group">
-              <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] [&::-webkit-details-marker]:hidden">
-                <span className="ui-label-caps text-[9px] text-muted-foreground/80 shrink-0">Lap source</span>
-                <span className="text-muted-foreground/90 truncate min-w-0 max-w-[min(100%,320px)]">
-                  {sourceSummary ?? "—"}
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="ui-label-caps">All laps ({laps.length})</div>
+          {laps.length > 0 ? (
+            <div className="flex flex-wrap gap-x-2 gap-y-1 font-mono text-[11px] max-h-24 overflow-y-auto rounded border border-border bg-muted/60 px-2 py-1.5">
+              {(ownRows.length === laps.length
+                ? ownRows
+                : laps.map((t, i) => ({
+                    lapNumber: i + 1,
+                    lapTimeSeconds: t,
+                    isIncluded: true,
+                  }))
+              ).map((r, i) => {
+                const isMistake = mistakeLapNumbers.has(r.lapNumber);
+                const isBest = bestLapNumbers.has(r.lapNumber);
+                const mistake = mistakeAnalysis.mistakes.find((m) => m.lapNumber === r.lapNumber);
+                return (
+                <span
+                  key={i}
+                  className={cn(
+                    "whitespace-nowrap tabular-nums rounded px-0.5",
+                    !r.isIncluded && "opacity-50 line-through",
+                    isMistake &&
+                      "bg-red-500/15 text-red-800 dark:text-red-300 ring-1 ring-red-500/30",
+                    isBest &&
+                      !isMistake &&
+                      "bg-purple-500/15 text-purple-900 dark:text-purple-200 ring-1 ring-purple-500/35"
+                  )}
+                  title={
+                    !r.isIncluded
+                      ? "Excluded"
+                      : isMistake && mistake
+                        ? `${formatMistakeLapDetail(mistake)} vs median`
+                        : isBest
+                          ? "Best lap"
+                          : undefined
+                  }
+                >
+                  <span className="text-muted-foreground">{r.lapNumber}.</span>{" "}
+                  {r.lapTimeSeconds.toFixed(3)}s
                 </span>
-                {sourceUrl ? (
-                  <span className="shrink-0 text-[10px] font-medium text-accent underline underline-offset-2">
-                    Link
-                  </span>
-                ) : null}
-              </summary>
-              {sourceUrl ? (
-                <div className="mt-1 pl-0.5">
-                  <a
-                    href={sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block break-all text-[10px] text-accent/90 underline underline-offset-2"
-                    title={sourceUrl}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {formatLapSourceLinkText(sourceUrl)}
-                  </a>
-                </div>
-              ) : null}
-            </details>
-          </div>
-
-          <p
-            className="text-[11px] text-muted-foreground pt-2 border-t border-border/60"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {uploadedLapSetsLine} Use <span className="font-medium text-foreground">Lap times</span> on the row
-            above for column compare.
-          </p>
+              );
+              })}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground">—</div>
+          )}
         </div>
       </div>
 
-      <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
-        <div className="ui-label-caps">Engineer</div>
-        <SessionsEngineerPairLinks runId={run.id} />
-        {engineerVsPreviousHref ? (
-          <Link
-            href={engineerVsPreviousHref}
-            className="inline-flex items-center rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
-          >
-            vs previous on same car
-          </Link>
-        ) : (
-          <Link
-            href={engineerThisRunHref}
-            className="inline-flex items-center rounded-md border border-border bg-card/40 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
-          >
-            Open this run in Engineer
-          </Link>
-        )}
+      <div className="pt-1 border-t border-border/60 border-dashed">
+        <details className="group">
+          <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] [&::-webkit-details-marker]:hidden">
+            <span className="ui-label-caps text-[9px] text-muted-foreground/80 shrink-0">Lap source</span>
+            <span className="text-muted-foreground/90 truncate min-w-0 max-w-[min(100%,320px)]">
+              {sourceSummary ?? "—"}
+            </span>
+            {sourceUrl ? (
+              <span className="shrink-0 text-[10px] font-medium text-accent underline underline-offset-2">
+                Link
+              </span>
+            ) : null}
+          </summary>
+          {sourceUrl ? (
+            <div className="mt-1 pl-0.5">
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block break-all text-[10px] text-accent/90 underline underline-offset-2"
+                title={sourceUrl}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {formatLapSourceLinkText(sourceUrl)}
+              </a>
+            </div>
+          ) : null}
+        </details>
       </div>
 
       <div className="space-y-2">
@@ -992,7 +1080,7 @@ function RunDetail({
         <div className="ui-label-caps">Setup vs previous run</div>
         {setupPreview.mode === "no_baseline" ? (
           <p className="text-muted-foreground text-xs">
-            No earlier run on this car to diff against. Use the Engineer links above for the full sheet.
+            No earlier run on this car to diff against.
           </p>
         ) : setupPreview.rows.length === 0 ? (
           <p className="text-muted-foreground text-xs">No setup changes since your previous run on this car.</p>
