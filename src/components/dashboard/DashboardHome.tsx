@@ -7,6 +7,7 @@ import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel"
 import { DashboardPreviousRunCard } from "@/components/dashboard/DashboardPreviousRunCard";
 import { TodaySummaryCard } from "@/components/dashboard/TodaySummaryCard";
 import { DashboardEngineerSuggestionsSection } from "@/components/dashboard/DashboardEngineerSuggestionsSection";
+import { SHOW_DASHBOARD_ENGINEER_SUGGESTIONS } from "@/lib/featureFlags";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -105,23 +106,25 @@ export function DashboardHome({
           </Link>
         </HeroPanel>
 
-        <Suspense
-          fallback={
-            <HeroPanel>
-              <SectionTitle as="div" className="text-sm">
-                Engineer suggestions
-              </SectionTitle>
-              <p className="mt-2 text-[11px] text-muted-foreground">Loading…</p>
-            </HeroPanel>
-          }
-        >
-          <DashboardEngineerSuggestionsSection
-            primaryRunId={engineerSuggestionsPrimaryRunId}
-            carName={recentRun?.carName ?? "Car"}
-            trackName={recentRun?.trackName ?? null}
-            eventName={recentRun?.eventName ?? null}
-          />
-        </Suspense>
+        {SHOW_DASHBOARD_ENGINEER_SUGGESTIONS ? (
+          <Suspense
+            fallback={
+              <HeroPanel>
+                <SectionTitle as="div" className="text-sm">
+                  Engineer suggestions
+                </SectionTitle>
+                <p className="mt-2 text-[11px] text-muted-foreground">Loading…</p>
+              </HeroPanel>
+            }
+          >
+            <DashboardEngineerSuggestionsSection
+              primaryRunId={engineerSuggestionsPrimaryRunId}
+              carName={recentRun?.carName ?? "Car"}
+              trackName={recentRun?.trackName ?? null}
+              eventName={recentRun?.eventName ?? null}
+            />
+          </Suspense>
+        ) : null}
 
         {featuredEvent ? (
           <FeaturedMeetingCard featuredEvent={featuredEvent} />

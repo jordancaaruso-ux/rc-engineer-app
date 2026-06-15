@@ -4,6 +4,7 @@ import { useEffect, useTransition, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareLazy";
 import { EngineerChatPanel } from "@/components/engineer/EngineerChatPanel";
+import { EngineerNavIcon } from "@/components/layout/EngineerNavIcon";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 import { EngineerSuggestionsStrip } from "@/components/engineer/EngineerSuggestionsStrip";
 import { cn } from "@/lib/utils";
@@ -65,11 +66,14 @@ export function EngineerPageClient() {
             isPending && "opacity-90"
           )}
         >
-          <div className="border-b border-border bg-muted/25 px-4 py-3 md:px-5">
-            <h2 className="text-lg font-semibold text-foreground tracking-tight">Ask the Engineer</h2>
-            <p className="text-xs text-muted-foreground mt-1 leading-snug">
-              Grounded in your vehicle-dynamics knowledge base and recent runs.
-            </p>
+          <div className="border-b border-border/80 px-4 py-2.5 md:px-5 flex items-center gap-2">
+            <EngineerNavIcon className="[&_svg]:h-4 [&_svg]:w-4" />
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-foreground tracking-tight">Ask the Engineer</h2>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Grounded in your KB and recent runs.
+              </p>
+            </div>
           </div>
           <EngineerChatPanel />
         </section>

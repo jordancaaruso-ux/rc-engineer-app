@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MOBILE_NAV, resolveActiveNavId } from "@/components/layout/navConfig";
+import { EngineerNavIcon } from "@/components/layout/EngineerNavIcon";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ export function BottomNav() {
               item.smartDraft && item.id === "add-run" ? addRunHref(item.href) : item.href;
             const Icon = item.icon;
             const prefetch = item.prefetch !== false;
+            const isEngineer = item.id === "engineer";
 
             return (
               <li key={item.id} className="flex flex-col items-center justify-end pb-1.5">
@@ -41,7 +43,11 @@ export function BottomNav() {
                   )}
                 >
                   <span className="relative shrink-0">
-                    <Icon className="h-5 w-5" aria-hidden />
+                    {isEngineer ? (
+                      <EngineerNavIcon />
+                    ) : (
+                      <Icon className="h-5 w-5" aria-hidden />
+                    )}
                     {item.smartDraft && draftRunId ? (
                       <span
                         className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-card"

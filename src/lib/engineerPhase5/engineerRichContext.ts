@@ -174,7 +174,17 @@ export async function buildEngineerRichContextV1(params: {
   /** Primary run to anchor; omit for KB-only context. */
   anchorRunId: string | null;
   lastUserMessage: string;
+  opts?: {
+    /** Skip community/garage setup spread (large DB reads). */
+    spreadDepth?: "full" | "none";
+    kbLimit?: number;
+    /** Skip linked timing field-stats recompute. */
+    skipFieldStats?: boolean;
+  };
 }): Promise<EngineerRichContextV1 | null> {
+  const spreadDepth = params.opts?.spreadDepth ?? "full";
+  const kbLimit = params.opts?.kbLimit ?? 12;
+  const skipFieldStats = params.opts?.skipFieldStats ?? spreadDepth === "none";
   const detectedIntent = detectOutcomeIntent(params.lastUserMessage);
 
   if (!params.anchorRunId?.trim()) {
@@ -188,7 +198,7 @@ export async function buildEngineerRichContextV1(params: {
           })
         : null;
     const kbQuery = kbSearchQueryForMessage(params.lastUserMessage, parameterIntentMatches);
-    const kb = await searchVehicleDynamicsKb(kbQuery, 12);
+    const kb = await searchVehicleDynamicsKb(kbQuery, kbLimit);
     if (kb.length === 0) return null;
     return {
       version: 1,
@@ -266,11 +276,25 @@ export async function buildEngineerRichContextV1(params: {
     sessionClass = { label: eventClassTrim, source: "event" };
   }
 
-  const spread = await buildSetupSpreadForEngineer({
-    userId: params.userId,
-    carId: run.carId,
-    setupSnapshotData: run.setupSnapshot?.data ?? null,
-  });
+  const spread =
+    spreadDepth === "full"
+      ? await buildSetupSpreadForEngineer({
+          userId: params.userId,
+          carId: run.carId,
+          setupSnapshotData: run.setupSnapshot?.data ?? null,
+        })
+      : {
+          siblingCarIds: run.carId ? [run.carId] : [],
+          communitySpreadAvailable: false,
+          communityContext: {
+            setupSheetTemplate: canonicalSetupSheetTemplateId(run.car?.setupSheetTemplate ?? null),
+            trackSurface: null,
+            gripLevel: "any" as const,
+            label: "light chat — use search_runs / apply_engineer_focus for full spread",
+          },
+          rows: [] as Awaited<ReturnType<typeof buildSetupSpreadForEngineer>>["rows"],
+          truncated: false,
+        };
 
   const parameterIntentMatches =
     detectedIntent != null
@@ -283,13 +307,13 @@ export async function buildEngineerRichContextV1(params: {
       : null;
 
   const kbQuery = kbSearchQueryForMessage(params.lastUserMessage, parameterIntentMatches);
-  const kb = await searchVehicleDynamicsKb(kbQuery, 12);
+  const kb = await searchVehicleDynamicsKb(kbQuery, kbLimit);
 
   const conditionSig = run.track
     ? encodeTrackConditionSignature(run.track.gripTags ?? [], run.track.layoutTags ?? [])
     : "";
   const conditionalSetupEmpirical =
-    run.track && run.carId
+    spreadDepth === "full" && run.track && run.carId
       ? await buildConditionalSetupEmpiricalV1({
           userId: params.userId,
           carId: run.carId,
@@ -299,7 +323,9 @@ export async function buildEngineerRichContextV1(params: {
       : null;
 
   const garageNote =
-    spread.siblingCarIds.length <= 1
+    spreadDepth === "none"
+      ? "Light chat context — community setup spread omitted for speed; call apply_engineer_focus on a run for full setupVsSpread."
+      : spread.siblingCarIds.length <= 1
       ? "Garage fallback uses setups recorded for this car only (no sibling cars with the same sheet template)."
       : "Garage fallback aggregates your cars that share the same setup sheet template.";
   const communityNote = spread.communitySpreadAvailable
@@ -328,7 +354,7 @@ export async function buildEngineerRichContextV1(params: {
   };
 
   let importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null = null;
-  if (run.importedLapTimeSessionId) {
+  if (!skipFieldStats && run.importedLapTimeSessionId) {
     const r = await resolveImportedTimingFieldStatsForEngineer({
       userId: params.userId,
       importedLapTimeSessionId: run.importedLapTimeSessionId,

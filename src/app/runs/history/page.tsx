@@ -6,6 +6,7 @@ import { getMyNameSetting } from "@/lib/appSettings";
 import { formatGroupDate } from "@/lib/formatDate";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
+import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { compareRunTimestamp } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
@@ -18,8 +19,10 @@ import type { Prisma } from "@prisma/client";
 
 import { perfSpan } from "@/lib/perfLog";
 
-/** Initial page size for Sessions — load more via future pagination if needed. */
+/** Initial page size for Sessions — recent runs only; use ?viewAll=1 for full history. */
 export const RUN_HISTORY_INITIAL_TAKE = 40;
+/** Cap when loading full history (view all). */
+export const RUN_HISTORY_VIEW_ALL_TAKE = 2000;
 
 export const revalidate = 30;
 
@@ -73,6 +76,37 @@ async function fetchRunHistoryRows(where: Prisma.RunWhereInput, take: number): P
       include: runHistoryInclude,
     })
   );
+}
+
+async function loadRunHistoryPage(opts: {
+  where: Prisma.RunWhereInput;
+  viewAll: boolean;
+  focusRunId: string | null;
+  takeWhenNotViewAll: number;
+}): Promise<{
+  runs: RunInGroup[];
+  totalRunCount: number;
+  viewAll: boolean;
+  hasMoreRuns: boolean;
+}> {
+  const totalRunCount = await perfSpan("countRunHistoryRows", () =>
+    prisma.run.count({ where: opts.where })
+  );
+  let viewAll = opts.viewAll;
+  let take = viewAll ? RUN_HISTORY_VIEW_ALL_TAKE : opts.takeWhenNotViewAll;
+  let runs = await fetchRunHistoryRows(opts.where, take);
+
+  if (
+    opts.focusRunId &&
+    !runs.some((r) => r.id === opts.focusRunId) &&
+    runs.length < totalRunCount
+  ) {
+    viewAll = true;
+    runs = await fetchRunHistoryRows(opts.where, RUN_HISTORY_VIEW_ALL_TAKE);
+  }
+
+  const hasMoreRuns = !viewAll && totalRunCount > runs.length;
+  return { runs, totalRunCount, viewAll, hasMoreRuns };
 }
 
 // NOTE: A one-shot backfill for `carNameSnapshot`/`trackNameSnapshot` used to
@@ -150,6 +184,7 @@ export default async function RunHistoryPage({
     expandLatest?: string | string[];
     focusRun?: string | string[];
     teamId?: string | string[];
+    viewAll?: string | string[];
   }>;
 }): Promise<ReactNode> {
   const resolvedSearch = (await searchParams) ?? {};
@@ -160,6 +195,9 @@ export default async function RunHistoryPage({
   const rawExpand = resolvedSearch.expandLatest;
   const expandLatest =
     (Array.isArray(rawExpand) ? rawExpand[0] : rawExpand) === "1";
+  const rawViewAll = resolvedSearch.viewAll;
+  const viewAllRequested =
+    (Array.isArray(rawViewAll) ? rawViewAll[0] : rawViewAll) === "1";
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -183,7 +221,15 @@ export default async function RunHistoryPage({
   const userDisplayName = await getMyNameSetting(user.id);
   const teamsForUser = await listTeamsForUser(user.id);
 
+  const rawFocus = resolvedSearch.focusRun;
+  const focusRunRaw = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;
+  const focusRunParam =
+    typeof focusRunRaw === "string" && focusRunRaw.trim() ? focusRunRaw.trim() : null;
+
   let runs: RunInGroup[] = [];
+  let totalRunCount = 0;
+  let viewAll = viewAllRequested;
+  let hasMoreRuns = false;
   let teamTitle: string | null = null;
   let memberDisplayByUserId: Record<string, string> = {};
   let teamAccessDenied = false;
@@ -199,11 +245,20 @@ export default async function RunHistoryPage({
       });
       teamTitle = teamRow?.name ?? "Team";
       const memberIds = await listTeamMemberUserIds(teamId);
-      const take = Math.min(120, Math.max(RUN_HISTORY_INITIAL_TAKE, RUN_HISTORY_INITIAL_TAKE * memberIds.length));
-      runs = await fetchRunHistoryRows(
-        { userId: { in: memberIds }, shareWithTeam: true },
-        take
+      const takeWhenNotViewAll = Math.min(
+        120,
+        Math.max(RUN_HISTORY_INITIAL_TAKE, RUN_HISTORY_INITIAL_TAKE * memberIds.length)
       );
+      const loaded = await loadRunHistoryPage({
+        where: { userId: { in: memberIds }, shareWithTeam: true },
+        viewAll: viewAllRequested,
+        focusRunId: focusRunParam,
+        takeWhenNotViewAll,
+      });
+      runs = loaded.runs;
+      totalRunCount = loaded.totalRunCount;
+      viewAll = loaded.viewAll;
+      hasMoreRuns = loaded.hasMoreRuns;
       const members = await prisma.user.findMany({
         where: { id: { in: memberIds } },
         select: { id: true, name: true, email: true },
@@ -216,16 +271,21 @@ export default async function RunHistoryPage({
       );
     }
   } else {
-    runs = await fetchRunHistoryRows({ userId: user.id }, RUN_HISTORY_INITIAL_TAKE);
+    const loaded = await loadRunHistoryPage({
+      where: { userId: user.id },
+      viewAll: viewAllRequested,
+      focusRunId: focusRunParam,
+      takeWhenNotViewAll: RUN_HISTORY_INITIAL_TAKE,
+    });
+    runs = loaded.runs;
+    totalRunCount = loaded.totalRunCount;
+    viewAll = loaded.viewAll;
+    hasMoreRuns = loaded.hasMoreRuns;
   }
 
   const groups = buildGroups(runs);
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
   const compareRunsDescending = allRunsDescending.map(toCompareRunShape);
-  const rawFocus = resolvedSearch.focusRun;
-  const focusRunRaw = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;
-  const focusRunParam =
-    typeof focusRunRaw === "string" && focusRunRaw.trim() ? focusRunRaw.trim() : null;
   const focusRunId =
     focusRunParam && runs.some((r) => r.id === focusRunParam) ? focusRunParam : null;
   const focusGroupIndex =
@@ -240,6 +300,103 @@ export default async function RunHistoryPage({
     : teamMode
       ? "Runs from everyone in this team (mutual pilot). Reordering is disabled; open a member’s run read-only."
       : "";
+
+  function renderSessionGroup(group: Group, idx: number) {
+    const showSessionColumn = group.runs.some((r) => formatRunSessionDisplay(r) !== "—");
+    return (
+      <details
+        key={group.id}
+        className="rounded-xl border border-border bg-muted/70 overflow-hidden group/details"
+        open={
+          focusRunId
+            ? group.runs.some((r) => r.id === focusRunId)
+            : expandLatest && idx === 0
+        }
+      >
+        <summary className="list-none cursor-pointer">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="page-title text-sm text-foreground">{group.title}</span>
+              <span className="ui-title text-xs text-muted-foreground">{group.type}</span>
+              {group.trackName && (
+                <span className="ui-title text-xs text-muted-foreground">
+                  · {group.trackName}
+                </span>
+              )}
+              <span className="ui-title text-xs text-muted-foreground">{group.dateLabel}</span>
+            </div>
+            <span className="ui-title text-sm text-muted-foreground tabular-nums">
+              {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </summary>
+        <div className="border-t border-border bg-muted/40">
+          <div className="max-md:overflow-x-visible md:overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
+                  {!teamMode ? (
+                    <th
+                      className="hidden md:table-cell w-6 px-1 py-2"
+                      aria-label="Drag to reorder"
+                    />
+                  ) : null}
+                  {teamMode ? (
+                    <th className="px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
+                      <span className="hidden sm:inline">Member</span>
+                      <span className="sm:hidden">Who</span>
+                    </th>
+                  ) : null}
+                  <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                    Date
+                  </th>
+                  {showSessionColumn ? (
+                    <th className="px-2 py-1.5 md:px-3 md:py-2 min-w-0">
+                      Session
+                    </th>
+                  ) : null}
+                  <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                    Best
+                  </th>
+                  <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                    Avg top 5
+                  </th>
+                  <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                    Median
+                  </th>
+                  <th className="hidden md:table-cell px-4 py-2">Car</th>
+                  <th className="px-2 py-1.5 md:px-2 md:py-2 w-[4.5rem] md:w-auto whitespace-nowrap">
+                    Setup
+                  </th>
+                  <th className="hidden md:table-cell px-4 py-2">Track</th>
+                  <th className="hidden md:table-cell px-4 py-2">Tires</th>
+                </tr>
+              </thead>
+              <tbody>
+                <RunHistoryTable
+                  runs={group.runs}
+                  allRunsDescending={compareRunsDescending}
+                  runListSource={teamMode ? "team_runs" : "my_runs"}
+                  userDisplayName={userDisplayName}
+                  displayTimeZone={displayTimeZone}
+                  enableReorder={!teamMode}
+                  viewerUserId={teamMode ? user.id : null}
+                  memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
+                  showMemberColumn={teamMode}
+                  showSessionColumn={showSessionColumn}
+                  initialExpandedRunId={
+                    focusRunId && group.runs.some((r) => r.id === focusRunId)
+                      ? focusRunId
+                      : null
+                  }
+                />
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+    );
+  }
 
   if (teamAccessDenied) {
     return (
@@ -301,7 +458,9 @@ export default async function RunHistoryPage({
           <span className="text-[11px] text-muted-foreground">
             {groups.length === 0
               ? "No runs yet."
-              : `${runs.length} run${runs.length === 1 ? "" : "s"} across ${groups.length} session${groups.length === 1 ? "" : "s"}`}
+              : hasMoreRuns
+                ? `${runs.length} of ${totalRunCount} runs across ${groups.length} session${groups.length === 1 ? "" : "s"}`
+                : `${runs.length} run${runs.length === 1 ? "" : "s"} across ${groups.length} session${groups.length === 1 ? "" : "s"}`}
           </span>
         </div>
         {groups.length === 0 ? (
@@ -316,106 +475,21 @@ export default async function RunHistoryPage({
           </CardPanel>
         ) : (
           <div className="space-y-2">
-            <SessionGroupsPager initial={pagerInitial} step={12}>
-              {groups.map((group, idx) => {
-                const showSessionColumn = group.runs.some(
-                  (r) => formatRunSessionDisplay(r) !== "—"
-                );
-                return (
-                  <details
-                    key={group.id}
-                    className="rounded-xl border border-border bg-muted/70 overflow-hidden group/details"
-                    open={
-                      focusRunId
-                        ? group.runs.some((r) => r.id === focusRunId)
-                        : expandLatest && idx === 0
-                    }
-                  >
-                    <summary className="list-none cursor-pointer">
-                      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
-                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                          <span className="page-title text-sm text-foreground">{group.title}</span>
-                          <span className="ui-title text-xs text-muted-foreground">{group.type}</span>
-                          {group.trackName && (
-                            <span className="ui-title text-xs text-muted-foreground">
-                              · {group.trackName}
-                            </span>
-                          )}
-                          <span className="ui-title text-xs text-muted-foreground">{group.dateLabel}</span>
-                        </div>
-                        <span className="ui-title text-sm text-muted-foreground tabular-nums">
-                          {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    </summary>
-                    <div className="border-t border-border bg-muted/40">
-                      <div className="max-md:overflow-x-visible md:overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
-                              {!teamMode ? (
-                                <th
-                                  className="hidden md:table-cell w-6 px-1 py-2"
-                                  aria-label="Drag to reorder"
-                                />
-                              ) : null}
-                              {teamMode ? (
-                                <th className="px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
-                                  <span className="hidden sm:inline">Member</span>
-                                  <span className="sm:hidden">Who</span>
-                                </th>
-                              ) : null}
-                              <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                                Date
-                              </th>
-                              {showSessionColumn ? (
-                                <th className="px-2 py-1.5 md:px-3 md:py-2 min-w-0">
-                                  Session
-                                </th>
-                              ) : null}
-                              <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                                Best
-                              </th>
-                              <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                                Avg top 5
-                              </th>
-                              <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                                Median
-                              </th>
-                              <th className="hidden md:table-cell px-4 py-2">Car</th>
-                              <th className="px-2 py-1.5 md:px-2 md:py-2 w-[4.5rem] md:w-auto whitespace-nowrap">
-                                Setup
-                              </th>
-                              <th className="hidden md:table-cell px-4 py-2">Track</th>
-                              <th className="hidden md:table-cell px-4 py-2">Tires</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <RunHistoryTable
-                              runs={group.runs}
-                              allRunsDescending={compareRunsDescending}
-                              runListSource={teamMode ? "team_runs" : "my_runs"}
-                              userDisplayName={userDisplayName}
-                              displayTimeZone={displayTimeZone}
-                              enableReorder={!teamMode}
-                              viewerUserId={teamMode ? user.id : null}
-                              memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
-                              showMemberColumn={teamMode}
-                              showSessionColumn={showSessionColumn}
-                              initialExpandedRunId={
-                                focusRunId && group.runs.some((r) => r.id === focusRunId)
-                                  ? focusRunId
-                                  : null
-                              }
-                            />
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </details>
-                );
-              })}
-            </SessionGroupsPager>
+            {viewAll ? (
+              groups.map((group, idx) => renderSessionGroup(group, idx))
+            ) : (
+              <SessionGroupsPager initial={pagerInitial} step={12}>
+                {groups.map((group, idx) => renderSessionGroup(group, idx))}
+              </SessionGroupsPager>
+            )}
+            <RunHistoryViewMore
+              viewAll={viewAll}
+              hasMoreRuns={hasMoreRuns}
+              totalRunCount={totalRunCount}
+              loadedRunCount={runs.length}
+              teamId={teamId}
+              focusRun={focusRunId}
+            />
           </div>
         )}
       </section>

@@ -2,15 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { EngineerNavIcon } from "@/components/layout/EngineerNavIcon";
 import { cn } from "@/lib/utils";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export type EngineerQueuedChatPrompt = { id: number; text: string };
 
+const STATUS_LABEL: Record<string, string> = {
+  preparing: "Preparing context…",
+  thinking: "Thinking…",
+};
+
 async function readSseStream(
   res: Response,
-  onToken: (text: string) => void
+  handlers: {
+    onToken?: (text: string) => void;
+    onStatus?: (phase: string) => void;
+  }
 ): Promise<{ reply: string; resolvedFocus: { runId: string; compareRunId: string | null } | null }> {
   const reader = res.body?.getReader();
   if (!reader) throw new Error("Stream had no body");
@@ -35,9 +44,11 @@ async function readSseStream(
       }
       if (!dataLine) continue;
       const data = JSON.parse(dataLine) as Record<string, unknown>;
-      if (event === "token" && typeof data.t === "string") {
+      if (event === "status" && typeof data.phase === "string") {
+        handlers.onStatus?.(data.phase);
+      } else if (event === "token" && typeof data.t === "string") {
         reply += data.t;
-        onToken(data.t);
+        handlers.onToken?.(data.t);
       } else if (event === "done") {
         if (typeof data.reply === "string" && data.reply.trim()) reply = data.reply;
         resolvedFocus =
@@ -57,7 +68,6 @@ export function EngineerChatPanel({
   queuedPrompt = null,
   onQueuedPromptConsumed,
 }: {
-  /** When set, appends this user message and posts to the API once (use a new `id` per enqueue). */
   queuedPrompt?: EngineerQueuedChatPrompt | null;
   onQueuedPromptConsumed?: () => void;
 } = {}) {
@@ -68,6 +78,7 @@ export function EngineerChatPanel({
   const compareRunIdFromUrl = searchParams.get("compareRunId")?.trim() || null;
 
   const [chatBusy, setChatBusy] = useState(false);
+  const [statusPhase, setStatusPhase] = useState<string | null>(null);
   const [chatErr, setChatErr] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -94,6 +105,7 @@ export function EngineerChatPanel({
 
   async function submitConversation(next: ChatMessage[]) {
     setChatBusy(true);
+    setStatusPhase("preparing");
     setChatErr(null);
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
     try {
@@ -117,6 +129,7 @@ export function EngineerChatPanel({
           if (!pendingTokens) return;
           const chunk = pendingTokens;
           pendingTokens = "";
+          setStatusPhase(null);
           setMessages((prev) => {
             const copy = [...prev];
             const last = copy[copy.length - 1];
@@ -127,16 +140,20 @@ export function EngineerChatPanel({
             return copy;
           });
         };
-        const { reply, resolvedFocus } = await readSseStream(res, (token) => {
-          pendingTokens += token;
-          if (flushRaf == null) {
-            flushRaf = requestAnimationFrame(flushTokens);
-          }
+        const { reply, resolvedFocus } = await readSseStream(res, {
+          onStatus: (phase) => setStatusPhase(phase),
+          onToken: (token) => {
+            pendingTokens += token;
+            if (flushRaf == null) {
+              flushRaf = requestAnimationFrame(flushTokens);
+            }
+          },
         });
         if (flushRaf != null) cancelAnimationFrame(flushRaf);
         if (pendingTokens) {
           const chunk = pendingTokens;
           pendingTokens = "";
+          setStatusPhase(null);
           setMessages((prev) => {
             const copy = [...prev];
             const last = copy[copy.length - 1];
@@ -197,6 +214,7 @@ export function EngineerChatPanel({
       setChatErr(`Could not reach server: ${msg}`);
     } finally {
       setChatBusy(false);
+      setStatusPhase(null);
     }
   }
 
@@ -224,71 +242,83 @@ export function EngineerChatPanel({
     await submitConversation(next);
   }
 
-  return (
-    <div className="space-y-3">
-      <div className="rounded-lg border border-border bg-background flex flex-col">
-        <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-[220px] sm:min-h-[280px] max-h-[min(52vh,420px)]">
-          {messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Ask about setup, handling, or laps. Optional: set a primary run (and compare run) in{" "}
-              <span className="font-medium text-foreground/90">Compare &amp; trend</span> so answers anchor to those
-              URLs.
-            </p>
-          ) : (
-            messages.map((m, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  "text-sm leading-relaxed rounded-md px-3 py-2",
-                  m.role === "user"
-                    ? "bg-muted/80 text-foreground ml-0 mr-4"
-                    : "bg-card border border-border/80 ml-4 mr-0 text-foreground/95"
-                )}
-              >
-                <div className="text-[10px] ui-title text-muted-foreground mb-1">
-                  {m.role === "user" ? "You" : "Engineer"}
-                </div>
-                <div className="whitespace-pre-wrap break-words">{m.content || (chatBusy ? "…" : "—")}</div>
-              </div>
-            ))
-          )}
-        </div>
-        {chatErr ? (
-          <div className="text-xs text-destructive px-3 pb-2 space-y-1 border-t border-border">
-            <div className="ui-title text-[11px] pt-2">Error</div>
-            <pre className="whitespace-pre-wrap break-words font-sans text-[11px] leading-snug opacity-95">
-              {chatErr}
-            </pre>
-          </div>
-        ) : null}
-      </div>
+  const statusLabel = statusPhase ? (STATUS_LABEL[statusPhase] ?? "Working…") : null;
 
-      <div className="rounded-lg border border-border bg-muted/20 p-3 flex flex-col sm:flex-row gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void sendMessage();
-            }
-          }}
-          className="flex-1 rounded-md border border-border bg-background px-3 py-2.5 text-sm outline-none min-h-[44px]"
-          placeholder="Ask the Engineer…"
-          disabled={chatBusy}
-          aria-label="Message to engineer"
-        />
-        <button
-          type="button"
-          onClick={() => void sendMessage()}
-          disabled={chatBusy || !input.trim()}
-          className={cn(
-            "inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-105 shrink-0 min-h-[44px]",
-            (chatBusy || !input.trim()) && "opacity-60 pointer-events-none"
-          )}
-        >
-          {chatBusy ? "…" : "Send"}
-        </button>
+  return (
+    <div className="flex flex-col">
+      {messages.length > 0 ? (
+        <div className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 space-y-2">
+          {messages.map((m, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "text-sm leading-relaxed rounded-lg px-3 py-2",
+                m.role === "user"
+                  ? "bg-muted/70 text-foreground mr-6"
+                  : "bg-background border border-border/70 ml-6 text-foreground/95"
+              )}
+            >
+              <div className="flex items-center gap-1.5 text-[10px] ui-title text-muted-foreground mb-1">
+                {m.role === "assistant" ? <EngineerNavIcon className="[&_svg]:h-3 [&_svg]:w-3" /> : null}
+                <span>{m.role === "user" ? "You" : "Engineer"}</span>
+              </div>
+              <div className="whitespace-pre-wrap break-words">
+                {m.content ||
+                  (chatBusy && m.role === "assistant"
+                    ? statusLabel ?? "…"
+                    : m.role === "assistant"
+                      ? "—"
+                      : "")}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {chatErr ? (
+        <div className="text-xs text-destructive px-3 pt-2 space-y-1">
+          <div className="ui-title text-[11px]">Error</div>
+          <pre className="whitespace-pre-wrap break-words font-sans text-[11px] leading-snug opacity-95">
+            {chatErr}
+          </pre>
+        </div>
+      ) : null}
+
+      <div className="p-3">
+        {messages.length === 0 ? (
+          <p className="mb-2 text-[11px] text-muted-foreground leading-snug">
+            Ask about setup, handling, or laps. Set a primary run in{" "}
+            <span className="text-foreground/80">Compare &amp; trend</span> to anchor answers.
+          </p>
+        ) : null}
+        <div className="flex items-end gap-2">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void sendMessage();
+              }
+            }}
+            rows={1}
+            className="flex-1 min-h-[42px] max-h-28 resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            placeholder="Ask the Engineer…"
+            disabled={chatBusy}
+            aria-label="Message to engineer"
+          />
+          <button
+            type="button"
+            onClick={() => void sendMessage()}
+            disabled={chatBusy || !input.trim()}
+            className={cn(
+              "inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-105 shrink-0 min-h-[42px]",
+              (chatBusy || !input.trim()) && "opacity-60 pointer-events-none"
+            )}
+          >
+            {chatBusy ? "…" : "Send"}
+          </button>
+        </div>
       </div>
     </div>
   );

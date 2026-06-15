@@ -33,14 +33,14 @@ function buildChatCompletionBody(
 
 /**
  * Chat uses one model for all turns (conversational engineer).
- * Default gpt-5; override with ENGINEER_MODEL when you need a cheaper model at scale.
+ * Default gpt-4o for responsive chat; override with ENGINEER_MODEL (e.g. gpt-5) when needed.
  * `temperature` is only sent when the model accepts it (see modelSupportsCustomTemperature).
  */
 function getEngineerChatModelAndTemperature(): {
   model: string;
   temperature: number;
 } {
-  const model = process.env.ENGINEER_MODEL?.trim() || "gpt-5";
+  const model = process.env.ENGINEER_MODEL?.trim() || "gpt-4o";
   return {
     model,
     temperature: 0.3,

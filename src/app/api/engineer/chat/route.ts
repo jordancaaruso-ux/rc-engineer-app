@@ -7,6 +7,7 @@ import {
   buildFocusedRunPairContext,
 } from "@/lib/engineerPhase5/contextPacket";
 import { buildEngineerRichContextV1 } from "@/lib/engineerPhase5/engineerRichContext";
+import { engineerChatNeedsDeepContext } from "@/lib/engineerPhase5/engineerChatContextTier";
 import { getOrComputeEngineerSummaryForLatestRun } from "@/lib/engineerPhase5/loadLatestEngineerSummary";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
@@ -15,11 +16,7 @@ import {
   type EngineerChatMessage,
 } from "@/lib/engineerPhase5/openaiEngineer";
 import { buildRunCatalogV1 } from "@/lib/engineerPhase5/runCatalog";
-import { resolveRunScopeForEngineerChat } from "@/lib/engineerPhase5/resolveEngineerRunScope";
-import {
-  buildTireLifePriorsForChatContext,
-} from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
-import { computeResolvedScopeTireStepsV1 } from "@/lib/engineerPhase5/tireLifePriors/computeResolvedScopeTireSteps";
+import { buildTireLifePriorsForChatContext } from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
 import { buildSetupHandlingPaceBundle } from "@/lib/engineerPhase5/setupHandlingPaceBundle";
 import { buildSetupOutcomeMemoryForRun } from "@/lib/engineerPhase5/setupOutcomeMemory";
 import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
@@ -28,6 +25,7 @@ import {
   parsePaceVsFieldRunDigestSubsetPayload,
 } from "@/lib/engineerPhase5/paceVsFieldRunDigestParse";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
+import { perfSpan } from "@/lib/perfLog";
 
 const MAX_MESSAGE_CHARS = 4096;
 
@@ -85,142 +83,223 @@ type ChatRequestBody = {
   stream?: unknown;
 };
 
+type BuiltChatContext =
+  | { error: string }
+  | {
+      contextJson: Record<string, unknown>;
+      baseForMerge: Record<string, unknown>;
+      lastUser: EngineerChatMessage | undefined;
+      needsDeep: boolean;
+    };
+
 async function buildEngineerChatContext(params: {
   userId: string;
   body: ChatRequestBody | null;
   messages: EngineerChatMessage[];
   runId: string;
   compareRunId: string;
-  timeZone: string;
-}) {
-  const { userId, body, messages, runId, compareRunId, timeZone } = params;
-  const basePacket = await buildEngineerContextPacketV1(userId);
-  const lastUser = [...messages].reverse().find((m) => m.role === "user");
-  const anchorForRichContext = runId || basePacket.latestRun?.id || null;
+}): Promise<BuiltChatContext> {
+  return perfSpan("buildEngineerChatContext", async () => {
+    const { userId, body, messages, runId, compareRunId } = params;
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    const needsDeep = engineerChatNeedsDeepContext({
+      lastUserMessage: lastUser?.content,
+      runId,
+      compareRunId,
+    });
 
-  const [richEngineerContext, resolvedRunScope, focusedRunPair] = await Promise.all([
-    lastUser && typeof lastUser.content === "string"
-      ? buildEngineerRichContextV1({
-          userId,
-          anchorRunId: anchorForRichContext,
-          lastUserMessage: lastUser.content,
-        })
-      : Promise.resolve(null),
-    !runId && lastUser
-      ? resolveRunScopeForEngineerChat({
-          userId,
-          lastUserMessage: lastUser.content,
-          timeZone,
-        }).catch(() => null)
-      : Promise.resolve(null),
-    runId
-      ? buildFocusedRunPairContext(userId, runId, compareRunId || null)
-      : Promise.resolve(null),
-  ]);
-
-  if (runId && !focusedRunPair) {
-    return { error: "Run not found" as const };
-  }
-
-  const patternDigest =
-    body?.includePatternDigest === true &&
-    body?.patternDigest &&
-    typeof body.patternDigest === "object" &&
-    body.patternDigest !== null
-      ? body.patternDigest
-      : null;
-
-  const includeRunCatalog = body?.includeRunCatalog === true;
-  const paceVsFieldRunDigest = parsePaceVsFieldRunDigestPayload(body?.paceVsFieldRunDigest);
-  const paceVsFieldRunDigestSubset = parsePaceVsFieldRunDigestSubsetPayload(body?.paceVsFieldRunDigestSubset);
-
-  const brainCarId = richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null;
-  const brainAnchor = anchorForRichContext;
-
-  const [
-    summaryResult,
-    tireLifePriors,
-    setupOutcomeMemory,
-    engineeringBrain,
-    runCatalog,
-    resolvedScopeTireSteps,
-  ] = await Promise.all([
-    !focusedRunPair
-      ? getOrComputeEngineerSummaryForLatestRun(userId)
-      : !compareRunId
-        ? getOrComputeEngineerSummaryForRun(userId, focusedRunPair.primaryRunId)
+    const [basePacket, focusedRunPair] = await Promise.all([
+      perfSpan("buildEngineerContextPacketV1", () => buildEngineerContextPacketV1(userId)),
+      runId
+        ? perfSpan("buildFocusedRunPairContext", () =>
+            buildFocusedRunPairContext(userId, runId, compareRunId || null)
+          )
         : Promise.resolve(null),
-    buildTireLifePriorsForChatContext({
-      userId,
-      anchorRunId: anchorForRichContext,
-      focusedPair: focusedPairForTirePriors(focusedRunPair),
-    }),
-    buildSetupOutcomeMemoryForRun({
-      userId,
-      anchorRunId: anchorForRichContext,
-      carId: richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null,
-    }).catch(() => null),
-    brainCarId && brainAnchor
-      ? buildEngineeringBrainV1({
-          userId,
-          carId: brainCarId,
-          anchorRunId: brainAnchor,
-          referenceRunId: focusedRunPair?.compare?.id ?? null,
-        }).catch(() => null)
-      : Promise.resolve(null),
-    includeRunCatalog ? buildRunCatalogV1({ userId }) : Promise.resolve(null),
-    resolvedRunScope &&
-    !resolvedRunScope.ambiguousMeetingScope &&
-    resolvedRunScope.runs.length >= 2
-      ? computeResolvedScopeTireStepsV1({
-          userId,
-          runIds: resolvedRunScope.runs.map((r) => r.runId),
-        }).catch(() => null)
-      : Promise.resolve(null),
-  ]);
+    ]);
 
-  const engineerSummary: EngineerRunSummaryV2 | null = summaryResult?.summary ?? null;
-  const setupHandlingPaceBundle = buildSetupHandlingPaceBundle(focusedRunPair);
+    if (runId && !focusedRunPair) {
+      return { error: "Run not found" };
+    }
 
-  const contextJson = {
-    defaultDashboardContext: basePacket,
-    engineerSummary,
-    richEngineerContext,
-    resolvedRunScope,
-    focusedRunPair,
-    patternDigest,
-    runCatalog,
-    tireLifePriors,
-    setupHandlingPaceBundle,
-    setupOutcomeMemory,
-    engineeringBrain,
-    resolvedScopeTireSteps,
-    thingsToTry: basePacket.thingsToTry,
-    thingsToDo: basePacket.thingsToDo,
-    paceVsFieldRunDigest,
-    paceVsFieldRunDigestSubset,
-  };
+    const anchorForRichContext = runId || basePacket.latestRun?.id || null;
 
-  const baseForMerge = {
-    defaultDashboardContext: basePacket,
-    resolvedRunScope,
-    patternDigest,
-    runCatalog,
-    tireLifePriors,
-    resolvedScopeTireSteps,
-    setupHandlingPaceBundle,
-    setupOutcomeMemory,
-    engineeringBrain,
-    thingsToTry: basePacket.thingsToTry,
-    thingsToDo: basePacket.thingsToDo,
-    paceVsFieldRunDigest,
-    paceVsFieldRunDigestSubset,
-  };
+    const richEngineerContext =
+      lastUser && typeof lastUser.content === "string"
+        ? await perfSpan("buildEngineerRichContextV1", () =>
+            buildEngineerRichContextV1({
+              userId,
+              anchorRunId: anchorForRichContext,
+              lastUserMessage: lastUser.content,
+              opts: needsDeep
+                ? { spreadDepth: "full", kbLimit: 10 }
+                : { spreadDepth: "none", kbLimit: 5, skipFieldStats: true },
+            })
+          )
+        : null;
 
-  return {
-    contextJson,
-    baseForMerge,
-    lastUser,
+    const patternDigest =
+      body?.includePatternDigest === true &&
+      body?.patternDigest &&
+      typeof body.patternDigest === "object" &&
+      body.patternDigest !== null
+        ? body.patternDigest
+        : null;
+
+    const includeRunCatalog = body?.includeRunCatalog === true;
+    const paceVsFieldRunDigest = parsePaceVsFieldRunDigestPayload(body?.paceVsFieldRunDigest);
+    const paceVsFieldRunDigestSubset = parsePaceVsFieldRunDigestSubsetPayload(
+      body?.paceVsFieldRunDigestSubset
+    );
+
+    const brainCarId = richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null;
+    const brainAnchor = anchorForRichContext;
+
+    const [
+      summaryResult,
+      tireLifePriors,
+      setupOutcomeMemory,
+      engineeringBrain,
+      runCatalog,
+    ] = await Promise.all([
+      needsDeep
+        ? !focusedRunPair
+          ? perfSpan("getOrComputeEngineerSummaryForLatestRun", () =>
+              getOrComputeEngineerSummaryForLatestRun(userId)
+            )
+          : !compareRunId
+            ? perfSpan("getOrComputeEngineerSummaryForRun", () =>
+                getOrComputeEngineerSummaryForRun(userId, focusedRunPair.primaryRunId)
+              )
+            : Promise.resolve(null)
+        : Promise.resolve(null),
+      needsDeep
+        ? perfSpan("buildTireLifePriorsForChatContext", () =>
+            buildTireLifePriorsForChatContext({
+              userId,
+              anchorRunId: anchorForRichContext,
+              focusedPair: focusedPairForTirePriors(focusedRunPair),
+            })
+          )
+        : Promise.resolve(null),
+      needsDeep
+        ? perfSpan("buildSetupOutcomeMemoryForRun", () =>
+            buildSetupOutcomeMemoryForRun({
+              userId,
+              anchorRunId: anchorForRichContext,
+              carId: richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null,
+            }).catch(() => null)
+          )
+        : Promise.resolve(null),
+      needsDeep && brainCarId && brainAnchor
+        ? perfSpan("buildEngineeringBrainV1", () =>
+            buildEngineeringBrainV1({
+              userId,
+              carId: brainCarId,
+              anchorRunId: brainAnchor,
+              referenceRunId: focusedRunPair?.compare?.id ?? null,
+            }).catch(() => null)
+          )
+        : Promise.resolve(null),
+      includeRunCatalog ? buildRunCatalogV1({ userId }) : Promise.resolve(null),
+    ]);
+
+    const engineerSummary: EngineerRunSummaryV2 | null = summaryResult?.summary ?? null;
+    const setupHandlingPaceBundle = needsDeep ? buildSetupHandlingPaceBundle(focusedRunPair) : null;
+
+    const contextJson: Record<string, unknown> = {
+      contextTier: needsDeep ? "full" : "light",
+      defaultDashboardContext: basePacket,
+      engineerSummary,
+      richEngineerContext,
+      resolvedRunScope: null,
+      focusedRunPair,
+      patternDigest,
+      runCatalog,
+      tireLifePriors,
+      setupHandlingPaceBundle,
+      setupOutcomeMemory,
+      engineeringBrain,
+      resolvedScopeTireSteps: null,
+      thingsToTry: basePacket.thingsToTry,
+      thingsToDo: basePacket.thingsToDo,
+      paceVsFieldRunDigest,
+      paceVsFieldRunDigestSubset,
+    };
+
+    const baseForMerge: Record<string, unknown> = {
+      contextTier: needsDeep ? "full" : "light",
+      defaultDashboardContext: basePacket,
+      resolvedRunScope: null,
+      patternDigest,
+      runCatalog,
+      tireLifePriors,
+      resolvedScopeTireSteps: null,
+      setupHandlingPaceBundle,
+      setupOutcomeMemory,
+      engineeringBrain,
+      thingsToTry: basePacket.thingsToTry,
+      thingsToDo: basePacket.thingsToDo,
+      paceVsFieldRunDigest,
+      paceVsFieldRunDigestSubset,
+    };
+
+    return {
+      contextJson,
+      baseForMerge,
+      lastUser,
+      needsDeep,
+    };
+  });
+}
+
+function buildMergeContextWithFocusedPair(opts: {
+  userId: string;
+  baseForMerge: Record<string, unknown>;
+  lastUser: EngineerChatMessage | undefined;
+}) {
+  return async (focused: NonNullable<Awaited<ReturnType<typeof buildFocusedRunPairContext>>>) => {
+    const [summaryResult, rich, reTire, reSetupOutcomeMemory, reEngineeringBrain] = await Promise.all([
+      !focused.compareRunId
+        ? getOrComputeEngineerSummaryForRun(opts.userId, focused.primaryRunId)
+        : Promise.resolve(null),
+      opts.lastUser && typeof opts.lastUser.content === "string"
+        ? buildEngineerRichContextV1({
+            userId: opts.userId,
+            anchorRunId: focused.primaryRunId,
+            lastUserMessage: opts.lastUser.content,
+            opts: { spreadDepth: "full", kbLimit: 10 },
+          })
+        : Promise.resolve(null),
+      buildTireLifePriorsForChatContext({
+        userId: opts.userId,
+        anchorRunId: focused.primaryRunId,
+        focusedPair: focusedPairForTirePriors(focused),
+      }),
+      buildSetupOutcomeMemoryForRun({
+        userId: opts.userId,
+        anchorRunId: focused.primaryRunId,
+        carId: focused.primary.carId,
+      }).catch(() => null),
+      focused.primary.carId
+        ? buildEngineeringBrainV1({
+            userId: opts.userId,
+            carId: focused.primary.carId,
+            anchorRunId: focused.primaryRunId,
+            referenceRunId: focused.compare?.id ?? null,
+          }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    return {
+      ...opts.baseForMerge,
+      contextTier: "full",
+      engineerSummary: summaryResult?.summary ?? null,
+      focusedRunPair: focused,
+      richEngineerContext: rich,
+      tireLifePriors: reTire,
+      setupHandlingPaceBundle: buildSetupHandlingPaceBundle(focused),
+      setupOutcomeMemory: reSetupOutcomeMemory,
+      engineeringBrain: reEngineeringBrain,
+    };
   };
 }
 
@@ -258,67 +337,7 @@ export async function POST(request: Request) {
 
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
-    const timeZone =
-      typeof body?.timeZone === "string" && body.timeZone.trim().length > 0 ? body.timeZone.trim() : "UTC";
     const useStream = body?.stream === true;
-
-    const built = await buildEngineerChatContext({
-      userId: user.id,
-      body,
-      messages,
-      runId,
-      compareRunId,
-      timeZone,
-    });
-    if ("error" in built) {
-      return jsonError(404, built.error ?? "Run not found");
-    }
-    const { contextJson, baseForMerge, lastUser } = built;
-
-    const mergeContextWithFocusedPair = async (
-      focused: NonNullable<Awaited<ReturnType<typeof buildFocusedRunPairContext>>>
-    ) => {
-      const [summaryResult, rich, reTire, reSetupOutcomeMemory, reEngineeringBrain] = await Promise.all([
-        !focused.compareRunId
-          ? getOrComputeEngineerSummaryForRun(user.id, focused.primaryRunId)
-          : Promise.resolve(null),
-        lastUser && typeof lastUser.content === "string"
-          ? buildEngineerRichContextV1({
-              userId: user.id,
-              anchorRunId: focused.primaryRunId,
-              lastUserMessage: lastUser.content,
-            })
-          : Promise.resolve(null),
-        buildTireLifePriorsForChatContext({
-          userId: user.id,
-          anchorRunId: focused.primaryRunId,
-          focusedPair: focusedPairForTirePriors(focused),
-        }),
-        buildSetupOutcomeMemoryForRun({
-          userId: user.id,
-          anchorRunId: focused.primaryRunId,
-          carId: focused.primary.carId,
-        }).catch(() => null),
-        focused.primary.carId
-          ? buildEngineeringBrainV1({
-              userId: user.id,
-              carId: focused.primary.carId,
-              anchorRunId: focused.primaryRunId,
-              referenceRunId: focused.compare?.id ?? null,
-            }).catch(() => null)
-          : Promise.resolve(null),
-      ]);
-      return {
-        ...baseForMerge,
-        engineerSummary: summaryResult?.summary ?? null,
-        focusedRunPair: focused,
-        richEngineerContext: rich,
-        tireLifePriors: reTire,
-        setupHandlingPaceBundle: buildSetupHandlingPaceBundle(focused),
-        setupOutcomeMemory: reSetupOutcomeMemory,
-        engineeringBrain: reEngineeringBrain,
-      };
-    };
 
     if (useStream) {
       const encoder = new TextEncoder();
@@ -328,6 +347,25 @@ export async function POST(request: Request) {
             controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
           };
           try {
+            send("status", { phase: "preparing" });
+            const built = await buildEngineerChatContext({
+              userId: user.id,
+              body,
+              messages,
+              runId,
+              compareRunId,
+            });
+            if ("error" in built) {
+              send("error", { message: built.error ?? "Run not found" });
+              return;
+            }
+            const { contextJson, baseForMerge, lastUser } = built;
+            const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
+              userId: user.id,
+              baseForMerge,
+              lastUser,
+            });
+            send("status", { phase: "thinking" });
             const out = await generateEngineerChatReplyWithTools({
               contextJson,
               messages,
@@ -355,6 +393,23 @@ export async function POST(request: Request) {
         },
       });
     }
+
+    const built = await buildEngineerChatContext({
+      userId: user.id,
+      body,
+      messages,
+      runId,
+      compareRunId,
+    });
+    if ("error" in built) {
+      return jsonError(404, built.error ?? "Run not found");
+    }
+    const { contextJson, baseForMerge, lastUser } = built;
+    const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
+      userId: user.id,
+      baseForMerge,
+      lastUser,
+    });
 
     const out = await generateEngineerChatReplyWithTools({
       contextJson,
