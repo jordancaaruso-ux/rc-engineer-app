@@ -8,6 +8,11 @@ import {
   searchRunsForEngineerTool,
   type SearchRunsForEngineerArgs,
 } from "@/lib/engineerPhase5/engineerRunSearchTools";
+import {
+  ENGINEER_CHAT_CONTEXT_MAX_CHARS,
+  formatEngineerChatContextSystemMessage,
+  isContextTooLargeOpenAiError,
+} from "@/lib/engineerPhase5/slimEngineerChatContextForApi";
 /**
  * Some models (GPT-5 family, o-series) only allow the default sampler — sending temperature≠1 errors.
  * Omit `temperature` in the request body for those; OpenAI uses its default.
@@ -440,7 +445,7 @@ export async function generateEngineerChatReply(params: {
 
   const messages: ChatCompletionMessage[] = [
     { role: "system", content: CHAT_SYSTEM },
-    { role: "system", content: `Context (JSON):\n${JSON.stringify(params.contextJson)}` },
+    { role: "system", content: formatEngineerChatContextSystemMessage(params.contextJson) },
     ...safeMsgs.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
   ];
 
@@ -491,13 +496,21 @@ export async function generateEngineerChatReplyWithTools(params: {
 
   let workingContext = params.contextJson;
   let resolvedFocus: { runId: string; compareRunId: string | null } | null = null;
+  let contextBudgetChars = ENGINEER_CHAT_CONTEXT_MAX_CHARS;
 
   const messagesApi: ChatCompletionMessage[] = [
     {
       role: "system",
       content: CHAT_SYSTEM + TOOL_INSTRUCTIONS,
     },
-    { role: "system", content: `Context (JSON):\n${JSON.stringify(workingContext)}` },
+    {
+      role: "system",
+      content: formatEngineerChatContextSystemMessage(
+        workingContext,
+        "Context (JSON):",
+        contextBudgetChars
+      ),
+    },
     ...safeMsgs.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
   ];
 
@@ -508,13 +521,33 @@ export async function generateEngineerChatReplyWithTools(params: {
       role: "system",
       content: CHAT_SYSTEM + TOOL_INSTRUCTIONS,
     };
+    messagesApi[1] = {
+      role: "system",
+      content: formatEngineerChatContextSystemMessage(
+        workingContext,
+        "Context (JSON):",
+        contextBudgetChars
+      ),
+    };
 
     const useTools = true;
     const bodyObj = buildChatCompletionBody(opts.model, opts.temperature, {
       messages: messagesApi,
       ...(useTools ? { tools: TOOLS, tool_choice: "auto" as const } : { tool_choice: "none" as const }),
     });
-    const res = await postChatCompletion(apiKey, bodyObj, params.onToken);
+    let res = await postChatCompletion(apiKey, bodyObj, params.onToken);
+    if (!res.ok && isContextTooLargeOpenAiError(res.data) && contextBudgetChars > 10_000) {
+      contextBudgetChars = Math.floor(contextBudgetChars * 0.5);
+      messagesApi[1] = {
+        role: "system",
+        content: formatEngineerChatContextSystemMessage(
+          workingContext,
+          "Context (JSON):",
+          contextBudgetChars
+        ),
+      };
+      res = await postChatCompletion(apiKey, bodyObj, params.onToken);
+    }
     if (!res.ok) {
       const msg =
         (res.data?.error as { message?: string } | undefined)?.message || `OpenAI error (${res.status})`;
@@ -570,7 +603,11 @@ export async function generateEngineerChatReplyWithTools(params: {
           };
           messagesApi[1] = {
             role: "system",
-            content: `Context (JSON) — updated after apply_engineer_focus:\n${JSON.stringify(workingContext)}`,
+            content: formatEngineerChatContextSystemMessage(
+              workingContext,
+              "Context (JSON) — updated after apply_engineer_focus:",
+              contextBudgetChars
+            ),
           };
           messagesApi.push({
             role: "tool",

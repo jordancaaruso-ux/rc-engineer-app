@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { EngineerNavIcon } from "@/components/layout/EngineerNavIcon";
 import { cn } from "@/lib/utils";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -258,9 +257,8 @@ export function EngineerChatPanel({
                   : "bg-background border border-border/70 ml-6 text-foreground/95"
               )}
             >
-              <div className="flex items-center gap-1.5 text-[10px] ui-title text-muted-foreground mb-1">
-                {m.role === "assistant" ? <EngineerNavIcon className="[&_svg]:h-3 [&_svg]:w-3" /> : null}
-                <span>{m.role === "user" ? "You" : "Engineer"}</span>
+              <div className="text-[10px] ui-title text-muted-foreground mb-1">
+                {m.role === "user" ? "You" : "Engineer"}
               </div>
               <div className="whitespace-pre-wrap break-words">
                 {m.content ||
