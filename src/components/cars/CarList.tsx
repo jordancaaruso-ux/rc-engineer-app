@@ -6,7 +6,9 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { labelForSetupSheetTemplate, SETUP_SHEET_TEMPLATE_OPTIONS } from "@/lib/setupSheetTemplateId";
+import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
+
+type SetupSheetModelOption = { id: string; name: string; slug: string };
 
 type Car = {
   id: string;
@@ -27,16 +29,35 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   return data as T;
 }
 
-export function CarList({ initialCars }: { initialCars: Car[] }) {
+export function CarList({
+  initialCars,
+  setupSheetModels: initialSetupSheetModels = [],
+}: {
+  initialCars: Car[];
+  setupSheetModels?: SetupSheetModelOption[];
+}) {
   const router = useRouter();
   const [cars, setCars] = useState<Car[]>(initialCars);
+  const [setupSheetModels, setSetupSheetModels] =
+    useState<SetupSheetModelOption[]>(initialSetupSheetModels);
   useEffect(() => {
     setCars(initialCars);
   }, [initialCars]);
+  useEffect(() => {
+    setSetupSheetModels(initialSetupSheetModels);
+  }, [initialSetupSheetModels]);
+  useEffect(() => {
+    fetch("/api/setup-sheet-models")
+      .then((r) => r.json())
+      .then((d: { models?: SetupSheetModelOption[] }) => {
+        if (Array.isArray(d.models)) setSetupSheetModels(d.models);
+      })
+      .catch(() => {});
+  }, []);
   const [name, setName] = useState("");
   const [chassis, setChassis] = useState("");
   const [notes, setNotes] = useState("");
-  const [setupSheetTemplate, setSetupSheetTemplate] = useState("");
+  const [setupSheetModelId, setSetupSheetModelId] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -47,9 +68,9 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
       setMessage("Name is required.");
       return;
     }
-    if (!setupSheetTemplate) {
+    if (!setupSheetModelId) {
       const ok = window.confirm(
-        "Add this car without a setup sheet template? Engineer community spread, setup compare, and structured setup tools need a template. Choose “Awesomatix A800RR” if this car uses that sheet."
+        "Add this car without a setup sheet model? Community stats, setup compare, and structured setup tools work best when you link a model (create one in the setup wizard if needed)."
       );
       if (!ok) return;
     }
@@ -63,14 +84,14 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
           name: trimmed,
           chassis: chassis.trim() || null,
           notes: notes.trim() || null,
-          setupSheetTemplate: setupSheetTemplate === "awesomatix_a800rr" ? "awesomatix_a800rr" : null,
+          setupSheetModelId: setupSheetModelId || null,
         }),
       });
       setCars((prev) => [car, ...prev]);
       setName("");
       setChassis("");
       setNotes("");
-      setSetupSheetTemplate("");
+      setSetupSheetModelId("");
       setMessage("Car added. You can use it when logging a run.");
       router.refresh();
     } catch (err) {
@@ -129,20 +150,31 @@ export function CarList({ initialCars }: { initialCars: Car[] }) {
           </div>
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">
-              Setup sheet template <span className="text-amber-600 dark:text-amber-500">(recommended)</span>
+              Setup sheet model <span className="text-amber-600 dark:text-amber-500">(recommended)</span>
             </label>
             <select
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={setupSheetTemplate}
-              onChange={(e) => setSetupSheetTemplate(e.target.value)}
+              value={setupSheetModelId}
+              onChange={(e) => setSetupSheetModelId(e.target.value)}
             >
-              {SETUP_SHEET_TEMPLATE_OPTIONS.map((o) => (
-                <option key={o.value || "none"} value={o.value}>{o.label}</option>
+              <option value="">None</option>
+              {setupSheetModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
               ))}
             </select>
-            {!setupSheetTemplate ? (
+            {setupSheetModels.length === 0 ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                No models yet — use{" "}
+                <Link href="/cars/new/setup" className="text-sky-400 hover:underline">
+                  Start setup wizard
+                </Link>{" "}
+                to create one (e.g. Mugen MTC3).
+              </p>
+            ) : !setupSheetModelId ? (
               <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-                Without a template, community stats and Engineer spread won’t apply to this car.
+                Without a model, community stats and Engineer spread won’t apply to this car.
               </p>
             ) : null}
           </div>

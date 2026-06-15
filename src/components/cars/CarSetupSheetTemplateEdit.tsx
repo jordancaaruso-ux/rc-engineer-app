@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
-import { labelForSetupSheetTemplate, SETUP_SHEET_TEMPLATE_OPTIONS } from "@/lib/setupSheetTemplateId";
+import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
+
+type SheetModelOption = { id: string; name: string; slug: string };
 
 export function CarSetupSheetTemplateEdit({
   carId,
@@ -14,28 +16,29 @@ export function CarSetupSheetTemplateEdit({
   currentTemplate: string | null;
 }) {
   const router = useRouter();
-  const [value, setValue] = useState(currentTemplate ?? "");
+  const [models, setModels] = useState<SheetModelOption[]>([]);
+  const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const dirty = value !== (currentTemplate ?? "");
+
+  useEffect(() => {
+    fetch("/api/setup-sheet-models")
+      .then((r) => r.json())
+      .then((d: { models?: SheetModelOption[] }) => setModels(d.models ?? []))
+      .catch(() => {});
+  }, []);
+
+  const dirty = Boolean(value);
 
   async function handleSave() {
-    if (!dirty) return;
-    if (value === "" && (currentTemplate ?? "")) {
-      const ok = window.confirm(
-        "Clear the setup sheet template? Engineer community spread, setup compare, and structured setup features won’t apply until you set a template again."
-      );
-      if (!ok) return;
-    }
+    if (!dirty || !value) return;
     setMessage(null);
     setSaving(true);
     try {
       const res = await fetch(`/api/cars/${carId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          setupSheetTemplate: value === "awesomatix_a800rr" ? "awesomatix_a800rr" : null,
-        }),
+        body: JSON.stringify({ setupSheetModelId: value }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((data as { error?: string })?.error || "Failed to update");
@@ -51,10 +54,13 @@ export function CarSetupSheetTemplateEdit({
   return (
     <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
       <div className="text-sm font-medium text-muted-foreground mb-2">
-        Setup sheet template <span className="font-normal">(car type for setup features)</span>
+        Setup sheet model <span className="font-normal">(car type for setup features)</span>
       </div>
       <p className="text-[11px] text-muted-foreground mb-2">
-        Current: <span className="font-medium text-foreground">{labelForSetupSheetTemplate(currentTemplate)}</span>
+        Current:{" "}
+        <span className="font-medium text-foreground">
+          {labelForSetupSheetTemplate(currentTemplate)}
+        </span>
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <select
@@ -62,14 +68,17 @@ export function CarSetupSheetTemplateEdit({
           value={value}
           onChange={(e) => setValue(e.target.value)}
         >
-          {SETUP_SHEET_TEMPLATE_OPTIONS.map((o) => (
-            <option key={o.value || "none"} value={o.value}>{o.label}</option>
+          <option value="">Select model…</option>
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
           ))}
         </select>
         {dirty && (
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || !value}
             onClick={handleSave}
             className={cn(
               buttonLinkClassName("primary"),
@@ -86,9 +95,8 @@ export function CarSetupSheetTemplateEdit({
         )}
       </div>
       <p className="text-[11px] text-muted-foreground mt-2">
-        This links the car to structured setup data: community aggregations, Engineer spread, and setup compare are keyed by
-        template. When set to Awesomatix A800RR, Analysis run details will show a &quot;View setup sheet&quot; button for runs with
-        this car.
+        Links the car to structured setup data: community aggregations, Engineer spread, and setup compare are keyed by
+        model. All models you create in the setup wizard appear here.
       </p>
     </div>
   );

@@ -5,6 +5,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { canViewPeerRuns } from "@/lib/teammateRunAccess";
 import { SETUP_SHEET_TEMPLATE_A800RR, canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
+import { legacyTemplateFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -56,17 +57,19 @@ export async function POST(request: Request) {
       );
     }
     const setupSheetTemplateRaw = canonicalSetupSheetTemplateId(body.setupSheetTemplate ?? null);
-    const setupSheetTemplate =
-      setupSheetTemplateRaw === SETUP_SHEET_TEMPLATE_A800RR ? SETUP_SHEET_TEMPLATE_A800RR : null;
+    let setupSheetTemplate: string | null =
+      setupSheetTemplateRaw === SETUP_SHEET_TEMPLATE_A800RR ? SETUP_SHEET_TEMPLATE_A800RR : setupSheetTemplateRaw;
     let setupSheetModelId: string | null = body.setupSheetModelId?.trim() || null;
     if (setupSheetModelId) {
       const model = await prisma.setupSheetModel.findFirst({
         where: { id: setupSheetModelId, userId: user.id },
-        select: { id: true },
+        select: { id: true, slug: true },
       });
       if (!model) {
         return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
       }
+      const legacy = legacyTemplateFromModelSlug(model.slug);
+      if (legacy) setupSheetTemplate = legacy;
     }
     const car = await prisma.car.create({
       data: {
@@ -84,6 +87,7 @@ export async function POST(request: Request) {
         notes: true,
         setupSheetTemplate: true,
         setupSheetModelId: true,
+        setupSheetModel: { select: { id: true, name: true } },
       },
     });
     revalidateAfterCarMutation(user.id);

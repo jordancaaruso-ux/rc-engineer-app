@@ -306,7 +306,7 @@ export default async function RunHistoryPage({
     return (
       <details
         key={group.id}
-        className="rounded-xl border border-border bg-muted/70 min-w-0 max-w-full overflow-x-clip group/details"
+        className="rounded-xl border border-border bg-muted/70 min-w-0 max-w-full group/details"
         open={
           focusRunId
             ? group.runs.some((r) => r.id === focusRunId)
@@ -331,8 +331,8 @@ export default async function RunHistoryPage({
           </div>
         </summary>
         <div className="min-w-0 max-w-full border-t border-border bg-muted/40">
-          <div className="min-w-0 max-w-full">
-            <table className="w-full min-w-0 max-w-full text-sm max-md:table-fixed">
+          <div className="min-w-0 max-w-full overflow-x-auto">
+            <table className="w-full text-sm min-w-[36rem]">
               <thead>
                 <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
                   {!teamMode ? (
@@ -362,7 +362,11 @@ export default async function RunHistoryPage({
                     <span className="md:hidden">Top 5</span>
                     <span className="hidden md:inline">Avg top 5</span>
                   </th>
-                  <th className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                  <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                    <span className="md:hidden">Top 10</span>
+                    <span className="hidden md:inline">Avg top 10</span>
+                  </th>
+                  <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
                     Median
                   </th>
                   <th className="hidden md:table-cell px-4 py-2">Car</th>

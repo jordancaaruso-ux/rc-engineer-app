@@ -29,6 +29,11 @@ export default async function CarManagerPage(): Promise<ReactNode> {
 
   const user = await requireCurrentUser();
   await ensureA800SetupSheetModelForUser(user.id);
+  const setupSheetModels = await prisma.setupSheetModel.findMany({
+    where: { userId: user.id },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, slug: true },
+  });
   const cars = await prisma.car.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
@@ -55,7 +60,7 @@ export default async function CarManagerPage(): Promise<ReactNode> {
       </header>
       <section className="page-body">
         <div className="max-w-2xl">
-          <CarList initialCars={cars} />
+          <CarList initialCars={cars} setupSheetModels={setupSheetModels} />
         </div>
       </section>
     </>

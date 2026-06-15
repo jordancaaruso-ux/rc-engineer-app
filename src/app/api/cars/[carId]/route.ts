@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
-import { SETUP_SHEET_TEMPLATE_A800RR, canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
+import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
+import { legacyTemplateFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function GET(
@@ -89,6 +90,7 @@ export async function PATCH(
     chassis?: string | null;
     notes?: string | null;
     setupSheetTemplate?: string | null;
+    setupSheetModelId?: string | null;
   };
 
   const data: {
@@ -96,6 +98,7 @@ export async function PATCH(
     chassis?: string | null;
     notes?: string | null;
     setupSheetTemplate?: string | null;
+    setupSheetModelId?: string | null;
   } = {};
   if (body.name !== undefined) {
     const v = body.name?.trim();
@@ -104,13 +107,29 @@ export async function PATCH(
   if (body.chassis !== undefined) data.chassis = body.chassis?.trim() || null;
   if (body.notes !== undefined) data.notes = body.notes?.trim() || null;
   if (body.setupSheetTemplate !== undefined) {
-    const c = canonicalSetupSheetTemplateId(body.setupSheetTemplate);
-    data.setupSheetTemplate = c === SETUP_SHEET_TEMPLATE_A800RR ? SETUP_SHEET_TEMPLATE_A800RR : null;
+    data.setupSheetTemplate = canonicalSetupSheetTemplateId(body.setupSheetTemplate);
+  }
+  if (body.setupSheetModelId !== undefined) {
+    const modelId = body.setupSheetModelId?.trim() || null;
+    if (!modelId) {
+      data.setupSheetModelId = null;
+    } else {
+      const model = await prisma.setupSheetModel.findFirst({
+        where: { id: modelId, userId: user.id },
+        select: { id: true, slug: true },
+      });
+      if (!model) {
+        return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
+      }
+      data.setupSheetModelId = model.id;
+      const legacy = legacyTemplateFromModelSlug(model.slug);
+      if (legacy) data.setupSheetTemplate = legacy;
+    }
   }
   if (Object.keys(data).length === 0) {
     const car = await prisma.car.findFirst({
       where: { id: carId, userId: user.id },
-      select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, createdAt: true },
+      select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
     });
     return NextResponse.json({ car });
   }
@@ -118,7 +137,7 @@ export async function PATCH(
   const car = await prisma.car.update({
     where: { id: carId },
     data,
-    select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, createdAt: true },
+    select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
   });
   return NextResponse.json({ car });
 }

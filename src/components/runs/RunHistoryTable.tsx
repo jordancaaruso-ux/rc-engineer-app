@@ -187,7 +187,7 @@ function LapStatChip({
 type ExpandedLapStat = "best" | "avg5" | "avg10" | "mistakes" | null;
 
 /** Main sessions grid columns (excluding drag handle, member, compare pair). */
-const SESSION_TABLE_BODY_COLS_WITHOUT_SESSION = 8;
+const SESSION_TABLE_BODY_COLS_WITHOUT_SESSION = 9;
 
 function setupFieldLabel(key: string): string {
   const f = DEFAULT_SETUP_FIELDS.find((d) => d.key === key);
@@ -403,6 +403,7 @@ export function RunHistoryTable({
         const listLapDash = getIncludedLapDashboardMetrics(primaryLapRows);
         const bestLapDisplay = formatLap(run.bestLapSeconds ?? getBestLap(primaryLapRows));
         const avg5Display = formatLap(run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRows, 5));
+        const avg10Display = formatLap(getAverageTopN(primaryLapRows, 10));
         const medianLapDisplay = formatLap(listLapDash.median);
         const sessionDisplay = formatRunSessionDisplay(run);
         const runInstant = resolveRunDisplayInstant(run);
@@ -535,7 +536,10 @@ export function RunHistoryTable({
               <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {avg5Display}
               </td>
-              <td className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs tabular-nums tracking-tight text-foreground whitespace-nowrap">
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+                {avg10Display}
+              </td>
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {medianLapDisplay}
               </td>
               <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
@@ -577,8 +581,8 @@ export function RunHistoryTable({
             </tr>
             {isExpanded && (
               <tr className="border-b border-border/80 bg-muted/40">
-                <td colSpan={totalCols} className="px-2 py-3 md:px-4 md:py-4 max-w-0">
-                  <div className="min-w-0 max-w-full">
+                <td colSpan={totalCols} className="px-2 py-3 md:px-4 md:py-4 align-top">
+                  <div className="min-w-0 w-full overflow-x-auto">
                     <RunDetail
                       run={run}
                       pickerRuns={allRunsDescending}
@@ -854,7 +858,7 @@ function RunDetail({
   const dateTimeLabel = formatRunCreatedAtDateTime(runInstant, displayTimeZone);
 
   return (
-    <CardPanel className="bg-muted/40 space-y-3 text-sm min-w-0 max-w-full overflow-hidden">
+    <CardPanel className="bg-muted/40 space-y-3 text-sm min-w-0 w-full">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
         <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3 min-w-0 flex-1">
           <CompactField label="Date / time" value={dateTimeLabel} />
