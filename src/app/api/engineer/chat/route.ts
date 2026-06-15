@@ -7,7 +7,8 @@ import {
   buildFocusedRunPairContext,
 } from "@/lib/engineerPhase5/contextPacket";
 import { buildEngineerRichContextV1 } from "@/lib/engineerPhase5/engineerRichContext";
-import { engineerChatNeedsDeepContext } from "@/lib/engineerPhase5/engineerChatContextTier";
+import { engineerChatNeedsDeepContext, engineerChatContextTier } from "@/lib/engineerPhase5/engineerChatContextTier";
+import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
 import { getOrComputeEngineerSummaryForLatestRun } from "@/lib/engineerPhase5/loadLatestEngineerSummary";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
@@ -90,6 +91,7 @@ type BuiltChatContext =
       baseForMerge: Record<string, unknown>;
       lastUser: EngineerChatMessage | undefined;
       needsDeep: boolean;
+      contextTier: "light" | "full";
     };
 
 async function buildEngineerChatContext(params: {
@@ -103,6 +105,11 @@ async function buildEngineerChatContext(params: {
     const { userId, body, messages, runId, compareRunId } = params;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const needsDeep = engineerChatNeedsDeepContext({
+      lastUserMessage: lastUser?.content,
+      runId,
+      compareRunId,
+    });
+    const contextTier = engineerChatContextTier({
       lastUserMessage: lastUser?.content,
       runId,
       compareRunId,
@@ -207,7 +214,7 @@ async function buildEngineerChatContext(params: {
     const setupHandlingPaceBundle = needsDeep ? buildSetupHandlingPaceBundle(focusedRunPair) : null;
 
     const contextJson: Record<string, unknown> = {
-      contextTier: needsDeep ? "full" : "light",
+      contextTier,
       defaultDashboardContext: basePacket,
       engineerSummary,
       richEngineerContext,
@@ -227,7 +234,7 @@ async function buildEngineerChatContext(params: {
     };
 
     const baseForMerge: Record<string, unknown> = {
-      contextTier: needsDeep ? "full" : "light",
+      contextTier,
       defaultDashboardContext: basePacket,
       resolvedRunScope: null,
       patternDigest,
@@ -248,6 +255,7 @@ async function buildEngineerChatContext(params: {
       baseForMerge,
       lastUser,
       needsDeep,
+      contextTier,
     };
   });
 }
@@ -338,6 +346,43 @@ export async function POST(request: Request) {
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
     const useStream = body?.stream === true;
+    const timeZone =
+      typeof body?.timeZone === "string" && body.timeZone.trim() ? body.timeZone.trim() : "UTC";
+
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const lapHistoryAnswer = await tryAnswerLapHistoryQuery({
+      userId: user.id,
+      message: lastUserMsg,
+      timeZone,
+    });
+    if (lapHistoryAnswer) {
+      if (useStream) {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            const send = (event: string, data: unknown) => {
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+            };
+            send("status", { phase: "done", source: "lap_history" });
+            send("done", { reply: lapHistoryAnswer.reply, source: "lap_history" });
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        });
+      }
+      return NextResponse.json({
+        reply: lapHistoryAnswer.reply,
+        contextJson: null,
+        resolvedFocus: null,
+        source: "lap_history",
+      });
+    }
 
     if (useStream) {
       const encoder = new TextEncoder();
@@ -359,7 +404,7 @@ export async function POST(request: Request) {
               send("error", { message: built.error ?? "Run not found" });
               return;
             }
-            const { contextJson, baseForMerge, lastUser } = built;
+            const { contextJson, baseForMerge, lastUser, contextTier } = built;
             const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
               userId: user.id,
               baseForMerge,
@@ -371,6 +416,7 @@ export async function POST(request: Request) {
               messages,
               userId: user.id,
               mergeContextWithFocusedPair,
+              contextTier,
               onToken: (t) => send("token", { t }),
             });
             send("done", {
@@ -404,7 +450,7 @@ export async function POST(request: Request) {
     if ("error" in built) {
       return jsonError(404, built.error ?? "Run not found");
     }
-    const { contextJson, baseForMerge, lastUser } = built;
+    const { contextJson, baseForMerge, lastUser, contextTier } = built;
     const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
       userId: user.id,
       baseForMerge,
@@ -416,6 +462,7 @@ export async function POST(request: Request) {
       messages,
       userId: user.id,
       mergeContextWithFocusedPair,
+      contextTier,
     });
 
     return NextResponse.json({

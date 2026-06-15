@@ -12,7 +12,10 @@ import {
   ENGINEER_CHAT_CONTEXT_MAX_CHARS,
   formatEngineerChatContextSystemMessage,
   isContextTooLargeOpenAiError,
+  isOpenAiTpmRateLimitError,
+  parseOpenAiRetryAfterMs,
 } from "@/lib/engineerPhase5/slimEngineerChatContextForApi";
+import type { EngineerChatContextTier } from "@/lib/engineerPhase5/engineerChatContextTier";
 /**
  * Some models (GPT-5 family, o-series) only allow the default sampler — sending temperature≠1 errors.
  * Omit `temperature` in the request body for those; OpenAI uses its default.
@@ -41,15 +44,34 @@ function buildChatCompletionBody(
  * Default gpt-4o for responsive chat; override with ENGINEER_MODEL (e.g. gpt-5) when needed.
  * `temperature` is only sent when the model accepts it (see modelSupportsCustomTemperature).
  */
-function getEngineerChatModelAndTemperature(): {
+function getEngineerChatModelAndTemperature(tier: EngineerChatContextTier = "full"): {
   model: string;
   temperature: number;
 } {
+  if (tier === "light") {
+    const model =
+      process.env.ENGINEER_LIGHT_MODEL?.trim()
+      || process.env.ENGINEER_MODEL?.trim()
+      || "gpt-4o-mini";
+    return { model, temperature: 0.2 };
+  }
   const model = process.env.ENGINEER_MODEL?.trim() || "gpt-4o";
   return {
     model,
     temperature: 0.3,
   };
+}
+
+function contextBudgetCharsForTier(tier: EngineerChatContextTier): number {
+  if (tier === "light") {
+    const n = Number(process.env.ENGINEER_LIGHT_CONTEXT_MAX_CHARS);
+    return Number.isFinite(n) && n > 2000 ? n : 10_000;
+  }
+  return ENGINEER_CHAT_CONTEXT_MAX_CHARS;
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function mustGetKey(): string {
@@ -192,6 +214,13 @@ PARAMETER CHANGE RECOMMENDATIONS (strict — apply every single time you suggest
 
 If the user asks outside the context, ask a short clarifying question or explain what info is missing.
 Do not invent facts or lap times. Keep answers practical and racing-specific.`;
+
+const CHAT_SYSTEM_LIGHT = `You are an RC touring car engineer assistant grounded in the user's run log JSON.
+Answer the user's question using context tools and data only — do not invent lap times or setup values.
+For lap history, pace at a track, or "which run was fastest", prefer search_runs with date_from/date_to and track_id or text_contains before guessing.
+When listing runs, cite whenLabel, track, car, and bestLapSeconds from tool results.
+For setup, handling, or tuning advice, say you need a focused run or more detail — do not improvise setup numbers.
+Keep replies short and direct.`;
 
 const TOOL_INSTRUCTIONS = `
 
@@ -362,24 +391,38 @@ async function postChatCompletion(
   onToken?: (delta: string) => void
 ): Promise<{ ok: boolean; status: number; data?: Record<string, unknown>; streamResult?: ChatCompletionStreamResult }> {
   const useStream = Boolean(onToken);
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ ...body, stream: useStream }),
-  });
-  if (useStream) {
-    if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      return { ok: false, status: res.status, data };
+  const maxAttempts = 3;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ...body, stream: useStream }),
+    });
+    if (useStream) {
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (isOpenAiTpmRateLimitError(data) && attempt < maxAttempts - 1) {
+          await sleepMs(parseOpenAiRetryAfterMs(data) + 50);
+          continue;
+        }
+        return { ok: false, status: res.status, data };
+      }
+      const streamResult = await readOpenAiChatStream(res, onToken);
+      return { ok: true, status: res.status, streamResult };
     }
-    const streamResult = await readOpenAiChatStream(res, onToken);
-    return { ok: true, status: res.status, streamResult };
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok) return { ok: true, status: res.status, data };
+    if (isOpenAiTpmRateLimitError(data) && attempt < maxAttempts - 1) {
+      await sleepMs(parseOpenAiRetryAfterMs(data) + 50);
+      continue;
+    }
+    return { ok: false, status: res.status, data };
   }
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  return { ok: res.ok, status: res.status, data };
+  return { ok: false, status: 429, data: { error: { message: "Rate limit exceeded" } } };
 }
 
 async function executeSearchOrListTool(
@@ -484,6 +527,7 @@ export async function generateEngineerChatReplyWithTools(params: {
   userId: string;
   mergeContextWithFocusedPair: (focused: EngineerFocusedRunPairContext) => Promise<unknown>;
   onToken?: (delta: string) => void;
+  contextTier?: EngineerChatContextTier;
 }): Promise<{
   reply: string;
   contextJson: unknown;
@@ -496,12 +540,14 @@ export async function generateEngineerChatReplyWithTools(params: {
 
   let workingContext = params.contextJson;
   let resolvedFocus: { runId: string; compareRunId: string | null } | null = null;
-  let contextBudgetChars = ENGINEER_CHAT_CONTEXT_MAX_CHARS;
+  const tier: EngineerChatContextTier = params.contextTier ?? "full";
+  let contextBudgetChars = contextBudgetCharsForTier(tier);
+  const systemPrompt = tier === "light" ? CHAT_SYSTEM_LIGHT : CHAT_SYSTEM;
 
   const messagesApi: ChatCompletionMessage[] = [
     {
       role: "system",
-      content: CHAT_SYSTEM + TOOL_INSTRUCTIONS,
+      content: systemPrompt + TOOL_INSTRUCTIONS,
     },
     {
       role: "system",
@@ -516,10 +562,10 @@ export async function generateEngineerChatReplyWithTools(params: {
 
   const MAX_ITERS = 10;
   for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const opts = getEngineerChatModelAndTemperature();
+    const opts = getEngineerChatModelAndTemperature(tier);
     messagesApi[0] = {
       role: "system",
-      content: CHAT_SYSTEM + TOOL_INSTRUCTIONS,
+      content: systemPrompt + TOOL_INSTRUCTIONS,
     };
     messagesApi[1] = {
       role: "system",

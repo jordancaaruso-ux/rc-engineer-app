@@ -294,5 +294,18 @@ function openAiErrorMessage(data: Record<string, unknown> | undefined): string {
 
 export function isContextTooLargeOpenAiError(data: Record<string, unknown> | undefined): boolean {
   const msg = openAiErrorMessage(data);
-  return /tokens per min|Request too large|maximum context length|rate_limit_exceeded/i.test(msg);
+  return /Request too large|maximum context length/i.test(msg);
+}
+
+export function isOpenAiTpmRateLimitError(data: Record<string, unknown> | undefined): boolean {
+  const msg = openAiErrorMessage(data);
+  return /tokens per min|rate_limit_exceeded/i.test(msg);
+}
+
+/** Parse "Please try again in 388ms" from OpenAI error bodies. */
+export function parseOpenAiRetryAfterMs(data: Record<string, unknown> | undefined): number {
+  const msg = openAiErrorMessage(data);
+  const m = msg.match(/try again in (\d+)\s*ms/i);
+  if (m) return Math.min(15_000, Math.max(200, Number(m[1])));
+  return 1000;
 }
