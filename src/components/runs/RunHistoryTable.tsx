@@ -851,35 +851,35 @@ function RunDetail({
 
   return (
     <CardPanel className="bg-muted/40 space-y-3 text-sm">
-      {allowRunMutations ? (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
+        <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3 min-w-0 flex-1">
+          <CompactField label="Date / time" value={dateTimeLabel} />
+          <CompactField
+            label="Session type"
+            value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}
+          />
+          {hasMeetingType ? <CompactField label="Meeting session" value={meetingType} /> : null}
+          <CompactField label="Label" value={run.sessionLabel?.trim() || "—"} />
+          <CompactField label="Car" value={carDisplay} />
+          <CompactField label="Track" value={trackDisplay} />
+          <CompactField
+            label="Tire set"
+            value={
+              run.tireSet
+                ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
+                : "—"
+            }
+          />
+        </div>
+        {allowRunMutations ? (
           <Link
             href={`/runs/${encodeURIComponent(run.id)}/edit`}
             className={cn(buttonLinkClassName("primary"), "no-underline shrink-0 text-xs")}
+            onClick={(e) => e.stopPropagation()}
           >
             Edit run
           </Link>
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3">
-        <CompactField label="Date / time" value={dateTimeLabel} />
-        <CompactField
-          label="Session type"
-          value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}
-        />
-        {hasMeetingType ? <CompactField label="Meeting session" value={meetingType} /> : null}
-        <CompactField label="Label" value={run.sessionLabel?.trim() || "—"} />
-        <CompactField label="Car" value={carDisplay} />
-        <CompactField label="Track" value={trackDisplay} />
-        <CompactField
-          label="Tire set"
-          value={
-            run.tireSet
-              ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
-              : "—"
-          }
-        />
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-4 min-w-0">
@@ -999,7 +999,7 @@ function RunDetail({
                 <span
                   key={i}
                   className={cn(
-                    "whitespace-nowrap tabular-nums rounded px-0.5",
+                    "inline-grid grid-cols-[2rem_auto] gap-x-0.5 items-baseline tabular-nums rounded px-0.5",
                     !r.isIncluded && "opacity-50 line-through",
                     isMistake &&
                       "bg-red-500/15 text-red-800 dark:text-red-300 ring-1 ring-red-500/30",
@@ -1017,8 +1017,8 @@ function RunDetail({
                           : undefined
                   }
                 >
-                  <span className="text-muted-foreground">{r.lapNumber}.</span>{" "}
-                  {r.lapTimeSeconds.toFixed(3)}s
+                  <span className="text-right text-muted-foreground">{r.lapNumber}.</span>
+                  <span>{r.lapTimeSeconds.toFixed(3)}s</span>
                 </span>
               );
               })}
