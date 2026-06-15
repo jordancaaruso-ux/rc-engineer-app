@@ -179,6 +179,7 @@ export async function searchRunsForEngineerTool(
       car: { select: { name: true } },
       track: { select: { name: true } },
       event: { select: { name: true } },
+      tireSet: { select: { label: true } },
     },
   });
 
@@ -224,6 +225,7 @@ export async function searchRunsForEngineerTool(
         r.track?.name,
         r.sessionLabel,
         r.event?.name,
+        r.tireSet?.label,
       ]
         .filter(Boolean)
         .join(" ")

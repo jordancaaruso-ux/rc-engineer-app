@@ -370,9 +370,10 @@ export default async function RunHistoryPage({
                     Median
                   </th>
                   <th className="hidden md:table-cell px-4 py-2">Car</th>
-                  <th className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px]">
-                    Setup
-                  </th>
+                  <th
+                    className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px]"
+                    aria-label="Setup and laps"
+                  />
                   <th className="hidden md:table-cell px-4 py-2">Track</th>
                   <th className="hidden md:table-cell px-4 py-2">Tires</th>
                 </tr>

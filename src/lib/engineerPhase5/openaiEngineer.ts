@@ -264,7 +264,7 @@ const TOOLS = [
           car_id: { type: "string" },
           track_id: { type: "string" },
           event_id: { type: "string" },
-          text_contains: { type: "string", description: "Substring match on car, track, event, session label." },
+          text_contains: { type: "string", description: "Substring match on car, track, event, session label, tire set label." },
           max_results: { type: "integer", description: "Default 25, max 40" },
         },
         required: ["owner_scope"],

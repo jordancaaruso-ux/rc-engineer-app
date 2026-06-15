@@ -5,7 +5,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { engineerChatIsLapHistoryQuestion, engineerChatNeedsDeepContext } from "@/lib/engineerPhase5/engineerChatContextTier";
 import { parseLapHistoryDateWindow } from "@/lib/engineerPhase5/parseLapHistoryWindow";
-import { parseLapHistoryQueryIntent } from "@/lib/engineerPhase5/lapHistoryQueryParse";
+import {
+  extractTireLabelContains,
+  parseLapHistoryQueryIntent,
+  stripTireQualifierClause,
+} from "@/lib/engineerPhase5/lapHistoryQueryParse";
 
 test("lap history question is light tier not deep", () => {
   const msg = "whats the best laptime ive done at tftr in the last 2 months";
@@ -30,6 +34,26 @@ test("parseLapHistoryQueryIntent extracts track", () => {
   );
   assert.ok(intent);
   assert.equal(intent!.trackQuery.toLowerCase(), "tftr");
+  assert.equal(intent!.tireLabelContains, null);
+});
+
+test("parseLapHistoryQueryIntent splits track and tire qualifier", () => {
+  const intent = parseLapHistoryQueryIntent(
+    "what is the fastest lap ive done at tftr on vaulk tires"
+  );
+  assert.ok(intent);
+  assert.equal(intent!.trackQuery.toLowerCase(), "tftr");
+  assert.equal(intent!.tireLabelContains?.toLowerCase(), "vaulk");
+});
+
+test("tire qualifier works before track when clause is stripped", () => {
+  const msg = "fastest lap on vault tires at tftr";
+  assert.equal(extractTireLabelContains(msg)?.toLowerCase(), "vault");
+  assert.equal(stripTireQualifierClause(msg).toLowerCase(), "fastest lap at tftr");
+  const intent = parseLapHistoryQueryIntent(msg);
+  assert.ok(intent);
+  assert.equal(intent!.trackQuery.toLowerCase(), "tftr");
+  assert.equal(intent!.tireLabelContains?.toLowerCase(), "vault");
 });
 
 test("parseLapHistoryDateWindow last 2 months", () => {

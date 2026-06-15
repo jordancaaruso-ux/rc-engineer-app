@@ -10,7 +10,10 @@ import {
   primaryLapRowsFromRun,
 } from "@/lib/lapAnalysis";
 import { formatLocalCalendarDate } from "@/lib/engineerPhase5/localCalendarInTimeZone";
-import { matchTracksForEngineerQuery } from "@/lib/engineerPhase5/matchTrackForEngineer";
+import {
+  matchTracksForEngineerQuery,
+  type MatchedTrack,
+} from "@/lib/engineerPhase5/matchTrackForEngineer";
 import {
   parseLapHistoryDateWindow,
   parseLapHistoryQueryIntent,
@@ -18,6 +21,8 @@ import {
 import type { LapHistoryDateWindow } from "@/lib/engineerPhase5/parseLapHistoryWindow";
 
 export { parseLapHistoryQueryIntent } from "@/lib/engineerPhase5/lapHistoryQueryParse";
+
+const TRACK_SCORE_CLUSTER_GAP = 8;
 
 function formatLapSeconds(seconds: number): string {
   return `${seconds.toFixed(3)}s`;
@@ -32,6 +37,49 @@ function runInDateWindow(
   const inst = resolveRunDisplayInstant(run);
   const ymd = formatLocalCalendarDate(inst, timeZone);
   return ymd >= window.dateFrom && ymd <= window.dateTo;
+}
+
+function runMatchesTireLabel(
+  run: { tireSet: { label: string | null } | null },
+  tireLabelContains: string | null
+): boolean {
+  if (!tireLabelContains) return true;
+  const needle = tireLabelContains.trim().toLowerCase();
+  if (!needle) return true;
+  return (run.tireSet?.label ?? "").toLowerCase().includes(needle);
+}
+
+/**
+ * When several tracks tie on score and share the same display name (e.g. duplicate TFTR rows),
+ * search all of them instead of asking the user to pick.
+ */
+function resolveTrackCluster(
+  matches: MatchedTrack[],
+  trackQuery: string
+): { ok: true; trackIds: string[]; displayName: string } | { ok: false; reply: string } {
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      reply: `I couldn't find a track matching "${trackQuery}" in your log. Check the track name in Tracks, or try the LiveRC slug (e.g. tftr).`,
+    };
+  }
+
+  const topScore = matches[0]!.score;
+  const cluster = matches.filter((m) => topScore - m.score < TRACK_SCORE_CLUSTER_GAP);
+  if (cluster.length === 1) {
+    return { ok: true, trackIds: [cluster[0]!.id], displayName: cluster[0]!.name };
+  }
+
+  const uniqueNames = [...new Set(cluster.map((m) => m.name.trim().toLowerCase()))];
+  if (uniqueNames.length > 1) {
+    const names = cluster.slice(0, 4).map((m) => m.name).join(", ");
+    return {
+      ok: false,
+      reply: `Several tracks could match "${trackQuery}": ${names}. Which one did you mean?`,
+    };
+  }
+
+  return { ok: true, trackIds: cluster.map((m) => m.id), displayName: cluster[0]!.name };
 }
 
 export type LapHistoryAnswer =
@@ -53,25 +101,13 @@ export async function tryAnswerLapHistoryQuery(input: {
   const dateWindow = intent.dateWindow ?? parseLapHistoryDateWindow(input.message, tz);
 
   const matches = await matchTracksForEngineerQuery(input.userId, intent.trackQuery);
-  if (matches.length === 0) {
-    return {
-      ok: false,
-      reply: `I couldn't find a track matching "${intent.trackQuery}" in your log. Check the track name in Tracks, or try the LiveRC slug (e.g. tftr).`,
-    };
-  }
+  const resolved = resolveTrackCluster(matches, intent.trackQuery);
+  if (!resolved.ok) return resolved;
 
-  if (matches.length > 1 && matches[0]!.score - (matches[1]?.score ?? 0) < 8) {
-    const names = matches.slice(0, 4).map((m) => m.name).join(", ");
-    return {
-      ok: false,
-      reply: `Several tracks could match "${intent.trackQuery}": ${names}. Which one did you mean?`,
-    };
-  }
-
-  const track = matches[0]!;
+  const { trackIds, displayName } = resolved;
 
   const runs = await prisma.run.findMany({
-    where: { userId: input.userId, trackId: track.id },
+    where: { userId: input.userId, trackId: { in: trackIds } },
     orderBy: { createdAt: "desc" },
     take: 600,
     select: {
@@ -88,24 +124,30 @@ export async function tryAnswerLapHistoryQuery(input: {
       car: { select: { name: true } },
       carNameSnapshot: true,
       track: { select: { name: true } },
+      tireSet: { select: { label: true } },
     },
   });
 
   const inWindow = runs.filter((r) => runInDateWindow(r, dateWindow, tz));
-  if (inWindow.length === 0) {
+  const scoped = inWindow.filter((r) => runMatchesTireLabel(r, intent.tireLabelContains));
+
+  if (scoped.length === 0) {
     const when = dateWindow?.label ?? "that period";
+    const tireNote = intent.tireLabelContains
+      ? ` with tire set label matching **${intent.tireLabelContains}**`
+      : "";
     return {
       ok: false,
-      reply: `No logged runs at **${track.name}** in ${when}.`,
+      reply: `No logged runs at **${displayName}**${tireNote} in ${when}.`,
     };
   }
 
   let bestLap: number | null = null;
-  let bestRun: (typeof inWindow)[0] | null = null;
+  let bestRun: (typeof scoped)[0] | null = null;
   let bestAvg5: number | null = null;
-  let bestAvg5Run: (typeof inWindow)[0] | null = null;
+  let bestAvg5Run: (typeof scoped)[0] | null = null;
 
-  for (const run of inWindow) {
+  for (const run of scoped) {
     const rows = primaryLapRowsFromRun(run);
     const lap = getBestLap(rows);
     if (lap != null && (bestLap == null || lap < bestLap)) {
@@ -120,7 +162,12 @@ export async function tryAnswerLapHistoryQuery(input: {
   }
 
   const whenLabel = dateWindow?.label ?? "your log";
-  const lines: string[] = [`At **${track.name}** (${whenLabel}, ${inWindow.length} run${inWindow.length === 1 ? "" : "s"}, excluded laps omitted):`];
+  const tireScope = intent.tireLabelContains
+    ? `tire **${intent.tireLabelContains}** · `
+    : "";
+  const lines: string[] = [
+    `At **${displayName}** (${tireScope}${whenLabel}, ${scoped.length} run${scoped.length === 1 ? "" : "s"}, excluded laps omitted):`,
+  ];
 
   if (intent.wantsBestLap) {
     if (bestLap != null && bestRun) {
@@ -157,7 +204,7 @@ export async function tryAnswerLapHistoryQuery(input: {
   return {
     ok: true,
     reply: lines.join("\n"),
-    trackName: track.name,
-    runCount: inWindow.length,
+    trackName: displayName,
+    runCount: scoped.length,
   };
 }
