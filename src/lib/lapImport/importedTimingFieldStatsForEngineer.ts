@@ -283,8 +283,8 @@ export async function resolveImportedTimingFieldStatsForEngineer(opts: {
   });
   if (!row) return { compact: null, fingerprintToken: "" };
 
-  let stats = importedSessionFieldStatsV1FromJson(row.fieldStatsJson);
-  if (!stats && row.parsedPayload != null) {
+  let stats: ImportedSessionFieldStatsV1 | null = null;
+  if (row.parsedPayload != null) {
     stats = computeImportedSessionFieldStatsFromPayload(row.parsedPayload);
     if (stats) {
       stats = normalizeImportedSessionFieldStatsV1(stats);
@@ -295,6 +295,9 @@ export async function resolveImportedTimingFieldStatsForEngineer(opts: {
         })
         .catch(() => {});
     }
+  }
+  if (!stats) {
+    stats = importedSessionFieldStatsV1FromJson(row.fieldStatsJson);
   }
   if (!stats) return { compact: null, fingerprintToken: "" };
 

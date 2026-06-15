@@ -1,4 +1,5 @@
-import { getAverageTopN, getBestLap, type LapRow } from "@/lib/lapAnalysis";
+import { getAverageTopN, getBestLap, getIncludedLaps, type LapRow } from "@/lib/lapAnalysis";
+import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import type { LapUrlParseResult, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
 
@@ -38,11 +39,12 @@ export type ImportedSessionFieldStatsV1 = {
 };
 
 function lapRowsFromDriverLaps(nums: number[]): LapRow[] {
-  return nums.map((t, i) => ({
+  const raw = nums.map((t, i) => ({
     lapNumber: i + 1,
     lapTimeSeconds: t,
     isIncluded: true,
   }));
+  return applyMedianBandAutoExclude(raw);
 }
 
 /** Median of a sorted finite numeric array (ascending). Exported for normalizing older stored field stats. */
@@ -81,7 +83,7 @@ function buildImportedSessionStatsFromDriversArray(
       driverId: d.driverId,
       driverName: d.driverName,
       normalizedName: d.normalizedName,
-      lapCount: d.laps.length,
+      lapCount: getIncludedLaps(rows).length,
       bestLapSeconds: best,
       avgTop5Seconds: getAverageTopN(rows, 5),
       avgTop10Seconds: getAverageTopN(rows, 10),
