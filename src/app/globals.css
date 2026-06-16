@@ -333,7 +333,7 @@ body {
 }
 
 .sidebar-footer {
-  @apply mt-auto text-[11px] text-muted-foreground;
+  @apply mt-auto text-xs text-muted-foreground;
 }
 
 .page {
@@ -368,7 +368,7 @@ body {
 
 /* Page chrome only: italic uppercase Montserrat (matches sidebar brand). */
 :where(.page-title) {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 700;
   font-style: italic;
   text-transform: uppercase;
@@ -376,7 +376,7 @@ body {
 
 /* In-form / in-card headings: Montserrat bold, normal case (write labels in Title case in JSX). */
 .ui-title {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 700;
   font-style: normal;
   text-transform: none;
@@ -386,31 +386,32 @@ body {
 /* Strong brand voice: sidebar nav + explicit .ui-strong / .btn-brand.
    Native <button> is not forced to italic uppercase — use Button + primaryButtonClassName or .btn-brand when needed. */
 :where(.ui-strong, .sidebar-nav a, .btn-brand) {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 700;
   font-style: italic;
   text-transform: uppercase;
 }
 
-/* Dense field / table labels — same brand face as .ui-title, smaller. */
+/* Field / filter labels — Inter medium, not hairline Montserrat at 10px. */
 .ui-label-caps {
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-weight: 700;
-  font-style: normal;
-  text-transform: none;
-  @apply text-[10px] tracking-tight text-muted-foreground;
+  @apply text-xs font-medium tracking-normal text-muted-foreground;
 }
 
 .ui-label-meta {
-  @apply text-[11px] text-muted-foreground leading-snug;
+  @apply text-xs font-medium text-muted-foreground leading-snug;
+}
+
+/* Inputs, selects, compact controls — Inter at 14px. */
+.ui-control {
+  @apply text-sm font-normal leading-snug;
 }
 
 .ui-body-tight {
-  @apply text-xs leading-snug text-foreground;
+  @apply text-sm leading-snug text-foreground;
 }
 
 .page-subtitle {
-  @apply text-xs font-normal tracking-[-0.004em] text-muted-foreground;
+  @apply text-sm font-normal tracking-[-0.004em] text-muted-foreground;
 }
 
 .page-body {

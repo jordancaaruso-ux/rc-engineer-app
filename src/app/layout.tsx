@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat } from "next/font/google";
+import { Inter, Montserrat } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import type { ReactNode } from "react";
@@ -9,9 +9,17 @@ import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLin
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
-const montserrat = Montserrat({
+/** Body, inputs, tables, and helper copy — legible at small sizes. */
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
+  weight: ["400", "500", "600"],
+});
+
+/** Display / brand — page titles, nav, session headers. */
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  variable: "--font-display",
   weight: ["400", "700"],
   style: ["normal", "italic"],
 });
@@ -36,7 +44,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }): ReactNode {
   return (
-    <html lang="en" className={montserrat.variable}>
+    <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
       <body className="min-h-[100dvh] font-sans font-normal antialiased">
         {/*
          * Single fixed wash at z-index 0 (never negative): duplicate fixed layers on

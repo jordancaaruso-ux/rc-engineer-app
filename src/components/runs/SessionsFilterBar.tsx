@@ -22,6 +22,10 @@ type SessionsFilterBarProps = {
   viewAll: boolean;
 };
 
+const controlClass =
+  "rounded-md border border-border bg-background px-2.5 py-2 ui-control outline-none";
+const labelClass = "ui-label-meta block";
+
 function MultiSelect({
   label,
   options,
@@ -53,11 +57,11 @@ function MultiSelect({
 
   return (
     <div className={`relative ${className ?? ""}`}>
-      <label className="text-[10px] text-muted-foreground">{label}</label>
+      <span className={labelClass}>{label}</span>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="mt-0.5 flex w-full min-w-[8rem] items-center justify-between gap-2 rounded-md border border-border bg-background px-2 py-1.5 text-left text-xs outline-none hover:bg-muted/40"
+        className={`mt-1 flex w-full min-w-[8rem] items-center justify-between gap-2 text-left hover:bg-muted/40 ${controlClass}`}
       >
         <span className="truncate">{summary}</span>
         <span className="text-muted-foreground">{open ? "▴" : "▾"}</span>
@@ -72,12 +76,12 @@ function MultiSelect({
           />
           <div className="absolute left-0 top-full z-20 mt-1 max-h-48 w-full min-w-[12rem] overflow-y-auto rounded-md border border-border bg-card p-2 shadow-lg">
             {options.length === 0 ? (
-              <p className="px-1 py-1 text-[11px] text-muted-foreground">None</p>
+              <p className="px-1 py-1 ui-label-meta">None</p>
             ) : (
               options.map((opt) => (
                 <label
                   key={opt.id}
-                  className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/50"
+                  className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 ui-control hover:bg-muted/50"
                 >
                   <input
                     type="checkbox"
@@ -145,14 +149,14 @@ export function SessionsFilterBar({
     <div className="rounded-lg border border-border bg-card p-3 space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[10rem] flex-1 space-y-1">
-          <label className="text-[10px] text-muted-foreground" htmlFor="sessions-search">
+          <label className={labelClass} htmlFor="sessions-search">
             Search
           </label>
           <input
             id="sessions-search"
             type="search"
             placeholder="Track, car, tires, notes…"
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+            className={`w-full ${controlClass}`}
             defaultValue={filters.q ?? ""}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -178,19 +182,19 @@ export function SessionsFilterBar({
           onChange={(trackIds) => patch({ trackIds })}
         />
         <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">From</label>
+          <label className={labelClass}>From</label>
           <input
             type="date"
-            className="block rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+            className={`block ${controlClass}`}
             value={filters.dateFrom ?? ""}
             onChange={(e) => patch({ dateFrom: e.target.value || null })}
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] text-muted-foreground">To</label>
+          <label className={labelClass}>To</label>
           <input
             type="date"
-            className="block rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+            className={`block ${controlClass}`}
             value={filters.dateTo ?? ""}
             onChange={(e) => patch({ dateTo: e.target.value || null })}
           />
@@ -199,7 +203,7 @@ export function SessionsFilterBar({
           <button
             type="button"
             onClick={() => setAdvancedOpen((v) => !v)}
-            className="rounded-md border border-border bg-background px-2 py-1.5 text-xs hover:bg-muted/40"
+            className={`hover:bg-muted/40 ${controlClass}`}
           >
             {advancedOpen ? "Fewer filters" : "More filters"}
           </button>
@@ -207,7 +211,7 @@ export function SessionsFilterBar({
             <button
               type="button"
               onClick={clearFilters}
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/40"
+              className={`text-muted-foreground hover:bg-muted/40 ${controlClass}`}
             >
               Clear
             </button>
@@ -224,9 +228,9 @@ export function SessionsFilterBar({
             onChange={(tireSetIds) => patch({ tireSetIds })}
           />
           <div className="space-y-1 min-w-[10rem]">
-            <label className="text-[10px] text-muted-foreground">Event</label>
+            <label className={labelClass}>Event</label>
             <select
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={`w-full ${controlClass}`}
               value={filters.eventId ?? ""}
               onChange={(e) => patch({ eventId: e.target.value || null })}
             >
@@ -239,9 +243,9 @@ export function SessionsFilterBar({
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">Session type</label>
+            <label className={labelClass}>Session type</label>
             <select
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={controlClass}
               value={filters.sessionType ?? ""}
               onChange={(e) =>
                 patch({
@@ -258,9 +262,9 @@ export function SessionsFilterBar({
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">Meeting session</label>
+            <label className={labelClass}>Meeting session</label>
             <select
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={controlClass}
               value={filters.meetingSessionType ?? ""}
               onChange={(e) => patch({ meetingSessionType: e.target.value || null })}
             >
@@ -272,21 +276,21 @@ export function SessionsFilterBar({
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">Race class</label>
+            <label className={labelClass}>Race class</label>
             <input
               type="text"
-              className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={`w-28 ${controlClass}`}
               placeholder="e.g. 13.5"
               defaultValue={filters.raceClass ?? ""}
               onBlur={(e) => patch({ raceClass: e.target.value.trim() || null })}
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">Best lap min (s)</label>
+            <label className={labelClass}>Best lap min (s)</label>
             <input
               type="number"
               step="0.001"
-              className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={`w-28 ${controlClass}`}
               value={filters.bestLapMin ?? ""}
               onChange={(e) =>
                 patch({
@@ -296,11 +300,11 @@ export function SessionsFilterBar({
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">Best lap max (s)</label>
+            <label className={labelClass}>Best lap max (s)</label>
             <input
               type="number"
               step="0.001"
-              className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={`w-28 ${controlClass}`}
               value={filters.bestLapMax ?? ""}
               onChange={(e) =>
                 patch({
@@ -310,9 +314,9 @@ export function SessionsFilterBar({
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">Status</label>
+            <label className={labelClass}>Status</label>
             <select
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={controlClass}
               value={filters.status}
               onChange={(e) =>
                 patch({
@@ -329,9 +333,9 @@ export function SessionsFilterBar({
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">Sort</label>
+            <label className={labelClass}>Sort</label>
             <select
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={controlClass}
               value={filters.sort}
               onChange={(e) =>
                 patch({
@@ -351,9 +355,9 @@ export function SessionsFilterBar({
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground">Layout</label>
+            <label className={labelClass}>Layout</label>
             <select
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+              className={controlClass}
               value={filters.layout}
               onChange={(e) =>
                 patch({ layout: e.target.value === "flat" ? "flat" : "grouped" })
