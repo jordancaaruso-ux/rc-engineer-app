@@ -341,6 +341,7 @@ export default async function RunHistoryPage({
                       Session
                     </th>
                   ) : null}
+                  <th className="hidden md:table-cell px-4 py-2">Car</th>
                   <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
                     Best
                   </th>
@@ -355,13 +356,10 @@ export default async function RunHistoryPage({
                   <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
                     Median
                   </th>
-                  <th className="hidden md:table-cell px-4 py-2">Car</th>
                   <th
-                    className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px]"
+                    className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px] md:text-right"
                     aria-label="Setup and laps"
                   />
-                  <th className="hidden md:table-cell px-4 py-2">Track</th>
-                  <th className="hidden md:table-cell px-4 py-2">Tires</th>
                 </tr>
               </thead>
               <tbody>
@@ -414,6 +412,7 @@ export default async function RunHistoryPage({
                 {showSessionColumn ? (
                   <th className="px-2 py-1.5 md:px-3 md:py-2 min-w-0">Session</th>
                 ) : null}
+                <th className="hidden md:table-cell px-4 py-2">Car</th>
                 <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">Best</th>
                 <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
                   <span className="md:hidden">Top 5</span>
@@ -424,13 +423,10 @@ export default async function RunHistoryPage({
                   <span className="hidden md:inline">Avg top 10</span>
                 </th>
                 <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">Median</th>
-                <th className="hidden md:table-cell px-4 py-2">Car</th>
                 <th
-                  className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px]"
+                  className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px] md:text-right"
                   aria-label="Setup and laps"
                 />
-                <th className="hidden md:table-cell px-4 py-2">Track</th>
-                <th className="hidden md:table-cell px-4 py-2">Tires</th>
               </tr>
             </thead>
             <tbody>

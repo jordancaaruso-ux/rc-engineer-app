@@ -186,8 +186,8 @@ function LapStatChip({
 
 type ExpandedLapStat = "best" | "avg5" | "avg10" | "mistakes" | null;
 
-/** Main sessions grid columns (excluding drag handle, member, compare pair). */
-const SESSION_TABLE_BODY_COLS_WITHOUT_SESSION = 9;
+/** Main sessions grid columns (date, car, best, avg5, avg10, median, setup/laps). */
+const SESSION_TABLE_BODY_COLS_WITHOUT_SESSION = 7;
 
 function setupFieldLabel(key: string): string {
   const f = DEFAULT_SETUP_FIELDS.find((d) => d.key === key);
@@ -395,10 +395,6 @@ export function RunHistoryTable({
             : null;
         const allowRunMutations = !viewerUserId || !run.userId || run.userId === viewerUserId;
         const carDisplay = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
-        const trackDisplay = run.track?.name ?? run.trackNameSnapshot ?? "—";
-        const tiresDisplay = run.tireSet
-          ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
-          : "—";
         const primaryLapRows = primaryLapRowsFromRun(run);
         const listLapDash = getIncludedLapDashboardMetrics(primaryLapRows);
         const bestLapDisplay = formatLap(run.bestLapSeconds ?? getBestLap(primaryLapRows));
@@ -530,6 +526,9 @@ export function RunHistoryTable({
                   </div>
                 </td>
               ) : null}
+              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
+                {carDisplay}
+              </td>
               <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {bestLapDisplay}
               </td>
@@ -542,15 +541,12 @@ export function RunHistoryTable({
               <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {medianLapDisplay}
               </td>
-              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
-                {carDisplay}
-              </td>
               <td
-                className="px-1 py-1.5 md:px-2 md:py-2 align-middle max-md:w-[26%]"
+                className="px-1 py-1.5 md:px-2 md:py-2 align-middle max-md:w-[26%] md:text-right md:whitespace-nowrap"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <div className="flex flex-col items-stretch gap-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-1">
+                <div className="flex flex-col items-stretch gap-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-1 md:justify-end">
                   <button
                     type="button"
                     onClick={() => setSetupModalRunId(run.id)}
@@ -570,12 +566,6 @@ export function RunHistoryTable({
                     <span className="hidden md:inline">Lap times</span>
                   </button>
                 </div>
-              </td>
-              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
-                {trackDisplay}
-              </td>
-              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
-                {tiresDisplay}
               </td>
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>

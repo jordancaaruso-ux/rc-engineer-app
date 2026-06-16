@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
 import { TireGaragePanel } from "@/components/tires/TireGaragePanel";
 
@@ -26,7 +27,8 @@ export default async function TiresPage(): Promise<ReactNode> {
     );
   }
 
-  await requireCurrentUser();
+  const user = await requireCurrentUser();
+  const isAdmin = isAuthAdminEmail(user.email);
   const count = await prisma.tireType.count();
   if (count === 0) {
     await ensureSeedTireTypes();
@@ -41,14 +43,12 @@ export default async function TiresPage(): Promise<ReactNode> {
       <header className="page-header">
         <div>
           <h1 className="page-title">Tires</h1>
-          <p className="page-subtitle">
-            Manage tire compounds and review your linked sets.
-          </p>
+          <p className="page-subtitle">Tire type catalog.</p>
         </div>
       </header>
       <section className="page-body">
         <div className="max-w-2xl">
-          <TireGaragePanel initialTireTypes={tireTypes} />
+          <TireGaragePanel initialTireTypes={tireTypes} isAdmin={isAdmin} />
         </div>
       </section>
     </>

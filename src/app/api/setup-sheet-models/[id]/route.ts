@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 function normalizeSchema(schema: SetupSheetModelSchema | null): SetupSheetModelSchema | null {
@@ -118,4 +119,34 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
       updatedAt: model.updatedAt.toISOString(),
     },
   });
+}
+
+export async function DELETE(_request: Request, ctx: RouteCtx) {
+  if (!hasDatabaseUrl()) {
+    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+  }
+  const user = await getAuthenticatedApiUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await ctx.params;
+
+  const existing = await prisma.setupSheetModel.findFirst({
+    where: { id, userId: user.id },
+    select: { id: true, slug: true, name: true },
+  });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (existing.slug === SETUP_SHEET_MODEL_SLUG_A800RR) {
+    return NextResponse.json(
+      { error: "The built-in Awesomatix A800 chassis type cannot be deleted." },
+      { status: 400 }
+    );
+  }
+
+  await prisma.setupSheetModel.delete({ where: { id } });
+
+  revalidatePath("/cars");
+  revalidatePath("/setup");
+  revalidatePath("/setup-sheet-models");
+  revalidatePath(`/setup-sheet-models/${id}/schema`);
+  return NextResponse.json({ ok: true, deletedId: id, name: existing.name });
 }

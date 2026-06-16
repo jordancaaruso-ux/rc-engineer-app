@@ -236,6 +236,12 @@ export default async function SetupPage({
               Bulk setup import
             </Link>
             <Link
+              href="/setup-sheet-models"
+              className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-medium hover:bg-muted transition"
+            >
+              Chassis types
+            </Link>
+            <Link
               href="/setup/aggregations-debug"
               className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-medium hover:bg-muted transition"
             >

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalibrationDeleteButton } from "@/components/setup-documents/CalibrationDeleteButton";
+import { CalibrationChassisDefaultPanel } from "@/components/setup-sheet-models/CalibrationChassisDefaultPanel";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
@@ -76,7 +77,14 @@ export default async function SetupCalibrationDetailPage({
           />
         </div>
       </header>
-      <SetupCalibrationEditorClient
+      <section className="page-body space-y-4 pb-6">
+        <CalibrationChassisDefaultPanel
+          calibrationId={calibration.id}
+          calibrationName={calibration.name}
+          currentModelId={calibration.setupSheetModelId}
+          currentModelName={calibration.setupSheetModel?.name ?? null}
+        />
+        <SetupCalibrationEditorClient
         calibrationId={calibration.id}
         documentId={calibration.exampleDocumentId ?? ""}
         previewUrl={
@@ -90,6 +98,7 @@ export default async function SetupCalibrationDetailPage({
         initialCalibrationData={calibration.calibrationDataJson}
         setupSheetModelId={calibration.setupSheetModelId}
       />
+      </section>
     </>
   );
 }

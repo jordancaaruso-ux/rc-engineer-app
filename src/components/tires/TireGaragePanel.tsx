@@ -1,46 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import type { TireTypeOption } from "@/components/tires/TireTypeCombobox";
 
-type TireSetRow = {
-  id: string;
-  label: string;
-  setNumber: number;
-  specificModel?: string | null;
-  tireType?: { id: string; displayName: string; modelCode: string } | null;
-};
-
 export function TireGaragePanel({
   initialTireTypes,
+  isAdmin = false,
 }: {
   initialTireTypes: TireTypeOption[];
+  isAdmin?: boolean;
 }) {
   const [tireTypes, setTireTypes] = useState(initialTireTypes);
-  const [tireSets, setTireSets] = useState<TireSetRow[]>([]);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadingSets, setLoadingSets] = useState(true);
-
-  const loadSets = useCallback(async () => {
-    setLoadingSets(true);
-    try {
-      const res = await fetch("/api/tire-sets", { cache: "no-store" });
-      const data = (await res.json()) as { tireSets?: TireSetRow[] };
-      setTireSets(data.tireSets ?? []);
-    } catch {
-      setTireSets([]);
-    } finally {
-      setLoadingSets(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadSets();
-  }, [loadSets]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function addTireType(e: React.FormEvent) {
     e.preventDefault();
@@ -84,105 +63,159 @@ export function TireGaragePanel({
     }
   }
 
-  const setsByType = new Map<string, TireSetRow[]>();
-  for (const ts of tireSets) {
-    const key = ts.tireType?.id ?? "_legacy";
-    const list = setsByType.get(key) ?? [];
-    list.push(ts);
-    setsByType.set(key, list);
+  function startEdit(t: TireTypeOption) {
+    setEditingId(t.id);
+    setEditName(t.displayName);
+    setError(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditName("");
+  }
+
+  async function saveEdit(tireTypeId: string) {
+    const displayName = editName.trim();
+    if (!displayName) return;
+    setSavingId(tireTypeId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tire-types/${encodeURIComponent(tireTypeId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName }),
+      });
+      const data = (await res.json()) as { tireType?: TireTypeOption; error?: string };
+      if (!res.ok || !data.tireType) {
+        setError(data.error ?? "Failed to update tire type");
+        return;
+      }
+      setTireTypes((prev) =>
+        prev
+          .map((t) => (t.id === tireTypeId ? data.tireType! : t))
+          .sort((a, b) => a.displayName.localeCompare(b.displayName))
+      );
+      cancelEdit();
+    } catch {
+      setError("Failed to update tire type");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function deleteTireType(t: TireTypeOption) {
+    const ok = window.confirm(`Delete "${t.displayName}" from the catalog? Linked sets will keep their label but lose this type link.`);
+    if (!ok) return;
+    setDeletingId(t.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tire-types/${encodeURIComponent(t.id)}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Failed to delete tire type");
+        return;
+      }
+      setTireTypes((prev) => prev.filter((row) => row.id !== t.id));
+      if (editingId === t.id) cancelEdit();
+    } catch {
+      setError("Failed to delete tire type");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <div>
-          <h2 className="ui-title text-base">Tire types</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Broad compounds you log against — e.g. Sweep D32, Sweep D36. Add types here so they show up when you log a run.
-          </p>
-        </div>
-        <form onSubmit={addTireType} className="flex flex-wrap gap-2 items-start">
-          <input
-            className="flex-1 min-w-[12rem] rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            placeholder="e.g. Sweep D32"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            aria-label="New tire type name"
-          />
-          <button
-            type="submit"
-            disabled={creating || !newName.trim()}
-            className={cn(
-              buttonLinkClassName("primary"),
-              "text-sm px-4 py-2",
-              (creating || !newName.trim()) && "opacity-60 pointer-events-none"
-            )}
-          >
-            {creating ? "Adding…" : "Add tire type"}
-          </button>
-        </form>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {tireTypes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tire types yet. Add your first compound above.</p>
-        ) : (
-          <ul className="rounded-lg border border-border divide-y divide-border bg-card">
-            {tireTypes.map((t) => (
-              <li key={t.id} className="px-4 py-3 text-sm font-medium">
-                {t.displayName}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+    <div className="space-y-4">
+      <form onSubmit={addTireType} className="flex flex-wrap gap-2 items-start">
+        <input
+          className="flex-1 min-w-[12rem] rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+          placeholder="e.g. Sweep D32"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          aria-label="New tire type name"
+        />
+        <button
+          type="submit"
+          disabled={creating || !newName.trim()}
+          className={cn(
+            buttonLinkClassName("primary"),
+            "text-sm px-4 py-2",
+            (creating || !newName.trim()) && "opacity-60 pointer-events-none"
+          )}
+        >
+          {creating ? "Adding…" : "Add"}
+        </button>
+      </form>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="ui-title text-base">Your tire sets</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Physical sets you&apos;ve linked while logging runs. Set numbers are assigned when you log a run, not here.
-          </p>
-        </div>
-        {loadingSets ? (
-          <p className="text-sm text-muted-foreground">Loading sets…</p>
-        ) : tireSets.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tire sets yet — pick a type and set number when you log a run.</p>
-        ) : (
-          <ul className="space-y-3">
-            {tireTypes.map((t) => {
-              const sets = (setsByType.get(t.id) ?? []).sort((a, b) => a.setNumber - b.setNumber);
-              if (sets.length === 0) return null;
-              return (
-                <li key={t.id} className="rounded-lg border border-border bg-card overflow-hidden">
-                  <div className="px-4 py-2 bg-muted/30 text-sm font-medium border-b border-border">{t.displayName}</div>
-                  <ul className="divide-y divide-border">
-                    {sets.map((s) => (
-                      <li key={s.id} className="px-4 py-2 text-sm flex flex-wrap gap-x-3 gap-y-1">
-                        <span className="font-medium">#{s.setNumber}</span>
-                        {s.specificModel ? (
-                          <span className="text-muted-foreground">{s.specificModel}</span>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              );
-            })}
-            {(setsByType.get("_legacy") ?? []).length > 0 ? (
-              <li className="rounded-lg border border-border bg-card overflow-hidden">
-                <div className="px-4 py-2 bg-muted/30 text-sm font-medium border-b border-border">Legacy sets</div>
-                <ul className="divide-y divide-border">
-                  {(setsByType.get("_legacy") ?? []).map((s) => (
-                    <li key={s.id} className="px-4 py-2 text-sm">
-                      {s.label}
-                      {s.setNumber >= 1 ? ` #${s.setNumber}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ) : null}
-          </ul>
-        )}
-      </section>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      {tireTypes.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No tire types yet.</p>
+      ) : (
+        <ul className="rounded-lg border border-border divide-y divide-border bg-card">
+          {tireTypes.map((t) => (
+            <li key={t.id} className="px-4 py-3 flex flex-wrap items-center gap-2 justify-between">
+              {editingId === t.id ? (
+                <>
+                  <input
+                    className="flex-1 min-w-[10rem] rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    aria-label="Edit tire type name"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={savingId === t.id || !editName.trim()}
+                      onClick={() => void saveEdit(t.id)}
+                      className={cn(
+                        buttonLinkClassName("primary"),
+                        "text-xs px-3 py-1.5",
+                        (savingId === t.id || !editName.trim()) && "opacity-60 pointer-events-none"
+                      )}
+                    >
+                      {savingId === t.id ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm font-medium">{t.displayName}</span>
+                  {isAdmin ? (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(t)}
+                        className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deletingId === t.id}
+                        onClick={() => void deleteTireType(t)}
+                        className="text-xs px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-60"
+                      >
+                        {deletingId === t.id ? "Deleting…" : "Delete"}
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
