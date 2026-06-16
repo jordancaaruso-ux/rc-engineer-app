@@ -9,11 +9,16 @@ const LAP_HISTORY_SIGNAL_RE =
 const SESSION_SCOPE_RE =
   /\b(practice|qualifying|race|session|meeting|weekend|yesterday|today|last\s+\d+\s+(day|week|month)|last\s+(week|month|year))\b/i;
 
+const LAP_HISTORY_FOLLOWUP_RE =
+  /\b(?:what(?:'s| is)\s+(?:my\s+)?)?(?:next|second|2nd|third|3rd|\d+(?:st|nd|rd|th)?)\s+best\b/i;
+
 export function engineerChatIsLapHistoryQuestion(message: string | undefined): boolean {
   const msg = message?.trim() ?? "";
+  if (msg.length < 4) return false;
+  if (/\b(setup|shim|camber|toe|spring|diff|wing|balance|handling)\b/i.test(msg)) return false;
+  if (LAP_HISTORY_FOLLOWUP_RE.test(msg)) return true;
   if (msg.length < 8) return false;
   if (!LAP_HISTORY_SIGNAL_RE.test(msg)) return false;
-  if (/\b(setup|shim|camber|toe|spring|diff|wing|balance|handling)\b/i.test(msg)) return false;
   return /\b(at|on)\s+[a-z0-9]/i.test(msg);
 }
 

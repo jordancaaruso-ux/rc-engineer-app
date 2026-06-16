@@ -353,6 +353,7 @@ export async function POST(request: Request) {
     const lapHistoryAnswer = await tryAnswerLapHistoryQuery({
       userId: user.id,
       message: lastUserMsg,
+      messages,
       timeZone,
     });
     if (lapHistoryAnswer) {

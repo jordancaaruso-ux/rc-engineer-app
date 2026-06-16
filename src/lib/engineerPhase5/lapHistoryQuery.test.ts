@@ -6,6 +6,9 @@ import { test } from "node:test";
 import { engineerChatIsLapHistoryQuestion, engineerChatNeedsDeepContext } from "@/lib/engineerPhase5/engineerChatContextTier";
 import { parseLapHistoryDateWindow } from "@/lib/engineerPhase5/parseLapHistoryWindow";
 import {
+  extractLapHistoryPriorFromMessages,
+  extractLapRank,
+  extractLapTimeProbe,
   extractTireLabelContains,
   parseLapHistoryQueryIntent,
   stripTireQualifierClause,
@@ -61,4 +64,41 @@ test("parseLapHistoryDateWindow last 2 months", () => {
   assert.ok(w);
   assert.equal(w!.dateTo, "2026-05-27");
   assert.equal(w!.dateFrom, "2026-03-27");
+});
+
+test("follow-up next best uses prior TFTR context", () => {
+  const prior = extractLapHistoryPriorFromMessages([
+    { role: "user", content: "whats my best laptime at tftr" },
+    {
+      role: "assistant",
+      content:
+        "At **TFTR** (your log, 69 runs, excluded laps omitted):\n- **Best lap:** 8.182s — …",
+    },
+  ]);
+  assert.ok(prior);
+  assert.equal(prior!.trackQuery, "TFTR");
+  const intent = parseLapHistoryQueryIntent("whats my next best", prior);
+  assert.ok(intent);
+  assert.equal(intent!.trackQuery, "TFTR");
+  assert.equal(intent!.lapRank, 2);
+  assert.equal(intent!.wantsAvgTop5, false);
+});
+
+test("correction with lap time probes prior track", () => {
+  const prior = extractLapHistoryPriorFromMessages([
+    { role: "user", content: "whats my best laptime at tftr" },
+    { role: "assistant", content: "At **TFTR** (your log, 69 runs…)" },
+    { role: "user", content: "whats my next best" },
+    { role: "assistant", content: "At **TFTR** … **Next best lap:** 15.732s …" },
+  ]);
+  assert.ok(prior);
+  const intent = parseLapHistoryQueryIntent("no, i have done a 15.5", prior);
+  assert.ok(intent);
+  assert.equal(intent!.lapTimeProbe, 15.5);
+  assert.equal(intent!.trackQuery, "TFTR");
+});
+
+test("extractLapRank maps next best to 2", () => {
+  assert.equal(extractLapRank("whats my next best"), 2);
+  assert.equal(extractLapTimeProbe("no, i have done a 15.5"), 15.5);
 });

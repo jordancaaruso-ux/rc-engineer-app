@@ -6,7 +6,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import {
   getAverageTopN,
-  getBestLap,
+  getIncludedLaps,
   primaryLapRowsFromRun,
 } from "@/lib/lapAnalysis";
 import { formatLocalCalendarDate } from "@/lib/engineerPhase5/localCalendarInTimeZone";
@@ -15,6 +15,7 @@ import {
   type MatchedTrack,
 } from "@/lib/engineerPhase5/matchTrackForEngineer";
 import {
+  extractLapHistoryPriorFromMessages,
   parseLapHistoryDateWindow,
   parseLapHistoryQueryIntent,
 } from "@/lib/engineerPhase5/lapHistoryQueryParse";
@@ -23,6 +24,30 @@ import type { LapHistoryDateWindow } from "@/lib/engineerPhase5/parseLapHistoryW
 export { parseLapHistoryQueryIntent } from "@/lib/engineerPhase5/lapHistoryQueryParse";
 
 const TRACK_SCORE_CLUSTER_GAP = 8;
+const LAP_TIME_PROBE_TOLERANCE_SEC = 0.06;
+
+type ScopedRun = {
+  id: string;
+  createdAt: Date;
+  sessionCompletedAt: Date | null;
+  loggingCompletedAt: Date | null;
+  sessionType: string;
+  meetingSessionType: string | null;
+  meetingSessionCode: string | null;
+  sessionLabel: string | null;
+  lapTimes: unknown;
+  lapSession: unknown;
+  car: { name: string } | null;
+  carNameSnapshot: string | null;
+  track: { name: string } | null;
+  tireSet: { label: string | null } | null;
+};
+
+type RankedLap = {
+  lap: number;
+  lapNumber: number;
+  run: ScopedRun;
+};
 
 function formatLapSeconds(seconds: number): string {
   return `${seconds.toFixed(3)}s`;
@@ -47,6 +72,41 @@ function runMatchesTireLabel(
   const needle = tireLabelContains.trim().toLowerCase();
   if (!needle) return true;
   return (run.tireSet?.label ?? "").toLowerCase().includes(needle);
+}
+
+function collectRankedLaps(runs: ScopedRun[]): RankedLap[] {
+  const all: RankedLap[] = [];
+  for (const run of runs) {
+    for (const row of getIncludedLaps(primaryLapRowsFromRun(run))) {
+      all.push({ lap: row.lapTimeSeconds, lapNumber: row.lapNumber, run });
+    }
+  }
+  all.sort((a, b) => a.lap - b.lap || a.lapNumber - b.lapNumber);
+  return all;
+}
+
+/** Nth fastest distinct lap time (1 = best). */
+function distinctRankedLap(entries: RankedLap[], rank: number): RankedLap | null {
+  if (rank < 1 || entries.length === 0) return null;
+  const seenMs = new Set<number>();
+  for (const entry of entries) {
+    const key = Math.round(entry.lap * 1000);
+    if (seenMs.has(key)) continue;
+    seenMs.add(key);
+    if (seenMs.size === rank) return entry;
+  }
+  return null;
+}
+
+function formatRankedLapLine(
+  label: string,
+  entry: RankedLap,
+  timeZone: string
+): string {
+  const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(entry.run), timeZone);
+  const session = formatRunSessionDisplay(entry.run);
+  const car = entry.run.car?.name ?? entry.run.carNameSnapshot ?? "Car";
+  return `- **${label}:** ${formatLapSeconds(entry.lap)} (lap ${entry.lapNumber}) — ${when}, ${session}, ${car} ([view run](/runs/${entry.run.id}/edit))`;
 }
 
 /**
@@ -92,13 +152,19 @@ export type LapHistoryAnswer =
 export async function tryAnswerLapHistoryQuery(input: {
   userId: string;
   message: string;
+  messages?: Array<{ role: string; content: string }>;
   timeZone: string;
 }): Promise<LapHistoryAnswer | null> {
-  const intent = parseLapHistoryQueryIntent(input.message);
+  const prior =
+    input.messages && input.messages.length > 1
+      ? extractLapHistoryPriorFromMessages(input.messages.slice(0, -1))
+      : null;
+  const intent = parseLapHistoryQueryIntent(input.message, prior);
   if (!intent) return null;
 
   const tz = input.timeZone.trim() || "UTC";
-  const dateWindow = intent.dateWindow ?? parseLapHistoryDateWindow(input.message, tz);
+  const dateWindow =
+    intent.dateWindow ?? parseLapHistoryDateWindow(input.message, tz) ?? prior?.dateWindow ?? null;
 
   const matches = await matchTracksForEngineerQuery(input.userId, intent.trackQuery);
   const resolved = resolveTrackCluster(matches, intent.trackQuery);
@@ -142,25 +208,6 @@ export async function tryAnswerLapHistoryQuery(input: {
     };
   }
 
-  let bestLap: number | null = null;
-  let bestRun: (typeof scoped)[0] | null = null;
-  let bestAvg5: number | null = null;
-  let bestAvg5Run: (typeof scoped)[0] | null = null;
-
-  for (const run of scoped) {
-    const rows = primaryLapRowsFromRun(run);
-    const lap = getBestLap(rows);
-    if (lap != null && (bestLap == null || lap < bestLap)) {
-      bestLap = lap;
-      bestRun = run;
-    }
-    const avg5 = getAverageTopN(rows, 5);
-    if (avg5 != null && (bestAvg5 == null || avg5 < bestAvg5)) {
-      bestAvg5 = avg5;
-      bestAvg5Run = run;
-    }
-  }
-
   const whenLabel = dateWindow?.label ?? "your log";
   const tireScope = intent.tireLabelContains
     ? `tire **${intent.tireLabelContains}** · `
@@ -169,28 +216,67 @@ export async function tryAnswerLapHistoryQuery(input: {
     `At **${displayName}** (${tireScope}${whenLabel}, ${scoped.length} run${scoped.length === 1 ? "" : "s"}, excluded laps omitted):`,
   ];
 
-  if (intent.wantsBestLap) {
-    if (bestLap != null && bestRun) {
-      const when = formatRunCreatedAtDateTime(
-        resolveRunDisplayInstant(bestRun),
-        tz
-      );
-      const session = formatRunSessionDisplay(bestRun);
-      const car = bestRun.car?.name ?? bestRun.carNameSnapshot ?? "Car";
+  const rankedLaps = collectRankedLaps(scoped);
+
+  if (intent.lapTimeProbe != null) {
+    const probe = intent.lapTimeProbe;
+    const hits = rankedLaps.filter((e) => Math.abs(e.lap - probe) <= LAP_TIME_PROBE_TOLERANCE_SEC);
+    if (hits.length === 0) {
+      const closest = distinctRankedLap(rankedLaps, 1);
+      const second = distinctRankedLap(rankedLaps, 2);
+      const hint =
+        closest && second
+          ? ` Your fastest laps there are **${formatLapSeconds(closest.lap)}** and **${formatLapSeconds(second.lap)}**.`
+          : closest
+            ? ` Your best there is **${formatLapSeconds(closest.lap)}**.`
+            : "";
+      return {
+        ok: false,
+        reply: `I don't see a **${probe.toFixed(1)}s** lap at **${displayName}** in ${whenLabel} (within ${(LAP_TIME_PROBE_TOLERANCE_SEC * 1000).toFixed(0)} ms).${hint}`,
+      };
+    }
+    const seen = new Set<string>();
+    for (const hit of hits.slice(0, 5)) {
+      const key = `${hit.run.id}:${hit.lapNumber}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       lines.push(
-        `- **Best lap:** ${formatLapSeconds(bestLap)} — ${when}, ${session}, ${car} ([view run](/runs/${bestRun.id}/edit))`
+        formatRankedLapLine(`**${hit.lap.toFixed(3)}s** lap`, hit, tz)
       );
+    }
+    return { ok: true, reply: lines.join("\n"), trackName: displayName, runCount: scoped.length };
+  }
+
+  if (intent.wantsBestLap) {
+    const entry = distinctRankedLap(rankedLaps, intent.lapRank);
+    if (entry) {
+      const rankLabel =
+        intent.lapRank === 1
+          ? "Best lap"
+          : intent.lapRank === 2
+            ? "Next best lap"
+            : `${intent.lapRank}${intent.lapRank === 3 ? "rd" : "th"} best lap`;
+      lines.push(formatRankedLapLine(rankLabel, entry, tz));
     } else {
-      lines.push("- **Best lap:** no included laps in this window.");
+      lines.push(
+        `- **Rank #${intent.lapRank}:** not enough distinct lap times in this window (only ${new Set(rankedLaps.map((e) => Math.round(e.lap * 1000))).size} unique).`
+      );
     }
   }
 
   if (intent.wantsAvgTop5) {
+    let bestAvg5: number | null = null;
+    let bestAvg5Run: ScopedRun | null = null;
+    for (const run of scoped) {
+      const rows = primaryLapRowsFromRun(run);
+      const avg5 = getAverageTopN(rows, 5);
+      if (avg5 != null && (bestAvg5 == null || avg5 < bestAvg5)) {
+        bestAvg5 = avg5;
+        bestAvg5Run = run;
+      }
+    }
     if (bestAvg5 != null && bestAvg5Run) {
-      const when = formatRunCreatedAtDateTime(
-        resolveRunDisplayInstant(bestAvg5Run),
-        tz
-      );
+      const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(bestAvg5Run), tz);
       const session = formatRunSessionDisplay(bestAvg5Run);
       const car = bestAvg5Run.car?.name ?? bestAvg5Run.carNameSnapshot ?? "Car";
       lines.push(
