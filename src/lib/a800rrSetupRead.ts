@@ -15,6 +15,11 @@ import {
   normalizeTopDeckScrews,
 } from "@/lib/setup/screwNormalize";
 import { isMultiSelectFieldKey, multiSelectSetEquals, normalizeMultiSelectValue } from "@/lib/setup/multiSelect";
+import {
+  displayTireSelection,
+  isTireSelectionValue,
+  type TireSelectionValue,
+} from "@/lib/tires/tireSelectionValue";
 
 /** Canonical key → legacy keys to read if canonical is empty */
 export const SETUP_FIELD_READ_ALIASES: Record<string, string[]> = {
@@ -52,6 +57,7 @@ export function rawField(data: SetupSnapshotData, key: string): string {
     return displayPresetWithOther(pov);
   }
   if (Array.isArray(x)) return x.join(", ");
+  if (isTireSelectionValue(x)) return displayTireSelection(x);
   if (x && typeof x === "object" && !Array.isArray(x)) {
     const s = scalarSetupTextFromUnknown(x).trim();
     if (s) return s;

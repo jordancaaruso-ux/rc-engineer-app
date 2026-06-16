@@ -14,6 +14,8 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
+import { tireSelectionFromTireSet, tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
+import { TireTypeCombobox, type TireTypeOption } from "@/components/tires/TireTypeCombobox";
 import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
@@ -79,7 +81,16 @@ type TrackOption = {
   gripTags?: string[];
   layoutTags?: string[];
 };
-type TireSetOption = { id: string; label: string; setNumber?: number; initialRunCount?: number };
+type TireSetOption = {
+  id: string;
+  label: string;
+  setNumber?: number;
+  initialRunCount?: number;
+  insertLabel?: string | null;
+  wheelLabel?: string | null;
+  tireTypeId?: string | null;
+  tireType?: { id: string; displayName: string; modelCode: string } | null;
+};
 type BatteryPackOption = { id: string; label: string; packNumber?: number; initialRunCount?: number };
 
 type EventOption = {
@@ -95,6 +106,8 @@ type EventOption = {
   resultsSourceUrl?: string | null;
   /** Optional spec compound (same style as TireSet.label), e.g. Sweep 32. */
   controlledTireLabel?: string | null;
+  controlledTireTypeId?: string | null;
+  controlledTireType?: { id: string; displayName: string; modelCode: string } | null;
   track?: { id: string; name: string; location?: string | null } | null;
 };
 
@@ -116,7 +129,15 @@ type LastRun = {
   setupSnapshot: { id: string; data: unknown };
   event?: EventOption | null;
   track?: { id: string; name: string } | null;
-  tireSet?: { id: string; label: string; setNumber?: number | null } | null;
+  tireSet?: {
+    id: string;
+    label: string;
+    setNumber?: number | null;
+    insertLabel?: string | null;
+    wheelLabel?: string | null;
+    tireTypeId?: string | null;
+    tireType?: { id: string; displayName: string; modelCode: string } | null;
+  } | null;
   batteryId?: string | null;
   batteryRunNumber?: number;
   battery?: { id: string; label: string; packNumber?: number | null } | null;
@@ -263,6 +284,12 @@ export function NewRunForm(props: {
   const [trackId, setTrackId] = useState<string>("");
   const [tireSets, setTireSets] = useState<TireSetOption[]>([]);
   const [tireSetId, setTireSetId] = useState<string>("");
+  const [selectedTireTypeId, setSelectedTireTypeId] = useState<string>("");
+  const [selectedTireType, setSelectedTireType] = useState<TireTypeOption | null>(null);
+  const [tireSetNumber, setTireSetNumber] = useState<string>("1");
+  const [tireInsertLabel, setTireInsertLabel] = useState("");
+  const [tireWheelLabel, setTireWheelLabel] = useState("");
+  const [resolvingTireSet, setResolvingTireSet] = useState(false);
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
   const [batteries, setBatteries] = useState<BatteryPackOption[]>([]);
   const [batteryId, setBatteryId] = useState<string>("");
@@ -277,11 +304,11 @@ export function NewRunForm(props: {
   const [newEventEndDate, setNewEventEndDate] = useState("");
   const [newEventPracticeUrl, setNewEventPracticeUrl] = useState("");
   const [newEventResultsUrl, setNewEventResultsUrl] = useState("");
-  const [newEventControlledTire, setNewEventControlledTire] = useState("");
+  const [newEventControlledTireTypeId, setNewEventControlledTireTypeId] = useState("");
   /** When logging a race meeting, timing URLs (stored on the Event; edited here, PATCH on save). */
   const [eventPracticeTimingUrl, setEventPracticeTimingUrl] = useState("");
   const [eventRaceTimingUrl, setEventRaceTimingUrl] = useState("");
-  const [eventControlledTireLabel, setEventControlledTireLabel] = useState("");
+  const [eventControlledTireTypeId, setEventControlledTireTypeId] = useState("");
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
 
@@ -319,14 +346,6 @@ export function NewRunForm(props: {
   const [trackSaveWarning, setTrackSaveWarning] = useState(false);
   const [trackGripTags, setTrackGripTags] = useState<string[]>([]);
   const [trackLayoutTags, setTrackLayoutTags] = useState<string[]>([]);
-
-  const [showNewTireSetPanel, setShowNewTireSetPanel] = useState(false);
-  const [creatingTireSet, setCreatingTireSet] = useState(false);
-  const [newTireLabel, setNewTireLabel] = useState("");
-  const [newTireSetNumber, setNewTireSetNumber] = useState<string>("1");
-  const [newTireInitialRunCount, setNewTireInitialRunCount] = useState<number>(0);
-  /** When true, compound came from event spec — show set # only until user overrides. */
-  const [newTireCompoundFromEvent, setNewTireCompoundFromEvent] = useState(false);
 
   const [showNewBatteryPanel, setShowNewBatteryPanel] = useState(false);
   const [creatingBattery, setCreatingBattery] = useState(false);
@@ -384,6 +403,7 @@ export function NewRunForm(props: {
   batteryIdRef.current = batteryId;
   const tireRunUserTouchedRef = useRef(false);
   const batteryRunUserTouchedRef = useRef(false);
+  const skipTireResolveRef = useRef(false);
   /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
   const pendingCompleteNavigationRef = useRef(false);
   const [trackLocationPrompt, setTrackLocationPrompt] = useState<{
@@ -517,6 +537,16 @@ export function NewRunForm(props: {
     setEventId(r.eventId ?? "");
     setRaceClass((r.raceClass ?? "").trim());
     setTireSetId(r.tireSetId ?? "");
+    if (r.tireSet) {
+      skipTireResolveRef.current = true;
+      if (r.tireSet.tireType) {
+        setSelectedTireTypeId(r.tireSet.tireType.id);
+        setSelectedTireType(r.tireSet.tireType);
+      }
+      setTireSetNumber(String(r.tireSet.setNumber ?? 1));
+      setTireInsertLabel(r.tireSet.insertLabel?.trim() ?? "");
+      setTireWheelLabel(r.tireSet.wheelLabel?.trim() ?? "");
+    }
     // `runsCompleted` is always the count of *prior* runs on this tire set —
     // save() sends `runsCompleted + 1`. When hydrating an existing run we want
     // that re-save to preserve the run's current tireRunNumber, not bump it,
@@ -715,20 +745,42 @@ export function NewRunForm(props: {
     setReplicateLast(false);
   }, [dashboardPrefill, carsList]);
 
+  function applyTireFieldsFromSet(ts: TireSetOption | null) {
+    if (!ts) {
+      setSelectedTireTypeId("");
+      setSelectedTireType(null);
+      setTireSetNumber("1");
+      setTireInsertLabel("");
+      setTireWheelLabel("");
+      return;
+    }
+    if (ts.tireType) {
+      setSelectedTireTypeId(ts.tireType.id);
+      setSelectedTireType(ts.tireType);
+    } else {
+      setSelectedTireTypeId("");
+      setSelectedTireType(null);
+    }
+    setTireSetNumber(String(ts.setNumber ?? 1));
+    setTireInsertLabel(ts.insertLabel?.trim() ?? "");
+    setTireWheelLabel(ts.wheelLabel?.trim() ?? "");
+  }
+
   function applyTireBatteryToSetupSnapshot(nextTireSetId: string, nextBatteryId: string) {
     const tire = nextTireSetId ? tireSets.find((t) => t.id === nextTireSetId) ?? null : null;
     const bat = nextBatteryId ? batteries.find((b) => b.id === nextBatteryId) ?? null : null;
-    const tireLabel = tire ? `${tire.label}${tire.setNumber != null ? ` #${tire.setNumber}` : ""}` : "";
+    const tireValue = tire ? tireSelectionFromTireSet(tire) : undefined;
     const batLabel = bat ? `${bat.label}${bat.packNumber != null ? ` #${bat.packNumber}` : ""}` : "";
-    setSetupData((prev) =>
-      prev.tires === (tireLabel || undefined) && prev.battery === (batLabel || undefined)
-        ? prev
-        : applyDerivedFieldsToSnapshot({
-            ...prev,
-            tires: tireLabel || undefined,
-            battery: batLabel || undefined,
-          })
-    );
+    setSetupData((prev) => {
+      const nextTires = tireValue || undefined;
+      const nextBattery = batLabel || undefined;
+      if (prev.tires === nextTires && prev.battery === nextBattery) return prev;
+      return applyDerivedFieldsToSnapshot({
+        ...prev,
+        tires: nextTires,
+        battery: nextBattery,
+      });
+    });
   }
 
   // Deterministic sync: snapshot tires/battery always mirror the run context selections,
@@ -737,6 +789,48 @@ export function NewRunForm(props: {
     applyTireBatteryToSetupSnapshot(tireSetId, batteryId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tireSetId, batteryId, tireSets, batteries]);
+
+  useEffect(() => {
+    if (skipTireResolveRef.current) {
+      skipTireResolveRef.current = false;
+      return;
+    }
+    if (!selectedTireTypeId) return;
+    const setParsed = parseInt(tireSetNumber.trim(), 10);
+    const setNumber = Number.isFinite(setParsed) && setParsed >= 1 ? setParsed : 1;
+    let alive = true;
+    setResolvingTireSet(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/tire-sets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tireTypeId: selectedTireTypeId,
+            setNumber,
+            insertLabel: tireInsertLabel.trim() || null,
+            wheelLabel: tireWheelLabel.trim() || null,
+          }),
+        });
+        const data = (await res.json()) as { tireSet?: TireSetOption };
+        if (!alive || !data.tireSet?.id) return;
+        setTireSets((prev) => {
+          const rest = prev.filter((t) => t.id !== data.tireSet!.id);
+          return [data.tireSet!, ...rest];
+        });
+        setTireSetId(data.tireSet.id);
+        applyTireBatteryToSetupSnapshot(data.tireSet.id, batteryIdRef.current);
+      } catch {
+        /* keep prior selection */
+      } finally {
+        if (alive) setResolvingTireSet(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTireTypeId, tireSetNumber, tireInsertLabel, tireWheelLabel]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
@@ -934,7 +1028,12 @@ export function NewRunForm(props: {
     }
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
-    setEventControlledTireLabel(ev.controlledTireLabel?.trim() ?? "");
+    setEventControlledTireTypeId(ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "");
+    if (sessionType === "RACE_MEETING" && ev.controlledTireTypeId) {
+      skipTireResolveRef.current = true;
+      setSelectedTireTypeId(ev.controlledTireTypeId);
+      if (ev.controlledTireType) setSelectedTireType(ev.controlledTireType);
+    }
   }
 
   function parseEventFromApi(raw: Record<string, unknown>): EventOption {
@@ -960,6 +1059,8 @@ export function NewRunForm(props: {
       practiceSourceUrl: (raw.practiceSourceUrl as string | null) ?? null,
       resultsSourceUrl: (raw.resultsSourceUrl as string | null) ?? null,
       controlledTireLabel: (raw.controlledTireLabel as string | null) ?? null,
+      controlledTireTypeId: (raw.controlledTireTypeId as string | null) ?? null,
+      controlledTireType: (raw.controlledTireType as EventOption["controlledTireType"]) ?? null,
       track: (raw.track as EventOption["track"]) ?? null,
     };
   }
@@ -1488,14 +1589,14 @@ export function NewRunForm(props: {
     if (!needsEvent || !eventId) {
       setEventPracticeTimingUrl("");
       setEventRaceTimingUrl("");
-      setEventControlledTireLabel("");
+      setEventControlledTireTypeId("");
       return;
     }
     const ev = events.find((e) => e.id === eventId);
     if (!ev) return;
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
-    setEventControlledTireLabel(ev.controlledTireLabel?.trim() ?? "");
+    setEventControlledTireTypeId(ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "");
   }, [needsEvent, eventId, events]);
 
   function applyCopyFromPreview() {
@@ -1688,7 +1789,7 @@ export function NewRunForm(props: {
           endDate: end,
           practiceSourceUrl: newEventPracticeUrl.trim() || null,
           resultsSourceUrl: newEventResultsUrl.trim() || null,
-          controlledTireLabel: newEventControlledTire.trim() || null,
+          controlledTireTypeId: newEventControlledTireTypeId.trim() || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1713,106 +1814,13 @@ export function NewRunForm(props: {
       setNewEventEndDate("");
       setNewEventPracticeUrl("");
       setNewEventResultsUrl("");
-      setNewEventControlledTire("");
+      setNewEventControlledTireTypeId("");
       setShowNewEventPanel(false);
       setStatus("Event created — selected.");
     } catch (err) {
       setEventError(err instanceof Error ? err.message : "Failed to create event");
     } finally {
       setCreatingEvent(false);
-    }
-  }
-
-  function toggleNewTireSetPanel() {
-    if (showNewTireSetPanel) {
-      setNewTireLabel("");
-      setNewTireSetNumber("1");
-      setNewTireInitialRunCount(0);
-      setNewTireCompoundFromEvent(false);
-      setInlineError(null);
-      setShowNewTireSetPanel(false);
-      return;
-    }
-    setInlineError(null);
-    const specFromList = events.find((e) => e.id === eventId)?.controlledTireLabel?.trim() ?? "";
-    const specFromForm = eventControlledTireLabel.trim();
-    const spec =
-      sessionType === "RACE_MEETING" && eventId ? specFromForm || specFromList : "";
-    if (spec) {
-      setNewTireLabel(spec);
-      setNewTireCompoundFromEvent(true);
-      setNewTireSetNumber("1");
-      setNewTireInitialRunCount(0);
-    } else {
-      setNewTireLabel("");
-      setNewTireCompoundFromEvent(false);
-      setNewTireSetNumber("1");
-      setNewTireInitialRunCount(0);
-    }
-    setShowNewTireSetPanel(true);
-  }
-
-  async function createTireSet(e?: React.MouseEvent) {
-    e?.preventDefault();
-    const label = newTireLabel.trim();
-    if (!label) {
-      setInlineError("Enter a tire set label (e.g. Sweep 32).");
-      return;
-    }
-    setInlineError(null);
-    setStatus(null);
-    setCreatingTireSet(true);
-
-    const setRaw = newTireSetNumber.trim();
-    const setParsed = setRaw === "" ? NaN : parseInt(setRaw, 10);
-    const setNumber = Number.isFinite(setParsed) && setParsed >= 1 ? setParsed : 1;
-    const initialRunCount = newTireInitialRunCount >= 0 ? Math.floor(newTireInitialRunCount) : 0;
-
-    const runCreate = async (): Promise<{ tireSet: TireSetOption }> => {
-      const res = await fetch("/api/tire-sets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label,
-          setNumber,
-          initialRunCount,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = (data as { error?: string })?.error || `Server error (${res.status})`;
-        throw new Error(msg);
-      }
-      const tireSet = (data as { tireSet?: TireSetOption })?.tireSet;
-      if (!tireSet?.id) {
-        throw new Error("Invalid response: tire set not returned.");
-      }
-      return { tireSet };
-    };
-
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Request timed out (15s). Try again.")), 15000)
-    );
-
-    try {
-      const { tireSet } = await Promise.race([runCreate(), timeout]);
-      setTireSets((prev) => [tireSet, ...prev]);
-      setTireSetId(tireSet.id);
-      tireRunUserTouchedRef.current = true;
-      setRunsCompleted(initialRunCount);
-      setNewTireLabel("");
-      setNewTireSetNumber("1");
-      setNewTireInitialRunCount(0);
-      setNewTireCompoundFromEvent(false);
-      setShowNewTireSetPanel(false);
-      setStatus("Tire set created — selected.");
-      setInlineError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to create tire set";
-      setStatus(msg);
-      setInlineError(msg);
-    } finally {
-      setCreatingTireSet(false);
     }
   }
 
@@ -2233,14 +2241,14 @@ export function NewRunForm(props: {
       if (sessionType === "RACE_MEETING" && needsEvent && eventId) {
         const p = eventPracticeTimingUrl.trim() || null;
         const r = eventRaceTimingUrl.trim() || null;
-        const c = eventControlledTireLabel.trim() || null;
+        const c = eventControlledTireTypeId.trim() || null;
         void fetch(`/api/events/${encodeURIComponent(eventId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             practiceSourceUrl: p,
             resultsSourceUrl: r,
-            controlledTireLabel: c,
+            controlledTireTypeId: c,
           }),
         })
           .then((res) => {
@@ -2248,7 +2256,7 @@ export function NewRunForm(props: {
             setEvents((prev) =>
               prev.map((e) =>
                 e.id === eventId
-                  ? { ...e, practiceSourceUrl: p, resultsSourceUrl: r, controlledTireLabel: c }
+                  ? { ...e, practiceSourceUrl: p, resultsSourceUrl: r, controlledTireTypeId: c }
                   : e
               )
             );
@@ -2490,7 +2498,7 @@ export function NewRunForm(props: {
                     Race timing URL set
                   </span>
                 ) : null}
-                {eventControlledTireLabel.trim() ? (
+                {eventControlledTireTypeId.trim() ? (
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">Spec tire set</span>
                 ) : null}
               </div>
@@ -2650,24 +2658,28 @@ export function NewRunForm(props: {
               </div>
               <div className="space-y-1">
                 <label
-                  htmlFor="event-controlled-tire-label"
+                  htmlFor="event-controlled-tire-type"
                   className="block text-xs font-medium text-muted-foreground"
                 >
                   Controlled / spec tire (optional)
                 </label>
-                <input
-                  id="event-controlled-tire-label"
-                  type="text"
-                  value={eventControlledTireLabel}
-                  onChange={(e) => setEventControlledTireLabel(e.target.value)}
-                  placeholder="e.g. Sweep 32 — used when you add a new tire set during this event"
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
+                <TireTypeCombobox
+                  value={eventControlledTireTypeId}
+                  onChange={(id) => {
+                    setEventControlledTireTypeId(id);
+                    if (id && sessionType === "RACE_MEETING") {
+                      skipTireResolveRef.current = true;
+                      setSelectedTireTypeId(id);
+                    }
+                  }}
+                  placeholder="Search spec tire type"
+                  aria-label="Event spec tire type"
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">
                 Saved on the event when you save this run. Lap times → URL uses the practice link when your
                 meeting session is Practice; otherwise it prefers the race/results link (either link can be
-                scanned). Spec tire is optional — when set, New tire set pre-fills that compound for this event.
+                scanned). Spec tire pre-selects that compound when you log tires for this event.
               </p>
             </div>
           ) : null}
@@ -2750,12 +2762,11 @@ export function NewRunForm(props: {
               </div>
               <div className="space-y-1">
                 <label className="block ui-label-meta">Controlled / spec tire (optional)</label>
-                <input
-                  type="text"
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
-                  value={newEventControlledTire}
-                  onChange={(e) => setNewEventControlledTire(e.target.value)}
-                  placeholder="e.g. Sweep 32"
+                <TireTypeCombobox
+                  value={newEventControlledTireTypeId}
+                  onChange={setNewEventControlledTireTypeId}
+                  placeholder="Search spec tire type"
+                  aria-label="Event spec tire type"
                 />
               </div>
               {isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate) ? (
@@ -2866,7 +2877,7 @@ export function NewRunForm(props: {
               {(() => {
                 const t = tireSets.find((x) => x.id === tireSetId);
                 if (!t) return "—";
-                return `${t.label}${t.setNumber != null ? ` #${t.setNumber}` : ""}`;
+                return tireSetDisplayLine(t);
               })()}
             </span>
             <span className="text-muted-foreground">Battery</span>
@@ -3115,125 +3126,81 @@ export function NewRunForm(props: {
 
         {runDetailsTab === "tires" ? (
           <div className="space-y-4 pt-1">
-            <div className="space-y-2 text-sm">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <div className="ui-title text-sm text-muted-foreground">Tire set</div>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted transition"
-                  onClick={() => {
-                    toggleNewTireSetPanel();
+            <div className="space-y-3 text-sm">
+              <div className="ui-title text-sm text-muted-foreground">Tire type</div>
+              <TireTypeCombobox
+                value={selectedTireTypeId}
+                onChange={setSelectedTireTypeId}
+                onSelectedTypeChange={setSelectedTireType}
+                placeholder="Search tire type or create new"
+                aria-label="Tire type"
+              />
+              {resolvingTireSet ? (
+                <p className="text-[11px] text-muted-foreground">Linking tire set…</p>
+              ) : null}
+              <div className="space-y-1">
+                <label className="block ui-label-meta font-medium">Or pick existing set</label>
+                <select
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                  value={tireSetId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    const ts = tireSets.find((t) => t.id === nextId) ?? null;
+                    skipTireResolveRef.current = true;
+                    setTireSetId(nextId);
+                    if (ts) applyTireFieldsFromSet(ts);
+                    applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
+                    setCopyTireWarning(null);
                   }}
+                  aria-label="Existing tire set"
                 >
-                  {showNewTireSetPanel ? "Cancel" : "New tire set"}
-                </button>
+                  <option value="">—</option>
+                  {tireSets.map((ts) => (
+                    <option key={ts.id} value={ts.id}>
+                      {tireSetDisplayLine(ts)}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <select
-                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                value={tireSetId}
-                onChange={(e) => {
-                  const nextId = e.target.value;
-                  setTireSetId(nextId);
-                  applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
-                  setCopyTireWarning(null);
-                }}
-                aria-label="Tire set"
-              >
-                <option value="">—</option>
-                {tireSets.map((ts) => (
-                  <option key={ts.id} value={ts.id}>
-                    {ts.label}
-                    {ts.setNumber != null ? ` #${ts.setNumber}` : ""}
-                  </option>
-                ))}
-              </select>
-              {copyTireWarning && (
-                <div className="text-[11px] text-muted-foreground mt-1">{copyTireWarning}</div>
-              )}
-            </div>
-
-            {showNewTireSetPanel && (
-              <div className="rounded-md border border-border bg-muted/60 p-3 space-y-3">
-                {newTireCompoundFromEvent && newTireLabel.trim() ? (
-                  <div className="space-y-2">
-                    <div className="rounded-md border border-border bg-card px-3 py-2 text-sm">
-                      <div className="ui-title text-[10px] text-muted-foreground">
-                        Event spec compound
-                      </div>
-                      <div className="font-medium text-foreground mt-0.5">{newTireLabel.trim()}</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="text-[11px] text-muted-foreground underline hover:text-foreground"
-                      onClick={() => setNewTireCompoundFromEvent(false)}
-                    >
-                      Different compound
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <input
-                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                      placeholder="Label (brand + compound, e.g. Sweep 32)"
-                      value={newTireLabel}
-                      onChange={(e) => setNewTireLabel(e.target.value)}
-                      aria-label="Tire set label"
-                    />
-                    <p className="text-[11px] text-muted-foreground">Brand + compound (e.g. Sweep 32)</p>
-                  </>
-                )}
+              {copyTireWarning ? (
+                <div className="text-[11px] text-muted-foreground">{copyTireWarning}</div>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-1">
                   <label className="block ui-label-meta font-medium">Set number</label>
                   <input
                     type="number"
                     min={1}
-                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none md:max-w-xs"
-                    placeholder="Set number"
-                    value={newTireSetNumber}
-                    onChange={(e) => setNewTireSetNumber(e.target.value)}
-                    aria-label="Set number"
-                  />
-                  <p className="text-[11px] text-muted-foreground">Physical tire set number (e.g. 1, 2, 3)</p>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="ui-title text-sm text-muted-foreground">Prior runs on this set (before first log)</div>
-                  <input
-                    type="number"
-                    min={0}
                     className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                    inputMode="numeric"
-                    value={newTireInitialRunCount}
-                    onChange={(e) =>
-                      setNewTireInitialRunCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                    }
-                    aria-label="Prior runs on this tire set before first log"
+                    value={tireSetNumber}
+                    onChange={(e) => setTireSetNumber(e.target.value)}
+                    aria-label="Tire set number"
                   />
-                  <div className="text-[11px] text-muted-foreground">
-                    First log on this set will be <span className="font-medium text-foreground">tire run #{newTireInitialRunCount + 1}</span>
-                    {newTireInitialRunCount === 0
-                      ? " (no prior runs)."
-                      : newTireInitialRunCount === 1
-                        ? " (1 prior run)."
-                        : ` (${newTireInitialRunCount} prior runs).`}
-                  </div>
                 </div>
-                <button
-                  type="button"
-                  className={cn(
-                    buttonLinkClassName("primary"),
-                    (!newTireLabel.trim() || creatingTireSet) && "opacity-60 pointer-events-none"
-                  )}
-                  onClick={(e) => createTireSet(e)}
-                  disabled={!newTireLabel.trim() || creatingTireSet}
-                >
-                  {creatingTireSet ? "Adding…" : "Add tire set"}
-                </button>
+                <div className="space-y-1">
+                  <label className="block ui-label-meta font-medium">Insert (optional)</label>
+                  <input
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                    placeholder="e.g. medium soft"
+                    value={tireInsertLabel}
+                    onChange={(e) => setTireInsertLabel(e.target.value)}
+                    aria-label="Tire insert"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block ui-label-meta font-medium">Wheel (optional)</label>
+                  <input
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                    placeholder="e.g. 2.4"
+                    value={tireWheelLabel}
+                    onChange={(e) => setTireWheelLabel(e.target.value)}
+                    aria-label="Tire wheel"
+                  />
+                </div>
               </div>
-            )}
+            </div>
 
-            {!showNewTireSetPanel && tireSetId ? (
+            {tireSetId ? (
               <div className="space-y-1 text-sm">
                 <div className="ui-title text-sm text-muted-foreground">Prior runs on this set (before this log)</div>
                 <input

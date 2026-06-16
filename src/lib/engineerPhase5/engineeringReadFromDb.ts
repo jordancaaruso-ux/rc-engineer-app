@@ -24,14 +24,20 @@ export type EngineeringReadDbRunRow = {
   handlingProblems: string | null;
   lapTimes: unknown;
   lapSession: unknown;
-  tireSet: { id: string; label: string; setNumber: number } | null;
+  tireSet: {
+    id: string;
+    label: string;
+    setNumber: number;
+    tireType: { displayName: string; modelCode: string } | null;
+  } | null;
   setupSnapshot: { data: unknown } | null;
 };
 
 function tireLabel(row: EngineeringReadDbRunRow): string | null {
   if (!row.tireSet) return null;
+  const name = row.tireSet.tireType?.displayName ?? row.tireSet.label;
   const seg = row.tireSet.setNumber != null ? ` #${row.tireSet.setNumber}` : "";
-  return `${row.tireSet.label}${seg}`;
+  return `${name}${seg}`;
 }
 
 function rowToInput(row: EngineeringReadDbRunRow): EngineeringReadRunInput {
@@ -42,7 +48,7 @@ function rowToInput(row: EngineeringReadDbRunRow): EngineeringReadRunInput {
     eventId: row.eventId,
     tireSetId: row.tireSetId,
     tireLabel: tireLabel(row),
-    tireCompoundLabel: row.tireSet?.label ?? null,
+    tireCompoundLabel: row.tireSet?.tireType?.displayName ?? row.tireSet?.label ?? null,
     tireRunNumber: row.tireRunNumber ?? 1,
     carRating: row.carRating ?? null,
     handlingAssessmentJson: row.handlingAssessmentJson,
@@ -71,7 +77,14 @@ const engineeringReadRunSelect = {
   handlingProblems: true,
   lapTimes: true,
   lapSession: true,
-  tireSet: { select: { id: true, label: true, setNumber: true } },
+  tireSet: {
+    select: {
+      id: true,
+      label: true,
+      setNumber: true,
+      tireType: { select: { displayName: true, modelCode: true } },
+    },
+  },
   setupSnapshot: { select: { data: true } },
 } as const;
 

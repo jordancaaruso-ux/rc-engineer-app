@@ -8,9 +8,8 @@ import {
   normalizeSetupSnapshotForStorage,
   type SetupSnapshotData,
 } from "@/lib/runSetup";
-import {
-  computeSetupDeltaForAudit,
-} from "@/lib/setup/resolveSetupSnapshot";
+import { tireSelectionFromTireSet } from "@/lib/tires/tireSelectionFromSet";
+import { computeSetupDeltaForAudit } from "@/lib/setup/resolveSetupSnapshot";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -130,7 +129,14 @@ export async function PATCH(request: Request, { params }: Params) {
   const tireSet = run.tireSetId
     ? await prisma.tireSet.findFirst({
         where: { id: run.tireSetId, userId: user.id },
-        select: { label: true, setNumber: true },
+        select: {
+          label: true,
+          setNumber: true,
+          insertLabel: true,
+          wheelLabel: true,
+          tireTypeId: true,
+          tireType: { select: { id: true, displayName: true, modelCode: true } },
+        },
       })
     : null;
   const battery = run.batteryId
@@ -140,14 +146,14 @@ export async function PATCH(request: Request, { params }: Params) {
       })
     : null;
 
-  const tireLabel = tireSet ? `${tireSet.label}${tireSet.setNumber != null ? ` #${tireSet.setNumber}` : ""}` : "";
+  const tireValue = tireSet ? tireSelectionFromTireSet(tireSet) : undefined;
   const batteryLabel = battery
     ? `${battery.label}${battery.packNumber != null ? ` #${battery.packNumber}` : ""}`
     : "";
 
   resolvedData = normalizeSetupSnapshotForStorage({
     ...resolvedData,
-    tires: tireLabel || resolvedData.tires,
+    tires: tireValue || resolvedData.tires,
     battery: batteryLabel || resolvedData.battery,
   });
 

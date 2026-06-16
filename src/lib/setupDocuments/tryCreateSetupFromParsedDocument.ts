@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { isCarValidTargetForSetupDocument } from "@/lib/carSetupScope";
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
+import { linkTireFieldsInSnapshotData } from "@/lib/tires/linkTireFieldsInSnapshot";
 
 export type TryCreateSetupResult =
   | { ok: true; setupId: string }
@@ -38,11 +39,15 @@ export async function tryCreateSetupFromParsedDocument(input: {
   if (!allowed) return { ok: false, reason: "car_mismatch" };
 
   try {
+    const normalized = normalizeSetupSnapshotForStorage(
+      (doc.parsedDataJson ?? {}) as SetupSnapshotData
+    ) as SetupSnapshotData;
+    const linkedTires = await linkTireFieldsInSnapshotData(normalized);
     const setup = await prisma.setupSnapshot.create({
       data: {
         userId: input.userId,
         carId: doc.carId,
-        data: normalizeSetupSnapshotForStorage((doc.parsedDataJson ?? {}) as SetupSnapshotData) as object,
+        data: normalizeSetupSnapshotForStorage(linkedTires) as object,
       },
       select: { id: true },
     });

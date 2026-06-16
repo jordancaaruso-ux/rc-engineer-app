@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { canViewPeerRuns, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
+import {
+  applyRunHistoryPostFilters,
+  buildRunHistoryPrismaWhere,
+  parseRunHistoryFilters,
+  sortRunsForHistory,
+} from "@/lib/runs/runHistoryFilters";
 
 /** Filtered runs for Engineer compare pickers + search (same shape as for-picker). */
 export async function GET(request: Request) {
@@ -11,15 +17,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(request.url);
-  const carId = searchParams.get("carId")?.trim() || null;
-  const eventId = searchParams.get("eventId")?.trim() || null;
-  const trackId = searchParams.get("trackId")?.trim() || null;
+  const raw: Record<string, string> = {};
+  searchParams.forEach((value, key) => {
+    raw[key] = value;
+  });
+  const filters = parseRunHistoryFilters(raw);
   const forUserIdRaw = searchParams.get("forUserId")?.trim() || null;
-  const q = searchParams.get("q")?.trim().toLowerCase() || "";
-  const dateFrom = searchParams.get("dateFrom")?.trim() || null;
-  const dateTo = searchParams.get("dateTo")?.trim() || null;
   const take = Math.min(300, Math.max(1, Number(searchParams.get("take")) || 200));
 
   let runOwnerId = user.id;
@@ -33,13 +39,12 @@ export async function GET(request: Request) {
     teamOnlyPeer = await peerAccessIsTeamOnly(user.id, forUserIdRaw);
   }
 
-  const where: NonNullable<Parameters<typeof prisma.run.findMany>[0]>["where"] = {
+  const baseWhere = {
     userId: runOwnerId,
     ...(teamOnlyPeer ? { shareWithTeam: true } : {}),
   };
-  if (carId) where.carId = carId;
-  if (eventId) where.eventId = eventId;
-  if (trackId) where.trackId = trackId;
+  const where = buildRunHistoryPrismaWhere(filters, baseWhere);
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
 
   const runs = await prisma.run.findMany({
     where,
@@ -60,55 +65,25 @@ export async function GET(request: Request) {
       carId: true,
       carNameSnapshot: true,
       trackNameSnapshot: true,
+      raceClass: true,
+      bestLapSeconds: true,
+      lapTimes: true,
+      lapSession: true,
       notes: true,
       driverNotes: true,
       handlingProblems: true,
-      lapTimes: true,
       setupSnapshot: { select: { id: true, data: true } },
       car: { select: { name: true, setupSheetTemplate: true } },
       track: { select: { name: true } },
       event: { select: { name: true } },
+      tireSet: { select: { label: true, setNumber: true } },
     },
   });
 
-  let filtered = runs;
-
-  if (dateFrom || dateTo) {
-    const from = dateFrom ? new Date(`${dateFrom}T00:00:00.000`) : null;
-    const to = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
-    filtered = runs.filter((r) => {
-      const t = resolveRunDisplayInstant({
-        createdAt: r.createdAt,
-        sessionCompletedAt: r.sessionCompletedAt,
-        loggingCompletedAt: r.loggingCompletedAt,
-        sortAt: r.sortAt,
-      }).getTime();
-      const d = new Date(t);
-      if (from && d < from) return false;
-      if (to && d > to) return false;
-      return true;
-    });
-  }
-
-  if (q) {
-    filtered = filtered.filter((r) => {
-      const hay = [
-        r.car?.name,
-        r.carNameSnapshot,
-        r.track?.name,
-        r.trackNameSnapshot,
-        r.event?.name,
-        r.sessionLabel,
-        r.notes,
-        r.driverNotes,
-        r.handlingProblems,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
-    });
-  }
+  const filtered = sortRunsForHistory(
+    applyRunHistoryPostFilters(runs, filters, displayTimeZone),
+    filters.sort
+  );
 
   return NextResponse.json({ runs: filtered });
 }

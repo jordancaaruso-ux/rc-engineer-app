@@ -14,14 +14,21 @@ import {
 import { canonicalGeometrySignedValue } from "@/lib/setup/geometrySignNormalize";
 import { normalizeMotorMountScrews, normalizeTopDeckCuts, normalizeTopDeckScrews } from "@/lib/setup/screwNormalize";
 import { isMultiSelectFieldKey, normalizeMultiSelectValue } from "@/lib/setup/multiSelect";
+import {
+  isTireFieldKey,
+  isTireSelectionValue,
+  normalizeTireSelectionFromUnknown,
+  type TireSelectionValue,
+} from "@/lib/tires/tireSelectionValue";
 
-export type { PresetWithOtherValue };
+export type { PresetWithOtherValue, TireSelectionValue };
 
 export type SetupSnapshotValue =
   | string
   | number
   | string[]
   | PresetWithOtherValue
+  | TireSelectionValue
   | null
   | undefined;
 
@@ -93,6 +100,18 @@ export function normalizeSetupSnapshotForStorage(input: unknown): SetupSnapshotD
       out[k] = normalized;
       continue;
     }
+    if (isTireFieldKey(k)) {
+      const structured = normalizeTireSelectionFromUnknown(v);
+      if (structured) {
+        out[k] = structured;
+        continue;
+      }
+      if (typeof v === "string") {
+        const t = v.trim();
+        if (t) out[k] = t;
+      }
+      continue;
+    }
     if (v === null) {
       out[k] = null;
       continue;
@@ -116,6 +135,11 @@ export function normalizeSetupSnapshotForStorage(input: unknown): SetupSnapshotD
     }
     if (typeof v === "object" && v !== null && !Array.isArray(v)) {
       const rec = v as Record<string, unknown>;
+      if (isTireFieldKey(k) && typeof rec.tireTypeId === "string") {
+        const structured = normalizeTireSelectionFromUnknown(v);
+        if (structured) out[k] = structured;
+        continue;
+      }
       if ("selectedPreset" in rec || "otherText" in rec) {
         const opts = getSingleSelectChipOptions(k);
         const pov = normalizePresetWithOtherFromUnknown(v, undefined, opts);

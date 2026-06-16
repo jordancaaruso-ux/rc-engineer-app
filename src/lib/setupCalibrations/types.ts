@@ -138,7 +138,8 @@ export type CustomFieldUiType =
   | "select"
   | "multiSelect"
   | "date"
-  | "groupOption";
+  | "groupOption"
+  | "tireType";
 
 export type GroupedFieldBehaviorType =
   | "singleChoiceGroup"

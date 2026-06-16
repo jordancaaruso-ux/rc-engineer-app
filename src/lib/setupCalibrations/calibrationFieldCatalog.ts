@@ -20,7 +20,8 @@ export type CalibrationFieldKind =
   | "singleSelect"
   | "paired"
   | "visualMulti"
-  | "documentMetadata";
+  | "documentMetadata"
+  | "tireType";
 
 export type CalibrationFieldCategory = "setup" | "document";
 
@@ -81,7 +82,8 @@ const FIELD_TYPE_BY_KEY: Record<string, CalibrationFieldKind> = {
   final_drive_ratio: "number",
   winglet: "singleSelect",
   front_body_post_oring: "singleSelect",
-  tires: "text",
+  tires: "tireType",
+  tires_setup: "tireType",
 
   // visual multi
   motor_mount_screws: "visualMulti",

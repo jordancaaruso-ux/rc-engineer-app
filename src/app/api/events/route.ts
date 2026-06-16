@@ -5,6 +5,12 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { parseEventDateYmd } from "@/lib/eventDateParse";
 import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
 
+const EVENT_TIRE_TYPE_SELECT = {
+  id: true,
+  displayName: true,
+  modelCode: true,
+} as const;
+
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json(
@@ -49,6 +55,7 @@ export async function GET(request: Request) {
     take: 50,
     include: {
       track: { select: { id: true, name: true, location: true } },
+      controlledTireType: { select: EVENT_TIRE_TYPE_SELECT },
     },
   });
 
@@ -74,6 +81,7 @@ export async function POST(request: Request) {
       practiceSourceUrl?: string | null;
       resultsSourceUrl?: string | null;
       controlledTireLabel?: string | null;
+      controlledTireTypeId?: string | null;
     };
 
     const name = body.name?.trim();
@@ -123,6 +131,16 @@ export async function POST(request: Request) {
       typeof body.controlledTireLabel === "string" && body.controlledTireLabel.trim()
         ? body.controlledTireLabel.trim()
         : null;
+    const controlledTireTypeId = body.controlledTireTypeId?.trim() || null;
+    if (controlledTireTypeId) {
+      const tt = await prisma.tireType.findUnique({
+        where: { id: controlledTireTypeId },
+        select: { id: true },
+      });
+      if (!tt) {
+        return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
+      }
+    }
 
     if (resultsSourceUrl) {
       const existing = await prisma.event.findFirst({
@@ -162,9 +180,11 @@ export async function POST(request: Request) {
         practiceSourceUrl,
         resultsSourceUrl,
         controlledTireLabel,
+        controlledTireTypeId,
       },
       include: {
         track: { select: { id: true, name: true, location: true } },
+        controlledTireType: { select: EVENT_TIRE_TYPE_SELECT },
       },
     });
 

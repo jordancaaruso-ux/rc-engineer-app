@@ -36,6 +36,7 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
   for (const [key, meta] of keyMeta) {
     const isSession = meta.sectionId === "session";
     const isNotes = key.includes("notes") || key === "tires_setup";
+    const isTireField = key === "tires" || key === "tires_setup";
     const sessionInAnalysis = key === "track_surface" || key === "traction";
     const sessionFieldExtras =
       key === "track_surface"
@@ -68,8 +69,10 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
       displayLabel: meta.label,
       sectionId: meta.sectionId,
       sectionTitle: meta.sectionTitle,
-      valueType: sessionFieldExtras?.valueType ?? (isSession || isNotes ? "string" : "number"),
-      uiType: sessionFieldExtras?.uiType ?? (isSession ? "text" : isNotes ? "textarea" : "text"),
+      valueType: sessionFieldExtras?.valueType ?? (isTireField ? "string" : isSession || isNotes ? "string" : "number"),
+      uiType:
+        sessionFieldExtras?.uiType ??
+        (isTireField ? "tireType" : isSession ? "text" : isNotes ? "textarea" : "text"),
       unit: meta.unit,
       showInSetupSheet: true,
       showInAnalysis: !isSession || sessionInAnalysis,

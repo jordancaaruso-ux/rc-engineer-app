@@ -40,7 +40,10 @@ type ScopedRun = {
   car: { name: string } | null;
   carNameSnapshot: string | null;
   track: { name: string } | null;
-  tireSet: { label: string | null } | null;
+  tireSet: {
+    label: string | null;
+    tireType: { displayName: string; modelCode: string } | null;
+  } | null;
 };
 
 type RankedLap = {
@@ -65,13 +68,26 @@ function runInDateWindow(
 }
 
 function runMatchesTireLabel(
-  run: { tireSet: { label: string | null } | null },
+  run: {
+    tireSet: {
+      label: string | null;
+      tireType: { displayName: string; modelCode: string } | null;
+    } | null;
+  },
   tireLabelContains: string | null
 ): boolean {
   if (!tireLabelContains) return true;
   const needle = tireLabelContains.trim().toLowerCase();
   if (!needle) return true;
-  return (run.tireSet?.label ?? "").toLowerCase().includes(needle);
+  const parts = [
+    run.tireSet?.tireType?.displayName,
+    run.tireSet?.tireType?.modelCode,
+    run.tireSet?.label,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return parts.includes(needle);
 }
 
 function collectRankedLaps(runs: ScopedRun[]): RankedLap[] {
@@ -190,7 +206,12 @@ export async function tryAnswerLapHistoryQuery(input: {
       car: { select: { name: true } },
       carNameSnapshot: true,
       track: { select: { name: true } },
-      tireSet: { select: { label: true } },
+      tireSet: {
+        select: {
+          label: true,
+          tireType: { select: { displayName: true, modelCode: true } },
+        },
+      },
     },
   });
 

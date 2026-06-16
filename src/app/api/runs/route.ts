@@ -13,6 +13,7 @@ import {
   resolveSetupSnapshot,
 } from "@/lib/setup/resolveSetupSnapshot";
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
+import { tireSelectionFromTireSet } from "@/lib/tires/tireSelectionFromSet";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
@@ -297,7 +298,15 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   const tireSet = body.tireSetId
     ? await prisma.tireSet.findFirst({
         where: { id: body.tireSetId, userId: params.userId },
-        select: { id: true, label: true, setNumber: true },
+        select: {
+          id: true,
+          label: true,
+          setNumber: true,
+          insertLabel: true,
+          wheelLabel: true,
+          tireTypeId: true,
+          tireType: { select: { id: true, displayName: true, modelCode: true } },
+        },
       })
     : null;
   if (body.tireSetId && !tireSet) {
@@ -314,11 +323,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     return NextResponse.json({ error: "Battery not found" }, { status: 400 });
   }
 
-  const tireLabel = tireSet ? `${tireSet.label}${tireSet.setNumber != null ? ` #${tireSet.setNumber}` : ""}` : "";
+  const tireValue = tireSet ? tireSelectionFromTireSet(tireSet) : undefined;
   const batteryLabel = battery ? `${battery.label}${battery.packNumber != null ? ` #${battery.packNumber}` : ""}` : "";
   resolvedData = normalizeSetupSnapshotForStorage({
     ...resolvedData,
-    tires: tireLabel || undefined,
+    tires: tireValue || undefined,
     battery: batteryLabel || undefined,
   });
 

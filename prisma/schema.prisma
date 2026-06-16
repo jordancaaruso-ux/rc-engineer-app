@@ -27,6 +27,7 @@ model User {
   runs            Run[]
   tracks          Track[]
   tireSets        TireSet[]
+  tireTypesCreated TireType[] @relation("TireTypeCreatedBy")
   batteries       Battery[]
   snapshots       SetupSnapshot[]
   events          Event[]
@@ -297,6 +298,9 @@ model Event {
   raceClass         String?
   /** Optional spec / controlled compound label (same style as TireSet.label), e.g. Sweep 32. */
   controlledTireLabel String?
+  /** Canonical spec tire from global catalog (preferred over controlledTireLabel). */
+  controlledTireType   TireType? @relation(fields: [controlledTireTypeId], references: [id], onDelete: SetNull)
+  controlledTireTypeId String?
 
   /** Watermark for practice auto-import (canonical session completion instant). */
   practiceLastSeenSessionCompletedAt DateTime?
@@ -308,18 +312,45 @@ model Event {
   // Future: timetable/scheduled sessions (timetableSessions?), reminders, "most likely session" suggestions
 }
 
+/** Global tire product catalog (shared across all users). */
+model TireType {
+  id          String   @id @default(cuid())
+  displayName String
+  /** Unique manufacturer/product code — canonical identity. */
+  modelCode   String   @unique
+  createdAt   DateTime @default(now())
+
+  createdBy   User?   @relation("TireTypeCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+
+  tireSets  TireSet[]
+  events    Event[]
+
+  @@index([displayName])
+}
+
 model TireSet {
   id         String   @id @default(cuid())
-  label      String   // brand + compound, e.g. "Sweep 32"
+  /** Denormalized display label; legacy rows may use this without tireTypeId. */
+  label      String
   setNumber  Int      @default(1) // individual set number
   initialRunCount Int @default(0) // optional starting run count (usually 0)
+  /** Optional insert (e.g. medium soft). */
+  insertLabel String?
+  /** Optional wheel type. */
+  wheelLabel  String?
   notes      String?
   createdAt  DateTime @default(now())
+
+  tireType   TireType? @relation(fields: [tireTypeId], references: [id], onDelete: SetNull)
+  tireTypeId String?
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   runs Run[]
+
+  @@index([userId, tireTypeId, setNumber])
 }
 
 /** Reusable battery pack; run counts mirror TireSet (global per pack, linked via Run). */

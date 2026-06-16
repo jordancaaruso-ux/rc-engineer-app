@@ -44,6 +44,7 @@ export type EngineerRichContextV1 = {
   tires: null | {
     id: string;
     label: string;
+    modelCode: string | null;
     setNumber: number;
     tireRunNumber: number;
   };
@@ -145,7 +146,15 @@ const runSelectRich = {
     select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
   },
   event: { select: { id: true, raceClass: true } },
-  tireSet: { select: { id: true, label: true, setNumber: true, initialRunCount: true } },
+  tireSet: {
+    select: {
+      id: true,
+      label: true,
+      setNumber: true,
+      initialRunCount: true,
+      tireType: { select: { displayName: true, modelCode: true } },
+    },
+  },
   importedLapSets: {
     select: {
       driverName: true,
@@ -390,7 +399,8 @@ export async function buildEngineerRichContextV1(params: {
     tires: run.tireSet
       ? {
           id: run.tireSet.id,
-          label: run.tireSet.label,
+          label: run.tireSet.tireType?.displayName ?? run.tireSet.label,
+          modelCode: run.tireSet.tireType?.modelCode ?? null,
           setNumber: run.tireSet.setNumber,
           tireRunNumber: run.tireRunNumber,
         }

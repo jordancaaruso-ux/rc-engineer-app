@@ -36,24 +36,44 @@ export async function PATCH(
     resultsSourceUrl?: unknown;
     raceClass?: unknown;
     controlledTireLabel?: unknown;
+    controlledTireTypeId?: unknown;
   };
 
   const practiceSourceUrl = optString(body.practiceSourceUrl);
   const resultsSourceUrl = optString(body.resultsSourceUrl);
   const raceClass = optString(body.raceClass);
   const controlledTireLabel = optString(body.controlledTireLabel);
+  const controlledTireTypeId =
+    body.controlledTireTypeId === undefined
+      ? undefined
+      : body.controlledTireTypeId === null
+        ? null
+        : optString(body.controlledTireTypeId);
 
   const data: {
     practiceSourceUrl?: string | null;
     resultsSourceUrl?: string | null;
     raceClass?: string | null;
     controlledTireLabel?: string | null;
+    controlledTireTypeId?: string | null;
   } = {};
 
   if (practiceSourceUrl !== undefined) data.practiceSourceUrl = practiceSourceUrl;
   if (resultsSourceUrl !== undefined) data.resultsSourceUrl = resultsSourceUrl;
   if (raceClass !== undefined) data.raceClass = raceClass;
   if (controlledTireLabel !== undefined) data.controlledTireLabel = controlledTireLabel;
+  if (controlledTireTypeId !== undefined) {
+    if (controlledTireTypeId) {
+      const tt = await prisma.tireType.findUnique({
+        where: { id: controlledTireTypeId },
+        select: { id: true },
+      });
+      if (!tt) {
+        return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
+      }
+    }
+    data.controlledTireTypeId = controlledTireTypeId;
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });

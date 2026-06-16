@@ -1,12 +1,22 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getMyNameSetting } from "@/lib/appSettings";
-import { formatGroupDate } from "@/lib/formatDate";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
+import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
+import { buildRunHistoryGroups, type RunHistoryGroup } from "@/lib/runs/buildRunHistoryGroups";
+import {
+  applyRunHistoryPostFilters,
+  buildRunHistoryPrismaWhere,
+  filtersToSearchParams,
+  parseRunHistoryFilters,
+  runHistoryFiltersActive,
+  sortRunsForHistory,
+} from "@/lib/runs/runHistoryFilters";
 import { compareRunTimestamp } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
@@ -50,22 +60,6 @@ const runHistoryInclude = {
 } satisfies Prisma.RunInclude;
 
 type RunInGroup = Prisma.RunGetPayload<{ include: typeof runHistoryInclude }>;
-
-function dateKey(d: Date): string {
-  return new Date(d).toISOString().slice(0, 10);
-}
-
-/**
- * List-ordering instant. Always reads from `sortAt` (the stable ordering axis
- * stamped once at create, mutated only by explicit user reorder). Falls back
- * to createdAt defensively for rows older than the migration that somehow
- * arrived without a sortAt value — shouldn't happen post-backfill.
- */
-function runSessionSortInstant(run: RunInGroup): Date {
-  const s = run.sortAt ?? run.createdAt;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? new Date(run.createdAt) : d;
-}
 
 async function fetchRunHistoryRows(where: Prisma.RunWhereInput, take: number): Promise<RunInGroup[]> {
   return perfSpan(`fetchRunHistoryRows(take=${take})`, () =>
@@ -117,60 +111,7 @@ async function loadRunHistoryPage(opts: {
 // If old rows ever need patching, call a one-shot migration endpoint — do not
 // reintroduce this on render.
 
-type Group = {
-  id: string;
-  title: string;
-  type: "Testing" | "Race Meeting";
-  trackName: string | null;
-  dateLabel: string;
-  runs: RunInGroup[];
-};
-
-function buildGroups(runs: RunInGroup[]): Group[] {
-  const byKey = new Map<string, RunInGroup[]>();
-  for (const run of runs) {
-    const key = run.eventId ? `event-${run.eventId}` : `day-${dateKey(runSessionSortInstant(run))}`;
-    const list = byKey.get(key) ?? [];
-    list.push(run);
-    byKey.set(key, list);
-  }
-  const groups: Group[] = [];
-  for (const [key, groupRuns] of byKey) {
-    const run = groupRuns[0];
-    const isEvent = !!run.eventId && run.event;
-    const title = isEvent && run.event
-      ? run.event.name
-      : `Test day – ${formatGroupDate(runSessionSortInstant(run))}`;
-    const type: Group["type"] = isEvent ? "Race Meeting" : "Testing";
-    const trackName = isEvent && run.event
-      ? (run.event.track?.name ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
-      : (run.track?.name ?? run.trackNameSnapshot ?? "—");
-    const dateLabel = isEvent && run.event
-      ? (() => {
-          const start = run.event.startDate ? new Date(run.event.startDate) : runSessionSortInstant(run);
-          const end = run.event.endDate ? new Date(run.event.endDate) : runSessionSortInstant(run);
-          if (dateKey(start) === dateKey(end)) return formatGroupDate(start);
-          return `${formatGroupDate(start)} – ${formatGroupDate(end)}`;
-        })()
-      : formatGroupDate(runSessionSortInstant(run));
-    groups.push({
-      id: key,
-      title,
-      type,
-      trackName,
-      dateLabel,
-      runs: groupRuns.sort(
-        (a, b) => runSessionSortInstant(b).getTime() - runSessionSortInstant(a).getTime()
-      ),
-    });
-  }
-  groups.sort((a, b) => {
-    const aMax = Math.max(...a.runs.map((r) => runSessionSortInstant(r).getTime()));
-    const bMax = Math.max(...b.runs.map((r) => runSessionSortInstant(r).getTime()));
-    return bMax - aMax;
-  });
-  return groups;
-}
+type Group = RunHistoryGroup<RunInGroup>;
 
 export default async function RunHistoryPage({
   searchParams,
@@ -180,12 +121,7 @@ export default async function RunHistoryPage({
   // visible without an extra click.
   // `focusRun=<runId>` opens the session group that contains the run and
   // expands that row (e.g. from dashboard "View run").
-  searchParams?: Promise<{
-    expandLatest?: string | string[];
-    focusRun?: string | string[];
-    teamId?: string | string[];
-    viewAll?: string | string[];
-  }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<ReactNode> {
   const resolvedSearch = (await searchParams) ?? {};
   const rawTeam = resolvedSearch.teamId;
@@ -198,6 +134,9 @@ export default async function RunHistoryPage({
   const rawViewAll = resolvedSearch.viewAll;
   const viewAllRequested =
     (Array.isArray(rawViewAll) ? rawViewAll[0] : rawViewAll) === "1";
+  const filters = parseRunHistoryFilters(resolvedSearch);
+  const filtersActive = runHistoryFiltersActive(filters);
+  const effectiveViewAllRequested = viewAllRequested || filtersActive;
   if (!hasDatabaseUrl()) {
     return (
       <>
@@ -228,11 +167,15 @@ export default async function RunHistoryPage({
 
   let runs: RunInGroup[] = [];
   let totalRunCount = 0;
-  let viewAll = viewAllRequested;
+  let viewAll = effectiveViewAllRequested;
   let hasMoreRuns = false;
   let teamTitle: string | null = null;
   let memberDisplayByUserId: Record<string, string> = {};
   let teamAccessDenied = false;
+  let filterCars: { id: string; label: string }[] = [];
+  let filterTracks: { id: string; label: string }[] = [];
+  let filterEvents: { id: string; label: string }[] = [];
+  let filterTireSets: { id: string; label: string }[] = [];
 
   if (teamId) {
     const allowed = await assertUserInTeam(teamId, user.id);
@@ -249,9 +192,13 @@ export default async function RunHistoryPage({
         120,
         Math.max(RUN_HISTORY_INITIAL_TAKE, RUN_HISTORY_INITIAL_TAKE * memberIds.length)
       );
+      const baseWhere = buildRunHistoryPrismaWhere(filters, {
+        userId: { in: memberIds },
+        shareWithTeam: true,
+      });
       const loaded = await loadRunHistoryPage({
-        where: { userId: { in: memberIds }, shareWithTeam: true },
-        viewAll: viewAllRequested,
+        where: baseWhere,
+        viewAll: effectiveViewAllRequested,
         focusRunId: focusRunParam,
         takeWhenNotViewAll,
       });
@@ -271,9 +218,10 @@ export default async function RunHistoryPage({
       );
     }
   } else {
+    const baseWhere = buildRunHistoryPrismaWhere(filters, { userId: user.id });
     const loaded = await loadRunHistoryPage({
-      where: { userId: user.id },
-      viewAll: viewAllRequested,
+      where: baseWhere,
+      viewAll: effectiveViewAllRequested,
       focusRunId: focusRunParam,
       takeWhenNotViewAll: RUN_HISTORY_INITIAL_TAKE,
     });
@@ -283,7 +231,46 @@ export default async function RunHistoryPage({
     hasMoreRuns = loaded.hasMoreRuns;
   }
 
-  const groups = buildGroups(runs);
+  if (!teamAccessDenied) {
+    const [cars, tracks, events, tireSets] = await Promise.all([
+      prisma.car.findMany({
+        where: { userId: user.id },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      }),
+      prisma.track.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      }),
+      prisma.event.findMany({
+        where: { userId: user.id },
+        orderBy: { startDate: "desc" },
+        select: { id: true, name: true },
+      }),
+      prisma.tireSet.findMany({
+        where: { userId: user.id },
+        orderBy: [{ label: "asc" }, { setNumber: "asc" }],
+        select: { id: true, label: true, setNumber: true },
+      }),
+    ]);
+    filterCars = cars.map((c) => ({ id: c.id, label: c.name }));
+    filterTracks = tracks.map((t) => ({ id: t.id, label: t.name }));
+    filterEvents = events.map((e) => ({ id: e.id, label: e.name }));
+    filterTireSets = tireSets.map((ts) => ({
+      id: ts.id,
+      label: `${ts.label}${ts.setNumber != null ? ` #${ts.setNumber}` : ""}`,
+    }));
+  }
+
+  const dbMatchedCount = runs.length;
+  runs = sortRunsForHistory(
+    applyRunHistoryPostFilters<RunInGroup>(runs, filters, displayTimeZone),
+    filters.sort
+  );
+  const matchedRunCount = runs.length;
+
+  const groups: Group[] =
+    filters.layout === "flat" ? [] : buildRunHistoryGroups(runs);
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
   const compareRunsDescending = allRunsDescending.map(toCompareRunShape);
   const focusRunId =
@@ -404,6 +391,90 @@ export default async function RunHistoryPage({
     );
   }
 
+  function renderFlatRunList() {
+    const showSessionColumn = runs.some((r) => formatRunSessionDisplay(r) !== "—");
+    return (
+      <div className="rounded-xl border border-border bg-muted/70 min-w-0 max-w-full">
+        <div className="min-w-0 max-w-full overflow-x-auto">
+          <table className="w-full text-sm min-w-[36rem]">
+            <thead>
+              <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
+                {!teamMode ? (
+                  <th
+                    className="hidden md:table-cell w-6 px-1 py-2"
+                    aria-label="Drag to reorder"
+                  />
+                ) : null}
+                {teamMode ? (
+                  <th className="px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
+                    <span className="hidden sm:inline">Member</span>
+                    <span className="sm:hidden">Who</span>
+                  </th>
+                ) : null}
+                <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">Date</th>
+                {showSessionColumn ? (
+                  <th className="px-2 py-1.5 md:px-3 md:py-2 min-w-0">Session</th>
+                ) : null}
+                <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">Best</th>
+                <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                  <span className="md:hidden">Top 5</span>
+                  <span className="hidden md:inline">Avg top 5</span>
+                </th>
+                <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                  <span className="md:hidden">Top 10</span>
+                  <span className="hidden md:inline">Avg top 10</span>
+                </th>
+                <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">Median</th>
+                <th className="hidden md:table-cell px-4 py-2">Car</th>
+                <th
+                  className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px]"
+                  aria-label="Setup and laps"
+                />
+                <th className="hidden md:table-cell px-4 py-2">Track</th>
+                <th className="hidden md:table-cell px-4 py-2">Tires</th>
+              </tr>
+            </thead>
+            <tbody>
+              <RunHistoryTable
+                runs={runs}
+                allRunsDescending={compareRunsDescending}
+                runListSource={teamMode ? "team_runs" : "my_runs"}
+                userDisplayName={userDisplayName}
+                displayTimeZone={displayTimeZone}
+                enableReorder={!teamMode}
+                viewerUserId={teamMode ? user.id : null}
+                memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
+                showMemberColumn={teamMode}
+                showSessionColumn={showSessionColumn}
+                initialExpandedRunId={focusRunId}
+              />
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  const filterQuery = filtersToSearchParams(filters, {
+    ...(teamId ? { teamId } : {}),
+    ...(focusRunId ? { focusRun: focusRunId } : {}),
+    ...(viewAll ? { viewAll: "1" } : {}),
+  }).toString();
+
+  const runCountLabel = (() => {
+    if (filtersActive) {
+      return `${matchedRunCount} run${matchedRunCount === 1 ? "" : "s"} match (of ${totalRunCount} total)`;
+    }
+    if (filters.layout === "flat") {
+      return `${matchedRunCount} run${matchedRunCount === 1 ? "" : "s"}`;
+    }
+    if (groups.length === 0) return "No runs yet.";
+    if (hasMoreRuns) {
+      return `${matchedRunCount} of ${totalRunCount} runs across ${groups.length} session${groups.length === 1 ? "" : "s"}`;
+    }
+    return `${matchedRunCount} run${matchedRunCount === 1 ? "" : "s"} across ${groups.length} session${groups.length === 1 ? "" : "s"}`;
+  })();
+
   if (teamAccessDenied) {
     return (
       <>
@@ -457,21 +528,28 @@ export default async function RunHistoryPage({
             ))}
           </div>
         ) : null}
+        <Suspense fallback={<div className="h-20 rounded-lg border border-border bg-card animate-pulse" />}>
+          <SessionsFilterBar
+            cars={filterCars}
+            tracks={filterTracks}
+            events={filterEvents}
+            tireSets={filterTireSets}
+            teamId={teamId}
+            focusRun={focusRunId}
+            viewAll={viewAll}
+          />
+        </Suspense>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <ButtonLink href="/runs/new" variant="primary" className="btn-brand">
             New run
           </ButtonLink>
-          <span className="text-[11px] text-muted-foreground">
-            {groups.length === 0
-              ? "No runs yet."
-              : hasMoreRuns
-                ? `${runs.length} of ${totalRunCount} runs across ${groups.length} session${groups.length === 1 ? "" : "s"}`
-                : `${runs.length} run${runs.length === 1 ? "" : "s"} across ${groups.length} session${groups.length === 1 ? "" : "s"}`}
-          </span>
+          <span className="text-[11px] text-muted-foreground">{runCountLabel}</span>
         </div>
-        {groups.length === 0 ? (
+        {matchedRunCount === 0 ? (
           <CardPanel className="text-sm text-muted-foreground">
-            {teamMode ? (
+            {filtersActive ? (
+              <>No runs match these filters.</>
+            ) : teamMode ? (
               <>No runs from team members yet.</>
             ) : (
               <>
@@ -479,6 +557,19 @@ export default async function RunHistoryPage({
               </>
             )}
           </CardPanel>
+        ) : filters.layout === "flat" ? (
+          <div className="space-y-2">
+            {renderFlatRunList()}
+            <RunHistoryViewMore
+              viewAll={viewAll}
+              hasMoreRuns={hasMoreRuns}
+              totalRunCount={totalRunCount}
+              loadedRunCount={dbMatchedCount}
+              teamId={teamId}
+              focusRun={focusRunId}
+              filterQuery={filterQuery}
+            />
+          </div>
         ) : (
           <div className="space-y-2">
             {viewAll ? (
@@ -492,9 +583,10 @@ export default async function RunHistoryPage({
               viewAll={viewAll}
               hasMoreRuns={hasMoreRuns}
               totalRunCount={totalRunCount}
-              loadedRunCount={runs.length}
+              loadedRunCount={dbMatchedCount}
               teamId={teamId}
               focusRun={focusRunId}
+              filterQuery={filterQuery}
             />
           </div>
         )}

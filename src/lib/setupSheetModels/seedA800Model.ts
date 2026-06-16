@@ -83,7 +83,9 @@ export function buildA800SeedSchema(): SetupSheetModelSchema {
               ? "select"
               : kind === "visualMulti"
                 ? "multiSelect"
-                : "text",
+                : kind === "tireType"
+                  ? "tireType"
+                  : "text",
         unit: meta.unit,
         showInSetupSheet: true,
         showInAnalysis: true,

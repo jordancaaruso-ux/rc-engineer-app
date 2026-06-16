@@ -7,6 +7,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { formatEventDate } from "@/lib/formatDate";
+import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 
 type TrackOption = { id: string; name: string; location?: string | null };
 
@@ -18,7 +19,8 @@ type EventItem = {
   notes: string | null;
   practiceSourceUrl?: string | null;
   resultsSourceUrl?: string | null;
-  controlledTireLabel?: string | null;
+  controlledTireTypeId?: string | null;
+  controlledTireType?: { id: string; displayName: string; modelCode: string } | null;
   track: { id: string; name: string; location?: string | null } | null;
 };
 
@@ -121,7 +123,7 @@ export function EventList({
   const [notes, setNotes] = useState("");
   const [practiceSourceUrl, setPracticeSourceUrl] = useState("");
   const [resultsSourceUrl, setResultsSourceUrl] = useState("");
-  const [controlledTireLabel, setControlledTireLabel] = useState("");
+  const [controlledTireTypeId, setControlledTireTypeId] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -192,7 +194,7 @@ export function EventList({
           notes: notes.trim() || null,
           practiceSourceUrl: practiceSourceUrl.trim() || null,
           resultsSourceUrl: resultsSourceUrl.trim() || null,
-          controlledTireLabel: controlledTireLabel.trim() || null,
+          controlledTireTypeId: controlledTireTypeId.trim() || null,
         }),
       });
       setEvents((prev) => [event, ...prev]);
@@ -203,7 +205,7 @@ export function EventList({
       setNotes("");
       setPracticeSourceUrl("");
       setResultsSourceUrl("");
-      setControlledTireLabel("");
+      setControlledTireTypeId("");
       setMessage("Event created.");
       router.refresh();
     } catch (err) {
@@ -305,12 +307,11 @@ export function EventList({
         </div>
         <div>
           <label className="block text-[11px] text-muted-foreground mb-1">Controlled / spec tire (optional)</label>
-          <input
-            type="text"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={controlledTireLabel}
-            onChange={(e) => setControlledTireLabel(e.target.value)}
-            placeholder="e.g. Sweep 32"
+          <TireTypeCombobox
+            value={controlledTireTypeId}
+            onChange={setControlledTireTypeId}
+            placeholder="Search spec tire type"
+            aria-label="Event spec tire type"
           />
         </div>
         <div className="flex items-center gap-2">

@@ -64,6 +64,31 @@ const INTENT_PATTERNS: readonly IntentPattern[] = [
     ],
   },
   {
+    // Front-end rotation / turn-in eagerness, distinct from raw front grip.
+    // Placed before front_grip so rotation-specific phrases (e.g. "too much
+    // front rotation") are not stolen by front_grip's generic "too much front".
+    outcome: "front_rotation",
+    direction: "increase",
+    phrases: [
+      "more front rotation",
+      "front won't rotate",
+      "front wont rotate",
+      "nose won't tuck",
+      "nose wont tuck",
+    ],
+  },
+  {
+    outcome: "front_rotation",
+    direction: "decrease",
+    phrases: [
+      "less front rotation",
+      "too much front rotation",
+      "front rotates too much",
+      "nose tucks too much",
+      "too pointy",
+    ],
+  },
+  {
     outcome: "front_grip",
     direction: "increase",
     phrases: [

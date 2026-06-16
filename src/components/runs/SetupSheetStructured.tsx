@@ -69,6 +69,14 @@ import {
   isPresetWithOtherFieldKey,
   normalizePresetWithOtherFromUnknown,
 } from "@/lib/setup/presetWithOther";
+import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
+import {
+  buildTireSelectionValue,
+  displayTireSelection,
+  isTireFieldKey,
+  isTireSelectionValue,
+  normalizeTireSelectionFromUnknown,
+} from "@/lib/tires/tireSelectionValue";
 
 /** Avoid hard-crash if formatter is missing (bundler/circular edge cases). */
 function displayMultiForCompare(raw: string): string {
@@ -953,6 +961,115 @@ function EditableSingle({
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
+  if (isTireFieldKey(fieldKey)) {
+    const raw = value[fieldKey];
+    const structured = normalizeTireSelectionFromUnknown(raw);
+    const display = displayTireSelection(
+      structured ?? (typeof raw === "string" ? raw : "")
+    );
+    const tireTypeId = structured?.tireTypeId ?? "";
+
+    if (readOnly) {
+      return (
+        <div
+          data-setup-field-key={fieldKey}
+          className="flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0"
+        >
+          <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground flex items-center">
+            {label}
+          </div>
+          <div
+            className={cn(
+              "flex min-w-0 flex-1 flex-col justify-center px-2 py-1 text-sm font-semibold",
+              changed && rowHighlight.className
+            )}
+            style={changed && rowHighlight.style ? rowHighlight.style : undefined}
+          >
+            {display || "—"}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        data-setup-field-key={fieldKey}
+        className="flex min-h-[1.9rem] items-stretch border-b border-border/80 last:border-b-0"
+      >
+        <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground flex items-center">
+          {label}
+        </div>
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col justify-center gap-1 px-1 py-1",
+            changed && rowHighlight.className
+          )}
+          style={changed && rowHighlight.style ? rowHighlight.style : undefined}
+        >
+          <TireTypeCombobox
+            value={tireTypeId}
+            onChange={(id) => {
+              if (!id) onCommit(fieldKey, "");
+            }}
+            onSelectedTypeChange={(option) => {
+              if (!option) {
+                onCommit(fieldKey, "");
+                return;
+              }
+              const prev = normalizeTireSelectionFromUnknown(value[fieldKey]);
+              onCommit(
+                fieldKey,
+                buildTireSelectionValue({
+                  tireTypeId: option.id,
+                  displayName: option.displayName,
+                  insert: prev?.insert,
+                  wheel: prev?.wheel,
+                })
+              );
+            }}
+            aria-label={label}
+          />
+          <div className="grid grid-cols-2 gap-1">
+            <input
+              className="rounded-md border border-border bg-card px-2 py-1 text-xs outline-none"
+              placeholder="Insert (optional)"
+              value={structured?.insert ?? ""}
+              onChange={(e) => {
+                if (!structured?.tireTypeId) return;
+                onCommit(
+                  fieldKey,
+                  buildTireSelectionValue({
+                    tireTypeId: structured.tireTypeId,
+                    displayName: structured.displayName ?? "",
+                    insert: e.target.value,
+                    wheel: structured.wheel,
+                  })
+                );
+              }}
+            />
+            <input
+              className="rounded-md border border-border bg-card px-2 py-1 text-xs outline-none"
+              placeholder="Wheel (optional)"
+              value={structured?.wheel ?? ""}
+              onChange={(e) => {
+                if (!structured?.tireTypeId) return;
+                onCommit(
+                  fieldKey,
+                  buildTireSelectionValue({
+                    tireTypeId: structured.tireTypeId,
+                    displayName: structured.displayName ?? "",
+                    insert: structured.insert,
+                    wheel: e.target.value,
+                  })
+                );
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const chipAccent: "sky" | "rose" = compareColumnRole === "b" ? "rose" : "sky";
   const { showDeltaSuffix } = useCompareUi();
   const compareSuffix = showDeltaSuffix ? formatSetupCompareDeltaSuffix(fieldCompare) : null;
