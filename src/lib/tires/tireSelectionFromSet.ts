@@ -9,6 +9,7 @@ export type TireSetForSelection = {
   setNumber?: number | null;
   insertLabel?: string | null;
   wheelLabel?: string | null;
+  specificModel?: string | null;
   tireTypeId?: string | null;
   tireType?: { id: string; displayName: string; modelCode: string } | null;
 };
@@ -19,6 +20,7 @@ export function tireSelectionFromTireSet(tireSet: TireSetForSelection): TireSele
     return buildTireSelectionValue({
       tireTypeId: tireSet.tireType.id,
       displayName: tireSet.tireType.displayName,
+      specificModel: tireSet.specificModel,
       insert: tireSet.insertLabel,
       wheel: tireSet.wheelLabel,
     });
@@ -33,6 +35,7 @@ export function tireSetDisplayLine(tireSet: TireSetForSelection): string {
       buildTireSelectionValue({
         tireTypeId: tireSet.tireType.id,
         displayName: tireSet.tireType.displayName,
+        specificModel: tireSet.specificModel,
         insert: tireSet.insertLabel,
         wheel: tireSet.wheelLabel,
       }),

@@ -339,6 +339,8 @@ model TireSet {
   insertLabel String?
   /** Optional wheel type. */
   wheelLabel  String?
+  /** Optional specific product model for this physical set (e.g. premount SKU). */
+  specificModel String?
   notes      String?
   createdAt  DateTime @default(now())
 

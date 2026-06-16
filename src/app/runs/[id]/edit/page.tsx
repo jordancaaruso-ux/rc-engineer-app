@@ -71,6 +71,7 @@ export default async function EditRunPage({
           initialRunCount: true,
           insertLabel: true,
           wheelLabel: true,
+          specificModel: true,
           tireTypeId: true,
           tireType: { select: { id: true, displayName: true, modelCode: true } },
         },

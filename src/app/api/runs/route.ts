@@ -304,6 +304,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
           setNumber: true,
           insertLabel: true,
           wheelLabel: true,
+          specificModel: true,
           tireTypeId: true,
           tireType: { select: { id: true, displayName: true, modelCode: true } },
         },

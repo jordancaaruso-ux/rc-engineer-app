@@ -10,6 +10,7 @@ const TIRE_SET_SELECT = {
   initialRunCount: true,
   insertLabel: true,
   wheelLabel: true,
+  specificModel: true,
   tireTypeId: true,
   tireType: { select: { id: true, displayName: true, modelCode: true } },
 } as const;
@@ -43,13 +44,9 @@ export async function POST(request: Request) {
       initialRunCount?: number;
       insertLabel?: string | null;
       wheelLabel?: string | null;
+      specificModel?: string | null;
       notes?: string;
     };
-
-    const setNumber =
-      typeof body.setNumber === "number" && Number.isFinite(body.setNumber) && body.setNumber >= 1
-        ? Math.floor(body.setNumber)
-        : 1;
 
     const initialRunCount =
       typeof body.initialRunCount === "number" &&
@@ -60,9 +57,18 @@ export async function POST(request: Request) {
 
     const insertLabel = body.insertLabel?.trim() || null;
     const wheelLabel = body.wheelLabel?.trim() || null;
+    const specificModel = body.specificModel?.trim() || null;
 
     const tireTypeId = body.tireTypeId?.trim();
     if (tireTypeId) {
+      const setNumber =
+        typeof body.setNumber === "number" && Number.isFinite(body.setNumber) && body.setNumber >= 1
+          ? Math.floor(body.setNumber)
+          : null;
+      if (setNumber == null) {
+        return NextResponse.json({ error: "setNumber is required when tireTypeId is set" }, { status: 400 });
+      }
+
       const tireType = await prisma.tireType.findUnique({
         where: { id: tireTypeId },
         select: { id: true, displayName: true },
@@ -76,18 +82,21 @@ export async function POST(request: Request) {
         select: TIRE_SET_SELECT,
       });
       if (existing) {
-        const updated =
+        const needsUpdate =
+          (specificModel != null && specificModel !== existing.specificModel) ||
           (insertLabel && insertLabel !== existing.insertLabel) ||
-          (wheelLabel && wheelLabel !== existing.wheelLabel)
-            ? await prisma.tireSet.update({
-                where: { id: existing.id },
-                data: {
-                  insertLabel: insertLabel ?? existing.insertLabel,
-                  wheelLabel: wheelLabel ?? existing.wheelLabel,
-                },
-                select: TIRE_SET_SELECT,
-              })
-            : existing;
+          (wheelLabel && wheelLabel !== existing.wheelLabel);
+        const updated = needsUpdate
+          ? await prisma.tireSet.update({
+              where: { id: existing.id },
+              data: {
+                specificModel: specificModel ?? existing.specificModel,
+                insertLabel: insertLabel ?? existing.insertLabel,
+                wheelLabel: wheelLabel ?? existing.wheelLabel,
+              },
+              select: TIRE_SET_SELECT,
+            })
+          : existing;
         return NextResponse.json({ tireSet: updated }, { status: 200 });
       }
 
@@ -99,6 +108,7 @@ export async function POST(request: Request) {
           initialRunCount,
           insertLabel,
           wheelLabel,
+          specificModel,
           notes: body.notes?.trim() || null,
           userId: user.id,
         },
@@ -112,6 +122,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "tireTypeId or label is required" }, { status: 400 });
     }
 
+    const setNumber =
+      typeof body.setNumber === "number" && Number.isFinite(body.setNumber) && body.setNumber >= 1
+        ? Math.floor(body.setNumber)
+        : 1;
+
     const tireSet = await prisma.tireSet.create({
       data: {
         label,
@@ -119,6 +134,7 @@ export async function POST(request: Request) {
         initialRunCount,
         insertLabel,
         wheelLabel,
+        specificModel,
         notes: body.notes?.trim() || null,
         userId: user.id,
       },

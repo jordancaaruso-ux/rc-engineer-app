@@ -22,7 +22,6 @@ import { toCompareRunShape } from "@/lib/runCompareShape";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import Link from "next/link";
-import { ButtonLink } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { assertUserInTeam, listTeamMemberUserIds, listTeamsForUser } from "@/lib/teamAccess";
 import type { Prisma } from "@prisma/client";
@@ -539,10 +538,7 @@ export default async function RunHistoryPage({
             viewAll={viewAll}
           />
         </Suspense>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <ButtonLink href="/runs/new" variant="primary" className="btn-brand">
-            New run
-          </ButtonLink>
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <span className="text-[11px] text-muted-foreground">{runCountLabel}</span>
         </div>
         {matchedRunCount === 0 ? (

@@ -3,6 +3,7 @@ import {
   BarChart3,
   Calendar,
   Car,
+  CircleDot,
   GitCompare,
   History,
   LayoutDashboard,
@@ -57,6 +58,7 @@ const GARAGE_PREFIXES = [
   "/setup",
   "/events",
   "/tracks",
+  "/tires",
   "/cars",
   "/garage",
 ] as const;
@@ -164,6 +166,12 @@ export const GARAGE_HUB_LINKS: NavHubLink[] = [
     label: "Tracks",
     description: "Tracks, layouts, and grip tags.",
     icon: MapPin,
+  },
+  {
+    href: "/tires",
+    label: "Tires",
+    description: "Tire compounds and your tire sets.",
+    icon: CircleDot,
   },
   {
     href: "/events",

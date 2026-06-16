@@ -1,5 +1,7 @@
 export type TireSelectionValue = {
   tireTypeId: string;
+  /** Optional specific product model for this set. */
+  specificModel?: string;
   insert?: string;
   wheel?: string;
   /** Denormalized for PDF/export; derived from TireType.displayName */
@@ -21,13 +23,15 @@ export function normalizeTireSelectionFromUnknown(
   if (isTireSelectionValue(v)) {
     const tireTypeId = v.tireTypeId.trim();
     if (!tireTypeId) return null;
+    const specificModel =
+      typeof v.specificModel === "string" ? v.specificModel.trim() || undefined : undefined;
     const insert = typeof v.insert === "string" ? v.insert.trim() || undefined : undefined;
     const wheel = typeof v.wheel === "string" ? v.wheel.trim() || undefined : undefined;
     const displayName =
       typeof v.displayName === "string" && v.displayName.trim()
         ? v.displayName.trim()
         : fallbackDisplayName?.trim() || undefined;
-    return { tireTypeId, insert, wheel, displayName };
+    return { tireTypeId, specificModel, insert, wheel, displayName };
   }
   return null;
 }
@@ -46,6 +50,7 @@ export function displayTireSelection(
   const parts: string[] = [];
   const name = value.displayName?.trim() || "Tire";
   parts.push(name);
+  if (value.specificModel?.trim()) parts.push(value.specificModel.trim());
   if (value.insert?.trim()) parts.push(`insert: ${value.insert.trim()}`);
   if (value.wheel?.trim()) parts.push(`wheel: ${value.wheel.trim()}`);
   let line = parts.join(" · ");
@@ -56,12 +61,14 @@ export function displayTireSelection(
 export function buildTireSelectionValue(input: {
   tireTypeId: string;
   displayName: string;
+  specificModel?: string | null;
   insert?: string | null;
   wheel?: string | null;
 }): TireSelectionValue {
   return {
     tireTypeId: input.tireTypeId,
     displayName: input.displayName.trim(),
+    specificModel: input.specificModel?.trim() || undefined,
     insert: input.insert?.trim() || undefined,
     wheel: input.wheel?.trim() || undefined,
   };

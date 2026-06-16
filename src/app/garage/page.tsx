@@ -5,7 +5,7 @@ export default function GarageHubPage() {
   return (
     <NavHubPage
       title="Garage"
-      subtitle="Cars, tracks, events, and setup tools."
+      subtitle="Cars, tracks, tires, events, and setup tools."
       links={GARAGE_HUB_LINKS}
     />
   );

@@ -134,6 +134,7 @@ export async function PATCH(request: Request, { params }: Params) {
           setNumber: true,
           insertLabel: true,
           wheelLabel: true,
+          specificModel: true,
           tireTypeId: true,
           tireType: { select: { id: true, displayName: true, modelCode: true } },
         },
