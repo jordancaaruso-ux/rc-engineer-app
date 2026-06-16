@@ -86,7 +86,7 @@ export function RunLogQuickSetupUpload(props: {
       setInfo(null);
       setStage("uploading");
       scheduleStageHints(setStage, timersRef);
-      const result = await postQuickCreateSetup(file, carId);
+      const result = await postQuickCreateSetup(file, { carId });
       clearTimers(timersRef);
       if (!result.ok) {
         setError(result.error);

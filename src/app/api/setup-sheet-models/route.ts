@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { buildGenericPresetSchema } from "@/lib/setupSheetModels/genericPresetSchema";
+import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
+import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { slugifySetupSheetModelName, uniqueSlugCandidate } from "@/lib/setupSheetModels/slug";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { ensureA800SetupSheetModelForUser } from "@/lib/setupSheetModels/seedA800Model";
@@ -40,6 +42,15 @@ export async function GET() {
       carCount: m._count.cars,
       calibrationCount: m._count.calibrations,
     })),
+    pickerModels: dedupeSetupSheetModelsForPicker(
+      models.map((m) => ({
+        id: m.id,
+        name: m.name,
+        slug: m.slug,
+        carCount: m._count.cars,
+        calibrationCount: m._count.calibrations,
+      }))
+    ),
   });
 }
 
@@ -60,14 +71,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
 
-  const existingSlugs = new Set(
-    (
-      await prisma.setupSheetModel.findMany({
-        where: { userId: user.id },
-        select: { slug: true },
-      })
-    ).map((r) => r.slug)
-  );
+  const norm = normalizeSetupSheetModelName(name);
+  const existingRows = await prisma.setupSheetModel.findMany({
+    where: { userId: user.id },
+    select: { id: true, name: true, slug: true },
+  });
+  const existingByName = existingRows.find((m) => normalizeSetupSheetModelName(m.name) === norm);
+  if (existingByName) {
+    revalidatePath("/cars");
+    revalidatePath("/setup-sheet-models");
+    return NextResponse.json({ model: existingByName, reused: true });
+  }
+
+  const existingSlugs = new Set(existingRows.map((r) => r.slug));
   const slug = uniqueSlugCandidate(slugifySetupSheetModelName(name), existingSlugs);
 
   let schemaJson: object;

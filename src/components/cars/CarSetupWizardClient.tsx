@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
 import { buildGenericPresetSchema } from "@/lib/setupSheetModels/genericPresetSchema";
+import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { customFieldDefinitionsFromModelSchema } from "@/lib/setupSheetModels/customFieldDefinitionsFromSchema";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
 
-type SheetModelOption = { id: string; name: string; slug: string };
+type SheetModelOption = { id: string; name: string; slug: string; carCount?: number; calibrationCount?: number };
 
 type Step = "car" | "schema" | "upload" | "done";
 
@@ -34,7 +35,16 @@ export function CarSetupWizardClient() {
   useEffect(() => {
     fetch("/api/setup-sheet-models")
       .then((r) => r.json())
-      .then((d: { models?: SheetModelOption[] }) => setModels(d.models ?? []))
+      .then((d: { pickerModels?: SheetModelOption[]; models?: SheetModelOption[] }) => {
+        const raw = (d.pickerModels ?? d.models ?? []).map((m) => ({
+          id: m.id,
+          name: m.name,
+          slug: m.slug,
+          carCount: m.carCount ?? 0,
+          calibrationCount: m.calibrationCount ?? 0,
+        }));
+        setModels(d.pickerModels ? raw : dedupeSetupSheetModelsForPicker(raw));
+      })
       .catch(() => {});
   }, []);
 
@@ -56,7 +66,11 @@ export function CarSetupWizardClient() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create sheet model");
-    return (data as { model: { id: string } }).model.id;
+    const model = (data as { model: { id: string }; reused?: boolean }).model;
+    if ((data as { reused?: boolean }).reused) {
+      setError(`Using existing sheet model “${name}” (same chassis type already defined).`);
+    }
+    return model.id;
   }
 
   async function saveSchemaForModel(id: string) {
@@ -262,18 +276,28 @@ export function CarSetupWizardClient() {
               />
             </label>
           ) : (
-            <select
-              className="w-full rounded border border-border bg-muted/40 px-3 py-2 text-sm"
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-            >
-              <option value="">Select model…</option>
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                className="w-full rounded border border-border bg-muted/40 px-3 py-2 text-sm"
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+              >
+                <option value="">Select model…</option>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                    {m.carCount != null && m.carCount > 0
+                      ? ` (${m.carCount} car${m.carCount === 1 ? "" : "s"})`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              {models.length > 1 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Duplicate names are merged here — pick the row for your chassis type.
+                </p>
+              ) : null}
+            </>
           )}
           <button
             type="button"

@@ -781,14 +781,27 @@ export function SetupDocumentReviewClient({
                 {docSetupSheetModelName}
               </div>
             ) : null}
-            <div className="text-[10px] opacity-90">
-              Calibrations are matched by PDF form layout (fingerprint), then linked to this car type.
+            <div className="text-xs opacity-90">
+              Calibrations are matched by PDF form layout for the chassis type you chose at upload.
             </div>
           </div>
         ) : null}
         {autoPickUserNote ? (
-          <div className="mt-2 rounded border border-sky-500/35 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-100">
-            {autoPickUserNote}
+          <div className="mt-2 rounded border border-sky-500/35 bg-sky-500/10 px-3 py-2 text-sm text-sky-100 space-y-2">
+            <p>{autoPickUserNote}</p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              <Link href="/cars/new/setup" className="underline text-sky-50 hover:text-white">
+                Add car &amp; setup sheet
+              </Link>
+              <a
+                href={previewUrl}
+                className="underline text-sky-50/90 hover:text-white"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Download / view PDF anyway
+              </a>
+            </div>
           </div>
         ) : null}
         {shouldSuggestManual ? (

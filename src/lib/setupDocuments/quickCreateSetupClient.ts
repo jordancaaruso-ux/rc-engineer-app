@@ -19,21 +19,35 @@ export type QuickCreateSetupResponse = {
   calibrationAmbiguous: boolean;
   pickUserNote?: string | null;
   calibrationModelMismatch?: boolean;
+  detectedSheetModelName?: string | null;
 };
 
 export type PostQuickCreateSetupResult =
   | { ok: true; data: QuickCreateSetupResponse }
   | { ok: false; status: number; error: string };
 
+export type QuickCreateSetupTarget = {
+  /** Preferred: chassis / setup sheet model (one per car type). */
+  setupSheetModelId?: string;
+  /** Optional: link to a specific car when model is omitted. */
+  carId?: string;
+};
+
 export async function postQuickCreateSetup(
   file: File,
-  carId: string,
+  target: QuickCreateSetupTarget,
   opts?: { signal?: AbortSignal; timeoutMs?: number }
 ): Promise<PostQuickCreateSetupResult> {
+  const modelId = target.setupSheetModelId?.trim();
+  const carId = target.carId?.trim();
+  if (!modelId && !carId) {
+    return { ok: false, status: 0, error: "Select a setup sheet model before uploading." };
+  }
   const timeoutMs = opts?.timeoutMs ?? 60_000;
   const fd = new FormData();
   fd.set("file", file);
-  fd.set("carId", carId);
+  if (modelId) fd.set("setupSheetModelId", modelId);
+  if (carId) fd.set("carId", carId);
   const controller = new AbortController();
   const outer = opts?.signal;
   if (outer) {

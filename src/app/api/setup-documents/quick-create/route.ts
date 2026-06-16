@@ -14,6 +14,7 @@ import {
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
+import { legacyTemplateFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import type { RepickOutcome } from "@/lib/setupCalibrations/autoPickCalibration";
 import {
   applyPostFingerprintPickLinks,
@@ -66,10 +67,28 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const explicitCarIdRaw = form.get("carId");
   const explicitCarIdProvided = typeof explicitCarIdRaw === "string" && explicitCarIdRaw.trim() !== "";
+  const explicitModelIdRaw = form.get("setupSheetModelId");
+  const explicitModelIdProvided =
+    typeof explicitModelIdRaw === "string" && explicitModelIdRaw.trim() !== "";
+
   let carId: string | null = null;
   let setupSheetTemplate: string | null = null;
   let setupSheetModelId: string | null = null;
   let carSetupSheetModelName: string | null = null;
+
+  if (explicitModelIdProvided) {
+    const modelRow = await prisma.setupSheetModel.findFirst({
+      where: { id: explicitModelIdRaw!.trim(), userId: user.id },
+      select: { id: true, name: true, slug: true },
+    });
+    if (!modelRow) {
+      return NextResponse.json({ error: "Setup sheet model not found" }, { status: 400 });
+    }
+    setupSheetModelId = modelRow.id;
+    carSetupSheetModelName = modelRow.name;
+    setupSheetTemplate = legacyTemplateFromModelSlug(modelRow.slug) ?? modelRow.slug;
+  }
+
   if (explicitCarIdProvided) {
     const carResolved = await resolveOwnedCarId(user.id, explicitCarIdRaw);
     if (!carResolved.ok) {
@@ -81,12 +100,37 @@ export async function POST(request: Request): Promise<NextResponse> {
       select: {
         setupSheetModelId: true,
         setupSheetTemplate: true,
-        setupSheetModel: { select: { id: true, name: true } },
+        setupSheetModel: { select: { id: true, name: true, slug: true } },
       },
     });
-    setupSheetModelId = carRow?.setupSheetModelId ?? null;
-    carSetupSheetModelName = carRow?.setupSheetModel?.name ?? null;
-    setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carId);
+    if (!setupSheetModelId && carRow?.setupSheetModel) {
+      setupSheetModelId = carRow.setupSheetModel.id;
+      carSetupSheetModelName = carRow.setupSheetModel.name;
+      setupSheetTemplate =
+        legacyTemplateFromModelSlug(carRow.setupSheetModel.slug) ?? carRow.setupSheetModel.slug;
+    } else if (!setupSheetTemplate) {
+      setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carId);
+    }
+    if (carRow?.setupSheetModelId && setupSheetModelId && carRow.setupSheetModelId !== setupSheetModelId) {
+      return NextResponse.json(
+        { error: "Selected car does not use the chosen setup sheet model." },
+        { status: 400 }
+      );
+    }
+  } else if (setupSheetModelId) {
+    const carForModel = await prisma.car.findFirst({
+      where: { userId: user.id, setupSheetModelId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    carId = carForModel?.id ?? null;
+  }
+
+  if (!explicitCarIdProvided && !explicitModelIdProvided) {
+    return NextResponse.json(
+      { error: "setupSheetModelId or carId is required" },
+      { status: 400 }
+    );
   }
 
   if (file.size > SETUP_DOCUMENT_MAX_BYTES) {

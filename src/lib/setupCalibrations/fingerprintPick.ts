@@ -11,7 +11,7 @@ export type FingerprintPickContext = {
   userId: string;
   bytes: Uint8Array;
   debugPrefix?: string;
-  /** Car’s setup sheet model (e.g. Mugen MTC3) — used for mismatch warnings and auto-link, not to filter candidates. */
+  /** Target setup sheet model (chassis type) — fingerprint is scoped here first. */
   carSetupSheetModelId?: string | null;
   carSetupSheetModelName?: string | null;
 };
@@ -20,6 +20,9 @@ export type FingerprintPickResult = RepickOutcome & {
   /** Plain-language note for review UI / needsReviewReason. */
   userNote: string | null;
   modelMismatch: boolean;
+  /** When PDF matches a different chassis type than selected. */
+  detectedSheetModelId?: string | null;
+  detectedSheetModelName?: string | null;
 };
 
 function humanPickNote(outcome: RepickOutcome): string | null {
@@ -43,22 +46,94 @@ function humanPickNote(outcome: RepickOutcome): string | null {
   return null;
 }
 
+function scopeCandidates(
+  candidates: Awaited<ReturnType<typeof buildCalibrationFingerprints>>,
+  modelId: string
+) {
+  return candidates.filter((c) => c.setupSheetModelId === modelId);
+}
+
+function outcomeFromGlobalMismatch(
+  prefix: string,
+  global: RepickOutcome,
+  candidates: Awaited<ReturnType<typeof buildCalibrationFingerprints>>,
+  targetModelId: string,
+  targetModelName: string
+): FingerprintPickResult | null {
+  if (!global.pickedCalibrationId) return null;
+  const matched = candidates.find((c) => c.calibrationId === global.pickedCalibrationId);
+  const detectedId = matched?.setupSheetModelId?.trim() || null;
+  const detectedName = matched?.setupSheetModelName?.trim() || null;
+  if (!detectedId || detectedId === targetModelId) return null;
+
+  const label = detectedName ?? "another chassis type";
+  return {
+    pickedCalibrationId: null,
+    pickedCalibrationName: null,
+    pickSource: "none",
+    pickDebug: `${prefix} wrong_model detected=${label} target=${targetModelName}`,
+    userNote: `This PDF matches the ${label} setup sheet, not ${targetModelName}. Add a ${label} car or pick the correct calibration below.`,
+    modelMismatch: true,
+    detectedSheetModelId: detectedId,
+    detectedSheetModelName: detectedName,
+  };
+}
+
 /**
- * Pick calibration by AcroForm fingerprint across all user/community calibrations with example PDFs.
+ * Pick calibration by AcroForm fingerprint. When a target sheet model is set, only auto-pick
+ * calibrations for that chassis; cross-model matches become a mismatch hint (no A800 default).
  */
 export async function pickCalibrationByFingerprint(
   input: FingerprintPickContext
 ): Promise<FingerprintPickResult> {
   const prefix = input.debugPrefix ?? "auto";
   const candidates = await buildCalibrationFingerprints({ userId: input.userId });
-  const outcome = await repickCalibrationForBytes(input.bytes, candidates, {
-    debugPrefix: prefix,
-    suggestOnAmbiguous: true,
-  });
+  const targetModelId = input.carSetupSheetModelId?.trim() || null;
+  const targetModelName = input.carSetupSheetModelName?.trim() || "this chassis type";
+
+  let outcome: RepickOutcome;
+  if (targetModelId) {
+    const scoped = scopeCandidates(candidates, targetModelId);
+    outcome = await repickCalibrationForBytes(input.bytes, scoped, {
+      debugPrefix: `${prefix}:scoped`,
+      suggestOnAmbiguous: false,
+    });
+
+    if (outcome.pickSource === "none") {
+      const global = await repickCalibrationForBytes(input.bytes, candidates, {
+        debugPrefix: `${prefix}:global`,
+        suggestOnAmbiguous: false,
+      });
+      const mismatch = outcomeFromGlobalMismatch(
+        prefix,
+        global,
+        candidates,
+        targetModelId,
+        targetModelName
+      );
+      if (mismatch) return mismatch;
+
+      if (scoped.length === 0) {
+        return {
+          ...outcome,
+          userNote: `No calibration exists yet for ${targetModelName}. Finish the car wizard with an example PDF, or map fields manually.`,
+          modelMismatch: false,
+        };
+      }
+    }
+  } else {
+    outcome = await repickCalibrationForBytes(input.bytes, candidates, {
+      debugPrefix: prefix,
+      suggestOnAmbiguous: true,
+    });
+  }
+
   let modelMismatch = false;
   let userNote = humanPickNote(outcome);
+  let detectedSheetModelId: string | null = null;
+  let detectedSheetModelName: string | null = null;
 
-  if (outcome.pickedCalibrationId && input.carSetupSheetModelId) {
+  if (outcome.pickedCalibrationId && targetModelId) {
     const cal = await prisma.setupSheetCalibration.findFirst({
       where: { id: outcome.pickedCalibrationId },
       select: {
@@ -67,16 +142,28 @@ export async function pickCalibrationByFingerprint(
       },
     });
     const calModelId = cal?.setupSheetModelId?.trim() || null;
-    const carModelId = input.carSetupSheetModelId.trim();
-    if (calModelId && calModelId !== carModelId) {
+    if (calModelId && calModelId !== targetModelId) {
       modelMismatch = true;
-      const calModelName = cal?.setupSheetModel?.name ?? "another model";
-      const carModelName = input.carSetupSheetModelName?.trim() || "this car’s sheet model";
-      userNote = `Matched “${outcome.pickedCalibrationName}” (linked to ${calModelName}), but the car uses ${carModelName}. Confirm or pick another calibration.`;
+      detectedSheetModelId = calModelId;
+      detectedSheetModelName = cal?.setupSheetModel?.name ?? null;
+      const calModelName = detectedSheetModelName ?? "another model";
+      userNote = `Matched “${outcome.pickedCalibrationName}” (${calModelName}), but you selected ${targetModelName}. Confirm or pick another calibration.`;
+      outcome = {
+        pickedCalibrationId: null,
+        pickedCalibrationName: null,
+        pickSource: "none",
+        pickDebug: `${prefix} model_mismatch cal=${calModelName}`,
+      };
     }
   }
 
-  return { ...outcome, userNote, modelMismatch };
+  return {
+    ...outcome,
+    userNote,
+    modelMismatch,
+    detectedSheetModelId,
+    detectedSheetModelName,
+  };
 }
 
 /**

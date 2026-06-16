@@ -11,6 +11,8 @@ export type CalibrationFingerprint = {
   calibrationId: string;
   calibrationName: string;
   names: string[];
+  setupSheetModelId: string | null;
+  setupSheetModelName: string | null;
 };
 
 export type RepickOutcome = {
@@ -53,7 +55,14 @@ export async function buildCalibrationFingerprints(input: {
         : {}),
       ...(modelId ? { setupSheetModelId: modelId } : {}),
     },
-    select: { id: true, name: true, exampleDocumentId: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      exampleDocumentId: true,
+      createdAt: true,
+      setupSheetModelId: true,
+      setupSheetModel: { select: { name: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
   // Collapse duplicates by name → keep the most recently created entry. Historical cleanup can leave
@@ -84,7 +93,13 @@ export async function buildCalibrationFingerprints(input: {
       const bytes = await readBytesFromStorageRef(doc.storagePath);
       const fp = await fingerprintPdfFormFieldsFromBytes(new Uint8Array(bytes));
       if (fp.names.length < minNameCount) continue;
-      out.push({ calibrationId: c.id, calibrationName: c.name, names: fp.names });
+      out.push({
+        calibrationId: c.id,
+        calibrationName: c.name,
+        names: fp.names,
+        setupSheetModelId: c.setupSheetModelId,
+        setupSheetModelName: c.setupSheetModel?.name ?? null,
+      });
     } catch {
       // Skip broken examples
     }
