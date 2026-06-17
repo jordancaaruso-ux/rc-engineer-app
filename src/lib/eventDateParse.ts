@@ -25,3 +25,12 @@ export function parseEventDateYmd(input: string | Date): Date {
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
+
+/** Format a stored event date as YYYY-MM-DD for `<input type="date">` (UTC calendar day). */
+export function eventDateToYmd(d: string | Date): string {
+  const date = new Date(d);
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}

@@ -29,7 +29,7 @@ export default async function EventsPage(): Promise<ReactNode> {
   const user = await requireCurrentUser();
   const [events, tracks] = await Promise.all([
     prisma.event.findMany({
-      where: {},
+      where: { userId: user.id },
       orderBy: { startDate: "desc" },
       take: 120,
       include: {

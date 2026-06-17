@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type LapDetectionDebug = {
   eventInSyncScope?: boolean;
@@ -55,6 +56,7 @@ export function EventLapSourcesPanel(props: {
   resultsSourceUrl: string | null;
   raceClass: string | null;
 }) {
+  const router = useRouter();
   const [practice, setPractice] = useState(props.practiceSourceUrl ?? "");
   const [results, setResults] = useState(props.resultsSourceUrl ?? "");
   const [raceClass, setRaceClass] = useState(props.raceClass ?? "");
@@ -84,6 +86,7 @@ export function EventLapSourcesPanel(props: {
         return;
       }
       setMessage("Saved");
+      router.refresh();
     } finally {
       setSaving(false);
     }
