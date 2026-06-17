@@ -11,6 +11,7 @@ import { SETUP_DOCUMENT_ALLOWED_MIME, SETUP_DOCUMENT_MAX_BYTES } from "@/lib/set
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
+import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -57,22 +58,58 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (dbg) console.log(`[setup-upload-timing] after auth ${(performance.now() - t0).toFixed(1)}ms`);
   const ct = request.headers.get("content-type") ?? "";
-  if (!ct.includes("multipart/form-data")) {
-    return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 });
+
+  let originalFilename = "upload";
+  let mimeType = "";
+  let carIdRaw: string | FormDataEntryValue | null = null;
+  let setupSheetModelIdRaw: string | FormDataEntryValue | null = null;
+  let preStoredPath: string | null = null;
+  let multipartFile: File | null = null;
+
+  if (ct.includes("application/json")) {
+    const body = (await request.json().catch(() => null)) as {
+      storagePath?: string;
+      originalFilename?: string;
+      mimeType?: string;
+      carId?: string;
+      setupSheetModelId?: string;
+    } | null;
+    if (!body?.storagePath?.trim()) {
+      return NextResponse.json({ error: "Missing storagePath" }, { status: 400 });
+    }
+    preStoredPath = body.storagePath.trim();
+    if (!isAllowedSetupDocumentBlobUrl(preStoredPath)) {
+      return NextResponse.json({ error: "Invalid storagePath" }, { status: 400 });
+    }
+    originalFilename = body.originalFilename?.trim() || "upload";
+    mimeType = (body.mimeType || "").toLowerCase();
+    carIdRaw = body.carId ?? null;
+    setupSheetModelIdRaw = body.setupSheetModelId ?? null;
+  } else if (ct.includes("multipart/form-data")) {
+    const tForm = dbg ? performance.now() : 0;
+    const form = await request.formData().catch(() => null);
+    if (dbg) console.log(`[setup-upload-timing] after formData ${(performance.now() - tForm).toFixed(1)}ms`);
+    if (!form) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
+    const file = form.get("file");
+    if (!file || !(file instanceof File)) {
+      return NextResponse.json({ error: "Missing file field" }, { status: 400 });
+    }
+    multipartFile = file;
+    originalFilename = file.name || "upload";
+    mimeType = (file.type || "").toLowerCase();
+    carIdRaw = form.get("carId");
+    setupSheetModelIdRaw = form.get("setupSheetModelId");
+  } else {
+    return NextResponse.json(
+      { error: "Expected multipart/form-data or application/json" },
+      { status: 400 }
+    );
   }
-  const tForm = dbg ? performance.now() : 0;
-  const form = await request.formData().catch(() => null);
-  if (dbg) console.log(`[setup-upload-timing] after formData ${(performance.now() - tForm).toFixed(1)}ms`);
-  if (!form) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
-  const file = form.get("file");
-  if (!file || !(file instanceof File)) {
-    return NextResponse.json({ error: "Missing file field" }, { status: 400 });
-  }
-  const carResolved = await resolveOwnedCarId(user.id, form.get("carId"));
+
+  const carResolved = await resolveOwnedCarId(user.id, carIdRaw);
   if (!carResolved.ok) {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
-  const setupSheetModelIdRaw = form.get("setupSheetModelId");
   let setupSheetModelId =
     typeof setupSheetModelIdRaw === "string" && setupSheetModelIdRaw.trim()
       ? setupSheetModelIdRaw.trim()
@@ -94,23 +131,26 @@ export async function POST(request: Request) {
     }
   }
   const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carResolved.carId);
-  if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
+  if (!preStoredPath && (multipartFile?.size ?? 0) > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
   }
-  const mimeType = (file.type || "").toLowerCase();
   if (!SETUP_DOCUMENT_ALLOWED_MIME.has(mimeType)) {
     return NextResponse.json({ error: "Unsupported file type. Use PDF/JPG/PNG/WEBP." }, { status: 400 });
   }
 
   let storagePath: string;
   const tStore = dbg ? performance.now() : 0;
-  try {
-    ({ storagePath } = await storeSetupDocumentFile(file));
-  } catch (e) {
-    if (e instanceof StorageConfigurationError) {
-      return NextResponse.json({ error: e.message }, { status: 503 });
+  if (preStoredPath) {
+    storagePath = preStoredPath;
+  } else {
+    try {
+      ({ storagePath } = await storeSetupDocumentFile(multipartFile!));
+    } catch (e) {
+      if (e instanceof StorageConfigurationError) {
+        return NextResponse.json({ error: e.message }, { status: 503 });
+      }
+      throw e;
     }
-    throw e;
   }
   if (dbg) console.log(`[setup-upload-timing] after storeSetupDocumentFile ${(performance.now() - tStore).toFixed(1)}ms`);
   const sourceType = sourceTypeFromMime(mimeType);
@@ -123,7 +163,7 @@ export async function POST(request: Request) {
       carId: carResolved.carId,
       setupSheetTemplate,
       setupSheetModelId,
-      originalFilename: file.name || "upload",
+      originalFilename,
       storagePath,
       mimeType,
       sourceType,
@@ -135,7 +175,7 @@ export async function POST(request: Request) {
     select: { id: true },
   });
   if (dbg) console.log(`[setup-upload-timing] after prisma.create ${(performance.now() - tDb).toFixed(1)}ms`);
-  console.log(`[setup-documents/upload] doc=${created.id} stored ${file.name} (${mimeType})`);
+  console.log(`[setup-documents/upload] doc=${created.id} stored ${originalFilename} (${mimeType})`);
   if (dbg) console.log(`[setup-upload-timing] POST total ${(performance.now() - t0).toFixed(1)}ms`);
 
   return NextResponse.json({ id: created.id, document: { id: created.id } }, { status: 201 });

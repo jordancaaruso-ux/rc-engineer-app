@@ -26,6 +26,8 @@ import {
 } from "@/lib/setupCalibrations/autoPickImageCalibration";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
 import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
+import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
+import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 
 const PDF_MIME = "application/pdf";
 
@@ -61,20 +63,54 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ct = request.headers.get("content-type") ?? "";
-  if (!ct.includes("multipart/form-data")) {
-    return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 });
-  }
-  const form = await request.formData().catch(() => null);
-  if (!form) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
 
-  const file = form.get("file");
-  if (!file || !(file instanceof File)) {
-    return NextResponse.json({ error: "Missing file field" }, { status: 400 });
+  let originalFilename = "upload";
+  let mimeType = "";
+  let explicitCarIdRaw: string | null = null;
+  let explicitModelIdRaw: string | null = null;
+  /** When set, the file was already stored via client Blob upload (avoids the 4.5MB body limit). */
+  let preStoredPath: string | null = null;
+  let multipartFile: File | null = null;
+
+  if (ct.includes("application/json")) {
+    const body = (await request.json().catch(() => null)) as {
+      storagePath?: string;
+      originalFilename?: string;
+      mimeType?: string;
+      carId?: string;
+      setupSheetModelId?: string;
+    } | null;
+    if (!body?.storagePath?.trim()) {
+      return NextResponse.json({ error: "Missing storagePath" }, { status: 400 });
+    }
+    preStoredPath = body.storagePath.trim();
+    if (!isAllowedSetupDocumentBlobUrl(preStoredPath)) {
+      return NextResponse.json({ error: "Invalid storagePath" }, { status: 400 });
+    }
+    originalFilename = body.originalFilename?.trim() || "upload";
+    mimeType = (body.mimeType || "").toLowerCase();
+    explicitCarIdRaw = typeof body.carId === "string" ? body.carId : null;
+    explicitModelIdRaw = typeof body.setupSheetModelId === "string" ? body.setupSheetModelId : null;
+  } else if (ct.includes("multipart/form-data")) {
+    const form = await request.formData().catch(() => null);
+    if (!form) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
+    const file = form.get("file");
+    if (!file || !(file instanceof File)) {
+      return NextResponse.json({ error: "Missing file field" }, { status: 400 });
+    }
+    multipartFile = file;
+    originalFilename = file.name || "upload";
+    mimeType = (file.type || "").toLowerCase();
+    explicitCarIdRaw = form.get("carId") as string | null;
+    explicitModelIdRaw = form.get("setupSheetModelId") as string | null;
+  } else {
+    return NextResponse.json(
+      { error: "Expected multipart/form-data or application/json" },
+      { status: 400 }
+    );
   }
 
-  const explicitCarIdRaw = form.get("carId");
   const explicitCarIdProvided = typeof explicitCarIdRaw === "string" && explicitCarIdRaw.trim() !== "";
-  const explicitModelIdRaw = form.get("setupSheetModelId");
   const explicitModelIdProvided =
     typeof explicitModelIdRaw === "string" && explicitModelIdRaw.trim() !== "";
 
@@ -135,10 +171,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // No car/model context is allowed: the chassis is auto-detected from the sheet fingerprint below.
 
-  if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
+  const byteLength = preStoredPath ? null : multipartFile?.size ?? 0;
+  if (byteLength != null && byteLength > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
   }
-  const mimeType = (file.type || "").toLowerCase();
   if (!SETUP_DOCUMENT_ALLOWED_MIME.has(mimeType)) {
     return NextResponse.json(
       { error: "Unsupported file type. Use PDF/JPG/PNG/WEBP." },
@@ -146,10 +182,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Read bytes once so we can both store the file and fingerprint PDFs.
+  // Read bytes once so we can fingerprint PDFs/images (and re-store small multipart uploads).
   let bytes: Uint8Array;
   try {
-    bytes = new Uint8Array(await file.arrayBuffer());
+    if (preStoredPath) {
+      bytes = new Uint8Array(await readBytesFromStorageRef(preStoredPath));
+      if (bytes.byteLength > SETUP_DOCUMENT_MAX_BYTES) {
+        return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
+      }
+    } else {
+      bytes = new Uint8Array(await multipartFile!.arrayBuffer());
+    }
   } catch {
     return NextResponse.json({ error: "Failed to read uploaded file" }, { status: 400 });
   }
@@ -297,19 +340,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Persist the raw file. Construct a fresh `File` from the already-captured bytes so the Blob
-  // streaming path in `storeSetupDocumentFile` does not try to re-read an exhausted stream.
-  const storageFile = new File([new Uint8Array(bytes)], file.name || "upload", {
-    type: mimeType || "application/octet-stream",
-  });
+  // Persist the raw file (skip when the client already uploaded to Blob).
   let storagePath: string;
-  try {
-    ({ storagePath } = await storeSetupDocumentFile(storageFile));
-  } catch (e) {
-    if (e instanceof StorageConfigurationError) {
-      return NextResponse.json({ error: e.message }, { status: 503 });
+  if (preStoredPath) {
+    storagePath = preStoredPath;
+  } else {
+    const storageFile = new File([new Uint8Array(bytes)], originalFilename, {
+      type: mimeType || "application/octet-stream",
+    });
+    try {
+      ({ storagePath } = await storeSetupDocumentFile(storageFile));
+    } catch (e) {
+      if (e instanceof StorageConfigurationError) {
+        return NextResponse.json({ error: e.message }, { status: 503 });
+      }
+      throw e;
     }
-    throw e;
   }
   const sourceType = sourceTypeFromMime(mimeType);
 
@@ -320,7 +366,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       carId,
       setupSheetTemplate,
       setupSheetModelId,
-      originalFilename: file.name || "upload",
+      originalFilename,
       storagePath,
       mimeType,
       sourceType,
@@ -349,7 +395,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     select: { id: true },
   });
   console.log(
-    `[setup-documents/quick-create] doc=${created.id} file=${file.name} calibration=${pickedCalibrationId ?? "none"} source=${outcome.pickSource}`
+    `[setup-documents/quick-create] doc=${created.id} file=${originalFilename} calibration=${pickedCalibrationId ?? "none"} source=${outcome.pickSource}`
   );
 
   // Run the parse/map pipeline inline so the response can report final status without the client

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { postSetupDocumentUpload } from "@/lib/setupDocuments/setupDocumentUploadClient";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { carTemplateSelectGroups, type CarForTemplateGroup } from "@/lib/cars/setupSheetTemplateCarGroups";
@@ -65,20 +66,13 @@ export function SetupDocumentLibraryClient({
     setError(null);
     setStatus(null);
     try {
-      const fd = new FormData();
-      fd.set("file", file);
-      fd.set("carId", uploadCarId);
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 45000);
-      const res = await fetch("/api/setup-documents", { method: "POST", body: fd, signal: controller.signal });
-      window.clearTimeout(timeoutId);
-      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; note?: string | null };
-      if (!res.ok || !data.id) {
-        setError(data.error || "Upload failed.");
+      const upload = await postSetupDocumentUpload(file, { carId: uploadCarId }, { timeoutMs: 45_000 });
+      if (!upload.ok) {
+        setError(upload.error);
         return;
       }
       setStatus("Uploaded. Processing will begin on the review page…");
-      router.push(`/setup-documents/${data.id}`);
+      router.push(`/setup-documents/${upload.id}`);
       router.refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Upload failed.";

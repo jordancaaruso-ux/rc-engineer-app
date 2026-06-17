@@ -1,7 +1,10 @@
 /**
- * Client helpers for `POST /api/setup-documents/quick-create` (multipart file + carId).
+ * Client helpers for `POST /api/setup-documents/quick-create`.
  * Used by Setup page upload and Log your run quick-import.
  */
+
+import { uploadSetupDocumentViaClientBlob } from "@/lib/setupDocuments/clientBlobUpload";
+import { SETUP_UPLOAD_SERVERLESS_SAFE_BYTES } from "@/lib/setupDocuments/uploadLimits";
 
 export const QUICK_CREATE_SETUP_ACCEPT_MIME =
   "application/pdf,image/jpeg,image/png,image/webp" as const;
@@ -41,19 +44,45 @@ export type QuickCreateSetupTarget = {
   carId?: string;
 };
 
+function uploadErrorMessage(status: number, fallback?: string): string {
+  if (status === 413) {
+    return "File too large for direct upload. Try again — the app should stream large files automatically.";
+  }
+  return fallback?.trim() || `Upload failed (${status})`;
+}
+
+function parseQuickCreateResponse(
+  data: Partial<QuickCreateSetupResponse> & { error?: string }
+): QuickCreateSetupResponse | null {
+  if (!data.documentId) return null;
+  return {
+    documentId: data.documentId,
+    setupId: data.setupId ?? null,
+    calibrationId: data.calibrationId ?? null,
+    calibrationName: data.calibrationName ?? null,
+    pickSource: data.pickSource ?? "none",
+    pickDebug: typeof data.pickDebug === "string" ? data.pickDebug : "",
+    parseStatus: (data.parseStatus as QuickCreateSetupResponse["parseStatus"]) ?? "PENDING",
+    needsReview: Boolean(data.needsReview),
+    needsReviewReason: data.needsReviewReason ?? null,
+    calibrationAmbiguous: Boolean(data.calibrationAmbiguous),
+    pickUserNote: data.pickUserNote ?? null,
+    calibrationModelMismatch: Boolean(data.calibrationModelMismatch),
+    detectedModelId: data.detectedModelId ?? null,
+    detectedModelName: data.detectedModelName ?? null,
+    carCandidates: Array.isArray(data.carCandidates) ? data.carCandidates : [],
+    notRecognized: Boolean(data.notRecognized),
+  };
+}
+
 export async function postQuickCreateSetup(
   file: File,
   target: QuickCreateSetupTarget = {},
   opts?: { signal?: AbortSignal; timeoutMs?: number }
 ): Promise<PostQuickCreateSetupResult> {
-  // No target = auto-detect the chassis from the sheet fingerprint.
   const modelId = target.setupSheetModelId?.trim();
   const carId = target.carId?.trim();
   const timeoutMs = opts?.timeoutMs ?? 60_000;
-  const fd = new FormData();
-  fd.set("file", file);
-  if (modelId) fd.set("setupSheetModelId", modelId);
-  if (carId) fd.set("carId", carId);
   const controller = new AbortController();
   const outer = opts?.signal;
   if (outer) {
@@ -61,7 +90,44 @@ export async function postQuickCreateSetup(
     else outer.addEventListener("abort", () => controller.abort(), { once: true });
   }
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
   try {
+    const useClientBlob = file.size > SETUP_UPLOAD_SERVERLESS_SAFE_BYTES;
+
+    if (useClientBlob) {
+      const { storagePath } = await uploadSetupDocumentViaClientBlob(file, {
+        signal: controller.signal,
+      });
+      const res = await fetch("/api/setup-documents/quick-create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storagePath,
+          originalFilename: file.name,
+          mimeType: file.type,
+          ...(modelId ? { setupSheetModelId: modelId } : {}),
+          ...(carId ? { carId } : {}),
+        }),
+        signal: controller.signal,
+      });
+      const data = (await res.json().catch(() => ({}))) as Partial<QuickCreateSetupResponse> & {
+        error?: string;
+      };
+      const parsed = parseQuickCreateResponse(data);
+      if (!res.ok || !parsed) {
+        return {
+          ok: false,
+          status: res.status,
+          error: uploadErrorMessage(res.status, data.error),
+        };
+      }
+      return { ok: true, data: parsed };
+    }
+
+    const fd = new FormData();
+    fd.set("file", file);
+    if (modelId) fd.set("setupSheetModelId", modelId);
+    if (carId) fd.set("carId", carId);
     const res = await fetch("/api/setup-documents/quick-create", {
       method: "POST",
       body: fd,
@@ -70,34 +136,15 @@ export async function postQuickCreateSetup(
     const data = (await res.json().catch(() => ({}))) as Partial<QuickCreateSetupResponse> & {
       error?: string;
     };
-    if (!res.ok || !data.documentId) {
+    const parsed = parseQuickCreateResponse(data);
+    if (!res.ok || !parsed) {
       return {
         ok: false,
         status: res.status,
-        error: (data.error as string | undefined)?.trim() || `Upload failed (${res.status})`,
+        error: uploadErrorMessage(res.status, data.error),
       };
     }
-    return {
-      ok: true,
-      data: {
-        documentId: data.documentId,
-        setupId: data.setupId ?? null,
-        calibrationId: data.calibrationId ?? null,
-        calibrationName: data.calibrationName ?? null,
-        pickSource: data.pickSource ?? "none",
-        pickDebug: typeof data.pickDebug === "string" ? data.pickDebug : "",
-        parseStatus: (data.parseStatus as QuickCreateSetupResponse["parseStatus"]) ?? "PENDING",
-        needsReview: Boolean(data.needsReview),
-        needsReviewReason: data.needsReviewReason ?? null,
-        calibrationAmbiguous: Boolean(data.calibrationAmbiguous),
-        pickUserNote: data.pickUserNote ?? null,
-        calibrationModelMismatch: Boolean(data.calibrationModelMismatch),
-        detectedModelId: data.detectedModelId ?? null,
-        detectedModelName: data.detectedModelName ?? null,
-        carCandidates: Array.isArray(data.carCandidates) ? data.carCandidates : [],
-        notRecognized: Boolean(data.notRecognized),
-      },
-    };
+    return { ok: true, data: parsed };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
     return {

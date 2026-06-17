@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
+import { postSetupDocumentUpload } from "@/lib/setupDocuments/setupDocumentUploadClient";
 import { buildGenericPresetSchema } from "@/lib/setupSheetModels/genericPresetSchema";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { customFieldDefinitionsFromModelSchema } from "@/lib/setupSheetModels/customFieldDefinitionsFromSchema";
@@ -150,15 +151,12 @@ export function CarSetupWizardClient() {
     setUploading(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("carId", carId);
-      fd.append("setupSheetModelId", modelId);
-      const res = await fetch("/api/setup-documents", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Upload failed");
-      const docId = (data as { document?: { id: string } }).document?.id;
-      if (!docId) throw new Error("No document id returned");
+      const upload = await postSetupDocumentUpload(file, {
+        carId,
+        setupSheetModelId: modelId,
+      });
+      if (!upload.ok) throw new Error(upload.error);
+      const docId = upload.id;
       setDocumentId(docId);
 
       const schemaForCal = schema ?? buildGenericPresetSchema(newModelName.trim() || carName.trim());
