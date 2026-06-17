@@ -61,8 +61,8 @@ export async function POST(request: Request) {
       setupSheetTemplateRaw === SETUP_SHEET_TEMPLATE_A800RR ? SETUP_SHEET_TEMPLATE_A800RR : setupSheetTemplateRaw;
     let setupSheetModelId: string | null = body.setupSheetModelId?.trim() || null;
     if (setupSheetModelId) {
-      const model = await prisma.setupSheetModel.findFirst({
-        where: { id: setupSheetModelId, userId: user.id },
+      const model = await prisma.setupSheetModel.findUnique({
+        where: { id: setupSheetModelId },
         select: { id: true, slug: true },
       });
       if (!model) {

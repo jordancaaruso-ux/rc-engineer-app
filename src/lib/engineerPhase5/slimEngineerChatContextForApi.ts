@@ -180,6 +180,39 @@ type SlimPass = (ctx: Record<string, unknown>) => void;
 
 const SLIM_PASSES: SlimPass[] = [
   (ctx) => {
+    if (ctx.hybridContextMode === true && isRecord(ctx.richEngineerContext)) {
+      const rich = { ...ctx.richEngineerContext };
+      if (isRecord(rich.setupVsSpread)) {
+        rich.setupVsSpread = {
+          ...rich.setupVsSpread,
+          note:
+            "Hybrid mode — spread rows omitted from payload; call get_param_spread for on-demand rows.",
+          rows: [],
+          truncated: true,
+        };
+      }
+      if (Array.isArray(rich.vehicleDynamicsKb)) {
+        rich.vehicleDynamicsKb = rich.vehicleDynamicsKb.slice(0, 3);
+      }
+      ctx.richEngineerContext = rich;
+    }
+    if (ctx.reasoningSpine && isRecord(ctx.reasoningSpine)) {
+      ctx.reasoningSpine = {
+        version: ctx.reasoningSpine.version,
+        route: ctx.reasoningSpine.route,
+        decisionTier: ctx.reasoningSpine.decisionTier,
+        tierReason: ctx.reasoningSpine.tierReason,
+        promptLines: Array.isArray(ctx.reasoningSpine.promptLines)
+          ? ctx.reasoningSpine.promptLines
+          : [],
+        problemStatement: ctx.reasoningSpine.problemStatement ?? null,
+        gradedLevers: Array.isArray(ctx.reasoningSpine.gradedLevers)
+          ? ctx.reasoningSpine.gradedLevers.slice(0, 8)
+          : [],
+      };
+    }
+  },
+  (ctx) => {
     if (ctx.richEngineerContext) ctx.richEngineerContext = slimRichContext(ctx.richEngineerContext);
     if (ctx.engineeringBrain) ctx.engineeringBrain = slimEngineeringBrain(ctx.engineeringBrain);
     if (ctx.focusedRunPair) ctx.focusedRunPair = slimFocusedPair(ctx.focusedRunPair);

@@ -75,8 +75,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
       data.setupSheetModelId = null;
     } else if (typeof raw === "string" && raw.trim()) {
       const modelId = raw.trim();
-      const model = await prisma.setupSheetModel.findFirst({
-        where: { id: modelId, userId: user.id },
+      const model = await prisma.setupSheetModel.findUnique({
+        where: { id: modelId },
         select: { id: true },
       });
       if (!model) {

@@ -61,8 +61,8 @@ export async function POST(request: Request) {
   }
   let setupSheetModelId = body.setupSheetModelId?.trim() || null;
   if (setupSheetModelId) {
-    const model = await prisma.setupSheetModel.findFirst({
-      where: { id: setupSheetModelId, userId: user.id },
+    const model = await prisma.setupSheetModel.findUnique({
+      where: { id: setupSheetModelId },
       select: { id: true },
     });
     if (!model) {
@@ -81,8 +81,8 @@ export async function POST(request: Request) {
     select: { id: true, name: true },
   });
   if (setupSheetModelId) {
-    const model = await prisma.setupSheetModel.findFirst({
-      where: { id: setupSheetModelId, userId: user.id },
+    const model = await prisma.setupSheetModel.findUnique({
+      where: { id: setupSheetModelId },
       select: { defaultCalibrationId: true },
     });
     if (model && !model.defaultCalibrationId) {

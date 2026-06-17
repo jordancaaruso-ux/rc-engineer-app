@@ -11,9 +11,21 @@ export type SetupSheetModelPickerRow = {
   calibrationCount: number;
 };
 
-/** Higher score = preferred row when collapsing duplicate chassis names. */
+/**
+ * Higher score = preferred row when collapsing duplicate chassis names.
+ * A row that actually has a calibration always beats one without, because the
+ * calibrated row is the only one whose example PDF can fingerprint-match uploads.
+ * (Previously car count dominated, so a duplicate "Mugen MTC3" with cars but no
+ * calibration could win and silently break scoped fingerprint matching.)
+ */
 export function setupSheetModelPickerScore(row: SetupSheetModelPickerRow): number {
-  return row.carCount * 1000 + row.calibrationCount * 10 - setupSheetModelSlugRank(row.slug);
+  const hasCalibration = row.calibrationCount > 0 ? 1_000_000 : 0;
+  return (
+    hasCalibration +
+    row.carCount * 1000 +
+    row.calibrationCount * 10 -
+    setupSheetModelSlugRank(row.slug)
+  );
 }
 
 /** Id of the row `dedupeSetupSheetModelsForPicker` would keep for each normalized name. */

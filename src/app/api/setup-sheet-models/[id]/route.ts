@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
@@ -14,6 +15,18 @@ function normalizeSchema(schema: SetupSheetModelSchema | null): SetupSheetModelS
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+/**
+ * Models are global. Only an admin — or the creator while the model is still unauthorized — may
+ * edit a shared model's name/schema or delete it. Authorizing a model is admin-only.
+ */
+function canEditModel(
+  user: { id: string; email: string | null },
+  model: { userId: string | null; isAuthorized: boolean }
+): boolean {
+  if (isAuthAdminEmail(user.email)) return true;
+  return model.userId === user.id && !model.isAuthorized;
+}
+
 export async function GET(_request: Request, ctx: RouteCtx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
@@ -22,9 +35,17 @@ export async function GET(_request: Request, ctx: RouteCtx) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
 
-  const model = await prisma.setupSheetModel.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true, name: true, slug: true, schemaJson: true, createdAt: true, updatedAt: true },
+  const model = await prisma.setupSheetModel.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      schemaJson: true,
+      isAuthorized: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
   if (!model) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -35,6 +56,7 @@ export async function GET(_request: Request, ctx: RouteCtx) {
       name: model.name,
       slug: model.slug,
       schema,
+      isAuthorized: model.isAuthorized,
       createdAt: model.createdAt.toISOString(),
       updatedAt: model.updatedAt.toISOString(),
     },
@@ -49,9 +71,9 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
 
-  const existing = await prisma.setupSheetModel.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true, slug: true },
+  const existing = await prisma.setupSheetModel.findUnique({
+    where: { id },
+    select: { id: true, slug: true, userId: true, isAuthorized: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -59,9 +81,35 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     name?: string;
     schema?: unknown;
     defaultCalibrationId?: string | null;
+    isAuthorized?: boolean;
   };
-  const data: { name?: string; schemaJson?: object; defaultCalibrationId?: string | null } = {};
+  const isAdmin = isAuthAdminEmail(user.email);
+
+  // Name/schema edits to a shared model require admin, or the creator while it's still unauthorized.
+  const editsSharedShape = Boolean(body.name?.trim()) || body.schema !== undefined;
+  if (editsSharedShape && !canEditModel(user, existing)) {
+    return NextResponse.json(
+      { error: "This chassis type is shared. Only an admin can change its name or parameters." },
+      { status: 403 }
+    );
+  }
+
+  const data: {
+    name?: string;
+    schemaJson?: object;
+    defaultCalibrationId?: string | null;
+    isAuthorized?: boolean;
+  } = {};
   if (body.name?.trim()) data.name = body.name.trim();
+  if (typeof body.isAuthorized === "boolean") {
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "Only an admin can change a chassis type's authorized status." },
+        { status: 403 }
+      );
+    }
+    data.isAuthorized = body.isAuthorized;
+  }
   if ("defaultCalibrationId" in body) {
     const raw = body.defaultCalibrationId;
     if (raw === null || raw === "") {
@@ -103,19 +151,28 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
   const model = await prisma.setupSheetModel.update({
     where: { id },
     data,
-    select: { id: true, name: true, slug: true, schemaJson: true, updatedAt: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      schemaJson: true,
+      isAuthorized: true,
+      updatedAt: true,
+    },
   });
 
   const schema = normalizeSchema(parseSetupSheetModelSchema(model.schemaJson));
   revalidatePath("/cars");
   revalidatePath(`/setup-sheet-models/${id}/schema`);
   revalidatePath("/setup");
+  revalidatePath("/setup-sheet-models");
   return NextResponse.json({
     model: {
       id: model.id,
       name: model.name,
       slug: model.slug,
       schema,
+      isAuthorized: model.isAuthorized,
       updatedAt: model.updatedAt.toISOString(),
     },
   });
@@ -129,11 +186,18 @@ export async function DELETE(_request: Request, ctx: RouteCtx) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
 
-  const existing = await prisma.setupSheetModel.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true, slug: true, name: true },
+  const existing = await prisma.setupSheetModel.findUnique({
+    where: { id },
+    select: { id: true, slug: true, name: true, userId: true, isAuthorized: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (!canEditModel(user, existing)) {
+    return NextResponse.json(
+      { error: "This chassis type is shared. Only an admin can delete it." },
+      { status: 403 }
+    );
+  }
 
   if (existing.slug === SETUP_SHEET_MODEL_SLUG_A800RR) {
     return NextResponse.json(

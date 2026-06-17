@@ -10,8 +10,8 @@ export async function documentUsesA800rrDerived(input: {
   setupSheetTemplate?: string | null;
 }): Promise<boolean> {
   if (input.setupSheetModelId) {
-    const model = await prisma.setupSheetModel.findFirst({
-      where: { id: input.setupSheetModelId, userId: input.userId },
+    const model = await prisma.setupSheetModel.findUnique({
+      where: { id: input.setupSheetModelId },
       select: { slug: true },
     });
     return model?.slug === SETUP_SHEET_MODEL_SLUG_A800RR;

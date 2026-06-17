@@ -6,6 +6,8 @@
 export const QUICK_CREATE_SETUP_ACCEPT_MIME =
   "application/pdf,image/jpeg,image/png,image/webp" as const;
 
+export type QuickCreateCarCandidate = { id: string; name: string };
+
 export type QuickCreateSetupResponse = {
   documentId: string;
   setupId: string | null;
@@ -19,7 +21,13 @@ export type QuickCreateSetupResponse = {
   calibrationAmbiguous: boolean;
   pickUserNote?: string | null;
   calibrationModelMismatch?: boolean;
-  detectedSheetModelName?: string | null;
+  /** Chassis auto-detected from the sheet's fingerprint (global match). */
+  detectedModelId?: string | null;
+  detectedModelName?: string | null;
+  /** When >1 of the uploader's cars share the detected chassis, they must pick one. */
+  carCandidates?: QuickCreateCarCandidate[];
+  /** No calibration anywhere matched this sheet's layout. */
+  notRecognized?: boolean;
 };
 
 export type PostQuickCreateSetupResult =
@@ -35,14 +43,12 @@ export type QuickCreateSetupTarget = {
 
 export async function postQuickCreateSetup(
   file: File,
-  target: QuickCreateSetupTarget,
+  target: QuickCreateSetupTarget = {},
   opts?: { signal?: AbortSignal; timeoutMs?: number }
 ): Promise<PostQuickCreateSetupResult> {
+  // No target = auto-detect the chassis from the sheet fingerprint.
   const modelId = target.setupSheetModelId?.trim();
   const carId = target.carId?.trim();
-  if (!modelId && !carId) {
-    return { ok: false, status: 0, error: "Select a setup sheet model before uploading." };
-  }
   const timeoutMs = opts?.timeoutMs ?? 60_000;
   const fd = new FormData();
   fd.set("file", file);
@@ -84,6 +90,12 @@ export async function postQuickCreateSetup(
         needsReview: Boolean(data.needsReview),
         needsReviewReason: data.needsReviewReason ?? null,
         calibrationAmbiguous: Boolean(data.calibrationAmbiguous),
+        pickUserNote: data.pickUserNote ?? null,
+        calibrationModelMismatch: Boolean(data.calibrationModelMismatch),
+        detectedModelId: data.detectedModelId ?? null,
+        detectedModelName: data.detectedModelName ?? null,
+        carCandidates: Array.isArray(data.carCandidates) ? data.carCandidates : [],
+        notRecognized: Boolean(data.notRecognized),
       },
     };
   } catch (e) {

@@ -13,12 +13,13 @@ export type ResolvedSetupSheetModel = {
   schema: SetupSheetModelSchema;
 };
 
+// Models are global; `userId` is accepted for call-site compatibility but no longer scopes the read.
 export async function loadSetupSheetModelById(
-  userId: string,
+  _userId: string,
   modelId: string
 ): Promise<ResolvedSetupSheetModel | null> {
-  const row = await prisma.setupSheetModel.findFirst({
-    where: { id: modelId, userId },
+  const row = await prisma.setupSheetModel.findUnique({
+    where: { id: modelId },
     select: { id: true, name: true, slug: true, schemaJson: true },
   });
   if (!row) return null;
@@ -36,7 +37,8 @@ export async function resolveSetupSheetModelForCar(
   }
   if (isA800RRCar(car.setupSheetTemplate)) {
     const seeded = await prisma.setupSheetModel.findFirst({
-      where: { userId, slug: SETUP_SHEET_MODEL_SLUG_A800RR },
+      where: { slug: SETUP_SHEET_MODEL_SLUG_A800RR },
+      orderBy: [{ isAuthorized: "desc" }, { createdAt: "asc" }],
       select: { id: true, name: true, slug: true, schemaJson: true },
     });
     if (seeded) {

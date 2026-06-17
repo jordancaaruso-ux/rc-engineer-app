@@ -8,7 +8,7 @@ import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
 
-type SetupSheetModelOption = { id: string; name: string; slug: string };
+type SetupSheetModelOption = { id: string; name: string; slug: string; isAuthorized?: boolean };
 
 type Car = {
   id: string;
@@ -49,8 +49,9 @@ export function CarList({
   useEffect(() => {
     fetch("/api/setup-sheet-models")
       .then((r) => r.json())
-      .then((d: { models?: SetupSheetModelOption[] }) => {
-        if (Array.isArray(d.models)) setSetupSheetModels(d.models);
+      .then((d: { models?: SetupSheetModelOption[]; pickerModels?: SetupSheetModelOption[] }) => {
+        const list = Array.isArray(d.pickerModels) ? d.pickerModels : d.models;
+        if (Array.isArray(list)) setSetupSheetModels(list);
       })
       .catch(() => {});
   }, []);
@@ -58,8 +59,41 @@ export function CarList({
   const [chassis, setChassis] = useState("");
   const [notes, setNotes] = useState("");
   const [setupSheetModelId, setSetupSheetModelId] = useState("");
+  const [modelQuery, setModelQuery] = useState("");
+  const [modelOpen, setModelOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const normalizedQuery = modelQuery.trim().toLowerCase();
+  const filteredModels = normalizedQuery
+    ? setupSheetModels.filter((m) => m.name.toLowerCase().includes(normalizedQuery))
+    : setupSheetModels;
+  const exactModelMatch = setupSheetModels.find(
+    (m) => m.name.trim().toLowerCase() === normalizedQuery
+  );
+
+  function selectModel(m: SetupSheetModelOption) {
+    setSetupSheetModelId(m.id);
+    setModelQuery(m.name);
+    setModelOpen(false);
+  }
+
+  /** Resolve the chosen chassis to a model id, creating (or reusing) one for free-typed names. */
+  async function resolveModelId(): Promise<string | null> {
+    if (setupSheetModelId) return setupSheetModelId;
+    const typed = modelQuery.trim();
+    if (!typed) return null;
+    if (exactModelMatch) return exactModelMatch.id;
+    const { model } = await jsonFetch<{ model: { id: string; name: string; slug: string } }>(
+      "/api/setup-sheet-models",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: typed }),
+      }
+    );
+    return model.id;
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -68,15 +102,17 @@ export function CarList({
       setMessage("Name is required.");
       return;
     }
-    if (!setupSheetModelId) {
+    const wantsModel = Boolean(setupSheetModelId || modelQuery.trim());
+    if (!wantsModel) {
       const ok = window.confirm(
-        "Add this car without a setup sheet model? Community stats, setup compare, and structured setup tools work best when you link a model (create one in the setup wizard if needed)."
+        "Add this car without a chassis type? Community stats, setup compare, and structured setup tools work best when you link one (e.g. Mugen MTC3)."
       );
       if (!ok) return;
     }
     setMessage(null);
     setAdding(true);
     try {
+      const modelId = await resolveModelId();
       const { car } = await jsonFetch<{ car: Car }>("/api/cars", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,7 +120,7 @@ export function CarList({
           name: trimmed,
           chassis: chassis.trim() || null,
           notes: notes.trim() || null,
-          setupSheetModelId: setupSheetModelId || null,
+          setupSheetModelId: modelId,
         }),
       });
       setCars((prev) => [car, ...prev]);
@@ -92,6 +128,7 @@ export function CarList({
       setChassis("");
       setNotes("");
       setSetupSheetModelId("");
+      setModelQuery("");
       setMessage("Car added. You can use it when logging a run.");
       router.refresh();
     } catch (err) {
@@ -148,33 +185,67 @@ export function CarList({
               placeholder="Optional"
             />
           </div>
-          <div>
+          <div className="relative">
             <label className="block text-[11px] text-muted-foreground mb-1">
-              Setup sheet model <span className="text-amber-600 dark:text-amber-500">(recommended)</span>
+              Chassis type <span className="text-amber-600 dark:text-amber-500">(recommended)</span>
             </label>
-            <select
+            <input
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={setupSheetModelId}
-              onChange={(e) => setSetupSheetModelId(e.target.value)}
-            >
-              <option value="">None</option>
-              {setupSheetModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            {setupSheetModels.length === 0 ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                No models yet — use{" "}
-                <Link href="/cars/new/setup" className="text-sky-400 hover:underline">
-                  Start setup wizard
-                </Link>{" "}
-                to create one (e.g. Mugen MTC3).
+              value={modelQuery}
+              placeholder="Search e.g. Mugen MTC3"
+              onChange={(e) => {
+                setModelQuery(e.target.value);
+                setSetupSheetModelId("");
+                setModelOpen(true);
+              }}
+              onFocus={() => setModelOpen(true)}
+            />
+            {modelOpen ? (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-10 cursor-default"
+                  aria-label="Close chassis menu"
+                  onClick={() => setModelOpen(false)}
+                />
+                <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
+                  {filteredModels.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => selectModel(m)}
+                      className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
+                    >
+                      <span className="truncate">{m.name}</span>
+                      {m.isAuthorized ? (
+                        <span className="shrink-0 rounded border border-sky-500/40 bg-sky-500/10 px-1 py-0.5 text-[9px] font-medium text-sky-200">
+                          Authorized
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                  {modelQuery.trim() && !exactModelMatch ? (
+                    <button
+                      type="button"
+                      onClick={() => setModelOpen(false)}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-sky-300 hover:bg-muted/60"
+                    >
+                      + Create chassis type “{modelQuery.trim()}”
+                    </button>
+                  ) : null}
+                  {filteredModels.length === 0 && !modelQuery.trim() ? (
+                    <p className="px-2 py-1.5 text-[11px] text-muted-foreground">No chassis types yet.</p>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+            {!setupSheetModelId && modelQuery.trim() && !exactModelMatch ? (
+              <p className="mt-1 text-[11px] text-sky-700 dark:text-sky-400">
+                New chassis type — it’ll be created and shared when you add the car.
               </p>
-            ) : !setupSheetModelId ? (
+            ) : !setupSheetModelId && !modelQuery.trim() ? (
               <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-                Without a model, community stats and Engineer spread won’t apply to this car.
+                Without a chassis type, community stats and Engineer spread won’t apply.
               </p>
             ) : null}
           </div>

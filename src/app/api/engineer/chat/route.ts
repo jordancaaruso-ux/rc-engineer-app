@@ -21,6 +21,12 @@ import { buildTireLifePriorsForChatContext } from "@/lib/engineerPhase5/tireLife
 import { buildSetupHandlingPaceBundle } from "@/lib/engineerPhase5/setupHandlingPaceBundle";
 import { buildSetupOutcomeMemoryForRun } from "@/lib/engineerPhase5/setupOutcomeMemory";
 import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
+import { buildReasoningSpineV1 } from "@/lib/engineerPhase5/reasoningSpine/buildReasoningSpine";
+import { applyHybridContextMode } from "@/lib/engineerPhase5/reasoningSpine/hybridContext";
+import {
+  tryAnswerComparisonQuery,
+  tryAnswerPlanningQuery,
+} from "@/lib/engineerPhase5/reasoningSpine/deterministicRoutes";
 import {
   parsePaceVsFieldRunDigestPayload,
   parsePaceVsFieldRunDigestSubsetPayload,
@@ -213,6 +219,16 @@ async function buildEngineerChatContext(params: {
     const engineerSummary: EngineerRunSummaryV2 | null = summaryResult?.summary ?? null;
     const setupHandlingPaceBundle = needsDeep ? buildSetupHandlingPaceBundle(focusedRunPair) : null;
 
+    const reasoningSpine =
+      lastUser && typeof lastUser.content === "string"
+        ? buildReasoningSpineV1({
+            userMessage: lastUser.content,
+            engineeringRead: engineeringBrain?.engineeringRead ?? null,
+            parameterIntentMatches: richEngineerContext?.parameterIntentMatches ?? null,
+            setupOutcomeMemory,
+          })
+        : null;
+
     const contextJson: Record<string, unknown> = {
       contextTier,
       defaultDashboardContext: basePacket,
@@ -226,12 +242,15 @@ async function buildEngineerChatContext(params: {
       setupHandlingPaceBundle,
       setupOutcomeMemory,
       engineeringBrain,
+      reasoningSpine,
       resolvedScopeTireSteps: null,
       thingsToTry: basePacket.thingsToTry,
       thingsToDo: basePacket.thingsToDo,
       paceVsFieldRunDigest,
       paceVsFieldRunDigestSubset,
     };
+
+    if (reasoningSpine) applyHybridContextMode(contextJson, reasoningSpine);
 
     const baseForMerge: Record<string, unknown> = {
       contextTier,
@@ -244,6 +263,7 @@ async function buildEngineerChatContext(params: {
       setupHandlingPaceBundle,
       setupOutcomeMemory,
       engineeringBrain,
+      reasoningSpine,
       thingsToTry: basePacket.thingsToTry,
       thingsToDo: basePacket.thingsToDo,
       paceVsFieldRunDigest,
@@ -297,7 +317,16 @@ function buildMergeContextWithFocusedPair(opts: {
           }).catch(() => null)
         : Promise.resolve(null),
     ]);
-    return {
+    const reasoningSpine =
+      opts.lastUser && typeof opts.lastUser.content === "string"
+        ? buildReasoningSpineV1({
+            userMessage: opts.lastUser.content,
+            engineeringRead: reEngineeringBrain?.engineeringRead ?? null,
+            parameterIntentMatches: rich?.parameterIntentMatches ?? null,
+            setupOutcomeMemory: reSetupOutcomeMemory,
+          })
+        : null;
+    const merged = {
       ...opts.baseForMerge,
       contextTier: "full",
       engineerSummary: summaryResult?.summary ?? null,
@@ -307,7 +336,10 @@ function buildMergeContextWithFocusedPair(opts: {
       setupHandlingPaceBundle: buildSetupHandlingPaceBundle(focused),
       setupOutcomeMemory: reSetupOutcomeMemory,
       engineeringBrain: reEngineeringBrain,
+      reasoningSpine,
     };
+    if (reasoningSpine) applyHybridContextMode(merged, reasoningSpine);
+    return merged;
   };
 }
 
@@ -383,6 +415,76 @@ export async function POST(request: Request) {
         resolvedFocus: null,
         source: "lap_history",
       });
+    }
+
+    const comparisonAnswer = await tryAnswerComparisonQuery({
+      userId: user.id,
+      message: lastUserMsg,
+      timeZone,
+    });
+    if (comparisonAnswer) {
+      const payload = {
+        reply: comparisonAnswer.reply,
+        contextJson: null,
+        resolvedFocus: null,
+        source: comparisonAnswer.source,
+      };
+      if (useStream) {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            const send = (event: string, data: unknown) => {
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+            };
+            send("status", { phase: "done", source: comparisonAnswer.source });
+            send("done", payload);
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        });
+      }
+      return NextResponse.json(payload);
+    }
+
+    const planningAnswer = await tryAnswerPlanningQuery({
+      userId: user.id,
+      message: lastUserMsg,
+      timeZone,
+    });
+    if (planningAnswer) {
+      const payload = {
+        reply: planningAnswer.reply,
+        contextJson: null,
+        resolvedFocus: null,
+        source: planningAnswer.source,
+      };
+      if (useStream) {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            const send = (event: string, data: unknown) => {
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+            };
+            send("status", { phase: "done", source: planningAnswer.source });
+            send("done", payload);
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        });
+      }
+      return NextResponse.json(payload);
     }
 
     if (useStream) {

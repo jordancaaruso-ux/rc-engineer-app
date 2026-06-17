@@ -41,4 +41,5 @@ run(
 );
 
 run("npx prisma migrate deploy");
+run("node scripts/build-kb-chunk-index.cjs");
 run("npx next build");

@@ -8,7 +8,7 @@ import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeMo
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { slugifySetupSheetModelName, uniqueSlugCandidate } from "@/lib/setupSheetModels/slug";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
-import { ensureA800SetupSheetModelForUser } from "@/lib/setupSheetModels/seedA800Model";
+import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -17,26 +17,29 @@ export async function GET() {
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  await ensureA800SetupSheetModelForUser(user.id);
+  await ensureAuthorizedSetupSheetCatalog();
 
+  // Models are global (shared across users) — list them all, authorized first.
   const models = await prisma.setupSheetModel.findMany({
-    where: { userId: user.id },
-    orderBy: [{ name: "asc" }],
+    orderBy: [{ isAuthorized: "desc" }, { name: "asc" }],
     select: {
       id: true,
       name: true,
       slug: true,
+      isAuthorized: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { cars: true, calibrations: true } },
     },
   });
 
+  const authById = new Map(models.map((m) => [m.id, m.isAuthorized] as const));
   return NextResponse.json({
     models: models.map((m) => ({
       id: m.id,
       name: m.name,
       slug: m.slug,
+      isAuthorized: m.isAuthorized,
       createdAt: m.createdAt.toISOString(),
       updatedAt: m.updatedAt.toISOString(),
       carCount: m._count.cars,
@@ -50,7 +53,7 @@ export async function GET() {
         carCount: m._count.cars,
         calibrationCount: m._count.calibrations,
       }))
-    ),
+    ).map((m) => ({ ...m, isAuthorized: authById.get(m.id) ?? false })),
   });
 }
 
@@ -71,9 +74,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
 
+  // Models are global: reuse an existing chassis (authorized first) by normalized name so two users
+  // adding "Mugen MTC3" share one row instead of creating per-user duplicates.
   const norm = normalizeSetupSheetModelName(name);
   const existingRows = await prisma.setupSheetModel.findMany({
-    where: { userId: user.id },
+    orderBy: [{ isAuthorized: "desc" }, { createdAt: "asc" }],
     select: { id: true, name: true, slug: true },
   });
   const existingByName = existingRows.find((m) => normalizeSetupSheetModelName(m.name) === norm);

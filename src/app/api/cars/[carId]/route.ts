@@ -114,8 +114,8 @@ export async function PATCH(
     if (!modelId) {
       data.setupSheetModelId = null;
     } else {
-      const model = await prisma.setupSheetModel.findFirst({
-        where: { id: modelId, userId: user.id },
+      const model = await prisma.setupSheetModel.findUnique({
+        where: { id: modelId },
         select: { id: true, slug: true },
       });
       if (!model) {

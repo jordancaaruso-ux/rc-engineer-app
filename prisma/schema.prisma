@@ -174,7 +174,8 @@ model ActionItem {
   @@index([userId, listKind, normKey, isArchived])
 }
 
-/// User-defined setup sheet model (e.g. Mugen MTC3): parameter schema shared by all cars of that model.
+/// Global setup sheet model (e.g. Mugen MTC3): parameter schema shared by every car of that chassis
+/// across all users. Not user-owned — `userId` is creator attribution only.
 model SetupSheetModel {
   id         String   @id @default(cuid())
   createdAt  DateTime @default(now())
@@ -183,9 +184,12 @@ model SetupSheetModel {
   /// Stable id for aggregation and built-in seeds (e.g. mugen_mtc3, awesomatix_a800rr).
   slug       String
   schemaJson Json
+  /// Confirmed/curated catalog entry (admin-managed). User-created models stay false until reviewed.
+  isAuthorized Boolean @default(false)
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
+  /// Creator (attribution only; models are shared globally). Null for seeded catalog entries.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
 
   cars           Car[]
   setupDocuments SetupDocument[]
@@ -194,8 +198,10 @@ model SetupSheetModel {
   defaultCalibrationId String?                @unique
   defaultCalibration   SetupSheetCalibration? @relation("ModelDefaultCalibration", fields: [defaultCalibrationId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, slug])
+  // NOTE: a global @@unique([slug]) is intentionally deferred until the one-time dedupe
+  // (scripts/dedupe-setup-sheet-models.ts) has collapsed per-user duplicates in every environment.
   @@index([userId, updatedAt])
+  @@index([slug])
 }
 
 model Car {

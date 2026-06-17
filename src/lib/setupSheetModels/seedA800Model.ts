@@ -1,10 +1,5 @@
 import "server-only";
 
-import { prisma } from "@/lib/prisma";
-import {
-  SETUP_SHEET_MODEL_SLUG_A800RR,
-  SETUP_SHEET_TEMPLATE_A800RR,
-} from "@/lib/setupSheetTemplateId";
 import { A800RR_STRUCTURED_SECTIONS } from "@/lib/a800rrSetupDisplayConfig";
 import {
   buildCalibrationFieldCatalog,
@@ -12,8 +7,6 @@ import {
 } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { materializeAwesomatixTemplateDefaultsOnField } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import { inferStructuredLayoutFromFields } from "@/lib/setupSheetModels/layoutGroupOps";
-import { mergeMissingA800CatalogFields } from "@/lib/setupSheetModels/mergeA800CatalogFields";
-import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import type {
   SetupSheetModelFieldDef,
   SetupSheetModelLayoutRow,
@@ -112,49 +105,4 @@ export function buildA800SeedSchema(): SetupSheetModelSchema {
     structuredSections,
     fields,
   };
-}
-
-/** Ensure user has built-in A800 model; link legacy A800 cars. */
-export async function ensureA800SetupSheetModelForUser(userId: string): Promise<string> {
-  const seedSchema = buildA800SeedSchema();
-  const existing = await prisma.setupSheetModel.findUnique({
-    where: { userId_slug: { userId, slug: SETUP_SHEET_MODEL_SLUG_A800RR } },
-    select: { id: true, schemaJson: true },
-  });
-  if (existing) {
-    const parsed = parseSetupSheetModelSchema(existing.schemaJson);
-    if (parsed) {
-      const merged = mergeMissingA800CatalogFields(parsed, seedSchema);
-      if (merged) {
-        await prisma.setupSheetModel.update({
-          where: { id: existing.id },
-          data: { schemaJson: merged as object },
-        });
-      }
-    }
-    await linkLegacyA800Cars(userId, existing.id);
-    return existing.id;
-  }
-  const created = await prisma.setupSheetModel.create({
-    data: {
-      userId,
-      name: "Awesomatix A800RR",
-      slug: SETUP_SHEET_MODEL_SLUG_A800RR,
-      schemaJson: seedSchema as object,
-    },
-    select: { id: true },
-  });
-  await linkLegacyA800Cars(userId, created.id);
-  return created.id;
-}
-
-async function linkLegacyA800Cars(userId: string, modelId: string): Promise<void> {
-  await prisma.car.updateMany({
-    where: {
-      userId,
-      setupSheetTemplate: SETUP_SHEET_TEMPLATE_A800RR,
-      setupSheetModelId: null,
-    },
-    data: { setupSheetModelId: modelId },
-  });
 }

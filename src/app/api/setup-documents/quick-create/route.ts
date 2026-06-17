@@ -44,6 +44,13 @@ type QuickCreateResponse = {
   /** Plain-language auto-pick summary for the review screen. */
   pickUserNote: string | null;
   calibrationModelMismatch: boolean;
+  /** Chassis auto-detected from the fingerprint (global match). */
+  detectedModelId: string | null;
+  detectedModelName: string | null;
+  /** When >1 of the uploader's cars share the detected chassis, they must pick one. */
+  carCandidates: Array<{ id: string; name: string }>;
+  /** No calibration anywhere matched this sheet's layout. */
+  notRecognized: boolean;
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -77,8 +84,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   let carSetupSheetModelName: string | null = null;
 
   if (explicitModelIdProvided) {
-    const modelRow = await prisma.setupSheetModel.findFirst({
-      where: { id: explicitModelIdRaw!.trim(), userId: user.id },
+    const modelRow = await prisma.setupSheetModel.findUnique({
+      where: { id: explicitModelIdRaw!.trim() },
       select: { id: true, name: true, slug: true },
     });
     if (!modelRow) {
@@ -126,12 +133,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     carId = carForModel?.id ?? null;
   }
 
-  if (!explicitCarIdProvided && !explicitModelIdProvided) {
-    return NextResponse.json(
-      { error: "setupSheetModelId or carId is required" },
-      { status: 400 }
-    );
-  }
+  // No car/model context is allowed: the chassis is auto-detected from the sheet fingerprint below.
 
   if (file.size > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
@@ -208,11 +210,43 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   }
 
-  // Auto-default carId from the picked calibration when the upload didn't specify one.
-  // Look up canonical setupSheetTemplate values from past SetupDocuments using this calibration;
-  // if exactly one of the user's cars has that template, use it. Avoids forcing a car picker for
-  // repeat users pasting screenshots from an entry point that doesn't already have a car context.
-  if (!carId && outcome.pickedCalibrationId) {
+  // Auto-detect the chassis from the fingerprint. Models are global, so the picked calibration's
+  // model identifies the chassis even when the calibration belongs to another user. We then look for
+  // the uploader's car(s) of that chassis to attach the setup to.
+  let detectedModelId: string | null = setupSheetModelId;
+  let detectedModelName: string | null = carSetupSheetModelName;
+  let carCandidates: Array<{ id: string; name: string }> = [];
+
+  if (!detectedModelId && outcome.pickedCalibrationId) {
+    const cal = await prisma.setupSheetCalibration.findUnique({
+      where: { id: outcome.pickedCalibrationId },
+      select: { setupSheetModel: { select: { id: true, name: true, slug: true } } },
+    });
+    if (cal?.setupSheetModel) {
+      detectedModelId = cal.setupSheetModel.id;
+      detectedModelName = cal.setupSheetModel.name;
+      setupSheetModelId = detectedModelId;
+      setupSheetTemplate =
+        legacyTemplateFromModelSlug(cal.setupSheetModel.slug) ?? cal.setupSheetModel.slug;
+    }
+  }
+
+  if (!carId && detectedModelId) {
+    const cars = await prisma.car.findMany({
+      where: { userId: user.id, setupSheetModelId: detectedModelId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true },
+      take: 6,
+    });
+    if (cars.length === 1) {
+      carId = cars[0]!.id;
+    } else if (cars.length > 1) {
+      carCandidates = cars;
+    }
+  }
+
+  // Legacy fallback: calibration matched but carries no model link — reuse the old template heuristic.
+  if (!carId && !detectedModelId && outcome.pickedCalibrationId) {
     const past = await prisma.setupDocument.findMany({
       where: {
         userId: user.id,
@@ -228,10 +262,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (templates.size === 1) {
       const template = templates.values().next().value as string;
       const matchingCars = await prisma.car.findMany({
-        where: {
-          userId: user.id,
-          setupSheetTemplate: { equals: template, mode: "insensitive" },
-        },
+        where: { userId: user.id, setupSheetTemplate: { equals: template, mode: "insensitive" } },
         select: { id: true },
         take: 2,
       });
@@ -241,15 +272,29 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
   }
-  // We still need a car to materialise a SetupSnapshot. Without one, accept the upload but
-  // require a manual car pick during review (needsReview=true downstream).
-  if (!carId) {
-    if (!explicitCarIdProvided) {
-      // No car context at all → keep going so user can pick a car in the review screen.
-      console.log(
-        `[setup-documents/quick-create] no carId; proceeding without car (calibration=${outcome.pickedCalibrationId ?? "none"})`
-      );
+
+  // Chassis not recognized: no calibration anywhere matched this PDF/image layout.
+  const notRecognized =
+    !outcome.pickedCalibrationId &&
+    !detectedModelId &&
+    (mimeType === PDF_MIME || mimeType.startsWith("image/"));
+
+  // Persist a plain-language note (shown on the review screen via calibrationResolvedDebug).
+  if (!pickUserNote) {
+    if (carCandidates.length > 1) {
+      pickUserNote = `Recognized as ${detectedModelName ?? "a known chassis"} — choose which car to attach it to.`;
+    } else if (detectedModelId && !carId) {
+      pickUserNote = `Recognized as ${detectedModelName ?? "a known chassis"}, but you have no ${detectedModelName ?? "matching"} car yet. Add one to import this setup.`;
+    } else if (notRecognized) {
+      pickUserNote =
+        "This chassis isn’t recognized from the sheet layout. Pick a chassis type and calibrate it once to teach the app.";
     }
+  }
+
+  if (!carId) {
+    console.log(
+      `[setup-documents/quick-create] no carId; detectedModel=${detectedModelId ?? "none"} candidates=${carCandidates.length} (calibration=${outcome.pickedCalibrationId ?? "none"})`
+    );
   }
 
   // Persist the raw file. Construct a fresh `File` from the already-captured bytes so the Blob
@@ -335,17 +380,31 @@ export async function POST(request: Request): Promise<NextResponse> {
   const calibrationAmbiguous = outcome.pickSource === "ambiguous_suggestion";
 
   // Decide if the document is clean enough to materialise a SetupSnapshot automatically.
+  const detectedLabel = detectedModelName ?? "a known chassis";
   if (!pickedCalibrationId && (mimeType === PDF_MIME || mimeType.startsWith("image/"))) {
     needsReview = true;
     needsReviewReason =
       needsReviewReason
       ?? (mimeType.startsWith("image/")
         ? "No image calibration matched — draw regions once to teach the app this sheet."
-        : pickUserNote ?? "No calibration matched — pick one in review.");
+        : pickUserNote
+          ?? "This chassis isn’t recognized from the sheet layout. Pick a chassis type and calibrate it once to teach the app.");
   }
   if (calibrationModelMismatch && pickUserNote) {
     needsReview = true;
     needsReviewReason = pickUserNote;
+  }
+  // Recognized the chassis, but the uploader has no (or several) cars of it.
+  if (!carId && detectedModelId && carCandidates.length === 0) {
+    needsReview = true;
+    needsReviewReason =
+      needsReviewReason
+      ?? `This looks like a ${detectedLabel} setup, but you don’t have a ${detectedModelName ?? "matching"} car yet. Add one to import it.`;
+  }
+  if (carCandidates.length > 1) {
+    needsReview = true;
+    needsReviewReason =
+      needsReviewReason ?? `This looks like a ${detectedLabel} setup — choose which car to attach it to.`;
   }
   if (parseStatus === "FAILED") {
     needsReview = true;
@@ -397,6 +456,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     calibrationAmbiguous,
     pickUserNote,
     calibrationModelMismatch,
+    detectedModelId,
+    detectedModelName,
+    carCandidates,
+    notRecognized,
   };
   return NextResponse.json(payload, { status: 201 });
 }

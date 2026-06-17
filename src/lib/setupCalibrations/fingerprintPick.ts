@@ -6,6 +6,8 @@ import {
   repickCalibrationForBytes,
   type RepickOutcome,
 } from "@/lib/setupCalibrations/autoPickCalibration";
+import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
+import { scopeCandidatesForModel } from "@/lib/setupCalibrations/scopeCandidates";
 
 export type FingerprintPickContext = {
   userId: string;
@@ -46,11 +48,24 @@ function humanPickNote(outcome: RepickOutcome): string | null {
   return null;
 }
 
+/**
+ * Calibrations usable for the selected chassis type:
+ *  - linked to exactly this model id, OR
+ *  - unlinked (no model) — generic calibrations apply to any chassis, and we
+ *    link them on a successful pick via {@link applyPostFingerprintPickLinks}, OR
+ *  - linked to a *duplicate* model row with the same normalized name (e.g. a
+ *    second "Mugen MTC3" created by a repeat wizard run).
+ *
+ * The same-name and unlinked cases are what `67b1f8e` accidentally excluded,
+ * which broke Mugen uploads when the matching calibration lived under a
+ * duplicate model row or had no model link yet.
+ */
 function scopeCandidates(
   candidates: Awaited<ReturnType<typeof buildCalibrationFingerprints>>,
-  modelId: string
+  modelId: string,
+  modelName: string | null
 ) {
-  return candidates.filter((c) => c.setupSheetModelId === modelId);
+  return scopeCandidatesForModel(candidates, modelId, modelName);
 }
 
 function outcomeFromGlobalMismatch(
@@ -89,11 +104,12 @@ export async function pickCalibrationByFingerprint(
   const prefix = input.debugPrefix ?? "auto";
   const candidates = await buildCalibrationFingerprints({ userId: input.userId });
   const targetModelId = input.carSetupSheetModelId?.trim() || null;
-  const targetModelName = input.carSetupSheetModelName?.trim() || "this chassis type";
+  const targetModelNameRaw = input.carSetupSheetModelName?.trim() || null;
+  const targetModelName = targetModelNameRaw ?? "this chassis type";
 
   let outcome: RepickOutcome;
   if (targetModelId) {
-    const scoped = scopeCandidates(candidates, targetModelId);
+    const scoped = scopeCandidates(candidates, targetModelId, targetModelNameRaw);
     outcome = await repickCalibrationForBytes(input.bytes, scoped, {
       debugPrefix: `${prefix}:scoped`,
       suggestOnAmbiguous: false,
@@ -142,10 +158,19 @@ export async function pickCalibrationByFingerprint(
       },
     });
     const calModelId = cal?.setupSheetModelId?.trim() || null;
-    if (calModelId && calModelId !== targetModelId) {
+    // Only a genuinely different *chassis* (different normalized name) is a
+    // mismatch. Unlinked calibrations (null model) and same-name duplicate
+    // model rows are valid for this chassis and are linked post-pick.
+    const calName = cal?.setupSheetModel?.name ?? null;
+    const sameChassisByName = Boolean(
+      calName &&
+        targetModelNameRaw &&
+        normalizeSetupSheetModelName(calName) === normalizeSetupSheetModelName(targetModelNameRaw)
+    );
+    if (calModelId && calModelId !== targetModelId && !sameChassisByName) {
       modelMismatch = true;
       detectedSheetModelId = calModelId;
-      detectedSheetModelName = cal?.setupSheetModel?.name ?? null;
+      detectedSheetModelName = calName;
       const calModelName = detectedSheetModelName ?? "another model";
       userNote = `Matched “${outcome.pickedCalibrationName}” (${calModelName}), but you selected ${targetModelName}. Confirm or pick another calibration.`;
       outcome = {
@@ -190,8 +215,8 @@ export async function applyPostFingerprintPickLinks(input: {
     });
   }
 
-  const model = await prisma.setupSheetModel.findFirst({
-    where: { id: modelId, userId: input.userId },
+  const model = await prisma.setupSheetModel.findUnique({
+    where: { id: modelId },
     select: { defaultCalibrationId: true },
   });
   if (model && !model.defaultCalibrationId) {

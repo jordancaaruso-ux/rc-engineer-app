@@ -85,8 +85,8 @@ export async function POST(request: Request) {
     setupSheetModelId = carRow.setupSheetModelId;
   }
   if (setupSheetModelId) {
-    const model = await prisma.setupSheetModel.findFirst({
-      where: { id: setupSheetModelId, userId: user.id },
+    const model = await prisma.setupSheetModel.findUnique({
+      where: { id: setupSheetModelId },
       select: { id: true, slug: true },
     });
     if (!model) {

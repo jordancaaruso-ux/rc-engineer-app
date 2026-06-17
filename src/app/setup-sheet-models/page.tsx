@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { SetupSheetModelDeleteButton } from "@/components/setup-sheet-models/SetupSheetModelDeleteButton";
+import { SetupSheetModelAuthorizeToggle } from "@/components/setup-sheet-models/SetupSheetModelAuthorizeToggle";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
@@ -10,8 +11,9 @@ import {
   setupSheetModelPickerScore,
   type SetupSheetModelPickerRow,
 } from "@/lib/setupSheetModels/pickerModels";
-import { ensureA800SetupSheetModelForUser } from "@/lib/setupSheetModels/seedA800Model";
+import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetTemplateId";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 
 function countDuplicateGroups(models: SetupSheetModelPickerRow[]): number {
   const byNorm = new Map<string, number>();
@@ -38,15 +40,17 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
   }
 
   const user = await requireCurrentUser();
-  await ensureA800SetupSheetModelForUser(user.id);
+  await ensureAuthorizedSetupSheetCatalog();
+  const isAdmin = isAuthAdminEmail(user.email);
 
   const rows = await prisma.setupSheetModel.findMany({
-    where: { userId: user.id },
-    orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ isAuthorized: "desc" }, { name: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
       name: true,
       slug: true,
+      isAuthorized: true,
+      userId: true,
       createdAt: true,
       defaultCalibration: { select: { id: true, name: true } },
       cars: { select: { id: true, name: true }, orderBy: { name: "asc" }, take: 4 },
@@ -129,6 +133,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
               ).length;
               const isDuplicate = dupCount > 1 && !isRecommended;
               const isBuiltin = m.slug === SETUP_SHEET_MODEL_SLUG_A800RR;
+              const canManage = isAdmin || (m.userId === user.id && !m.isAuthorized);
 
               return (
                 <div key={m.id} className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -143,6 +148,11 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                       {isDuplicate ? (
                         <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
                           Duplicate — safe to delete
+                        </span>
+                      ) : null}
+                      {m.isAuthorized ? (
+                        <span className="rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-200">
+                          Authorized
                         </span>
                       ) : null}
                       {isBuiltin ? (
@@ -195,16 +205,21 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                       href={`/setup-sheet-models/${m.id}/schema`}
                       className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
                     >
-                      Edit schema
+                      {canManage ? "Edit schema" : "View schema"}
                     </Link>
-                    <SetupSheetModelDeleteButton
-                      modelId={m.id}
-                      modelName={m.name}
-                      carCount={m._count.cars}
-                      calibrationCount={m._count.calibrations}
-                      documentCount={m._count.setupDocuments}
-                      protectedBuiltin={isBuiltin}
-                    />
+                    {isAdmin ? (
+                      <SetupSheetModelAuthorizeToggle modelId={m.id} isAuthorized={m.isAuthorized} />
+                    ) : null}
+                    {canManage ? (
+                      <SetupSheetModelDeleteButton
+                        modelId={m.id}
+                        modelName={m.name}
+                        carCount={m._count.cars}
+                        calibrationCount={m._count.calibrations}
+                        documentCount={m._count.setupDocuments}
+                        protectedBuiltin={isBuiltin}
+                      />
+                    ) : null}
                   </div>
                 </div>
               );

@@ -9,6 +9,16 @@ import {
   type SearchRunsForEngineerArgs,
 } from "@/lib/engineerPhase5/engineerRunSearchTools";
 import {
+  SPINE_TOOL_DEFINITIONS,
+  SPINE_TOOL_INSTRUCTIONS,
+} from "@/lib/engineerPhase5/reasoningSpine/spineToolDefinitions";
+import {
+  compareTiresTool,
+  getParamSpreadTool,
+  kbSearchTool,
+  tireHistoryAtTrackTool,
+} from "@/lib/engineerPhase5/reasoningSpine/spineTools";
+import {
   ENGINEER_CHAT_CONTEXT_MAX_CHARS,
   formatEngineerChatContextSystemMessage,
   isContextTooLargeOpenAiError,
@@ -16,6 +26,8 @@ import {
   parseOpenAiRetryAfterMs,
 } from "@/lib/engineerPhase5/slimEngineerChatContextForApi";
 import type { EngineerChatContextTier } from "@/lib/engineerPhase5/engineerChatContextTier";
+import { reasoningSpineSystemPromptAddon } from "@/lib/engineerPhase5/reasoningSpine/narrationPrompt";
+import type { ReasoningSpineV1 } from "@/lib/engineerPhase5/reasoningSpine/types";
 /**
  * Some models (GPT-5 family, o-series) only allow the default sampler — sending temperature≠1 errors.
  * Omit `temperature` in the request body for those; OpenAI uses its default.
@@ -81,6 +93,20 @@ function mustGetKey(): string {
 }
 
 export type EngineerChatMessage = { role: "user" | "assistant"; content: string };
+
+function spineFromContext(contextJson: unknown): ReasoningSpineV1 | null {
+  if (!contextJson || typeof contextJson !== "object") return null;
+  const spine = (contextJson as Record<string, unknown>).reasoningSpine;
+  if (!spine || typeof spine !== "object") return null;
+  const v = (spine as Record<string, unknown>).version;
+  if (v !== 1) return null;
+  return spine as ReasoningSpineV1;
+}
+
+function chatSystemPromptForContext(tier: EngineerChatContextTier, contextJson: unknown): string {
+  const base = tier === "light" ? CHAT_SYSTEM_LIGHT : CHAT_SYSTEM;
+  return base + reasoningSpineSystemPromptAddon(spineFromContext(contextJson));
+}
 
 const CHAT_SYSTEM = `You are an RC touring car race engineer assistant.
 Be conservative and grounded in the provided context JSON.
@@ -229,9 +255,9 @@ You have tools to find runs and focus the chat on specific runs:
 - search_runs: filter runs by owner (you vs a teammate or team peer), optional date range (ISO YYYY-MM-DD), car/track/event ids, or text. Compute date ranges yourself (e.g. "last weekend" → concrete calendar dates).
 - apply_engineer_focus: after you pick run ids from search_runs (or catalog), call this so the next context includes full lap/setup compare and richEngineerContext re-anchors to the primary run. **To only re-anchor** spread/KB to a session they named (no pairwise compare), pass compare_run_id null. Rules: primary_run_id MUST always be the user's own run id (owner_scope mine). compare_run_id can be the user's or a peer's run id when you are linked or share a pilot team (same track as primary for non-owner compare runs). If the user only asks about someone else's run, search with owner_scope teammate and answer from the search results; to compare, pick a primary run of the user on the same track when possible, then apply focus.
 
-Always use real run ids returned by search_runs or the catalog—never guess ids.`;
+Always use real run ids returned by search_runs or the catalog—never guess ids.${SPINE_TOOL_INSTRUCTIONS}`;
 
-const TOOLS = [
+const LEGACY_TOOLS = [
   {
     type: "function" as const,
     function: {
@@ -293,6 +319,8 @@ const TOOLS = [
     },
   },
 ];
+
+const TOOLS = [...SPINE_TOOL_DEFINITIONS, ...LEGACY_TOOLS];
 
 type ToolCall = {
   id: string;
@@ -467,11 +495,58 @@ async function executeSearchOrListTool(
         truncated: result.truncated,
       });
     }
+    const spineResult = await executeSpineTool(name, args, userId);
+    if (spineResult != null) return spineResult;
     return JSON.stringify({ error: `Unknown tool ${name}` });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Tool error";
     return JSON.stringify({ error: msg });
   }
+}
+
+async function executeSpineTool(
+  name: string,
+  args: Record<string, unknown>,
+  userId: string
+): Promise<string | null> {
+  if (name === "get_param_spread") {
+    const anchor = typeof args.anchor_run_id === "string" ? args.anchor_run_id : "";
+    const keys = Array.isArray(args.parameter_keys)
+      ? args.parameter_keys.filter((k): k is string => typeof k === "string")
+      : null;
+    const out = await getParamSpreadTool(userId, { anchor_run_id: anchor, parameter_keys: keys });
+    return JSON.stringify(out.ok ? { rows: out.rows } : { error: out.error });
+  }
+  if (name === "kb_search") {
+    const query = typeof args.query === "string" ? args.query : "";
+    const limit = typeof args.limit === "number" ? args.limit : undefined;
+    const out = await kbSearchTool({ query, limit });
+    return JSON.stringify(out);
+  }
+  if (name === "compare_tires") {
+    const out = await compareTiresTool(userId, {
+      tire_label_a: typeof args.tire_label_a === "string" ? args.tire_label_a : "",
+      tire_label_b: typeof args.tire_label_b === "string" ? args.tire_label_b : "",
+      track_query: typeof args.track_query === "string" ? args.track_query : null,
+      time_zone:
+        typeof args.calendar_time_zone === "string" ? args.calendar_time_zone : null,
+    });
+    return JSON.stringify(out.ok ? { rows: out.rows, trackName: out.trackName } : { error: out.error });
+  }
+  if (name === "tire_history_at_track") {
+    const out = await tireHistoryAtTrackTool(userId, {
+      track_query: typeof args.track_query === "string" ? args.track_query : "",
+      tire_label_contains:
+        typeof args.tire_label_contains === "string" ? args.tire_label_contains : null,
+      time_zone:
+        typeof args.calendar_time_zone === "string" ? args.calendar_time_zone : null,
+      max_results: typeof args.max_results === "number" ? args.max_results : undefined,
+    });
+    return JSON.stringify(
+      out.ok ? { trackName: out.trackName, rows: out.rows } : { error: out.error }
+    );
+  }
+  return null;
 }
 
 /** Single completion, no tools (tests and simple callers). */
@@ -542,7 +617,7 @@ export async function generateEngineerChatReplyWithTools(params: {
   let resolvedFocus: { runId: string; compareRunId: string | null } | null = null;
   const tier: EngineerChatContextTier = params.contextTier ?? "full";
   let contextBudgetChars = contextBudgetCharsForTier(tier);
-  const systemPrompt = tier === "light" ? CHAT_SYSTEM_LIGHT : CHAT_SYSTEM;
+  let systemPrompt = chatSystemPromptForContext(tier, workingContext);
 
   const messagesApi: ChatCompletionMessage[] = [
     {
@@ -563,6 +638,7 @@ export async function generateEngineerChatReplyWithTools(params: {
   const MAX_ITERS = 10;
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const opts = getEngineerChatModelAndTemperature(tier);
+    systemPrompt = chatSystemPromptForContext(tier, workingContext);
     messagesApi[0] = {
       role: "system",
       content: systemPrompt + TOOL_INSTRUCTIONS,
