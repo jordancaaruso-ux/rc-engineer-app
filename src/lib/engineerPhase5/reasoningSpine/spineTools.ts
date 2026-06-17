@@ -67,7 +67,7 @@ export async function getParamSpreadTool(
     ok: true,
     rows: rows.slice(0, 40).map((r) => ({
       parameterKey: r.parameterKey,
-      label: r.label,
+      label: r.currentDisplay || r.parameterKey,
       currentDisplay: r.currentDisplay,
       positionBand: r.positionBand,
       spreadSource: r.spreadSource,

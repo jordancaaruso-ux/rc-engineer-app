@@ -222,7 +222,7 @@ export async function tryAnswerPlanningQuery(input: {
         conditionSignature: sig,
         spreadRows: spread.rows,
       });
-      const top = empirical?.rows.filter((r) => r.hasEnoughData).slice(0, 5) ?? [];
+      const top = empirical?.hasEnoughData ? empirical.rows.slice(0, 5) : [];
       if (top.length > 0) {
         lines.push("", "**Your garage at this track condition** (median vs your overall — not community):");
         for (const row of top) {
