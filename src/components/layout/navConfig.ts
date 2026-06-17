@@ -6,6 +6,7 @@ import {
   CircleDot,
   GitCompare,
   History,
+  Layers,
   LayoutDashboard,
   MapPin,
   PlusCircle,
@@ -158,8 +159,14 @@ export const GARAGE_HUB_LINKS: NavHubLink[] = [
   {
     href: "/cars",
     label: "Cars",
-    description: "Manage chassis, templates, and setup sheets.",
+    description: "Your cars — name each one and link it to a chassis type.",
     icon: Car,
+  },
+  {
+    href: "/setup-sheet-models",
+    label: "Chassis types",
+    description: "Shared setup sheet models per chassis (e.g. Mugen MTC3).",
+    icon: Layers,
   },
   {
     href: "/tracks",
