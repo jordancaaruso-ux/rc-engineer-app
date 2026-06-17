@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { parseEventDateYmd } from "@/lib/eventDateParse";
+import { parseEventDateYmd, eventDateToYmd } from "@/lib/eventDateParse";
 import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
-
-const EVENT_TIRE_TYPE_SELECT = {
-  id: true,
-  displayName: true,
-  modelCode: true,
-} as const;
+import {
+  ensureEventParticipation,
+  EVENT_LIST_INCLUDE,
+  mapEventForUser,
+} from "@/lib/events/eventParticipation";
+import { findEventByTrackAndResultsUrl } from "@/lib/events/findEventForLiveRc";
+import { eventIdsInScopeForUser } from "@/lib/events/eventParticipation";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     );
   }
   const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const trackId = searchParams.get("trackId");
   const suggest = searchParams.get("suggest");
@@ -39,27 +40,35 @@ export async function GET(request: Request) {
       },
       orderBy: { createdAt: "desc" },
       include: {
-        event: { select: { id: true, name: true, trackId: true, startDate: true, endDate: true, notes: true } },
+        event: {
+          include: EVENT_LIST_INCLUDE,
+        },
       },
     });
 
     if (recentRun?.event) {
-      return NextResponse.json({ suggestedEvent: recentRun.event });
+      return NextResponse.json({
+        suggestedEvent: mapEventForUser(recentRun.event, user.id),
+      });
     }
     return NextResponse.json({ suggestedEvent: null });
   }
 
+  const scopedIds = await eventIdsInScopeForUser(user.id);
+  if (scopedIds.length === 0) {
+    return NextResponse.json({ events: [] });
+  }
+
   const events = await prisma.event.findMany({
-    where: { userId: user.id },
+    where: { id: { in: scopedIds } },
     orderBy: { startDate: "desc" },
     take: 50,
-    include: {
-      track: { select: { id: true, name: true, location: true } },
-      controlledTireType: { select: EVENT_TIRE_TYPE_SELECT },
-    },
+    include: EVENT_LIST_INCLUDE,
   });
 
-  return NextResponse.json({ events });
+  return NextResponse.json({
+    events: events.map((e) => mapEventForUser(e, user.id)),
+  });
 }
 
 export async function POST(request: Request) {
@@ -103,13 +112,7 @@ export async function POST(request: Request) {
     const startDate = body.startDate ? parseEventDateYmd(body.startDate) : new Date();
     const endDate = body.endDate ? parseEventDateYmd(body.endDate) : new Date(startDate);
 
-    function utcYmd(d: Date): string {
-      const y = d.getUTCFullYear();
-      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-      const day = String(d.getUTCDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    }
-    if (utcYmd(endDate) < utcYmd(startDate)) {
+    if (eventDateToYmd(endDate) < eventDateToYmd(startDate)) {
       return NextResponse.json(
         { error: "End date must be on or after the start date." },
         { status: 400 }
@@ -143,26 +146,24 @@ export async function POST(request: Request) {
     }
 
     if (resultsSourceUrl) {
-      const existing = await prisma.event.findFirst({
-        where: { userId: user.id, trackId, resultsSourceUrl },
-        select: {
-          id: true,
-          name: true,
-          trackId: true,
-          startDate: true,
-          endDate: true,
-          notes: true,
-          practiceSourceUrl: true,
-          resultsSourceUrl: true,
-          controlledTireLabel: true,
-        },
-      });
+      const existing = await findEventByTrackAndResultsUrl(trackId, resultsSourceUrl);
       if (existing) {
+        await ensureEventParticipation({
+          userId: user.id,
+          eventId: existing.id,
+          notes: body.notes,
+          controlledTireLabel,
+          controlledTireTypeId,
+        });
+        const event = await prisma.event.findUnique({
+          where: { id: existing.id },
+          include: EVENT_LIST_INCLUDE,
+        });
         return NextResponse.json(
           {
-            error: "An event with this LiveRC results URL already exists.",
+            error: "An event with this LiveRC results URL already exists — joined your participation.",
             existingEventId: existing.id,
-            event: existing,
+            event: event ? mapEventForUser(event, user.id) : null,
           },
           { status: 409 }
         );
@@ -176,19 +177,29 @@ export async function POST(request: Request) {
         trackId,
         startDate,
         endDate,
-        notes: body.notes?.trim() || null,
         practiceSourceUrl,
         resultsSourceUrl,
-        controlledTireLabel,
-        controlledTireTypeId,
       },
-      include: {
-        track: { select: { id: true, name: true, location: true } },
-        controlledTireType: { select: EVENT_TIRE_TYPE_SELECT },
-      },
+      include: EVENT_LIST_INCLUDE,
     });
 
-    return NextResponse.json({ event }, { status: 201 });
+    await ensureEventParticipation({
+      userId: user.id,
+      eventId: event.id,
+      notes: body.notes,
+      controlledTireLabel,
+      controlledTireTypeId,
+    });
+
+    const withParts = await prisma.event.findUnique({
+      where: { id: event.id },
+      include: EVENT_LIST_INCLUDE,
+    });
+
+    return NextResponse.json(
+      { event: withParts ? mapEventForUser(withParts, user.id) : mapEventForUser(event, user.id) },
+      { status: 201 }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create event";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -23,6 +23,7 @@ import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { loadUserScopedEvents } from "@/lib/events/eventParticipation";
 import { assertUserInTeam, listTeamMemberUserIds, listTeamsForUser } from "@/lib/teamAccess";
 import type { Prisma } from "@prisma/client";
 
@@ -231,7 +232,7 @@ export default async function RunHistoryPage({
   }
 
   if (!teamAccessDenied) {
-    const [cars, tracks, events, tireSets] = await Promise.all([
+    const [cars, tracks, scopedEvents, tireSets] = await Promise.all([
       prisma.car.findMany({
         where: { userId: user.id },
         orderBy: { name: "asc" },
@@ -241,11 +242,7 @@ export default async function RunHistoryPage({
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       }),
-      prisma.event.findMany({
-        where: { userId: user.id },
-        orderBy: { startDate: "desc" },
-        select: { id: true, name: true },
-      }),
+      loadUserScopedEvents({ userId: user.id, take: 200 }),
       prisma.tireSet.findMany({
         where: { userId: user.id },
         orderBy: [{ label: "asc" }, { setNumber: "asc" }],
@@ -254,7 +251,7 @@ export default async function RunHistoryPage({
     ]);
     filterCars = cars.map((c) => ({ id: c.id, label: c.name }));
     filterTracks = tracks.map((t) => ({ id: t.id, label: t.name }));
-    filterEvents = events.map((e) => ({ id: e.id, label: e.name }));
+    filterEvents = scopedEvents.map((e) => ({ id: e.id, label: e.name }));
     filterTireSets = tireSets.map((ts) => ({
       id: ts.id,
       label: `${ts.label}${ts.setNumber != null ? ` #${ts.setNumber}` : ""}`,

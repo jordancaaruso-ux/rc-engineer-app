@@ -18,6 +18,7 @@ import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedInge
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 import { eventIsActiveOnLocalToday } from "@/lib/eventActive";
 import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
+import { eventIdsInScopeForUser } from "@/lib/events/eventParticipation";
 
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 
@@ -40,8 +41,13 @@ export type EventLapDetectionScopeResult = {
  * Same scoping as sync and dashboard prompts: active-on-local-today events, else the single most recent by endDate.
  */
 export async function getEventLapDetectionScope(userId: string): Promise<EventLapDetectionScopeResult> {
+  const scopedIds = await eventIdsInScopeForUser(userId);
+  if (scopedIds.length === 0) {
+    return { scopedEventIds: [], strategy: "fallback_most_recent", activeTodayCount: 0 };
+  }
+
   const candidates = await prisma.event.findMany({
-    where: { userId },
+    where: { id: { in: scopedIds } },
     orderBy: { endDate: "desc" },
     take: EVENT_LAP_DETECTION_CANDIDATE_TAKE,
     select: { id: true, startDate: true, endDate: true },
@@ -98,7 +104,7 @@ export async function syncRecentEventLapSources(userId: string): Promise<void> {
   if (scope.scopedEventIds.length === 0) return;
 
   const scoped = await prisma.event.findMany({
-    where: { userId, id: { in: scope.scopedEventIds } },
+    where: { id: { in: scope.scopedEventIds } },
     orderBy: { endDate: "desc" },
     select: {
       id: true,
@@ -386,7 +392,7 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
 
   const scopedIds = scope.scopedEventIds;
   const scopedEvents = await prisma.event.findMany({
-    where: { userId, id: { in: scopedIds } },
+    where: { id: { in: scopedIds } },
     select: { id: true, name: true },
   });
   const eventNameById = new Map(scopedEvents.map((e) => [e.id, e.name] as const));

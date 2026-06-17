@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { EventList } from "@/components/events/EventList";
+import { loadUserScopedEvents } from "@/lib/events/eventParticipation";
 
 /** Match /tracks + /runs/new: always load user events/tracks fresh (avoids stale static RSC for selectors). */
 export const dynamic = "force-dynamic";
@@ -28,14 +29,7 @@ export default async function EventsPage(): Promise<ReactNode> {
 
   const user = await requireCurrentUser();
   const [events, tracks] = await Promise.all([
-    prisma.event.findMany({
-      where: { userId: user.id },
-      orderBy: { startDate: "desc" },
-      take: 120,
-      include: {
-        track: { select: { id: true, name: true, location: true } },
-      },
-    }),
+    loadUserScopedEvents({ userId: user.id, take: 120 }),
     prisma.track.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },

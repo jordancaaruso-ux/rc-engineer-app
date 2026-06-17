@@ -38,6 +38,7 @@
     "backfill:setup-car": "npx tsx scripts/backfill-setup-documents-car-id.ts",
     "db:prune-calibrations": "npx tsx scripts/prune-calibrations-keep-community-shared.ts",
     "db:dedupe:setup-models": "npx dotenv-cli -e .env.local -- npx tsx scripts/dedupe-setup-sheet-models.ts",
+    "db:dedupe:events": "npx dotenv-cli -e .env.local -- npx tsx scripts/dedupe-events.ts",
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios"
   },

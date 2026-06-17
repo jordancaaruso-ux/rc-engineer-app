@@ -27,17 +27,17 @@ async function main() {
   }
 
   let eventsLinked = 0;
-  const events = await prisma.event.findMany({
+  const participations = await prisma.eventParticipation.findMany({
     where: { controlledTireTypeId: null, controlledTireLabel: { not: null } },
     select: { id: true, controlledTireLabel: true },
   });
-  for (const ev of events) {
-    const label = ev.controlledTireLabel?.trim();
+  for (const part of participations) {
+    const label = part.controlledTireLabel?.trim();
     if (!label) continue;
     const match = bestTireTypeMatch(label, catalog);
     if (!match) continue;
-    await prisma.event.update({
-      where: { id: ev.id },
+    await prisma.eventParticipation.update({
+      where: { id: part.id },
       data: { controlledTireTypeId: match.id },
     });
     eventsLinked++;

@@ -79,9 +79,18 @@ export function EventMetaEditor(props: Props) {
           controlledTireTypeId: controlledTireTypeId.trim() || null,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; event?: { name?: string } };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        event?: { name?: string };
+        merged?: boolean;
+        eventId?: string;
+      };
       if (!res.ok) {
         setMessage(data.error ?? "Could not save.");
+        return;
+      }
+      if (data.merged && data.eventId && data.eventId !== props.eventId) {
+        router.replace(`/events/${encodeURIComponent(data.eventId)}`);
         return;
       }
       if (data.event?.name) setName(data.event.name);

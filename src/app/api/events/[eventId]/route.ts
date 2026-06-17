@@ -4,17 +4,12 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { eventDateToYmd, parseEventDateYmd } from "@/lib/eventDateParse";
 import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
-
-const EVENT_TIRE_TYPE_SELECT = {
-  id: true,
-  displayName: true,
-  modelCode: true,
-} as const;
-
-const EVENT_INCLUDE = {
-  track: { select: { id: true, name: true, location: true } },
-  controlledTireType: { select: EVENT_TIRE_TYPE_SELECT },
-} as const;
+import {
+  ensureEventParticipation,
+  EVENT_LIST_INCLUDE,
+  mapEventForUser,
+} from "@/lib/events/eventParticipation";
+import { mergeEventIntoExistingByResultsUrl } from "@/lib/events/mergeEvents";
 
 function optString(v: unknown): string | null | undefined {
   if (v === undefined) return undefined;
@@ -23,6 +18,23 @@ function optString(v: unknown): string | null | undefined {
   const t = v.trim();
   return t.length === 0 ? null : t;
 }
+
+const SHARED_PATCH_KEYS = new Set([
+  "name",
+  "trackId",
+  "startDate",
+  "endDate",
+  "practiceSourceUrl",
+  "resultsSourceUrl",
+  "raceClass",
+]);
+
+const PERSONAL_PATCH_KEYS = new Set([
+  "notes",
+  "controlledTireLabel",
+  "controlledTireTypeId",
+  "pinned",
+]);
 
 export async function PATCH(
   request: Request,
@@ -36,8 +48,8 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { eventId } = await context.params;
 
-  const existing = await prisma.event.findFirst({
-    where: { id: eventId, userId: user.id },
+  const existing = await prisma.event.findUnique({
+    where: { id: eventId },
     select: {
       id: true,
       trackId: true,
@@ -50,30 +62,26 @@ export async function PATCH(
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
-  const body = (await request.json()) as {
-    name?: unknown;
-    trackId?: unknown;
-    startDate?: unknown;
-    endDate?: unknown;
-    notes?: unknown;
-    practiceSourceUrl?: unknown;
-    resultsSourceUrl?: unknown;
-    raceClass?: unknown;
-    controlledTireLabel?: unknown;
-    controlledTireTypeId?: unknown;
-  };
+  const body = (await request.json()) as Record<string, unknown>;
 
-  const data: {
+  const hasShared = Object.keys(body).some((k) => SHARED_PATCH_KEYS.has(k));
+  const hasPersonal = Object.keys(body).some((k) => PERSONAL_PATCH_KEYS.has(k));
+  if (!hasShared && !hasPersonal) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  }
+
+  if (hasShared || hasPersonal) {
+    await ensureEventParticipation({ userId: user.id, eventId });
+  }
+
+  const eventData: {
     name?: string;
     trackId?: string;
     startDate?: Date;
     endDate?: Date;
-    notes?: string | null;
     practiceSourceUrl?: string | null;
     resultsSourceUrl?: string | null;
     raceClass?: string | null;
-    controlledTireLabel?: string | null;
-    controlledTireTypeId?: string | null;
   } = {};
 
   if (body.name !== undefined) {
@@ -81,7 +89,7 @@ export async function PATCH(
     if (!name) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
-    data.name = name;
+    eventData.name = name;
   }
 
   if (body.trackId !== undefined) {
@@ -96,7 +104,7 @@ export async function PATCH(
     if (!track) {
       return NextResponse.json({ error: "Track not found" }, { status: 400 });
     }
-    data.trackId = trackId;
+    eventData.trackId = trackId;
   }
 
   const nextStart =
@@ -107,8 +115,8 @@ export async function PATCH(
     body.endDate !== undefined && typeof body.endDate === "string"
       ? parseEventDateYmd(body.endDate)
       : existing.endDate;
-  if (body.startDate !== undefined) data.startDate = nextStart;
-  if (body.endDate !== undefined) data.endDate = nextEnd;
+  if (body.startDate !== undefined) eventData.startDate = nextStart;
+  if (body.endDate !== undefined) eventData.endDate = nextEnd;
   if (body.startDate !== undefined || body.endDate !== undefined) {
     if (eventDateToYmd(nextEnd) < eventDateToYmd(nextStart)) {
       return NextResponse.json(
@@ -118,11 +126,63 @@ export async function PATCH(
     }
   }
 
-  if (body.notes !== undefined) data.notes = optString(body.notes) ?? null;
-
   const practiceSourceUrl = optString(body.practiceSourceUrl);
   const resultsSourceUrlRaw = optString(body.resultsSourceUrl);
   const raceClass = optString(body.raceClass);
+
+  if (practiceSourceUrl !== undefined) eventData.practiceSourceUrl = practiceSourceUrl;
+  if (resultsSourceUrlRaw !== undefined) {
+    eventData.resultsSourceUrl = resultsSourceUrlRaw
+      ? normalizeLiveRcEventHubUrl(resultsSourceUrlRaw) ?? resultsSourceUrlRaw
+      : null;
+  }
+  if (raceClass !== undefined) eventData.raceClass = raceClass;
+
+  let survivingEventId = eventId;
+
+  if (Object.keys(eventData).length > 0) {
+    const targetTrackId = eventData.trackId ?? existing.trackId;
+    const targetResultsUrl =
+      eventData.resultsSourceUrl !== undefined
+        ? eventData.resultsSourceUrl
+        : existing.resultsSourceUrl;
+
+    if (targetResultsUrl) {
+      const merge = await mergeEventIntoExistingByResultsUrl({
+        sourceEventId: survivingEventId,
+        trackId: targetTrackId,
+        resultsSourceUrl: targetResultsUrl,
+      });
+      if (merge.merged) {
+        survivingEventId = merge.eventId;
+        await ensureEventParticipation({ userId: user.id, eventId: survivingEventId });
+        await prisma.event.update({
+          where: { id: survivingEventId },
+          data: eventData,
+        });
+      } else {
+        await prisma.event.update({
+          where: { id: survivingEventId },
+          data: eventData,
+        });
+      }
+    } else {
+      await prisma.event.update({
+        where: { id: survivingEventId },
+        data: eventData,
+      });
+    }
+  }
+
+  const participationData: {
+    notes?: string | null;
+    controlledTireLabel?: string | null;
+    controlledTireTypeId?: string | null;
+    pinnedAt?: Date | null;
+  } = {};
+
+  if (body.notes !== undefined) participationData.notes = optString(body.notes) ?? null;
+
   const controlledTireLabel = optString(body.controlledTireLabel);
   const controlledTireTypeId =
     body.controlledTireTypeId === undefined
@@ -131,14 +191,7 @@ export async function PATCH(
         ? null
         : optString(body.controlledTireTypeId);
 
-  if (practiceSourceUrl !== undefined) data.practiceSourceUrl = practiceSourceUrl;
-  if (resultsSourceUrlRaw !== undefined) {
-    data.resultsSourceUrl = resultsSourceUrlRaw
-      ? normalizeLiveRcEventHubUrl(resultsSourceUrlRaw) ?? resultsSourceUrlRaw
-      : null;
-  }
-  if (raceClass !== undefined) data.raceClass = raceClass;
-  if (controlledTireLabel !== undefined) data.controlledTireLabel = controlledTireLabel;
+  if (controlledTireLabel !== undefined) participationData.controlledTireLabel = controlledTireLabel;
   if (controlledTireTypeId !== undefined) {
     if (controlledTireTypeId) {
       const tt = await prisma.tireType.findUnique({
@@ -149,42 +202,34 @@ export async function PATCH(
         return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
       }
     }
-    data.controlledTireTypeId = controlledTireTypeId;
+    participationData.controlledTireTypeId = controlledTireTypeId;
   }
 
-  if (Object.keys(data).length === 0) {
-    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  if (body.pinned === true) {
+    participationData.pinnedAt = new Date();
+  } else if (body.pinned === false) {
+    participationData.pinnedAt = null;
   }
 
-  const targetTrackId = data.trackId ?? existing.trackId;
-  const targetResultsUrl =
-    data.resultsSourceUrl !== undefined ? data.resultsSourceUrl : existing.resultsSourceUrl;
-  if (targetResultsUrl && targetTrackId) {
-    const duplicate = await prisma.event.findFirst({
-      where: {
-        userId: user.id,
-        trackId: targetTrackId,
-        resultsSourceUrl: targetResultsUrl,
-        NOT: { id: eventId },
-      },
-      select: { id: true, name: true },
+  if (Object.keys(participationData).length > 0) {
+    await prisma.eventParticipation.update({
+      where: { userId_eventId: { userId: user.id, eventId: survivingEventId } },
+      data: participationData,
     });
-    if (duplicate) {
-      return NextResponse.json(
-        {
-          error: "An event with this LiveRC results URL already exists.",
-          existingEventId: duplicate.id,
-        },
-        { status: 409 }
-      );
-    }
   }
 
-  const event = await prisma.event.update({
-    where: { id: eventId },
-    data,
-    include: EVENT_INCLUDE,
+  const event = await prisma.event.findUnique({
+    where: { id: survivingEventId },
+    include: EVENT_LIST_INCLUDE,
   });
+  if (!event) {
+    return NextResponse.json({ error: "Event not found" }, { status: 404 });
+  }
 
-  return NextResponse.json({ ok: true, event });
+  return NextResponse.json({
+    ok: true,
+    merged: survivingEventId !== eventId,
+    eventId: survivingEventId,
+    event: mapEventForUser(event, user.id),
+  });
 }

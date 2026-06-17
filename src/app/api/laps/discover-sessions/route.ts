@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   const eventId = typeof body?.eventId === "string" ? body.eventId.trim() : "";
   if (eventId) {
     const ev = await prisma.event.findFirst({
-      where: { id: eventId, userId: user.id },
+      where: { id: eventId },
       select: { raceClass: true },
     });
     eventRaceClass = ev?.raceClass?.trim() || null;

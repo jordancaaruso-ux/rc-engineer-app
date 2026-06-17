@@ -19,6 +19,7 @@ type EventItem = {
   notes: string | null;
   practiceSourceUrl?: string | null;
   resultsSourceUrl?: string | null;
+  hasLiveRcLink?: boolean;
   controlledTireTypeId?: string | null;
   controlledTireType?: { id: string; displayName: string; modelCode: string } | null;
   track: { id: string; name: string; location?: string | null } | null;
@@ -78,9 +79,20 @@ function EventSection({
         <ul className="rounded-lg border border-border divide-y divide-border">
           {events.map((ev) => (
             <li key={ev.id} className="px-4 py-3">
-              <Link href={`/events/${ev.id}`} className="font-medium hover:underline block">
-                {ev.name}
-              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href={`/events/${ev.id}`} className="font-medium hover:underline">
+                  {ev.name}
+                </Link>
+                {ev.hasLiveRcLink ? (
+                  <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                    LiveRC linked
+                  </span>
+                ) : (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    Planned
+                  </span>
+                )}
+              </div>
               <div className="text-sm text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0">
                 {ev.track && (
                   <span>
@@ -183,7 +195,7 @@ export function EventList({
     try {
       const start = startDate || new Date().toISOString().slice(0, 10);
       const end = endDate || start;
-      const { event } = await jsonFetch<{ event: EventItem }>("/api/events", {
+      const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -197,6 +209,21 @@ export function EventList({
           controlledTireTypeId: controlledTireTypeId.trim() || null,
         }),
       });
+      const data = (await res.json().catch(() => ({}))) as {
+        event?: EventItem;
+        error?: string;
+        existingEventId?: string;
+      };
+      if (res.status === 409 && data.event) {
+        setEvents((prev) => [data.event!, ...prev.filter((e) => e.id !== data.event!.id)]);
+        setMessage(data.error ?? "Joined existing event with this LiveRC URL.");
+        router.refresh();
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(data.error ?? `Request failed (${res.status})`);
+      }
+      const { event } = data as { event: EventItem };
       setEvents((prev) => [event, ...prev]);
       setName("");
       setTrackId("");

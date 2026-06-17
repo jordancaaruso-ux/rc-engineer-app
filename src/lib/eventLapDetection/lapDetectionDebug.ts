@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { userCanAccessEvent } from "@/lib/events/eventParticipation";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { fetchUrlText } from "@/lib/lapUrlParsers/fetchText";
 import {
@@ -76,8 +77,10 @@ export async function buildEventLapDetectionDebug(
   userId: string,
   eventId: string
 ): Promise<EventLapDetectionDebugPayload | null> {
+  if (!(await userCanAccessEvent(userId, eventId))) return null;
+
   const event = await prisma.event.findFirst({
-    where: { id: eventId, userId },
+    where: { id: eventId },
     select: {
       id: true,
       name: true,

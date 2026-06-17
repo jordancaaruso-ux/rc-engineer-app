@@ -156,7 +156,7 @@ export async function POST(request: Request) {
     let eventRaceClass: string | null = null;
     if (eventId) {
       const ev = await prisma.event.findFirst({
-        where: { id: eventId, userId: user.id },
+        where: { id: eventId },
         select: { raceClass: true },
       });
       eventRaceClass = ev?.raceClass?.trim() || null;
@@ -230,7 +230,7 @@ export async function POST(request: Request) {
   let eventRaceClassField: string | null = null;
   if (eventId && isResults) {
     const ev = await prisma.event.findFirst({
-      where: { id: eventId, userId: user.id },
+      where: { id: eventId },
       select: { raceClass: true },
     });
     const rc = ev?.raceClass?.trim();

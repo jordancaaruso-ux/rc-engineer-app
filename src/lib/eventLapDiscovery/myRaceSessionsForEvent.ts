@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { userCanAccessEvent } from "@/lib/events/eventParticipation";
 import {
   getLiveRcDriverIdSetting,
   getLiveRcDriverNameSetting,
@@ -147,8 +148,17 @@ export async function listMyPendingRaceSessionsForEvent(
     };
   }
 
+  if (!(await userCanAccessEvent(userId, eventId))) {
+    return {
+      sessions: [],
+      hint: "Event not found.",
+      hubRowCount: 0,
+      pagesChecked: 0,
+    };
+  }
+
   const event = await prisma.event.findFirst({
-    where: { id: eventId, userId },
+    where: { id: eventId },
     select: { resultsSourceUrl: true },
   });
   const pageUrl = event?.resultsSourceUrl?.trim() ?? "";

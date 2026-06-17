@@ -57,8 +57,12 @@ export default async function EditRunPage({
           trackId: true,
           startDate: true,
           endDate: true,
-          notes: true,
           track: { select: { id: true, name: true, location: true } },
+          participations: {
+            where: { userId: user.id },
+            select: { notes: true },
+            take: 1,
+          },
         },
       },
       raceClass: true,
@@ -196,7 +200,7 @@ export default async function EditRunPage({
                   trackId: run.event.trackId,
                   startDate: run.event.startDate.toISOString(),
                   endDate: run.event.endDate.toISOString(),
-                  notes: run.event.notes,
+                  notes: run.event.participations[0]?.notes ?? null,
                   track: run.event.track
                     ? { id: run.event.track.id, name: run.event.track.name, location: run.event.track.location }
                     : null,

@@ -8,6 +8,7 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { pickFeaturedEvent } from "@/lib/eventActive";
 import { formatFeaturedEventDateLabel } from "@/lib/formatDate";
 import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
+import { loadUserScopedEvents, userCanAccessEvent } from "@/lib/events/eventParticipation";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
@@ -33,7 +34,8 @@ function localTodayBounds(): { start: Date; end: Date } {
   return { start, end };
 }
 
-const runPrefillInclude = {
+const runPrefillInclude = (userId: string) =>
+  ({
   track: { select: { id: true, name: true } },
   car: { select: { id: true, name: true } },
   tireSet: { select: { id: true, label: true, setNumber: true } },
@@ -45,12 +47,16 @@ const runPrefillInclude = {
       trackId: true,
       startDate: true,
       endDate: true,
-      notes: true,
       track: { select: { id: true, name: true, location: true } },
+      participations: {
+        where: { userId },
+        select: { notes: true },
+        take: 1,
+      },
     },
   },
   setupSnapshot: { select: { id: true, data: true } },
-} as const;
+} as const);
 
 function serializeRunForPrefill(
   run: {
@@ -74,8 +80,8 @@ function serializeRunForPrefill(
       trackId: string | null;
       startDate: Date;
       endDate: Date;
-      notes: string | null;
       track: { id: string; name: string; location: string | null } | null;
+      participations: Array<{ notes: string | null }>;
     } | null;
     track: { id: string; name: string } | null;
     tireSet: { id: string; label: string; setNumber: number | null } | null;
@@ -106,9 +112,13 @@ function serializeRunForPrefill(
     setupSnapshot: run.setupSnapshot,
     event: run.event
       ? {
-          ...run.event,
+          id: run.event.id,
+          name: run.event.name,
+          trackId: run.event.trackId,
           startDate: run.event.startDate.toISOString(),
           endDate: run.event.endDate.toISOString(),
+          notes: run.event.participations[0]?.notes ?? null,
+          track: run.event.track,
         }
       : null,
     track: run.track,
@@ -174,10 +184,10 @@ export async function getDashboardNewRunPrefill(
   if (!from || !eventId) return null;
 
   const event = await prisma.event.findFirst({
-    where: { id: eventId, userId },
+    where: { id: eventId },
     select: { id: true, trackId: true },
   });
-  if (!event) return null;
+  if (!event || !(await userCanAccessEvent(userId, eventId))) return null;
 
   if (from === "first") {
     return { mode: "first", eventId: event.id, trackId: event.trackId };
@@ -187,7 +197,7 @@ export async function getDashboardNewRunPrefill(
     const run = await prisma.run.findFirst({
       where: { userId, eventId: event.id },
       orderBy: { createdAt: "desc" },
-      include: runPrefillInclude,
+      include: runPrefillInclude(userId),
     });
     if (!run) {
       return { mode: "first", eventId: event.id, trackId: event.trackId };
@@ -394,16 +404,8 @@ export async function loadDashboardHomeModel(
   // sources fresh for next features / pages.
   void syncRecentEventLapSources(userId).catch(() => {});
 
-  const [events, recentRun, todaysRuns, priorRun, incompleteRunsRows] = await Promise.all([
-    prisma.event.findMany({
-      where: { userId },
-      orderBy: { startDate: "desc" },
-      take: 40,
-      include: {
-        track: { select: { id: true, name: true, location: true } },
-        _count: { select: { runs: true } },
-      },
-    }),
+  const [scopedEvents, recentRun, todaysRuns, priorRun, incompleteRunsRows] = await Promise.all([
+    loadUserScopedEvents({ userId, take: 40 }),
     prisma.run.findFirst({
       where: { userId },
       orderBy: { sortAt: "desc" },
@@ -489,21 +491,21 @@ export async function loadDashboardHomeModel(
   }
 
   const featuredPick = pickFeaturedEvent(
-    events.map((event) => ({
+    scopedEvents.map((event) => ({
       id: event.id,
       name: event.name,
       startDate: event.startDate,
       endDate: event.endDate,
-      runCount: event._count.runs,
+      runCount: event.runCount,
     })),
     timeZone
   );
 
   let featuredBlock: DashboardHomeModel["featuredEvent"] = null;
   if (featuredPick) {
-    const featuredEvent = events.find((event) => event.id === featuredPick.id);
+    const featuredEvent = scopedEvents.find((event) => event.id === featuredPick.id);
     if (featuredEvent) {
-      const runCount = featuredEvent._count.runs;
+      const runCount = featuredEvent.runCount;
       const latestRun =
         runCount > 0
           ? await prisma.run.findFirst({

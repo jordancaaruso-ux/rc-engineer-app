@@ -31,7 +31,7 @@ export async function expandLiveRcEventHubForImport(
   const eid = typeof eventId === "string" ? eventId.trim() : "";
   if (eid) {
     const ev = await prisma.event.findFirst({
-      where: { userId, id: eid },
+      where: { id: eid },
       select: { raceClass: true },
     });
     if (ev?.raceClass?.trim()) {

@@ -20,6 +20,7 @@ import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionComp
 import { coerceFeelVsLastRunForCompleteRun, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
+import { ensureEventParticipation } from "@/lib/events/eventParticipation";
 
 type RunUpsertBody = {
   runId?: string;
@@ -366,12 +367,15 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
 
   const event = body.eventId
     ? await prisma.event.findFirst({
-        where: { id: body.eventId, userId: params.userId },
+        where: { id: body.eventId },
         select: { id: true },
       })
     : null;
   if (body.eventId && !event) {
     return NextResponse.json({ error: "Event not found" }, { status: 400 });
+  }
+  if (event) {
+    await ensureEventParticipation({ userId: params.userId, eventId: event.id });
   }
 
   const sessionType =

@@ -8,6 +8,7 @@ import {
   buildLiveRcMeetingDetectionPayload,
   normalizeLiveRcEventHubUrl,
 } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
+import { findEventByTrackAndResultsUrl, findPlannedEventAtTrack } from "@/lib/events/findEventForLiveRc";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +43,10 @@ export async function POST(request: Request) {
     });
   }
 
+  const referenceDate = new Date();
   const meeting = await detectActiveRaceMeetingAtTrack({
     trackLiveRcUrl: liveRcUrl,
-    referenceDate: new Date(),
+    referenceDate,
   });
 
   if (!meeting.detected || !meeting.eventHubUrl) {
@@ -56,26 +58,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ detected: false, trackId });
   }
 
-  const existingRows = await prisma.event.findMany({
-    where: {
-      userId: user.id,
-      trackId,
-      resultsSourceUrl: { not: null },
-    },
-    select: { id: true, resultsSourceUrl: true },
-  });
-  const existing = existingRows.find((row) => {
-    const norm = row.resultsSourceUrl
-      ? normalizeLiveRcEventHubUrl(row.resultsSourceUrl)
-      : null;
-    return norm === eventHubUrl;
-  });
+  const existing = await findEventByTrackAndResultsUrl(trackId, eventHubUrl);
+  const planned = existing
+    ? null
+    : await findPlannedEventAtTrack({
+        trackId,
+        referenceDate,
+        eventHubUrl,
+      });
+  const matchedEventId = existing?.id ?? planned?.id ?? null;
 
   const payload = buildLiveRcMeetingDetectionPayload({
     eventLabel: meeting.eventLabel,
     eventHubUrl,
     trackLiveRcUrl: liveRcUrl,
-    matchedEventId: existing?.id ?? null,
+    matchedEventId,
   });
 
   if (!payload) {
@@ -86,5 +83,6 @@ export async function POST(request: Request) {
     trackId,
     trackName: track.name,
     ...payload,
+    matchedPlannedEventId: planned?.id ?? null,
   });
 }

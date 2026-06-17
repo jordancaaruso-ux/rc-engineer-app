@@ -31,6 +31,7 @@ model User {
   batteries       Battery[]
   snapshots       SetupSnapshot[]
   events          Event[]
+  eventParticipations EventParticipation[]
   favouriteTracks FavouriteTrack[]
   trackLocationRunPromptDismissals TrackLocationRunPromptDismissal[]
   appSettings     AppSetting[]
@@ -287,35 +288,60 @@ model Event {
   name       String
   startDate  DateTime
   endDate    DateTime
-  notes      String?
   createdAt  DateTime  @default(now())
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
+  /// Creator (attribution only). Events are global per track/meeting.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
 
-  track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
-  trackId String?
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Restrict)
+  trackId String
 
-  /** LiveRC practice session list URL for this event (optional). */
+  /** LiveRC practice session list URL for this event (optional — often added closer to the date). */
   practiceSourceUrl String?
-  /** LiveRC results index URL for this event (optional). */
+  /** LiveRC results index URL for this event (optional — often added closer to the date). */
   resultsSourceUrl  String?
   /** Race class to watch on results index (e.g. \"17.5 Stock\"). */
   raceClass         String?
-  /** Optional spec / controlled compound label (same style as TireSet.label), e.g. Sweep 32. */
-  controlledTireLabel String?
-  /** Canonical spec tire from global catalog (preferred over controlledTireLabel). */
-  controlledTireType   TireType? @relation(fields: [controlledTireTypeId], references: [id], onDelete: SetNull)
-  controlledTireTypeId String?
 
   /** Watermark for practice auto-import (canonical session completion instant). */
   practiceLastSeenSessionCompletedAt DateTime?
   /** Watermark for results auto-import. */
   resultsLastSeenSessionCompletedAt    DateTime?
 
+  participations EventParticipation[]
   runs Run[]
   importedLapTimeSessions ImportedLapTimeSession[]
   // Future: timetable/scheduled sessions (timetableSessions?), reminders, "most likely session" suggestions
+
+  // NOTE: partial UNIQUE(trackId, resultsSourceUrl) WHERE resultsSourceUrl IS NOT NULL is added in a
+  // LATER migration after scripts/dedupe-events.ts collapses duplicate meeting rows.
+  @@index([trackId, startDate])
+  @@index([trackId, endDate])
+}
+
+/// Per-user link to a global event (spec tire, notes, dashboard pin).
+model EventParticipation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId String
+
+  notes String?
+  /** Legacy free-text spec tire label. */
+  controlledTireLabel String?
+  controlledTireType   TireType? @relation(fields: [controlledTireTypeId], references: [id], onDelete: SetNull)
+  controlledTireTypeId String?
+
+  /** When set, prefer this event on the dashboard among active meetings. */
+  pinnedAt DateTime?
+
+  @@unique([userId, eventId])
+  @@index([eventId])
 }
 
 /** Global tire product catalog (shared across all users). */
@@ -330,7 +356,7 @@ model TireType {
   createdByUserId String?
 
   tireSets  TireSet[]
-  events    Event[]
+  eventParticipations EventParticipation[]
 
   @@index([displayName])
 }

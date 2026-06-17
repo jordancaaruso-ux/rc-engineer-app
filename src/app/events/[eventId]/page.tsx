@@ -5,6 +5,11 @@ import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
 import { EventLapSourcesPanel } from "@/components/events/EventLapSourcesPanel";
 import { EventMetaEditor } from "@/components/events/EventMetaEditor";
+import {
+  EVENT_LIST_INCLUDE,
+  mapEventForUser,
+  userCanAccessEvent,
+} from "@/lib/events/eventParticipation";
 
 export default async function EventDetailPage(props: {
   params: Promise<{ eventId: string }>;
@@ -30,15 +35,12 @@ export default async function EventDetailPage(props: {
   const { eventId } = await props.params;
   const user = await requireCurrentUser();
 
-  const event = await prisma.event.findFirst({
-    where: { id: eventId, userId: user.id },
-    include: {
-      track: { select: { id: true, name: true, location: true } },
-      controlledTireType: { select: { id: true, displayName: true, modelCode: true } },
-    },
+  const raw = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: EVENT_LIST_INCLUDE,
   });
 
-  if (!event) {
+  if (!raw || !(await userCanAccessEvent(user.id, eventId))) {
     return (
       <>
         <header className="page-header">
@@ -57,6 +59,8 @@ export default async function EventDetailPage(props: {
     );
   }
 
+  const event = mapEventForUser(raw, user.id);
+
   const runCount = await prisma.run.count({
     where: { eventId: event.id, userId: user.id },
   });
@@ -66,7 +70,9 @@ export default async function EventDetailPage(props: {
       <header className="page-header">
         <div>
           <h1 className="page-title">{event.name}</h1>
-          <p className="page-subtitle">Event details.</p>
+          <p className="page-subtitle">
+            {event.hasLiveRcLink ? "LiveRC linked meeting" : "Planned meeting"}
+          </p>
         </div>
         <Link
           href="/events"
