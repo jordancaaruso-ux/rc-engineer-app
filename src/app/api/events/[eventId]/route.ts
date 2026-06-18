@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -75,18 +76,7 @@ export async function PATCH(
     await ensureEventParticipation({ userId: user.id, eventId });
   }
 
-  const eventData: {
-    name?: string;
-    trackId?: string | null;
-    trackNameSnapshot?: string;
-    trackLocationSnapshot?: string | null;
-    legacyTrackJson?: null;
-    startDate?: Date;
-    endDate?: Date;
-    practiceSourceUrl?: string | null;
-    resultsSourceUrl?: string | null;
-    raceClass?: string | null;
-  } = {};
+  const eventData: Prisma.EventUncheckedUpdateInput = {};
 
   if (body.name !== undefined) {
     const name = optString(body.name);
@@ -111,7 +101,7 @@ export async function PATCH(
     eventData.trackId = trackId;
     eventData.trackNameSnapshot = linkFields.trackNameSnapshot;
     eventData.trackLocationSnapshot = linkFields.trackLocationSnapshot;
-    eventData.legacyTrackJson = null;
+    eventData.legacyTrackJson = Prisma.DbNull;
   }
 
   const nextStart =
@@ -148,17 +138,20 @@ export async function PATCH(
   let survivingEventId = eventId;
 
   if (Object.keys(eventData).length > 0) {
-    const targetTrackId = eventData.trackId ?? existing.trackId;
-    const targetResultsUrl =
+    const resolvedTrackId =
+      typeof eventData.trackId === "string" ? eventData.trackId : existing.trackId;
+    const resolvedResultsUrl =
       eventData.resultsSourceUrl !== undefined
-        ? eventData.resultsSourceUrl
+        ? typeof eventData.resultsSourceUrl === "string"
+          ? eventData.resultsSourceUrl
+          : null
         : existing.resultsSourceUrl;
 
-    if (targetResultsUrl && targetTrackId) {
+    if (resolvedResultsUrl && resolvedTrackId) {
       const merge = await mergeEventIntoExistingByResultsUrl({
         sourceEventId: survivingEventId,
-        trackId: targetTrackId,
-        resultsSourceUrl: targetResultsUrl,
+        trackId: resolvedTrackId,
+        resultsSourceUrl: resolvedResultsUrl,
       });
       if (merge.merged) {
         survivingEventId = merge.eventId;

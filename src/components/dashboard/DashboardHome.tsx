@@ -168,14 +168,14 @@ export function DashboardHome({
           <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <ActionItemListPanel
               list="try"
-              title="Try"
+              title="Things to try"
               addPlaceholder="Add an idea…"
               initialItems={thingsToTry}
               embedded
             />
             <ActionItemListPanel
               list="do"
-              title="Do"
+              title="things to do"
               addPlaceholder="Add a reminder…"
               initialItems={thingsToDo}
               embedded

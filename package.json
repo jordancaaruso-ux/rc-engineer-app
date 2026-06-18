@@ -25,6 +25,7 @@
     "test:between-hints": "npx tsx src/lib/engineerPhase5/betweenRunHints/betweenRunHints.test.ts",
     "test:engineering-read": "npx tsx src/lib/engineerPhase5/engineeringRead.test.ts",
     "test:intent": "node --conditions=react-server --import tsx src/lib/engineerPhase5/parameterEffects/intentFromMessage.test.ts",
+    "test:mechanism-outcomes": "node --conditions=react-server --import tsx src/lib/engineerPhase5/parameterEffects/mechanismOutcomes.test.ts",
     "test:reasoning-spine": "node --conditions=react-server --import tsx src/lib/engineerPhase5/reasoningSpine/reasoningSpine.test.ts",
     "test:spine-routes": "npx tsx src/lib/engineerPhase5/reasoningSpine/parseRoutes.test.ts",
     "test:video-analysis": "npx tsx src/lib/videoAnalysis/sectorStats.test.ts",

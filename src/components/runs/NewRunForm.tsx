@@ -40,9 +40,7 @@ import {
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
 import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
-import { TrackMetaChipGroups } from "@/components/runs/TrackMetaChipGroups";
 import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDialog";
-import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions";
 import {
@@ -345,8 +343,6 @@ export function NewRunForm(props: {
   const [carRating, setCarRating] = useState<number | null>(null);
   const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("tires");
   const [trackSaveWarning, setTrackSaveWarning] = useState(false);
-  const [trackGripTags, setTrackGripTags] = useState<string[]>([]);
-  const [trackLayoutTags, setTrackLayoutTags] = useState<string[]>([]);
 
   const [showNewBatteryPanel, setShowNewBatteryPanel] = useState(false);
   const [creatingBattery, setCreatingBattery] = useState(false);
@@ -1260,17 +1256,6 @@ export function NewRunForm(props: {
       alive = false;
     };
   }, [tracksFingerprint]);
-
-  useEffect(() => {
-    const t = tracksList.find((x) => x.id === trackId);
-    if (t) {
-      setTrackGripTags(Array.isArray(t.gripTags) ? [...t.gripTags] : []);
-      setTrackLayoutTags(Array.isArray(t.layoutTags) ? [...t.layoutTags] : []);
-    } else {
-      setTrackGripTags([]);
-      setTrackLayoutTags([]);
-    }
-  }, [trackId, tracksList]);
 
   /** Past-run + downloaded setup lists scoped to the selected car. */
   useEffect(() => {
@@ -2309,28 +2294,6 @@ export function NewRunForm(props: {
     }
   }
 
-  async function persistTrackPatch(overrides?: { gripTags?: string[]; layoutTags?: string[] }) {
-    if (!trackId) return;
-    const gripTags = overrides?.gripTags ?? trackGripTags;
-    const layoutTags = overrides?.layoutTags ?? trackLayoutTags;
-    try {
-      const res = await fetch(`/api/tracks/${encodeURIComponent(trackId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gripTags,
-          layoutTags,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { track?: TrackOption };
-      if (res.ok && data.track) {
-        setTracksList((prev) => prev.map((x) => (x.id === trackId ? { ...x, ...data.track } : x)));
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
   function navigateAfterRunComplete(runId: string) {
     pendingCompleteNavigationRef.current = true;
     setTimeout(() => {
@@ -3089,53 +3052,12 @@ export function NewRunForm(props: {
                       setTrackAutoDetectMessage(null);
                     }}
                   />
-                  {(() => {
-                    const t = tracksList.find((x) => x.id === trackId);
-                    if (!t || trackHasMarkedLocation(t)) return null;
-                    return (
-                      <TrackLocationNotSetBanner
-                        trackId={t.id}
-                        trackName={t.name}
-                        location={t.location}
-                        initial={{ latitude: t.latitude, longitude: t.longitude }}
-                        showCurrentLocation
-                        onSaved={(saved) => {
-                          setTracksList((prev) =>
-                            prev.map((x) => (x.id === t.id ? { ...x, ...saved } : x))
-                          );
-                        }}
-                      />
-                    );
-                  })()}
                 </div>
               )}
             </div>
             {copyTrackWarning && (
               <div className="text-[11px] text-muted-foreground">{copyTrackWarning}</div>
             )}
-
-            {trackId ? (
-              <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
-                <div className="ui-title text-xs text-muted-foreground">
-                  Track details (saved on track)
-                </div>
-                <p className="text-[11px] text-muted-foreground leading-snug">
-                  Tap chips to describe grip and layout; you can select multiple (e.g. medium + high grip).
-                </p>
-                <TrackMetaChipGroups
-                  gripTags={trackGripTags}
-                  layoutTags={trackLayoutTags}
-                  onGripChange={(next) => {
-                    setTrackGripTags(next);
-                    void persistTrackPatch({ gripTags: next });
-                  }}
-                  onLayoutChange={(next) => {
-                    setTrackLayoutTags(next);
-                    void persistTrackPatch({ layoutTags: next });
-                  }}
-                />
-              </div>
-            ) : null}
           </div>
         ) : null}
 

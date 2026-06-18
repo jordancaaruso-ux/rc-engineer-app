@@ -23,7 +23,7 @@ const APPLY = process.argv.includes("--apply");
 type EventRow = {
   id: string;
   name: string;
-  trackId: string;
+  trackId: string | null;
   startDate: Date;
   resultsSourceUrl: string;
   runCount: number;
