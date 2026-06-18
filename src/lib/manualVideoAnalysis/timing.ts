@@ -7,6 +7,7 @@ import type {
   ManualVideoSessionV2,
 } from "./types";
 import { newTimingSessionId } from "./types";
+import { parseViewCropNorm } from "./videoViewCrop";
 
 export function driversFromParseResult(
   parsed: LapUrlParseResult,
@@ -246,7 +247,12 @@ export function normalizeManualSession(session: ManualVideoSessionV2): ManualVid
       laps: d.laps.map((l) => ({ ...l, isIncluded: l.isIncluded !== false })),
     })),
   }));
-  return applyTop3LapSelection({ ...session, timingSessions });
+  const viewCropNorm = session.viewCropNorm ? parseViewCropNorm(session.viewCropNorm) : undefined;
+  return applyTop3LapSelection({
+    ...session,
+    timingSessions,
+    ...(viewCropNorm ? { viewCropNorm } : { viewCropNorm: undefined }),
+  });
 }
 
 export function applyTop3LapSelection(session: ManualVideoSessionV2): ManualVideoSessionV2 {

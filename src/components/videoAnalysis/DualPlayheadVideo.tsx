@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { VideoWithLineOverlay } from "./VideoWithLineOverlay";
+import { VideoCropFrame } from "./VideoCropFrame";
+import { VideoCropSelector } from "./VideoCropSelector";
+import type { VideoViewCropNorm } from "@/lib/manualVideoAnalysis/types";
 import type { SectorLineNorm } from "./SectorLineCanvas";
 import { VideoFrameControls } from "./VideoFrameControls";
 import { useVideoOverlayFrameLockSync } from "@/components/videos/useVideoOverlayFrameLockSync";
 import {
   pauseBoth,
   playBothSynced,
-  seekBottomAndSync,
 } from "@/components/videos/videoOverlayPlayback";
 import { hardSeekTop, seekVideoTo } from "@/components/videos/videoOverlaySync";
 
@@ -18,19 +20,19 @@ type Props = {
   videoSrc: string | null;
   lines: SectorLineNorm[];
   activeLineKey: string | null;
-  /** Ghost (top) = bottom + offsetSec when both compare laps are selected. */
   offsetSec: number | null;
-  /** True when my + competitor laps are picked — show dual-layer ghost view. */
   ghostCompareActive?: boolean;
-  /** Snap bottom playhead here when compare laps are first picked. */
   alignBottomSec?: number | null;
-  /** Fine-tune ghost layer relative to transponder alignment (seconds). */
   syncNudgeSec?: number;
   onSyncNudge?: (deltaSec: number) => void;
   bottomLabel?: string;
   topLabel?: string;
   videoRef?: RefObject<HTMLVideoElement | null>;
   onBottomTimeChange?: (sec: number) => void;
+  viewCropNorm?: VideoViewCropNorm | null;
+  cropSelectMode?: boolean;
+  draftCrop?: VideoViewCropNorm | null;
+  onDraftCropChange?: (crop: VideoViewCropNorm | null) => void;
 };
 
 function SectorLinesSvg({
@@ -79,6 +81,10 @@ export function DualPlayheadVideo({
   topLabel = "Compare",
   videoRef,
   onBottomTimeChange,
+  viewCropNorm = null,
+  cropSelectMode = false,
+  draftCrop = null,
+  onDraftCropChange,
 }: Props) {
   const internalBottomRef = useRef<HTMLVideoElement>(null);
   const bottomRef = videoRef ?? internalBottomRef;
@@ -86,7 +92,13 @@ export function DualPlayheadVideo({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const showGhost =
-    ghostCompareActive && offsetSec != null && Number.isFinite(offsetSec) && Boolean(videoSrc);
+    ghostCompareActive &&
+    offsetSec != null &&
+    Number.isFinite(offsetSec) &&
+    Boolean(videoSrc) &&
+    !cropSelectMode;
+
+  const displayCrop = cropSelectMode ? null : viewCropNorm;
 
   useVideoOverlayFrameLockSync({
     bottomRef,
@@ -150,45 +162,54 @@ export function DualPlayheadVideo({
           lines={lines}
           activeLineKey={activeLineKey}
           videoRef={singleRef}
+          viewCropNorm={viewCropNorm}
+          cropSelectMode={cropSelectMode}
+          draftCrop={draftCrop}
+          onDraftCropChange={onDraftCropChange}
+          hideControls={cropSelectMode}
         />
-        <VideoFrameControls
-          videoRef={singleRef}
-          active={!!videoSrc}
-          playbackRate={playbackRate}
-          onPlaybackRateChange={setPlaybackRate}
-        />
+        {!cropSelectMode ? (
+          <VideoFrameControls
+            videoRef={singleRef}
+            active={!!videoSrc}
+            playbackRate={playbackRate}
+            onPlaybackRateChange={setPlaybackRate}
+          />
+        ) : null}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
-      <div className="relative aspect-video w-full bg-black rounded-md overflow-hidden border border-border">
-        <video
-          ref={bottomRef}
-          src={videoSrc ?? undefined}
-          className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-          style={{ opacity: 0.5 }}
-          playsInline
-          preload="metadata"
-        />
-        <video
-          ref={topRef}
-          src={videoSrc ?? undefined}
-          className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-          style={{ opacity: 0.5 }}
-          playsInline
-          muted
-          preload="metadata"
-        />
-        <SectorLinesSvg lines={lines} activeLineKey={activeLineKey} />
-        <div className="absolute bottom-1 left-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
-          {bottomLabel}
+      <VideoCropFrame crop={displayCrop} rounded={false} className="rounded-md">
+        <div className="absolute inset-0">
+          <video
+            ref={bottomRef}
+            src={videoSrc ?? undefined}
+            className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+            style={{ opacity: 0.5 }}
+            playsInline
+            preload="metadata"
+          />
+          <video
+            ref={topRef}
+            src={videoSrc ?? undefined}
+            className="absolute inset-0 h-full w-full object-contain pointer-events-none"
+            style={{ opacity: 0.5 }}
+            playsInline
+            muted
+            preload="metadata"
+          />
+          <SectorLinesSvg lines={lines} activeLineKey={activeLineKey} />
+          <div className="absolute bottom-1 left-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
+            {bottomLabel}
+          </div>
+          <div className="absolute bottom-1 right-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
+            {topLabel} · ghost
+          </div>
         </div>
-        <div className="absolute bottom-1 right-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
-          {topLabel} · ghost
-        </div>
-      </div>
+      </VideoCropFrame>
       <VideoFrameControls
         videoRef={bottomRef}
         secondaryVideoRef={topRef}

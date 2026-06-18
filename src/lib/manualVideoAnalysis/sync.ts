@@ -194,6 +194,9 @@ export function predictSfStartTime(
   timingSession: ManualTimingSession
 ): number | null {
   const sync = timingSession.sync;
+  const key = lapSfKey(driver.role, lapNumber);
+  if (sync.perLapSfStart?.[key] != null) return sync.perLapSfStart[key]!;
+
   const anchor = sync.anchor;
   if (!anchor) return transponderSfStartSec(driver, lapNumber);
 

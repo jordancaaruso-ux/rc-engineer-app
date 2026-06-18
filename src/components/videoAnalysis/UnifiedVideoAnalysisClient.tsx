@@ -10,6 +10,7 @@ import type {
   ManualDriverLap,
   ManualTimingSession,
   ManualVideoSessionV2,
+  VideoViewCropNorm,
 } from "@/lib/manualVideoAnalysis/types";
 import {
   applyDefaultIsOnVideo,
@@ -25,6 +26,8 @@ import {
   updateTimingSession,
   videoTimeAtLapSf,
 } from "@/lib/manualVideoAnalysis/sessionModel";
+import { lapSfKey } from "@/lib/manualVideoAnalysis/types";
+import { clampViewCropNorm } from "@/lib/manualVideoAnalysis/videoViewCrop";
 
 type SectorLineApi = SectorLineNorm & { sortOrder: number };
 
@@ -147,6 +150,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
   const [timingLoading, setTimingLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [cropSelectMode, setCropSelectMode] = useState(false);
+  const [draftCrop, setDraftCrop] = useState<VideoViewCropNorm | null>(null);
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lines: SectorLineNorm[] =
@@ -265,6 +270,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
 
   function onLapClick(col: DriverColumn, lapNumber: number) {
     const key = driverColumnKey(col);
+    const playhead = currentVideoTime();
     setSelectedLap({
       sessionId: col.sessionId,
       role: col.role,
@@ -272,21 +278,45 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
       driverName: col.driverName,
     });
 
-    if (!session || !referenceAnchoredSession(session)) {
+    const refSession = session ? referenceAnchoredSession(session) : undefined;
+    if (!session || !refSession?.sync.anchor) {
       setMsg(
         `Lap ${lapNumber} selected for ${col.driverName}. Scrub to lap start on video, then Select as anchor.`
       );
       return;
     }
 
+    const anchor = refSession.sync.anchor;
+    const isAnchorDriverLap =
+      refSession.sessionId === col.sessionId &&
+      anchor.driverRole === col.role &&
+      anchor.lapNumber === lapNumber;
+
+    let workingSession = session;
+    if (!isAnchorDriverLap) {
+      const ts = findTimingSession(session, col.sessionId);
+      if (ts) {
+        const sfKey = lapSfKey(col.role, lapNumber);
+        workingSession = updateTimingSession(session, col.sessionId, {
+          sync: {
+            ...ts.sync,
+            perLapSfStart: {
+              ...ts.sync.perLapSfStart,
+              [sfKey]: playhead,
+            },
+          },
+        });
+      }
+    }
+
     const nextCompareLaps = { ...compareLaps, [key]: lapNumber };
     setCompareLaps(nextCompareLaps);
-    const nextSession = sessionWithCompareLaps(session, driverColumns, nextCompareLaps);
+    const nextSession = sessionWithCompareLaps(workingSession, driverColumns, nextCompareLaps);
     nextSession.compare = { ...nextSession.compare, offsetNudgeSec: 0 };
     setSession(nextSession);
     schedulePersist(nextSession);
 
-    const t = videoTimeAtLapSf(session, col.sessionId, col.role, lapNumber, "sf_start");
+    const t = videoTimeAtLapSf(nextSession, col.sessionId, col.role, lapNumber, "sf_start");
     if (t == null) {
       setMsg(`Could not map ${col.driverName} lap ${lapNumber} to video.`);
       return;
@@ -312,6 +342,13 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     }
 
     setCompareSnapSec(null);
+
+    if (!isAnchorDriverLap) {
+      setMsg(
+        `${col.driverName} lap ${lapNumber} synced to playhead @ ${playhead.toFixed(2)}s. Pick the other driver's lap to compare.`
+      );
+      return;
+    }
 
     seekTo(t);
     setMsg(`${col.driverName} lap ${lapNumber} start @ ${t.toFixed(2)}s`);
@@ -449,6 +486,46 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     );
   }
 
+  function startCropMode() {
+    if (!videoSrc) {
+      setMsg("Select a video file first.");
+      return;
+    }
+    setDraftCrop(session?.viewCropNorm ?? null);
+    setCropSelectMode(true);
+    setMsg("Drag on the video to select the track area. Hold Shift for a square.");
+  }
+
+  function cancelCropMode() {
+    setCropSelectMode(false);
+    setDraftCrop(null);
+  }
+
+  function applyCrop() {
+    if (!session) return;
+    const crop = draftCrop ? clampViewCropNorm(draftCrop) : null;
+    if (!crop) {
+      setMsg("Draw a crop region on the video first.");
+      return;
+    }
+    const next = { ...session, viewCropNorm: crop };
+    setSession(next);
+    schedulePersist(next);
+    setCropSelectMode(false);
+    setDraftCrop(null);
+    setMsg("Crop applied. Use Revert crop to restore the full frame.");
+  }
+
+  function revertCrop() {
+    if (!session) return;
+    const next = { ...session, viewCropNorm: undefined };
+    setSession(next);
+    schedulePersist(next);
+    setCropSelectMode(false);
+    setDraftCrop(null);
+    setMsg("Crop removed — showing full video frame.");
+  }
+
   if (!data || !session) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
@@ -483,6 +560,52 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           <span className="text-muted-foreground ml-2">{session.localVideoName}</span>
         )}
       </label>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {!cropSelectMode ? (
+          <>
+            <button
+              type="button"
+              className="rounded-md border border-border px-3 py-1.5 hover:bg-muted disabled:opacity-50"
+              disabled={!videoSrc}
+              onClick={startCropMode}
+            >
+              Crop video
+            </button>
+            {session.viewCropNorm ? (
+              <button
+                type="button"
+                className="rounded-md border border-border px-3 py-1.5 text-muted-foreground hover:bg-muted"
+                onClick={revertCrop}
+              >
+                Revert crop
+              </button>
+            ) : null}
+            {session.viewCropNorm ? (
+              <span className="text-muted-foreground">Track crop active</span>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground disabled:opacity-50"
+              disabled={!draftCrop}
+              onClick={applyCrop}
+            >
+              Apply crop
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-border px-3 py-1.5 hover:bg-muted"
+              onClick={cancelCropMode}
+            >
+              Cancel
+            </button>
+            <span className="text-muted-foreground">Snipping mode — drag on video</span>
+          </>
+        )}
+      </div>
 
       <div className="max-w-xl flex flex-col gap-2 text-xs">
         <label>
@@ -645,10 +768,14 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           ghostCompareActive={ghostCompareActive}
           alignBottomSec={compareSnapSec}
           syncNudgeSec={session.compare.offsetNudgeSec ?? 0}
-          onSyncNudge={ghostCompareActive ? nudgeCompareSync : undefined}
+          onSyncNudge={ghostCompareActive && !cropSelectMode ? nudgeCompareSync : undefined}
           bottomLabel={compareSlotLabel(session, col0, compareLap0)}
           topLabel={compareSlotLabel(session, col1, compareLap1)}
           videoRef={videoRef}
+          viewCropNorm={session.viewCropNorm ?? null}
+          cropSelectMode={cropSelectMode}
+          draftCrop={draftCrop}
+          onDraftCropChange={setDraftCrop}
         />
       </div>
 

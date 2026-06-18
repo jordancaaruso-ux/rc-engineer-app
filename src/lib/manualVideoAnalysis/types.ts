@@ -35,6 +35,8 @@ export type ManualSessionSync = {
   anchor?: ManualSyncAnchor;
   globalOffsetSec?: number;
   perLapSfEnd?: Record<string, number>;
+  /** Video time (sec) at SF lap start when transponder walk differs from scrubbed sync. */
+  perLapSfStart?: Record<string, number>;
 };
 
 export type ManualTimingSession = {
@@ -68,11 +70,21 @@ export type ManualFrameMark = {
   videoTimeSec: number;
 };
 
+/** Normalized viewport crop over the 16:9 video frame (persisted in manualJson). */
+export type VideoViewCropNorm = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 export type ManualVideoSessionV2 = {
   version: typeof MANUAL_VIDEO_SESSION_VERSION;
   timingSource: "run" | "url";
   timingUrls?: string[];
   localVideoName?: string | null;
+  /** Snipping-tool crop — zooms playback to the track region only. */
+  viewCropNorm?: VideoViewCropNorm;
   timingSessions: ManualTimingSession[];
   compare: ManualCompareState;
   selectedLaps: { me: number[]; competitor: number[] };
@@ -114,6 +126,10 @@ function parseV1(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
     perLapSfEnd:
       syncRaw.perLapSfEnd && typeof syncRaw.perLapSfEnd === "object"
         ? (syncRaw.perLapSfEnd as Record<string, number>)
+        : undefined,
+    perLapSfStart:
+      syncRaw.perLapSfStart && typeof syncRaw.perLapSfStart === "object"
+        ? (syncRaw.perLapSfStart as Record<string, number>)
         : undefined,
     anchor: anchorRaw
       ? {
@@ -180,6 +196,10 @@ function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
     timingSource: raw.timingSource === "url" ? "url" : "run",
     timingUrls: Array.isArray(raw.timingUrls) ? (raw.timingUrls as string[]) : [],
     localVideoName: typeof raw.localVideoName === "string" ? raw.localVideoName : null,
+    viewCropNorm:
+      raw.viewCropNorm && typeof raw.viewCropNorm === "object"
+        ? (raw.viewCropNorm as VideoViewCropNorm)
+        : undefined,
     timingSessions: raw.timingSessions as ManualTimingSession[],
     compare: {
       my: parseSlot(compareRaw.my),

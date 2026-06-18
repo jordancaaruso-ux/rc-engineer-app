@@ -212,4 +212,30 @@ if (!align || Math.abs(align.offsetSec - (111.5 - 100)) > 0.5) {
   throw new Error(`compare offset should be ghost-bottom, got ${align?.offsetSec}`);
 }
 
+const anchoredCompSession: ManualTimingSession = {
+  sessionId: "heat",
+  label: "Heat",
+  isOnVideo: true,
+  drivers: [me, comp],
+  sync: {
+    anchor: {
+      videoTimeSec: 100,
+      lapNumber: 2,
+      driverRole: "competitor",
+      anchorKind: "sf_start",
+    },
+    perLapSfStart: {
+      "me:2": 118,
+    },
+  },
+};
+const meStartOverride = predictSfStartTime(me, 2, anchoredCompSession);
+if (meStartOverride !== 118) {
+  throw new Error(`perLapSfStart should override same-heat walk, got ${meStartOverride}`);
+}
+const compStartFromAnchor = predictSfStartTime(comp, 2, anchoredCompSession);
+if (compStartFromAnchor !== 100) {
+  throw new Error(`anchor driver lap should stay at anchor video time, got ${compStartFromAnchor}`);
+}
+
 console.log("manualVideoAnalysis sync.test.ts OK");

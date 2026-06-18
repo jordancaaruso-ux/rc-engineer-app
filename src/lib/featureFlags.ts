@@ -1,2 +1,2 @@
-/** Dashboard Engineer suggestions hero — logic/API remain; UI gated here. */
+/** Engineer suggestions UI (dashboard + /engineer) — logic/API remain; hidden while off. */
 export const SHOW_DASHBOARD_ENGINEER_SUGGESTIONS = false;
