@@ -1,14 +1,8 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-import { isMobileOverlayUi } from "@/components/videos/videoOverlayConstants";
 import { syncBothPaused } from "@/components/videos/videoOverlayPlayback";
-import {
-  hardSeekTop,
-  SYNC_HARD_SEEK_MOBILE_SEC,
-  SYNC_HARD_SEEK_SEC,
-  smoothSyncTopToBottom,
-} from "@/components/videos/videoOverlaySync";
+import { frameLockTopToBottom, hardSeekTop } from "@/components/videos/videoOverlaySync";
 
 type VideoFrameRequestCallback = (now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => void;
 
@@ -23,15 +17,15 @@ type Params = {
   offsetSec: number;
   playbackRate: number;
   enabled: boolean;
-  /** When true, drift correction runs during playback. */
-  isPlaying: boolean;
+  /** @deprecated Sync loop follows bottom play/pause events directly. */
+  isPlaying?: boolean;
 };
 
-const PLAYBACK_SYNC_INTERVAL_MS = 100;
+const FALLBACK_SYNC_INTERVAL_MS = 16;
 
 /**
- * Hybrid sync: hard seek when paused/scrubbing; during playback use rate nudge
- * with occasional hard seek when drift grows — smoother than per-frame locking.
+ * Hard frame-lock sync: top follows bottom + offset every decoded frame.
+ * Play/pause on the bottom element drives the correction loop (no React state lag).
  */
 export function useVideoOverlayFrameLockSync({
   bottomRef,
@@ -39,7 +33,6 @@ export function useVideoOverlayFrameLockSync({
   offsetSec,
   playbackRate,
   enabled,
-  isPlaying,
 }: Params): void {
   const offsetRef = useRef(offsetSec);
   const rateRef = useRef(playbackRate);
@@ -69,51 +62,69 @@ export function useVideoOverlayFrameLockSync({
     return () => bottom.removeEventListener("seeked", onSeeked);
   }, [bottomRef, topRef, enabled]);
 
-  // Smooth drift correction while playing.
+  // Per-frame lock while bottom is playing.
   useEffect(() => {
     const bottom = bottomRef.current;
-    const top = topRef.current;
-    if (!bottom || !top || !enabled || !isPlaying) return;
+    if (!bottom || !enabled) return;
 
-    top.muted = true;
-    const hardSeekThreshold = isMobileOverlayUi() ? SYNC_HARD_SEEK_MOBILE_SEC : SYNC_HARD_SEEK_SEC;
     let rvfHandle: number | null = null;
     let intervalId = 0;
     let cancelled = false;
-    let lastTickMs = 0;
 
     const tick = () => {
       if (cancelled || bottom.paused) return;
-      const now = performance.now();
-      if (now - lastTickMs < PLAYBACK_SYNC_INTERVAL_MS) return;
-      lastTickMs = now;
-      smoothSyncTopToBottom(bottom, top, offsetRef.current, hardSeekThreshold);
+      const top = topRef.current;
+      if (!top) return;
+      top.muted = true;
+      frameLockTopToBottom(bottom, top, offsetRef.current);
     };
 
-    const bottomWithRvf = bottom as VideoWithFrameCallback;
-    if (typeof bottomWithRvf.requestVideoFrameCallback === "function") {
-      const onFrame: VideoFrameRequestCallback = () => {
-        if (cancelled || bottom.paused) return;
-        tick();
-        rvfHandle = bottomWithRvf.requestVideoFrameCallback!(onFrame);
-      };
-      rvfHandle = bottomWithRvf.requestVideoFrameCallback(onFrame);
-    } else {
-      intervalId = window.setInterval(tick, PLAYBACK_SYNC_INTERVAL_MS);
-    }
-
-    const onRateChange = () => {
-      if (!bottom.paused) tick();
+    const stopLoop = () => {
+      if (intervalId) {
+        window.clearInterval(intervalId);
+        intervalId = 0;
+      }
+      const bottomWithRvf = bottom as VideoWithFrameCallback;
+      if (rvfHandle != null && typeof bottomWithRvf.cancelVideoFrameCallback === "function") {
+        bottomWithRvf.cancelVideoFrameCallback(rvfHandle);
+        rvfHandle = null;
+      }
     };
-    bottom.addEventListener("ratechange", onRateChange);
+
+    const startLoop = () => {
+      if (cancelled) return;
+      stopLoop();
+      tick();
+
+      const bottomWithRvf = bottom as VideoWithFrameCallback;
+      if (typeof bottomWithRvf.requestVideoFrameCallback === "function") {
+        const onFrame: VideoFrameRequestCallback = () => {
+          if (cancelled || bottom.paused) return;
+          tick();
+          rvfHandle = bottomWithRvf.requestVideoFrameCallback!(onFrame);
+        };
+        rvfHandle = bottomWithRvf.requestVideoFrameCallback(onFrame);
+      } else {
+        intervalId = window.setInterval(tick, FALLBACK_SYNC_INTERVAL_MS);
+      }
+    };
+
+    const onPlay = () => startLoop();
+    const onPause = () => stopLoop();
+    const onEnded = () => stopLoop();
+
+    bottom.addEventListener("play", onPlay);
+    bottom.addEventListener("pause", onPause);
+    bottom.addEventListener("ended", onEnded);
+
+    if (!bottom.paused) startLoop();
 
     return () => {
       cancelled = true;
-      if (intervalId) window.clearInterval(intervalId);
-      if (rvfHandle != null && typeof bottomWithRvf.cancelVideoFrameCallback === "function") {
-        bottomWithRvf.cancelVideoFrameCallback(rvfHandle);
-      }
-      bottom.removeEventListener("ratechange", onRateChange);
+      stopLoop();
+      bottom.removeEventListener("play", onPlay);
+      bottom.removeEventListener("pause", onPause);
+      bottom.removeEventListener("ended", onEnded);
     };
-  }, [bottomRef, topRef, enabled, isPlaying]);
+  }, [bottomRef, topRef, enabled]);
 }

@@ -12,6 +12,7 @@ import type { SectorLineNorm } from "./SectorLineCanvas";
 import { VideoFrameControls } from "./VideoFrameControls";
 import { useVideoOverlayFrameLockSync } from "@/components/videos/useVideoOverlayFrameLockSync";
 import {
+  areBothBufferedForPlay,
   pauseBoth,
   playBothSynced,
 } from "@/components/videos/videoOverlayPlayback";
@@ -95,6 +96,7 @@ export function DualPlayheadVideo({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [videoAspect, setVideoAspect] = useState(VIDEO_FRAME_ASPECT);
+  const [bothReady, setBothReady] = useState(false);
   const showGhost =
     ghostCompareActive &&
     offsetSec != null &&
@@ -119,13 +121,53 @@ export function DualPlayheadVideo({
     return () => bottom.removeEventListener("loadedmetadata", syncAspect);
   }, [bottomRef, videoSrc]);
 
+  useEffect(() => {
+    if (!showGhost) {
+      setBothReady(false);
+      return;
+    }
+    const bottom = bottomRef.current;
+    const top = topRef.current;
+    if (!bottom || !top) return;
+
+    const refreshReady = () => {
+      setBothReady(areBothBufferedForPlay(bottom, top));
+    };
+
+    refreshReady();
+    bottom.addEventListener("canplay", refreshReady);
+    top.addEventListener("canplay", refreshReady);
+    bottom.addEventListener("loadeddata", refreshReady);
+    top.addEventListener("loadeddata", refreshReady);
+    return () => {
+      bottom.removeEventListener("canplay", refreshReady);
+      top.removeEventListener("canplay", refreshReady);
+      bottom.removeEventListener("loadeddata", refreshReady);
+      top.removeEventListener("loadeddata", refreshReady);
+    };
+  }, [showGhost, videoSrc, bottomRef]);
+
+  useEffect(() => {
+    const bottom = bottomRef.current;
+    if (!bottom || !showGhost) return;
+    const syncPlayState = () => setIsPlaying(!bottom.paused && !bottom.ended);
+    syncPlayState();
+    bottom.addEventListener("play", syncPlayState);
+    bottom.addEventListener("pause", syncPlayState);
+    bottom.addEventListener("ended", syncPlayState);
+    return () => {
+      bottom.removeEventListener("play", syncPlayState);
+      bottom.removeEventListener("pause", syncPlayState);
+      bottom.removeEventListener("ended", syncPlayState);
+    };
+  }, [showGhost, videoSrc, bottomRef]);
+
   useVideoOverlayFrameLockSync({
     bottomRef,
     topRef,
     offsetSec: offsetSec ?? 0,
     playbackRate,
     enabled: showGhost,
-    isPlaying,
   });
 
   const syncGhostToBottom = useCallback(() => {
@@ -171,11 +213,10 @@ export function DualPlayheadVideo({
     if (!bottom || !top || offsetSec == null) return;
     if (!bottom.paused) {
       pauseBoth(bottom, top);
-      setIsPlaying(false);
       return;
     }
+    if (!areBothBufferedForPlay(bottom, top)) return;
     await playBothSynced(bottom, top, offsetSec, playbackRate);
-    setIsPlaying(true);
   }
 
   if (!showGhost) {
@@ -228,7 +269,7 @@ export function DualPlayheadVideo({
               ...(displayCrop ? appliedVideoCropStyle(displayCrop) : {}),
             }}
             playsInline
-            preload="metadata"
+            preload="auto"
           />
           <video
             ref={topRef}
@@ -244,7 +285,7 @@ export function DualPlayheadVideo({
             }}
             playsInline
             muted
-            preload="metadata"
+            preload="auto"
           />
           <SectorLinesSvg lines={lines} activeLineKey={activeLineKey} />
           <div className="absolute bottom-1 left-1 z-20 rounded bg-black/75 px-1.5 py-0.5 text-[10px] text-white border border-white/20">
@@ -268,11 +309,12 @@ export function DualPlayheadVideo({
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
-          disabled={!videoSrc}
+          className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-40"
+          disabled={!videoSrc || !bothReady}
           onClick={() => void togglePlay()}
+          title={!bothReady ? "Buffering video…" : undefined}
         >
-          {isPlaying ? "Pause both" : "Play both"}
+          {isPlaying ? "Pause both" : bothReady ? "Play both" : "Buffering…"}
         </button>
       </div>
       {onSyncNudge && (

@@ -1,11 +1,11 @@
 /** Pure sync helpers for dual-video overlay (no React). */
 
 /** Start rate nudge when drift exceeds this (seconds). */
-export const SYNC_SOFT_DRIFT_SEC = 0.05;
-/** Hard seek when drift exceeds this on desktop (seconds). */
-export const SYNC_HARD_SEEK_SEC = 0.22;
+export const SYNC_SOFT_DRIFT_SEC = 0.016;
+/** Hard seek when drift exceeds this on desktop (seconds). ~2 frames at 60fps. */
+export const SYNC_HARD_SEEK_SEC = 0.034;
 /** Hard seek when drift exceeds this on mobile (seconds). */
-export const SYNC_HARD_SEEK_MOBILE_SEC = 0.32;
+export const SYNC_HARD_SEEK_MOBILE_SEC = 0.05;
 /** Playback-rate multiplier while catching up / slowing down. */
 export const SYNC_NUDGE_FACTOR = 1.02;
 
@@ -95,6 +95,7 @@ export function frameLockTopToBottom(
   top: HTMLVideoElement,
   offsetSec: number
 ): void {
+  if (top.seeking) return;
   const target = getSyncedTopTime(bottom.currentTime, offsetSec);
   if (Math.abs(top.currentTime - target) > 0.0001) {
     seekVideoTo(top, target);
