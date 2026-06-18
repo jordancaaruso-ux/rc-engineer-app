@@ -205,6 +205,13 @@ model SetupSheetModel {
   @@index([slug])
 }
 
+/// Catalog slugs removed by an admin — global seed must not recreate them.
+model SetupSheetCatalogSuppression {
+  slug         String   @id
+  suppressedAt DateTime @default(now())
+  suppressedBy String?
+}
+
 model Car {
   id                 String   @id @default(cuid())
   name               String

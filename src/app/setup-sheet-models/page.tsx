@@ -12,8 +12,8 @@ import {
   type SetupSheetModelPickerRow,
 } from "@/lib/setupSheetModels/pickerModels";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
-import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetTemplateId";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { isAuthorizedCatalogSlug } from "@/lib/setupSheetModels/catalogSuppression";
 
 function countDuplicateGroups(models: SetupSheetModelPickerRow[]): number {
   const byNorm = new Map<string, number>();
@@ -132,7 +132,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                 (r) => normalizeSetupSheetModelName(r.name) === norm
               ).length;
               const isDuplicate = dupCount > 1 && !isRecommended;
-              const isBuiltin = m.slug === SETUP_SHEET_MODEL_SLUG_A800RR;
+              const isGlobal = m.isAuthorized;
               const canManage = isAdmin || (m.userId === user.id && !m.isAuthorized);
 
               return (
@@ -150,12 +150,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                           Duplicate — safe to delete
                         </span>
                       ) : null}
-                      {m.isAuthorized ? (
-                        <span className="rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-200">
-                          Authorized
-                        </span>
-                      ) : null}
-                      {isBuiltin ? (
+                      {isGlobal ? (
                         <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                           Built-in
                         </span>
@@ -217,7 +212,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                         carCount={m._count.cars}
                         calibrationCount={m._count.calibrations}
                         documentCount={m._count.setupDocuments}
-                        protectedBuiltin={isBuiltin}
+                        isCatalogEntry={isAuthorizedCatalogSlug(m.slug)}
                       />
                     ) : null}
                   </div>

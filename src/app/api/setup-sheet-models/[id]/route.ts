@@ -6,7 +6,13 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { canManageCalibration } from "@/lib/setupCalibrations/calibrationAccess";
 import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
-import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
+import {
+  invalidateAuthorizedSetupSheetCatalogCache,
+} from "@/lib/setupSheetModels/seedAuthorizedCatalog";
+import {
+  isAuthorizedCatalogSlug,
+  suppressCatalogSlug,
+} from "@/lib/setupSheetModels/catalogSuppression";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 function normalizeSchema(schema: SetupSheetModelSchema | null): SetupSheetModelSchema | null {
@@ -205,14 +211,12 @@ export async function DELETE(_request: Request, ctx: RouteCtx) {
     );
   }
 
-  if (existing.slug === SETUP_SHEET_MODEL_SLUG_A800RR) {
-    return NextResponse.json(
-      { error: "The built-in Awesomatix A800 chassis type cannot be deleted." },
-      { status: 400 }
-    );
+  if (isAuthorizedCatalogSlug(existing.slug)) {
+    await suppressCatalogSlug(existing.slug, user.id);
   }
 
   await prisma.setupSheetModel.delete({ where: { id } });
+  invalidateAuthorizedSetupSheetCatalogCache();
 
   revalidatePath("/cars");
   revalidatePath("/setup");

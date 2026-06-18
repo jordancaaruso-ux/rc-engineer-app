@@ -9,10 +9,15 @@ import { AUTHORIZED_CHASSIS_CATALOG } from "@/lib/setupSheetModels/authorizedCat
 import { buildA800SeedSchema } from "@/lib/setupSheetModels/seedA800Model";
 import { mergeMissingA800CatalogFields } from "@/lib/setupSheetModels/mergeA800CatalogFields";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { getSuppressedCatalogSlugs } from "@/lib/setupSheetModels/catalogSuppression";
 
 // Per-process memo: the catalog is global and idempotent, so once a warm instance has ensured it we
 // skip the round-trip on subsequent page loads.
 let ensured = false;
+
+export function invalidateAuthorizedSetupSheetCatalogCache(): void {
+  ensured = false;
+}
 
 /**
  * Ensure the globally-shared Authorized chassis catalog exists. Idempotent and user-agnostic:
@@ -26,7 +31,8 @@ let ensured = false;
 export async function ensureAuthorizedSetupSheetCatalog(): Promise<void> {
   if (ensured) return;
 
-  const slugs = AUTHORIZED_CHASSIS_CATALOG.map((c) => c.slug);
+  const suppressed = await getSuppressedCatalogSlugs();
+  const slugs = AUTHORIZED_CHASSIS_CATALOG.map((c) => c.slug).filter((s) => !suppressed.has(s));
   const existingRows = await prisma.setupSheetModel.findMany({
     where: { slug: { in: slugs } },
     orderBy: [{ isAuthorized: "desc" }, { createdAt: "asc" }],
@@ -39,6 +45,7 @@ export async function ensureAuthorizedSetupSheetCatalog(): Promise<void> {
   }
 
   for (const entry of AUTHORIZED_CHASSIS_CATALOG) {
+    if (suppressed.has(entry.slug)) continue;
     const found = bySlug.get(entry.slug);
     if (!found) {
       await prisma.setupSheetModel.create({

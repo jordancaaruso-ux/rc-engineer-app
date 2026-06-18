@@ -9,7 +9,8 @@ type Props = {
   carCount: number;
   calibrationCount: number;
   documentCount: number;
-  protectedBuiltin?: boolean;
+  /** True for global catalog slugs (Awesomatix, Mugen MTC3, etc.). */
+  isCatalogEntry?: boolean;
   className?: string;
 };
 
@@ -18,15 +19,15 @@ export function SetupSheetModelDeleteButton(props: Props) {
   const [busy, setBusy] = useState(false);
 
   const onClick = useCallback(async () => {
-    if (props.protectedBuiltin) {
-      window.alert("The built-in Awesomatix A800 chassis type cannot be deleted.");
-      return;
-    }
-
     const parts = [
       `Delete chassis type "${props.modelName}"?`,
       "This cannot be undone.",
     ];
+    if (props.isCatalogEntry) {
+      parts.push(
+        "This is a built-in global chassis type. It will be removed for everyone and will not be auto-restored."
+      );
+    }
     if (props.carCount > 0) {
       parts.push(`${props.carCount} car(s) will be unlinked from this chassis type.`);
     }
@@ -60,13 +61,11 @@ export function SetupSheetModelDeleteButton(props: Props) {
     props.calibrationCount,
     props.carCount,
     props.documentCount,
+    props.isCatalogEntry,
     props.modelId,
     props.modelName,
-    props.protectedBuiltin,
     router,
   ]);
-
-  if (props.protectedBuiltin) return null;
 
   return (
     <button
