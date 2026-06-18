@@ -12,6 +12,7 @@ import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotS
 import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
+import { canDeleteTrack } from "@/lib/tracks/trackAccess";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -79,7 +80,8 @@ export default async function TrackDetailPage(props: {
     prisma.event.count({ where: { trackId } }),
     isTrackFavourite(user.id, trackId),
   ]);
-  const canDelete = track.userId === user.id;
+  const canDelete = canDeleteTrack(user, track);
+  const deleteAsAdmin = canDelete && track.userId !== user.id;
 
   return (
     <>
@@ -144,10 +146,11 @@ export default async function TrackDetailPage(props: {
               trackName={track.name}
               runCount={totalRunCount}
               eventCount={eventCount}
+              asAdmin={deleteAsAdmin}
             />
           ) : (
             <p className="text-xs text-muted-foreground leading-snug">
-              Only the user who added this track can delete it. Your runs at this venue: {runCount}.
+              Only the user who added this track or an admin can delete it. Your runs at this venue: {runCount}.
             </p>
           )}
         </div>

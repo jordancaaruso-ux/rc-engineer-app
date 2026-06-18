@@ -8,6 +8,7 @@ import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
 import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
+import { canDeleteTrack } from "@/lib/tracks/trackAccess";
 
 export async function GET(
   _request: Request,
@@ -180,9 +181,9 @@ export async function DELETE(
   if (!track) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
-  if (track.userId !== user.id) {
+  if (!canDeleteTrack(user, track)) {
     return NextResponse.json(
-      { error: "Only the user who added this track can delete it." },
+      { error: "Only the user who added this track or an admin can delete it." },
       { status: 403 }
     );
   }

@@ -18,6 +18,7 @@ export function TrackDeleteClient(props: {
   trackName: string;
   runCount: number;
   eventCount: number;
+  asAdmin?: boolean;
 }) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -46,6 +47,12 @@ export function TrackDeleteClient(props: {
   return (
     <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-2">
       <div className="ui-title text-sm text-muted-foreground">Delete track</div>
+
+      {props.asAdmin ? (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          You are deleting this track as an admin (you did not add it).
+        </p>
+      ) : null}
 
       <div className="text-sm text-muted-foreground space-y-1 leading-snug">
         <p>
