@@ -10,6 +10,7 @@ import {
   mapEventForUser,
 } from "@/lib/events/eventParticipation";
 import { mergeEventIntoExistingByResultsUrl } from "@/lib/events/mergeEvents";
+import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
 
 function optString(v: unknown): string | null | undefined {
   if (v === undefined) return undefined;
@@ -76,7 +77,10 @@ export async function PATCH(
 
   const eventData: {
     name?: string;
-    trackId?: string;
+    trackId?: string | null;
+    trackNameSnapshot?: string;
+    trackLocationSnapshot?: string | null;
+    legacyTrackJson?: null;
     startDate?: Date;
     endDate?: Date;
     practiceSourceUrl?: string | null;
@@ -95,16 +99,19 @@ export async function PATCH(
   if (body.trackId !== undefined) {
     const trackId = optString(body.trackId);
     if (!trackId) {
-      return NextResponse.json({ error: "trackId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "trackId is required, or omit to keep the legacy track." },
+        { status: 400 }
+      );
     }
-    const track = await prisma.track.findFirst({
-      where: { id: trackId },
-      select: { id: true },
-    });
-    if (!track) {
+    const linkFields = await eventTrackFieldsForLink(trackId);
+    if (!linkFields) {
       return NextResponse.json({ error: "Track not found" }, { status: 400 });
     }
     eventData.trackId = trackId;
+    eventData.trackNameSnapshot = linkFields.trackNameSnapshot;
+    eventData.trackLocationSnapshot = linkFields.trackLocationSnapshot;
+    eventData.legacyTrackJson = null;
   }
 
   const nextStart =
@@ -147,7 +154,7 @@ export async function PATCH(
         ? eventData.resultsSourceUrl
         : existing.resultsSourceUrl;
 
-    if (targetResultsUrl) {
+    if (targetResultsUrl && targetTrackId) {
       const merge = await mergeEventIntoExistingByResultsUrl({
         sourceEventId: survivingEventId,
         trackId: targetTrackId,

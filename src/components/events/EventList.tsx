@@ -23,6 +23,8 @@ type EventItem = {
   controlledTireTypeId?: string | null;
   controlledTireType?: { id: string; displayName: string; modelCode: string } | null;
   track: { id: string; name: string; location?: string | null } | null;
+  trackLabel?: string | null;
+  isLegacyTrack?: boolean;
 };
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -94,10 +96,13 @@ function EventSection({
                 )}
               </div>
               <div className="text-sm text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0">
-                {ev.track && (
+                {(ev.track || ev.trackLabel) && (
                   <span>
-                    {ev.track.name}
-                    {ev.track.location ? ` (${ev.track.location})` : ""}
+                    {ev.track?.name ?? ev.trackLabel}
+                    {ev.track?.location ? ` (${ev.track.location})` : ""}
+                    {ev.isLegacyTrack ? (
+                      <span className="text-amber-700 dark:text-amber-400"> · legacy track</span>
+                    ) : null}
                   </span>
                 )}
                 <span>

@@ -67,7 +67,8 @@ export function TrackDeleteClient(props: {
         ) : null}
         {props.eventCount > 0 ? (
           <p>
-            {props.eventCount} event{props.eventCount === 1 ? "" : "s"} will have their track cleared.
+            {props.eventCount} event{props.eventCount === 1 ? "" : "s"} will keep their meeting data with a legacy
+            track snapshot (name, location, URLs, tags).
           </p>
         ) : null}
       </div>

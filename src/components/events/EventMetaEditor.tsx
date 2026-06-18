@@ -14,6 +14,8 @@ type Props = {
   eventId: string;
   initialName: string;
   initialTrackId: string | null;
+  initialLegacyTrackLabel?: string | null;
+  initialIsLegacyTrack?: boolean;
   initialStartDate: string | Date;
   initialEndDate: string | Date;
   initialNotes: string | null;
@@ -51,6 +53,8 @@ export function EventMetaEditor(props: Props) {
     () => isEndDateBeforeStartDateYmd(startDate, endDate),
     [startDate, endDate]
   );
+  const hasLegacyTrack = Boolean(props.initialIsLegacyTrack && props.initialLegacyTrackLabel?.trim());
+  const canSaveWithoutTrackLink = hasLegacyTrack && !trackId.trim();
 
   async function save() {
     const trimmed = name.trim();
@@ -58,7 +62,7 @@ export function EventMetaEditor(props: Props) {
       setMessage("Name is required.");
       return;
     }
-    if (!trackId.trim()) {
+    if (!trackId.trim() && !hasLegacyTrack) {
       setMessage("Select a track for this event.");
       return;
     }
@@ -72,7 +76,7 @@ export function EventMetaEditor(props: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: trimmed,
-          trackId,
+          ...(trackId.trim() ? { trackId } : {}),
           startDate,
           endDate,
           notes: notes.trim() || null,
@@ -122,15 +126,22 @@ export function EventMetaEditor(props: Props) {
           />
         </div>
         <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Track *</label>
+          <label className="block text-[11px] text-muted-foreground mb-1">
+            Track{hasLegacyTrack && !trackId.trim() ? " (legacy)" : " *"}
+          </label>
+          {hasLegacyTrack && !trackId.trim() ? (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+              {props.initialLegacyTrackLabel} — catalog track removed. Select a new track below to re-link, or leave
+              unchanged to keep this legacy venue.
+            </p>
+          ) : null}
           <select
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+            className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
             value={trackId}
             onChange={(e) => setTrackId(e.target.value)}
             aria-label="Track"
-            required
           >
-            <option value="">— Select track —</option>
+            <option value="">{hasLegacyTrack ? "— Keep legacy track —" : "— Select track —"}</option>
             {tracks.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -186,12 +197,13 @@ export function EventMetaEditor(props: Props) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled={saving || !trackId.trim() || dateRangeInvalid}
+          disabled={saving || (!trackId.trim() && !canSaveWithoutTrackLink) || dateRangeInvalid}
           onClick={() => void save()}
           className={cn(
             buttonLinkClassName("primary"),
             "text-xs px-3 py-1.5",
-            (saving || !trackId.trim() || dateRangeInvalid) && "opacity-70 pointer-events-none"
+            (saving || (!trackId.trim() && !canSaveWithoutTrackLink) || dateRangeInvalid) &&
+              "opacity-70 pointer-events-none"
           )}
         >
           {saving ? "Saving…" : "Save changes"}

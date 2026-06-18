@@ -87,6 +87,8 @@ export default async function EventDetailPage(props: {
             eventId={event.id}
             initialName={event.name}
             initialTrackId={event.trackId}
+            initialLegacyTrackLabel={event.trackLabel}
+            initialIsLegacyTrack={event.isLegacyTrack}
             initialStartDate={event.startDate}
             initialEndDate={event.endDate}
             initialNotes={event.notes}

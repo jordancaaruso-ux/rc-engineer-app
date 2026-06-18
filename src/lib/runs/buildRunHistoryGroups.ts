@@ -11,6 +11,7 @@ export type RunForHistoryGroup = {
     name: string;
     startDate: Date | null;
     endDate: Date | null;
+    trackNameSnapshot?: string | null;
     track?: { name: string } | null;
   } | null;
 };
@@ -53,7 +54,7 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
       : `Test day – ${formatGroupDate(runSessionSortInstant(run))}`;
     const type: RunHistoryGroup["type"] = isEvent ? "Race Meeting" : "Testing";
     const trackName = isEvent && run.event
-      ? (run.event.track?.name ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
+      ? (run.event.track?.name ?? run.event.trackNameSnapshot ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
       : (run.track?.name ?? run.trackNameSnapshot ?? "—");
     const dateLabel = isEvent && run.event
       ? (() => {

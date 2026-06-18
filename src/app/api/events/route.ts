@@ -11,6 +11,7 @@ import {
 } from "@/lib/events/eventParticipation";
 import { findEventByTrackAndResultsUrl } from "@/lib/events/findEventForLiveRc";
 import { eventIdsInScopeForUser } from "@/lib/events/eventParticipation";
+import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
     }
     const track = await prisma.track.findFirst({
       where: { id: trackId },
-      select: { id: true },
+      select: { id: true, name: true, location: true },
     });
     if (!track) {
       return NextResponse.json({ error: "Track not found" }, { status: 400 });
@@ -175,6 +176,8 @@ export async function POST(request: Request) {
         userId: user.id,
         name,
         trackId,
+        trackNameSnapshot: track.name,
+        trackLocationSnapshot: track.location,
         startDate,
         endDate,
         practiceSourceUrl,

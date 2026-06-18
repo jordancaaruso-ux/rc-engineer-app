@@ -9,6 +9,7 @@ import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 import { canDeleteTrack } from "@/lib/tracks/trackAccess";
+import { archiveTrackLegacyDataBeforeDelete } from "@/lib/tracks/legacyTrackSnapshot";
 
 export async function GET(
   _request: Request,
@@ -188,6 +189,7 @@ export async function DELETE(
     );
   }
 
+  await archiveTrackLegacyDataBeforeDelete(trackId);
   await prisma.track.delete({ where: { id: trackId } });
   revalidateAfterTrackMutation(user.id);
   return NextResponse.json({ ok: true });

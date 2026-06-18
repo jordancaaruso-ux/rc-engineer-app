@@ -9,6 +9,7 @@ import { pickFeaturedEvent } from "@/lib/eventActive";
 import { formatFeaturedEventDateLabel } from "@/lib/formatDate";
 import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
 import { loadUserScopedEvents, userCanAccessEvent } from "@/lib/events/eventParticipation";
+import { resolveEventTrackLabel } from "@/lib/tracks/legacyTrackSnapshot";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
@@ -521,10 +522,7 @@ export async function loadDashboardHomeModel(
             })
           : null;
 
-      const track = featuredEvent.track;
-      const trackLabel = track
-        ? `${track.name}${track.location ? ` (${track.location})` : ""}`
-        : null;
+      const trackLabel = resolveEventTrackLabel(featuredEvent);
 
       let latest: {
         bestLap: number | null;

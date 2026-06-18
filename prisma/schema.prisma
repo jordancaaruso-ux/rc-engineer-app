@@ -294,8 +294,14 @@ model Event {
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   userId String?
 
-  track   Track  @relation(fields: [trackId], references: [id], onDelete: Restrict)
-  trackId String
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  trackId String?
+
+  /** Preserved when the linked Track row is deleted. */
+  trackNameSnapshot     String?
+  trackLocationSnapshot String?
+  /** Full track catalog row at unlink/delete time (URLs, tags, GPS, etc.). */
+  legacyTrackJson       Json?
 
   /** LiveRC practice session list URL for this event (optional — often added closer to the date). */
   practiceSourceUrl String?

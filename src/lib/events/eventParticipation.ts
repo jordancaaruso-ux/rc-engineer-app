@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  isLegacyEventTrack,
+  resolveEventTrackLabel,
+} from "@/lib/tracks/legacyTrackSnapshot";
 
 export const EVENT_PARTICIPATION_TIRE_SELECT = {
   id: true,
@@ -87,7 +91,9 @@ export type EventWithUserParticipation = {
   name: string;
   startDate: Date;
   endDate: Date;
-  trackId: string;
+  trackId: string | null;
+  trackNameSnapshot: string | null;
+  trackLocationSnapshot: string | null;
   practiceSourceUrl: string | null;
   resultsSourceUrl: string | null;
   raceClass: string | null;
@@ -122,7 +128,10 @@ export function mapEventForUser<
     name: string;
     startDate: Date;
     endDate: Date;
-    trackId: string;
+    trackId: string | null;
+    trackNameSnapshot: string | null;
+    trackLocationSnapshot: string | null;
+    legacyTrackJson?: unknown;
     practiceSourceUrl: string | null;
     resultsSourceUrl: string | null;
     raceClass: string | null;
@@ -138,9 +147,11 @@ export function mapEventForUser<
   },
 >(event: E, userId: string) {
   const mine = participationForUser(event.participations, userId);
-  const { participations: _p, ...rest } = event;
+  const { participations: _p, legacyTrackJson: _legacy, ...rest } = event;
   return {
     ...rest,
+    trackLabel: resolveEventTrackLabel(event),
+    isLegacyTrack: isLegacyEventTrack(event),
     notes: mine?.notes ?? null,
     controlledTireLabel: mine?.controlledTireLabel ?? null,
     controlledTireTypeId: mine?.controlledTireTypeId ?? null,

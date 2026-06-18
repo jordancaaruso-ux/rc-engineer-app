@@ -40,7 +40,15 @@ const runHistoryInclude = {
   car: { select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true } },
   track: { select: { id: true, name: true } },
   tireSet: { select: { id: true, label: true, setNumber: true } },
-  event: { include: { track: { select: { name: true } } } },
+  event: {
+    select: {
+      name: true,
+      startDate: true,
+      endDate: true,
+      trackNameSnapshot: true,
+      track: { select: { name: true } },
+    },
+  },
   setupSnapshot: { select: { id: true } },
   importedLapSets: {
     orderBy: { createdAt: "asc" as const },
