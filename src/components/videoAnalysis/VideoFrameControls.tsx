@@ -19,6 +19,8 @@ type Props = {
   /** Show scrub slider + time-jump buttons (compare mode). */
   compareScrub?: boolean;
   jumpIntervalsSec?: readonly number[];
+  /** Seek both layers to lap-start sync (compare ghost mode). */
+  onLapStart?: () => void;
 };
 
 export function VideoFrameControls({
@@ -31,6 +33,7 @@ export function VideoFrameControls({
   afterStep,
   compareScrub = false,
   jumpIntervalsSec = DEFAULT_JUMP_SEC,
+  onLapStart,
 }: Props) {
   const [timeSec, setTimeSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
@@ -145,6 +148,15 @@ export function VideoFrameControls({
                 +{sec}s
               </button>
             ))}
+            {onLapStart ? (
+              <button
+                type="button"
+                className="rounded-md border border-border px-1.5 py-0.5 hover:bg-muted ml-0.5"
+                onClick={onLapStart}
+              >
+                Lap start
+              </button>
+            ) : null}
           </div>
         </div>
       )}

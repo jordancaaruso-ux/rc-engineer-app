@@ -103,6 +103,8 @@ export function DualPlayheadVideo({
     !cropSelectMode;
 
   const displayCrop = cropSelectMode ? null : viewCropNorm;
+  const offsetSecRef = useRef(offsetSec);
+  offsetSecRef.current = offsetSec;
 
   useEffect(() => {
     const bottom = bottomRef.current;
@@ -137,17 +139,23 @@ export function DualPlayheadVideo({
     (bottomTime: number) => {
       const bottom = bottomRef.current;
       const top = topRef.current;
-      if (!bottom || !top || offsetSec == null) return;
+      const offset = offsetSecRef.current;
+      if (!bottom || !top || offset == null) return;
       seekVideoTo(bottom, bottomTime);
-      hardSeekTop(bottom, top, offsetSec);
+      hardSeekTop(bottom, top, offset);
     },
-    [bottomRef, offsetSec]
+    [bottomRef]
   );
+
+  const seekToLapStart = useCallback(() => {
+    if (alignBottomSec == null || !Number.isFinite(alignBottomSec)) return;
+    syncBothNow(alignBottomSec);
+  }, [alignBottomSec, syncBothNow]);
 
   useEffect(() => {
     if (!showGhost || alignBottomSec == null || !Number.isFinite(alignBottomSec)) return;
     syncBothNow(alignBottomSec);
-  }, [showGhost, alignBottomSec, offsetSec, syncBothNow, videoSrc]);
+  }, [showGhost, alignBottomSec, syncBothNow, videoSrc]);
 
   useEffect(() => {
     const bottom = bottomRef.current;
@@ -255,6 +263,7 @@ export function DualPlayheadVideo({
         onPlaybackRateChange={setPlaybackRate}
         afterStep={syncGhostToBottom}
         compareScrub
+        onLapStart={alignBottomSec != null ? seekToLapStart : undefined}
       />
       <div className="flex flex-wrap items-center gap-2">
         <button
