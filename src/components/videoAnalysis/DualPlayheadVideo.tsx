@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { VideoWithLineOverlay } from "./VideoWithLineOverlay";
+import {
+  appliedVideoCropStyle,
+  VIDEO_FRAME_ASPECT,
+} from "@/lib/manualVideoAnalysis/videoViewCrop";
 import { VideoCropFrame } from "./VideoCropFrame";
-import { VideoCropSelector } from "./VideoCropSelector";
 import type { VideoViewCropNorm } from "@/lib/manualVideoAnalysis/types";
 import type { SectorLineNorm } from "./SectorLineCanvas";
 import { VideoFrameControls } from "./VideoFrameControls";
@@ -91,6 +94,7 @@ export function DualPlayheadVideo({
   const topRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [videoAspect, setVideoAspect] = useState(VIDEO_FRAME_ASPECT);
   const showGhost =
     ghostCompareActive &&
     offsetSec != null &&
@@ -99,6 +103,19 @@ export function DualPlayheadVideo({
     !cropSelectMode;
 
   const displayCrop = cropSelectMode ? null : viewCropNorm;
+
+  useEffect(() => {
+    const bottom = bottomRef.current;
+    if (!bottom || !videoSrc) return;
+    const syncAspect = () => {
+      if (bottom.videoWidth > 0 && bottom.videoHeight > 0) {
+        setVideoAspect(bottom.videoWidth / bottom.videoHeight);
+      }
+    };
+    syncAspect();
+    bottom.addEventListener("loadedmetadata", syncAspect);
+    return () => bottom.removeEventListener("loadedmetadata", syncAspect);
+  }, [bottomRef, videoSrc]);
 
   useVideoOverlayFrameLockSync({
     bottomRef,
@@ -174,6 +191,7 @@ export function DualPlayheadVideo({
             active={!!videoSrc}
             playbackRate={playbackRate}
             onPlaybackRateChange={setPlaybackRate}
+            compareScrub={!!videoSrc}
           />
         ) : null}
       </div>
@@ -182,21 +200,40 @@ export function DualPlayheadVideo({
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
-      <VideoCropFrame crop={displayCrop} rounded={false} className="rounded-md">
+      <VideoCropFrame
+        crop={displayCrop}
+        videoAspect={videoAspect}
+        rounded={false}
+        className="rounded-md"
+      >
         <div className="absolute inset-0">
           <video
             ref={bottomRef}
             src={videoSrc ?? undefined}
-            className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-            style={{ opacity: 0.5 }}
+            className={
+              displayCrop
+                ? "absolute pointer-events-none"
+                : "absolute inset-0 h-full w-full object-contain pointer-events-none"
+            }
+            style={{
+              opacity: 0.5,
+              ...(displayCrop ? appliedVideoCropStyle(displayCrop) : {}),
+            }}
             playsInline
             preload="metadata"
           />
           <video
             ref={topRef}
             src={videoSrc ?? undefined}
-            className="absolute inset-0 h-full w-full object-contain pointer-events-none"
-            style={{ opacity: 0.5 }}
+            className={
+              displayCrop
+                ? "absolute pointer-events-none"
+                : "absolute inset-0 h-full w-full object-contain pointer-events-none"
+            }
+            style={{
+              opacity: 0.5,
+              ...(displayCrop ? appliedVideoCropStyle(displayCrop) : {}),
+            }}
             playsInline
             muted
             preload="metadata"

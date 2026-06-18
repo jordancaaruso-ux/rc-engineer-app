@@ -270,7 +270,6 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
 
   function onLapClick(col: DriverColumn, lapNumber: number) {
     const key = driverColumnKey(col);
-    const playhead = currentVideoTime();
     setSelectedLap({
       sessionId: col.sessionId,
       role: col.role,
@@ -286,32 +285,9 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
       return;
     }
 
-    const anchor = refSession.sync.anchor;
-    const isAnchorDriverLap =
-      refSession.sessionId === col.sessionId &&
-      anchor.driverRole === col.role &&
-      anchor.lapNumber === lapNumber;
-
-    let workingSession = session;
-    if (!isAnchorDriverLap) {
-      const ts = findTimingSession(session, col.sessionId);
-      if (ts) {
-        const sfKey = lapSfKey(col.role, lapNumber);
-        workingSession = updateTimingSession(session, col.sessionId, {
-          sync: {
-            ...ts.sync,
-            perLapSfStart: {
-              ...ts.sync.perLapSfStart,
-              [sfKey]: playhead,
-            },
-          },
-        });
-      }
-    }
-
     const nextCompareLaps = { ...compareLaps, [key]: lapNumber };
     setCompareLaps(nextCompareLaps);
-    const nextSession = sessionWithCompareLaps(workingSession, driverColumns, nextCompareLaps);
+    const nextSession = sessionWithCompareLaps(session, driverColumns, nextCompareLaps);
     nextSession.compare = { ...nextSession.compare, offsetNudgeSec: 0 };
     setSession(nextSession);
     schedulePersist(nextSession);
@@ -334,6 +310,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
       const alignment = getCompareSfAlignment(nextSession, nextSession.compare);
       if (alignment) {
         setCompareSnapSec(alignment.bottomSec);
+        seekTo(alignment.bottomSec);
         setMsg(
           `Comparing ${compareSlotLabel(session, col0, nextCompareLaps[driverColumnKey(col0)!])} vs ${compareSlotLabel(session, col1, nextCompareLaps[driverColumnKey(col1)!])} at lap start. Scrub or nudge sync to align.`
         );
@@ -342,14 +319,6 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     }
 
     setCompareSnapSec(null);
-
-    if (!isAnchorDriverLap) {
-      setMsg(
-        `${col.driverName} lap ${lapNumber} synced to playhead @ ${playhead.toFixed(2)}s. Pick the other driver's lap to compare.`
-      );
-      return;
-    }
-
     seekTo(t);
     setMsg(`${col.driverName} lap ${lapNumber} start @ ${t.toFixed(2)}s`);
   }
@@ -471,6 +440,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
       isOnVideo: true,
       sync: {
         ...ts.sync,
+        perLapSfStart: undefined,
+        perLapSfEnd: undefined,
         anchor: {
           videoTimeSec: t,
           lapNumber: selectedLap.lapNumber,
@@ -483,6 +454,32 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
     schedulePersist(next);
     setMsg(
       `${selectedLap.driverName} lap ${selectedLap.lapNumber} start = ${t.toFixed(3)}s on video.`
+    );
+  }
+
+  function syncLapToPlayhead() {
+    if (!session || !selectedLap) return;
+    if (!referenceAnchoredSession(session)) {
+      setMsg("Set an anchor on one lap first (Select as anchor).");
+      return;
+    }
+    const ts = findTimingSession(session, selectedLap.sessionId);
+    if (!ts) return;
+    const t = currentVideoTime();
+    const sfKey = lapSfKey(selectedLap.role, selectedLap.lapNumber);
+    const next = updateTimingSession(session, selectedLap.sessionId, {
+      sync: {
+        ...ts.sync,
+        perLapSfStart: {
+          ...ts.sync.perLapSfStart,
+          [sfKey]: t,
+        },
+      },
+    });
+    setSession(next);
+    schedulePersist(next);
+    setMsg(
+      `Pinned ${selectedLap.driverName} lap ${selectedLap.lapNumber} start to playhead @ ${t.toFixed(2)}s.`
     );
   }
 
@@ -583,7 +580,11 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
             ) : null}
             {session.viewCropNorm ? (
               <span className="text-muted-foreground">Track crop active</span>
-            ) : null}
+            ) : (
+              <span className="text-muted-foreground">
+                Zoom to track only — drag a box on the video, then Apply crop
+              </span>
+            )}
           </>
         ) : (
           <>
@@ -724,8 +725,8 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                             onClick={() => onLapClick(col, lap.lapNumber)}
                             title={
                               referenceAnchoredSession(session)
-                                ? "Jump to lap start · pick one lap per driver to compare"
-                                : "Select lap, then anchor at playhead"
+                                ? "Jump to this lap's mapped start on video"
+                                : "Select lap, scrub to its start, then Select as anchor"
                             }
                           >
                             {lap.lapNumber}{" "}
@@ -745,6 +746,15 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
             onClick={setAnchorAtPlayhead}
           >
             Select as anchor
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-40 w-fit"
+            disabled={!selectedLap || !videoSrc || !referenceAnchoredSession(session)}
+            onClick={syncLapToPlayhead}
+            title="After scrubbing, pin this lap's start to the current video time"
+          >
+            Sync lap to playhead
           </button>
           {selectedLap && (
             <p className="text-[10px] text-muted-foreground">

@@ -72,18 +72,82 @@ export function rectFromPoints(
   return clampViewCropNorm({ x: x1, y: y1, w, h });
 }
 
-export function cropDisplayAspectRatio(crop: VideoViewCropNorm): string {
-  return `${crop.w * 16} / ${crop.h * 9}`;
+export function cropDisplayAspectRatio(
+  crop: VideoViewCropNorm,
+  videoAspect = VIDEO_FRAME_ASPECT
+): string {
+  const cropAspect = (crop.w / crop.h) * videoAspect;
+  return `${cropAspect} / 1`;
 }
 
-/** Zoom/pan inner stage so `crop` fills the outer viewport. */
-export function cropFrameInnerStyle(crop: VideoViewCropNorm): CSSProperties {
+/** Letterboxed video content area inside a fixed-aspect container (object-contain). */
+export type VideoContentRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+export function videoContentRectInContainer(
+  containerAspect: number,
+  videoAspect: number
+): VideoContentRect {
+  if (
+    !Number.isFinite(containerAspect) ||
+    containerAspect <= 0 ||
+    !Number.isFinite(videoAspect) ||
+    videoAspect <= 0
+  ) {
+    return { left: 0, top: 0, width: 1, height: 1 };
+  }
+
+  if (videoAspect >= containerAspect) {
+    const height = containerAspect / videoAspect;
+    return { left: 0, top: (1 - height) / 2, width: 1, height };
+  }
+
+  const width = videoAspect / containerAspect;
+  return { left: (1 - width) / 2, top: 0, width, height: 1 };
+}
+
+/** Map container-normalized coords to video-pixel-normalized coords. */
+export function containerNormToVideoNorm(
+  cx: number,
+  cy: number,
+  content: VideoContentRect
+): { x: number; y: number } {
+  if (content.width <= 0 || content.height <= 0) {
+    return { x: 0, y: 0 };
+  }
+  return {
+    x: Math.max(0, Math.min(1, (cx - content.left) / content.width)),
+    y: Math.max(0, Math.min(1, (cy - content.top) / content.height)),
+  };
+}
+
+/** Map video-pixel-normalized crop to container-normalized overlay coords. */
+export function videoCropToContainerNorm(
+  crop: VideoViewCropNorm,
+  content: VideoContentRect
+): VideoViewCropNorm {
+  return {
+    x: content.left + crop.x * content.width,
+    y: content.top + crop.y * content.height,
+    w: crop.w * content.width,
+    h: crop.h * content.height,
+  };
+}
+
+/** Position the video element so `crop` (video-normalized) fills the viewport. */
+export function appliedVideoCropStyle(crop: VideoViewCropNorm): CSSProperties {
   return {
     position: "absolute",
-    left: 0,
-    top: 0,
+    left: `${(-crop.x / crop.w) * 100}%`,
+    top: `${(-crop.y / crop.h) * 100}%`,
     width: `${100 / crop.w}%`,
     height: `${100 / crop.h}%`,
-    transform: `translate(${(-crop.x / crop.w) * 100}%, ${(-crop.y / crop.h) * 100}%)`,
+    objectFit: "fill",
+    maxWidth: "none",
+    maxHeight: "none",
   };
 }

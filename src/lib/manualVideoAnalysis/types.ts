@@ -70,7 +70,7 @@ export type ManualFrameMark = {
   videoTimeSec: number;
 };
 
-/** Normalized viewport crop over the 16:9 video frame (persisted in manualJson). */
+/** Normalized crop in video pixel space (0–1), persisted in manualJson. */
 export type VideoViewCropNorm = {
   x: number;
   y: number;

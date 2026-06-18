@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { VideoViewCropNorm } from "@/lib/manualVideoAnalysis/types";
+import {
+  appliedVideoCropStyle,
+  VIDEO_FRAME_ASPECT,
+  videoContentRectInContainer,
+} from "@/lib/manualVideoAnalysis/videoViewCrop";
 import { VideoCropFrame } from "./VideoCropFrame";
 import { VideoCropSelector } from "./VideoCropSelector";
 import type { SectorLineNorm } from "./SectorLineCanvas";
@@ -75,28 +80,48 @@ export function VideoWithLineOverlay({
   const internalRef = useRef<HTMLVideoElement>(null);
   const videoRef = externalRef ?? internalRef;
   const [size, setSize] = useState({ w: 640, h: 360 });
+  const [videoAspect, setVideoAspect] = useState(VIDEO_FRAME_ASPECT);
 
   const displayCrop = cropSelectMode ? null : viewCropNorm;
+  const contentRect = videoContentRectInContainer(VIDEO_FRAME_ASPECT, videoAspect);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !videoSrc) return;
+    const syncAspect = () => {
+      if (v.videoWidth > 0 && v.videoHeight > 0) {
+        setVideoAspect(v.videoWidth / v.videoHeight);
+      }
+    };
+    syncAspect();
+    v.addEventListener("loadedmetadata", syncAspect);
+    return () => v.removeEventListener("loadedmetadata", syncAspect);
+  }, [videoRef, videoSrc]);
 
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
-      setSize({ w: Math.max(320, r.width), h: Math.max(180, r.width * (9 / 16)) });
+      setSize({ w: Math.max(320, r.width), h: Math.max(180, r.height) });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, [displayCrop]);
 
   return (
-    <VideoCropFrame crop={displayCrop}>
+    <VideoCropFrame crop={displayCrop} videoAspect={videoAspect}>
       <div ref={stageRef} className="absolute inset-0">
         {videoSrc ? (
           <video
             ref={videoRef}
             src={videoSrc}
-            className="absolute inset-0 h-full w-full object-contain"
+            className={
+              displayCrop
+                ? "absolute"
+                : "absolute inset-0 h-full w-full object-contain"
+            }
+            style={displayCrop ? appliedVideoCropStyle(displayCrop) : undefined}
             controls={!hideControls && !cropSelectMode}
             playsInline
           />
@@ -110,6 +135,7 @@ export function VideoWithLineOverlay({
           <VideoCropSelector
             value={draftCrop}
             onChange={onDraftCropChange}
+            contentRect={contentRect}
             disabled={!videoSrc}
           />
         ) : null}

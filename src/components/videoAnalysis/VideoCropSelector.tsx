@@ -3,45 +3,59 @@
 import { useCallback, useRef, useState } from "react";
 import {
   clampViewCropNorm,
+  containerNormToVideoNorm,
   rectFromPoints,
+  videoCropToContainerNorm,
+  type VideoContentRect,
   type VideoViewCropNorm,
 } from "@/lib/manualVideoAnalysis/videoViewCrop";
 
 type Props = {
   value: VideoViewCropNorm | null;
   onChange: (crop: VideoViewCropNorm | null) => void;
+  /** object-contain content area inside the 16:9 frame */
+  contentRect?: VideoContentRect;
   disabled?: boolean;
 };
 
 type DragState = { ax: number; ay: number };
 
-export function VideoCropSelector({ value, onChange, disabled }: Props) {
+const FULL_CONTENT: VideoContentRect = { left: 0, top: 0, width: 1, height: 1 };
+
+export function VideoCropSelector({
+  value,
+  onChange,
+  contentRect = FULL_CONTENT,
+  disabled,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
 
-  const toNorm = useCallback((clientX: number, clientY: number) => {
-    const el = wrapRef.current;
-    if (!el) return { x: 0, y: 0 };
-    const r = el.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(1, (clientX - r.left) / r.width)),
-      y: Math.max(0, Math.min(1, (clientY - r.top) / r.height)),
-    };
-  }, []);
+  const toVideoNorm = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = wrapRef.current;
+      if (!el) return { x: 0, y: 0 };
+      const r = el.getBoundingClientRect();
+      const cx = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+      const cy = Math.max(0, Math.min(1, (clientY - r.top) / r.height));
+      return containerNormToVideoNorm(cx, cy, contentRect);
+    },
+    [contentRect]
+  );
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (disabled) return;
     e.preventDefault();
     e.stopPropagation();
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-    const { x, y } = toNorm(e.clientX, e.clientY);
+    const { x, y } = toVideoNorm(e.clientX, e.clientY);
     setDrag({ ax: x, ay: y });
     onChange(clampViewCropNorm({ x, y, w: 0.05, h: 0.05 }));
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drag || disabled) return;
-    const { x, y } = toNorm(e.clientX, e.clientY);
+    const { x, y } = toVideoNorm(e.clientX, e.clientY);
     const next = rectFromPoints(drag.ax, drag.ay, x, y, e.shiftKey);
     if (next) onChange(next);
   };
@@ -52,7 +66,7 @@ export function VideoCropSelector({ value, onChange, disabled }: Props) {
     setDrag(null);
   };
 
-  const sel = value;
+  const sel = value ? videoCropToContainerNorm(value, contentRect) : null;
 
   return (
     <div
