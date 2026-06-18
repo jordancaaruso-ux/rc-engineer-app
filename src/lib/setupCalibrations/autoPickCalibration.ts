@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import {
   fingerprintPdfFormFieldsFromBytes,
@@ -49,7 +50,7 @@ export async function buildCalibrationFingerprints(input: {
   const modelId = input.restrictToSetupSheetModelId?.trim() || null;
   const calibrations = await prisma.setupSheetCalibration.findMany({
     where: {
-      OR: [{ userId: input.userId }, { communityShared: true }],
+      ...calibrationsVisibleToUserWhere(input.userId),
       ...(input.restrictToNames && input.restrictToNames.length > 0
         ? { name: { in: [...input.restrictToNames] } }
         : {}),

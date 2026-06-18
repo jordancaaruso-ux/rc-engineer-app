@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
-import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
+import { calibrationsVisibleToUserWhere, calibrationReadableByIdWhere } from "@/lib/setupCalibrations/calibrationAccess";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -11,7 +10,6 @@ export async function GET() {
   }
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  await ensureCommunitySharedCalibrationsIfEmpty();
   const calibrations = await prisma.setupSheetCalibration.findMany({
     where: calibrationsVisibleToUserWhere(user.id),
     orderBy: { createdAt: "desc" },
@@ -51,10 +49,7 @@ export async function POST(request: Request) {
   let inheritedExampleDocumentId: string | null = null;
   if (body.clonedFromCalibrationId?.trim()) {
     const base = await prisma.setupSheetCalibration.findFirst({
-      where: {
-        id: body.clonedFromCalibrationId.trim(),
-        OR: [{ userId: user.id }, { communityShared: true }],
-      },
+      where: calibrationReadableByIdWhere(body.clonedFromCalibrationId.trim()),
       select: { exampleDocumentId: true },
     });
     inheritedExampleDocumentId = base?.exampleDocumentId ?? null;

@@ -5,7 +5,6 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
-import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDocumentReviewClient";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
@@ -32,7 +31,6 @@ export default async function SetupDocumentDetailPage({
 
   const { id } = await params;
   const user = await requireCurrentUser();
-  await ensureCommunitySharedCalibrationsIfEmpty();
   const [doc, cars, calibrations] = await Promise.all([
     prisma.setupDocument.findFirst({
       where: { id, userId: user.id },

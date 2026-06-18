@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { calibrationReadableByIdWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import { applyCalibrationToPdf } from "@/lib/setupCalibrations/extract";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
@@ -46,10 +47,7 @@ export async function applyCalibrationToSetupDocument(input: {
       },
     }),
     prisma.setupSheetCalibration.findFirst({
-      where: {
-        id: input.calibrationId,
-        OR: [{ userId: input.userId }, { communityShared: true }],
-      },
+      where: calibrationReadableByIdWhere(input.calibrationId),
       select: { id: true, calibrationDataJson: true },
     }),
   ]);

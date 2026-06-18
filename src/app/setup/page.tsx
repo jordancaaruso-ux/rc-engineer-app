@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { NewSetupUploadButton } from "@/components/setup/NewSetupUploadButton";
 import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
-import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 
 import { SetupRunPdfReviewClient } from "@/components/setup/SetupRunPdfReviewClient";
@@ -97,7 +96,6 @@ export default async function SetupPage({
 
   const user = await requireCurrentUser();
   await ensureAuthorizedSetupSheetCatalog();
-  await ensureCommunitySharedCalibrationsIfEmpty();
   const [documents, runs, calibrations, cars] = await Promise.all([
     prisma.setupDocument.findMany({
       where: { userId: user.id, setupImportBatchId: null },

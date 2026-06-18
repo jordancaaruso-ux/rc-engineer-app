@@ -4,8 +4,11 @@ import { CalibrationDeleteButton } from "@/components/setup-documents/Calibratio
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
-import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
-import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
+import {
+  calibrationsVisibleToUserWhere,
+  canManageCalibration,
+  isCalibrationAdmin,
+} from "@/lib/setupCalibrations/calibrationAccess";
 import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 
 export default async function SetupCalibrationsPage(): Promise<ReactNode> {
@@ -22,7 +25,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
     );
   }
   const user = await requireCurrentUser();
-  await ensureCommunitySharedCalibrationsIfEmpty();
+  const isAdmin = isCalibrationAdmin(user);
   const calibrations = await prisma.setupSheetCalibration.findMany({
     where: calibrationsVisibleToUserWhere(user.id),
     orderBy: { createdAt: "desc" },
@@ -44,7 +47,10 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
       <header className="page-header">
         <div>
           <h1 className="page-title">Setup calibrations</h1>
-          <p className="page-subtitle">Versioned calibration profiles for PDF-to-canonical setup mapping.</p>
+          <p className="page-subtitle">
+            Shared calibration profiles for PDF-to-canonical setup mapping. You can edit and delete
+            calibrations you created{isAdmin ? "; as an admin you can manage any calibration" : ""}.
+          </p>
         </div>
       </header>
       <section className="page-body">
@@ -56,7 +62,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
               const { formFields, textFields, regionFields, imageFields } = calibrationMappingCounts(
                 normalizeCalibrationData(c.calibrationDataJson)
               );
-              const owned = c.userId === user.id;
+              const canManage = canManageCalibration(user, c);
               return (
                 <div key={c.id} className="px-4 py-3 flex items-center justify-between gap-2">
                   <div>
@@ -71,15 +77,18 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
                       {c.exampleDocumentId ? "" : " · no example PDF"}
                       {" · "}
                       {new Date(c.createdAt).toLocaleDateString()}
-                      {c.communityShared ? " · community" : ""}
+                      {!canManage && c.userId !== user.id ? " · view only" : ""}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {owned ? (
+                    {canManage ? (
                       <CalibrationDeleteButton calibrationId={c.id} calibrationName={c.name} />
                     ) : null}
-                    <Link href={`/setup-calibrations/${c.id}`} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">
-                      Open
+                    <Link
+                      href={`/setup-calibrations/${c.id}`}
+                      className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+                    >
+                      {canManage ? "Edit" : "View"}
                     </Link>
                   </div>
                 </div>
@@ -91,4 +100,3 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
     </>
   );
 }
-

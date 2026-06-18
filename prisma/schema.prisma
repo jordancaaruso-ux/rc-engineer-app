@@ -662,8 +662,8 @@ model SetupSheetCalibration {
   exampleDocumentId String?
   setupSheetModelId String?
   /**
-   * True when this row is one of the top calibrations (by use on aggregation-eligible uploads), recomputed
-   * on community rebuildâ€”readable and applicable by all authenticated users for setup uploads.
+   * Legacy flag from the community-shared top-3 promotion; calibrations are globally visible
+   * regardless of this field while global mode is enabled.
    */
   communityShared Boolean @default(false)
 

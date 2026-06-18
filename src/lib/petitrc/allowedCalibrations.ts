@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 
 /**
  * Names of calibrations considered valid for PetitRC auto-pick. Only calibrations matching one of
@@ -19,7 +20,7 @@ export async function resolveAllowedCalibrationIds(userId: string): Promise<stri
   const rows = await prisma.setupSheetCalibration.findMany({
     where: {
       name: { in: [...ALLOWED_CALIBRATION_NAMES] },
-      OR: [{ userId }, { communityShared: true }],
+      ...calibrationsVisibleToUserWhere(userId),
     },
     select: { id: true, name: true, createdAt: true },
     orderBy: { createdAt: "desc" },

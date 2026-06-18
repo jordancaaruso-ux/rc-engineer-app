@@ -6,7 +6,6 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { BulkImportDocReviewClient } from "@/components/setup/BulkImportDocReviewClient";
 import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
-import { ensureCommunitySharedCalibrationsIfEmpty } from "@/lib/setupCalibrations/communitySharedCalibrations";
 
 export default async function BulkImportDocumentPage({
   params,
@@ -24,7 +23,6 @@ export default async function BulkImportDocumentPage({
 
   const { batchId, documentId } = await params;
   const user = await requireCurrentUser();
-  await ensureCommunitySharedCalibrationsIfEmpty();
 
   const [doc, calibrations] = await Promise.all([
     prisma.setupDocument.findFirst({

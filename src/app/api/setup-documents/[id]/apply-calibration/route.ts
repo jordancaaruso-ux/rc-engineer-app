@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
+import { calibrationReadableByIdWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import { applyCalibrationToSetupDocument } from "@/lib/setupDocuments/applyCalibrationToDocument";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -26,10 +27,7 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: {
-      id: effective.calibrationId,
-      OR: [{ userId: user.id }, { communityShared: true }],
-    },
+    where: calibrationReadableByIdWhere(effective.calibrationId),
     select: { id: true, name: true },
   });
   if (!calibration) return NextResponse.json({ error: "Calibration not found" }, { status: 404 });

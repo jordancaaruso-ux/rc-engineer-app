@@ -12,6 +12,7 @@ import {
   type ImageCalibrationField,
   type ImageRegion,
 } from "@/lib/setupCalibrations/types";
+import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 
 export default async function CalibrateImagePage({
   params,
@@ -89,7 +90,7 @@ export default async function CalibrateImagePage({
 
   const fieldCatalog = buildCalibrationFieldCatalog();
   const calibrationRows = await prisma.setupSheetCalibration.findMany({
-    where: { userId: user.id },
+    where: calibrationsVisibleToUserWhere(user.id),
     select: {
       id: true,
       name: true,

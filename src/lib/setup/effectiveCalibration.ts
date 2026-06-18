@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { calibrationReadableByIdWhere } from "@/lib/setupCalibrations/calibrationAccess";
 
 export type EffectiveCalibrationResult = {
   calibrationId: string | null;
@@ -43,10 +44,7 @@ export async function getEffectiveCalibrationProfileId(input: {
 
   for (const candidate of candidates) {
     const exists = await prisma.setupSheetCalibration.findFirst({
-      where: {
-        id: candidate.id,
-        OR: [{ userId: input.userId }, { communityShared: true }],
-      },
+      where: calibrationReadableByIdWhere(candidate.id),
       select: { id: true },
     });
     if (exists) {

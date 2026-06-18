@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { hasDatabaseUrl } from "@/lib/env";
+import {
+  calibrationReadableByIdWhere,
+  canManageCalibration,
+} from "@/lib/setupCalibrations/calibrationAccess";
 import { prisma } from "@/lib/prisma";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import {
@@ -264,7 +268,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   let targetCalibrationId = body.calibrationId?.trim() || null;
   if (deriveFromCalibrationId) {
     const sourceCalibration = await prisma.setupSheetCalibration.findFirst({
-      where: { id: deriveFromCalibrationId, userId: user.id },
+      where: calibrationReadableByIdWhere(deriveFromCalibrationId),
       select: {
         id: true,
         calibrationDataJson: true,
@@ -350,10 +354,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   const calibrationId = targetCalibrationId;
   if (calibrationId) {
     const existing = await prisma.setupSheetCalibration.findFirst({
-      where: { id: calibrationId, userId: user.id },
-      select: { id: true, calibrationDataJson: true, name: true },
+      where: { id: calibrationId },
+      select: { id: true, userId: true, calibrationDataJson: true, name: true },
     });
     if (!existing) return NextResponse.json({ error: "Calibration not found" }, { status: 404 });
+    if (!canManageCalibration(user, existing)) {
+      return NextResponse.json(
+        { error: "You can only edit calibrations you created." },
+        { status: 403 }
+      );
+    }
     const merged = normalizeCalibrationData(existing.calibrationDataJson);
     merged.imageCalibration = imageCalibration;
     if (!deriveFromCalibrationId) merged.templateType = "image_region_v1";

@@ -6,6 +6,11 @@ import { CalibrationChassisDefaultPanel } from "@/components/setup-sheet-models/
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
+import {
+  calibrationReadableByIdWhere,
+  canManageCalibration,
+} from "@/lib/setupCalibrations/calibrationAccess";
+import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { SetupCalibrationEditorClient } from "@/components/setup-documents/SetupCalibrationEditorLazy";
 
 export default async function SetupCalibrationDetailPage({
@@ -28,7 +33,7 @@ export default async function SetupCalibrationDetailPage({
   const user = await requireCurrentUser();
   const { id } = await params;
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: { id, userId: user.id },
+    where: calibrationReadableByIdWhere(id),
     select: {
       id: true,
       name: true,
@@ -36,6 +41,7 @@ export default async function SetupCalibrationDetailPage({
       calibrationDataJson: true,
       exampleDocumentId: true,
       setupSheetModelId: true,
+      userId: true,
       setupSheetModel: { select: { id: true, name: true } },
       exampleDocument: {
         select: { id: true, originalFilename: true },
@@ -43,12 +49,14 @@ export default async function SetupCalibrationDetailPage({
     },
   });
   if (!calibration) notFound();
+  const canManage = canManageCalibration(user, calibration);
+  const mappingCounts = calibrationMappingCounts(normalizeCalibrationData(calibration.calibrationDataJson));
   return (
     <>
       <header className="page-header">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
-            <h1 className="page-title">Edit calibration</h1>
+            <h1 className="page-title">{canManage ? "Edit calibration" : "View calibration"}</h1>
             <p className="page-subtitle">
               {calibration.name}
               {calibration.setupSheetModel ? (
@@ -67,39 +75,71 @@ export default async function SetupCalibrationDetailPage({
               )}
             </p>
             <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-              Uploads auto-select this profile when the PDF form layout matches the linked example PDF.
+              {canManage
+                ? "Uploads auto-select this profile when the PDF form layout matches the linked example PDF."
+                : "This calibration is read-only for you. Only the creator or an admin can change mappings or delete it."}
             </p>
           </div>
-          <CalibrationDeleteButton
-            calibrationId={calibration.id}
-            calibrationName={calibration.name}
-            redirectTo="/setup-calibrations"
-          />
+          {canManage ? (
+            <CalibrationDeleteButton
+              calibrationId={calibration.id}
+              calibrationName={calibration.name}
+              redirectTo="/setup-calibrations"
+            />
+          ) : null}
         </div>
       </header>
       <section className="page-body space-y-4 pb-6">
-        <CalibrationChassisDefaultPanel
-          calibrationId={calibration.id}
-          calibrationName={calibration.name}
-          currentModelId={calibration.setupSheetModelId}
-          currentModelName={calibration.setupSheetModel?.name ?? null}
-        />
-        <SetupCalibrationEditorClient
-        calibrationId={calibration.id}
-        documentId={calibration.exampleDocumentId ?? ""}
-        previewUrl={
-          calibration.exampleDocumentId
-            ? `/api/setup-documents/${calibration.exampleDocumentId}/file`
-            : ""
-        }
-        exampleDocumentOriginalFilename={calibration.exampleDocument?.originalFilename ?? null}
-        initialName={calibration.name}
-        initialSourceType={calibration.sourceType}
-        initialCalibrationData={calibration.calibrationDataJson}
-        setupSheetModelId={calibration.setupSheetModelId}
-      />
+        {canManage ? (
+          <>
+            <CalibrationChassisDefaultPanel
+              calibrationId={calibration.id}
+              calibrationName={calibration.name}
+              currentModelId={calibration.setupSheetModelId}
+              currentModelName={calibration.setupSheetModel?.name ?? null}
+            />
+            <SetupCalibrationEditorClient
+              calibrationId={calibration.id}
+              documentId={calibration.exampleDocumentId ?? ""}
+              previewUrl={
+                calibration.exampleDocumentId
+                  ? `/api/setup-documents/${calibration.exampleDocumentId}/file`
+                  : ""
+              }
+              exampleDocumentOriginalFilename={calibration.exampleDocument?.originalFilename ?? null}
+              initialName={calibration.name}
+              initialSourceType={calibration.sourceType}
+              initialCalibrationData={calibration.calibrationDataJson}
+              setupSheetModelId={calibration.setupSheetModelId}
+            />
+          </>
+        ) : (
+          <div className="rounded-lg border border-border bg-card px-4 py-4 text-sm space-y-3 max-w-2xl">
+            <div className="text-xs text-muted-foreground">
+              {calibration.sourceType} · {mappingCounts.formFields} form · {mappingCounts.textFields} text ·{" "}
+              {mappingCounts.regionFields} region · {mappingCounts.imageFields} image
+            </div>
+            {calibration.exampleDocumentId ? (
+              <a
+                href={`/api/setup-documents/${calibration.exampleDocumentId}/file`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+              >
+                View example PDF
+                {calibration.exampleDocument?.originalFilename
+                  ? ` (${calibration.exampleDocument.originalFilename})`
+                  : ""}
+              </a>
+            ) : (
+              <p className="text-xs text-muted-foreground">No example PDF linked.</p>
+            )}
+            <Link href="/setup-calibrations" className="inline-block text-xs text-sky-400 hover:underline">
+              Back to calibrations
+            </Link>
+          </div>
+        )}
       </section>
     </>
   );
 }
-

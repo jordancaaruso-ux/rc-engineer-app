@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import {
+  calibrationReadableByIdWhere,
+  calibrationsEditableByUserWhere,
+  canManageCalibration,
+  setupDocumentLinkableAsCalibrationExampleWhere,
+} from "@/lib/setupCalibrations/calibrationAccess";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -13,7 +19,7 @@ export async function GET(_: Request, ctx: Ctx) {
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: { id, OR: [{ userId: user.id }, { communityShared: true }] },
+    where: calibrationReadableByIdWhere(id),
     select: {
       id: true,
       name: true,
@@ -27,7 +33,10 @@ export async function GET(_: Request, ctx: Ctx) {
     },
   });
   if (!calibration) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ calibration });
+  return NextResponse.json({
+    calibration,
+    canManage: canManageCalibration(user, calibration),
+  });
 }
 
 export async function PATCH(request: Request, ctx: Ctx) {
@@ -36,7 +45,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
   }
   const { id } = await ctx.params;
   const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as {
     name?: string;
     sourceType?: string;
@@ -44,11 +53,18 @@ export async function PATCH(request: Request, ctx: Ctx) {
     exampleDocumentId?: string | null;
     setupSheetModelId?: string | null;
   };
+
   const existing = await prisma.setupSheetCalibration.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true },
+    where: { id },
+    select: { id: true, userId: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!canManageCalibration(user, existing)) {
+    return NextResponse.json(
+      { error: "You can only edit calibrations you created." },
+      { status: 403 }
+    );
+  }
 
   const data: {
     name?: string;
@@ -93,12 +109,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
     } else if (typeof raw === "string" && raw.trim()) {
       const docId = raw.trim();
       const doc = await prisma.setupDocument.findFirst({
-        where: { id: docId, userId: user.id },
+        where: setupDocumentLinkableAsCalibrationExampleWhere(user, docId),
         select: { id: true },
       });
       if (!doc) {
         return NextResponse.json(
-          { error: "Example document not found or not owned by you" },
+          { error: "Example document not found or not available to link" },
           { status: 400 }
         );
       }
@@ -111,12 +127,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
   }
 
   const updated = await prisma.setupSheetCalibration.updateMany({
-    where: { id, userId: user.id },
+    where: calibrationsEditableByUserWhere(user, id),
     data,
   });
   if (updated.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const calibration = await prisma.setupSheetCalibration.findFirst({
-    where: { id, userId: user.id },
+    where: calibrationReadableByIdWhere(id),
     select: { id: true, updatedAt: true, exampleDocumentId: true },
   });
   return NextResponse.json({ calibration });
@@ -131,14 +147,19 @@ export async function DELETE(_request: Request, ctx: Ctx) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const existing = await prisma.setupSheetCalibration.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true },
+    where: { id },
+    select: { id: true, userId: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!canManageCalibration(user, existing)) {
+    return NextResponse.json(
+      { error: "You can only delete calibrations you created." },
+      { status: 403 }
+    );
+  }
 
   await prisma.setupSheetCalibration.delete({
     where: { id },
   });
   return NextResponse.json({ ok: true });
 }
-

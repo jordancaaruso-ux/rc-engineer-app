@@ -147,7 +147,7 @@ export default async function CarDetailPage(props: {
     modelRow?.defaultCalibration
     ?? (car.setupSheetModelId
       ? await prisma.setupSheetCalibration.findFirst({
-          where: { userId: user.id, setupSheetModelId: car.setupSheetModelId },
+          where: { setupSheetModelId: car.setupSheetModelId },
           orderBy: { updatedAt: "desc" },
           select: { id: true, name: true, exampleDocumentId: true },
         })

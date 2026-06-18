@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { canManageCalibration } from "@/lib/setupCalibrations/calibrationAccess";
 import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import { SETUP_SHEET_MODEL_SLUG_A800RR } from "@/lib/setupSheetModels/seedA800Model";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
@@ -119,15 +120,20 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
       const cal = await prisma.setupSheetCalibration.findFirst({
         where: {
           id: calId,
-          userId: user.id,
           OR: [{ setupSheetModelId: id }, { setupSheetModelId: null }],
         },
-        select: { id: true, setupSheetModelId: true },
+        select: { id: true, userId: true, setupSheetModelId: true },
       });
       if (!cal) {
         return NextResponse.json(
           { error: "Calibration not found or not for this sheet model" },
           { status: 400 }
+        );
+      }
+      if (!canManageCalibration(user, cal)) {
+        return NextResponse.json(
+          { error: "Only the calibration creator or an admin can set it as the chassis default." },
+          { status: 403 }
         );
       }
       data.defaultCalibrationId = calId;
