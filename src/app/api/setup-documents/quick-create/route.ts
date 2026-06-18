@@ -440,18 +440,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     needsReview = true;
     needsReviewReason = pickUserNote;
   }
-  // Recognized the chassis, but the uploader has no (or several) cars of it.
-  if (!carId && detectedModelId && carCandidates.length === 0) {
-    needsReview = true;
-    needsReviewReason =
-      needsReviewReason
-      ?? `This looks like a ${detectedLabel} setup, but you don’t have a ${detectedModelName ?? "matching"} car yet. Add one to import it.`;
-  }
-  if (carCandidates.length > 1) {
-    needsReview = true;
-    needsReviewReason =
-      needsReviewReason ?? `This looks like a ${detectedLabel} setup — choose which car to attach it to.`;
-  }
   if (parseStatus === "FAILED") {
     needsReview = true;
     needsReviewReason = needsReviewReason ?? "Parse did not produce any fields.";

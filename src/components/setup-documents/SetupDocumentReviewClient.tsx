@@ -147,6 +147,8 @@ export function SetupDocumentReviewClient({
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [originalOpen, setOriginalOpen] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [autoCreateDone, setAutoCreateDone] = useState(Boolean(doc.createdSetupId));
   const router = useRouter();
 
   const previewUrl = `/api/setup-documents/${liveDoc.id}/file`;
@@ -156,12 +158,6 @@ export function SetupDocumentReviewClient({
   const parseStamp = liveDoc.parsedCalibrationProfileId
     ? `${liveDoc.parsedCalibrationProfileId}${liveDoc.parsedAt ? ` · ${formatAppTimestampUtc(liveDoc.parsedAt)}` : ""}`
     : "—";
-  const parseStatusLabel =
-    liveDoc.parseStatus === "PARSED"
-      ? "Parsed"
-      : liveDoc.parseStatus === "PARTIAL"
-        ? "Partially Parsed"
-        : "Minimal Parse";
   const awaitingCalibration = !liveDoc.calibrationProfileId || liveDoc.currentStage === "awaiting_calibration";
   const parseIsStale = Boolean(
     liveDoc.calibrationProfileId
@@ -331,6 +327,51 @@ export function SetupDocumentReviewClient({
   );
   const blankTrackedFields = Math.max(0, totalTrackedFields - mappedKeys.length);
   const shouldSuggestManual = liveDoc.parseStatus === "FAILED" || mappedKeys.length < 8;
+  const calibrationSelectionChanged =
+    (selectedCalibrationId || "") !== (liveDoc.calibrationProfileId || "");
+  const showSetupSheet = mappedKeys.length > 0 || hasProcessedResult;
+  const activeCalibrationName =
+    storedCalibration?.name ?? selectedCalibration?.name ?? null;
+
+  // Save a setup snapshot automatically once import produced usable values (partial is normal).
+  useEffect(() => {
+    if (autoCreateDone || liveDoc.createdSetupId) return;
+    if (!liveDoc.calibrationProfileId) return;
+    if (liveDoc.parseStatus !== "PARSED" && liveDoc.parseStatus !== "PARTIAL") return;
+    if (!hasProcessedResult && mappedKeys.length < 1) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/setup-documents/${doc.id}/create-setup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ setupData }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { error?: string; setup?: { id: string } };
+        if (cancelled) return;
+        if (res.ok && data.setup?.id) {
+          setAutoCreateDone(true);
+          setLiveDoc((cur) => ({ ...cur, createdSetupId: data.setup!.id }));
+        }
+      } catch {
+        // User can still save from debug tools if auto-create fails.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setupData synced from liveDoc
+  }, [
+    autoCreateDone,
+    doc.id,
+    hasProcessedResult,
+    liveDoc.calibrationProfileId,
+    liveDoc.createdSetupId,
+    liveDoc.parseStatus,
+    mappedKeys.length,
+  ]);
 
   const parseStartedAtMs = liveDoc.parseStartedAt ? Date.parse(liveDoc.parseStartedAt) : null;
   const parseAgeMs = parseStartedAtMs ? Date.now() - parseStartedAtMs : null;
@@ -414,10 +455,6 @@ export function SetupDocumentReviewClient({
 
   async function createSetup() {
     if (liveDoc.createdSetupId) return;
-    if (!liveDoc.carId) {
-      setError("Select which car this setup belongs to before creating a setup snapshot.");
-      return;
-    }
     setCreatingSetup(true);
     setError(null);
     setStatus(null);
@@ -425,7 +462,7 @@ export function SetupDocumentReviewClient({
       const res = await fetch(`/api/setup-documents/${doc.id}/create-setup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setupData, carId: liveDoc.carId }),
+        body: JSON.stringify({ setupData, carId: liveDoc.carId ?? null }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; setup?: { id: string } };
       if (!res.ok || !data.setup?.id) {
@@ -750,14 +787,42 @@ export function SetupDocumentReviewClient({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="ui-title text-sm normal-case">{doc.originalFilename}</h2>
-            <p className="text-xs text-muted-foreground">
-              {liveDoc.sourceType} · {parseStatusLabel} · {liveDoc.parserType ?? "no parser"}
-            </p>
+            {docSetupSheetModelName ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">{docSetupSheetModelName}</p>
+            ) : null}
+            {activeCalibrationName ? (
+              <p className="text-xs text-muted-foreground">
+                Calibration: <span className="text-foreground">{activeCalibrationName}</span>
+              </p>
+            ) : awaitingCalibration ? (
+              <p className="text-xs text-amber-200/90">No calibration selected yet</p>
+            ) : null}
+            {liveDoc.importStatus === "PROCESSING" ? (
+              <p className="mt-1 text-xs text-muted-foreground">Importing…</p>
+            ) : null}
           </div>
-          <Link href="/setup-documents" className="text-xs text-muted-foreground hover:text-foreground">
-            Back to documents
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={cn(
+                "rounded-md border px-2.5 py-1 text-xs",
+                showDebug
+                  ? "border-amber-500/50 bg-amber-500/15 text-amber-100"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              )}
+              onClick={() => setShowDebug((d) => !d)}
+            >
+              {showDebug ? "Debug on" : "Debug"}
+            </button>
+            <Link
+              href="/setup"
+              className="rounded-md border border-primary/50 bg-primary/20 px-3 py-1.5 text-xs font-medium hover:bg-primary/30"
+            >
+              Done — back to Setup
+            </Link>
+          </div>
         </div>
+        {showDebug ? (
         <div className="mt-2 rounded border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           Review state:{" "}
           <span className="font-mono text-foreground">
@@ -768,7 +833,8 @@ export function SetupDocumentReviewClient({
                 : reviewState}
           </span>
         </div>
-        {(docSetupSheetModelName || docCarName) ? (
+        ) : null}
+        {showDebug && (docSetupSheetModelName || docCarName) ? (
           <div className="mt-2 rounded border border-border/70 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground space-y-1">
             {docCarName ? (
               <div>
@@ -804,7 +870,12 @@ export function SetupDocumentReviewClient({
             </div>
           </div>
         ) : null}
-        {shouldSuggestManual ? (
+        {shouldSuggestManual && !showDebug ? (
+          <div className="mt-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            Some fields could not be read from this sheet. Pick a calibration below or edit values manually.
+          </div>
+        ) : null}
+        {showDebug && shouldSuggestManual ? (
           <div className="mt-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
             Auto-parse is incomplete. You can apply an existing calibration, create a new calibration for this layout, or continue manually.
           </div>
@@ -812,6 +883,73 @@ export function SetupDocumentReviewClient({
         {status ? <p className="mt-2 text-xs text-muted-foreground">{status}</p> : null}
         {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
 
+        {!showDebug && (awaitingCalibration || calibrationSelectionChanged) ? (
+          <div className="mt-3 rounded border border-border/70 bg-muted/40 p-3 space-y-2">
+            <div className="ui-title text-[11px] text-muted-foreground">Calibration</div>
+            {calibrationPicker.totalCount === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No calibrations yet.{" "}
+                <Link href="/cars/new/setup" className="underline hover:text-foreground">
+                  Run the car wizard
+                </Link>{" "}
+                or{" "}
+                <Link href="/setup-calibrations" className="underline hover:text-foreground">
+                  add one under Setup
+                </Link>
+                .
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="rounded-md border border-border bg-card px-2 py-1.5 text-xs max-w-full min-w-[12rem]"
+                  value={selectedCalibrationId}
+                  onChange={(e) => setSelectedCalibrationId(e.target.value)}
+                >
+                  <option value="">Select calibration…</option>
+                  {(() => {
+                    const byGroup = new Map<string, typeof calibrationPicker.options>();
+                    for (const opt of calibrationPicker.options) {
+                      const list = byGroup.get(opt.groupLabel) ?? [];
+                      list.push(opt);
+                      byGroup.set(opt.groupLabel, list);
+                    }
+                    return [...byGroup.entries()].map(([label, opts]) => (
+                      <optgroup key={label} label={label}>
+                        {opts.map((o) => (
+                          <option key={o.calibration.id} value={o.calibration.id}>
+                            {o.optionLabel}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ));
+                  })()}
+                </select>
+                {calibrationSelectionChanged && selectedCalibration ? (
+                  <button
+                    type="button"
+                    className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+                    onClick={applyCalibrationAndProcess}
+                    disabled={processingImport}
+                  >
+                    {processingImport ? "Working…" : "Re-apply calibration"}
+                  </button>
+                ) : awaitingCalibration && selectedCalibration ? (
+                  <button
+                    type="button"
+                    className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+                    onClick={applyCalibrationAndProcess}
+                    disabled={processingImport}
+                  >
+                    {processingImport ? "Working…" : "Use this calibration"}
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {showDebug ? (
+        <>
         <div className="mt-3 rounded border border-border/70 bg-muted/30 p-2 text-xs">
           <div className="ui-title text-[11px] text-muted-foreground">Import diagnostics</div>
           <div className="mt-1 grid grid-cols-1 gap-1.5 text-[11px] text-muted-foreground md:grid-cols-2">
@@ -1140,6 +1278,20 @@ export function SetupDocumentReviewClient({
             </button>
           </div>
         </div>
+        </>
+        ) : null}
+
+        {!showDebug ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs hover:bg-muted"
+            onClick={() => setMode((m) => (m === "manual" ? "review" : "manual"))}
+          >
+            {mode === "manual" ? "Done editing" : "Edit setup"}
+          </button>
+        </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -1175,9 +1327,10 @@ export function SetupDocumentReviewClient({
               <p className="mt-1 text-xs text-muted-foreground">
                 {mode === "manual"
                   ? "Adjust values to fix mis-mapped or ambiguous PDF fields, then save changes."
-                  : "Read-only review. Click Edit setup to change structured fields, then save."}
+                  : "Check values look right. Use Edit setup above to fix anything wrong."}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
+                {showDebug ? (
                 <select
                   className="rounded-md border border-border bg-muted/60 px-2 py-1.5 text-xs"
                   value={liveDoc.carId ?? ""}
@@ -1191,6 +1344,7 @@ export function SetupDocumentReviewClient({
                     </option>
                   ))}
                 </select>
+                ) : null}
                 {mode === "manual" ? (
                   <button
                     type="button"
@@ -1201,6 +1355,7 @@ export function SetupDocumentReviewClient({
                     {savingDraft ? "Saving…" : "Save changes"}
                   </button>
                 ) : null}
+                {showDebug || calibrationSelectionChanged ? (
                 <button
                   type="button"
                   className="rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
@@ -1209,17 +1364,21 @@ export function SetupDocumentReviewClient({
                 >
                   {reparsing ? "Re-parsing…" : "Re-parse"}
                 </button>
+                ) : null}
+                {showDebug ? (
                 <button
                   type="button"
                   className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
                   onClick={createSetup}
                   disabled={
-                    creatingSetup || Boolean(liveDoc.createdSetupId) || !liveDoc.carId || savingCarLink
+                    creatingSetup || Boolean(liveDoc.createdSetupId) || savingCarLink
                   }
                 >
                   {liveDoc.createdSetupId ? "Setup already created" : creatingSetup ? "Creating…" : "Create setup from document"}
                 </button>
+                ) : null}
               </div>
+              {showDebug ? (
               <div className="mt-3 rounded border border-border/70 bg-muted/40 p-2">
                 <div className="ui-title text-[11px] text-muted-foreground">New text template</div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1239,10 +1398,11 @@ export function SetupDocumentReviewClient({
                   </button>
                 </div>
               </div>
+              ) : null}
             </div>
           </div>
 
-          {hasProcessedResult ? (
+          {showSetupSheet ? (
             <SetupSheetView
               value={setupData}
               onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
@@ -1252,12 +1412,15 @@ export function SetupDocumentReviewClient({
             />
           ) : (
             <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-              {awaitingCalibration
-                ? "No calibration selected yet. Save a calibration selection, then process the document."
-                : "Calibration is selected but this document has not been processed with it yet. Run process to load parsed setup values."}
+              {liveDoc.importStatus === "PROCESSING"
+                ? "Importing setup values…"
+                : awaitingCalibration
+                  ? "Select a calibration above to import values from this sheet."
+                  : "No setup values imported yet."}
             </div>
           )}
 
+          {showDebug ? (
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="ui-title text-xs text-muted-foreground">Extracted text</div>
             <div className="mt-1 rounded border border-border/70 bg-muted/40 p-2 text-[11px] text-muted-foreground">
@@ -1270,6 +1433,7 @@ export function SetupDocumentReviewClient({
               {liveDoc.extractedText?.trim() || "No extracted text available."}
             </pre>
           </div>
+          ) : null}
         </div>
       </div>
 

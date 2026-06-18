@@ -69,16 +69,8 @@ export function NewSetupUploadButton({
       if (isImageMime && data.pickSource === "none" && !data.setupId && !data.detectedModelId) {
         router.push(`/setup-documents/${docId}/calibrate-image`);
         router.refresh();
-      } else if (data.needsReview || !data.setupId) {
-        router.push(`/setup-documents/${docId}`);
-        router.refresh();
       } else {
-        const params = new URLSearchParams();
-        params.set("created", docId);
-        params.set("setupId", data.setupId);
-        if (data.calibrationName) params.set("calibration", data.calibrationName);
-        if (data.calibrationAmbiguous) params.set("calibrationAmbiguous", "1");
-        router.push(`/setup?${params.toString()}`);
+        router.push(`/setup-documents/${docId}`);
         router.refresh();
       }
       setStage("idle");

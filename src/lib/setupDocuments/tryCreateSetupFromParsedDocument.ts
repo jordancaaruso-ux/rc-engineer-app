@@ -33,10 +33,11 @@ export async function tryCreateSetupFromParsedDocument(input: {
   if (doc.parseStatus !== "PARSED" && doc.parseStatus !== "PARTIAL") {
     return { ok: false, reason: "parse_not_ready" };
   }
-  if (!doc.carId) return { ok: false, reason: "no_car" };
 
-  const allowed = await isCarValidTargetForSetupDocument(input.userId, doc, doc.carId);
-  if (!allowed) return { ok: false, reason: "car_mismatch" };
+  if (doc.carId) {
+    const allowed = await isCarValidTargetForSetupDocument(input.userId, doc, doc.carId);
+    if (!allowed) return { ok: false, reason: "car_mismatch" };
+  }
 
   try {
     const normalized = normalizeSetupSnapshotForStorage(

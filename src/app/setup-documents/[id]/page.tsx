@@ -148,8 +148,8 @@ export default async function SetupDocumentDetailPage({
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">Review setup document</h1>
-          <p className="page-subtitle">Review parsed values before creating a setup snapshot.</p>
+          <h1 className="page-title">Review setup</h1>
+          <p className="page-subtitle">Check the imported values look right, then return to Setup.</p>
         </div>
       </header>
       {showImageCalibrateCta ? (
