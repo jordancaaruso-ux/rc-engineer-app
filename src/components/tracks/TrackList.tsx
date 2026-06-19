@@ -134,7 +134,8 @@ export function TrackList({
       </div>
 
       {searchLooksUnmatched || showAddForm ? (
-        <form onSubmit={handleAdd} className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
+        <CardPanel>
+        <form onSubmit={handleAdd} className="space-y-3">
           <div className="ui-title text-sm text-muted-foreground">
             {searchLooksUnmatched ? "Cannot find it? Add a new track" : "Add track"}
           </div>
@@ -214,6 +215,7 @@ export function TrackList({
             ) : null}
           </div>
         </form>
+        </CardPanel>
       ) : (
         <button
           type="button"
@@ -234,9 +236,10 @@ export function TrackList({
             {search.trim() ? "No tracks match your search." : "No tracks yet. Add one above or from Log your run."}
           </CardPanel>
         ) : (
-          <ul className="rounded-lg border border-border divide-y divide-border">
+          <ul className="flex flex-col gap-2.5">
             {filteredTracks.map((t) => (
-              <li key={t.id} className="px-4 py-3 space-y-2">
+              <li key={t.id}>
+                <CardPanel contentClassName="px-4 py-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {favSet.has(t.id) && (
@@ -245,7 +248,11 @@ export function TrackList({
                       </span>
                     )}
                     <div>
-                      <Link href={`/tracks/${t.id}`} className="font-medium hover:underline">
+                      <Link
+                        href={`/tracks/${t.id}`}
+                        prefetch
+                        className="tap-active inline-block font-medium"
+                      >
                         {t.name}
                       </Link>
                       {t.location ? (
@@ -284,6 +291,7 @@ export function TrackList({
                     }}
                   />
                 ) : null}
+                </CardPanel>
               </li>
             ))}
           </ul>

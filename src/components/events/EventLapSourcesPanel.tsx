@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type LapDetectionDebug = {
   eventInSyncScope?: boolean;
@@ -111,7 +112,7 @@ export function EventLapSourcesPanel(props: {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 text-sm shadow-sm shadow-black/20">
+    <CardPanel contentClassName="text-sm">
       <h2 className="text-sm font-medium text-foreground">LiveRC lap detection</h2>
       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
         Optional overrides when track LiveRC URL is not enough. The app discovers your most recent sessions from the
@@ -300,6 +301,6 @@ export function EventLapSourcesPanel(props: {
           </div>
         </div>
       ) : null}
-    </div>
+    </CardPanel>
   );
 }

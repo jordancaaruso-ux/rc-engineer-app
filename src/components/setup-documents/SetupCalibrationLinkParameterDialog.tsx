@@ -196,7 +196,7 @@ export function SetupCalibrationLinkParameterDialog(props: {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-xs">
           {error ? (
-            <div className="mb-3 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-100">
+            <div className="mb-3 rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] text-foreground">
               {error}
             </div>
           ) : null}
@@ -302,7 +302,7 @@ export function SetupCalibrationLinkParameterDialog(props: {
                               type="button"
                               className={`rounded border px-2 py-0.5 text-[10px] ${
                                 assignOnPdfRow === a.optionValue
-                                  ? "border-sky-500/70 bg-sky-500/15 text-sky-100"
+                                  ? "border-primary/30 bg-primary/10 text-accent"
                                   : "border-border text-muted-foreground hover:bg-muted/50"
                               }`}
                               onClick={() =>
@@ -346,7 +346,7 @@ export function SetupCalibrationLinkParameterDialog(props: {
           {step === "assign" ? (
             <button
               type="button"
-              className="rounded border border-sky-500/60 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100 hover:bg-sky-500/25"
+              className="rounded border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-primary/10"
               onClick={handleConfirmGrouped}
             >
               Confirm mapping

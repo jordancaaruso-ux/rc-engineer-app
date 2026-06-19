@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
 import {
   DEFAULT_OVERLAY_ALIGNMENT,
   type OverlayAlignment,
@@ -98,7 +99,7 @@ export function VideoOverlayAlignmentPanel({
         <span className="text-[10px] opacity-70">{expanded ? "Hide" : "Show"}</span>
       </button>
       {expanded ? (
-        <div className={cn("space-y-3 rounded-md border border-border/80 bg-muted/20 p-3", compact && "max-h-48 overflow-y-auto")}>
+        <CardPanel contentClassName="space-y-3" className={compact ? "max-h-48 overflow-y-auto" : undefined}>
           <SliderRow
             label="Shift X"
             value={alignment.translateX}
@@ -194,7 +195,7 @@ export function VideoOverlayAlignmentPanel({
           >
             Reset alignment
           </button>
-        </div>
+        </CardPanel>
       ) : null}
     </div>
   );

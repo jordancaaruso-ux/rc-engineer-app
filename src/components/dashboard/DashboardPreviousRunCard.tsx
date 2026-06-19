@@ -7,6 +7,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow, PanelSubtitle, PanelTitle, StatStrip, StatTile } from "@/components/ui/panel";
 
 export function DashboardPreviousRunCard({
   recentRun,
@@ -16,15 +17,19 @@ export function DashboardPreviousRunCard({
   displayTimeZone: string;
 }) {
   return (
-    <CardPanel className="shadow-black/30 p-3 sm:p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-medium text-muted-foreground">Last run</div>
-      </div>
+    <CardPanel>
+      <Eyebrow dot="muted">Last run</Eyebrow>
       {recentRun ? (
-        <div className="mt-2 space-y-2 text-[11px]">
-          <div className="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 sm:grid-cols-[4.5rem_1fr]">
-            <span className="text-muted-foreground">When</span>
-            <span className="text-[10px] tabular-nums text-muted-foreground">
+        <div className="mt-1.5 space-y-2.5">
+          <div>
+            <PanelTitle as="h3">{recentRun.carName}</PanelTitle>
+            <PanelSubtitle className="mt-1">
+              {recentRun.trackName ?? "No track"} · {recentRun.sessionLabel}
+            </PanelSubtitle>
+          </div>
+          <div className="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 text-[13px] sm:grid-cols-[4.5rem_1fr]">
+            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-faint">When</span>
+            <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
               {formatRunCreatedAtDateTime(
                 resolveRunDisplayInstant({
                   createdAt: recentRun.createdAt,
@@ -34,29 +39,17 @@ export function DashboardPreviousRunCard({
                 displayTimeZone
               )}
             </span>
-            <span className="text-muted-foreground">Car</span>
-            <span className="min-w-0 font-medium text-foreground">{recentRun.carName}</span>
-            <span className="text-muted-foreground">Track</span>
-            <span className="min-w-0 text-muted-foreground">{recentRun.trackName ?? "—"}</span>
             {recentRun.eventName ? (
               <>
-                <span className="text-muted-foreground">Event</span>
-                <span className="min-w-0 text-muted-foreground">{recentRun.eventName}</span>
+                <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-faint">Event</span>
+                <span className="text-[13px] text-muted-foreground">{recentRun.eventName}</span>
               </>
             ) : null}
-            <span className="text-muted-foreground">Session</span>
-            <span className="min-w-0 text-muted-foreground">{recentRun.sessionLabel}</span>
           </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-border pt-2">
-            <span className="tabular-nums">
-              <span className="mr-1.5 text-[10px] font-medium text-muted-foreground">Best</span>
-              <span className="font-mono">{formatLap(recentRun.bestLap)}</span>
-            </span>
-            <span className="tabular-nums">
-              <span className="mr-1.5 text-[10px] font-medium text-muted-foreground">Avg 5</span>
-              <span className="font-mono">{formatLap(recentRun.avgTop5)}</span>
-            </span>
-          </div>
+          <StatStrip className="grid-cols-2">
+            <StatTile label="Best lap" value={formatLap(recentRun.bestLap)} accent className="py-2" />
+            <StatTile label="Avg top 5" value={formatLap(recentRun.avgTop5)} className="py-2" />
+          </StatStrip>
           <div className="flex flex-wrap gap-1.5">
             <Link
               href={`/runs/history?focusRun=${encodeURIComponent(recentRun.id)}`}
@@ -73,7 +66,7 @@ export function DashboardPreviousRunCard({
           </div>
         </div>
       ) : (
-        <p className="mt-2 text-[11px] text-muted-foreground">No runs yet — log one to populate this.</p>
+        <PanelSubtitle className="mt-1.5">No runs yet — log one to populate this.</PanelSubtitle>
       )}
     </CardPanel>
   );

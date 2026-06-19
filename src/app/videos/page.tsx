@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function VideosPage(): Promise<ReactNode> {
   return (
@@ -24,7 +25,7 @@ export default async function VideosPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-3">
+        <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground space-y-3">
           <p>
             Upload a heat or practice video, optionally paste LiveRC timing URLs, anchor start/finish
             on the video, then overlay two laps at 50% to compare lines.
@@ -32,7 +33,7 @@ export default async function VideosPage(): Promise<ReactNode> {
           <p className="text-xs">
             Video stays in your browser — only timing links and sync marks are saved to your account.
           </p>
-        </div>
+        </CardPanel>
       </section>
     </>
   );

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type CarOption = { id: string; name: string };
 
@@ -193,10 +194,8 @@ export function BulkImportHubClient({
 
   return (
     <div className="space-y-6">
-      <form
-        onSubmit={createBatch}
-        className="rounded-lg border border-border bg-card p-4 space-y-3 max-w-2xl"
-      >
+      <CardPanel className="max-w-2xl" contentClassName="space-y-3">
+        <form onSubmit={createBatch} className="space-y-3">
         <div className="ui-title text-xs text-muted-foreground">New import batch</div>
         <p className="text-xs text-muted-foreground">
           Name the batch, choose a car, then add PDFs from disk, or paste a PetitRC URL (e.g. Awesomatix hub), or both.
@@ -341,31 +340,32 @@ export function BulkImportHubClient({
                 ? "Create batch & import from PetitRC"
                 : `Create batch & upload (${queued.length})`}
         </button>
-      </form>
+        </form>
+      </CardPanel>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-2 ui-title text-xs text-muted-foreground">
-          Recent batches
-        </div>
+      <div className="space-y-2.5">
+        <div className="ui-title text-xs text-muted-foreground">Recent batches</div>
         {initialBatches.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-muted-foreground">No batches yet.</div>
+          <CardPanel contentClassName="text-sm text-muted-foreground">No batches yet.</CardPanel>
         ) : (
-          <ul className="divide-y divide-border/60">
+          <ul className="flex flex-col gap-2.5">
             {initialBatches.map((b) => (
-              <li key={b.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
-                <div className="min-w-0">
-                  <div className="truncate text-sm text-foreground">{b.name || "Untitled batch"}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {b._count.documents} file{b._count.documents === 1 ? "" : "s"} · {formatUtc(b.createdAt)}
-                    {b.calibrationProfile ? ` · batch default: ${b.calibrationProfile.name}` : ""}
+              <li key={b.id}>
+                <CardPanel contentClassName="flex items-center justify-between gap-2 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-foreground">{b.name || "Untitled batch"}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {b._count.documents} file{b._count.documents === 1 ? "" : "s"} · {formatUtc(b.createdAt)}
+                      {b.calibrationProfile ? ` · batch default: ${b.calibrationProfile.name}` : ""}
+                    </div>
                   </div>
-                </div>
-                <Link
-                  href={`/setup/bulk-import/${b.id}`}
-                  className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted"
-                >
-                  Open
-                </Link>
+                  <Link
+                    href={`/setup/bulk-import/${b.id}`}
+                    className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted"
+                  >
+                    Open
+                  </Link>
+                </CardPanel>
               </li>
             ))}
           </ul>

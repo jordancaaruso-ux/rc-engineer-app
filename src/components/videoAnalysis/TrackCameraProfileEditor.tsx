@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { SectorLineCanvas, type SectorLineNorm } from "./SectorLineCanvas";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type Profile = {
   id: string;
@@ -179,8 +180,9 @@ export function TrackCameraProfileEditor({
 
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
 
-      <details className="rounded-lg border border-border bg-card p-3 text-xs">
-        <summary className="cursor-pointer font-medium">Worker config (for Python CLI)</summary>
+      <CardPanel contentClassName="text-xs">
+        <details>
+          <summary className="cursor-pointer font-medium">Worker config (for Python CLI)</summary>
         <pre className="mt-2 overflow-auto max-h-48 text-[10px]">
           {JSON.stringify(workerConfig, null, 2)}
         </pre>
@@ -188,7 +190,8 @@ export function TrackCameraProfileEditor({
           Save as <code>config.json</code> and run:{" "}
           <code>python -m rc_video_analysis analyze --video heat.mp4 --config config.json --output results.json</code>
         </p>
-      </details>
+        </details>
+      </CardPanel>
     </div>
   );
 }

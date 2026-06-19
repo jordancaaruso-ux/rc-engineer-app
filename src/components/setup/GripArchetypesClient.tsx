@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 type GripBucket = "any" | "low" | "medium" | "high";
 
@@ -162,7 +164,7 @@ export function GripArchetypesClient(props: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm text-muted-foreground space-y-2">
+      <CardPanel contentClassName="text-sm text-muted-foreground space-y-2">
         <p>
           Median tuning values from all community-eligible uploads that match{" "}
           <span className="font-mono">{setupSheetTemplate}</span> on the selected surface, split by the{" "}
@@ -178,7 +180,7 @@ export function GripArchetypesClient(props: Props) {
         ) : (
           <p className="text-xs">No logged run with a setup on this car yet — the &quot;your value&quot; column will be empty.</p>
         )}
-      </div>
+      </CardPanel>
 
       <div className="flex flex-wrap items-center gap-3 text-xs">
         <div className="inline-flex rounded-md border border-border overflow-hidden">
@@ -218,13 +220,13 @@ export function GripArchetypesClient(props: Props) {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : error ? (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-sm text-red-600 dark:text-red-300">{error}</p>
       ) : !data || data.parameters.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No numeric parameters have grip-specific samples for this surface yet. Tag more uploads with a traction level and rebuild aggregations.
         </p>
       ) : (
-        <div className="rounded-lg border border-border bg-card overflow-x-auto">
+        <SurfaceCard overflowHidden={false} contentClassName="p-0 overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead className="bg-muted/60 text-muted-foreground">
               <tr>
@@ -324,7 +326,7 @@ export function GripArchetypesClient(props: Props) {
               })}
             </tbody>
           </table>
-        </div>
+        </SurfaceCard>
       )}
     </div>
   );

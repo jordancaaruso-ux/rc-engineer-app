@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
+import { Eyebrow } from "@/components/ui/panel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 type ListParam = "try" | "do";
 
@@ -157,12 +159,14 @@ export function ActionItemListPanel({
   const shell =
     embedded
       ? "rounded-md border-0 bg-transparent p-0 shadow-none"
-      : "rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25";
+      : "rounded-xl border border-border p-4 shadow-[0_18px_50px_-28px_rgba(0,0,0,0.75)]";
 
-  return (
-    <div className={shell}>
+  const titleEl = <Eyebrow dot="muted">{title}</Eyebrow>;
+
+  const content = (
+    <>
       <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
-        <div className="text-sm font-medium tracking-tight text-foreground">{title}</div>
+        {titleEl}
         {hint ? (
           <p
             className={
@@ -176,7 +180,7 @@ export function ActionItemListPanel({
         ) : null}
       </div>
 
-      <form onSubmit={addManual} className="mt-2 flex flex-wrap items-center gap-1.5">
+      <form onSubmit={addManual} className="mt-1.5 flex flex-wrap items-center gap-1.5">
         <input
           type="text"
           value={draft}
@@ -199,9 +203,9 @@ export function ActionItemListPanel({
       {reorderErr ? <p className="mt-1.5 text-[11px] text-destructive">{reorderErr}</p> : null}
 
       {items.length === 0 ? (
-        <p className="mt-2 text-[11px] text-muted-foreground">Nothing here yet — add above.</p>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">Nothing here yet — add above.</p>
       ) : (
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-1.5 space-y-1">
           {items.map((i) => {
             const showDropAbove = dropTarget?.itemId === i.id && dropTarget.edge === "above";
             const showDropBelow = dropTarget?.itemId === i.id && dropTarget.edge === "below";
@@ -249,8 +253,8 @@ export function ActionItemListPanel({
                 className={cn(
                   "flex items-start justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5",
                   draggingId === i.id && "opacity-50",
-                  showDropAbove && "shadow-[inset_0_2px_0_0_var(--color-primary,#2563eb)]",
-                  showDropBelow && "shadow-[inset_0_-2px_0_0_var(--color-primary,#2563eb)]"
+                  showDropAbove && "shadow-[inset_0_2px_0_0_rgb(var(--color-primary))]",
+                  showDropBelow && "shadow-[inset_0_-2px_0_0_rgb(var(--color-primary))]"
                 )}
               >
                 <div
@@ -266,7 +270,7 @@ export function ActionItemListPanel({
                     {i.text}
                   </p>
                   {i.sourceType !== "RUN" ? (
-                    <p className="mt-0.5 text-sm font-medium text-muted-foreground">Manual</p>
+                    <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-faint">Manual</p>
                   ) : null}
                 </div>
                 <button
@@ -282,6 +286,12 @@ export function ActionItemListPanel({
           })}
         </ul>
       )}
-    </div>
+    </>
   );
+
+  if (embedded) {
+    return <div className={shell}>{content}</div>;
+  }
+
+  return <SurfaceCard variant="panel">{content}</SurfaceCard>;
 }

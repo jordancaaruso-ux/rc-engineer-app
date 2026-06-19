@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { CarDeleteClient } from "@/components/cars/CarDeleteClient";
 import {
   CarSetupSheetModelCard,
@@ -24,9 +25,9 @@ export default async function CarDetailPage(props: {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env to view cars.
-          </div>
+          </CardPanel>
         </section>
       </>
     );
@@ -169,7 +170,7 @@ export default async function CarDetailPage(props: {
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
-          <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
+          <CardPanel contentClassName="text-sm">
             <div className="grid gap-2">
               <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(car.createdAt)}</span></div>
               <div><span className="text-sm font-medium text-muted-foreground">Runs</span> <span className="ml-2">{runCount}</span></div>
@@ -180,7 +181,7 @@ export default async function CarDetailPage(props: {
                 <div><span className="text-sm font-medium text-muted-foreground">Notes</span> <span className="ml-2">{car.notes}</span></div>
               ) : null}
             </div>
-          </div>
+          </CardPanel>
 
           {car.setupSheetModel ? (
             <CarSetupSheetModelCard
@@ -197,7 +198,7 @@ export default async function CarDetailPage(props: {
           ) : null}
 
           {car.setupSheetTemplate && !car.setupSheetModelId ? (
-            <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-2">
+            <CardPanel contentClassName="text-sm space-y-2">
               <div className="ui-title text-sm text-muted-foreground">Community tuning archetypes</div>
               <p className="text-xs text-muted-foreground">
                 Compare this car&apos;s latest setup against low / medium / high grip medians pooled from every
@@ -209,10 +210,10 @@ export default async function CarDetailPage(props: {
               >
                 Open grip archetypes →
               </Link>
-            </div>
+            </CardPanel>
           ) : null}
 
-          <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+          <CardPanel contentClassName="space-y-3">
             <div className="ui-title text-sm text-muted-foreground">Tires used with this car</div>
             {tireSetsOnCar.length === 0 ? (
               <p className="text-xs text-muted-foreground">
@@ -237,9 +238,9 @@ export default async function CarDetailPage(props: {
                 ))}
               </ul>
             )}
-          </div>
+          </CardPanel>
 
-          <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+          <CardPanel contentClassName="space-y-3">
             <div className="ui-title text-sm text-muted-foreground">Batteries used with this car</div>
             {batteriesOnCar.length === 0 ? (
               <p className="text-xs text-muted-foreground">
@@ -264,7 +265,7 @@ export default async function CarDetailPage(props: {
                 ))}
               </ul>
             )}
-          </div>
+          </CardPanel>
 
           <CarDeleteClient carId={car.id} carName={car.name} runCount={runCount} />
         </div>

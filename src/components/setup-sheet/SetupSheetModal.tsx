@@ -457,7 +457,7 @@ export function SetupSheetModal({
                     <p className="text-[11px] text-muted-foreground">
                       Showing this run&apos;s setup vs {formatPickerLine(baselineRun)}. Changed fields show{" "}
                       <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
-                      <span className="text-red-600/90 dark:text-red-400/90">Darker red</span> = larger difference vs
+                      <span className="text-destructive/90">Darker red</span> = larger difference vs
                       community spread for that parameter; parameters without enough community samples use a fixed
                       lighter red.
                     </p>
@@ -465,7 +465,7 @@ export function SetupSheetModal({
                     <p className="text-[11px] text-muted-foreground">
                       Compared to your current setup. Changed fields show{" "}
                       <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
-                      <span className="text-red-600/90 dark:text-red-400/90">Darker red</span> = larger difference vs
+                      <span className="text-destructive/90">Darker red</span> = larger difference vs
                       community spread{hasActiveSetup ? "." : " (no current setup loaded)."}
                     </p>
                   ) : null}

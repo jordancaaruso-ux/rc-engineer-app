@@ -5,14 +5,14 @@ import { formatLap } from "@/lib/runLaps";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
 import { DashboardPreviousRunCard } from "@/components/dashboard/DashboardPreviousRunCard";
-import { TodaySummaryCard } from "@/components/dashboard/TodaySummaryCard";
 import { DashboardEngineerSuggestionsSection } from "@/components/dashboard/DashboardEngineerSuggestionsSection";
 import { SHOW_DASHBOARD_ENGINEER_SUGGESTIONS } from "@/lib/featureFlags";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { HeroPanel } from "@/components/ui/HeroPanel";
-import { SectionMeta, SectionTitle } from "@/components/ui/SectionTitle";
+import { Eyebrow, PanelSubtitle, PanelTitle, StatStrip, StatTile } from "@/components/ui/panel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 export function DashboardHome({
   model,
@@ -27,14 +27,9 @@ export function DashboardHome({
     recentRun,
     thingsToTry,
     thingsToDo,
-    todayBestLap,
-    todayBestAvgTop5,
-    todayBestRunId,
-    todayBestRunLabel,
     todayRunCount,
     todayDraftRunId,
     todayDraftSavedAt,
-    todaysChanges,
     engineerSuggestionsPrimaryRunId,
   } = model;
 
@@ -54,6 +49,8 @@ export function DashboardHome({
         meta: "Log a session on your car and track.",
       };
 
+  const heroBlurb = "meta" in primaryAction ? primaryAction.meta : primaryAction.blurb;
+
   return (
     <>
       <header className="page-header">
@@ -62,33 +59,27 @@ export function DashboardHome({
         </div>
       </header>
 
-      <section className="page-body flex max-w-3xl flex-col gap-4">
-        <HeroPanel variant="muted" className="bg-card/80">
-          <Link
-            href={primaryAction.href}
-            className="group flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-1 py-0.5 text-left outline-offset-2 transition hover:bg-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/40"
-          >
-            <div className="min-w-0 flex-1 space-y-1">
-              {todayDraftRunId ? (
-                <div className="text-[11px] ui-title text-accent">
-                  Unfinished run
-                </div>
-              ) : null}
-              <SectionTitle as="div" className="leading-tight">
+      <section className="page-body flex max-w-3xl flex-col gap-3">
+        <SurfaceCard variant="hero">
+          <Eyebrow dot="accent">
+            {todayRunCount > 0
+              ? `Today · ${todayRunCount} run${todayRunCount === 1 ? "" : "s"}`
+              : "Today"}
+          </Eyebrow>
+
+          <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              {todayDraftRunId ? <Eyebrow dot="accent">Unfinished run</Eyebrow> : null}
+              <h1 className="mt-1 text-[22px] font-extrabold leading-none tracking-tight text-foreground sm:text-[24px]">
                 {primaryAction.label}
-              </SectionTitle>
-              {"meta" in primaryAction && primaryAction.meta ? (
-                <SectionMeta as="div" className="mt-0">
-                  {primaryAction.meta}
-                </SectionMeta>
-              ) : null}
-              {"blurb" in primaryAction && primaryAction.blurb ? (
-                <SectionMeta as="div" className="mt-0">
-                  {primaryAction.blurb}
-                </SectionMeta>
+              </h1>
+              {heroBlurb ? (
+                <p className="mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
+                  {heroBlurb}
+                </p>
               ) : null}
               {todayDraftRunId && todayDraftSavedAt ? (
-                <div className="text-[10px] font-mono tabular-nums text-muted-foreground">
+                <div className="mt-1.5 font-mono text-[10px] tabular-nums text-faint">
                   Saved{" "}
                   <RelativeTime
                     iso={todayDraftSavedAt}
@@ -97,23 +88,29 @@ export function DashboardHome({
                 </div>
               ) : null}
             </div>
-            <span
-              aria-hidden
-              className="shrink-0 rounded-md border border-primary/40 bg-background/60 px-2 py-1 text-[11px] font-medium text-primary transition group-hover:border-primary/55"
+
+            <Link
+              href={primaryAction.href}
+              prefetch
+              className="tap-active group inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-bold uppercase tracking-[0.12em] text-primary-foreground shadow-glow-sm transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
             >
-              {todayDraftRunId ? "Finish →" : "Start →"}
-            </span>
-          </Link>
-        </HeroPanel>
+              {todayDraftRunId ? "Finish" : "Add"}
+              <span
+                aria-hidden
+                className="inline-flex shrink-0 items-center justify-center text-[13px] font-bold leading-none"
+              >
+                {todayDraftRunId ? "→" : "+"}
+              </span>
+            </Link>
+          </div>
+        </SurfaceCard>
 
         {SHOW_DASHBOARD_ENGINEER_SUGGESTIONS ? (
           <Suspense
             fallback={
               <HeroPanel>
-                <SectionTitle as="div" className="text-sm">
-                  Engineer suggestions
-                </SectionTitle>
-                <p className="mt-2 text-[11px] text-muted-foreground">Loading…</p>
+                <Eyebrow dot="muted">Engineer suggestions</Eyebrow>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">Loading…</p>
               </HeroPanel>
             }
           >
@@ -126,46 +123,14 @@ export function DashboardHome({
           </Suspense>
         ) : null}
 
+        <DashboardPreviousRunCard recentRun={recentRun} displayTimeZone={displayTimeZone} />
+
         {featuredEvent ? (
           <FeaturedMeetingCard featuredEvent={featuredEvent} />
         ) : null}
 
-        <DashboardPreviousRunCard recentRun={recentRun} displayTimeZone={displayTimeZone} />
-
-        <div className="flex flex-wrap gap-1.5">
-          <Link
-            href="/engineer"
-            className={buttonLinkClassName("outline", "text-muted-foreground hover:text-foreground")}
-          >
-            Chat with engineer
-          </Link>
-          <Link
-            href="/setup"
-            className={buttonLinkClassName("outline", "text-muted-foreground hover:text-foreground")}
-          >
-            Analyze recent setups
-          </Link>
-          <Link
-            href="/runs/history"
-            className={buttonLinkClassName("outline", "text-muted-foreground hover:text-foreground")}
-          >
-            View runs
-          </Link>
-        </div>
-
-        <TodaySummaryCard
-          todayBestLap={todayBestLap}
-          todayBestAvgTop5={todayBestAvgTop5}
-          todayBestRunId={todayBestRunId}
-          todayBestRunLabel={todayBestRunLabel}
-          todayRunCount={todayRunCount}
-          todaysChanges={todaysChanges}
-          displayTimeZone={displayTimeZone}
-          hasActiveEvent={featuredEvent?.status === "active"}
-        />
-
-        <div className="rounded-xl border border-border bg-card/80 p-4 shadow-sm">
-          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <CardPanel contentClassName="space-y-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <ActionItemListPanel
               list="try"
               title="Things to try"
@@ -175,13 +140,13 @@ export function DashboardHome({
             />
             <ActionItemListPanel
               list="do"
-              title="things to do"
+              title="Things to do"
               addPlaceholder="Add a reminder…"
               initialItems={thingsToDo}
               embedded
             />
           </div>
-        </div>
+        </CardPanel>
       </section>
     </>
   );
@@ -201,17 +166,17 @@ function FeaturedMeetingCard({
   const isActive = featuredEvent.status === "active";
 
   return (
-    <CardPanel className="p-4">
-      <div className="text-xs font-medium text-muted-foreground">
+    <CardPanel>
+      <Eyebrow dot={isActive ? "gain" : "muted"}>
         {FEATURED_MEETING_LABELS[featuredEvent.status]}
-      </div>
+      </Eyebrow>
       <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-sm font-medium leading-tight text-foreground">{featuredEvent.name}</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{featuredEvent.dateLabel}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <PanelTitle>{featuredEvent.name}</PanelTitle>
+          <PanelSubtitle className="mt-1">{featuredEvent.dateLabel}</PanelSubtitle>
+          <PanelSubtitle className="mt-0.5">
             {featuredEvent.trackLabel ?? "Track not set — link one on the event"}
-          </p>
+          </PanelSubtitle>
         </div>
         <div className="flex shrink-0 flex-wrap gap-1.5">
           {isActive ? (
@@ -242,32 +207,21 @@ function FeaturedMeetingCard({
       </div>
 
       {featuredEvent.runCount > 0 ? (
-        <div className="mt-2.5 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-2.5 text-[11px]">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[10px] ui-title text-muted-foreground">Best</span>
-            <span className="font-mono tabular-nums text-foreground">
-              {formatLap(featuredEvent.latest?.bestLap ?? null)}
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[10px] ui-title text-muted-foreground">Avg 5</span>
-            <span className="font-mono tabular-nums text-foreground">
-              {formatLap(featuredEvent.latest?.avgTop5 ?? null)}
-            </span>
-          </div>
-          <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-            <div className="text-[10px] ui-title text-muted-foreground">Notes</div>
-            <div className="mt-0.5 line-clamp-2 break-words text-muted-foreground">
+        <StatStrip className="mt-2.5 grid-cols-2 sm:grid-cols-3">
+          <StatTile label="Best lap" value={formatLap(featuredEvent.latest?.bestLap ?? null)} accent className="py-2" />
+          <StatTile label="Avg top 5" value={formatLap(featuredEvent.latest?.avgTop5 ?? null)} className="py-2" />
+          <div className="col-span-2 bg-[#17130f]/55 px-3 py-2 sm:col-span-1">
+            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-faint">Notes</div>
+            <div className="mt-1 line-clamp-2 break-words text-[13px] leading-relaxed text-muted-foreground">
               {featuredEvent.latest?.notesPreview ?? "—"}
             </div>
           </div>
-        </div>
+        </StatStrip>
       ) : (
-        <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+        <PanelSubtitle className="mt-2.5 border-t border-border/70 pt-2.5">
           No runs logged for this event yet.
-        </p>
+        </PanelSubtitle>
       )}
     </CardPanel>
   );
 }
-

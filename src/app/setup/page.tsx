@@ -9,6 +9,7 @@ import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrat
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 
 import { SetupRunPdfReviewClient } from "@/components/setup/SetupRunPdfReviewClient";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type SetupPageSearchParams = {
   created?: string;
@@ -65,9 +66,9 @@ export default async function SetupPage({
             </div>
           </header>
           <section className="page-body">
-            <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+            <CardPanel contentClassName="text-sm text-muted-foreground">
               Set DATABASE_URL in .env.
-            </div>
+            </CardPanel>
           </section>
         </>
       );
@@ -86,9 +87,9 @@ export default async function SetupPage({
           </div>
         </header>
         <section className="page-body">
-          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env.
-          </div>
+          </CardPanel>
         </section>
       </>
     );
@@ -215,7 +216,7 @@ export default async function SetupPage({
             </div>
           </div>
         ) : null}
-        <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap items-center justify-between gap-3">
+        <CardPanel contentClassName="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="ui-title text-sm text-muted-foreground">Tools</div>
             <div className="text-xs text-muted-foreground">Compare setups or import many PDFs for a dataset.</div>
@@ -246,10 +247,10 @@ export default async function SetupPage({
               Aggregation stats (debug)
             </Link>
           </div>
-        </div>
+        </CardPanel>
 
-        <div className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between border-b border-border px-4 py-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
             <div className="ui-title text-xs text-muted-foreground">Downloaded setups</div>
             <div className="flex items-center gap-2">
               <NewSetupUploadButton defaultSetupSheetModelId={preselectModelId} />
@@ -259,11 +260,14 @@ export default async function SetupPage({
             </div>
           </div>
           {documents.length === 0 ? (
-            <div className="px-4 py-5 text-sm text-muted-foreground">No setup documents yet.</div>
+            <CardPanel>
+              <div className="text-sm text-muted-foreground">No setup documents yet.</div>
+            </CardPanel>
           ) : (
-            <div className="divide-y divide-border/60">
+            <ul className="flex flex-col gap-2">
               {documents.slice(0, 8).map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <li key={doc.id}>
+                  <CardPanel contentClassName="flex items-center justify-between gap-3 px-4 py-2.5">
                   <div className="min-w-0">
                     <div className="truncate text-sm text-foreground">{doc.originalFilename}</div>
                     <div className="text-[11px] text-muted-foreground">
@@ -285,25 +289,29 @@ export default async function SetupPage({
                       Review
                     </Link>
                   </div>
-                </div>
+                  </CardPanel>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
 
-        <div className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between border-b border-border px-4 py-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
             <div className="ui-title text-xs text-muted-foreground">Setups from runs</div>
             <Link href="/runs/history" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
               View runs
             </Link>
           </div>
           {runs.length === 0 ? (
-            <div className="px-4 py-5 text-sm text-muted-foreground">No runs saved yet.</div>
+            <CardPanel>
+              <div className="text-sm text-muted-foreground">No runs saved yet.</div>
+            </CardPanel>
           ) : (
-            <div className="divide-y divide-border/60">
+            <ul className="flex flex-col gap-2">
               {runs.slice(0, 10).map((run) => (
-                <div key={run.id} className="px-4 py-2.5 text-sm">
+                <li key={run.id}>
+                  <CardPanel contentClassName="px-4 py-2.5 text-sm">
                   <div className="text-foreground">
                     {run.event?.name ? `${run.event.name} · ` : ""}
                     {run.track?.name ?? "—"} · {run.car?.name ?? "—"}
@@ -317,14 +325,15 @@ export default async function SetupPage({
                     })}{" "}
                     · {new Date(run.createdAt).toLocaleString()}
                   </div>
-                </div>
+                  </CardPanel>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
 
-        <div className="rounded-lg border border-border/70 bg-muted/30">
-          <div className="flex items-center justify-between border-b border-border/70 px-4 py-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
             <div className="ui-title text-xs text-muted-foreground">
               Setup calibrations <span className="normal-case opacity-80">(advanced)</span>
             </div>
@@ -333,11 +342,14 @@ export default async function SetupPage({
             </Link>
           </div>
           {calibrations.length === 0 ? (
-            <div className="px-4 py-4 text-xs text-muted-foreground">No calibrations saved yet.</div>
+            <CardPanel>
+              <div className="text-xs text-muted-foreground">No calibrations saved yet.</div>
+            </CardPanel>
           ) : (
-            <div className="divide-y divide-border/60">
+            <ul className="flex flex-col gap-2">
               {calibrations.slice(0, 6).map((c) => (
-                <div key={c.id} className="flex items-center justify-between gap-2 px-4 py-2">
+                <li key={c.id}>
+                  <CardPanel contentClassName="flex items-center justify-between gap-2 px-4 py-2">
                   <div className="min-w-0">
                     <div className="truncate text-xs text-foreground">{c.name}</div>
                     <div className="text-[10px] text-muted-foreground">
@@ -347,9 +359,10 @@ export default async function SetupPage({
                   <Link href={`/setup-calibrations/${c.id}`} className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted">
                     Open
                   </Link>
-                </div>
+                  </CardPanel>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </section>

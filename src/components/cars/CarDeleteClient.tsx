@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
@@ -37,7 +38,7 @@ export function CarDeleteClient(props: { carId: string; carName: string; runCoun
   }
 
   return (
-    <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+    <CardPanel contentClassName="space-y-2">
       <div className="ui-title text-sm text-muted-foreground">Delete</div>
 
       <div className="text-sm text-muted-foreground space-y-1">
@@ -96,7 +97,7 @@ export function CarDeleteClient(props: { carId: string; carName: string; runCoun
       {message ? (
         <div className="text-xs text-muted-foreground">{message}</div>
       ) : null}
-    </div>
+    </CardPanel>
   );
 }
 

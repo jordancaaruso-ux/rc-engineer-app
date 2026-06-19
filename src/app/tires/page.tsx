@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
 import { TireGaragePanel } from "@/components/tires/TireGaragePanel";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export const revalidate = 30;
 
@@ -19,9 +20,9 @@ export default async function TiresPage(): Promise<ReactNode> {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env to manage tires.
-          </div>
+          </CardPanel>
         </section>
       </>
     );

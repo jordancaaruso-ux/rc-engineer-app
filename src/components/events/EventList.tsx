@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { formatEventDate } from "@/lib/formatDate";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 
@@ -74,13 +76,14 @@ function EventSection({
         {subtitle ? <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p> : null}
       </div>
       {events.length === 0 ? (
-        <div className="rounded-lg border border-border bg-muted/60 p-4 text-sm text-muted-foreground">
+        <CardPanel contentClassName="text-sm text-muted-foreground">
           {emptyMessage}
-        </div>
+        </CardPanel>
       ) : (
-        <ul className="rounded-lg border border-border divide-y divide-border">
+        <ul className="flex flex-col gap-2.5">
           {events.map((ev) => (
-            <li key={ev.id} className="px-4 py-3">
+            <li key={ev.id}>
+              <CardPanel contentClassName="px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Link href={`/events/${ev.id}`} className="font-medium hover:underline">
                   {ev.name}
@@ -114,6 +117,7 @@ function EventSection({
               {ev.notes && (
                 <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{ev.notes}</p>
               )}
+              </CardPanel>
             </li>
           ))}
         </ul>
@@ -249,7 +253,8 @@ export function EventList({
 
   return (
     <div className="space-y-8">
-      <form onSubmit={handleAdd} className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
+      <SurfaceCard variant="panel" overflowHidden={false}>
+        <form onSubmit={handleAdd} className="space-y-3">
         <div className="ui-title text-sm text-muted-foreground">New event</div>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
@@ -363,7 +368,8 @@ export function EventList({
             </span>
           )}
         </div>
-      </form>
+        </form>
+      </SurfaceCard>
 
       <EventSection
         title="Upcoming events"

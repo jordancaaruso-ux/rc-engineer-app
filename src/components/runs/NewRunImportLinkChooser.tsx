@@ -6,12 +6,14 @@ import type { DashboardIncompleteRunRow } from "@/lib/dashboardServer";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
+
 function btnPrimary(className = "") {
   return `inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
 }
 
 function btnGhost(className = "") {
-  return `inline-flex items-center justify-center rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted/60 ${className}`;
+  return `inline-flex items-center justify-center rounded-lg border border-border bg-surface-runna px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-surface-runna-inset ${className}`;
 }
 
 /**
@@ -68,19 +70,17 @@ export function NewRunImportLinkChooser({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
+      <CardPanel>
         <h2 className="text-sm font-semibold text-foreground">Link timing to a saved run?</h2>
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
           You have run log drafts that aren&apos;t marked complete. Attach this LiveRC session to one of them, or
           create a new run. Dismiss removes a draft from this list (same as on the dashboard); it does not delete the
           run.
         </p>
-        <ul className="mt-3 space-y-2">
+        <ul className="mt-3 flex flex-col gap-2">
           {incompleteRuns.map((r) => (
-            <li
-              key={r.id}
-              className="flex flex-col gap-2 rounded-md border border-border bg-card/90 p-3 sm:flex-row sm:items-center sm:justify-between"
-            >
+            <li key={r.id}>
+              <CardPanel contentClassName="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 text-[11px] leading-snug">
                 <div className="font-medium text-foreground">{r.carName}</div>
                 <div className="text-muted-foreground">
@@ -111,6 +111,7 @@ export function NewRunImportLinkChooser({
                   {dismissingRunId === r.id ? "…" : "Dismiss"}
                 </button>
               </div>
+              </CardPanel>
             </li>
           ))}
         </ul>
@@ -119,7 +120,7 @@ export function NewRunImportLinkChooser({
             Create a new run instead
           </button>
         </div>
-      </div>
+      </CardPanel>
       {dismissedChooser ? children : null}
     </div>
   );

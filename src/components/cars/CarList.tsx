@@ -47,6 +47,7 @@ export function CarList({
     setSetupSheetModels(initialSetupSheetModels);
   }, [initialSetupSheetModels]);
   useEffect(() => {
+    if (initialSetupSheetModels.length > 0) return;
     fetch("/api/setup-sheet-models")
       .then((r) => r.json())
       .then((d: { models?: SetupSheetModelOption[]; pickerModels?: SetupSheetModelOption[] }) => {
@@ -54,7 +55,7 @@ export function CarList({
         if (Array.isArray(list)) setSetupSheetModels(list);
       })
       .catch(() => {});
-  }, []);
+  }, [initialSetupSheetModels.length]);
   const [name, setName] = useState("");
   const [chassis, setChassis] = useState("");
   const [notes, setNotes] = useState("");
@@ -140,8 +141,8 @@ export function CarList({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-sky-500/35 bg-sky-500/5 p-4">
-        <div className="ui-title text-sm text-sky-100/95">New car with custom setup sheet</div>
+      <CardPanel>
+        <div className="ui-title text-sm text-foreground">New car with custom setup sheet</div>
         <p className="mt-1 text-[11px] text-muted-foreground">
           Define parameters for a car model (e.g. Mugen MTC3), upload a PDF, and calibrate — without inheriting the
           Awesomatix A800 sheet.
@@ -152,9 +153,10 @@ export function CarList({
         >
           Start setup wizard
         </Link>
-      </div>
+      </CardPanel>
 
-      <form onSubmit={handleAdd} className="rounded-lg border border-border bg-muted/70 p-4 space-y-3">
+      <CardPanel contentClassName="p-4">
+      <form onSubmit={handleAdd} className="space-y-3">
         <div className="ui-title text-sm text-muted-foreground">Add car (quick)</div>
         <div className="grid gap-3 md:grid-cols-3">
           <div>
@@ -218,7 +220,7 @@ export function CarList({
                     >
                       <span className="truncate">{m.name}</span>
                       {m.isAuthorized ? (
-                        <span className="shrink-0 rounded border border-sky-500/40 bg-sky-500/10 px-1 py-0.5 text-[9px] font-medium text-sky-200">
+                        <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1 py-0.5 text-[9px] font-medium text-primary">
                           Authorized
                         </span>
                       ) : null}
@@ -228,7 +230,7 @@ export function CarList({
                     <button
                       type="button"
                       onClick={() => setModelOpen(false)}
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-sky-300 hover:bg-muted/60"
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-accent hover:bg-muted/60"
                     >
                       + Create chassis type “{modelQuery.trim()}”
                     </button>
@@ -240,7 +242,7 @@ export function CarList({
               </>
             ) : null}
             {!setupSheetModelId && modelQuery.trim() && !exactModelMatch ? (
-              <p className="mt-1 text-[11px] text-sky-700 dark:text-sky-400">
+              <p className="mt-1 text-[11px] text-accent">
                 New chassis type — it’ll be created and shared when you add the car.
               </p>
             ) : !setupSheetModelId && !modelQuery.trim() ? (
@@ -268,36 +270,39 @@ export function CarList({
           )}
         </div>
       </form>
+      </CardPanel>
 
       <div>
         <div className="ui-title text-sm text-muted-foreground mb-2">Your cars</div>
         {cars.length === 0 ? (
-          <CardPanel className="bg-muted/70 text-sm text-muted-foreground">
+          <CardPanel className="text-sm text-muted-foreground">
             No cars yet. Add one above to log runs.
           </CardPanel>
         ) : (
-          <ul className="rounded-lg border border-border divide-y divide-border">
+          <ul className="flex flex-col gap-2.5">
             {cars.map((c) => (
-              <li key={c.id} className="px-4 py-3 flex items-center justify-between gap-2">
-                <div>
-                  <Link href={`/cars/${c.id}`} className="font-medium hover:underline">
-                    {c.name}
+              <li key={c.id}>
+                <Link href={`/cars/${c.id}`} prefetch className="tap-active block">
+                  <CardPanel contentClassName="px-4 py-3 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-medium">{c.name}</span>
+                      {c.chassis && <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>}
+                      <span className="block text-[11px] text-muted-foreground mt-0.5">
+                        Setup sheet:{" "}
+                        {c.setupSheetModel?.name ?? labelForSetupSheetTemplate(c.setupSheetTemplate ?? null)}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground font-mono">{c.id.slice(0, 8)}</span>
+                  </CardPanel>
+                </Link>
+                {c.setupSheetModelId ? (
+                  <Link
+                    href={`/setup-sheet-models/${c.setupSheetModelId}/schema`}
+                    className="tap-active mt-1 block text-[10px] text-accent hover:underline"
+                  >
+                    Edit parameters
                   </Link>
-                  {c.chassis && <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>}
-                  <span className="block text-[11px] text-muted-foreground mt-0.5">
-                    Setup sheet:{" "}
-                    {c.setupSheetModel?.name ?? labelForSetupSheetTemplate(c.setupSheetTemplate ?? null)}
-                  </span>
-                  {c.setupSheetModelId ? (
-                    <Link
-                      href={`/setup-sheet-models/${c.setupSheetModelId}/schema`}
-                      className="block text-[10px] text-sky-300 hover:underline mt-0.5"
-                    >
-                      Edit parameters
-                    </Link>
-                  ) : null}
-                </div>
-                <span className="text-[11px] text-muted-foreground font-mono">{c.id.slice(0, 8)}</span>
+                ) : null}
               </li>
             ))}
           </ul>

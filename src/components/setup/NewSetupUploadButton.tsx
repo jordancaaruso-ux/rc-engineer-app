@@ -130,7 +130,7 @@ export function NewSetupUploadButton({
         </div>
       </div>
       {error ? (
-        <span className="text-xs text-rose-400" role="alert">
+        <span className="text-xs text-destructive" role="alert">
           {error}
         </span>
       ) : null}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { CardPanel } from "@/components/ui/CardPanel";
 import {
   computeFieldImportSessionFromSets,
   type FieldImportSession,
@@ -27,14 +28,14 @@ export function ImportedFieldSessionCard({ importedLapSets }: { importedLapSets:
   if (!field) return null;
 
   return (
-    <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-2">
+    <CardPanel contentClassName="space-y-2">
       <div className="ui-title text-sm text-muted-foreground">Imported session — field</div>
       <p className="text-[11px] leading-snug text-muted-foreground">
         Same timing import, multiple drivers. Rank and gap use each driver&apos;s best included lap vs the session
         best. Fade is mean(second half) − mean(first half) of included laps (needs ≥4 laps); positive means slower
         toward the end of the stint.
       </p>
-      <div className="overflow-x-auto rounded-md border border-border bg-card">
+      <div className="overflow-x-auto inset-panel-deep">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border text-left text-muted-foreground">
@@ -68,6 +69,6 @@ export function ImportedFieldSessionCard({ importedLapSets }: { importedLapSets:
           </tbody>
         </table>
       </div>
-    </div>
+    </CardPanel>
   );
 }

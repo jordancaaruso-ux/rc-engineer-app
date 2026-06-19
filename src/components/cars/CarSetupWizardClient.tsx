@@ -214,7 +214,7 @@ export function CarSetupWizardClient() {
       </div>
 
       {error ? (
-        <div className="rounded border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">{error}</div>
+        <div className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-foreground">{error}</div>
       ) : null}
 
       {step === "car" && (
@@ -299,7 +299,7 @@ export function CarSetupWizardClient() {
           )}
           <button
             type="button"
-            className="rounded border border-sky-500/60 bg-sky-500/15 px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium disabled:opacity-50"
             disabled={busy}
             onClick={() => {
               if (modelMode === "new") {
@@ -324,7 +324,7 @@ export function CarSetupWizardClient() {
           <SetupSheetModelSchemaEditor schema={schema} onChange={setSchema} />
           <button
             type="button"
-            className="rounded border border-sky-500/60 bg-sky-500/15 px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium disabled:opacity-50"
             disabled={busy}
             onClick={() => void handleSchemaStepNext()}
           >
@@ -358,27 +358,27 @@ export function CarSetupWizardClient() {
           <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
             {modelId ? (
               <li>
-                <Link href={`/setup-sheet-models/${modelId}/schema`} className="text-sky-300 hover:underline">
+                <Link href={`/setup-sheet-models/${modelId}/schema`} className="text-accent hover:underline">
                   Edit parameters
                 </Link>
               </li>
             ) : null}
             {calibrationId ? (
               <li>
-                <Link href={`/setup-calibrations/${calibrationId}`} className="text-sky-300 hover:underline">
+                <Link href={`/setup-calibrations/${calibrationId}`} className="text-accent hover:underline">
                   Map PDF to parameters (calibration editor)
                 </Link>
               </li>
             ) : null}
             {documentId ? (
               <li>
-                <Link href={`/setup-documents/${documentId}`} className="text-sky-300 hover:underline">
+                <Link href={`/setup-documents/${documentId}`} className="text-accent hover:underline">
                   Review uploaded document
                 </Link>
               </li>
             ) : null}
             <li>
-              <Link href="/runs/new" className="text-sky-300 hover:underline">
+              <Link href="/runs/new" className="text-accent hover:underline">
                 Log a run
               </Link>
             </li>

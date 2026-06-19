@@ -12,6 +12,7 @@ import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "
 import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 export type UrlImportBlock = {
   blockId: string;
@@ -204,7 +205,7 @@ export function LapTimesIngestPanel({
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
   const hasTrackDiscovery = hasLiveRcTrack || hasSpeedhiveTrack;
   const hasUrlScan = Boolean((practiceDayUrl ?? "").trim()) || hasTrackDiscovery;
-  const [tab, setTab] = useState<IngestTab>(() => (hasUrlScan ? "url" : "manual"));
+  const [tab, setTab] = useState<IngestTab>("manual");
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoNote, setPhotoNote] = useState<string | null>(null);
   const [photoConfidence, setPhotoConfidence] = useState<string | null>(null);
@@ -287,12 +288,10 @@ export function LapTimesIngestPanel({
   }, []);
 
   useEffect(() => {
-    if (hasTrackDiscovery) {
-      setTab((prev) => (prev === "manual" ? "url" : prev));
-    } else if ((practiceDayUrl ?? "").trim()) {
+    if (hasUrlScan) {
       setTab((prev) => (prev === "manual" ? "url" : prev));
     }
-  }, [hasTrackDiscovery, practiceDayUrl]);
+  }, [hasUrlScan]);
 
   useEffect(() => {
     if (value.sourceKind === "url" && value.urlImportBlocks.length > 0) {
@@ -778,13 +777,11 @@ export function LapTimesIngestPanel({
   }, [value.urlImportBlocks]);
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border p-4 space-y-3",
-        showDraftLapSavedStyle
-          ? "border-emerald-500/40 bg-emerald-500/5"
-          : "border-border bg-surface-runna-deep"
-      )}
+    <SurfaceCard
+      variant="panel"
+      overflowHidden={false}
+      className={cn(showDraftLapSavedStyle && "border-emerald-500/40")}
+      contentClassName="space-y-3"
     >
       <div className="flex flex-wrap items-center gap-2">
         <div className="ui-title text-sm text-muted-foreground">Lap times</div>
@@ -1445,7 +1442,7 @@ export function LapTimesIngestPanel({
           </span>
         ) : null}
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 

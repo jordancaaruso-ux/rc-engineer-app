@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TrackMetaChipGroups } from "@/components/runs/TrackMetaChipGroups";
+import { CardPanel } from "@/components/ui/CardPanel";
 import {
   normalizeGripTags,
   normalizeLayoutTags,
@@ -63,38 +64,39 @@ export function TrackMetaTagsEditor({
     }
   }
 
-  return (
-    <div
-      className={
-        compact
-          ? "space-y-2"
-          : "rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-2"
-      }
-    >
-      {!compact ? (
-        <>
-          <div className="text-sm font-medium text-foreground">Grip &amp; layout</div>
-          <p className="text-[11px] text-muted-foreground leading-snug">
-            Tap chips to describe this venue. Multi-select is allowed (e.g. medium + high grip). Saved on the track
-            for everyone in the catalog.
-          </p>
-        </>
-      ) : (
+  const chipGroups = (
+    <TrackMetaChipGroups
+      gripTags={gripTags}
+      layoutTags={layoutTags}
+      disabled={saving}
+      onGripChange={(next) => {
+        setGripTags(next);
+        void persist({ gripTags: next });
+      }}
+      onLayoutChange={(next) => {
+        setLayoutTags(next);
+        void persist({ layoutTags: next });
+      }}
+    />
+  );
+
+  if (compact) {
+    return (
+      <div className="space-y-2">
         <div className="text-[11px] font-medium text-muted-foreground">Grip &amp; layout</div>
-      )}
-      <TrackMetaChipGroups
-        gripTags={gripTags}
-        layoutTags={layoutTags}
-        disabled={saving}
-        onGripChange={(next) => {
-          setGripTags(next);
-          void persist({ gripTags: next });
-        }}
-        onLayoutChange={(next) => {
-          setLayoutTags(next);
-          void persist({ layoutTags: next });
-        }}
-      />
-    </div>
+        {chipGroups}
+      </div>
+    );
+  }
+
+  return (
+    <CardPanel contentClassName="text-sm space-y-2">
+      <div className="text-sm font-medium text-foreground">Grip &amp; layout</div>
+      <p className="text-[11px] text-muted-foreground leading-snug">
+        Tap chips to describe this venue. Multi-select is allowed (e.g. medium + high grip). Saved on the track
+        for everyone in the catalog.
+      </p>
+      {chipGroups}
+    </CardPanel>
   );
 }

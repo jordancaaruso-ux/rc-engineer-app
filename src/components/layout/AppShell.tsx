@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { isHiddenNavRoute } from "@/components/layout/navConfig";
+import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <TodayDraftRunProvider>
       <div className="app-shell">
-        <Sidebar />
+        <PrimaryNavProvider>
+          <Sidebar />
+          <BottomNav />
+        </PrimaryNavProvider>
         <main
           className={cn(
             "page",
@@ -28,7 +32,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           {children}
         </main>
-        <BottomNav />
       </div>
     </TodayDraftRunProvider>
   );

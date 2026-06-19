@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import { RunVideoAnalysisSection } from "@/components/videoAnalysis/RunVideoAnalysisSection";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 
 export const dynamic = "force-dynamic";
@@ -247,10 +248,10 @@ export default async function EditRunPage({
             shareWithTeam: run.shareWithTeam,
           }}
         />
-        <div className="mt-8 max-w-2xl rounded-lg border border-border bg-card p-4">
+        <CardPanel className="mt-8 max-w-2xl">
           <h2 className="text-sm font-medium mb-2">Video lap sync</h2>
           <RunVideoAnalysisSection runId={run.id} trackId={run.trackId} />
-        </div>
+        </CardPanel>
       </section>
     </>
   );

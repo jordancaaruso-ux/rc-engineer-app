@@ -10,6 +10,8 @@ import {
 import { listModelParameters } from "@/lib/setupSheetModels/modelCalibrationMapping";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { cn } from "@/lib/utils";
 
 export function SetupCalibrationModelSidebar(props: {
   schema: SetupSheetModelSchema;
@@ -76,8 +78,8 @@ export function SetupCalibrationModelSidebar(props: {
 
   return (
     <div className="space-y-3 text-xs">
-      <div className="rounded-lg border border-sky-500/35 bg-sky-500/10 p-3">
-        <div className="ui-title text-[11px] text-sky-100/95">Map PDF to parameters</div>
+      <CardPanel className="border-primary/30 bg-primary/10" contentClassName="p-3">
+        <div className="ui-title text-[11px] text-accent">Map PDF to parameters</div>
         <ol className="mt-2 list-decimal space-y-1 pl-4 text-[11px] text-muted-foreground">
           <li>Click one or more PDF controls on the left</li>
           <li>
@@ -91,17 +93,17 @@ export function SetupCalibrationModelSidebar(props: {
           </span>{" "}
           <span className="text-muted-foreground">parameters mapped</span>
         </div>
-      </div>
+      </CardPanel>
 
       {widgetSelectionCount > 0 ? (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+        <CardPanel className="border-amber-500/40" contentClassName="p-3">
           <div className="font-medium text-foreground">
             {widgetSelectionCount} PDF control{widgetSelectionCount === 1 ? "" : "s"} selected
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded border border-sky-500/60 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100 hover:bg-sky-500/25"
+              className="rounded border border-accent/60 bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent/25"
               onClick={onOpenLinkDialog}
             >
               Link to parameter…
@@ -114,14 +116,14 @@ export function SetupCalibrationModelSidebar(props: {
               Clear
             </button>
           </div>
-        </div>
+        </CardPanel>
       ) : (
         <p className="text-[11px] text-muted-foreground">
           Select PDF controls on the sheet to link them to a parameter.
         </p>
       )}
 
-      <div className="rounded-lg border border-border bg-card p-3">
+      <CardPanel contentClassName="p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="ui-title text-[11px] text-muted-foreground">Parameters</div>
           <div className="flex gap-1">
@@ -130,7 +132,7 @@ export function SetupCalibrationModelSidebar(props: {
                 key={f}
                 type="button"
                 className={`rounded border px-2 py-0.5 text-[10px] capitalize ${
-                  filter === f ? "border-sky-500/60 bg-sky-500/10" : "border-border"
+                  filter === f ? "border-accent/60 bg-accent/10" : "border-border"
                 }`}
                 onClick={() => setFilter(f)}
               >
@@ -154,13 +156,14 @@ export function SetupCalibrationModelSidebar(props: {
             bySection.map(([title, sectionRows]) => (
               <div key={title}>
                 <div className="text-[10px] font-medium text-muted-foreground">{title}</div>
-                <div className="mt-1 space-y-1">
+                <div className="mt-1 flex flex-col gap-1.5">
                   {sectionRows.map((row: ModelParameterRow & { mapped: boolean }) => (
-                    <div
+                    <CardPanel
                       key={row.field.key}
-                      className={`flex items-center justify-between gap-2 rounded border px-2 py-1.5 ${
-                        row.mapped ? "border-emerald-500/30 bg-emerald-500/5" : "border-border/60 bg-muted/20"
-                      }`}
+                      className={cn(
+                        row.mapped ? "border-emerald-500/30" : "border-border/60"
+                      )}
+                      contentClassName="flex items-center justify-between gap-2 px-2 py-1.5"
                     >
                       <div className="min-w-0">
                         <div className="truncate font-medium text-foreground">{row.field.displayLabel}</div>
@@ -182,16 +185,16 @@ export function SetupCalibrationModelSidebar(props: {
                           {row.mapped ? "✓" : "—"}
                         </span>
                       )}
-                    </div>
+                    </CardPanel>
                   ))}
                 </div>
               </div>
             ))
           )}
         </div>
-      </div>
+      </CardPanel>
 
-      <div className="rounded-lg border border-border/80 bg-muted/25 p-3">
+      <CardPanel contentClassName="p-3">
         <div className="text-[11px] font-medium text-foreground">Missing a parameter?</div>
         <p className="mt-1 text-[10px] text-muted-foreground">
           Add it on the sheet model, then return here.{" "}
@@ -208,11 +211,11 @@ export function SetupCalibrationModelSidebar(props: {
         </button>
         <Link
           href={`/setup-sheet-models/${modelId}/schema?returnTo=${encodeURIComponent(schemaReturnTo)}`}
-          className="mt-2 block text-center text-[10px] text-sky-300/90 hover:text-sky-200"
+          className="mt-2 block text-center text-[10px] text-accent hover:underline"
         >
           Open schema editor
         </Link>
-      </div>
+      </CardPanel>
     </div>
   );
 }

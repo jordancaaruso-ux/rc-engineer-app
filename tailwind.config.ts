@@ -52,9 +52,9 @@ const config: Config = {
         sm: "0.25rem"
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
+        sans: ["var(--font-jakarta)", "var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-jakarta)", "var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono-jb)", "JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
       },
       boxShadow: {
         glow: "0 0 24px -4px rgb(var(--glow-shadow-rgb) / 0.28)",

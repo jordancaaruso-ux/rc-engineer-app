@@ -4,6 +4,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { BulkImportHubClient } from "@/components/setup/BulkImportHubClient";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function BulkImportPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -16,9 +17,9 @@ export default async function BulkImportPage(): Promise<ReactNode> {
           </div>
         </header>
         <section className="page-body">
-          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env.
-          </div>
+          </CardPanel>
         </section>
       </>
     );

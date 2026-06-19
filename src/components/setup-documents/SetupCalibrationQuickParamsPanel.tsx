@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
 import type { CustomSetupFieldDefinition } from "@/lib/setupCalibrations/types";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import { CUSTOM_FIELD_SECTION_PRESETS } from "@/lib/setupCalibrations/customFieldCatalog";
@@ -90,14 +91,14 @@ export function SetupCalibrationQuickParamsPanel(props: {
   const groupedCtx = (def: CustomSetupFieldDefinition) => customFieldGroupedChipContext(def);
 
   return (
-    <div className="rounded-lg border border-sky-500/40 bg-sky-500/5 p-3">
+    <CardPanel className="border-primary/30 bg-primary/10" contentClassName="p-3">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
         onClick={() => setOpen((o) => !o)}
       >
         <div>
-          <div className="ui-title text-xs text-sky-200/95">Quick add parameters</div>
+          <div className="ui-title text-xs text-accent">Quick add parameters</div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             Name the field, pick a value type, add it — then map each row to an AcroForm control (dropdown or use the
             Form tab and click the PDF).
@@ -175,7 +176,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="rounded-md border border-sky-500/60 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100 hover:bg-sky-500/25"
+              className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-primary/10"
               onClick={() => {
                 setLocalError(null);
                 const lines =
@@ -208,23 +209,21 @@ export function SetupCalibrationQuickParamsPanel(props: {
             )}
           </div>
 
-          {localError ? <div className="text-[11px] text-red-300/95">{localError}</div> : null}
+          {localError ? <div className="text-[11px] text-destructive">{localError}</div> : null}
 
           {customOnly.length > 0 ? (
             <div className="space-y-2">
               <div className="ui-title text-[10px] text-muted-foreground">Your custom parameters</div>
-              <ul className="max-h-56 space-y-2 overflow-y-auto rounded-md border border-border/70 bg-card/40 p-2">
+              <ul className="flex max-h-56 flex-col gap-2 overflow-y-auto">
                 {customOnly.map((def) => {
                   const mapped = ruleHasFormMapping(formFieldMappings[def.key]);
                   const g = groupedCtx(def);
                   return (
-                    <li
-                      key={def.id}
-                      className={cn(
-                        "rounded border border-border/60 bg-muted/20 px-2 py-1.5 text-[11px]",
-                        !mapped && "border-amber-500/30"
-                      )}
-                    >
+                    <li key={def.id}>
+                      <CardPanel
+                        className={cn(!mapped && "border-amber-500/30")}
+                        contentClassName="px-2 py-1.5 text-[11px]"
+                      >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <span className="font-medium text-foreground">{def.displayLabel}</span>
                         <span className="font-mono text-[10px] text-muted-foreground">{def.key}</span>
@@ -292,6 +291,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
                           ))}
                         </div>
                       )}
+                      </CardPanel>
                     </li>
                   );
                 })}
@@ -300,6 +300,6 @@ export function SetupCalibrationQuickParamsPanel(props: {
           ) : null}
         </div>
       ) : null}
-    </div>
+    </CardPanel>
   );
 }

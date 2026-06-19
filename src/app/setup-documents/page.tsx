@@ -3,6 +3,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { SetupDocumentLibraryClient } from "@/components/setup-documents/SetupDocumentLibraryClient";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 function formatUtcStamp(iso: string): string {
   // Deterministic SSR+client string (no locale/timezone differences).
@@ -21,9 +22,9 @@ export default async function SetupDocumentsPage(): Promise<ReactNode> {
           </div>
         </header>
         <section className="page-body">
-          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env.
-          </div>
+          </CardPanel>
         </section>
       </>
     );

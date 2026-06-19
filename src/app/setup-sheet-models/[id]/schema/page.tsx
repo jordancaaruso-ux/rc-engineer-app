@@ -35,8 +35,8 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
   if (!model) {
     return (
       <section className="page-body">
-        <p className="text-sm text-rose-300">Sheet model not found.</p>
-        <Link href="/cars" className="text-sm text-sky-300 hover:underline mt-2 inline-block">
+        <p className="text-sm text-destructive">Sheet model not found.</p>
+        <Link href="/cars" className="text-sm text-accent hover:underline mt-2 inline-block">
           Back to cars
         </Link>
       </section>
@@ -47,7 +47,7 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
   if (!schema) {
     return (
       <section className="page-body">
-        <p className="text-sm text-rose-300">Invalid schema data.</p>
+        <p className="text-sm text-destructive">Invalid schema data.</p>
       </section>
     );
   }

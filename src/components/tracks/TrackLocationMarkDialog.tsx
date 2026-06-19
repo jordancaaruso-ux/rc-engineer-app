@@ -40,7 +40,7 @@ export function TrackLocationMarkDialog({
       }}
     >
       <div
-        className="w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-md rounded-lg border border-border bg-surface-runna p-4 shadow-xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="track-location-mark-title" className="ui-title text-sm text-foreground">
@@ -63,7 +63,7 @@ export function TrackLocationMarkDialog({
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted/80 transition"
+            className="btn-surface px-3 py-1.5 text-xs font-medium"
             onClick={() => void dismissAndSkip()}
           >
             Not now

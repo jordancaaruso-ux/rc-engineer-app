@@ -26,15 +26,15 @@ function quickPickButtonClass(
       "rounded-md border px-2 py-1.5 text-[11px] font-medium transition flex-1 min-w-0",
       highlightMissing
         ? "border-amber-500/50 bg-amber-500/5 text-foreground hover:bg-amber-500/10"
-        : "border-border bg-card text-muted-foreground hover:text-foreground",
-      value < 0 && "hover:border-red-400/50 hover:bg-red-500/5",
+        : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground",
+      value < 0 && "hover:border-destructive/40 hover:bg-destructive/10",
       value === 0 && "hover:bg-muted/80",
       value > 0 && "hover:border-emerald-500/50 hover:bg-emerald-500/5"
     );
   }
   return cn(
     "rounded-md border px-2 py-1.5 text-[11px] font-medium flex-1 min-w-0 shadow-sm",
-    value < 0 && "border-red-500/70 bg-red-500/15 text-foreground",
+    value < 0 && "border-destructive/70 bg-destructive/15 text-foreground",
     value === 0 && "border-muted-foreground/60 bg-muted text-foreground",
     value > 0 && "border-emerald-600/70 bg-emerald-500/15 text-foreground"
   );
@@ -57,7 +57,7 @@ export function FeelVsLastRunQuickPick({
         "rounded-md border px-3 py-2 transition-[box-shadow,border-color,background-color]",
         highlightMissing && needsPick
           ? "border-amber-500/70 bg-amber-500/10 ring-2 ring-amber-500/40"
-          : "border-border/80 bg-muted/20"
+          : "border-border/80 bg-surface-runna/50"
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">

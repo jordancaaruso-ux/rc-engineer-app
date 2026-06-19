@@ -23,6 +23,7 @@ import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { loadUserScopedEvents } from "@/lib/events/eventParticipation";
 import { assertUserInTeam, listTeamMemberUserIds, listTeamsForUser } from "@/lib/teamAccess";
 import type { Prisma } from "@prisma/client";
@@ -155,9 +156,9 @@ export default async function RunHistoryPage({
           </div>
         </header>
         <section className="page-body">
-          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env to view run history.
-          </div>
+          </CardPanel>
         </section>
       </>
     );
@@ -295,9 +296,14 @@ export default async function RunHistoryPage({
   function renderSessionGroup(group: Group, idx: number) {
     const showSessionColumn = group.runs.some((r) => formatRunSessionDisplay(r) !== "—");
     return (
-      <details
+      <SurfaceCard
         key={group.id}
-        className="rounded-xl border border-border bg-muted/70 min-w-0 max-w-full group/details"
+        variant="panel"
+        contentClassName="p-0"
+        className="min-w-0 max-w-full"
+      >
+      <details
+        className="min-w-0 max-w-full group/details"
         open={
           focusRunId
             ? group.runs.some((r) => r.id === focusRunId)
@@ -390,13 +396,15 @@ export default async function RunHistoryPage({
           </div>
         </div>
       </details>
+      </SurfaceCard>
     );
   }
 
   function renderFlatRunList() {
     const showSessionColumn = runs.some((r) => formatRunSessionDisplay(r) !== "—");
     return (
-      <div className="rounded-xl border border-border bg-muted/70 min-w-0 max-w-full">
+      <SurfaceCard variant="panel" contentClassName="p-0" className="min-w-0 max-w-full">
+      <div className="min-w-0 max-w-full">
         <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-sm min-w-[36rem]">
             <thead>
@@ -452,6 +460,7 @@ export default async function RunHistoryPage({
           </table>
         </div>
       </div>
+      </SurfaceCard>
     );
   }
 
@@ -485,11 +494,11 @@ export default async function RunHistoryPage({
           </div>
         </header>
         <section className="page-body space-y-3 min-w-0 max-w-full">
-          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel contentClassName="text-sm text-muted-foreground">
             <Link href="/runs/history" className="text-accent underline">
               Back to my sessions
             </Link>
-          </div>
+          </CardPanel>
         </section>
       </>
     );

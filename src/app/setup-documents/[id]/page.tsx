@@ -10,6 +10,7 @@ import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCa
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { loadSetupSheetModelById } from "@/lib/setupSheetModels/resolveModelForCar";
 import { buildSetupSheetTemplateFromParsedSchema } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function SetupDocumentDetailPage({
   params,
@@ -152,7 +153,7 @@ export default async function SetupDocumentDetailPage({
       </header>
       {showImageCalibrateCta ? (
         <div className="page-body pb-0">
-          <div className="rounded-md border border-primary/40 bg-primary/5 p-3 flex items-center justify-between gap-3">
+          <CardPanel contentClassName="p-3 flex items-center justify-between gap-3">
             <div className="text-xs">
               <div className="font-medium text-foreground">Teach the app this screenshot</div>
               <div className="text-muted-foreground">
@@ -166,7 +167,7 @@ export default async function SetupDocumentDetailPage({
             >
               Open image calibration
             </Link>
-          </div>
+          </CardPanel>
         </div>
       ) : null}
       <SetupDocumentReviewClient

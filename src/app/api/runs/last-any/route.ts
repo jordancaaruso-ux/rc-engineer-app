@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { getLastRunForCopyPreview } from "@/lib/runs/getLastRunForCopyPreview";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -12,21 +12,9 @@ export async function GET() {
   }
 
   const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const lastRun = await prisma.run.findFirst({
-    where: { userId: user.id },
-    orderBy: { sortAt: "desc" },
-    include: {
-      car: { select: { id: true, name: true } },
-      track: { select: { id: true, name: true } },
-      tireSet: { select: { id: true, label: true, setNumber: true } },
-      battery: { select: { id: true, label: true, packNumber: true } },
-      event: { select: { id: true, name: true } },
-      setupSnapshot: { select: { id: true, data: true } },
-    },
-  });
+  const lastRun = await getLastRunForCopyPreview(user.id);
 
   return NextResponse.json({ lastRun });
 }
-

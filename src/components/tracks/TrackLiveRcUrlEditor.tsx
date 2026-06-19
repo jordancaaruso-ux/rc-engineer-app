@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export function TrackLiveRcUrlEditor(props: {
   trackId: string;
@@ -40,7 +41,7 @@ export function TrackLiveRcUrlEditor(props: {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-2">
+    <CardPanel contentClassName="text-sm space-y-2">
       <div className="text-sm font-medium text-foreground">LiveRC track URL</div>
       <p className="text-[11px] text-muted-foreground leading-snug">
         Paste the track home page (e.g. https://tftr.liverc.com/). Lap times discovery uses this to find your most
@@ -68,6 +69,6 @@ export function TrackLiveRcUrlEditor(props: {
           </span>
         ) : null}
       </div>
-    </div>
+    </CardPanel>
   );
 }

@@ -15,6 +15,7 @@ import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/set
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export type EngineerByIdsRunRow = {
   id: string;
@@ -79,14 +80,16 @@ function LapPairTable({
 
   if (nums.length === 0) {
     return (
-      <p className="text-[11px] text-muted-foreground rounded-md border border-border bg-muted/30 px-2 py-2">
-        No comparable lap rows on one or both runs (check lap times / session).
-      </p>
+      <CardPanel>
+        <p className="text-[11px] text-muted-foreground">
+          No comparable lap rows on one or both runs (check lap times / session).
+        </p>
+      </CardPanel>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-border">
+    <CardPanel contentClassName="p-0 overflow-x-auto">
       <table className="w-full min-w-[320px] text-[11px]">
         <thead>
           <tr className="border-b border-border bg-muted/70 text-left text-[10px] font-medium text-muted-foreground">
@@ -132,7 +135,7 @@ function LapPairTable({
           })}
         </tbody>
       </table>
-    </div>
+    </CardPanel>
   );
 }
 
@@ -241,7 +244,7 @@ export function EngineerRunPairVisualCompare({
           <div>
             <h4 className="ui-title text-[10px] text-muted-foreground mb-1.5">Setup (side by side)</h4>
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              <div className="min-w-0">
+              <CardPanel contentClassName="min-w-0">
                 <div className="mb-1 text-[10px] font-medium text-muted-foreground truncate" title={labelA}>
                   {labelA}
                 </div>
@@ -255,8 +258,8 @@ export function EngineerRunPairVisualCompare({
                   compareValueColumnRole="a"
                   className="shadow-none"
                 />
-              </div>
-              <div className="min-w-0">
+              </CardPanel>
+              <CardPanel contentClassName="min-w-0">
                 <div className="mb-1 text-[10px] font-medium text-muted-foreground truncate" title={labelB}>
                   {labelB}
                 </div>
@@ -270,7 +273,7 @@ export function EngineerRunPairVisualCompare({
                   compareValueColumnRole="b"
                   className="shadow-none"
                 />
-              </div>
+              </CardPanel>
             </div>
           </div>
         </>

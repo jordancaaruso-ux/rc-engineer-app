@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type Props = {
   carId: string;
@@ -17,7 +18,7 @@ export function CarSetupSheetModelCard({
   exampleDocumentId,
 }: Props) {
   return (
-    <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-3">
+    <CardPanel contentClassName="text-sm space-y-3">
       <div>
         <div className="text-sm font-medium text-muted-foreground">Setup sheet model</div>
         <p className="mt-1 text-base font-medium text-foreground">{model.name}</p>
@@ -37,7 +38,7 @@ export function CarSetupSheetModelCard({
         <li>
           <Link
             href={`/setup-sheet-models/${model.id}/schema?tab=layout`}
-            className="text-sky-400 hover:text-sky-300 hover:underline"
+            className="text-accent hover:text-accent hover:underline"
           >
             Edit setup sheet
           </Link>
@@ -46,7 +47,7 @@ export function CarSetupSheetModelCard({
           <li>
             <Link
               href={`/setup-calibrations/${calibrationId}`}
-              className="text-sky-400 hover:text-sky-300 hover:underline"
+              className="text-accent hover:text-accent hover:underline"
             >
               Edit PDF calibration (map fields)
             </Link>
@@ -58,7 +59,7 @@ export function CarSetupSheetModelCard({
           <li>
             <Link
               href={`/setup-documents/${exampleDocumentId}`}
-              className="text-sky-400 hover:text-sky-300 hover:underline"
+              className="text-accent hover:text-accent hover:underline"
             >
               View baseline setup PDF
             </Link>
@@ -67,13 +68,13 @@ export function CarSetupSheetModelCard({
         <li>
           <Link
             href={`/setup?carId=${encodeURIComponent(carId)}`}
-            className="text-sky-400 hover:text-sky-300 hover:underline"
+            className="text-accent hover:text-accent hover:underline"
           >
             Upload new setup for this car
           </Link>
         </li>
       </ul>
-    </div>
+    </CardPanel>
   );
 }
 

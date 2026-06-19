@@ -18,7 +18,7 @@ const SetupSheetStructured = dynamic(
   () => import("@/components/runs/SetupSheetStructured").then((m) => ({ default: m.SetupSheetStructured })),
   {
     loading: () => (
-      <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
+      <div className="rounded-lg border border-border bg-surface-runna p-4 text-xs text-muted-foreground">
         Loading setup sheet…
       </div>
     ),
@@ -111,7 +111,7 @@ function SheetCell({
             <button
               type="button"
               className={cn(
-                "rounded-md border border-border bg-muted/70 px-2 py-1 text-[11px] font-mono hover:bg-muted/70 transition",
+                "rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-[11px] font-mono hover:bg-surface-runna transition",
                 getBoolFromSetupString(value) && "border-accent/60 bg-accent/10"
               )}
               aria-pressed={getBoolFromSetupString(value)}
@@ -128,7 +128,7 @@ function SheetCell({
           <textarea
             className={cn(
               "w-full min-h-[2.5rem] resize-y bg-transparent px-2 py-1 text-xs font-mono outline-none rounded",
-              focused && "ring-1 ring-accent/50 bg-card"
+              focused && "ring-1 ring-accent/50 bg-surface-runna-inset"
             )}
             placeholder="—"
             rows={2}
@@ -148,7 +148,7 @@ function SheetCell({
           <input
             className={cn(
               "w-full bg-transparent px-2 py-1 text-sm font-mono outline-none rounded",
-              focused && "ring-1 ring-accent/50 bg-card"
+              focused && "ring-1 ring-accent/50 bg-surface-runna-inset"
             )}
             inputMode="decimal"
             placeholder="—"
@@ -192,11 +192,11 @@ function GroupBlock({
   return (
     <div
       className={cn(
-        "rounded-md border-2 border-border bg-muted/60 overflow-hidden flex flex-col",
+        "rounded-md border-2 border-border bg-surface-runna overflow-hidden flex flex-col",
         className
       )}
     >
-      <div className="px-2 py-1.5 bg-card border-b border-border text-center text-[11px] ui-title tracking-tight">
+      <div className="px-2 py-1.5 bg-surface-runna-inset border-b border-border text-center text-[11px] ui-title tracking-tight">
         {title}
       </div>
       <div className="flex-1 divide-y divide-border/30">{children}</div>
@@ -264,7 +264,7 @@ export function SetupSheetView({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-card p-3 shadow-sm",
+        "rounded-lg border border-border bg-surface-runna p-3 shadow-sm",
         className
       )}
       data-setup-sheet-template={template.id}

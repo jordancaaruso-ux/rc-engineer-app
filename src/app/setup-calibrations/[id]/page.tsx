@@ -12,6 +12,7 @@ import {
 } from "@/lib/setupCalibrations/calibrationAccess";
 import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { SetupCalibrationEditorClient } from "@/components/setup-documents/SetupCalibrationEditorLazy";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function SetupCalibrationDetailPage({
   params,
@@ -65,7 +66,7 @@ export default async function SetupCalibrationDetailPage({
                   · Car type:{" "}
                   <Link
                     href={`/setup-sheet-models/${calibration.setupSheetModel.id}/schema`}
-                    className="text-sky-400 hover:underline"
+                    className="text-accent hover:underline"
                   >
                     {calibration.setupSheetModel.name}
                   </Link>
@@ -114,7 +115,7 @@ export default async function SetupCalibrationDetailPage({
             />
           </>
         ) : (
-          <div className="rounded-lg border border-border bg-card px-4 py-4 text-sm space-y-3 max-w-2xl">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm space-y-3">
             <div className="text-xs text-muted-foreground">
               {calibration.sourceType} · {mappingCounts.formFields} form · {mappingCounts.textFields} text ·{" "}
               {mappingCounts.regionFields} region · {mappingCounts.imageFields} image
@@ -134,10 +135,10 @@ export default async function SetupCalibrationDetailPage({
             ) : (
               <p className="text-xs text-muted-foreground">No example PDF linked.</p>
             )}
-            <Link href="/setup-calibrations" className="inline-block text-xs text-sky-400 hover:underline">
+            <Link href="/setup-calibrations" className="inline-block text-xs text-accent hover:underline">
               Back to calibrations
             </Link>
-          </div>
+          </CardPanel>
         )}
       </section>
     </>

@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareLazy";
 import { EngineerChatPanel } from "@/components/engineer/EngineerChatPanel";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 
 type EngineerMainTab = "chat" | "compare";
@@ -32,12 +34,12 @@ export function EngineerPageClient() {
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-6">
-      <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+      <SurfaceCard variant="panel" contentClassName="flex gap-1 p-1">
         <button
           type="button"
           className={cn(
-            "tap-active flex-1 rounded-md px-3 py-2 text-sm font-medium transition",
-            mainTab === "chat" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            "tap-active flex-1 rounded-lg px-3 py-2 text-sm font-medium transition",
+            mainTab === "chat" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
           onClick={() => selectTab("chat")}
         >
@@ -46,30 +48,25 @@ export function EngineerPageClient() {
         <button
           type="button"
           className={cn(
-            "tap-active flex-1 rounded-md px-3 py-2 text-sm font-medium transition",
-            mainTab === "compare" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            "tap-active flex-1 rounded-lg px-3 py-2 text-sm font-medium transition",
+            mainTab === "compare" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
           onClick={() => selectTab("compare")}
         >
           Compare &amp; trend
         </button>
-      </div>
+      </SurfaceCard>
 
       {mainTab === "chat" ? (
-        <section
-          className={cn(
-            "rounded-xl border border-border bg-card shadow-sm overflow-hidden",
-            isPending && "opacity-90"
-          )}
-        >
-          <div className="border-b border-border/80 px-4 py-2.5 md:px-5">
-            <h2 className="text-sm font-semibold text-foreground tracking-tight">Ask the Engineer</h2>
-            <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+        <SurfaceCard variant="panel" overflowHidden={false} contentClassName={cn("p-0", isPending && "opacity-90")}>
+          <div className="border-b border-border/80 px-4 py-3 md:px-5">
+            <Eyebrow dot="accent">Ask the Engineer</Eyebrow>
+            <p className="text-[11px] text-muted-foreground leading-snug mt-1.5">
               Grounded in your KB and recent runs.
             </p>
           </div>
           <EngineerChatPanel />
-        </section>
+        </SurfaceCard>
       ) : (
         <section className={cn(isPending && "opacity-90")}>
           <EngineerCompareAndPattern />

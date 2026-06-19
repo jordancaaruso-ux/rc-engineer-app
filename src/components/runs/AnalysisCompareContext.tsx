@@ -10,6 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export type AnalysisCompareContextValue = {
   targetRunId: string | null;
@@ -111,7 +112,7 @@ export function AnalysisCompareBar() {
     v;
 
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2 text-[11px] mb-3">
+    <CardPanel className="mb-3" contentClassName="px-4 py-3 space-y-2 text-[11px]">
       <div className="font-medium text-foreground text-xs">Compare pair</div>
       <p className="text-[10px] text-muted-foreground leading-snug">
         Defaults to your two most recent runs. Use <span className="font-medium text-foreground/90">Set target</span>{" "}
@@ -179,7 +180,7 @@ export function AnalysisCompareBar() {
           )}
         </div>
       </div>
-    </div>
+    </CardPanel>
   );
 }
 

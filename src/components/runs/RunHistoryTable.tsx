@@ -570,7 +570,7 @@ export function RunHistoryTable({
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>
             {isExpanded && (
-              <tr className="border-b border-border/80 bg-muted/40">
+              <tr className="border-b border-border/80">
                 <td colSpan={totalCols} className="px-2 py-3 md:px-4 md:py-4 align-top">
                   <div className="min-w-0 w-full overflow-x-auto">
                     <RunDetail
@@ -848,7 +848,7 @@ function RunDetail({
   const dateTimeLabel = formatRunCreatedAtDateTime(runInstant, displayTimeZone);
 
   return (
-    <CardPanel className="bg-muted/40 space-y-3 text-sm min-w-0 w-full">
+    <CardPanel contentClassName="space-y-3 text-sm min-w-0 w-full">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
         <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3 min-w-0 flex-1">
           <CompactField label="Date / time" value={dateTimeLabel} />

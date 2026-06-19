@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import {
   buildOverlayTransform,
   buildTransformOrigin,
@@ -454,39 +455,51 @@ export function VideoOverlayClient() {
         <div
           className={cn(
             "space-y-4",
-            isFullscreen ? "flex min-h-0 flex-1 flex-col px-2 pt-2" : "rounded-lg border border-border bg-card p-4"
+            isFullscreen ? "flex min-h-0 flex-1 flex-col px-2 pt-2" : ""
           )}
         >
           {!isFullscreen ? (
-            <div className="ui-title flex items-center justify-between text-xs text-muted-foreground">
-              <span>Overlay player</span>
-              {isMobile ? (
+            <SurfaceCard overflowHidden={false} contentClassName="space-y-4">
+              <div className="ui-title flex items-center justify-between text-xs text-muted-foreground">
+                <span>Overlay player</span>
+                {isMobile ? (
+                  <button
+                    type="button"
+                    className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted md:hidden"
+                    onClick={() => void enterFullscreen()}
+                  >
+                    Fullscreen
+                  </button>
+                ) : null}
+              </div>
+
+              {playerBlock}
+              {transport}
+              <div className="grid gap-4 md:grid-cols-2">
+                {offsetControls}
+                <VideoOverlayAlignmentPanel
+                  alignment={alignment}
+                  onChange={setAlignment}
+                  expanded={alignExpanded}
+                  onToggleExpanded={() => setAlignExpanded((v) => !v)}
+                />
+              </div>
+            </SurfaceCard>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2 text-[11px] text-white/80">
+                <span>{showRotateHint ? "Rotate to landscape for best view" : "Landscape fullscreen"}</span>
                 <button
                   type="button"
-                  className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted md:hidden"
-                  onClick={() => void enterFullscreen()}
+                  className="rounded-md border border-white/30 px-2 py-1 text-white hover:bg-white/10"
+                  onClick={exitFullscreen}
                 >
-                  Fullscreen
+                  Exit
                 </button>
-              ) : null}
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-2 text-[11px] text-white/80">
-              <span>{showRotateHint ? "Rotate to landscape for best view" : "Landscape fullscreen"}</span>
-              <button
-                type="button"
-                className="rounded-md border border-white/30 px-2 py-1 text-white hover:bg-white/10"
-                onClick={exitFullscreen}
-              >
-                Exit
-              </button>
-            </div>
-          )}
+              </div>
 
-          {playerBlock}
+              {playerBlock}
 
-          {isFullscreen ? (
-            <>
               <div className="shrink-0 rounded-lg bg-black/80 p-2 backdrop-blur-sm">{transport}</div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <label className="ml-auto flex min-w-[8rem] flex-1 items-center gap-2 text-[10px] text-white">
@@ -520,19 +533,6 @@ export function VideoOverlayClient() {
                   />
                 </div>
               ) : null}
-            </>
-          ) : (
-            <>
-              {transport}
-              <div className="grid gap-4 md:grid-cols-2">
-                {offsetControls}
-                <VideoOverlayAlignmentPanel
-                  alignment={alignment}
-                  onChange={setAlignment}
-                  expanded={alignExpanded}
-                  onToggleExpanded={() => setAlignExpanded((v) => !v)}
-                />
-              </div>
             </>
           )}
         </div>

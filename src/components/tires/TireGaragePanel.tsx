@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { CardPanel } from "@/components/ui/CardPanel";
 import type { TireTypeOption } from "@/components/tires/TireTypeCombobox";
 
 export function TireGaragePanel({
@@ -154,9 +155,10 @@ export function TireGaragePanel({
       {tireTypes.length === 0 ? (
         <p className="text-sm text-muted-foreground">No tire types yet.</p>
       ) : (
-        <ul className="rounded-lg border border-border divide-y divide-border bg-card">
+        <ul className="flex flex-col gap-2.5">
           {tireTypes.map((t) => (
-            <li key={t.id} className="px-4 py-3 flex flex-wrap items-center gap-2 justify-between">
+            <li key={t.id}>
+              <CardPanel contentClassName="px-4 py-3 flex flex-wrap items-center gap-2 justify-between">
               {editingId === t.id ? (
                 <>
                   <input
@@ -212,6 +214,7 @@ export function TireGaragePanel({
                   ) : null}
                 </>
               )}
+              </CardPanel>
             </li>
           ))}
         </ul>

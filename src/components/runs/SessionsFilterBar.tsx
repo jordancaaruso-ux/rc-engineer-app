@@ -9,6 +9,7 @@ import {
   runHistoryFiltersActive,
   type RunHistoryFilters,
 } from "@/lib/runs/runHistoryFilters";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type Option = { id: string; label: string };
 
@@ -146,7 +147,7 @@ export function SessionsFilterBar({
   const filtersActive = runHistoryFiltersActive(filters);
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+    <CardPanel contentClassName="p-3 space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[10rem] flex-1 space-y-1">
           <label className={labelClass} htmlFor="sessions-search">
@@ -369,6 +370,6 @@ export function SessionsFilterBar({
           </div>
         </div>
       ) : null}
-    </div>
+    </CardPanel>
   );
 }

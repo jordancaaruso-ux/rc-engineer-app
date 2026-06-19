@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type TeamRow = { id: string; name: string; role: string };
 
@@ -188,7 +189,7 @@ export function TeamsClient() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <CardPanel contentClassName="space-y-3">
         <h2 className="text-sm font-medium text-foreground">Create team</h2>
         <form onSubmit={handleCreateTeam} className="flex flex-wrap items-end gap-2">
           <div className="space-y-1 flex-1 min-w-[200px]">
@@ -209,9 +210,9 @@ export function TeamsClient() {
           </button>
         </form>
         {createErr ? <p className="text-xs text-destructive">{createErr}</p> : null}
-      </div>
+      </CardPanel>
 
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <CardPanel contentClassName="space-y-3">
         <h2 className="text-sm font-medium text-foreground">Your teams</h2>
         {loadingList ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
         {listErr ? <p className="text-xs text-destructive">{listErr}</p> : null}
@@ -235,10 +236,10 @@ export function TeamsClient() {
             ))}
           </ul>
         )}
-      </div>
+      </CardPanel>
 
       {selectedId ? (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+        <CardPanel contentClassName="space-y-4">
           {loadingDetail ? <p className="text-xs text-muted-foreground">Loading team…</p> : null}
           {detailErr ? <p className="text-xs text-destructive">{detailErr}</p> : null}
           {detail ? (
@@ -348,7 +349,7 @@ export function TeamsClient() {
               </div>
             </>
           ) : null}
-        </div>
+        </CardPanel>
       ) : null}
     </div>
   );

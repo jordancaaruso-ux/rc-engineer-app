@@ -597,7 +597,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             </div>
             <p className="text-[11px]">
               Changed fields show <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
-              <span className="text-red-600/90 dark:text-red-400/90">Darker red</span> = larger difference vs community
+              <span className="text-destructive/90">Darker red</span> = larger difference vs community
               spread; parameters without enough community samples use a fixed lighter red.
             </p>
           </div>

@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import type { ImportedSessionFieldStatsPreviewV1 } from "@/lib/lapImport/computeImportedSessionFieldStats";
@@ -158,9 +159,9 @@ export function LapImportWorkspace() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25">
+      <CardPanel className="max-w-3xl" contentClassName="space-y-3">
         <div className="text-xs ui-title text-muted-foreground">Import from URLs</div>
-        <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
+        <p className="text-[11px] text-muted-foreground leading-snug">
           Paste LiveRC (or other supported) timing links — one per line. LiveRC event hub URLs expand to each race result.
           Use <code className="text-[10px]">?eventId=…</code> on this page to filter by that event&apos;s race classes. Failed lines do not cancel the rest.
         </p>
@@ -169,11 +170,11 @@ export function LapImportWorkspace() {
           onChange={(e) => setText(e.target.value)}
           rows={5}
           placeholder={"https://…\nhttps://…"}
-          className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground outline-none font-mono"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground outline-none font-mono"
           disabled={busy}
           aria-label="Timing URLs, one per line"
         />
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={busy}
@@ -186,7 +187,7 @@ export function LapImportWorkspace() {
         </div>
 
         {lastResults.length > 0 ? (
-          <ul className="mt-3 space-y-1 border-t border-border pt-3 text-[11px]">
+          <ul className="space-y-1 border-t border-border pt-3 text-[11px]">
             {lastResults.map((r) => (
               <li key={r.url + (r.success ? r.importedSessionId : r.error)} className="flex flex-wrap gap-x-2">
                 <span className={cn("shrink-0 font-medium", r.success ? "text-emerald-600" : "text-destructive")}>
@@ -198,54 +199,58 @@ export function LapImportWorkspace() {
             ))}
           </ul>
         ) : null}
-      </div>
+      </CardPanel>
 
-      <div className="rounded-lg border border-border bg-card p-3 shadow-sm shadow-black/25">
+      <div className="space-y-2.5">
         <div className="text-xs ui-title text-muted-foreground">Imported sessions</div>
-        {listErr ? <p className="mt-2 text-[11px] text-destructive">{listErr}</p> : null}
+        {listErr ? <p className="text-[11px] text-destructive">{listErr}</p> : null}
         {!listErr && sessions.length === 0 ? (
-          <p className="mt-2 text-[11px] text-muted-foreground">None yet — import URLs above.</p>
+          <CardPanel contentClassName="text-[11px] text-muted-foreground">
+            None yet — import URLs above.
+          </CardPanel>
         ) : null}
-        <ul className="mt-2 space-y-1">
+        <ul className="flex flex-col gap-2.5">
           {sessions.map((s) => (
-            <li key={s.id} className="rounded-md border border-border bg-muted/40">
-              <button
-                type="button"
-                onClick={() => void expandSession(s.id)}
-                className="flex w-full flex-col gap-0.5 px-2.5 py-2 text-left text-[11px] hover:bg-muted/60"
-              >
-                <span className="text-xs font-medium text-foreground">
-                  {(() => {
-                    const p = primaryLapRowsFromImportedPayload(s.parsedPayload);
-                    const name = p?.driverName ?? "Session";
-                    const whenIso = resolveImportedSessionDisplayTimeIso({
-                      sessionCompletedAt: s.sessionCompletedAt ?? null,
-                      parsedPayload: s.parsedPayload,
-                      createdAt: s.createdAt,
-                    });
-                    return formatDriverSessionLabel(name, whenIso);
-                  })()}
-                </span>
-                <span className="break-all text-[11px] text-muted-foreground">{s.sourceUrl}</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {s.parserId} · {s.sourceType}
-                  {s.linkedRunId ? ` · linked run` : ""}
-                  {s.fieldStatsPreview && s.fieldStatsPreview.driverCount > 0
-                    ? ` · ${s.fieldStatsPreview.driverCount} driver${s.fieldStatsPreview.driverCount === 1 ? "" : "s"} · median best ${formatLap(s.fieldStatsPreview.medianBestSeconds)}`
-                    : ""}
-                </span>
-              </button>
-              {expandedId === s.id ? (
-                <div className="border-t border-border px-2.5 py-2">
-                  {detailLoading ? (
-                    <p className="text-[11px] text-muted-foreground">Loading…</p>
-                  ) : (
-                    <pre className="max-h-48 overflow-auto rounded border border-border bg-background p-2 text-[10px] leading-snug">
-                      {detailJson ?? "—"}
-                    </pre>
-                  )}
-                </div>
-              ) : null}
+            <li key={s.id}>
+              <CardPanel contentClassName="p-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => void expandSession(s.id)}
+                  className="flex w-full flex-col gap-0.5 px-2.5 py-2 text-left text-[11px]"
+                >
+                  <span className="text-xs font-medium text-foreground">
+                    {(() => {
+                      const p = primaryLapRowsFromImportedPayload(s.parsedPayload);
+                      const name = p?.driverName ?? "Session";
+                      const whenIso = resolveImportedSessionDisplayTimeIso({
+                        sessionCompletedAt: s.sessionCompletedAt ?? null,
+                        parsedPayload: s.parsedPayload,
+                        createdAt: s.createdAt,
+                      });
+                      return formatDriverSessionLabel(name, whenIso);
+                    })()}
+                  </span>
+                  <span className="break-all text-[11px] text-muted-foreground">{s.sourceUrl}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {s.parserId} · {s.sourceType}
+                    {s.linkedRunId ? ` · linked run` : ""}
+                    {s.fieldStatsPreview && s.fieldStatsPreview.driverCount > 0
+                      ? ` · ${s.fieldStatsPreview.driverCount} driver${s.fieldStatsPreview.driverCount === 1 ? "" : "s"} · median best ${formatLap(s.fieldStatsPreview.medianBestSeconds)}`
+                      : ""}
+                  </span>
+                </button>
+                {expandedId === s.id ? (
+                  <div className="border-t border-border px-2.5 py-2">
+                    {detailLoading ? (
+                      <p className="text-[11px] text-muted-foreground">Loading…</p>
+                    ) : (
+                      <pre className="max-h-48 overflow-auto rounded border border-border bg-background p-2 text-[10px] leading-snug">
+                        {detailJson ?? "—"}
+                      </pre>
+                    )}
+                  </div>
+                ) : null}
+              </CardPanel>
             </li>
           ))}
         </ul>

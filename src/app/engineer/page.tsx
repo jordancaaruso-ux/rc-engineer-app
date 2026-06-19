@@ -3,6 +3,21 @@ import { Suspense } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { EngineerPageClient } from "@/components/engineer/EngineerPageClient";
+import { CardPanel } from "@/components/ui/CardPanel";
+
+function EngineerClientSkeleton() {
+  return (
+    <CardPanel className="max-w-4xl mx-auto w-full" contentClassName="p-0">
+      <div className="animate-pulse border-b border-border px-4 py-3">
+        <div className="h-4 w-32 rounded-md bg-muted/60" />
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="h-10 w-full rounded-lg bg-muted/60" />
+        <div className="h-48 w-full rounded-lg bg-muted/60" />
+      </div>
+    </CardPanel>
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +46,7 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body flex min-h-0 flex-1 flex-col gap-4 pb-2 md:pb-0">
-        <Suspense
-          fallback={
-            <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm text-muted-foreground max-w-4xl mx-auto w-full">
-              Loading…
-            </div>
-          }
-        >
+        <Suspense fallback={<EngineerClientSkeleton />}>
           <EngineerPageClient />
         </Suspense>
       </section>

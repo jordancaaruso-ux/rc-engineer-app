@@ -227,18 +227,18 @@ function SetupFieldJumpSearch({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => window.setTimeout(() => setOpen(false), 180)}
-        className="w-full max-w-md rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-accent/50"
+        className="w-full max-w-md rounded-md border border-border bg-surface-runna-inset px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-accent/50"
       />
       {open && filtered.length > 0 ? (
         <ul
-          className="absolute z-20 mt-1 max-h-48 w-full max-w-md overflow-auto rounded-md border border-border bg-card py-1 text-xs shadow-md"
+          className="absolute z-20 mt-1 max-h-48 w-full max-w-md overflow-auto rounded-md border border-border bg-surface-runna-inset py-1 text-xs shadow-md"
           role="listbox"
         >
           {filtered.slice(0, 50).map((e) => (
             <li key={e.key} role="option">
               <button
                 type="button"
-                className="flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left hover:bg-muted/80"
+                className="flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left hover:bg-surface-runna-inset"
                 onMouseDown={(ev) => {
                   ev.preventDefault();
                   jumpTo(e.key);
@@ -588,8 +588,8 @@ function OptionSquareFieldDisplay({
             : (selected != null && normalizeOptionToken(selected) === normalizeOptionToken(opt));
           const selectedChip =
             chipAccent === "rose"
-              ? "border-rose-500/90 bg-rose-500/25 text-foreground"
-              : "border-sky-500/90 bg-sky-500/25 text-foreground";
+              ? "border-destructive/90 bg-destructive/25 text-foreground"
+              : "border-primary/90 bg-primary/25 text-foreground";
           return (
             <button
               key={opt}
@@ -602,8 +602,8 @@ function OptionSquareFieldDisplay({
               }}
               className={cn(
                 "rounded border px-2 py-1 text-[11px] font-sans tabular-nums font-semibold transition-colors",
-                isSelected ? selectedChip : "border-border bg-muted/40 text-muted-foreground",
-                !readOnly && "hover:bg-muted/70",
+                isSelected ? selectedChip : "border-border bg-surface-runna/50 text-muted-foreground",
+                !readOnly && "hover:bg-surface-runna-inset",
                 readOnly && "cursor-default"
               )}
             >
@@ -692,8 +692,8 @@ function PresetWithOtherChipEditor({
       type="text"
       placeholder="Custom / notes (optional)"
       className={cn(
-        "mt-1 w-full rounded border border-border/60 bg-muted/20 px-2 py-1 text-xs font-sans tabular-nums font-medium outline-none placeholder:text-muted-foreground/70",
-        otherFocused && "bg-card ring-1 ring-accent/40",
+        "mt-1 w-full rounded border border-border/60 bg-surface-runna/40 px-2 py-1 text-xs font-sans tabular-nums font-medium outline-none placeholder:text-muted-foreground/70",
+        otherFocused && "bg-surface-runna-inset ring-1 ring-accent/40",
         readOnly && "cursor-default border-transparent bg-transparent opacity-90"
       )}
       value={otherFocused ? localOther : otherRaw}
@@ -814,7 +814,7 @@ function LegacyCompanionOtherChipEditor({
         ref={otherInputRef}
         className={cn(
           "w-full rounded bg-transparent px-2 py-1 text-sm font-sans tabular-nums font-semibold outline-none",
-          otherFocused && "bg-card ring-1 ring-accent/40"
+          otherFocused && "bg-surface-runna-inset ring-1 ring-accent/40"
         )}
         value={otherFocused ? localOther : otherRawLegacy}
         onFocus={() => {
@@ -863,7 +863,7 @@ function LegacyCompanionOtherChipEditor({
           ref={otherInputRef}
           className={cn(
             "w-full rounded bg-transparent px-2 py-1 text-sm font-sans tabular-nums font-semibold outline-none",
-            otherFocused && "bg-card ring-1 ring-accent/40"
+            otherFocused && "bg-surface-runna-inset ring-1 ring-accent/40"
           )}
           value={otherFocused ? localOther : otherRawLegacy}
           onFocus={() => {
@@ -1031,7 +1031,7 @@ function EditableSingle({
           />
           <div className="grid grid-cols-2 gap-1">
             <input
-              className="rounded-md border border-border bg-card px-2 py-1 text-xs outline-none"
+              className="rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-xs outline-none"
               placeholder="Insert (optional)"
               value={structured?.insert ?? ""}
               onChange={(e) => {
@@ -1048,7 +1048,7 @@ function EditableSingle({
               }}
             />
             <input
-              className="rounded-md border border-border bg-card px-2 py-1 text-xs outline-none"
+              className="rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-xs outline-none"
               placeholder="Wheel (optional)"
               value={structured?.wheel ?? ""}
               onChange={(e) => {
@@ -1150,7 +1150,7 @@ function EditableSingle({
               <button
                 type="button"
                 className={cn(
-                  "rounded-md border border-border bg-muted/70 px-2 py-1 text-[11px] font-sans tabular-nums font-semibold",
+                  "rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-[11px] font-sans tabular-nums font-semibold",
                   getBoolFromSetupString(vRaw) && "border-accent/60 bg-accent/10"
                 )}
                 onClick={() => onCommit(fieldKey, getBoolFromSetupString(vRaw) ? "" : "1")}
@@ -1257,7 +1257,7 @@ function EditableSingle({
           ) : showCompareEdit ? (
             <button
               type="button"
-              className="w-full rounded px-2 py-1 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/50"
+              className="w-full rounded px-2 py-1 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-surface-runna-inset"
               onClick={beginEdit}
             >
               <InlineValueCompare
@@ -1291,7 +1291,7 @@ function EditableSingle({
               ref={textareaRef}
               className={cn(
                 "min-h-[2.5rem] w-full resize-y rounded bg-transparent px-2 py-1 text-xs font-sans tabular-nums font-semibold outline-none",
-                "bg-card ring-1 ring-accent/40"
+                "bg-surface-runna-inset ring-1 ring-accent/40"
               )}
               rows={2}
               value={local}
@@ -1304,7 +1304,7 @@ function EditableSingle({
           ) : showCompareEdit ? (
             <button
               type="button"
-              className="w-full rounded px-2 py-1 text-left text-xs font-sans tabular-nums font-semibold outline-none hover:bg-muted/50"
+              className="w-full rounded px-2 py-1 text-left text-xs font-sans tabular-nums font-semibold outline-none hover:bg-surface-runna-inset"
               onClick={beginEdit}
             >
               <InlineValueCompare
@@ -1320,7 +1320,7 @@ function EditableSingle({
               ref={textareaRef}
               className={cn(
                 "min-h-[2.5rem] w-full resize-y rounded bg-transparent px-2 py-1 text-xs font-sans tabular-nums font-semibold outline-none",
-                focused && "bg-card ring-1 ring-accent/40"
+                focused && "bg-surface-runna-inset ring-1 ring-accent/40"
               )}
               rows={2}
               value={focused ? local : v}
@@ -1340,7 +1340,7 @@ function EditableSingle({
             ref={inputRef}
             className={cn(
               "w-full rounded bg-transparent px-2 py-1 text-sm font-sans tabular-nums font-semibold outline-none",
-              "bg-card ring-1 ring-accent/40"
+              "bg-surface-runna-inset ring-1 ring-accent/40"
             )}
             value={local}
             onBlur={() => {
@@ -1352,7 +1352,7 @@ function EditableSingle({
         ) : showCompareEdit ? (
           <button
             type="button"
-            className="w-full rounded px-2 py-1 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/50"
+            className="w-full rounded px-2 py-1 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-surface-runna-inset"
             onClick={beginEdit}
           >
             <InlineValueCompare
@@ -1369,7 +1369,7 @@ function EditableSingle({
             ref={inputRef}
             className={cn(
               "w-full rounded bg-transparent px-2 py-1 text-sm font-sans tabular-nums font-semibold outline-none",
-              focused && "bg-card ring-1 ring-accent/40"
+              focused && "bg-surface-runna-inset ring-1 ring-accent/40"
             )}
             value={focused ? local : v}
             onFocus={() => {
@@ -1489,7 +1489,7 @@ function PairSideCell({
             <button
               type="button"
               className={cn(
-                "rounded border border-border bg-muted/70 px-1.5 py-0.5 text-[11px] font-sans tabular-nums font-semibold",
+                "rounded border border-border bg-surface-runna-inset px-1.5 py-0.5 text-[11px] font-sans tabular-nums font-semibold",
                 getBoolFromSetupString(vRaw) && "border-accent/60 bg-accent/10"
               )}
               onClick={() => onCommit(fieldKey, getBoolFromSetupString(vRaw) ? "" : "1")}
@@ -1562,7 +1562,7 @@ function PairSideCell({
           ref={inputRef}
           className={cn(
             "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
-            "bg-card ring-1 ring-accent/40"
+            "bg-surface-runna-inset ring-1 ring-accent/40"
           )}
           value={local}
           onBlur={() => {
@@ -1574,7 +1574,7 @@ function PairSideCell({
       ) : showCompareEdit ? (
         <button
           type="button"
-          className="w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
+          className="w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-surface-runna-inset"
           onClick={beginEdit}
         >
           <InlineValueCompare
@@ -1590,7 +1590,7 @@ function PairSideCell({
           ref={inputRef}
           className={cn(
             "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
-            focused && "bg-card ring-1 ring-accent/40"
+            focused && "bg-surface-runna-inset ring-1 ring-accent/40"
           )}
           value={focused ? local : v}
           onFocus={() => {
@@ -1788,7 +1788,7 @@ function CornerCell({
           ref={inputRef}
           className={cn(
             "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
-            "bg-card ring-1 ring-accent/40"
+            "bg-surface-runna-inset ring-1 ring-accent/40"
           )}
           value={local}
           onBlur={() => {
@@ -1800,7 +1800,7 @@ function CornerCell({
       ) : showCompareEdit ? (
         <button
           type="button"
-          className="w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-muted/40"
+          className="w-full min-w-0 rounded px-0 py-0.5 text-left text-sm font-sans tabular-nums font-semibold outline-none hover:bg-surface-runna-inset"
           onClick={beginEdit}
         >
           <InlineValueCompare
@@ -1816,7 +1816,7 @@ function CornerCell({
           ref={inputRef}
           className={cn(
             "w-full min-w-0 rounded bg-transparent text-sm font-sans tabular-nums font-semibold outline-none",
-            focused && "bg-card ring-1 ring-accent/40"
+            focused && "bg-surface-runna-inset ring-1 ring-accent/40"
           )}
           value={focused ? local : value}
           onFocus={() => {
@@ -1986,12 +1986,12 @@ function SectionCard({
   showFrontRearHeader: boolean;
 }) {
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-muted/40">
-      <div className="border-b border-border bg-card/80 px-2 py-1 text-[11px] ui-title text-muted-foreground">
+    <div className="overflow-hidden rounded-md border border-border bg-surface-runna">
+      <div className="border-b border-border bg-surface-runna-inset px-2 py-1 text-[11px] ui-title text-muted-foreground">
         {title}
       </div>
       {showFrontRearHeader ? (
-        <div className="hidden border-b border-border/70 bg-card/40 text-[10px] ui-title text-muted-foreground md:flex">
+        <div className="hidden border-b border-border/70 bg-surface-runna-inset/60 text-[10px] ui-title text-muted-foreground md:flex">
           <div className="w-[38%] shrink-0 border-r border-border/60 px-2 py-1">Parameter</div>
           <div className="grid flex-1 grid-cols-2 divide-x divide-border/60">
             <div className="px-2 py-1">Front</div>

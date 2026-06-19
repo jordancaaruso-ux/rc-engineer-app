@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { SETUP_SHEET_TEMPLATE_OPTIONS } from "@/lib/setupSheetTemplateId";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type BaselineRow = {
   setupSheetTemplate: string;
@@ -104,7 +105,7 @@ export function ManufacturerBaselineAdminSection() {
   }
 
   return (
-    <section className="mt-10 rounded-lg border border-border bg-card/40 p-4">
+    <CardPanel className="mt-10">
       <h2 className="text-sm font-semibold text-foreground">Manufacturer baseline (admin)</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         One official PDF + optional summary per setup sheet template. Stored in the database; not mixed into
@@ -189,6 +190,6 @@ export function ManufacturerBaselineAdminSection() {
           Save baseline
         </button>
       </form>
-    </section>
+    </CardPanel>
   );
 }

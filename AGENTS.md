@@ -2,6 +2,21 @@
 
 Guidance for any AI agent working in this repository (Cursor, Claude Code, Codex, etc.). Read this before making edits.
 
+## UI / visual design (Technical v2)
+
+**Before any UI, styling, layout, or visual rework** — read `docs/VISUAL_NORTH_STAR.md` and follow it. That doc is the locked north star: palette, typography, component vocabulary, journey-map rollout order, and per-screen checklist.
+
+### Hard rule
+
+- **Visual changes only** unless the user explicitly asks for behavior, routing, or API changes. Restyle; do not refactor flows while "fixing" the look.
+- **Use existing primitives** (`SurfaceCard`, `CardPanel`, `panel.tsx` — `Eyebrow`, `StatStrip`, `StatTile`, `Button` / `ButtonLink`) instead of inventing parallel card/stat/label patterns.
+- **Semantic tokens** from `globals.css` / Tailwind (`bg-background`, `text-primary`, `border-border`, `font-mono` for data) — no new raw legacy hex (`#c92a2a`, `#2563eb`) or cool greys off-palette.
+- **Yellow = actions only**; green/red = data deltas. See the doc for full semantics.
+
+### When in doubt
+
+Match the nearest **Tier A** screen that is already done (login, dashboard) or the shared components listed in the doc. Update the rollout status table in `docs/VISUAL_NORTH_STAR.md` when a screen tier is completed.
+
 ## Engineer KB is hand-curated ground truth
 
 The "Engineer" feature retrieves prose verbatim from `content/vehicle-dynamics/*.md` (see `src/lib/engineerPhase5/vehicleDynamicsKb.ts`) and quotes it back to end users as authoritative RC car setup advice. **Any language written in those files is presented to drivers as if it were expert knowledge**, regardless of who wrote it.

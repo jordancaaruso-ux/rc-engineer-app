@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { emptyManualSession } from "@/lib/manualVideoAnalysis/types";
 
@@ -88,7 +89,7 @@ function NewLapSyncForm() {
   }
 
   return (
-    <div className="max-w-lg flex flex-col gap-4 text-sm">
+    <CardPanel className="max-w-lg" contentClassName="flex flex-col gap-4 text-sm">
       <label className="text-xs">
         Track
         <select
@@ -151,7 +152,7 @@ function NewLapSyncForm() {
       <Link href="/videos" className="text-xs underline">
         ← Videos
       </Link>
-    </div>
+    </CardPanel>
   );
 }
 

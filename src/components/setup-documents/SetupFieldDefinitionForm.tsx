@@ -174,7 +174,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
         </div>
       ) : null}
       {p.error ? (
-        <div className="rounded border border-rose-500/50 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100">{p.error}</div>
+        <div className="rounded border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] text-foreground">{p.error}</div>
       ) : null}
 
       {isTemplate ? (
@@ -191,7 +191,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
             <span className="mt-0.5 block text-[9px] text-muted-foreground/90">Read-only. Lowercase, underscores.</span>
           </label>
           <label className="block text-[11px] text-muted-foreground">
-            Name on the setup sheet <span className="text-rose-300">*</span>
+            Name on the setup sheet <span className="text-destructive">*</span>
             <input
               className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs"
               value={p.cfLabel}
@@ -218,7 +218,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
         <>
           <div className="space-y-2.5">
             <label className="block text-[11px] text-muted-foreground">
-              Name <span className="text-rose-300">*</span>
+              Name <span className="text-destructive">*</span>
               <input
                 className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs"
                 value={p.cfLabel}
@@ -341,7 +341,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
           {p.cfUiType === "groupOption" ? (
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[11px] text-muted-foreground">
-                Group key <span className="text-rose-300">*</span>
+                Group key <span className="text-destructive">*</span>
                 <input
                   className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
                   value={p.cfGroupKey}

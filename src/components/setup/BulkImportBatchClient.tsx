@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 type CarOption = { id: string; name: string };
 
@@ -161,7 +163,7 @@ export function BulkImportBatchClient({
   }
 
   if (loadErr) {
-    return <div className="rounded-lg border border-destructive/50 bg-card p-4 text-sm text-destructive">{loadErr}</div>;
+    return <CardPanel className="border-destructive/50" contentClassName="text-sm text-destructive">{loadErr}</CardPanel>;
   }
   if (!batch || !counts) {
     return <div className="text-sm text-muted-foreground">Loading…</div>;
@@ -169,7 +171,7 @@ export function BulkImportBatchClient({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+      <CardPanel contentClassName="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
         <span>
           <span className="text-foreground font-medium">{counts.total}</span> total
         </span>
@@ -188,9 +190,9 @@ export function BulkImportBatchClient({
         <span>
           <span className="text-foreground font-medium">{counts.eligibleAggregation}</span> aggregation-eligible
         </span>
-      </div>
+      </CardPanel>
 
-      <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap items-end gap-3">
+      <CardPanel contentClassName="flex flex-wrap items-end gap-3">
         {cars.length === 0 ? (
           <p className="text-xs text-amber-600 dark:text-amber-400">
             Add a car under{" "}
@@ -249,10 +251,10 @@ export function BulkImportBatchClient({
             View parameter audit / grip archetypes on a car page
           </a>
         </div>
-      </div>
+      </CardPanel>
       {actionErr ? <div className="text-xs text-destructive">{actionErr}</div> : null}
 
-      <div className="rounded-lg border border-border bg-card overflow-x-auto">
+      <SurfaceCard overflowHidden={false} contentClassName="p-0 overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-border bg-muted/40">
@@ -331,7 +333,7 @@ export function BulkImportBatchClient({
             )}
           </tbody>
         </table>
-      </div>
+      </SurfaceCard>
 
       <p className="text-[11px] text-muted-foreground">
         Open a PDF to choose a calibration and parse. Re-parse with another calibration anytime; the latest result

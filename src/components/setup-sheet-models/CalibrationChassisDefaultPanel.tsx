@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type ModelRow = {
   id: string;
@@ -100,12 +101,12 @@ export function CalibrationChassisDefaultPanel(props: Props) {
   ]);
 
   return (
-    <div className="rounded-lg border border-sky-500/35 bg-sky-500/10 px-4 py-3 text-sm">
-      <div className="ui-title text-xs text-sky-100/95">Chassis type &amp; default calibration</div>
+    <CardPanel contentClassName="px-4 py-3 text-sm">
+      <div className="ui-title text-xs text-accent">Chassis type &amp; default calibration</div>
       <p className="mt-1 text-xs text-muted-foreground max-w-2xl">
         Link this profile to a chassis type (e.g. Mugen MTC3) and mark it as the default so uploads
         auto-select it when the PDF matches. If you have duplicate chassis types,{" "}
-        <a href="/setup-sheet-models" className="text-sky-300 hover:underline">
+        <a href="/setup-sheet-models" className="text-accent hover:underline">
           manage chassis types
         </a>{" "}
         to delete extras and keep one.
@@ -129,7 +130,7 @@ export function CalibrationChassisDefaultPanel(props: Props) {
         </label>
         <button
           type="button"
-          className="rounded-md border border-sky-500/60 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100 hover:bg-sky-500/25 disabled:opacity-50"
+          className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-primary/10 disabled:opacity-50"
           disabled={loading || busy || !selectedModelId}
           onClick={onSetDefault}
         >
@@ -142,6 +143,6 @@ export function CalibrationChassisDefaultPanel(props: Props) {
         </p>
       ) : null}
       {status ? <p className="mt-2 text-xs text-foreground">{status}</p> : null}
-    </div>
+    </CardPanel>
   );
 }

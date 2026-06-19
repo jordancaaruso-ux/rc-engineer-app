@@ -4,7 +4,8 @@ import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { EngineerSuggestionsCard } from "@/components/engineer/EngineerSuggestionsCard";
 import { HeroPanel } from "@/components/ui/HeroPanel";
-import { SectionMetaInline, SectionTitle } from "@/components/ui/SectionTitle";
+import { Eyebrow } from "@/components/ui/panel";
+import { SectionMetaInline } from "@/components/ui/SectionTitle";
 import { cn } from "@/lib/utils";
 
 function scopeLine(carName: string, trackName: string | null, eventName: string | null): string {
@@ -45,12 +46,10 @@ export function DashboardEngineerSuggestionsSection({
   return (
     <HeroPanel className={cn(className)}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <SectionTitle as="div" className="text-sm">
-          Engineer suggestions
-        </SectionTitle>
+        <Eyebrow dot="muted">Engineer suggestions</Eyebrow>
         <SectionMetaInline>{scopeLine(carName, trackName, eventName)}</SectionMetaInline>
       </div>
-      <div className="mt-2">
+      <div className="mt-1.5">
         <EngineerSuggestionsCard
           runId={primaryRunId}
           emphasis={emphasis}

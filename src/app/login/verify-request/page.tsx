@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function VerifyRequestPage({
   searchParams,
@@ -13,10 +14,8 @@ export default async function VerifyRequestPage({
     <main className="mx-auto max-w-md px-4 py-16 text-center">
       <h1 className="page-title text-base not-italic normal-case text-foreground">Check your email</h1>
       {consoleOnly ? (
-        <div
-          className="mt-4 rounded-lg border border-accent/40 bg-accent/10 px-4 py-3 text-left text-sm text-foreground"
-          role="status"
-        >
+        <div className="mt-4 text-left" role="status">
+          <CardPanel contentClassName="border border-accent/40 bg-accent/10">
           <p className="font-medium text-foreground">No email was sent from this environment</p>
           <p className="mt-2 text-muted-foreground">
             <code className="text-xs">EMAIL_SERVER</code> and <code className="text-xs">EMAIL_FROM</code>{" "}
@@ -29,6 +28,7 @@ export default async function VerifyRequestPage({
             <code className="text-xs">.env.example</code>). For local dev, set{" "}
             <code className="text-xs">AUTH_URL=http://localhost:3000</code> so the link matches this app.
           </p>
+          </CardPanel>
         </div>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type VideoRow = {
   id: string;
@@ -68,7 +69,7 @@ export function VideoLibraryClient({ initialVideos }: { initialVideos: VideoRow[
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3 max-w-2xl">
+      <CardPanel className="max-w-2xl" contentClassName="space-y-3">
         <div className="ui-title text-xs text-muted-foreground">Upload video</div>
         <p className="text-[11px] text-muted-foreground">
           Server uploads are capped on Vercel (roughly 4–4.5MB). For now, keep clips short/small.
@@ -111,35 +112,35 @@ export function VideoLibraryClient({ initialVideos }: { initialVideos: VideoRow[
           </button>
         </div>
         {err ? <div className="text-xs text-destructive">{err}</div> : null}
-      </div>
+      </CardPanel>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-2 ui-title text-xs text-muted-foreground">
-          Your videos
-        </div>
+      <div className="space-y-2.5">
+        <div className="ui-title text-xs text-muted-foreground">Your videos</div>
         {videos.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-muted-foreground">No videos uploaded yet.</div>
+          <CardPanel contentClassName="text-sm text-muted-foreground">No videos uploaded yet.</CardPanel>
         ) : (
-          <ul className="divide-y divide-border/60">
+          <ul className="flex flex-col gap-2.5">
             {videos.map((v) => (
-              <li key={v.id} className="px-4 py-3 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-foreground">
-                      {v.label?.trim() ? v.label : v.originalFilename}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {formatUtc(v.createdAt)} · {formatFileSize(v.bytes)} · {v.mimeType}
+              <li key={v.id}>
+                <CardPanel contentClassName="space-y-2 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm text-foreground">
+                        {v.label?.trim() ? v.label : v.originalFilename}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {formatUtc(v.createdAt)} · {formatFileSize(v.bytes)} · {v.mimeType}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <video
-                  className="w-full max-w-3xl rounded-md border border-border bg-black"
-                  controls
-                  playsInline
-                  preload="metadata"
-                  src={`/api/videos/${v.id}/file`}
-                />
+                  <video
+                    className="w-full max-w-3xl rounded-md border border-border bg-black"
+                    controls
+                    playsInline
+                    preload="metadata"
+                    src={`/api/videos/${v.id}/file`}
+                  />
+                </CardPanel>
               </li>
             ))}
           </ul>

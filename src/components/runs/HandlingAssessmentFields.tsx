@@ -39,15 +39,15 @@ function phaseBalanceChipClass(n: PhaseBalance, current: PhaseBalance | null): s
   if (!on) {
     return cn(
       "rounded border px-1.5 py-0.5 text-[11px] font-medium transition min-w-[2rem]",
-      "border-border bg-card text-muted-foreground hover:text-foreground",
-      n < 0 && "hover:border-red-400/50 hover:bg-red-500/5",
+      "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground",
+      n < 0 && "hover:border-destructive/40 hover:bg-destructive/10",
       n === 0 && "hover:bg-muted/80",
       n > 0 && "hover:border-emerald-500/50 hover:bg-emerald-500/5"
     );
   }
   return cn(
     "rounded border px-1.5 py-0.5 text-[11px] font-medium min-w-[2rem]",
-    n < 0 && "border-red-500/70 bg-red-500/15 text-foreground",
+    n < 0 && "border-destructive/70 bg-destructive/15 text-foreground",
     n === 0 && "border-muted-foreground/60 bg-muted text-foreground",
     n > 0 && "border-emerald-600/70 bg-emerald-500/15 text-foreground"
   );
@@ -93,7 +93,7 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
   }
 
   return (
-    <div className="space-y-4 rounded-md border border-border/80 bg-muted/30 p-3">
+    <div className="space-y-4 inset-panel p-3">
       <div className="space-y-3">
         <div className="text-xs font-medium text-muted-foreground">
           Corner balance (−3 push → +3 oversteer, per phase)
@@ -107,7 +107,7 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
             >
               <span className="text-[11px] font-medium text-foreground">{label}</span>
               <div className="flex flex-wrap items-center gap-1">
-                <span className="text-[10px] text-red-600/90 dark:text-red-400/90">Push</span>
+                <span className="text-[10px] text-destructive/90">Push</span>
                 {PHASE_BALANCE_LEVELS.map((n) => (
                   <button
                     key={n}
@@ -141,7 +141,7 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
             >
               <span className="text-[11px] font-medium text-foreground">{meta.title}</span>
               <div className="flex flex-wrap items-center gap-1">
-                <span className="text-[10px] text-red-600/90 dark:text-red-400/90">{meta.neg}</span>
+                <span className="text-[10px] text-destructive/90">{meta.neg}</span>
                 {PHASE_BALANCE_LEVELS.map((n) => (
                   <button
                     key={n}
@@ -167,7 +167,7 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
         </label>
         <select
           id="handling-primary-focus"
-          className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none disabled:opacity-60"
+          className="form-control w-full px-2 py-1.5 text-xs disabled:opacity-60"
           disabled={primaryFocusOptions.length === 0}
           value={primaryFocusValue}
           onChange={(e) => {

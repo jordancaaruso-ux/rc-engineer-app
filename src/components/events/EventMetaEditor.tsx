@@ -6,6 +6,7 @@ import { eventDateToYmd } from "@/lib/eventDateParse";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 
 type TrackOption = { id: string; name: string; location?: string | null };
@@ -108,7 +109,7 @@ export function EventMetaEditor(props: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm space-y-3">
+    <SurfaceCard variant="panel" overflowHidden={false} contentClassName="text-sm space-y-3">
       <div>
         <div className="text-sm font-medium text-foreground">Event details</div>
         <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -214,6 +215,6 @@ export function EventMetaEditor(props: Props) {
           </span>
         ) : null}
       </div>
-    </div>
+    </SurfaceCard>
   );
 }

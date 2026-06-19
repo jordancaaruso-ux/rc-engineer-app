@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { EventList } from "@/components/events/EventList";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { loadUserScopedEvents } from "@/lib/events/eventParticipation";
 
 /** Match /tracks + /runs/new: always load user events/tracks fresh (avoids stale static RSC for selectors). */
@@ -19,9 +20,9 @@ export default async function EventsPage(): Promise<ReactNode> {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env to manage events.
-          </div>
+          </CardPanel>
         </section>
       </>
     );

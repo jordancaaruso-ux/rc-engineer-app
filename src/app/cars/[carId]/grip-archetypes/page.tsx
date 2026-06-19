@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -105,10 +106,10 @@ export default async function CarGripArchetypesPage(props: {
       </header>
       <section className="page-body">
         {setupSheetTemplate == null ? (
-          <div className="max-w-2xl rounded-lg border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             This car has no <code className="font-mono">setupSheetTemplate</code> set, so the community archetypes can&apos;t be
             looked up. Open the car page and assign the template first.
-          </div>
+          </CardPanel>
         ) : (
           <GripArchetypesClient
             carId={car.id}

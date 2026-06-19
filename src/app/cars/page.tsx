@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { CarList } from "@/components/cars/CarList";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 
@@ -20,9 +21,9 @@ export default async function CarManagerPage(): Promise<ReactNode> {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env to create and manage cars.
-          </div>
+          </CardPanel>
         </section>
       </>
     );
@@ -30,16 +31,31 @@ export default async function CarManagerPage(): Promise<ReactNode> {
 
   const user = await requireCurrentUser();
   await ensureAuthorizedSetupSheetCatalog();
-  const allModels = await prisma.setupSheetModel.findMany({
-    orderBy: [{ isAuthorized: "desc" }, { name: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      isAuthorized: true,
-      _count: { select: { cars: true, calibrations: true } },
-    },
-  });
+  const [allModels, cars] = await Promise.all([
+    prisma.setupSheetModel.findMany({
+      orderBy: [{ isAuthorized: "desc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        isAuthorized: true,
+        _count: { select: { cars: true, calibrations: true } },
+      },
+    }),
+    prisma.car.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        chassis: true,
+        notes: true,
+        setupSheetTemplate: true,
+        setupSheetModelId: true,
+        setupSheetModel: { select: { id: true, name: true } },
+      },
+    }),
+  ]);
   const authById = new Map(allModels.map((m) => [m.id, m.isAuthorized] as const));
   const setupSheetModels = dedupeSetupSheetModelsForPicker(
     allModels.map((m) => ({
@@ -55,19 +71,6 @@ export default async function CarManagerPage(): Promise<ReactNode> {
     slug: m.slug,
     isAuthorized: authById.get(m.id) ?? false,
   }));
-  const cars = await prisma.car.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      chassis: true,
-      notes: true,
-      setupSheetTemplate: true,
-      setupSheetModelId: true,
-      setupSheetModel: { select: { id: true, name: true } },
-    },
-  });
 
   return (
     <>

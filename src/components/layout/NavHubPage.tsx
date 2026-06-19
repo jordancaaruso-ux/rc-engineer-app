@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { NavHubLink } from "@/components/layout/navConfig";
 import { ChevronRight } from "lucide-react";
-
+import { PanelTitle } from "@/components/ui/panel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 export function NavHubPage({
   title,
   subtitle,
@@ -20,26 +21,28 @@ export function NavHubPage({
         </div>
       </header>
       <section className="page-body flex max-w-2xl flex-col gap-2">
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2.5">
           {links.map((link) => {
             const Icon = link.icon;
             return (
               <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="group tap-active flex items-center gap-3 rounded-xl border border-border bg-card/80 px-4 py-3.5 transition hover:border-accent/30 hover:bg-card"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground group-hover:text-foreground">
-                    <Icon className="h-5 w-5" aria-hidden />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="ui-title block text-sm text-foreground">{link.label}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{link.description}</span>
-                  </span>
-                  <ChevronRight
-                    className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground"
-                    aria-hidden
-                  />
+                <Link href={link.href} prefetch className="tap-active block">
+                  <SurfaceCard variant="panel" contentClassName="flex items-center gap-3 px-4 py-3.5">
+                    <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-border bg-background/50 text-muted-foreground transition-colors group-hover:text-foreground">
+                      <Icon className="size-[15px]" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <PanelTitle
+                        as="span"
+                        className="block font-normal text-[18px] uppercase italic tracking-wide sm:text-[20px]"
+                      >
+                        {link.label}
+                      </PanelTitle>
+                    </span>                    <ChevronRight
+                      className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                      aria-hidden
+                    />
+                  </SurfaceCard>
                 </Link>
               </li>
             );

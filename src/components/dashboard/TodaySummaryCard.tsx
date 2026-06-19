@@ -5,6 +5,8 @@ import { useState } from "react";
 import { formatLap } from "@/lib/runLaps";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
+import { Eyebrow, PanelSubtitle, StatStrip, StatTile } from "@/components/ui/panel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 type Props = {
   todayBestLap: number | null;
@@ -33,12 +35,10 @@ export function TodaySummaryCard({
   const totalChanges = todaysChanges.reduce((acc, block) => acc + block.rows.length, 0);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm shadow-black/25">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <div className="text-xs font-medium text-muted-foreground">
-          {hasActiveEvent ? "This event" : "Today"}
-        </div>
-        <div className="text-[10px] text-muted-foreground">
+    <SurfaceCard contentClassName="p-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
+        <Eyebrow dot="muted">{hasActiveEvent ? "This event" : "Today"}</Eyebrow>
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-faint">
           {todayRunCount === 0
             ? "No runs yet"
             : `${todayRunCount} run${todayRunCount === 1 ? "" : "s"} logged today`}
@@ -46,7 +46,7 @@ export function TodaySummaryCard({
       </div>
 
       <div
-        className="flex border-b border-border/70 px-3"
+        className="flex border-b border-border/70 px-4"
         role="tablist"
         aria-label="Today summary tabs"
       >
@@ -56,14 +56,14 @@ export function TodaySummaryCard({
         <TabButton id="changes" active={tab === "changes"} onClick={() => setTab("changes")}>
           Changes today
           {totalChanges > 0 ? (
-            <span className="ml-1.5 inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:text-amber-300">
+            <span className="ml-1.5 inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">
               {totalChanges}
             </span>
           ) : null}
         </TabButton>
       </div>
 
-      <div className="p-3">
+      <div className="p-4">
         {tab === "best" ? (
           <TodayBestPanel
             todayBestLap={todayBestLap}
@@ -75,7 +75,7 @@ export function TodaySummaryCard({
           <TodayChangesPanel blocks={todaysChanges} displayTimeZone={displayTimeZone} />
         )}
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 
@@ -116,24 +116,20 @@ function TodayBestPanel({
 }: Pick<Props, "todayBestLap" | "todayBestAvgTop5" | "todayBestRunId" | "todayBestRunLabel">) {
   if (todayBestLap == null) {
     return (
-      <p className="text-[11px] text-muted-foreground">
+      <PanelSubtitle>
         No laps logged yet today. Save a run to populate today&apos;s best.
-      </p>
+      </PanelSubtitle>
     );
   }
   return (
-    <div className="flex flex-wrap items-start gap-x-6 gap-y-1">
-      <div>
-        <div className="text-[10px] font-medium text-muted-foreground">Best lap</div>
-        <div className="font-mono text-sm tabular-nums text-foreground">{formatLap(todayBestLap)}</div>
-      </div>
-      <div>
-        <div className="text-[10px] font-medium text-muted-foreground">Best avg top 5</div>
-        <div className="font-mono text-sm tabular-nums text-foreground">{formatLap(todayBestAvgTop5)}</div>
-      </div>
-      <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-        <div className="text-[10px] font-medium text-muted-foreground">Best run</div>
-        <div className="min-w-0 truncate text-[11px] text-foreground">
+    <div className="space-y-2.5">
+      <StatStrip className="grid-cols-2">
+        <StatTile label="Best lap" value={formatLap(todayBestLap)} accent />
+        <StatTile label="Best avg top 5" value={formatLap(todayBestAvgTop5)} />
+      </StatStrip>
+      <div className="min-w-0">
+        <Eyebrow dot="muted">Best run</Eyebrow>
+        <div className="mt-1 min-w-0 truncate text-[11px] text-foreground">
           {todayBestRunId ? (
             <Link
               href={`/runs/history?focusRun=${encodeURIComponent(todayBestRunId)}`}

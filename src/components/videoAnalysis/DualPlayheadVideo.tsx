@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { VideoWithLineOverlay } from "./VideoWithLineOverlay";
 import {
   appliedVideoCropStyle,
@@ -318,7 +319,7 @@ export function DualPlayheadVideo({
         </button>
       </div>
       {onSyncNudge && (
-        <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
+        <CardPanel contentClassName="space-y-1.5">
           <p className="text-xs font-medium">Change sync</p>
           <p className="text-[10px] text-muted-foreground">
             Nudge {topLabel} earlier or later vs {bottomLabel}
@@ -364,7 +365,7 @@ export function DualPlayheadVideo({
               </button>
             )}
           </div>
-        </div>
+        </CardPanel>
       )}
     </div>
   );

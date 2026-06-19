@@ -8,6 +8,8 @@ import type {
 } from "@/lib/setupCalibrations/types";
 import type { SetupFieldMeta } from "@/lib/setupFieldCatalog";
 import { getCalibrationFieldKind } from "@/lib/setupCalibrations/calibrationFieldCatalog";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { cn } from "@/lib/utils";
 
 type FieldKind = "text" | "checkbox" | "singleChoiceGroup" | "multiSelectGroup";
 
@@ -641,7 +643,7 @@ export function ImageCalibrationEditorClient(props: Props) {
       </section>
 
       <aside className="space-y-3">
-        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <CardPanel contentClassName="p-3 space-y-2">
           <div className="text-sm font-medium">Calibration</div>
           <label className="block text-xs text-muted-foreground">Name</label>
           <input
@@ -668,9 +670,9 @@ export function ImageCalibrationEditorClient(props: Props) {
               Saved. Returning to document review…
             </div>
           ) : null}
-        </div>
+        </CardPanel>
 
-        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <CardPanel contentClassName="p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div className="text-sm font-medium">Detected boxes</div>
             <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -705,9 +707,9 @@ export function ImageCalibrationEditorClient(props: Props) {
               {detectError}
             </div>
           ) : null}
-        </div>
+        </CardPanel>
 
-        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <CardPanel contentClassName="p-3 space-y-2">
           <div className="text-sm font-medium">Sheet page bounds</div>
           <p className="text-xs text-muted-foreground">
             For editable-PDF-derived mappings, draw around the visible setup sheet page in this
@@ -733,9 +735,9 @@ export function ImageCalibrationEditorClient(props: Props) {
               Full image
             </button>
           </div>
-        </div>
+        </CardPanel>
 
-        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <CardPanel contentClassName="p-3 space-y-2">
           <div className="text-sm font-medium">Use editable PDF mapping</div>
           <p className="text-xs text-muted-foreground">
             If you have already calibrated the editable PDF for this sheet, the app can convert those
@@ -777,9 +779,9 @@ export function ImageCalibrationEditorClient(props: Props) {
               then return here to derive the screenshot map.
             </p>
           )}
-        </div>
+        </CardPanel>
 
-        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <CardPanel contentClassName="p-3 space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium">Anchors ({anchors.length})</div>
             <button
@@ -829,9 +831,9 @@ export function ImageCalibrationEditorClient(props: Props) {
               ))}
             </ul>
           )}
-        </div>
+        </CardPanel>
 
-        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <CardPanel contentClassName="p-3 space-y-2">
           <div className="text-sm font-medium">Add field</div>
           <input
             value={keyFilter}
@@ -868,9 +870,9 @@ export function ImageCalibrationEditorClient(props: Props) {
               <p className="text-xs text-muted-foreground">No matching fields.</p>
             ) : null}
           </div>
-        </div>
+        </CardPanel>
 
-        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <CardPanel contentClassName="p-3 space-y-2">
           <div className="text-sm font-medium">Mapped fields ({fields.length})</div>
           {fields.length === 0 ? (
             <p className="text-xs text-muted-foreground">
@@ -878,13 +880,13 @@ export function ImageCalibrationEditorClient(props: Props) {
               screenshot.
             </p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="flex flex-col gap-2">
               {fields.map((f) => (
-                <li
-                  key={f.id}
-                  className={`rounded border p-2 ${f.id === activeFieldId ? "border-primary" : "border-border"}`}
-                  onClick={() => setActiveFieldId(f.id)}
-                >
+                <li key={f.id} onClick={() => setActiveFieldId(f.id)}>
+                  <CardPanel
+                    className={cn(f.id === activeFieldId && "ring-1 ring-primary")}
+                    contentClassName="p-2"
+                  >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs font-medium truncate">{f.key}</div>
                     <button
@@ -1005,11 +1007,12 @@ export function ImageCalibrationEditorClient(props: Props) {
                       Drawing — drag on the image, or press Escape to cancel.
                     </div>
                   ) : null}
+                  </CardPanel>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </CardPanel>
       </aside>
     </div>
   );

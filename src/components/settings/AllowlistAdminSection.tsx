@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type Row = { id: string; email: string; createdAt: string };
 
@@ -91,7 +92,7 @@ export function AllowlistAdminSection() {
   }
 
   return (
-    <section className="mt-10 rounded-lg border border-border bg-card/40 p-4">
+    <CardPanel className="mt-10">
       <h2 className="text-sm font-semibold text-foreground">Sign-in allowlist (admin)</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Emails listed here may request a magic link (in addition to <code className="text-foreground">AUTH_ALLOWED_EMAILS</code>{" "}
@@ -142,6 +143,6 @@ export function AllowlistAdminSection() {
           )}
         </ul>
       )}
-    </section>
+    </CardPanel>
   );
 }

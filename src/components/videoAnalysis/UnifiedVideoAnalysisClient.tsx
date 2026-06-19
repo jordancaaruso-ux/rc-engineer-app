@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { DualPlayheadVideo } from "./DualPlayheadVideo";
 import type { SectorLineNorm } from "./SectorLineCanvas";
 import type {
@@ -608,7 +609,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
         )}
       </div>
 
-      <div className="max-w-xl flex flex-col gap-2 text-xs">
+      <CardPanel className="max-w-xl" contentClassName="flex flex-col gap-2 text-xs">
         <label>
           LiveRC / timing URLs <span className="text-muted-foreground">(optional)</span>
           <textarea
@@ -679,13 +680,13 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
             </label>
           </div>
         )}
-      </div>
+      </CardPanel>
 
       <div
         className={`grid gap-4 ${driverColumns.length > 0 ? "lg:grid-cols-[auto_minmax(0,1fr)]" : ""}`}
       >
         {driverColumns.length > 0 && (
-        <div className="flex flex-col gap-3 min-w-[140px]">
+        <CardPanel contentClassName="flex flex-col gap-3 min-w-[140px]">
           <p className="text-sm font-medium">Drivers</p>
           <div className="flex gap-4">
             {driverColumns.map((col) => (
@@ -767,7 +768,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
               {compareSlotLabel(session, col1, compareLap1)}
             </p>
           )}
-        </div>
+        </CardPanel>
         )}
 
         <DualPlayheadVideo

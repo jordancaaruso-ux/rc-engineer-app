@@ -40,8 +40,9 @@ export function TodayDraftRunProvider({ children }: { children: ReactNode }) {
   }, [refreshDraft, pathname]);
 
   useEffect(() => {
-    router.prefetch("/");
-  }, [router]);
+    if (!draftRunId) return;
+    router.prefetch(`/runs/${encodeURIComponent(draftRunId)}/edit`);
+  }, [draftRunId, router]);
 
   const value = useMemo(
     (): TodayDraftContextValue => ({

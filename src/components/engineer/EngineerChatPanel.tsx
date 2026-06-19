@@ -251,10 +251,10 @@ export function EngineerChatPanel({
             <div
               key={idx}
               className={cn(
-                "text-sm leading-relaxed rounded-lg px-3 py-2",
+                "text-sm leading-relaxed rounded-lg px-3 py-2 border",
                 m.role === "user"
-                  ? "bg-muted/70 text-foreground mr-6"
-                  : "bg-background border border-border/70 ml-6 text-foreground/95"
+                  ? "border-border/60 bg-muted/40 text-foreground mr-6"
+                  : "border-border/70 bg-background/30 ml-6 text-foreground/95"
               )}
             >
               <div className="text-[10px] ui-title text-muted-foreground mb-1">

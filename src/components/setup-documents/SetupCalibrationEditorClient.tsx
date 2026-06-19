@@ -47,6 +47,8 @@ import { SetupFieldDefinitionForm } from "@/components/setup-documents/SetupFiel
 import { SetupCalibrationQuickParamsPanel } from "@/components/setup-documents/SetupCalibrationQuickParamsPanel";
 import { SetupCalibrationLinkParameterDialog } from "@/components/setup-documents/SetupCalibrationLinkParameterDialog";
 import { SetupCalibrationModelSidebar } from "@/components/setup-documents/SetupCalibrationModelSidebar";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import {
   buildGroupedRuleFromAssignments,
   extractAssignmentsFromGroupedRule,
@@ -2785,7 +2787,7 @@ export function SetupCalibrationEditorClient({
           onAssignGroupOption={quickAssignGroupOption}
         />
       ) : null}
-      <div className="rounded-lg border border-border bg-card p-3">
+      <CardPanel contentClassName="p-3">
         <div className="ui-title text-xs text-muted-foreground">Calibration mapping profile</div>
         <p className="mt-1 text-[11px] text-muted-foreground">
           {modelLinkedMode ? (
@@ -2824,7 +2826,7 @@ export function SetupCalibrationEditorClient({
           </button>
           <button
             type="button"
-            className="rounded-md border border-sky-500/60 bg-sky-500/10 px-3 py-1.5 text-xs hover:bg-sky-500/20 disabled:opacity-60"
+            className="rounded-md border border-accent/60 bg-accent/10 px-3 py-1.5 text-xs hover:bg-accent/20 disabled:opacity-60"
             onClick={saveAsNewVersion}
             disabled={savingAsNew || saving}
           >
@@ -2864,7 +2866,7 @@ export function SetupCalibrationEditorClient({
             >
               {attachListOpen ? "Close picker" : documentId ? "Change…" : "Link PDF…"}
             </button>
-            <Link href="/setup-documents" className="text-xs text-sky-300/90 hover:text-sky-200">
+            <Link href="/setup-documents" className="text-xs text-accent hover:text-accent/80">
               Upload PDF
             </Link>
           </div>
@@ -2875,7 +2877,7 @@ export function SetupCalibrationEditorClient({
               ) : attachCandidates.length === 0 ? (
                 <div className="text-muted-foreground">
                   No PDFs found.{" "}
-                  <Link href="/setup-documents" className="text-sky-300/90 hover:text-sky-200">
+                  <Link href="/setup-documents" className="text-accent hover:text-accent/80">
                     Upload one
                   </Link>{" "}
                   (bulk-import PDFs are included here).
@@ -2945,7 +2947,7 @@ export function SetupCalibrationEditorClient({
             </button>
           </div>
         ) : null}
-      </div>
+      </CardPanel>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[2fr_1fr]">
         {tab === "sheet" ? (
@@ -3900,7 +3902,7 @@ export function SetupCalibrationEditorClient({
           </div>
         )}
 
-        <div className="rounded-lg border border-border bg-card p-3">
+        <CardPanel contentClassName="p-3">
           {modelLinkedMode && tab === "form" && setupSheetModelSchema && initialSetupSheetModelId ? (
             <SetupCalibrationModelSidebar
               schema={setupSheetModelSchema}
@@ -4779,7 +4781,7 @@ export function SetupCalibrationEditorClient({
               </Link>
             )}
           </div>
-        </div>
+        </CardPanel>
       </div>
 
       {setupSheetModelSchema && linkDialogOpen ? (
@@ -4814,7 +4816,7 @@ export function SetupCalibrationEditorClient({
           role="dialog"
           aria-modal="true"
         >
-          <div className="max-w-md rounded-lg border border-border bg-card p-4 shadow-lg">
+          <SurfaceCard className="max-w-md shadow-lg" contentClassName="p-4">
             <div className="text-sm font-semibold text-foreground">Save calibration first?</div>
             <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
               You have unsaved mapping changes. Save before adding parameters on the sheet model so your PDF links are kept.
@@ -4843,7 +4845,7 @@ export function SetupCalibrationEditorClient({
               </button>
               <button
                 type="button"
-                className="rounded border border-sky-500/60 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100 hover:bg-sky-500/25"
+                className="rounded border border-accent/60 bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent/25"
                 onClick={async () => {
                   await save();
                   setSchemaNavPending(false);
@@ -4857,7 +4859,7 @@ export function SetupCalibrationEditorClient({
                 Save & continue
               </button>
             </div>
-          </div>
+          </SurfaceCard>
         </div>
       ) : null}
 
@@ -4868,7 +4870,7 @@ export function SetupCalibrationEditorClient({
           aria-modal="true"
           aria-labelledby="pdf-map-conflict-title"
         >
-          <div className="max-w-md rounded-lg border border-border bg-card p-4 shadow-lg">
+          <SurfaceCard className="max-w-md shadow-lg" contentClassName="p-4">
             <div id="pdf-map-conflict-title" className="text-sm font-semibold text-foreground">
               PDF widget already in use
             </div>
@@ -4911,7 +4913,7 @@ export function SetupCalibrationEditorClient({
                 Overwrite
               </button>
             </div>
-          </div>
+          </SurfaceCard>
         </div>
       ) : null}
     </section>

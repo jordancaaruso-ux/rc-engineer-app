@@ -163,7 +163,7 @@ export function RunLapAnalysisModal({
       }}
     >
       <div
-        className="w-full max-h-[min(92vh,720px)] sm:max-w-4xl rounded-t-lg sm:rounded-lg border border-border bg-card shadow-lg flex flex-col"
+        className="w-full max-h-[min(92vh,720px)] sm:max-w-4xl rounded-t-lg sm:rounded-lg border border-border bg-surface-runna shadow-lg flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 shrink-0">
@@ -172,7 +172,7 @@ export function RunLapAnalysisModal({
           </h2>
           <button
             type="button"
-            className="rounded-md border border-border bg-muted/60 px-2 py-1 text-[11px] font-medium hover:bg-muted transition shrink-0"
+            className="btn-surface px-2 py-1 text-[11px] font-medium shrink-0"
             onClick={onClose}
           >
             Close
@@ -180,7 +180,7 @@ export function RunLapAnalysisModal({
         </div>
         <div className="overflow-y-auto p-3 min-h-0 flex-1">
           {importedLapsError ? (
-            <p className="text-xs text-red-600 dark:text-red-400 mb-2">{importedLapsError}</p>
+            <p className="text-xs text-destructive mb-2">{importedLapsError}</p>
           ) : null}
           {missingImportedLapRows && importedLapsLoading && !importedLapSetsFull ? (
             <p className="text-xs text-muted-foreground py-2">Loading imported lap sets…</p>

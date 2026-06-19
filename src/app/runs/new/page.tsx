@@ -6,7 +6,11 @@ import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getDashboardNewRunPrefill, loadIncompleteRunsForImportChooser } from "@/lib/dashboardServer";
 import { NewRunImportLinkChooser } from "@/components/runs/NewRunImportLinkChooser";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
+import { getLastRunForCopyPreview } from "@/lib/runs/getLastRunForCopyPreview";
+import { CopyLastRunFormProvider } from "@/components/runs/CopyLastRunFormContext";
+import { NewRunCopyLastRunSlot } from "@/components/runs/NewRunCopyLastRunSlot";
 
 export default async function NewRunPage({
   searchParams,
@@ -18,25 +22,26 @@ export default async function NewRunPage({
       <>
         <header className="page-header">
           <div>
-            <h1 className="page-title">Log your run</h1>
+            <h1 className="page-title text-base text-base">Log your run</h1>
             <p className="page-subtitle">Database not configured yet.</p>
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-3xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-3xl" contentClassName="text-sm text-muted-foreground">
             Set <span className="font-mono">DATABASE_URL</span> in a{" "}
             <span className="font-mono">.env</span> file (Postgres) to enable
             saving runs.
-          </div>
+          </CardPanel>
         </section>
       </>
     );
   }
 
-  const user = await requireCurrentUser();
-  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
-  const sp = await searchParams;
-  const dashboardPrefill = await getDashboardNewRunPrefill(user.id, sp);
+  const [user, displayTimeZone, sp] = await Promise.all([
+    requireCurrentUser(),
+    getExplicitTimeZoneForRunFormatting(),
+    searchParams,
+  ]);
   const initialEventId =
     typeof sp.eventId === "string" && sp.eventId.trim().length > 0 ? sp.eventId.trim() : null;
   const focusSection: "setup" | null =
@@ -45,12 +50,13 @@ export default async function NewRunPage({
       : null;
   const importedLapTimeSessionIdRaw =
     typeof sp.importedLapTimeSessionId === "string" ? sp.importedLapTimeSessionId.trim() : "";
-  const incompleteRunsForImport =
-    importedLapTimeSessionIdRaw.length > 0
-      ? await loadIncompleteRunsForImportChooser(user.id, initialEventId)
-      : [];
 
-  const [cars, allTracks, favouriteTrackIds] = await Promise.all([
+  const [dashboardPrefill, incompleteRunsForImport, cars, allTracks, favouriteTrackIds, copyPreviewRun] =
+    await Promise.all([
+    getDashboardNewRunPrefill(user.id, sp),
+    importedLapTimeSessionIdRaw.length > 0
+      ? loadIncompleteRunsForImportChooser(user.id, initialEventId)
+      : Promise.resolve([]),
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -70,6 +76,7 @@ export default async function NewRunPage({
       },
     }),
     getFavouriteTrackIdsForUser(user.id),
+    getLastRunForCopyPreview(user.id),
   ]);
 
   const favSet = new Set(favouriteTrackIds);
@@ -80,27 +87,35 @@ export default async function NewRunPage({
     <>
       <header className="page-header">
         <div className="min-w-0">
-          <h1 className="page-title">Log your run</h1>
+          <h1 className="page-title text-base">Log your run</h1>
           <p className="page-subtitle mt-0.5">Capture session details, laps, and setup.</p>
         </div>
       </header>
       <section className="page-body max-w-3xl">
-        <NewRunImportLinkChooser
-          incompleteRuns={incompleteRunsForImport}
-          importedLapTimeSessionId={importedLapTimeSessionIdRaw || null}
-          eventId={initialEventId}
-          displayTimeZone={displayTimeZone}
-        >
-          <NewRunForm
-            cars={cars}
-            tracks={tracks}
-            favouriteTrackIds={favouriteTrackIds}
-            favouriteTracks={favouriteTracks}
-            dashboardPrefill={dashboardPrefill}
-            initialEventId={initialEventId}
-            focusSection={focusSection}
-          />
-        </NewRunImportLinkChooser>
+        <CopyLastRunFormProvider previewRun={copyPreviewRun}>
+          <NewRunImportLinkChooser
+            incompleteRuns={incompleteRunsForImport}
+            importedLapTimeSessionId={importedLapTimeSessionIdRaw || null}
+            eventId={initialEventId}
+            displayTimeZone={displayTimeZone}
+          >
+            {copyPreviewRun ? (
+              <div className="mb-4">
+                <NewRunCopyLastRunSlot displayTimeZone={displayTimeZone} />
+              </div>
+            ) : null}
+            <NewRunForm
+              cars={cars}
+              tracks={tracks}
+              favouriteTrackIds={favouriteTrackIds}
+              favouriteTracks={favouriteTracks}
+              dashboardPrefill={dashboardPrefill}
+              initialEventId={initialEventId}
+              focusSection={focusSection}
+              initialCopyPreviewRun={copyPreviewRun}
+            />
+          </NewRunImportLinkChooser>
+        </CopyLastRunFormProvider>
       </section>
     </>
   );

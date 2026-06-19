@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { carTemplateSelectGroups, type CarForTemplateGroup } from "@/lib/cars/setupSheetTemplateCarGroups";
 import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
 import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type CarOption = CarForTemplateGroup;
 
@@ -33,7 +34,7 @@ type SetupDocListItem = {
 function statusClass(status: SetupDocListItem["parseStatus"]): string {
   if (status === "PARSED") return "text-emerald-300";
   if (status === "PARTIAL") return "text-amber-300";
-  if (status === "FAILED") return "text-rose-300";
+  if (status === "FAILED") return "text-destructive";
   return "text-muted-foreground";
 }
 
@@ -85,7 +86,7 @@ export function SetupDocumentLibraryClient({
 
   return (
     <section className="page-body space-y-4">
-      <div className="rounded-lg border border-border bg-card p-4">
+      <CardPanel>
         <div className="ui-title text-sm">Upload setup sheet</div>
         <p className="mt-1 text-xs text-muted-foreground">
           PDF and images are stored as setup documents. Parsing creates draft values for review.
@@ -130,19 +131,22 @@ export function SetupDocumentLibraryClient({
           <span className="text-[11px] text-muted-foreground">Max 12 MB</span>
         </div>
         {status ? <p className="mt-2 text-xs text-muted-foreground">{status}</p> : null}
-        {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
-      </div>
+        {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+      </CardPanel>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-2 ui-title text-xs text-muted-foreground">
-          Setup documents
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <div className="ui-title text-xs text-muted-foreground">Setup documents</div>
         </div>
         {initialDocuments.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-muted-foreground">No setup documents uploaded yet.</div>
+          <CardPanel>
+            <div className="text-sm text-muted-foreground">No setup documents uploaded yet.</div>
+          </CardPanel>
         ) : (
-          <div className="divide-y divide-border/60">
+          <ul className="flex flex-col gap-2.5">
             {initialDocuments.map((doc) => (
-              <div key={doc.id} className="flex items-center justify-between gap-4 px-4 py-3">
+              <li key={doc.id}>
+                <CardPanel contentClassName="flex items-center justify-between gap-4 px-4 py-3">
                 <div className="min-w-0">
                   <div className="truncate ui-title text-sm normal-case">{doc.originalFilename}</div>
                   <div className="mt-0.5 text-[11px] text-muted-foreground">
@@ -154,7 +158,7 @@ export function SetupDocumentLibraryClient({
                       · <span
                           className={cn(
                             doc.importStatus === "FAILED"
-                              ? "text-rose-300"
+                              ? "text-destructive"
                               : doc.importStatus === "COMPLETED_WITH_WARNINGS"
                                 ? "text-amber-200"
                                 : "text-muted-foreground"
@@ -171,7 +175,7 @@ export function SetupDocumentLibraryClient({
                       : ""}
                   </div>
                 {doc.importStatus === "FAILED" && doc.importErrorMessage ? (
-                  <div className="mt-1 text-[11px] text-rose-300 line-clamp-2">{doc.importErrorMessage}</div>
+                  <div className="mt-1 text-[11px] text-destructive line-clamp-2">{doc.importErrorMessage}</div>
                 ) : null}
                 </div>
                 <Link
@@ -180,9 +184,10 @@ export function SetupDocumentLibraryClient({
                 >
                   Review
                 </Link>
-              </div>
+                </CardPanel>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
     </section>

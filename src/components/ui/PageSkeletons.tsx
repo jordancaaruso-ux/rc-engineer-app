@@ -59,7 +59,11 @@ export function NewRunLoadingSkeleton() {
     <>
       <PageHeaderSkeleton subtitle />
       <section className="page-body max-w-3xl space-y-3">
-        {[0, 1, 2, 3].map((i) => (
+        <CardPanel>
+          <Shimmer className="mb-2 h-3 w-16" />
+          <Shimmer className="h-12 w-full" />
+        </CardPanel>
+        {[0, 1, 2].map((i) => (
           <CardPanel key={i}>
             <Shimmer className="mb-2 h-4 w-28" />
             <Shimmer className="h-10 w-full" />
@@ -91,11 +95,11 @@ export function HubLoadingSkeleton() {
   return (
     <>
       <PageHeaderSkeleton subtitle />
-      <section className="page-body max-w-2xl space-y-2">
+      <section className="page-body max-w-2xl flex flex-col gap-2.5">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-xl border border-border bg-card/80 px-4 py-3.5">
+          <CardPanel key={i} contentClassName="px-4 py-3.5">
             <Shimmer className="h-12 w-full" />
-          </div>
+          </CardPanel>
         ))}
       </section>
     </>

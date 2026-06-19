@@ -4,6 +4,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getCachedDashboardHomeModel } from "@/lib/cachedReads";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function DashboardPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -16,17 +17,19 @@ export default async function DashboardPage(): Promise<ReactNode> {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             Set <span className="font-mono">DATABASE_URL</span> in <span className="font-mono">.env</span>{" "}
             to load your dashboard.
-          </div>
+          </CardPanel>
         </section>
       </>
     );
   }
 
-  const user = await requireCurrentUser();
-  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
+  const [user, displayTimeZone] = await Promise.all([
+    requireCurrentUser(),
+    getExplicitTimeZoneForRunFormatting(),
+  ]);
   const model = await getCachedDashboardHomeModel(user.id, displayTimeZone);
 
   return <DashboardHome model={model} displayTimeZone={displayTimeZone} />;

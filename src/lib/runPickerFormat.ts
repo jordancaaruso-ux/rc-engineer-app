@@ -1,6 +1,6 @@
 import { bestLap, formatLap } from "@/lib/runLaps";
 import { formatRunSessionDisplay } from "@/lib/runSession";
-import { formatRunPickerScanDate } from "@/lib/formatDate";
+import { formatRunPickerScanDate, RUN_DATETIME_LOCALE } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 
 /** Run shape needed for picker line (API + server components). */
@@ -151,4 +151,33 @@ export function formatRunPickerWhenSegment(run: RunPickerRun): string {
  */
 export function formatRunPickerLineRelativeWhen(run: RunPickerRun): string {
   return formatRunPickerLine(run);
+}
+
+/**
+ * Copy-last-run card: date · time · track · car · best lap (when known).
+ */
+export function formatCopyLastRunCardSummary(
+  run: RunPickerRun,
+  timeZone?: string | null
+): string {
+  const instant = pickRunInstant(run);
+  const tz = timeZone?.trim();
+  const date = new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    ...(tz ? { timeZone: tz } : {}),
+  }).format(instant);
+  const time = new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    ...(tz ? { timeZone: tz } : {}),
+  }).format(instant);
+  const track = run.track?.name ?? run.trackNameSnapshot ?? "—";
+  const car = run.car?.name ?? run.carNameSnapshot ?? "—";
+  const parts = [date, time, track, car];
+  const lap = bestLap(run.lapTimes);
+  if (lap != null) parts.push(formatLap(lap));
+  return parts.join(" · ");
 }

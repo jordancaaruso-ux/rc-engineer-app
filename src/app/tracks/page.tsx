@@ -4,6 +4,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { TrackList } from "@/components/tracks/TrackList";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 /** Favourites + global track list — revalidated on track mutations. */
 export const revalidate = 30;
@@ -19,9 +20,9 @@ export default async function TracksPage(): Promise<ReactNode> {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env to manage tracks.
-          </div>
+          </CardPanel>
         </section>
       </>
     );

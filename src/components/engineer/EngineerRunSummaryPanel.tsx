@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 const quickAskBtnClass =
-  "inline-flex items-center rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition disabled:opacity-40 disabled:cursor-not-allowed";
+  "inline-flex items-center rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition disabled:opacity-40 disabled:cursor-not-allowed";
 
 export function EngineerRunSummaryPanel({
   runId,
@@ -64,11 +65,17 @@ export function EngineerRunSummaryPanel({
 
   if (loading && !summary) {
     return (
-      <div className="rounded-lg border border-border bg-card p-3 text-[11px] text-muted-foreground">Loading engineer summary…</div>
+      <CardPanel>
+        <p className="text-[11px] text-muted-foreground">Loading engineer summary…</p>
+      </CardPanel>
     );
   }
   if (err) {
-    return <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-[11px] text-destructive">{err}</div>;
+    return (
+      <CardPanel className="border-destructive/30">
+        <p className="text-[11px] text-destructive">{err}</p>
+      </CardPanel>
+    );
   }
   if (!summary) return null;
 
@@ -77,7 +84,7 @@ export function EngineerRunSummaryPanel({
   const showFullBody = defaultExpanded || fullSummaryOpen;
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <CardPanel contentClassName="p-0">
       <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
         <div className="ui-title text-[10px] text-muted-foreground">Engineer summary</div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -154,7 +161,7 @@ export function EngineerRunSummaryPanel({
             <div className="text-muted-foreground">No setup differences vs reference on record.</div>
           ) : null}
 
-          <div className="rounded-md border border-border bg-muted/30 p-2 text-foreground/90">{summary.interpretation}</div>
+          <CardPanel contentClassName="text-foreground/90">{summary.interpretation}</CardPanel>
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -167,6 +174,6 @@ export function EngineerRunSummaryPanel({
           </div>
         </div>
       ) : null}
-    </div>
+    </CardPanel>
   );
 }

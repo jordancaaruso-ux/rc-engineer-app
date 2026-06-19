@@ -9,6 +9,7 @@ import type { PatternDigestRunRow, PatternDigestV1 } from "@/lib/engineerPhase5/
 import { cn } from "@/lib/utils";
 import { EngineerRunPairVisualCompare } from "@/components/engineer/EngineerRunPairVisualCompare";
 import { formatLap } from "@/lib/runLaps";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type CarOpt = { id: string; name: string };
 type EventOpt = { id: string; name: string };
@@ -417,12 +418,8 @@ export function EngineerCompareAndPattern({
     return r ? digestRunLabel(r) : digestPairRunIdB ? `Run ${digestPairRunIdB.slice(0, 8)}…` : "";
   }, [digest, digestPairRunIdB]);
 
-  return (
-    <div
-      className={cn(
-        embedded ? "space-y-4" : "rounded-lg border border-border bg-card p-3 space-y-4"
-      )}
-    >
+  const inner = (
+    <>
       <div className="flex flex-wrap gap-3 items-end">
         <div className="space-y-1 min-w-[140px]">
           <label className="text-[10px] text-muted-foreground">Event filter</label>
@@ -465,7 +462,7 @@ export function EngineerCompareAndPattern({
         <p className="text-[11px] text-muted-foreground">No runs match filters.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+          <CardPanel overflowHidden={false} contentClassName="space-y-2">
             <div className="text-[10px] ui-title text-muted-foreground">Target</div>
             <div className="space-y-1">
               <label className="text-[10px] text-muted-foreground">Select car</label>
@@ -495,9 +492,9 @@ export function EngineerCompareAndPattern({
               placeholder="Select…"
               formatLine={formatRunPickerLine}
             />
-          </div>
+          </CardPanel>
 
-          <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+          <CardPanel overflowHidden={false} contentClassName="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="text-[10px] ui-title text-muted-foreground">Comparison</div>
               <div className="flex rounded-md border border-border p-0.5 bg-muted/40">
@@ -552,7 +549,7 @@ export function EngineerCompareAndPattern({
                 </label>
               </>
             ) : (
-              <div className="space-y-2 rounded-md border border-border/80 bg-muted/30 p-2">
+              <CardPanel overflowHidden={false} contentClassName="space-y-2">
                 <div className="flex flex-wrap gap-1">
                   <input
                     className="flex-1 min-w-[140px] rounded border border-border bg-background px-2 py-1 text-[11px] outline-none"
@@ -608,7 +605,7 @@ export function EngineerCompareAndPattern({
                     ))}
                   </select>
                 </div>
-              </div>
+              </CardPanel>
             )}
 
             <div className="pt-1">
@@ -630,7 +627,7 @@ export function EngineerCompareAndPattern({
                 />
               )}
             </div>
-          </div>
+          </CardPanel>
         </div>
       )}
 
@@ -657,30 +654,29 @@ export function EngineerCompareAndPattern({
           when known. Highlight shows best single lap in the series.
         </p>
         {digestPickerRuns.length > 0 ? (
-          <div className="rounded-md border border-border/70 bg-muted/25 p-2 space-y-2">
+          <CardPanel overflowHidden={false} contentClassName="space-y-2">
             <div className="text-[10px] font-medium text-muted-foreground">Runs to include (optional)</div>
             <p className="text-[10px] text-muted-foreground leading-snug">
               Check two or more runs, then load digest — only those sessions are used. Leave unchecked to use the
               filtered time window (newest slice) as before.
             </p>
-            <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+            <div className="max-h-40 overflow-y-auto flex flex-col gap-1.5 pr-1">
               {digestPickerRuns.map((r) => (
-                <label
-                  key={r.id}
-                  className="flex items-start gap-2 cursor-pointer text-[10px] text-muted-foreground leading-snug"
-                >
-                  <input
-                    type="checkbox"
-                    className="h-3 w-3 accent-primary shrink-0 mt-0.5"
-                    checked={digestSelectedRunIds.includes(r.id)}
-                    onChange={() => toggleDigestRunSelected(r.id)}
-                  />
-                  <span className="min-w-0">
-                    <span className="font-mono text-foreground/90">{r.id.slice(0, 8)}…</span>
-                    {" · "}
-                    {formatRunPickerLine(r)}
-                  </span>
-                </label>
+                <CardPanel key={r.id} contentClassName="py-1.5 px-2">
+                  <label className="flex items-start gap-2 cursor-pointer text-[10px] text-muted-foreground leading-snug">
+                    <input
+                      type="checkbox"
+                      className="h-3 w-3 accent-primary shrink-0 mt-0.5"
+                      checked={digestSelectedRunIds.includes(r.id)}
+                      onChange={() => toggleDigestRunSelected(r.id)}
+                    />
+                    <span className="min-w-0">
+                      <span className="font-mono text-foreground/90">{r.id.slice(0, 8)}…</span>
+                      {" · "}
+                      {formatRunPickerLine(r)}
+                    </span>
+                  </label>
+                </CardPanel>
               ))}
             </div>
             <div className="flex flex-wrap gap-2 items-center text-[10px]">
@@ -700,7 +696,7 @@ export function EngineerCompareAndPattern({
               </button>
               <span className="text-muted-foreground">{digestSelectedRunIds.length} selected</span>
             </div>
-          </div>
+          </CardPanel>
         ) : null}
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
@@ -738,8 +734,8 @@ export function EngineerCompareAndPattern({
         {digestErr ? <p className="text-[11px] text-destructive">{digestErr}</p> : null}
         {digest ? (
           <div className="space-y-3">
-            <div className="rounded-md border border-border bg-muted/40 p-2">
-              <div className="text-[10px] text-muted-foreground mb-2">
+            <CardPanel contentClassName="space-y-2">
+              <div className="text-[10px] text-muted-foreground">
                 Best lap in series:{" "}
                 {digest.highlight.bestLapSeconds != null ? `${digest.highlight.bestLapSeconds.toFixed(3)}s` : "—"}
                 {digest.highlight.bestLapRunId ? ` · run ${digest.highlight.bestLapRunId.slice(0, 8)}…` : ""}
@@ -789,13 +785,13 @@ export function EngineerCompareAndPattern({
                   </tbody>
                 </table>
               </div>
-            </div>
+            </CardPanel>
 
             {digest.runs.length >= 2 &&
             digestPairRunIdA &&
             digestPairRunIdB &&
             digestPairRunIdA !== digestPairRunIdB ? (
-              <div className="space-y-2 rounded-md border border-border bg-card/50 p-2">
+              <CardPanel overflowHidden={false} contentClassName="space-y-2">
                 <div className="text-[10px] font-medium text-muted-foreground">Pair compare (setup + laps)</div>
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="space-y-1 min-w-0 flex-1">
@@ -839,7 +835,7 @@ export function EngineerCompareAndPattern({
                   labelA={digestPairLabelA}
                   labelB={digestPairLabelB}
                 />
-              </div>
+              </CardPanel>
             ) : digest.runs.length < 2 ? (
               <p className="text-[11px] text-muted-foreground">
                 Digest needs at least two runs in the series to open side-by-side setup and laps.
@@ -848,6 +844,12 @@ export function EngineerCompareAndPattern({
           </div>
         ) : null}
       </div>
-    </div>
+    </>
   );
+
+  if (embedded) {
+    return <div className="space-y-4">{inner}</div>;
+  }
+
+  return <CardPanel overflowHidden={false} contentClassName="space-y-4">{inner}</CardPanel>;
 }

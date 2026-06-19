@@ -5,6 +5,7 @@ import { isTrackFavourite } from "@/lib/track-favourites";
 import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { TrackFavouriteClient } from "@/components/tracks/TrackFavouriteClient";
 import { TrackLiveRcUrlEditor } from "@/components/tracks/TrackLiveRcUrlEditor";
 import { TrackSpeedhiveUrlEditor } from "@/components/tracks/TrackSpeedhiveUrlEditor";
@@ -27,9 +28,9 @@ export default async function TrackDetailPage(props: {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env to view tracks.
-          </div>
+          </CardPanel>
         </section>
       </>
     );
@@ -99,7 +100,7 @@ export default async function TrackDetailPage(props: {
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
-          <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
+          <CardPanel contentClassName="text-sm">
             <div className="grid gap-2">
               <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(track.createdAt)}</span></div>
               <div><span className="text-sm font-medium text-muted-foreground">Runs</span> <span className="ml-2">{runCount}</span></div>
@@ -107,7 +108,7 @@ export default async function TrackDetailPage(props: {
                 <div><span className="text-sm font-medium text-muted-foreground">Location</span> <span className="ml-2">{track.location}</span></div>
               ) : null}
             </div>
-          </div>
+          </CardPanel>
 
           <TrackLocationNotSetBanner
             trackId={track.id}
@@ -117,7 +118,7 @@ export default async function TrackDetailPage(props: {
             showCurrentLocation
           />
 
-          <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
+          <CardPanel contentClassName="text-sm">
             <div className="ui-title text-sm text-muted-foreground mb-2">GPS location</div>
             <TrackLocationEditor
               trackId={track.id}
@@ -126,7 +127,7 @@ export default async function TrackDetailPage(props: {
               initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
               showCurrentLocation
             />
-          </div>
+          </CardPanel>
 
           <TrackMetaTagsEditor
             trackId={track.id}

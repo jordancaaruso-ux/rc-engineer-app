@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Montserrat } from "next/font/google";
+import { Inter, Montserrat, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import type { ReactNode } from "react";
@@ -24,6 +24,20 @@ const montserrat = Montserrat({
   style: ["normal", "italic"],
 });
 
+/** Visual rework (Technical v2) — UI text. Available app-wide; applied per redesigned route. */
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-jakarta",
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+/** Visual rework (Technical v2) — data, lap times, deltas, tracked labels. */
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono-jb",
+  weight: ["400", "500", "700"],
+});
+
 export const metadata: Metadata = {
   title: "JRC Race Engineer",
   description:
@@ -39,12 +53,15 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#2a1520",
+  themeColor: "#17130f",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }): ReactNode {
   return (
-    <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${montserrat.variable} ${plusJakarta.variable} ${jetBrainsMono.variable}`}
+    >
       <body className="min-h-[100dvh] font-sans font-normal antialiased">
         {/*
          * Single fixed wash at z-index 0 (never negative): duplicate fixed layers on

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export function AccountSection({ email }: { email: string }) {
   const [busy, setBusy] = useState(false);
@@ -32,7 +33,7 @@ export function AccountSection({ email }: { email: string }) {
   }
 
   return (
-    <section className="mt-10 rounded-lg border border-border bg-card/40 p-4">
+    <CardPanel className="mt-10">
       <h2 className="text-sm font-semibold text-foreground">Account</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Signed in as <span className="text-foreground">{email || "—"}</span>
@@ -55,6 +56,6 @@ export function AccountSection({ email }: { email: string }) {
         </button>
       </div>
       {error ? <p className="mt-2 text-xs text-primary">{error}</p> : null}
-    </section>
+    </CardPanel>
   );
 }

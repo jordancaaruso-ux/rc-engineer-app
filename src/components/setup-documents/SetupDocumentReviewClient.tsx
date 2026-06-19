@@ -16,6 +16,8 @@ import { normalizeCalibrationData, type CustomSetupFieldDefinition } from "@/lib
 import { getEffectiveFieldCatalog } from "@/lib/setupDocuments/fieldMap";
 import { mappedFieldKeys } from "@/lib/setupDocuments/normalize";
 import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { computeA800rrDerived } from "@/lib/setupCalculations/a800rrDerived";
@@ -783,7 +785,7 @@ export function SetupDocumentReviewClient({
 
   return (
     <section className="page-body space-y-4">
-      <div className="rounded-lg border border-border bg-card p-4">
+      <CardPanel contentClassName="p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="ui-title text-sm normal-case">{doc.originalFilename}</h2>
@@ -853,15 +855,15 @@ export function SetupDocumentReviewClient({
           </div>
         ) : null}
         {autoPickUserNote ? (
-          <div className="mt-2 rounded border border-sky-500/35 bg-sky-500/10 px-3 py-2 text-sm text-sky-100 space-y-2">
+          <div className="mt-2 rounded border border-accent/35 bg-accent/10 px-3 py-2 text-sm text-accent-foreground space-y-2">
             <p>{autoPickUserNote}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <Link href="/cars/new/setup" className="underline text-sky-50 hover:text-white">
+              <Link href="/cars/new/setup" className="underline text-accent-foreground hover:text-foreground">
                 Add car &amp; setup sheet
               </Link>
               <a
                 href={previewUrl}
-                className="underline text-sky-50/90 hover:text-white"
+                className="underline text-accent-foreground/90 hover:text-foreground"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -1178,7 +1180,7 @@ export function SetupDocumentReviewClient({
             Saved templates map editable PDF text (and optional regions) to setup fields. Choose one and confirm to prefill.
           </p>
           {!liveDoc.calibrationProfileId && !liveDoc.calibrationResolvedProfileId ? (
-            <div className="mt-2 rounded border border-blue-500/40 bg-blue-500/10 px-2 py-1.5 text-[11px] text-blue-100">
+            <div className="mt-2 rounded border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-accent-foreground">
               No calibration selected yet — pick one whose example PDF matches this form layout.
             </div>
           ) : null}
@@ -1292,11 +1294,11 @@ export function SetupDocumentReviewClient({
           </button>
         </div>
         ) : null}
-      </div>
+      </CardPanel>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className={mode === "manual" ? "xl:sticky xl:top-4 xl:self-start" : ""}>
-          <div className="rounded-lg border border-border bg-card p-3">
+          <CardPanel contentClassName="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="ui-title text-xs text-muted-foreground">Original sheet</div>
               <button
@@ -1310,12 +1312,12 @@ export function SetupDocumentReviewClient({
             <p className="mt-2 text-[11px] text-muted-foreground">
               View-only reference. Use the structured setup on the right for edits.
             </p>
-          </div>
+          </CardPanel>
         </div>
 
         <div className="space-y-3">
           <div className={mode === "manual" ? "xl:sticky xl:top-4 xl:z-10" : ""}>
-            <div className="rounded-lg border border-border bg-card p-3">
+            <CardPanel contentClassName="p-3">
               <div className="ui-title text-xs text-muted-foreground">
                 {mode === "manual" ? "Edit structured setup" : "Review parsed setup"}
               </div>
@@ -1399,7 +1401,7 @@ export function SetupDocumentReviewClient({
                 </div>
               </div>
               ) : null}
-            </div>
+            </CardPanel>
           </div>
 
           {showSetupSheet ? (
@@ -1411,17 +1413,17 @@ export function SetupDocumentReviewClient({
               readOnly={mode === "review"}
             />
           ) : (
-            <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+            <CardPanel contentClassName="p-4 text-sm text-muted-foreground">
               {liveDoc.importStatus === "PROCESSING"
                 ? "Importing setup values…"
                 : awaitingCalibration
                   ? "Select a calibration above to import values from this sheet."
                   : "No setup values imported yet."}
-            </div>
+            </CardPanel>
           )}
 
           {showDebug ? (
-          <div className="rounded-lg border border-border bg-card p-3">
+          <CardPanel contentClassName="p-3">
             <div className="ui-title text-xs text-muted-foreground">Extracted text</div>
             <div className="mt-1 rounded border border-border/70 bg-muted/40 p-2 text-[11px] text-muted-foreground">
               <div>Text length: {(liveDoc.extractedText ?? "").length}</div>
@@ -1432,7 +1434,7 @@ export function SetupDocumentReviewClient({
             <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-[11px] text-muted-foreground">
               {liveDoc.extractedText?.trim() || "No extracted text available."}
             </pre>
-          </div>
+          </CardPanel>
           ) : null}
         </div>
       </div>
@@ -1445,10 +1447,8 @@ export function SetupDocumentReviewClient({
           aria-label="Original setup sheet"
           onClick={(e) => e.target === e.currentTarget && setOriginalOpen(false)}
         >
-          <div
-            className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-lg border border-border bg-background shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div onClick={(e) => e.stopPropagation()}>
+          <SurfaceCard className="w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-xl" contentClassName="p-0">
             <div className="flex items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2">
               <div className="min-w-0 truncate text-xs text-muted-foreground">{doc.originalFilename}</div>
               <button
@@ -1467,6 +1467,7 @@ export function SetupDocumentReviewClient({
                 <iframe title={doc.originalFilename} src={previewUrl} className="h-full w-full border-0" />
               )}
             </div>
+          </SurfaceCard>
           </div>
         </div>
       ) : null}

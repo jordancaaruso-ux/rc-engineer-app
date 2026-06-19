@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { SectorHeatMatrix } from "./SectorHeatMatrix";
 import type { SectorFastestRow } from "@/lib/videoAnalysis/sectorStats";
 import type { VideoAnalysisResultV1, MotIdCorrection } from "@/lib/videoAnalysis/types";
@@ -139,7 +141,7 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
       </div>
 
       {!data.result && (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <CardPanel contentClassName="space-y-3">
           <h2 className="text-sm font-medium">Import worker JSON</h2>
           <p className="text-xs text-muted-foreground">
             Run the Python worker locally, then paste <code>results.json</code> here.
@@ -157,12 +159,12 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
           >
             Import results
           </button>
-        </div>
+        </CardPanel>
       )}
 
       {data.result && (
         <>
-          <div className="rounded-lg border border-border bg-card p-4 text-xs space-y-1">
+          <CardPanel contentClassName="text-xs space-y-1">
             <p>
               <span className="text-muted-foreground">Tracks detected:</span> {data.result.tracks.length}
             </p>
@@ -180,23 +182,24 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
                   `(inliers ${(data.result.alignment.inlier_ratio * 100).toFixed(0)}%)`}
               </p>
             )}
-          </div>
+          </CardPanel>
 
           {data.sectorMatrix && <SectorHeatMatrix rows={data.sectorMatrix} />}
 
           {data.transponderCompare && (
-            <div className="rounded-lg border border-border bg-card p-4 text-xs">
+            <CardPanel contentClassName="text-xs">
               <h3 className="font-medium mb-2">vs transponder (linked run)</h3>
               <p>
                 Median Δ: {data.transponderCompare.medianDeltaSec?.toFixed(3) ?? "—"}s ·{" "}
                 {(data.transponderCompare.pctWithin0_15s * 100).toFixed(0)}% within 0.15s (
                 {data.transponderCompare.comparedLaps} laps)
               </p>
-            </div>
+            </CardPanel>
           )}
 
-          <details className="rounded-lg border border-border bg-card p-3">
-            <summary className="text-xs cursor-pointer font-medium">Per-track laps</summary>
+          <SurfaceCard overflowHidden={false} contentClassName="p-3">
+            <details className="text-xs">
+              <summary className="cursor-pointer font-medium">Per-track laps</summary>
             <div className="mt-2 space-y-3 max-h-64 overflow-auto">
               {data.result.tracks.map((tr) => (
                 <div key={tr.motTrackId}>
@@ -216,10 +219,11 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
               ))}
             </div>
           </details>
+          </SurfaceCard>
         </>
       )}
 
-      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+      <CardPanel contentClassName="space-y-2">
         <h3 className="text-sm font-medium">Link to Run (transponder compare)</h3>
         <div className="flex gap-2">
           <input
@@ -241,9 +245,9 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
             </Link>
           )}
         </div>
-      </div>
+      </CardPanel>
 
-      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+      <CardPanel contentClassName="space-y-2">
         <h3 className="text-sm font-medium">Manual MOT ID correction</h3>
         <p className="text-xs text-muted-foreground">
           Reassign track ID for a time window (e.g. after crossover swap).
@@ -282,7 +286,7 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
             Add correction
           </button>
         </div>
-      </div>
+      </CardPanel>
 
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
     </div>

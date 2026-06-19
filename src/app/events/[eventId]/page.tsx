@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
+import { CardPanel } from "@/components/ui/CardPanel";
 import { EventLapSourcesPanel } from "@/components/events/EventLapSourcesPanel";
 import { EventMetaEditor } from "@/components/events/EventMetaEditor";
 import {
@@ -24,9 +25,9 @@ export default async function EventDetailPage(props: {
           </div>
         </header>
         <section className="page-body">
-          <div className="max-w-2xl rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
             Set DATABASE_URL in .env to view events.
-          </div>
+          </CardPanel>
         </section>
       </>
     );

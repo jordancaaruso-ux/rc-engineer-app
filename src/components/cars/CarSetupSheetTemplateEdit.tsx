@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 type SheetModelOption = { id: string; name: string; slug: string };
 
@@ -52,7 +53,7 @@ export function CarSetupSheetTemplateEdit({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
+    <CardPanel contentClassName="text-sm">
       <div className="text-sm font-medium text-muted-foreground mb-2">
         Setup sheet model <span className="font-normal">(car type for setup features)</span>
       </div>
@@ -98,6 +99,6 @@ export function CarSetupSheetTemplateEdit({
         Links the car to structured setup data: community aggregations, Engineer spread, and setup compare are keyed by
         model. All models you create in the setup wizard appear here.
       </p>
-    </div>
+    </CardPanel>
   );
 }

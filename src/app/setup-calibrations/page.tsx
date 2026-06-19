@@ -10,6 +10,7 @@ import {
   isCalibrationAdmin,
 } from "@/lib/setupCalibrations/calibrationAccess";
 import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
+import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function SetupCalibrationsPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -54,17 +55,20 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body">
-        <div className="rounded-lg border border-border bg-card divide-y divide-border/60">
-          {calibrations.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-muted-foreground">No calibrations saved yet.</div>
-          ) : (
-            calibrations.map((c) => {
+        {calibrations.length === 0 ? (
+          <CardPanel>
+            <div className="text-sm text-muted-foreground">No calibrations saved yet.</div>
+          </CardPanel>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {calibrations.map((c) => {
               const { formFields, textFields, regionFields, imageFields } = calibrationMappingCounts(
                 normalizeCalibrationData(c.calibrationDataJson)
               );
               const canManage = canManageCalibration(user, c);
               return (
-                <div key={c.id} className="px-4 py-3 flex items-center justify-between gap-2">
+                <li key={c.id}>
+                  <CardPanel contentClassName="px-4 py-3 flex items-center justify-between gap-2">
                   <div>
                     <div className="ui-title text-sm text-foreground normal-case">{c.name}</div>
                     <div className="text-xs text-muted-foreground">
@@ -91,11 +95,12 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
                       {canManage ? "Edit" : "View"}
                     </Link>
                   </div>
-                </div>
+                  </CardPanel>
+                </li>
               );
-            })
-          )}
-        </div>
+            })}
+          </ul>
+        )}
       </section>
     </>
   );
