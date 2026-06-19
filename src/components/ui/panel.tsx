@@ -31,7 +31,7 @@ export function PanelTitle({
 }: {
   children: ReactNode;
   className?: string;
-  as?: "h1" | "h2" | "h3";
+  as?: "h1" | "h2" | "h3" | "span";
 }) {
   return (
     <Tag
