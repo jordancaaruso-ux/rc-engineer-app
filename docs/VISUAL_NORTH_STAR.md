@@ -92,7 +92,7 @@ Both are **free** (Google Fonts / OFL).
 
 | Content | Treatment |
 |---------|-----------|
-| Page titles | Plus Jakarta 700, **sentence case** in JSX (CSS no longer uppercases). Class: `.page-title`. |
+| Page titles | Plus Jakarta 800 (`font-extrabold`), **uppercase** via CSS (`text-transform`). Same scale as `PanelTitle` (`20px` / `22px` sm). Class: `.page-title`. |
 | Section labels / eyebrows | JetBrains Mono, **uppercase**, ~`tracking-[0.28em]`, `text-faint`. Use `<Eyebrow>`. |
 | Lap times, deltas, run IDs | JetBrains Mono, `tabular-nums`. Prefer `font-mono` over `font-sans tabular-nums`. |
 | Body / form copy | Plus Jakarta, 13–15px, `text-muted-foreground` for supporting lines |
@@ -224,7 +224,7 @@ Before opening a PR or marking a screen “done”:
 - [ ] Primary actions use `Button` / `ButtonLink` primary (yellow + dark text).
 - [ ] Cards use `CardPanel` or `SurfaceCard`, not one-off `bg-card` wrappers with different radii.
 - [ ] Section labels use `<Eyebrow>` where the dashboard does.
-- [ ] Page title uses `.page-title` (sentence case in JSX).
+- [ ] Page title uses `.page-title` (uppercase via CSS).
 - [ ] Works at 390px width with bottom tab bar.
 - [ ] No behavior, routing, or API changes.
 - [ ] Yellow is not used for data meaning (only actions / focus).

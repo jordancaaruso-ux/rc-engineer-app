@@ -1,5 +1,5 @@
 import { inferSectionLayoutRows } from "@/lib/setupSheetModels/inferStructuredLayout";
-import { collectModelLayoutKeys } from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
+import { collectModelLayoutKeys, modelLayoutRowKeys } from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
 import type {
   LayoutGroupKind,
   LayoutGroupRole,
@@ -361,14 +361,22 @@ function mergeSectionRows(
     for (const key of layoutRowFieldKeys(row)) manualKeys.add(key);
   }
 
-  const autoRows = inferredRows.filter((row) => {
-    if (layoutGroupIdForRow(row)) return false;
-    return !layoutRowFieldKeys(row).some((key) => manualKeys.has(key));
-  });
-
   const specialRows = existingRows.filter(
     (row) => row.type === "screw_strip" || row.type === "top_deck_block"
   );
+
+  const specialKeys = new Set<string>();
+  for (const row of specialRows) {
+    for (const key of modelLayoutRowKeys(row)) specialKeys.add(key);
+  }
+
+  const autoRows = inferredRows.filter((row) => {
+    if (layoutGroupIdForRow(row)) return false;
+    const keys = layoutRowFieldKeys(row);
+    if (keys.some((key) => manualKeys.has(key))) return false;
+    if (keys.some((key) => specialKeys.has(key))) return false;
+    return true;
+  });
 
   return [...manualRows, ...autoRows, ...specialRows];
 }

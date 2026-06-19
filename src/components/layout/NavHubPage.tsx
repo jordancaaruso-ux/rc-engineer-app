@@ -16,7 +16,7 @@ export function NavHubPage({
     <>
       <header className="page-header">
         <div className="min-w-0">
-          <h1 className="page-title text-base">{title}</h1>
+          <h1 className="page-title">{title}</h1>
           <p className="page-subtitle mt-0.5">{subtitle}</p>
         </div>
       </header>

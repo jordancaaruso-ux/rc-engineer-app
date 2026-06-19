@@ -55,7 +55,7 @@ export function DashboardHome({
     <>
       <header className="page-header">
         <div className="min-w-0">
-          <h1 className="page-title text-base">Dashboard</h1>
+          <h1 className="page-title">Dashboard</h1>
         </div>
       </header>
 

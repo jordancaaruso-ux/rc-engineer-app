@@ -22,7 +22,7 @@ export default async function NewRunPage({
       <>
         <header className="page-header">
           <div>
-            <h1 className="page-title text-base text-base">Log your run</h1>
+            <h1 className="page-title">Log your run</h1>
             <p className="page-subtitle">Database not configured yet.</p>
           </div>
         </header>
@@ -87,7 +87,7 @@ export default async function NewRunPage({
     <>
       <header className="page-header">
         <div className="min-w-0">
-          <h1 className="page-title text-base">Log your run</h1>
+          <h1 className="page-title">Log your run</h1>
           <p className="page-subtitle mt-0.5">Capture session details, laps, and setup.</p>
         </div>
       </header>

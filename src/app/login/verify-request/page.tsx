@@ -12,7 +12,7 @@ export default async function VerifyRequestPage({
 
   return (
     <main className="mx-auto max-w-md px-4 py-16 text-center">
-      <h1 className="page-title text-base not-italic normal-case text-foreground">Check your email</h1>
+      <h1 className="page-title">Check your email</h1>
       {consoleOnly ? (
         <div className="mt-4 text-left" role="status">
           <CardPanel contentClassName="border border-accent/40 bg-accent/10">

@@ -96,6 +96,62 @@ test("inferStructuredLayoutFromFields rebuilds stacked singles into corner4", ()
   assert.equal(sections[0]?.rows[0]?.type, "corner4");
 });
 
+test("inferStructuredLayoutFromFields keeps screw_strip without duplicating as single", () => {
+  const fields = [
+    field({
+      key: "top_deck_front",
+      displayLabel: "Top deck (Front)",
+      sectionId: "flex",
+      sectionTitle: "Flex",
+      sortOrder: 0,
+    }),
+    field({
+      key: "top_deck_rear",
+      displayLabel: "Top deck (Rear)",
+      sectionId: "flex",
+      sectionTitle: "Flex",
+      sortOrder: 1,
+    }),
+    field({
+      key: "motor_mount_screws",
+      displayLabel: "Motor mount screws",
+      sectionId: "flex",
+      sectionTitle: "Flex",
+      sortOrder: 2,
+      valueType: "string",
+      uiType: "text",
+    }),
+  ];
+  const existing = [
+    {
+      id: "flex",
+      title: "Flex",
+      rows: [
+        {
+          type: "pair" as const,
+          label: "Top deck",
+          leftKey: "top_deck_front",
+          rightKey: "top_deck_rear",
+        },
+        {
+          type: "screw_strip" as const,
+          key: "motor_mount_screws" as const,
+          label: "Motor mount screws",
+        },
+      ],
+    },
+  ];
+  const sections = inferStructuredLayoutFromFields(fields, existing);
+  const rows = sections.find((s) => s.id === "flex")?.rows ?? [];
+  const motorRows = rows.filter(
+    (r) =>
+      (r.type === "single" && r.key === "motor_mount_screws")
+      || (r.type === "screw_strip" && r.key === "motor_mount_screws")
+  );
+  assert.equal(motorRows.length, 1);
+  assert.equal(motorRows[0]?.type, "screw_strip");
+});
+
 test("mixed corner4, pair, and single in sort order", () => {
   const fields = [
     field({ key: "camber_front", displayLabel: "Camber (Front)", sortOrder: 0 }),

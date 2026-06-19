@@ -26,7 +26,7 @@ export default function LapTimeImportPage(): ReactNode {
       <header className="page-header">
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <h1 className="page-title text-base">Lap-time import</h1>
+            <h1 className="page-title">Lap-time import</h1>
             <p className="page-subtitle mt-0.5 max-w-xl text-[11px] leading-snug">
               Import timing URLs outside a run. Same parser as Log your run; sessions are saved for reuse and can link when you log a run.
             </p>

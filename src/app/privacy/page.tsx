@@ -6,7 +6,7 @@ export const metadata = {
 export default function PrivacyPage() {
   return (
     <div className="container mx-auto max-w-2xl px-4 py-10 text-sm leading-relaxed text-foreground">
-      <h1 className="page-title text-base">Privacy policy</h1>
+      <h1 className="page-title">Privacy policy</h1>
       <p className="mt-4 text-muted-foreground">
         JRC Race Engineer is a personal motorsports setup and run logging tool. This page summarizes what the hosted
         service processes so you can complete App Store Connect disclosures.

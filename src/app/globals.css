@@ -388,16 +388,14 @@ html[data-nav-pending] .page {
 }
 
 .page-title {
-  @apply text-base tracking-tight text-foreground;
+  @apply text-[20px] font-extrabold leading-tight tracking-tight text-foreground sm:text-[22px];
 }
 
-/* Page chrome: Plus Jakarta Sans bold, normal case (Technical v2 — clean, not italic). */
+/* Page chrome: Plus Jakarta extrabold, uppercase — matches PanelTitle scale (e.g. dashboard car name). */
 :where(.page-title) {
   font-family: var(--font-jakarta), system-ui, sans-serif;
-  font-weight: 700;
   font-style: normal;
-  text-transform: none;
-  letter-spacing: -0.01em;
+  text-transform: uppercase;
 }
 
 /* In-form / in-card headings: Plus Jakarta bold, normal case (write labels in Title case in JSX). */

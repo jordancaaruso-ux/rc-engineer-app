@@ -201,6 +201,8 @@ type DownloadedSetupOption = {
 function copyPreviewRecordToLastRun(r: CopyPreviewRunRecord): LastRun {
   return {
     ...r,
+    carId: r.carId ?? undefined,
+    event: r.event as LastRun["event"],
     createdAt:
       r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
     sessionType: (r.sessionType ?? "TESTING") as LastRun["sessionType"],
