@@ -45,9 +45,9 @@ type ChatRequestBody = {
   messages?: Array<{ role?: unknown; content?: unknown }>;
   runId?: unknown;
   compareRunId?: unknown;
-  includePatternDigest?: unknown;
+  includePatternDigest?: boolean;
   patternDigest?: unknown;
-  includeRunCatalog?: unknown;
+  includeRunCatalog?: boolean;
   timeZone?: unknown;
   paceVsFieldRunDigest?: unknown;
   paceVsFieldRunDigestSubset?: unknown;

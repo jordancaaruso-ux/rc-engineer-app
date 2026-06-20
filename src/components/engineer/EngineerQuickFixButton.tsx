@@ -65,8 +65,10 @@ export function EngineerQuickFixButton({
               type="button"
               aria-label={loading ? undefined : "Improve my car"}
               className={primaryButtonClassName(
-                compact ? compactPrimaryClasses : dashboardPrimaryClasses,
-                "disabled:opacity-60"
+                cn(
+                  compact ? compactPrimaryClasses : dashboardPrimaryClasses,
+                  "disabled:opacity-60"
+                )
               )}
               disabled={loading || !runId}
               onClick={() => void generate()}

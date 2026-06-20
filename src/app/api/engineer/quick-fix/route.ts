@@ -17,11 +17,13 @@ export async function POST(request: Request) {
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const limited = await checkApiRateLimit(`engineer-quick-fix:${user.id}`, {
-    max: 12,
+  const limited = checkApiRateLimit({
+    key: `engineer-quick-fix:${user.id}`,
+    limit: 12,
     windowMs: 60_000,
+    userEmail: user.email,
   });
-  if (!limited.ok) return rateLimitResponse(limited);
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
 
   if (!hasOpenAiApiKey()) {
     return NextResponse.json({ error: "OPENAI_API_KEY is not set" }, { status: 503 });

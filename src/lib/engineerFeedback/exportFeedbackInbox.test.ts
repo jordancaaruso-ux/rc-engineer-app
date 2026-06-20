@@ -86,10 +86,11 @@ test("serializeInboxMarkdown includes score and question", () => {
 });
 
 test("isFeedbackFilesystemExportMode is true only in development", () => {
-  const original = process.env.NODE_ENV;
-  process.env.NODE_ENV = "development";
+  const env = process.env as Record<string, string | undefined>;
+  const original = env.NODE_ENV;
+  env.NODE_ENV = "development";
   assert.equal(isFeedbackFilesystemExportMode(), true);
-  process.env.NODE_ENV = "production";
+  env.NODE_ENV = "production";
   assert.equal(isFeedbackFilesystemExportMode(), false);
-  process.env.NODE_ENV = original;
+  env.NODE_ENV = original;
 });
