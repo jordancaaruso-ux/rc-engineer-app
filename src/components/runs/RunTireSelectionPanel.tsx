@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
+import { Button } from "@/components/ui/Button";
 import { tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
 import { TireTypeCombobox, type TireTypeOption } from "@/components/tires/TireTypeCombobox";
 import { TireSetSelect } from "@/components/runs/TireSetSelect";
@@ -27,11 +28,12 @@ type Props = {
   onTireTypeIdChange: (id: string) => void;
   tireSetNumber: string;
   onTireSetNumberChange: (value: string) => void;
-  resolvingTireSet: boolean;
+  addingTireSet: boolean;
+  addTireSetError: string | null;
+  onAddTireSet: () => void;
   runsCompleted: number;
   onRunsCompletedChange: (value: number) => void;
   onRunsCompletedUserTouched: () => void;
-  skipTireResolveRef: React.MutableRefObject<boolean>;
   onPrefillClear?: () => void;
   copyTireWarning?: string | null;
   prefillFieldClass?: string;
@@ -54,11 +56,12 @@ export function RunTireSelectionPanel({
   onTireTypeIdChange,
   tireSetNumber,
   onTireSetNumberChange,
-  resolvingTireSet,
+  addingTireSet,
+  addTireSetError,
+  onAddTireSet,
   runsCompleted,
   onRunsCompletedChange,
   onRunsCompletedUserTouched,
-  skipTireResolveRef,
   onPrefillClear,
   copyTireWarning,
   prefillFieldClass,
@@ -67,8 +70,11 @@ export function RunTireSelectionPanel({
   const [recentSets, setRecentSets] = useState<RunTireSetOption[]>([]);
   const [recentSetsLoaded, setRecentSetsLoaded] = useState(false);
   const [recentTypes, setRecentTypes] = useState<TireTypeOption[]>([]);
-  const prevResolvingRef = useRef(resolvingTireSet);
+  const prevAddingRef = useRef(addingTireSet);
   const defaultTireSetAppliedRef = useRef(false);
+
+  const setParsed = parseInt(tireSetNumber.trim(), 10);
+  const canAddSet = Boolean(selectedTireTypeId && Number.isFinite(setParsed) && setParsed >= 1);
 
   const loadRecentSets = useCallback(async () => {
     try {
@@ -111,12 +117,12 @@ export function RunTireSelectionPanel({
   }, [tireSetId]);
 
   useEffect(() => {
-    const wasResolving = prevResolvingRef.current;
-    prevResolvingRef.current = resolvingTireSet;
-    if (wasResolving && !resolvingTireSet && tireSetId && showNewSetPanel) {
+    const wasAdding = prevAddingRef.current;
+    prevAddingRef.current = addingTireSet;
+    if (wasAdding && !addingTireSet && tireSetId && showNewSetPanel) {
       setShowNewSetPanel(false);
     }
-  }, [resolvingTireSet, tireSetId, showNewSetPanel]);
+  }, [addingTireSet, tireSetId, showNewSetPanel]);
 
   const sortedSets = useMemo(() => {
     const recentIds = new Set(recentSets.map((s) => s.id));
@@ -128,7 +134,6 @@ export function RunTireSelectionPanel({
   }, [tireSets, recentSets]);
 
   function handleSelectSet(nextId: string) {
-    skipTireResolveRef.current = true;
     const ts = tireSets.find((t) => t.id === nextId) ?? null;
     onSelectExistingSet(nextId, ts);
     onPrefillClear?.();
@@ -151,7 +156,6 @@ export function RunTireSelectionPanel({
   }, [recentSetsLoaded, recentSets.length, tireSetId, showNewSetPanel, sortedSets]);
 
   function openNewSet() {
-    skipTireResolveRef.current = true;
     onSelectExistingSet("", null);
     onTireTypeIdChange("");
     onTireSetNumberChange("");
@@ -165,7 +169,6 @@ export function RunTireSelectionPanel({
   }
 
   function pickRecentType(id: string) {
-    skipTireResolveRef.current = false;
     onTireTypeIdChange(id);
     onSelectExistingSet("", null);
   }
@@ -239,7 +242,6 @@ export function RunTireSelectionPanel({
             <TireTypeCombobox
               value={selectedTireTypeId}
               onChange={(id) => {
-                skipTireResolveRef.current = false;
                 onTireTypeIdChange(id);
                 onSelectExistingSet("", null);
               }}
@@ -249,7 +251,7 @@ export function RunTireSelectionPanel({
           </div>
 
           {selectedTireTypeId ? (
-            <>
+            <div className="space-y-3">
               <div className="space-y-1">
                 <label className="block ui-label-meta font-medium">Set number</label>
                 <input
@@ -262,15 +264,16 @@ export function RunTireSelectionPanel({
                   aria-label="Tire set number"
                   autoFocus
                 />
-                {resolvingTireSet ? (
-                  <p className="text-[11px] text-muted-foreground">Linking tire set…</p>
-                ) : (
-                  <p className="text-[11px] text-muted-foreground">
-                    Creates or links a set for this compound and number.
-                  </p>
-                )}
               </div>
-            </>
+
+              {addTireSetError ? (
+                <p className="text-[11px] text-destructive">{addTireSetError}</p>
+              ) : null}
+
+              <Button type="button" disabled={!canAddSet || addingTireSet} onClick={onAddTireSet}>
+                {addingTireSet ? "Adding…" : "Add tire set"}
+              </Button>
+            </div>
           ) : (
             <p className="text-[11px] text-muted-foreground">Select a tire type to continue.</p>
           )}

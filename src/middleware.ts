@@ -19,9 +19,6 @@ export default auth((req) => {
   if (pathname === "/privacy") {
     return NextResponse.next();
   }
-  if (pathname.startsWith("/api/auth")) {
-    return NextResponse.next();
-  }
   if (pathname.startsWith("/api/health/")) {
     return NextResponse.next();
   }
@@ -47,6 +44,7 @@ export default auth((req) => {
 export const config = {
   matcher: [
     "/",
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Exclude /api/auth so Auth.js route handlers (session, callbacks) return JSON — not page 404 HTML.
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

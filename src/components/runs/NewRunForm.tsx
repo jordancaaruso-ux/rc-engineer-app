@@ -338,6 +338,7 @@ export function NewRunForm(props: {
   const [tireSetNumber, setTireSetNumber] = useState<string>("");
   const [tireSpecificModel, setTireSpecificModel] = useState("");
   const [resolvingTireSet, setResolvingTireSet] = useState(false);
+  const [addTireSetError, setAddTireSetError] = useState<string | null>(null);
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
   const [batteries, setBatteries] = useState<BatteryPackOption[]>([]);
   const [batteryId, setBatteryId] = useState<string>("");
@@ -450,7 +451,6 @@ export function NewRunForm(props: {
   batteryIdRef.current = batteryId;
   const tireRunUserTouchedRef = useRef(false);
   const batteryRunUserTouchedRef = useRef(false);
-  const skipTireResolveRef = useRef(false);
   /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
   const pendingCompleteNavigationRef = useRef(false);
   const pendingDraftNavigationRef = useRef(false);
@@ -586,7 +586,6 @@ export function NewRunForm(props: {
     setRaceClass((r.raceClass ?? "").trim());
     setTireSetId(r.tireSetId ?? "");
     if (r.tireSet) {
-      skipTireResolveRef.current = true;
       if (r.tireSet.tireType) {
         setSelectedTireTypeId(r.tireSet.tireType.id);
       }
@@ -824,14 +823,15 @@ export function NewRunForm(props: {
     });
   }
 
-  const resolveTireSet = useCallback(async () => {
+  const addTireSet = useCallback(async () => {
     if (!selectedTireTypeId) return;
     const setParsed = parseInt(tireSetNumber.trim(), 10);
     if (!Number.isFinite(setParsed) || setParsed < 1) {
-      setTireSetId("");
+      setAddTireSetError("Enter a valid set number.");
       return;
     }
     setResolvingTireSet(true);
+    setAddTireSetError(null);
     try {
       const res = await fetch("/api/tire-sets", {
         method: "POST",
@@ -842,8 +842,11 @@ export function NewRunForm(props: {
           specificModel: tireSpecificModel.trim() || null,
         }),
       });
-      const data = (await res.json()) as { tireSet?: TireSetOption };
-      if (!data.tireSet?.id) return;
+      const data = (await res.json()) as { tireSet?: TireSetOption; error?: string };
+      if (!res.ok || !data.tireSet?.id) {
+        setAddTireSetError(data.error?.trim() || "Failed to add tire set.");
+        return;
+      }
       setTireSets((prev) => {
         const rest = prev.filter((t) => t.id !== data.tireSet!.id);
         return [data.tireSet!, ...rest];
@@ -851,11 +854,11 @@ export function NewRunForm(props: {
       setTireSetId(data.tireSet.id);
       applyTireBatteryToSetupSnapshot(data.tireSet.id, batteryIdRef.current);
     } catch {
-      /* keep prior selection */
+      setAddTireSetError("Failed to add tire set.");
     } finally {
       setResolvingTireSet(false);
     }
-  }, [selectedTireTypeId, tireSetNumber, tireSpecificModel, tireSets, batteries]);
+  }, [selectedTireTypeId, tireSetNumber, tireSpecificModel]);
 
   // Deterministic sync: snapshot tires/battery always mirror the run context selections,
   // including on initial load and when option lists arrive async.
@@ -863,26 +866,6 @@ export function NewRunForm(props: {
     applyTireBatteryToSetupSnapshot(tireSetId, batteryId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tireSetId, batteryId, tireSets, batteries]);
-
-  useEffect(() => {
-    if (skipTireResolveRef.current) {
-      skipTireResolveRef.current = false;
-      return;
-    }
-    if (!selectedTireTypeId || !tireSetNumber.trim()) {
-      setTireSetId("");
-      return;
-    }
-    const setParsed = parseInt(tireSetNumber.trim(), 10);
-    if (!Number.isFinite(setParsed) || setParsed < 1) {
-      setTireSetId("");
-      return;
-    }
-    const t = window.setTimeout(() => {
-      void resolveTireSet();
-    }, 400);
-    return () => window.clearTimeout(t);
-  }, [selectedTireTypeId, tireSetNumber, tireSpecificModel, resolveTireSet]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
@@ -1102,7 +1085,6 @@ export function NewRunForm(props: {
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
     setEventControlledTireTypeId(ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "");
     if (sessionType === "RACE_MEETING" && ev.controlledTireTypeId) {
-      skipTireResolveRef.current = true;
       setSelectedTireTypeId(ev.controlledTireTypeId);
       setTireSetId("");
       setTireSetNumber("");
@@ -2618,7 +2600,6 @@ export function NewRunForm(props: {
                   onChange={(id) => {
                     setEventControlledTireTypeId(id);
                     if (id && sessionType === "RACE_MEETING") {
-                      skipTireResolveRef.current = true;
                       setSelectedTireTypeId(id);
                       setTireSetId("");
                       setTireSetNumber("");
@@ -3081,6 +3062,7 @@ export function NewRunForm(props: {
               tireSetId={tireSetId}
               onSelectExistingSet={(nextId, ts) => {
                 setTireSetId(nextId);
+                setAddTireSetError(null);
                 if (!nextId) setTireSpecificModel("");
                 // Only hydrate type/set fields when picking a saved set — clearing the set id
                 // during new-set flow must not wipe a tire type the user just selected.
@@ -3091,17 +3073,22 @@ export function NewRunForm(props: {
               selectedTireTypeId={selectedTireTypeId}
               onTireTypeIdChange={(id) => {
                 setSelectedTireTypeId(id);
+                setAddTireSetError(null);
                 if (!id) setTireSpecificModel("");
               }}
               tireSetNumber={tireSetNumber}
-              onTireSetNumberChange={setTireSetNumber}
-              resolvingTireSet={resolvingTireSet}
+              onTireSetNumberChange={(value) => {
+                setTireSetNumber(value);
+                setAddTireSetError(null);
+              }}
+              addingTireSet={resolvingTireSet}
+              addTireSetError={addTireSetError}
+              onAddTireSet={() => void addTireSet()}
               runsCompleted={runsCompleted}
               onRunsCompletedChange={setRunsCompleted}
               onRunsCompletedUserTouched={() => {
                 tireRunUserTouchedRef.current = true;
               }}
-              skipTireResolveRef={skipTireResolveRef}
               onPrefillClear={() => setPrefillHighlights((h) => (h ? { ...h, tires: false } : h))}
               copyTireWarning={copyTireWarning}
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}

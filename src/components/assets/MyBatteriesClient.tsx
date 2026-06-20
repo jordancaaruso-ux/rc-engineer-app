@@ -9,6 +9,7 @@ import { batteryDisplayLabel } from "@/lib/assets/batteryDisplay";
 import { AssetListRow } from "@/components/assets/AssetListRow";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { QuickAddBatteryPanel } from "@/components/assets/QuickAddBatteryPanel";
+import { deleteBatteryApi } from "@/lib/assets/createAssetApi";
 
 export type BatteryListItemClient = {
   id: string;
@@ -44,6 +45,13 @@ export function MyBatteriesClient({ initialBatteries }: { initialBatteries: Batt
     });
     setShowAdd(false);
     setMessage("Battery pack added.");
+    router.refresh();
+  }
+
+  async function handleDelete(id: string) {
+    await deleteBatteryApi(id);
+    setBatteries((prev) => prev.filter((b) => b.id !== id));
+    setMessage(null);
     router.refresh();
   }
 
@@ -86,7 +94,13 @@ export function MyBatteriesClient({ initialBatteries }: { initialBatteries: Batt
         <ul className="flex flex-col gap-2.5">
           {batteries.map((row) => (
             <li key={row.id}>
-              <AssetListRow href={`/batteries/${row.id}`} title={row.displayLine} meta={formatAssetMeta(row.stats)} />
+              <AssetListRow
+                href={`/batteries/${row.id}`}
+                title={row.displayLine}
+                meta={formatAssetMeta(row.stats)}
+                runCount={row.stats.runCount}
+                onDelete={() => handleDelete(row.id)}
+              />
             </li>
           ))}
         </ul>

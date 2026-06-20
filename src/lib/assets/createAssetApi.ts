@@ -67,3 +67,21 @@ export async function createBatteryApi(input: {
   }
   return data.battery;
 }
+
+export async function deleteTireSetApi(tireSetId: string): Promise<void> {
+  const res = await fetch(`/api/tire-sets/${encodeURIComponent(tireSetId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(await parseJsonError(res));
+  }
+}
+
+export async function deleteBatteryApi(batteryId: string): Promise<void> {
+  const res = await fetch(`/api/batteries/${encodeURIComponent(batteryId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(await parseJsonError(res));
+  }
+}

@@ -9,6 +9,7 @@ import type { TireSetApiRow } from "@/lib/assets/createAssetApi";
 import { AssetListRow } from "@/components/assets/AssetListRow";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { QuickAddTireSetPanel } from "@/components/assets/QuickAddTireSetPanel";
+import { deleteTireSetApi } from "@/lib/assets/createAssetApi";
 
 export type TireSetListItemClient = {
   id: string;
@@ -49,6 +50,13 @@ export function MyTireSetsClient({ initialTireSets }: { initialTireSets: TireSet
     router.refresh();
   }
 
+  async function handleDelete(id: string) {
+    await deleteTireSetApi(id);
+    setTireSets((prev) => prev.filter((t) => t.id !== id));
+    setMessage(null);
+    router.refresh();
+  }
+
   return (
     <div className="max-w-2xl space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -86,7 +94,13 @@ export function MyTireSetsClient({ initialTireSets }: { initialTireSets: TireSet
         <ul className="flex flex-col gap-2.5">
           {tireSets.map((row) => (
             <li key={row.id}>
-              <AssetListRow href={`/tire-sets/${row.id}`} title={row.displayLine} meta={formatAssetMeta(row.stats)} />
+              <AssetListRow
+                href={`/tire-sets/${row.id}`}
+                title={row.displayLine}
+                meta={formatAssetMeta(row.stats)}
+                runCount={row.stats.runCount}
+                onDelete={() => handleDelete(row.id)}
+              />
             </li>
           ))}
         </ul>

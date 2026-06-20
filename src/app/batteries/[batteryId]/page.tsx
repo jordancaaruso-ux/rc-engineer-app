@@ -6,6 +6,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { loadUserBatteryDetail } from "@/lib/assets/loadUserAssets";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow, StatStrip, StatTile } from "@/components/ui/panel";
+import { BatteryDeleteClient } from "@/components/assets/AssetDeleteClient";
 
 export default async function BatteryDetailPage(props: {
   params: Promise<{ batteryId: string }>;
@@ -60,12 +61,19 @@ export default async function BatteryDetailPage(props: {
           <h1 className="page-title">{displayLine}</h1>
           <p className="page-subtitle">Battery pack details and run history.</p>
         </div>
-        <Link
-          href="/batteries"
-          className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
-        >
-          Back
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <BatteryDeleteClient
+            batteryId={battery.id}
+            displayLine={displayLine}
+            runCount={stats.runCount}
+          />
+          <Link
+            href="/batteries"
+            className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
+          >
+            Back
+          </Link>
+        </div>
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
