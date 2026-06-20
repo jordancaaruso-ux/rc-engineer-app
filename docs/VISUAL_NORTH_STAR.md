@@ -10,7 +10,7 @@ This document is the **single source of truth** for UI/visual work in JRC Race E
 
 ## North star sentence
 
-> A premium racing instrument: **warm-dark graphite** surfaces, **electric-but-confident yellow** for every action, **Plus Jakarta Sans** for reading and **JetBrains Mono** for data. Friendly to learn, technical to trust — never cold, never gimmicky.
+> A premium racing instrument: **warm-dark graphite** surfaces, **electric-but-confident yellow** for every action, **HK Grotesk Wide** for reading and **JetBrains Mono** for data. Friendly to learn, technical to trust — never cold, never gimmicky.
 
 ### Personality (locked)
 
@@ -79,28 +79,31 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 ## Typography
 
-Loaded in `src/app/layout.tsx` via `next/font/google`:
+Loaded in `src/app/layout.tsx` — **HK Grotesk Wide** (self-hosted WOFF2 in `public/fonts/hk-grotesk-wide/`), **HK Grotesk** via `typeface-hk-grotesk` as fallback until Wide files are added, **JetBrains Mono** via `next/font/google`:
 
 | Role | Font | Weights | Applied via |
 |------|------|---------|-------------|
-| UI — headings, body, buttons | **Plus Jakarta Sans** | 400–800 | `font-sans`, `font-display`, `.page-title`, `.ui-title`, `body` |
+| UI — headings, body, buttons | **HK Grotesk Wide** | 300–900 (static) | `--font-ui`, `font-sans`, `font-display`, `.page-title`, `.ui-title`, `body` |
 | Data — lap times, deltas, IDs, micro-labels | **JetBrains Mono** | 400, 500, 700 | `font-mono`, `Eyebrow`, `StatTile` |
 
-Both are **free** (Google Fonts / OFL).
+HK Grotesk Wide (desktop, free from Hanken) and JetBrains Mono are SIL OFL. See `public/fonts/hk-grotesk-wide/README.md` for download and WOFF2 conversion.
 
 ### Type rules
 
 | Content | Treatment |
 |---------|-----------|
-| Page titles | Plus Jakarta 800 (`font-extrabold`), **uppercase** via CSS (`text-transform`). Same scale as `PanelTitle` (`20px` / `22px` sm). Class: `.page-title`. |
+| Page titles | HK Grotesk Wide 800 (`font-extrabold`), **uppercase** via CSS (`text-transform`). Same scale as `PanelTitle` (`20px` / `22px` sm). Class: `.page-title`. |
 | Section labels / eyebrows | JetBrains Mono, **uppercase**, ~`tracking-[0.28em]`, `text-faint`. Use `<Eyebrow>`. |
 | Lap times, deltas, run IDs | JetBrains Mono, `tabular-nums`. Prefer `font-mono` over `font-sans tabular-nums`. |
-| Body / form copy | Plus Jakarta, 13–15px, `text-muted-foreground` for supporting lines |
-| Primary CTA label | Plus Jakarta 700; optional `uppercase tracking-[0.14em]` on hero actions only |
+| Body / form copy | HK Grotesk Wide, 13–15px, `text-muted-foreground` for supporting lines |
+| Page subtitle | 13px — `.page-subtitle` (matches `PanelSubtitle`) |
+| Hub row title | 17px / 18px sm — `HubRowTitle` |
+| Caption / hint | 11px — `.ui-caption` |
+| Primary CTA label | HK Grotesk Wide 700; optional `uppercase tracking-[0.14em]` on hero actions only |
 
 ### Legacy fonts (phasing out)
 
-`Inter` and `Montserrat` remain loaded as `--font-sans` / `--font-display` fallbacks but must **not** be used for new UI. Remove stray `font-display` / italic-uppercase patterns when touching a file.
+`Inter` and `Montserrat` remain loaded as `--font-sans` / `--font-display` fallbacks but must **not** be used for new UI. **Geist Sans** was replaced by HK Grotesk Wide (June 2026). Remove stray `font-display` / italic-uppercase patterns when touching a file.
 
 ---
 
@@ -139,7 +142,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 | `SurfaceCard` | `src/components/ui/SurfaceCard.tsx` | Base espresso surface; `hero` or `panel` variant |
 | `CardPanel` | `src/components/ui/CardPanel.tsx` | Standard content card (wraps `SurfaceCard`) |
 | `HeroPanel` | `src/components/ui/HeroPanel.tsx` | Legacy hero wrapper — prefer `SurfaceCard variant="hero"` on new work |
-| `PanelTitle`, `PanelSubtitle` | `src/components/ui/panel.tsx` | Card headlines + supporting line |
+| `PanelTitle`, `PanelSubtitle`, `HubRowTitle` | `src/components/ui/panel.tsx` | Card headlines + supporting line; hub row labels |
 | `Eyebrow` | `src/components/ui/panel.tsx` | Mono uppercase section label with optional dot |
 | `StatStrip`, `StatTile` | `src/components/ui/panel.tsx` | Hairline-separated metric strip (instrument panel) |
 | `Button` / `ButtonLink` | `src/components/ui/Button.tsx`, `ButtonLink.tsx` | Primary (yellow) and outline actions |
@@ -148,7 +151,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 ### Page chrome
 
 - **Header:** `.page-header` + `h1.page-title` (see any Tier A page).
-- **Body:** `.page-body` with `max-w-*` as appropriate; `gap-4` between major blocks.
+- **Body:** `.page-body` with `max-w-*` as appropriate; `gap-3` between major blocks (locked in CSS).
 - **Mobile nav order (unchanged):** Dashboard · Analysis · **Add run (center)** · Garage · Engineer · Settings.
 
 ---
@@ -208,7 +211,7 @@ Foundations (globals.css tokens + fonts)
 |-------|---------|-------|
 | CSS tokens | `src/app/globals.css` `:root` | Technical v2 palette; flat mesh |
 | Tailwind | `tailwind.config.ts` | Semantic colors; Jakarta + JetBrains in `fontFamily` |
-| Fonts | `src/app/layout.tsx` | `--font-jakarta`, `--font-mono-jb` |
+| Fonts | `src/app/layout.tsx`, `src/app/hk-grotesk-wide.css`, `public/fonts/hk-grotesk-wide/` | `--font-ui`, `--font-mono-jb` |
 | Panel DNA | `src/components/ui/panel.tsx` | Eyebrow, StatStrip, StatTile |
 | Surfaces | `src/components/ui/SurfaceCard.tsx` | Prefer tokens over hardcoded `#1b1712` when refactoring |
 | Theme preview | `html[data-theme-preview=...]` in `globals.css` | Dev-only; still has legacy red/blue — update or remove when touching |

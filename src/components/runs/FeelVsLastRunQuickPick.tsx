@@ -54,25 +54,14 @@ export function FeelVsLastRunQuickPick({
   return (
     <div
       className={cn(
-        "rounded-md border px-3 py-2 transition-[box-shadow,border-color,background-color]",
-        highlightMissing && needsPick
-          ? "border-amber-500/70 bg-amber-500/10 ring-2 ring-amber-500/40"
-          : "border-border/80 bg-surface-runna/50"
+        highlightMissing &&
+          needsPick &&
+          "rounded-md ring-2 ring-amber-500/40 ring-offset-2 ring-offset-background"
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="text-xs font-medium text-foreground">
-          vs last run on this car{" "}
-          <span
-            className={cn(
-              "text-[10px] font-normal",
-              highlightMissing && needsPick
-                ? "font-medium text-amber-700 dark:text-amber-300"
-                : "text-muted-foreground"
-            )}
-          >
-            (required to complete)
-          </span>
+          Compared to last run with this car
         </div>
         <div
           className={cn(
@@ -87,7 +76,7 @@ export function FeelVsLastRunQuickPick({
       </div>
       <div
         role="radiogroup"
-        aria-label="Feel vs last run on this car"
+        aria-label="Compared to last run with this car"
         className="mt-2 flex flex-wrap gap-1"
       >
         {FEEL_VS_LAST_RUN_QUICK_OPTIONS.map(({ value: n, label }) => {
@@ -106,11 +95,6 @@ export function FeelVsLastRunQuickPick({
           );
         })}
       </div>
-      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-        {eligible
-          ? "Required to complete the run. The Engineer uses this with your car rating to track setup direction."
-          : "First run on this car — defaults to Similar. Change if you had a prior baseline in mind."}
-      </p>
     </div>
   );
 }

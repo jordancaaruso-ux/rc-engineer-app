@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { EngineerPageClient } from "@/components/engineer/EngineerPageClient";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 
 function EngineerClientSkeleton() {
   return (
@@ -35,19 +36,20 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
     );
   }
 
-  await requireCurrentUser();
+  const user = await requireCurrentUser();
+  const ratingsEnabled = isAuthAdminEmail(user.email);
 
   return (
     <>
       <header className="page-header">
         <div className="min-w-0">
           <h1 className="page-title">Engineer</h1>
-          <p className="page-subtitle mt-0.5">Setup guidance from your runs and knowledge base.</p>
+          <p className="page-subtitle">Setup guidance from your runs and knowledge base.</p>
         </div>
       </header>
-      <section className="page-body flex min-h-0 flex-1 flex-col gap-4 pb-2 md:pb-0">
+      <section className="page-body flex min-h-0 flex-1 flex-col pb-2 md:pb-0">
         <Suspense fallback={<EngineerClientSkeleton />}>
-          <EngineerPageClient />
+          <EngineerPageClient ratingsEnabled={ratingsEnabled} />
         </Suspense>
       </section>
     </>

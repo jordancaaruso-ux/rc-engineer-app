@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense, useEffect, useState } from "react";
 
-const SANS: React.CSSProperties = { fontFamily: "var(--font-jakarta), system-ui, sans-serif" };
+const SANS: React.CSSProperties = { fontFamily: "var(--font-ui)" };
 const MONO: React.CSSProperties = {
   fontFamily: "var(--font-mono-jb), ui-monospace, SFMono-Regular, monospace",
 };

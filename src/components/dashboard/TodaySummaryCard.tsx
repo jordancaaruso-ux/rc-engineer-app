@@ -63,6 +63,12 @@ export function TodaySummaryCard({
         </TabButton>
       </div>
 
+      <p className="ui-caption border-b border-border/70 px-4 pb-2">
+        {tab === "best"
+          ? "Fastest lap and avg top 5 from today’s runs."
+          : "Setup and tire changes logged today."}
+      </p>
+
       <div className="p-4">
         {tab === "best" ? (
           <TodayBestPanel

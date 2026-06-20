@@ -53,7 +53,7 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
   }
 
   return (
-    <section className="page-body space-y-4 max-w-6xl">
+    <section className="page-body max-w-6xl">
       <div>
         <Link href="/cars" className="text-xs text-muted-foreground hover:text-foreground">
           ← Cars

@@ -9,7 +9,7 @@ import { NewRunImportLinkChooser } from "@/components/runs/NewRunImportLinkChoos
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { getLastRunForCopyPreview } from "@/lib/runs/getLastRunForCopyPreview";
-import { CopyLastRunFormProvider } from "@/components/runs/CopyLastRunFormContext";
+import { CopyLastRunFormProvider } from "@/components/runs/CopyLastRunFormProvider";
 import { NewRunCopyLastRunSlot } from "@/components/runs/NewRunCopyLastRunSlot";
 
 export default async function NewRunPage({
@@ -88,7 +88,7 @@ export default async function NewRunPage({
       <header className="page-header">
         <div className="min-w-0">
           <h1 className="page-title">Log your run</h1>
-          <p className="page-subtitle mt-0.5">Capture session details, laps, and setup.</p>
+          <p className="page-subtitle">Capture session details, laps, and setup.</p>
         </div>
       </header>
       <section className="page-body max-w-3xl">

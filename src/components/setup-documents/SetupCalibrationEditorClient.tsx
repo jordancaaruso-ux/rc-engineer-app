@@ -2773,7 +2773,7 @@ export function SetupCalibrationEditorClient({
   }
 
   return (
-    <section className="page-body space-y-3">
+    <section className="page-body">
       {!modelLinkedMode ? (
         <SetupCalibrationQuickParamsPanel
           pdfFormRowsCount={pdfFormRows.length}

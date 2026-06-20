@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 type VideoRow = {
   id: string;
@@ -70,7 +71,7 @@ export function VideoLibraryClient({ initialVideos }: { initialVideos: VideoRow[
   return (
     <div className="space-y-6">
       <CardPanel className="max-w-2xl" contentClassName="space-y-3">
-        <div className="ui-title text-xs text-muted-foreground">Upload video</div>
+        <Eyebrow>Upload video</Eyebrow>
         <p className="text-[11px] text-muted-foreground">
           Server uploads are capped on Vercel (roughly 4–4.5MB). For now, keep clips short/small.
         </p>
@@ -115,7 +116,7 @@ export function VideoLibraryClient({ initialVideos }: { initialVideos: VideoRow[
       </CardPanel>
 
       <div className="space-y-2.5">
-        <div className="ui-title text-xs text-muted-foreground">Your videos</div>
+        <Eyebrow>Your videos</Eyebrow>
         {videos.length === 0 ? (
           <CardPanel contentClassName="text-sm text-muted-foreground">No videos uploaded yet.</CardPanel>
         ) : (

@@ -1,8 +1,10 @@
 "use client";
 
+import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
+import { primarySegmentButtonClassName } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
@@ -180,23 +182,28 @@ export function ActionItemListPanel({
         ) : null}
       </div>
 
-      <form onSubmit={addManual} className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={addPlaceholder}
-          className="min-w-[160px] flex-1 rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground"
-          disabled={busy}
-          aria-label={`Add ${title}`}
-        />
-        <button
-          type="submit"
-          disabled={busy || !draft.trim()}
-          className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 disabled:opacity-50"
-        >
-          Add
-        </button>
+      <form onSubmit={addManual} className="mt-1.5 w-full">
+        <div className="action-item-add-composite flex w-full min-w-0 items-stretch rounded-lg border border-border bg-card">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={addPlaceholder}
+            className="min-w-0 flex-1 rounded-l-lg border-0 bg-transparent px-2.5 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+            disabled={busy}
+            aria-label={`Add ${title}`}
+          />
+          <button
+            type="submit"
+            disabled={busy || !draft.trim()}
+            aria-label="Add idea"
+            className={primarySegmentButtonClassName(
+              "relative z-[1] shrink-0 px-2.5 min-h-9 min-w-9"
+            )}
+          >
+            <Plus className="size-4" strokeWidth={2.5} aria-hidden />
+          </button>
+        </div>
       </form>
 
       {error ? <p className="mt-1.5 text-[11px] text-destructive">{error}</p> : null}
@@ -251,14 +258,14 @@ export function ActionItemListPanel({
                   }
                 }}
                 className={cn(
-                  "flex items-start justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5",
+                  "flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1",
                   draggingId === i.id && "opacity-50",
                   showDropAbove && "shadow-[inset_0_2px_0_0_rgb(var(--color-primary))]",
                   showDropBelow && "shadow-[inset_0_-2px_0_0_rgb(var(--color-primary))]"
                 )}
               >
                 <div
-                  className="shrink-0 cursor-grab select-none px-0.5 pt-0.5 text-[10px] leading-none text-muted-foreground"
+                  className="shrink-0 cursor-grab select-none px-0.5 text-xs leading-none text-muted-foreground"
                   title="Drag to reorder"
                   aria-label="Drag to reorder"
                   onClick={(e) => e.stopPropagation()}
@@ -266,20 +273,19 @@ export function ActionItemListPanel({
                   ⋮⋮
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] leading-snug text-foreground whitespace-pre-wrap break-words">
+                  <p className="text-base leading-snug text-foreground whitespace-pre-wrap break-words">
                     {i.text}
                   </p>
-                  {i.sourceType !== "RUN" ? (
-                    <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-faint">Manual</p>
-                  ) : null}
                 </div>
                 <button
                   type="button"
                   onClick={() => archive(i.id)}
                   disabled={busy}
-                  className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition hover:bg-muted/80 hover:text-foreground"
+                  aria-label="Remove idea"
+                  title="Remove"
+                  className="tap-active -mr-0.5 flex shrink-0 items-center justify-center rounded-md p-1.5 min-h-9 min-w-9 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive/90 disabled:opacity-50"
                 >
-                  Remove
+                  <X className="size-4" strokeWidth={2} aria-hidden />
                 </button>
               </li>
             );

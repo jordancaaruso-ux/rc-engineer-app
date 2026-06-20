@@ -2,6 +2,10 @@
 
 Guidance for any AI agent working in this repository (Cursor, Claude Code, Codex, etc.). Read this before making edits.
 
+For **product direction and prioritization** (core loop, pillar rank, horizons), read `docs/PRODUCT_NORTH_STAR.md`.
+
+For **Engineer quality iteration** (eval failures, prompt/context/retrieval fixes, gold-set hygiene), use `.cursor/skills/engineer-improver/SKILL.md` — invoke only when the founder says "improve engineer" or similar. Session logs: `docs/ENGINEER_CHANGELOG.md`.
+
 ## UI / visual design (Technical v2)
 
 **Before any UI, styling, layout, or visual rework** — read `docs/VISUAL_NORTH_STAR.md` and follow it. That doc is the locked north star: palette, typography, component vocabulary, journey-map rollout order, and per-screen checklist.
@@ -72,6 +76,8 @@ Commit trailers like `Made-with: Cursor` are welcome — they make it easy to au
 ## Auth
 
 - **Magic link + optional Google OAuth** via Auth.js (`src/auth.ts`): allowlist in `AuthAllowedEmail` + env `AUTH_ALLOWED_EMAILS` (see `src/lib/authAllowlist.ts`). Google: `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, callback `{AUTH_URL}/api/auth/callback/google`. Admins: `AUTH_ADMIN_EMAILS`, `src/lib/authAdmin.ts`. Session bridge: `src/lib/currentUser.ts` (`requireCurrentUser`, `getAuthenticatedApiUser`).
+- **Teams / teammates**: mutual team visibility via `src/lib/teamAccess.ts`; one-way `TeammateLink` + per-run `shareWithTeam` via `src/lib/teammateRunAccess.ts`.
+- **Security reviews**: use project skill `.cursor/skills/security-architect/SKILL.md` (access tiers T0–T6, IDOR, scale). Update `ACCESS_TIERS.md` when auth rules change.
 - **iOS shell**: Capacitor (`capacitor.config.ts`, `ios/`), checklist in `docs/TESTFLIGHT.md`.
 
 ## Other areas worth knowing

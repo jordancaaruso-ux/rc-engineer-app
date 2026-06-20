@@ -110,7 +110,7 @@ export function SetupPageClient() {
         </div>
       </header>
 
-      <section className="page-body space-y-3">
+      <section className="page-body">
         {savedToast ? (
           <div className="text-xs text-muted-foreground">{savedToast}</div>
         ) : (

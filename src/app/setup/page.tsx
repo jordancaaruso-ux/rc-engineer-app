@@ -10,6 +10,7 @@ import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAu
 
 import { SetupRunPdfReviewClient } from "@/components/setup/SetupRunPdfReviewClient";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 type SetupPageSearchParams = {
   created?: string;
@@ -165,7 +166,7 @@ export default async function SetupPage({
         </div>
       </header>
 
-      <section className="page-body space-y-4">
+      <section className="page-body">
         {createdDoc ? (
           <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-100">
             <div className="font-medium text-emerald-200">
@@ -218,7 +219,7 @@ export default async function SetupPage({
         ) : null}
         <CardPanel contentClassName="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="ui-title text-sm text-muted-foreground">Tools</div>
+            <Eyebrow>Tools</Eyebrow>
             <div className="text-xs text-muted-foreground">Compare setups or import many PDFs for a dataset.</div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -251,7 +252,7 @@ export default async function SetupPage({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
-            <div className="ui-title text-xs text-muted-foreground">Downloaded setups</div>
+            <Eyebrow>Downloaded setups</Eyebrow>
             <div className="flex items-center gap-2">
               <NewSetupUploadButton defaultSetupSheetModelId={preselectModelId} />
               <Link href="/setup-documents" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
@@ -298,7 +299,7 @@ export default async function SetupPage({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
-            <div className="ui-title text-xs text-muted-foreground">Setups from runs</div>
+            <Eyebrow>Setups from runs</Eyebrow>
             <Link href="/runs/history" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
               View runs
             </Link>
@@ -334,9 +335,9 @@ export default async function SetupPage({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
-            <div className="ui-title text-xs text-muted-foreground">
+            <Eyebrow>
               Setup calibrations <span className="normal-case opacity-80">(advanced)</span>
-            </div>
+            </Eyebrow>
             <Link href="/setup-calibrations" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
               Manage
             </Link>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   DEFAULT_RUN_HISTORY_FILTERS,
@@ -9,7 +10,28 @@ import {
   runHistoryFiltersActive,
   type RunHistoryFilters,
 } from "@/lib/runs/runHistoryFilters";
+import { Button } from "@/components/ui/Button";
+import { primarySegmentLeadingClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
+
+const FILTER_PANEL_SESSION_KEY = "runs-history-filters-open";
+
+function readFilterPanelSessionOpen(): boolean {
+  try {
+    return sessionStorage.getItem(FILTER_PANEL_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeFilterPanelSessionOpen(open: boolean) {
+  try {
+    if (open) sessionStorage.setItem(FILTER_PANEL_SESSION_KEY, "1");
+    else sessionStorage.removeItem(FILTER_PANEL_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 type Option = { id: string; label: string };
 
@@ -145,19 +167,70 @@ export function SessionsFilterBar({
   };
 
   const filtersActive = runHistoryFiltersActive(filters);
+  const [panelOpen, setPanelOpen] = useState(filtersActive);
+  const [sessionHydrated, setSessionHydrated] = useState(false);
+  const prevFiltersActive = useRef(filtersActive);
+
+  useEffect(() => {
+    if (!sessionHydrated) {
+      setSessionHydrated(true);
+      if (!filtersActive && readFilterPanelSessionOpen()) {
+        setPanelOpen(true);
+      }
+      prevFiltersActive.current = filtersActive;
+      return;
+    }
+    if (!prevFiltersActive.current && filtersActive) {
+      setPanelOpen(true);
+    }
+    prevFiltersActive.current = filtersActive;
+  }, [filtersActive, sessionHydrated]);
+
+  const openPanel = () => {
+    setPanelOpen(true);
+    writeFilterPanelSessionOpen(true);
+  };
+
+  const closePanel = () => {
+    setPanelOpen(false);
+    writeFilterPanelSessionOpen(false);
+  };
+
+  const togglePanel = () => {
+    if (panelOpen) closePanel();
+    else openPanel();
+  };
+
+  const filtersActiveExcludingQuery =
+    filters.carIds.length > 0 ||
+    filters.trackIds.length > 0 ||
+    filters.tireSetIds.length > 0 ||
+    Boolean(filters.eventId) ||
+    Boolean(filters.dateFrom) ||
+    Boolean(filters.dateTo) ||
+    Boolean(filters.sessionType) ||
+    Boolean(filters.meetingSessionType) ||
+    filters.bestLapMin != null ||
+    filters.bestLapMax != null ||
+    Boolean(filters.raceClass) ||
+    filters.status !== "all";
 
   return (
-    <CardPanel contentClassName="p-3 space-y-3">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[10rem] flex-1 space-y-1">
-          <label className={labelClass} htmlFor="sessions-search">
-            Search
+    <div className="w-full min-w-0 space-y-2">
+      <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="action-item-add-composite flex min-w-0 flex-1 items-stretch rounded-lg border border-border bg-card">
+          <div className={primarySegmentLeadingClassName()} aria-hidden>
+            <Search className="size-4" strokeWidth={2.5} />
+          </div>
+          <label htmlFor="sessions-search" className="sr-only">
+            Search sessions
           </label>
           <input
             id="sessions-search"
+            key={filters.q ?? ""}
             type="search"
             placeholder="Track, car, tires, notes…"
-            className={`w-full ${controlClass}`}
+            className="min-w-0 flex-1 border-0 bg-transparent px-2.5 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
             defaultValue={filters.q ?? ""}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -169,7 +242,37 @@ export function SessionsFilterBar({
               if (v !== filters.q) patch({ q: v });
             }}
           />
+          <button
+            type="button"
+            onClick={togglePanel}
+            aria-expanded={panelOpen}
+            aria-label="Filters"
+            className="tap-active relative inline-flex shrink-0 items-center justify-center rounded-l-none rounded-r-lg px-2.5 min-h-9 min-w-9 text-muted-foreground transition hover:text-foreground"
+          >
+            <SlidersHorizontal className="h-4 w-4" strokeWidth={2} aria-hidden />
+            {filtersActiveExcludingQuery ? (
+              <span
+                className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-card"
+                aria-label="Advanced filters active"
+              />
+            ) : null}
+          </button>
         </div>
+        {filtersActive ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={clearFilters}
+            className="shrink-0 self-end sm:self-auto"
+          >
+            Clear
+          </Button>
+        ) : null}
+      </div>
+
+      {panelOpen ? (
+        <CardPanel contentClassName="p-3 space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
         <MultiSelect
           label="Cars"
           options={cars}
@@ -208,20 +311,14 @@ export function SessionsFilterBar({
           >
             {advancedOpen ? "Fewer filters" : "More filters"}
           </button>
-          {filtersActive ? (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className={`text-muted-foreground hover:bg-muted/40 ${controlClass}`}
-            >
-              Clear
-            </button>
-          ) : null}
+          <Button type="button" variant="outline" onClick={closePanel} aria-expanded={true}>
+            Hide
+          </Button>
         </div>
-      </div>
+          </div>
 
-      {advancedOpen ? (
-        <div className="flex flex-wrap items-end gap-3 border-t border-border pt-3">
+          {advancedOpen ? (
+            <div className="flex flex-wrap items-end gap-3 border-t border-border pt-3">
           <MultiSelect
             label="Tire sets"
             options={tireSets}
@@ -368,8 +465,10 @@ export function SessionsFilterBar({
               <option value="flat">Flat list</option>
             </select>
           </div>
-        </div>
+            </div>
+          ) : null}
+        </CardPanel>
       ) : null}
-    </CardPanel>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getMyNameSetting } from "@/lib/appSettings";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
+import { RunHistoryColGroup } from "@/components/runs/runHistoryTableColumns";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
@@ -286,15 +287,25 @@ export default async function RunHistoryPage({
     focusGroupIndex >= 0 ? Math.max(8, focusGroupIndex + 1) : 8;
 
   const teamMode = Boolean(teamId && !teamAccessDenied);
+  const showViewTabs = teamsForUser.length > 0 && !teamAccessDenied;
   const pageTitle = teamAccessDenied ? "Sessions" : teamMode ? `Team — ${teamTitle}` : "Sessions";
+  const mySessionsViewDescription =
+    "Your runs grouped by session. Filter, compare, and drag to reorder within a group.";
+  const activeTeamViewDescription = teamTitle
+    ? `Runs shared with everyone in ${teamTitle}. Open any member’s run read-only; reordering is disabled.`
+    : "Runs shared with your team. Open any member’s run read-only; reordering is disabled.";
+  const activeViewDescription = teamMode ? activeTeamViewDescription : mySessionsViewDescription;
   const pageSubtitle = teamAccessDenied
     ? "That team was not found or you are not a member."
-    : teamMode
-      ? "Runs from everyone in this team (mutual pilot). Reordering is disabled; open a member’s run read-only."
-      : "";
+    : activeViewDescription;
 
   function renderSessionGroup(group: Group, idx: number) {
     const showSessionColumn = group.runs.some((r) => formatRunSessionDisplay(r) !== "—");
+    const columnLayout = {
+      showReorderColumn: !teamMode,
+      showMemberColumn: teamMode,
+      showSessionColumn,
+    };
     return (
       <SurfaceCard
         key={group.id}
@@ -310,26 +321,29 @@ export default async function RunHistoryPage({
             : expandLatest && idx === 0
         }
       >
-        <summary className="list-none cursor-pointer">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="page-title text-sm text-foreground">{group.title}</span>
-              <span className="ui-title text-xs text-muted-foreground">{group.type}</span>
-              {group.trackName && (
-                <span className="ui-title text-xs text-muted-foreground">
+        <summary className="list-none cursor-pointer overflow-x-hidden">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 leading-none">
+              <span className="session-group-title">{group.title}</span>
+              <span className="ui-title text-xs leading-none text-muted-foreground">{group.type}</span>
+              {group.trackName ? (
+                <span className="ui-title text-xs leading-none text-muted-foreground">
                   · {group.trackName}
                 </span>
-              )}
-              <span className="ui-title text-xs text-muted-foreground">{group.dateLabel}</span>
+              ) : null}
+              <span className="ui-title text-xs leading-none text-muted-foreground tabular-nums">
+                {group.dateLabel}
+              </span>
             </div>
-            <span className="ui-title text-sm text-muted-foreground tabular-nums">
+            <span className="ui-title shrink-0 text-xs leading-none text-muted-foreground tabular-nums">
               {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
             </span>
           </div>
         </summary>
         <div className="min-w-0 max-w-full border-t border-border bg-muted/40">
           <div className="min-w-0 max-w-full overflow-x-auto">
-            <table className="w-full text-sm min-w-[36rem]">
+            <table className="w-full text-sm min-w-[36rem] table-fixed">
+              <RunHistoryColGroup layout={columnLayout} />
               <thead>
                 <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
                   {!teamMode ? (
@@ -493,7 +507,7 @@ export default async function RunHistoryPage({
             <p className="page-subtitle">{pageSubtitle}</p>
           </div>
         </header>
-        <section className="page-body space-y-3 min-w-0 max-w-full">
+      <section className="page-body min-w-0 max-w-full">
           <CardPanel contentClassName="text-sm text-muted-foreground">
             <Link href="/runs/history" className="text-accent underline">
               Back to my sessions
@@ -509,34 +523,37 @@ export default async function RunHistoryPage({
       <header className="page-header">
         <div>
           <h1 className="page-title">{pageTitle}</h1>
-          {pageSubtitle ? <p className="page-subtitle">{pageSubtitle}</p> : null}
+          <p className="page-subtitle">{pageSubtitle}</p>
         </div>
       </header>
-      <section className="page-body space-y-3 min-w-0 max-w-full">
-        {teamsForUser.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground/80">View:</span>
-            <Link
-              href="/runs/history"
-              className={!teamMode ? "font-semibold text-foreground underline" : "hover:text-foreground underline-offset-2 hover:underline"}
-            >
-              My sessions
-            </Link>
-            {teamsForUser.map((t) => (
+      <section className="page-body min-w-0 max-w-full">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {showViewTabs ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground/80">View:</span>
               <Link
-                key={t.id}
-                href={`/runs/history?teamId=${encodeURIComponent(t.id)}`}
-                className={
-                  teamId === t.id
-                    ? "font-semibold text-foreground underline"
-                    : "hover:text-foreground underline-offset-2 hover:underline"
-                }
+                href="/runs/history"
+                className={!teamMode ? "font-semibold text-foreground underline" : "hover:text-foreground underline-offset-2 hover:underline"}
               >
-                {t.name}
+                My sessions
               </Link>
-            ))}
-          </div>
-        ) : null}
+              {teamsForUser.map((t) => (
+                <Link
+                  key={t.id}
+                  href={`/runs/history?teamId=${encodeURIComponent(t.id)}`}
+                  className={
+                    teamId === t.id
+                      ? "font-semibold text-foreground underline"
+                      : "hover:text-foreground underline-offset-2 hover:underline"
+                  }
+                >
+                  {t.name}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          <span className="ml-auto text-[11px] text-muted-foreground">{runCountLabel}</span>
+        </div>
         <Suspense fallback={<div className="h-20 rounded-lg border border-border bg-card animate-pulse" />}>
           <SessionsFilterBar
             cars={filterCars}
@@ -548,9 +565,6 @@ export default async function RunHistoryPage({
             viewAll={viewAll}
           />
         </Suspense>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <span className="text-[11px] text-muted-foreground">{runCountLabel}</span>
-        </div>
         {matchedRunCount === 0 ? (
           <CardPanel className="text-sm text-muted-foreground">
             {filtersActive ? (

@@ -60,7 +60,7 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <SettingField
         label="Your display name"
         hint="Shown on your runs. Purely cosmetic."
@@ -122,7 +122,7 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
 
       <div className="space-y-1 text-sm">
         <label className="block text-sm font-medium text-foreground">LiveRC driver ID</label>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="ui-caption">
           From LiveRC result tables (<code className="text-[10px]">data-driver-id</code>). Usually filled automatically
           when you import a race or open “Your sessions at this event.” Clear it if results pick the wrong person.
         </p>
@@ -149,9 +149,9 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
           >
             Clear ID
           </button>
-          {savingDriverId.kind === "ok" ? <span className="text-[11px] text-emerald-600">Cleared.</span> : null}
+          {savingDriverId.kind === "ok" ? <span className="ui-caption text-emerald-600">Cleared.</span> : null}
           {savingDriverId.kind === "error" ? (
-            <span className="text-[11px] text-destructive">{savingDriverId.text}</span>
+            <span className="ui-caption text-destructive">{savingDriverId.text}</span>
           ) : null}
         </div>
       </div>
@@ -179,7 +179,7 @@ function SettingField({
   return (
     <div className="space-y-1 text-sm">
       <label className="block text-sm font-medium text-foreground">{label}</label>
-      {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="ui-caption">{hint}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
@@ -196,9 +196,9 @@ function SettingField({
         >
           {state.kind === "saving" ? "Saving…" : "Save"}
         </button>
-        {state.kind === "ok" ? <span className="text-[11px] text-emerald-600">Saved.</span> : null}
+        {state.kind === "ok" ? <span className="ui-caption text-emerald-600">Saved.</span> : null}
         {state.kind === "error" ? (
-          <span className="text-[11px] text-destructive">{state.text}</span>
+          <span className="ui-caption text-destructive">{state.text}</span>
         ) : null}
       </div>
     </div>

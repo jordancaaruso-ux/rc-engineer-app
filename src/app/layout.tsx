@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Montserrat, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter, Montserrat, JetBrains_Mono } from "next/font/google";
+import "typeface-hk-grotesk";
 import Script from "next/script";
 import "./globals.css";
 import type { ReactNode } from "react";
@@ -7,6 +8,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
 import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLinkBridge";
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
+import { bgPreviewBootstrapScript } from "@/lib/appThemePreview";
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
 /** Body, inputs, tables, and helper copy — legible at small sizes. */
@@ -24,14 +26,9 @@ const montserrat = Montserrat({
   style: ["normal", "italic"],
 });
 
-/** Visual rework (Technical v2) — UI text. Available app-wide; applied per redesigned route. */
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-jakarta",
-  weight: ["400", "500", "600", "700", "800"],
-});
+/** Technical v2 — UI text (HK Grotesk Wide). Self-hosted WOFF2 + HK Grotesk npm fallback; see public/fonts/hk-grotesk-wide/README.md. */
 
-/** Visual rework (Technical v2) — data, lap times, deltas, tracked labels. */
+/** Data — lap times, deltas, tracked labels. */
 const jetBrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono-jb",
@@ -60,7 +57,7 @@ export default function RootLayout({ children }: { children: ReactNode }): React
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${montserrat.variable} ${plusJakarta.variable} ${jetBrainsMono.variable}`}
+      className={`${inter.variable} ${montserrat.variable} ${jetBrainsMono.variable}`}
     >
       <body className="min-h-[100dvh] font-sans font-normal antialiased">
         {/*
@@ -70,6 +67,9 @@ export default function RootLayout({ children }: { children: ReactNode }): React
          */}
         <div className="page-bg" aria-hidden="true" />
         <div className="app-root">
+          <Script id="rc-bg-preview-bootstrap" strategy="beforeInteractive">
+            {bgPreviewBootstrapScript()}
+          </Script>
           <Script
             id="rc-tz-cookie-bootstrap"
             strategy="beforeInteractive"

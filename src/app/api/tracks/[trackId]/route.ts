@@ -8,7 +8,7 @@ import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
 import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
-import { canDeleteTrack } from "@/lib/tracks/trackAccess";
+import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
 import { archiveTrackLegacyDataBeforeDelete } from "@/lib/tracks/legacyTrackSnapshot";
 
 export async function GET(
@@ -78,10 +78,16 @@ export async function PATCH(
 
   const existing = await prisma.track.findFirst({
     where: communityTrackByIdWhere(trackId),
-    select: { id: true },
+    select: { id: true, userId: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
+  }
+  if (!canManageCommunityTrack(user, existing)) {
+    return NextResponse.json(
+      { error: "Only the user who added this track or an admin can edit its metadata." },
+      { status: 403 }
+    );
   }
 
   const data: {
@@ -182,7 +188,7 @@ export async function DELETE(
   if (!track) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
-  if (!canDeleteTrack(user, track)) {
+  if (!canManageCommunityTrack(user, track)) {
     return NextResponse.json(
       { error: "Only the user who added this track or an admin can delete it." },
       { status: 403 }

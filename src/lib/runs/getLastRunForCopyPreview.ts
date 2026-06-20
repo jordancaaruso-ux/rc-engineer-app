@@ -33,6 +33,4 @@ export async function getLastRunForCopyPreview(userId: string) {
   });
 }
 
-export type CopyPreviewRunRecord = NonNullable<
-  Awaited<ReturnType<typeof getLastRunForCopyPreview>>
->;
+export type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";

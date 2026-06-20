@@ -276,7 +276,7 @@ export function EngineerSuggestionsCard({
   return (
     <div
       className={cn(
-        effectiveEmphasis === "postRun" && !suggestions && "rounded-lg ring-1 ring-primary/30 -m-0.5 p-0.5",
+        effectiveEmphasis === "postRun" && !suggestions && "rounded-lg ring-1 ring-inset ring-primary/30",
         className
       )}
     >

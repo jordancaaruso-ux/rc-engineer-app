@@ -129,7 +129,7 @@ export default async function CalibrateImagePage({
           </p>
         </div>
       </header>
-      <section className="page-body space-y-3">
+      <section className="page-body">
         <div className="text-xs text-muted-foreground">
           Source: <span className="font-medium text-foreground">{doc.originalFilename}</span> ·{" "}
           <Link href={`/setup-documents/${doc.id}`} className="underline">

@@ -47,7 +47,7 @@ export default function TrackVideoAnalysisPage() {
           ← Hub
         </Link>
       </header>
-      <section className="page-body flex flex-col gap-4">
+      <section className="page-body">
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

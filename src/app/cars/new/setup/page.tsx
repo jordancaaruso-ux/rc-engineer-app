@@ -8,7 +8,7 @@ export default async function CarNewSetupPage() {
   if (!user) redirect("/login");
 
   return (
-    <section className="page-body space-y-4">
+    <section className="page-body">
       <div>
         <Link href="/cars" className="text-xs text-muted-foreground hover:text-foreground">
           ← Cars

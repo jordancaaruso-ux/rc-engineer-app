@@ -15,7 +15,7 @@ export default function SetupDocumentError({
   }, [error]);
 
   return (
-    <section className="page-body max-w-lg space-y-4">
+    <section className="page-body max-w-lg">
       <h1 className="ui-title text-lg text-destructive">Could not load this setup document</h1>
       <p className="text-sm text-muted-foreground">
         Something went wrong in the browser while rendering the review page. Try again, or open Setup and pick the

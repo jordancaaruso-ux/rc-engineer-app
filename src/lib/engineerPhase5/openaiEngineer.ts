@@ -25,6 +25,12 @@ import {
   isOpenAiTpmRateLimitError,
   parseOpenAiRetryAfterMs,
 } from "@/lib/engineerPhase5/slimEngineerChatContextForApi";
+import {
+  computeOpenAiRetryDelayMs,
+  engineerOpenAiUserMessage,
+  maxOpenAiRateLimitAttempts,
+  sleepMs,
+} from "@/lib/openAiRetry";
 import type { EngineerChatContextTier } from "@/lib/engineerPhase5/engineerChatContextTier";
 import { reasoningSpineSystemPromptAddon } from "@/lib/engineerPhase5/reasoningSpine/narrationPrompt";
 import type { ReasoningSpineV1 } from "@/lib/engineerPhase5/reasoningSpine/types";
@@ -80,10 +86,6 @@ function contextBudgetCharsForTier(tier: EngineerChatContextTier): number {
     return Number.isFinite(n) && n > 2000 ? n : 10_000;
   }
   return ENGINEER_CHAT_CONTEXT_MAX_CHARS;
-}
-
-function sleepMs(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function mustGetKey(): string {
@@ -419,7 +421,7 @@ async function postChatCompletion(
   onToken?: (delta: string) => void
 ): Promise<{ ok: boolean; status: number; data?: Record<string, unknown>; streamResult?: ChatCompletionStreamResult }> {
   const useStream = Boolean(onToken);
-  const maxAttempts = 3;
+  const maxAttempts = maxOpenAiRateLimitAttempts();
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -433,8 +435,8 @@ async function postChatCompletion(
     if (useStream) {
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-        if (isOpenAiTpmRateLimitError(data) && attempt < maxAttempts - 1) {
-          await sleepMs(parseOpenAiRetryAfterMs(data) + 50);
+        if (isOpenAiTpmRateLimitError(data, res.status) && attempt < maxAttempts - 1) {
+          await sleepMs(computeOpenAiRetryDelayMs(parseOpenAiRetryAfterMs(data), attempt));
           continue;
         }
         return { ok: false, status: res.status, data };
@@ -444,13 +446,17 @@ async function postChatCompletion(
     }
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (res.ok) return { ok: true, status: res.status, data };
-    if (isOpenAiTpmRateLimitError(data) && attempt < maxAttempts - 1) {
-      await sleepMs(parseOpenAiRetryAfterMs(data) + 50);
+    if (isOpenAiTpmRateLimitError(data, res.status) && attempt < maxAttempts - 1) {
+      await sleepMs(computeOpenAiRetryDelayMs(parseOpenAiRetryAfterMs(data), attempt));
       continue;
     }
     return { ok: false, status: res.status, data };
   }
-  return { ok: false, status: 429, data: { error: { message: "Rate limit exceeded" } } };
+  return {
+    ok: false,
+    status: 429,
+    data: { error: { message: engineerOpenAiUserMessage("Rate limit exceeded") } },
+  };
 }
 
 async function executeSearchOrListTool(
@@ -567,23 +573,14 @@ export async function generateEngineerChatReply(params: {
     ...safeMsgs.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
   ];
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(
-      buildChatCompletionBody(opts.model, opts.temperature, {
-        messages,
-      })
-    ),
-  });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const bodyObj = buildChatCompletionBody(opts.model, opts.temperature, { messages });
+  const res = await postChatCompletion(apiKey, bodyObj);
   if (!res.ok) {
-    const msg = (data.error as { message?: string } | undefined)?.message || `OpenAI error (${res.status})`;
-    throw new Error(msg);
+    const rawMsg =
+      (res.data?.error as { message?: string } | undefined)?.message || `OpenAI error (${res.status})`;
+    throw new Error(engineerOpenAiUserMessage(rawMsg));
   }
+  const data = res.data!;
   const lastText =
     (data.choices as Array<{ message?: { content?: string } }> | undefined)?.[0]?.message?.content?.trim() ?? "";
   if (!lastText) {
@@ -671,9 +668,9 @@ export async function generateEngineerChatReplyWithTools(params: {
       res = await postChatCompletion(apiKey, bodyObj, params.onToken);
     }
     if (!res.ok) {
-      const msg =
+      const rawMsg =
         (res.data?.error as { message?: string } | undefined)?.message || `OpenAI error (${res.status})`;
-      throw new Error(msg);
+      throw new Error(engineerOpenAiUserMessage(rawMsg));
     }
     const msg =
       res.streamResult != null

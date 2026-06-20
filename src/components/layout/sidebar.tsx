@@ -31,7 +31,7 @@ export const Sidebar = memo(function Sidebar() {
             >
               <span className="flex min-w-0 items-center gap-2">
                 {isEngineer ? (
-                  <EngineerNavIcon className="h-4 w-4" active={active} />
+                  <EngineerNavIcon className="h-4 w-4" />
                 ) : (
                   <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
                 )}

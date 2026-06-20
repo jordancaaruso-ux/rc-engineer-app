@@ -182,7 +182,7 @@ export function SetupRunPdfReviewClient({ runId }: { runId: string }) {
         </div>
       </header>
 
-      <section className="page-body space-y-4">
+      <section className="page-body">
         {loading ? (
           <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             Loading setup…

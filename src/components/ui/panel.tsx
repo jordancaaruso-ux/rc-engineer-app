@@ -45,6 +45,28 @@ export function PanelTitle({
   );
 }
 
+/** Nav hub row label — between body copy and card titles. */
+export function HubRowTitle({
+  children,
+  className,
+  as: Tag = "span",
+}: {
+  children: ReactNode;
+  className?: string;
+  as?: "h2" | "h3" | "span";
+}) {
+  return (
+    <Tag
+      className={cn(
+        "text-[17px] font-extrabold leading-tight tracking-tight text-foreground sm:text-[18px]",
+        className
+      )}
+    >
+      {children}
+    </Tag>
+  );
+}
+
 /** Muted supporting line under a panel title (matches hero subtitle). */
 export function PanelSubtitle({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -65,7 +87,7 @@ export function Eyebrow({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {dot ? <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass(dot))} /> : null}
-      <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-faint">{children}</span>
+      <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{children}</span>
     </div>
   );
 }
@@ -99,7 +121,7 @@ export function StatTile({
 }) {
   return (
     <div className={cn("bg-[#17130f]/55 px-3 py-2.5", className)}>
-      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-faint">{label}</div>
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-faint">{label}</div>
       <div
         className={cn(
           "mt-1 font-mono text-[18px] font-medium tabular-nums",

@@ -49,6 +49,9 @@ model User {
   teammateLinksPeer  TeammateLink[] @relation("TeammateLinksPeer")
   engineerBetweenRunHints EngineerBetweenRunHint[]
   engineerDashboardSuggestions EngineerDashboardSuggestion[]
+  engineerChatThreads EngineerChatThread[]
+  engineerMessageRatings EngineerMessageRating[]
+  engineerGoldSetCandidates EngineerGoldSetCandidate[]
 
   teamMemberships TeamMembership[]
   teamsCreated    Team[]           @relation("TeamsCreated")
@@ -897,6 +900,100 @@ model EngineerDashboardSuggestion {
   payloadJson Json
 
   @@index([userId, updatedAt])
+}
+
+/** Persisted Engineer chat thread for feedback / founder review. */
+model EngineerChatThread {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  primaryRunId String?
+  compareRunId String?
+
+  messages EngineerChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+/** Single user or assistant turn in an Engineer chat thread. */
+model EngineerChatMessage {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  threadId String
+  thread   EngineerChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  role    String
+  content String @db.Text
+
+  /** KB sections, run ids, source route, etc. — populated on assistant turns. */
+  metadataJson Json?
+
+  ratings EngineerMessageRating[]
+
+  @@index([threadId, createdAt])
+}
+
+/** In-app 0–10 score (`stars` column) + optional note on an Engineer assistant message. */
+model EngineerMessageRating {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messageId String
+  message   EngineerChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stars Int
+  note  String? @db.Text
+
+  /** Auto-captured question, answer, run/setup ids, KB sections at rating time. */
+  contextSnapshot Json
+
+  @@unique([messageId, userId])
+  @@index([userId, updatedAt])
+  @@index([createdAt])
+}
+
+/** Auto-captured founder Engineer Q&A queued for gold-set review (T6 admin). */
+model EngineerGoldSetCandidate {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  threadId           String
+  assistantMessageId String @unique
+
+  /** pending | promoted | dismissed */
+  status String @default("pending")
+
+  question     String @db.Text
+  questionHash String
+  answer       String @db.Text
+
+  runId        String?
+  compareRunId String?
+  kbSections   Json?
+  source       String?
+
+  reviewerJson      Json?
+  reviewerReviewedAt DateTime?
+
+  promotedAt     DateTime?
+  promotedCaseId String?
+
+  @@index([status, createdAt])
+  @@index([questionHash])
+  @@index([userId, createdAt])
 }
 
 /**

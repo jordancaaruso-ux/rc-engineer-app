@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunCreatedAtDateTime, formatRunDateCompact } from "@/lib/formatDate";
@@ -37,6 +38,7 @@ import type {
 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { EngineerQuickFixButton } from "@/components/engineer/EngineerQuickFixButton";
 
 type Run = {
   id: string;
@@ -305,6 +307,11 @@ export function RunHistoryTable({
   >(null);
   const [reorderErr, setReorderErr] = useState<string | null>(null);
   const [reorderBusy, setReorderBusy] = useState(false);
+  const [modalsPortalReady, setModalsPortalReady] = useState(false);
+
+  useEffect(() => {
+    setModalsPortalReady(true);
+  }, []);
 
   function toggleRow(runId: string) {
     setExpandedId((prev) => (prev === runId ? null : runId));
@@ -529,16 +536,16 @@ export function RunHistoryTable({
               <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
                 {carDisplay}
               </td>
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {bestLapDisplay}
               </td>
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {avg5Display}
               </td>
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {avg10Display}
               </td>
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {medianLapDisplay}
               </td>
               <td
@@ -587,27 +594,34 @@ export function RunHistoryTable({
           </React.Fragment>
         );
       })}
-      <SetupSheetModal
-        open={setupModalRunId !== null}
-        onClose={() => setSetupModalRunId(null)}
-        run={setupModalRun as SetupSheetModalRun | null}
-        pickerRuns={allRunsDescending as SetupSheetModalRun[]}
-        runListSource={runListSource}
-        viewerUserId={viewerUserId}
-        memberDisplayByUserId={memberDisplayByUserId}
-      />
-      {lapModalRun ? (
-        <RunLapAnalysisModal
-          open={lapModalRunId !== null}
-          onClose={() => setLapModalRunId(null)}
-          run={lapModalRun}
-          pickerRunsSameCar={lapModalPickerRuns}
-          runListSource={runListSource}
-          userDisplayName={lapModalUserDisplayName}
-          viewerUserId={viewerUserId}
-          memberDisplayByUserId={memberDisplayByUserId}
-        />
-      ) : null}
+      {modalsPortalReady
+        ? createPortal(
+            <>
+              <SetupSheetModal
+                open={setupModalRunId !== null}
+                onClose={() => setSetupModalRunId(null)}
+                run={setupModalRun as SetupSheetModalRun | null}
+                pickerRuns={allRunsDescending as SetupSheetModalRun[]}
+                runListSource={runListSource}
+                viewerUserId={viewerUserId}
+                memberDisplayByUserId={memberDisplayByUserId}
+              />
+              {lapModalRun ? (
+                <RunLapAnalysisModal
+                  open={lapModalRunId !== null}
+                  onClose={() => setLapModalRunId(null)}
+                  run={lapModalRun}
+                  pickerRunsSameCar={lapModalPickerRuns}
+                  runListSource={runListSource}
+                  userDisplayName={lapModalUserDisplayName}
+                  viewerUserId={viewerUserId}
+                  memberDisplayByUserId={memberDisplayByUserId}
+                />
+              ) : null}
+            </>,
+            document.body
+          )
+        : null}
     </>
   );
 }
@@ -992,6 +1006,7 @@ function RunDetail({
               ).map((r, i) => {
                 const isMistake = mistakeLapNumbers.has(r.lapNumber);
                 const isBest = bestLapNumbers.has(r.lapNumber);
+                const isHighlighted = isMistake || isBest;
                 const mistake = mistakeAnalysis.mistakes.find((m) => m.lapNumber === r.lapNumber);
                 return (
                 <span
@@ -1000,10 +1015,10 @@ function RunDetail({
                     "inline-grid grid-cols-[2rem_auto] gap-x-0.5 items-baseline tabular-nums rounded px-0.5",
                     !r.isIncluded && "opacity-50 line-through",
                     isMistake &&
-                      "bg-red-500/15 text-red-800 dark:text-red-300 ring-1 ring-red-500/30",
+                      "bg-red-600/55 text-white ring-1 ring-red-500/45",
                     isBest &&
                       !isMistake &&
-                      "bg-purple-500/15 text-purple-900 dark:text-purple-200 ring-1 ring-purple-500/35"
+                      "bg-purple-600/55 text-white ring-1 ring-purple-500/45"
                   )}
                   title={
                     !r.isIncluded
@@ -1015,7 +1030,14 @@ function RunDetail({
                           : undefined
                   }
                 >
-                  <span className="text-right text-muted-foreground">{r.lapNumber}.</span>
+                  <span
+                    className={cn(
+                      "text-right",
+                      isHighlighted ? "text-white/80" : "text-muted-foreground"
+                    )}
+                  >
+                    {r.lapNumber}.
+                  </span>
                   <span>{r.lapTimeSeconds.toFixed(3)}s</span>
                 </span>
               );
@@ -1072,6 +1094,9 @@ function RunDetail({
             emptyAsDash
           />
         ) : null}
+        <div onClick={(e) => e.stopPropagation()}>
+          <EngineerQuickFixButton runId={run.id} compact />
+        </div>
       </div>
 
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>

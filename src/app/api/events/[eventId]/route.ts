@@ -9,7 +9,9 @@ import {
   ensureEventParticipation,
   EVENT_LIST_INCLUDE,
   mapEventForUser,
+  userCanAccessEvent,
 } from "@/lib/events/eventParticipation";
+import { canEditSharedEventFields } from "@/lib/events/eventAccess";
 import { mergeEventIntoExistingByResultsUrl } from "@/lib/events/mergeEvents";
 import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
 
@@ -54,6 +56,7 @@ export async function PATCH(
     where: { id: eventId },
     select: {
       id: true,
+      userId: true,
       trackId: true,
       startDate: true,
       endDate: true,
@@ -72,7 +75,18 @@ export async function PATCH(
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
-  if (hasShared || hasPersonal) {
+  if (hasShared && !canEditSharedEventFields(user, existing)) {
+    return NextResponse.json(
+      { error: "Only the user who created this event or an admin can edit shared event fields." },
+      { status: 403 }
+    );
+  }
+
+  if (hasPersonal && !(await userCanAccessEvent(user.id, eventId))) {
+    return NextResponse.json({ error: "Event not found" }, { status: 404 });
+  }
+
+  if (hasPersonal) {
     await ensureEventParticipation({ userId: user.id, eventId });
   }
 

@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "description": "Starter regression gold set for npm run engineer:eval. Replace runId/compareRunId with founder real runs before weekly iteration.",
+  "cases": [
+    {
+      "id": "push-mid-corner",
+      "tags": ["handling", "test-day"],
+      "question": "Car has understeer mid corner — what should I try first on this run?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "rear-loose-entry",
+      "tags": ["handling", "test-day"],
+      "question": "I lose the rear on entry. what are some small changes to try?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "upper-inner-direction",
+      "tags": ["physics", "kb-grounding"],
+      "question": "If I raise front upper inner shims 0.5mm, what happens to the handling?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "under-lower-vs-upper",
+      "tags": ["physics", "kb-grounding"],
+      "question": "What's the difference between raising under lower arm shims vs upper inner on the rear?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "compare-setup-diff",
+      "tags": ["compare", "test-day"],
+      "question": "Summarize the main setup changes between my compare run and primary run and what handling effect they might explain.",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "lap-regression",
+      "tags": ["laps", "test-day"],
+      "question": "Why might my best lap be slower than the previous session on the same tire run?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "community-spread",
+      "tags": ["community", "setup"],
+      "question": "Which suspension parameters am I far from community median at this track grip level?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "tire-life",
+      "tags": ["tires", "test-day"],
+      "question": "Given my tire run number, should I expect pace drop — what setup compensations are reasonable?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "hypothetical-stiffer-rear",
+      "tags": ["hypothetical"],
+      "question": "Hypothetically on a high-grip carpet track, would a stiffer rear spring usually help rotation or hurt mid-corner?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "hypothetical-droop",
+      "tags": ["hypothetical"],
+      "question": "If grip drops mid-day, is adding droop always the right move?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "one-change-discipline",
+      "tags": ["process"],
+      "question": "I changed rear spring, rear camber, and rear toe between runs — how should I interpret handling now?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "front-bite-entry",
+      "tags": ["handling", "response-vs-sustained"],
+      "question": "I want more bite on entry without killing mid-corner — which end do I tune first?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "damper-direction",
+      "tags": ["setup", "kb-grounding"],
+      "question": "Should I go heavier or lighter on front damper oil if the car feels lazy on turn-in?",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "anti-dive-split",
+      "tags": ["physics"],
+      "question": "Explain anti-dive split on the front bulkhead and when I'd change FF vs FR pickup.",
+      "runId": null,
+      "compareRunId": null
+    },
+    {
+      "id": "plan-next-change",
+      "tags": ["planning", "test-day"],
+      "question": "Based on my notes and handling ratings, what's the highest-confidence next setup experiment?",
+      "runId": null,
+      "compareRunId": null
+    }
+  ]
+}

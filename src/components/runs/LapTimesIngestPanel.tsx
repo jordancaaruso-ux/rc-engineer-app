@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { parseManualLapText } from "@/lib/lapSession/parseManual";
 import type { LapSourceKind } from "@/lib/lapSession/types";
 import type { LapImportLapRow, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
-import { computeLapMetrics, formatLap } from "@/lib/runLaps";
+import { formatLap } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { getAverageTopN, getBestLap } from "@/lib/lapAnalysis";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
@@ -13,6 +13,7 @@ import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriv
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { Eyebrow } from "@/components/ui/panel";
 
 export type UrlImportBlock = {
   blockId: string;
@@ -44,7 +45,13 @@ export type LapIngestFormValue = {
   urlImportBlocks: UrlImportBlock[];
 };
 
-type IngestTab = "manual" | "photo" | "url" | "csv";
+type IngestTab = "url-auto" | "url-manual" | "manual" | "photo" | "csv";
+
+const URL_TABS: IngestTab[] = ["url-auto", "url-manual"];
+
+function isUrlTab(tab: IngestTab): boolean {
+  return URL_TABS.includes(tab);
+}
 
 const DEFAULT_VALUE: LapIngestFormValue = {
   manualText: "",
@@ -133,6 +140,25 @@ type ScanDayCandidate = {
 const RECENT_RUNS_COLLAPSED = 3;
 const RECENT_RUNS_MAX = 10;
 
+/** One scan-status line — prefer server hint; fall back to totals when all are imported. */
+function resolveScanStatusMessage(opts: {
+  scanMessage: string | null;
+  totalCandidates: number;
+  unimportedCount: number;
+  candidateCount: number;
+}): string | null {
+  const { scanMessage, totalCandidates, unimportedCount, candidateCount } = opts;
+  if (scanMessage) return scanMessage;
+  if (candidateCount === 0) {
+    if (totalCandidates > 0 && unimportedCount === 0) {
+      const n = totalCandidates;
+      return `Found ${n} session${n === 1 ? "" : "s"} for your driver — all already imported.`;
+    }
+    return "No new sessions to import.";
+  }
+  return null;
+}
+
 /** Server: `/api/events/[eventId]/my-race-sessions` — driver verified on each race page. */
 type EventRaceSessionRow = {
   sessionUrl: string;
@@ -205,7 +231,7 @@ export function LapTimesIngestPanel({
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
   const hasTrackDiscovery = hasLiveRcTrack || hasSpeedhiveTrack;
   const hasUrlScan = Boolean((practiceDayUrl ?? "").trim()) || hasTrackDiscovery;
-  const [tab, setTab] = useState<IngestTab>("manual");
+  const [tab, setTab] = useState<IngestTab>("url-auto");
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoNote, setPhotoNote] = useState<string | null>(null);
   const [photoConfidence, setPhotoConfidence] = useState<string | null>(null);
@@ -289,13 +315,13 @@ export function LapTimesIngestPanel({
 
   useEffect(() => {
     if (hasUrlScan) {
-      setTab((prev) => (prev === "manual" ? "url" : prev));
+      setTab((prev) => (prev === "manual" ? "url-auto" : prev));
     }
   }, [hasUrlScan]);
 
   useEffect(() => {
     if (value.sourceKind === "url" && value.urlImportBlocks.length > 0) {
-      setTab("url");
+      setTab("url-auto");
     }
   }, [value.sourceKind, value.urlImportBlocks.length]);
 
@@ -326,39 +352,6 @@ export function LapTimesIngestPanel({
   }, [scanCandidatesExcludingLinked, showAllRecentRuns]);
 
   const canExpandRecentRuns = scanCandidatesExcludingLinked.length > RECENT_RUNS_COLLAPSED;
-
-  const parsedLaps = useMemo(() => parseManualLapText(value.manualText), [value.manualText]);
-  const manualMetrics = useMemo(() => {
-    const rows = value.manualLapRows;
-    if (rows?.length) {
-      const included = rows.filter((r) => r.isIncluded && r.lapNumber !== 0);
-      return {
-        lapCount: included.length,
-        bestLap: getBestLap(rows),
-        averageTop5: getAverageTopN(rows, 5),
-      };
-    }
-    return computeLapMetrics(parsedLaps);
-  }, [value.manualLapRows, parsedLaps]);
-  const metrics = manualMetrics;
-
-  const urlPrimaryPreviewMetrics = useMemo(() => {
-    if (value.sourceKind !== "url") return null;
-    const blocks = value.urlImportBlocks ?? [];
-    const first = blocks[0];
-    if (!first?.sessionDrivers?.length) return null;
-    const ids = first.selectedDriverIds ?? [];
-    const primaryId = ids[0] ?? first.sessionDrivers[0]?.driverId ?? null;
-    if (!primaryId) return null;
-    const rows = first.driverLapRowsByDriverId?.[primaryId];
-    if (!rows?.length) return null;
-    const included = rows.filter((r) => r.isIncluded && r.lapNumber !== 0);
-    return {
-      lapCount: included.length,
-      bestLap: getBestLap(rows),
-      averageTop5: getAverageTopN(rows, 5),
-    };
-  }, [value.sourceKind, value.urlImportBlocks]);
 
   function selectTab(id: IngestTab) {
     setTab(id);
@@ -428,6 +421,7 @@ export function LapTimesIngestPanel({
     setDayScanMessage(null);
     setDayScanIndexKind(null);
     setDiscoveryDebug(null);
+    setDebugOpen(false);
     setScanTotals(null);
     setShowAllRecentRuns(false);
     try {
@@ -469,12 +463,14 @@ export function LapTimesIngestPanel({
       setDayScanCandidates(candidates);
       setDiscoveryDebug(dbg ?? null);
       setScanTotals({ total: totalCandidates, unimported: unimportedCount });
-      if (candidates.length === 0) {
-        setDayScanMessage(scanMessage ?? "No new sessions to import.");
-        setDebugOpen(Boolean(dbg));
-      } else if (scanMessage) {
-        setDayScanMessage(scanMessage);
-      }
+      setDayScanMessage(
+        resolveScanStatusMessage({
+          scanMessage,
+          totalCandidates,
+          unimportedCount,
+          candidateCount: candidates.length,
+        })
+      );
     } catch {
       setDayScanMessage("Scan failed.");
     } finally {
@@ -764,18 +760,6 @@ export function LapTimesIngestPanel({
     });
   }
 
-  const primaryDriverLabels = useMemo(() => {
-    const blocks = value.urlImportBlocks ?? [];
-    const parts: string[] = [];
-    for (const b of blocks) {
-      const id = b.selectedDriverIds?.[0];
-      if (!id) continue;
-      const d = b.sessionDrivers.find((x) => x.driverId === id);
-      if (d) parts.push(formatDriverSessionLabel(d.driverName, blockLabelTimeIso(b)));
-    }
-    return parts;
-  }, [value.urlImportBlocks]);
-
   return (
     <SurfaceCard
       variant="panel"
@@ -784,7 +768,7 @@ export function LapTimesIngestPanel({
       contentClassName="space-y-3"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <div className="ui-title text-sm text-muted-foreground">Lap times</div>
+        <Eyebrow>Lap times</Eyebrow>
         {showDraftLapSavedStyle ? (
           <span
             className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
@@ -802,7 +786,8 @@ export function LapTimesIngestPanel({
       >
         {(
           [
-            ["url", "URL"],
+            ["url-auto", "URL Auto"],
+            ["url-manual", "URL Manual"],
             ["manual", "Manual"],
             ["photo", "Photo"],
             ["csv", "CSV"],
@@ -857,20 +842,18 @@ export function LapTimesIngestPanel({
               Model confidence: <span className="font-mono text-foreground/90">{photoConfidence}</span>
             </p>
           ) : null}
-          {photoNote ? <p className="text-[11px] text-amber-600 dark:text-amber-400">{photoNote}</p> : null}
+          {photoNote ? <p className="text-[11px] text-muted-foreground">{photoNote}</p> : null}
         </div>
       ) : null}
 
-      {tab === "url" ? (
+      {tab === "url-auto" ? (
         <div className="space-y-2 text-sm">
           {lapImportEventId?.trim() ? (
             <div className="space-y-2 rounded-md border border-accent/35 bg-accent/5 p-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="ui-title text-[11px] text-muted-foreground">
-                    Your sessions at this event
-                  </div>
-                  <p className="mt-0.5 ui-label-meta">
+                  <Eyebrow dot="accent">Your sessions at this event</Eyebrow>
+                  <p className="mt-1 ui-label-meta">
                     Uses your LiveRC <span className="text-foreground/90">driver ID</span> from each result table (not
                     just name), so you are not mixed up with someone else on another main. IDs are saved automatically in
                     Settings when unambiguous; clear there if wrong.
@@ -927,7 +910,7 @@ export function LapTimesIngestPanel({
                 </ul>
               ) : null}
               {!eventRaceBusy && eventRaceSessions !== null && eventRaceSessions.length === 0 ? (
-                <p className="text-[11px] text-amber-600 dark:text-amber-500">
+                <p className="text-[11px] text-muted-foreground">
                   {eventRaceHint ??
                     "No pending race sessions — add a LiveRC results URL on the event, or every session may already have a run logged."}
                 </p>
@@ -948,10 +931,8 @@ export function LapTimesIngestPanel({
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="ui-title text-[11px] text-muted-foreground">
-                    Recent runs at this track
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <Eyebrow dot="muted">Recent runs at this track</Eyebrow>
+                  <p className="mt-1 ui-label-meta">
                     {dayScanBusy
                       ? [
                           hasLiveRcTrack && "LiveRC",
@@ -972,11 +953,13 @@ export function LapTimesIngestPanel({
                               ? ` · ${visibleDayScanCandidates.length} more to import`
                               : ""
                           }`
-                        : dayScanCandidates && dayScanCandidates.length > 0
-                          ? scanTotals && scanTotals.unimported > dayScanCandidates.length
+                        : scanCandidatesExcludingLinked.length > 0
+                          ? scanTotals &&
+                            scanTotals.unimported > visibleDayScanCandidates.length &&
+                            !showAllRecentRuns
                             ? `Showing ${visibleDayScanCandidates.length} of ${scanTotals.unimported} unimported runs (newest first)`
-                            : `${dayScanCandidates.length} recent run${dayScanCandidates.length === 1 ? "" : "s"} to import`
-                          : "Your 3 most recent unimported runs (expand to 10)"}
+                            : `${scanCandidatesExcludingLinked.length} recent run${scanCandidatesExcludingLinked.length === 1 ? "" : "s"} to import`
+                          : null}
                   </p>
                 </div>
                 <button
@@ -992,7 +975,7 @@ export function LapTimesIngestPanel({
                 </button>
               </div>
               {!dayScanHasDriverName ? (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                <p className="text-[11px] text-muted-foreground">
                   {hasSpeedhiveTrack && !hasLiveRcTrack
                     ? "Set your MYLAPS transponder number and/or Speedhive driver name in Settings so we can find your sessions at this track."
                     : "Set your driver name in Settings (LiveRC and/or Speedhive transponder / name) so we can find your sessions."}
@@ -1117,11 +1100,8 @@ export function LapTimesIngestPanel({
                 </div>
               ) : null}
               {dayScanMessage && !dayScanBusy ? (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400">{dayScanMessage}</p>
-              ) : null}
-              {scanTotals && scanTotals.total > 0 && scanTotals.unimported === 0 && !dayScanBusy ? (
-                <p className="text-[11px] text-muted-foreground">
-                  Found {scanTotals.total} session(s) for your driver — all are already imported.
+                <p className="rounded-md border border-border bg-muted/50 px-2 py-1.5 text-[11px] text-muted-foreground">
+                  {dayScanMessage}
                 </p>
               ) : null}
               {discoveryDebug ? (
@@ -1144,10 +1124,24 @@ export function LapTimesIngestPanel({
           ) : hasUrlScan ? (
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <p className="ui-label-meta">
-                Add a LiveRC or Speedhive URL on the Tracks page for this venue, or paste a session URL below.
+                Add a LiveRC or Speedhive URL on the Tracks page for this venue, or use{" "}
+                <span className="text-foreground/90">URL Manual</span> to paste a session URL.
               </p>
             </div>
-          ) : null}
+          ) : (
+            <p className="ui-label-meta">
+              Select a track with a LiveRC or Speedhive URL on the Tracks page, or use{" "}
+              <span className="text-foreground/90">URL Manual</span> to paste a timing URL.
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {tab === "url-manual" ? (
+        <div className="space-y-2 text-sm">
+          <p className="ui-label-meta">
+            Paste a LiveRC, Speedhive, or other timing/results page URL to import laps.
+          </p>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               id="url-import-input"
@@ -1252,7 +1246,7 @@ export function LapTimesIngestPanel({
                   </div>
 
                   <div className="space-y-1 rounded-md border border-border bg-surface-runna-inset p-2">
-                    <div className="ui-title text-sm text-muted-foreground">Lap preview</div>
+                    <Eyebrow>Lap preview</Eyebrow>
                     <p className="text-[10px] leading-snug text-muted-foreground mb-1">
                       Fast laps well below the session median start excluded; slow laps only when far above
                       median. Use Include to restore a lap.
@@ -1321,7 +1315,7 @@ export function LapTimesIngestPanel({
                 (urlMessage.toLowerCase().includes("not found") ||
                   urlMessage.toLowerCase().includes("unsupported") ||
                   urlMessage.toLowerCase().includes("could not")) &&
-                  "text-amber-600 dark:text-amber-400"
+                  "text-muted-foreground"
               )}
             >
               {urlMessage}
@@ -1334,7 +1328,7 @@ export function LapTimesIngestPanel({
         <p className="ui-label-meta">CSV import will use the same confirmation step as manual entry.</p>
       ) : null}
 
-      {tab !== "url" ? (
+      {!isUrlTab(tab) ? (
         <div className="space-y-1">
           <label className="text-sm font-medium text-muted-foreground" htmlFor="lap-times-edit">
             Laps (edit before save)
@@ -1361,7 +1355,7 @@ export function LapTimesIngestPanel({
           />
           {value.manualLapRows && value.manualLapRows.length > 0 ? (
             <div className="space-y-1 rounded-md border border-border bg-surface-runna-inset p-2">
-              <div className="ui-title text-sm text-muted-foreground">Lap include / exclude</div>
+              <Eyebrow>Lap include / exclude</Eyebrow>
               <p className="text-[10px] leading-snug text-muted-foreground mb-1">
                 Fast laps well below the session median start excluded; slow laps only when far above median.
               </p>
@@ -1403,45 +1397,6 @@ export function LapTimesIngestPanel({
           ) : null}
         </div>
       ) : null}
-
-      <div className="rounded-md border border-border bg-surface-runna-inset px-3 py-2 text-[11px] space-y-1">
-        <div className="ui-title text-sm text-muted-foreground">Preview</div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-foreground">
-          <span>
-            Count:{" "}
-            <span className="font-mono">
-              {urlPrimaryPreviewMetrics ? urlPrimaryPreviewMetrics.lapCount : metrics.lapCount}
-            </span>
-          </span>
-          <span>
-            Best:{" "}
-            <span className="font-mono">
-              {formatLap(urlPrimaryPreviewMetrics ? urlPrimaryPreviewMetrics.bestLap : metrics.bestLap)}
-            </span>
-          </span>
-          <span>
-            Avg top 5:{" "}
-            <span className="font-mono">
-              {formatLap(urlPrimaryPreviewMetrics ? urlPrimaryPreviewMetrics.averageTop5 : metrics.averageTop5)}
-            </span>
-          </span>
-        </div>
-        <span className="text-muted-foreground">
-          Source: <span className="text-foreground/90">{value.sourceKind}</span>
-          {value.sourceDetail ? (
-            <>
-              {" "}
-              · <span className="truncate inline-block max-w-[280px] align-bottom">{value.sourceDetail}</span>
-            </>
-          ) : null}
-        </span>
-        {primaryDriverLabels.length > 0 ? (
-          <span className="text-muted-foreground block">
-            Your laps for this run:{" "}
-            <span className="text-foreground/90">{primaryDriverLabels.join(" · ")}</span>
-          </span>
-        ) : null}
-      </div>
     </SurfaceCard>
   );
 }

@@ -161,7 +161,7 @@ export default function NewManualVideoAnalysisPage() {
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">Video lap sync</h1>
+          <h1 className="page-title">Video analysis</h1>
           <p className="page-subtitle">
             Watch your video, optionally link LiveRC laps, anchor SF, and compare drivers.
           </p>

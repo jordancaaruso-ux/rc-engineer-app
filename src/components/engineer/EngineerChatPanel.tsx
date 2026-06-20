@@ -3,8 +3,26 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  messageId?: string;
+  ratingContext?: {
+    question?: string;
+    answer?: string;
+    runId?: string | null;
+    compareRunId?: string | null;
+    kbSections?: string[];
+  };
+};
+
+type EngineerChatFeedback = {
+  threadId: string;
+  assistantMessageId: string;
+  ratingContext: ChatMessage["ratingContext"];
+};
 
 export type EngineerQueuedChatPrompt = { id: number; text: string };
 
@@ -19,13 +37,18 @@ async function readSseStream(
     onToken?: (text: string) => void;
     onStatus?: (phase: string) => void;
   }
-): Promise<{ reply: string; resolvedFocus: { runId: string; compareRunId: string | null } | null }> {
+): Promise<{
+  reply: string;
+  resolvedFocus: { runId: string; compareRunId: string | null } | null;
+  feedback: EngineerChatFeedback | null;
+}> {
   const reader = res.body?.getReader();
   if (!reader) throw new Error("Stream had no body");
   const decoder = new TextDecoder();
   let buffer = "";
   let reply = "";
   let resolvedFocus: { runId: string; compareRunId: string | null } | null = null;
+  let feedback: EngineerChatFeedback | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -54,21 +77,36 @@ async function readSseStream(
           data.resolvedFocus && typeof data.resolvedFocus === "object"
             ? (data.resolvedFocus as { runId: string; compareRunId: string | null })
             : null;
+        if (data.feedback && typeof data.feedback === "object") {
+          const fb = data.feedback as Record<string, unknown>;
+          if (typeof fb.threadId === "string" && typeof fb.assistantMessageId === "string") {
+            feedback = {
+              threadId: fb.threadId,
+              assistantMessageId: fb.assistantMessageId,
+              ratingContext:
+                fb.ratingContext && typeof fb.ratingContext === "object"
+                  ? (fb.ratingContext as ChatMessage["ratingContext"])
+                  : undefined,
+            };
+          }
+        }
       } else if (event === "error") {
         throw new Error(typeof data.message === "string" ? data.message : "Engineer chat failed");
       }
     }
   }
 
-  return { reply, resolvedFocus };
+  return { reply, resolvedFocus, feedback };
 }
 
 export function EngineerChatPanel({
   queuedPrompt = null,
   onQueuedPromptConsumed,
+  ratingsEnabled = false,
 }: {
   queuedPrompt?: EngineerQueuedChatPrompt | null;
   onQueuedPromptConsumed?: () => void;
+  ratingsEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const pathname = usePathname();
@@ -81,6 +119,7 @@ export function EngineerChatPanel({
   const [chatErr, setChatErr] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [threadId, setThreadId] = useState<string | null>(null);
 
   const messagesRef = useRef<ChatMessage[]>([]);
   const lastQueuedId = useRef<number | null>(null);
@@ -114,6 +153,7 @@ export function EngineerChatPanel({
         body: JSON.stringify({
           messages: next,
           stream: true,
+          ...(threadId ? { threadId } : {}),
           ...(runIdFromUrl ? { runId: runIdFromUrl } : {}),
           ...(compareRunIdFromUrl ? { compareRunId: compareRunIdFromUrl } : {}),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -139,7 +179,7 @@ export function EngineerChatPanel({
             return copy;
           });
         };
-        const { reply, resolvedFocus } = await readSseStream(res, {
+        const { reply, resolvedFocus, feedback } = await readSseStream(res, {
           onStatus: (phase) => setStatusPhase(phase),
           onToken: (token) => {
             pendingTokens += token;
@@ -164,6 +204,7 @@ export function EngineerChatPanel({
           });
         }
         applyResolvedFocus(resolvedFocus);
+        if (feedback?.threadId) setThreadId(feedback.threadId);
         setMessages((prev) => {
           const copy = [...prev];
           const last = copy[copy.length - 1];
@@ -171,6 +212,8 @@ export function EngineerChatPanel({
             copy[copy.length - 1] = {
               role: "assistant",
               content: reply || last.content || "—",
+              messageId: feedback?.assistantMessageId,
+              ratingContext: feedback?.ratingContext,
             };
           }
           const trimmed = copy.slice(-8);
@@ -185,6 +228,7 @@ export function EngineerChatPanel({
         debug?: string;
         reply?: string;
         resolvedFocus?: { runId: string; compareRunId: string | null } | null;
+        feedback?: EngineerChatFeedback | null;
       };
       if (!res.ok) {
         setMessages((prev) => prev.slice(0, -1));
@@ -200,10 +244,19 @@ export function EngineerChatPanel({
         return;
       }
       applyResolvedFocus(data.resolvedFocus ?? null);
+      if (data.feedback?.threadId) setThreadId(data.feedback.threadId);
       const reply = data.reply ?? "";
       setMessages((prev) => {
         const withoutEmpty = prev.slice(0, -1);
-        const withAssistant = [...withoutEmpty, { role: "assistant" as const, content: reply || "—" }].slice(-8);
+        const withAssistant = [
+          ...withoutEmpty,
+          {
+            role: "assistant" as const,
+            content: reply || "—",
+            messageId: data.feedback?.assistantMessageId,
+            ratingContext: data.feedback?.ratingContext,
+          },
+        ].slice(-8);
         messagesRef.current = withAssistant;
         return withAssistant;
       });
@@ -268,6 +321,13 @@ export function EngineerChatPanel({
                       ? "—"
                       : "")}
               </div>
+              {ratingsEnabled && m.role === "assistant" && m.messageId ? (
+                <EngineerMessageRatingRow
+                  messageId={m.messageId}
+                  disabled={chatBusy}
+                  initialContext={m.ratingContext}
+                />
+              ) : null}
             </div>
           ))}
         </div>

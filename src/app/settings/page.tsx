@@ -11,9 +11,12 @@ import {
   formatSpeedhiveTransponderNumbersForSetting,
   parseSpeedhiveTransponderNumbersSetting,
 } from "@/lib/speedhive/speedhiveTransponder";
+import { BackgroundPreviewSection } from "@/components/settings/BackgroundPreviewSection";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
+import { EngineerFeedbackAdminSection } from "@/components/settings/EngineerFeedbackAdminSection";
+import { EngineerGoldSetAdminSection } from "@/components/settings/EngineerGoldSetAdminSection";
 import { ManufacturerBaselineAdminSection } from "@/components/settings/ManufacturerBaselineAdminSection";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -47,7 +50,7 @@ export default async function SettingsPage() {
       <header className="page-header">
         <div className="min-w-0">
           <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle mt-0.5">
+          <p className="page-subtitle">
             Per-user preferences. These persist across Log Your Run forms and lap imports.
           </p>
         </div>
@@ -62,12 +65,15 @@ export default async function SettingsPage() {
             speedhiveTransponderNumbers: speedhiveTransponderNumbersText,
           }}
         />
+        <BackgroundPreviewSection />
         <SettingsNavSection />
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (
           <>
             <AllowlistAdminSection />
             <ManufacturerBaselineAdminSection />
+            <EngineerGoldSetAdminSection />
+            <EngineerFeedbackAdminSection />
           </>
         ) : null}
       </section>

@@ -294,6 +294,8 @@ export type DashboardHomeModel = {
     sessionLabel: string;
     bestLap: number | null;
     avgTop5: number | null;
+    /** 1–10 car handling rating from the feedback section; null when not rated. */
+    carRating: number | null;
   };
   /** Cached dashboard Engineer suggestions for the latest run (peek on SSR). Client sync-fetches when null. */
   engineerSuggestionsInitial: DashboardEngineerSuggestionPayloadV1 | null;
@@ -314,6 +316,7 @@ const recentRunSelect = {
   meetingSessionType: true,
   meetingSessionCode: true,
   sessionLabel: true,
+  carRating: true,
   car: { select: { id: true, name: true } },
   track: { select: { id: true, name: true } },
   event: { select: { id: true, name: true } },
@@ -628,6 +631,7 @@ export async function loadDashboardHomeModel(
       sessionLabel: formatRunSessionDisplay(recentRun),
       bestLap: m.bestLap,
       avgTop5: m.averageTop5,
+      carRating: recentRun.carRating ?? null,
     };
   }
 

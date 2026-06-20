@@ -8,6 +8,7 @@ import { carTemplateSelectGroups, type CarForTemplateGroup } from "@/lib/cars/se
 import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 type CarOption = CarForTemplateGroup;
 
@@ -85,9 +86,9 @@ export function SetupDocumentLibraryClient({
   }
 
   return (
-    <section className="page-body space-y-4">
+    <section className="page-body">
       <CardPanel>
-        <div className="ui-title text-sm">Upload setup sheet</div>
+        <Eyebrow>Upload setup sheet</Eyebrow>
         <p className="mt-1 text-xs text-muted-foreground">
           PDF and images are stored as setup documents. Parsing creates draft values for review.
         </p>
@@ -136,7 +137,7 @@ export function SetupDocumentLibraryClient({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
-          <div className="ui-title text-xs text-muted-foreground">Setup documents</div>
+          <Eyebrow>Setup documents</Eyebrow>
         </div>
         {initialDocuments.length === 0 ? (
           <CardPanel>

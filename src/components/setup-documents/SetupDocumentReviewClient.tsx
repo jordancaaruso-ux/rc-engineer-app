@@ -784,7 +784,7 @@ export function SetupDocumentReviewClient({
   }
 
   return (
-    <section className="page-body space-y-4">
+    <section className="page-body">
       <CardPanel contentClassName="p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>

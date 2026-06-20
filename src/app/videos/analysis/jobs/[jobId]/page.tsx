@@ -9,7 +9,7 @@ export default async function VideoAnalysisJobPage({ params }: Props): Promise<R
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">Analysis job</h1>
+          <h1 className="page-title">Video analysis</h1>
           <p className="page-subtitle">Lap sync — watch video, link timing, compare laps</p>
         </div>
       </header>

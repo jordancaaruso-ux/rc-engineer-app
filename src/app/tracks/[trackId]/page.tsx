@@ -13,7 +13,7 @@ import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotS
 import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
-import { canDeleteTrack } from "@/lib/tracks/trackAccess";
+import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -81,8 +81,8 @@ export default async function TrackDetailPage(props: {
     prisma.event.count({ where: { trackId } }),
     isTrackFavourite(user.id, trackId),
   ]);
-  const canDelete = canDeleteTrack(user, track);
-  const deleteAsAdmin = canDelete && track.userId !== user.id;
+  const canManage = canManageCommunityTrack(user, track);
+  const deleteAsAdmin = canManage && track.userId !== user.id;
 
   return (
     <>
@@ -110,38 +110,53 @@ export default async function TrackDetailPage(props: {
             </div>
           </CardPanel>
 
-          <TrackLocationNotSetBanner
-            trackId={track.id}
-            trackName={track.name}
-            location={track.location}
-            initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
-            showCurrentLocation
-          />
+          {!canManage ? (
+            <p className="text-xs text-muted-foreground leading-snug">
+              Only the user who added this track or an admin can edit metadata (GPS, tags, timing URLs).
+              Your runs at this venue: {runCount}.
+            </p>
+          ) : null}
 
-          <CardPanel contentClassName="text-sm">
-            <div className="ui-title text-sm text-muted-foreground mb-2">GPS location</div>
-            <TrackLocationEditor
-              trackId={track.id}
-              trackName={track.name}
-              location={track.location}
-              initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
-              showCurrentLocation
-            />
-          </CardPanel>
+          {canManage ? (
+            <>
+              <TrackLocationNotSetBanner
+                trackId={track.id}
+                trackName={track.name}
+                location={track.location}
+                initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
+                showCurrentLocation
+              />
 
-          <TrackMetaTagsEditor
-            trackId={track.id}
-            initialGripTags={track.gripTags}
-            initialLayoutTags={track.layoutTags}
-          />
+              <CardPanel contentClassName="text-sm">
+                <div className="ui-title text-sm text-muted-foreground mb-2">GPS location</div>
+                <TrackLocationEditor
+                  trackId={track.id}
+                  trackName={track.name}
+                  location={track.location}
+                  initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
+                  showCurrentLocation
+                />
+              </CardPanel>
 
-          <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />
+              <TrackMetaTagsEditor
+                trackId={track.id}
+                initialGripTags={track.gripTags}
+                initialLayoutTags={track.layoutTags}
+              />
 
-          <TrackSpeedhiveUrlEditor trackId={track.id} initialSpeedhiveUrl={track.speedhiveUrl} />
+              <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />
+
+              <TrackSpeedhiveUrlEditor trackId={track.id} initialSpeedhiveUrl={track.speedhiveUrl} />
+            </>
+          ) : (
+            <CardPanel contentClassName="text-sm text-muted-foreground">
+              GPS, grip/layout tags, and timing URLs are managed by the user who added this track.
+            </CardPanel>
+          )}
 
           <TrackFavouriteClient trackId={track.id} trackName={track.name} isFavourite={isFavourite} />
 
-          {canDelete ? (
+          {canManage ? (
             <TrackDeleteClient
               trackId={track.id}
               trackName={track.name}

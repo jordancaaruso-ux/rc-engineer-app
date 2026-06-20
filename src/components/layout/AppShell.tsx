@@ -19,20 +19,24 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <TodayDraftRunProvider>
-      <div className="app-shell">
-        <PrimaryNavProvider>
+      <PrimaryNavProvider>
+        <div className="app-shell">
           <Sidebar />
-          <BottomNav />
-        </PrimaryNavProvider>
-        <main
-          className={cn(
-            "page",
-            "pb-[calc(var(--mobile-tab-bar-height)+env(safe-area-inset-bottom))] md:pb-0"
-          )}
-        >
-          {children}
-        </main>
-      </div>
+          <main
+            className={cn(
+              "page",
+              "pb-[calc(var(--mobile-tab-bar-height)+env(safe-area-inset-bottom))] md:pb-0"
+            )}
+          >
+            {children}
+          </main>
+        </div>
+        {/*
+         * After <main> and outside `.app-shell` (overflow-x-hidden → scroll container)
+         * so fixed positioning is not clipped on iOS. See globals.css stacking note.
+         */}
+        <BottomNav />
+      </PrimaryNavProvider>
     </TodayDraftRunProvider>
   );
 }

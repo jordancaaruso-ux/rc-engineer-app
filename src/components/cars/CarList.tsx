@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/panel";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
@@ -142,8 +143,8 @@ export function CarList({
   return (
     <div className="space-y-4">
       <CardPanel>
-        <div className="ui-title text-sm text-foreground">New car with custom setup sheet</div>
-        <p className="mt-1 text-[11px] text-muted-foreground">
+        <Eyebrow>New car with custom setup sheet</Eyebrow>
+        <p className="ui-caption mt-1">
           Define parameters for a car model (e.g. Mugen MTC3), upload a PDF, and calibrate — without inheriting the
           Awesomatix A800 sheet.
         </p>
@@ -157,7 +158,7 @@ export function CarList({
 
       <CardPanel contentClassName="p-4">
       <form onSubmit={handleAdd} className="space-y-3">
-        <div className="ui-title text-sm text-muted-foreground">Add car (quick)</div>
+        <Eyebrow>Add car (quick)</Eyebrow>
         <div className="grid gap-3 md:grid-cols-3">
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
@@ -273,7 +274,7 @@ export function CarList({
       </CardPanel>
 
       <div>
-        <div className="ui-title text-sm text-muted-foreground mb-2">Your cars</div>
+        <Eyebrow className="mb-2">Your cars</Eyebrow>
         {cars.length === 0 ? (
           <CardPanel className="text-sm text-muted-foreground">
             No cars yet. Add one above to log runs.
@@ -287,7 +288,7 @@ export function CarList({
                     <div>
                       <span className="font-medium">{c.name}</span>
                       {c.chassis && <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>}
-                      <span className="block text-[11px] text-muted-foreground mt-0.5">
+                      <span className="ui-caption block mt-0.5">
                         Setup sheet:{" "}
                         {c.setupSheetModel?.name ?? labelForSetupSheetTemplate(c.setupSheetTemplate ?? null)}
                       </span>

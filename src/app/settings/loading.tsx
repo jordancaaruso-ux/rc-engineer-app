@@ -9,7 +9,7 @@ export default function Loading() {
   return (
     <>
       <PageHeaderSkeleton subtitle />
-      <section className="page-body max-w-2xl space-y-3">
+      <section className="page-body max-w-2xl">
         {[0, 1, 2].map((i) => (
           <CardPanel key={i}>
             <Shimmer className="mb-2 h-4 w-32" />

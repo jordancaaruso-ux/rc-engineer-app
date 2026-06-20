@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/panel";
 import {
   coerceSetupValue,
   DEFAULT_SETUP_FIELDS,
@@ -23,8 +24,8 @@ export function SetupEditor({ value, onChange, compact, embed }: Props) {
     <div className="space-y-3">
       {!embed ? (
         <div className="flex items-center justify-between">
-          <div className="ui-title text-sm text-muted-foreground">Setup</div>
-          <div className="text-[11px] text-muted-foreground">
+          <Eyebrow>Setup</Eyebrow>
+          <div className="ui-caption">
             Minimal fields (stored as snapshot)
           </div>
         </div>
@@ -42,7 +43,7 @@ export function SetupEditor({ value, onChange, compact, embed }: Props) {
             className="rounded-md border border-border bg-muted/70 px-3 py-2"
           >
             <div className="flex items-center justify-between gap-2">
-              <div className="ui-title text-sm text-muted-foreground">
+              <div className="ui-label-meta text-muted-foreground">
                 {f.label}
               </div>
               {f.unit ? (

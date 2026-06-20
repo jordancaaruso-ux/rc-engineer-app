@@ -1,23 +1,31 @@
 "use client";
 
-import { useEffect, useTransition, useState } from "react";
+import { useEffect, useMemo, useTransition, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareLazy";
-import { EngineerChatPanel } from "@/components/engineer/EngineerChatPanel";
+import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/engineer/EngineerChatPanel";
+import { EngineerQuickFixStrip } from "@/components/engineer/EngineerQuickFixStrip";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
-import { Eyebrow } from "@/components/ui/panel";
+import { Eyebrow, PanelSubtitle } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 
 type EngineerMainTab = "chat" | "compare";
 
-export function EngineerPageClient() {
+export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?: boolean }) {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("engineerTab")?.trim();
+  const promptParam = searchParams.get("prompt")?.trim() || "";
   const [mainTab, setMainTab] = useState<EngineerMainTab>(() =>
     tabParam === "compare" ? "compare" : "chat"
   );
   const [isPending, startTransition] = useTransition();
+  const [promptConsumed, setPromptConsumed] = useState(false);
+
+  const queuedPrompt: EngineerQueuedChatPrompt | null = useMemo(() => {
+    if (!promptParam || promptConsumed) return null;
+    return { id: promptParam.length, text: promptParam };
+  }, [promptParam, promptConsumed]);
 
   useEffect(() => {
     if (tabParam === "compare") setMainTab("compare");
@@ -28,12 +36,17 @@ export function EngineerPageClient() {
     if (runId) persistEngineerSessionsTargetRunId(runId);
   }, [searchParams]);
 
+  useEffect(() => {
+    setPromptConsumed(false);
+  }, [promptParam]);
+
   function selectTab(tab: EngineerMainTab) {
     startTransition(() => setMainTab(tab));
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-full space-y-6">
+    <div className="max-w-4xl mx-auto w-full space-y-3">
+      <EngineerQuickFixStrip />
       <SurfaceCard variant="panel" contentClassName="flex gap-1 p-1">
         <button
           type="button"
@@ -61,11 +74,13 @@ export function EngineerPageClient() {
         <SurfaceCard variant="panel" overflowHidden={false} contentClassName={cn("p-0", isPending && "opacity-90")}>
           <div className="border-b border-border/80 px-4 py-3 md:px-5">
             <Eyebrow dot="accent">Ask the Engineer</Eyebrow>
-            <p className="text-[11px] text-muted-foreground leading-snug mt-1.5">
-              Grounded in your KB and recent runs.
-            </p>
+            <PanelSubtitle className="mt-1.5">Grounded in your KB and recent runs.</PanelSubtitle>
           </div>
-          <EngineerChatPanel />
+          <EngineerChatPanel
+            ratingsEnabled={ratingsEnabled}
+            queuedPrompt={queuedPrompt}
+            onQueuedPromptConsumed={() => setPromptConsumed(true)}
+          />
         </SurfaceCard>
       ) : (
         <section className={cn(isPending && "opacity-90")}>

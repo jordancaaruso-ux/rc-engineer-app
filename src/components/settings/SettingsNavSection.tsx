@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ChevronRight, Users } from "lucide-react";
-import { ThemePreviewSwitcher } from "@/components/layout/ThemePreviewSwitcher";
 import { CardPanel } from "@/components/ui/CardPanel";
 
 export function SettingsNavSection() {
@@ -26,16 +25,6 @@ export function SettingsNavSection() {
             </Link>
           </li>
         </ul>
-      </div>
-
-      <div>
-        <h2 className="ui-title text-sm text-foreground">Appearance</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Theme previews are stored locally on this device.
-        </p>
-        <CardPanel className="mt-3" contentClassName="p-3">
-          <ThemePreviewSwitcher placement="sidebar" />
-        </CardPanel>
       </div>
     </div>
   );

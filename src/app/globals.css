@@ -1,8 +1,11 @@
 @config "../../tailwind.config.ts";
 @import "tailwindcss";
+@import "./hk-grotesk-wide.css";
 
 :root {
   color-scheme: dark;
+  /* Primary UI stack: Wide (self-hosted) → HK Grotesk (npm fallback) → legacy Inter. */
+  --font-ui: "HK Grotesk Wide", "HK Grotesk", var(--font-sans), system-ui, sans-serif;
   /* Legacy single-hex aliases (some docs / snippets); UI uses Tailwind + rgb triplets below. */
   --background: #17130f;
   --foreground: #ece7df;
@@ -42,6 +45,10 @@
   --body-stripe-blue: 0;
   /* boxShadow.glow / glow-sm — subtle yellow lift on active chrome. */
   --glow-shadow-rgb: 255 214 10;
+  /* SurfaceCard hover glow. */
+  --surface-card-glow-image:
+    radial-gradient(120% 140% at 100% 0%, rgba(255, 214, 10, 0.12), transparent 55%),
+    radial-gradient(120% 120% at 0% 110%, rgba(150, 108, 58, 0.22), transparent 60%);
   /* Safari `theme-color` + html overscroll fallback — espresso, matches the flat base. */
   --page-top-theme: #17130f;
 
@@ -54,142 +61,29 @@
   --mobile-tab-bar-height: 3.25rem;
 }
 
-/* Near-black previews: darker base + surfaces; slightly softer corner glow so hues stay subtle. */
-html[data-theme-preview="carbon"] {
-  --color-background: 8 8 9;
-  --color-foreground: 232 234 236;
-  --color-card: 14 14 16;
-  --color-card-foreground: 232 234 236;
-  --color-primary: 201 42 42;
-  --color-primary-foreground: 248 249 250;
-  --color-secondary: 10 10 12;
-  --color-secondary-foreground: 230 232 234;
-  --color-muted: 12 12 14;
-  --color-muted-foreground: 152 156 160;
-  --color-accent: 37 99 235;
-  --color-accent-foreground: 248 249 250;
-  --color-destructive: 122 30 30;
-  --color-border: 28 28 32;
-  --color-input: 13 13 15;
-  --color-ring: 201 42 42;
-  --color-faint: 95 98 102;
-  --body-glow-red-strong: 0.2;
-  --body-glow-red-soft: 0.17;
-  --body-glow-blue: 0.11;
-  --body-glow-center: 0.018;
-  --body-stripe-red: 0.022;
-  --body-stripe-blue: 0.026;
+/* Dev background preview — `data-bg-preview` overrides page base only (see Settings). */
+html[data-bg-preview="butter-cream"] {
+  --background: #231f15;
+  --color-background: 35 31 21;
+  --page-top-theme: #231f15;
 }
 
-html[data-theme-preview="forest"] {
-  --color-background: 6 10 8;
-  --color-foreground: 230 236 233;
-  --color-card: 11 16 13;
-  --color-card-foreground: 230 236 233;
-  --color-primary: 201 42 42;
-  --color-primary-foreground: 248 249 250;
-  --color-secondary: 8 12 10;
-  --color-secondary-foreground: 228 234 231;
-  --color-muted: 10 14 12;
-  --color-muted-foreground: 148 158 152;
-  --color-accent: 37 99 235;
-  --color-accent-foreground: 248 249 250;
-  --color-destructive: 122 30 30;
-  --color-border: 24 32 28;
-  --color-input: 11 15 13;
-  --color-ring: 201 42 42;
-  --color-faint: 90 100 94;
-  --body-glow-red-strong: 0.2;
-  --body-glow-red-soft: 0.17;
-  --body-glow-blue: 0.11;
-  --body-glow-center: 0.018;
-  --body-stripe-red: 0.022;
-  --body-stripe-blue: 0.026;
+html[data-bg-preview="cool-slate"] {
+  --background: #14161c;
+  --color-background: 20 22 28;
+  --page-top-theme: #14161c;
 }
 
-html[data-theme-preview="polar"] {
-  --color-background: 6 8 12;
-  --color-foreground: 228 234 240;
-  --color-card: 11 14 18;
-  --color-card-foreground: 228 234 240;
-  --color-primary: 201 42 42;
-  --color-primary-foreground: 248 249 250;
-  --color-secondary: 8 10 14;
-  --color-secondary-foreground: 226 232 238;
-  --color-muted: 10 12 16;
-  --color-muted-foreground: 145 154 168;
-  --color-accent: 37 99 235;
-  --color-accent-foreground: 248 249 250;
-  --color-destructive: 122 30 30;
-  --color-border: 26 30 38;
-  --color-input: 11 14 18;
-  --color-ring: 201 42 42;
-  --color-faint: 88 96 110;
-  --body-glow-red-strong: 0.2;
-  --body-glow-red-soft: 0.17;
-  --body-glow-blue: 0.11;
-  --body-glow-center: 0.018;
-  --body-stripe-red: 0.022;
-  --body-stripe-blue: 0.026;
+html[data-bg-preview="ash-warm"] {
+  --background: #1b1a17;
+  --color-background: 27 26 23;
+  --page-top-theme: #1b1a17;
 }
 
-html[data-theme-preview="ember"] {
-  --color-background: 10 7 6;
-  --color-foreground: 236 232 230;
-  --color-card: 16 12 11;
-  --color-card-foreground: 236 232 230;
-  --color-primary: 201 42 42;
-  --color-primary-foreground: 248 249 250;
-  --color-secondary: 12 9 8;
-  --color-secondary-foreground: 234 230 228;
-  --color-muted: 14 11 10;
-  --color-muted-foreground: 160 152 148;
-  --color-accent: 37 99 235;
-  --color-accent-foreground: 248 249 250;
-  --color-destructive: 122 30 30;
-  --color-border: 36 30 28;
-  --color-input: 15 12 11;
-  --color-ring: 201 42 42;
-  --color-faint: 102 96 92;
-  --body-glow-red-strong: 0.2;
-  --body-glow-red-soft: 0.17;
-  --body-glow-blue: 0.11;
-  --body-glow-center: 0.018;
-  --body-stripe-red: 0.022;
-  --body-stripe-blue: 0.026;
-}
-
-/*
- * runna.com Webflow :root tokens (pulled from their shared CSS):
- * --black:#161616, --grey:#333, --cool-grey:#a9acaf, --cool-dark-grey:#4e565d.
- * Flat surfaces (card / muted / secondary / input) share the exact --black triplet.
- */
-html[data-theme-preview="runna"] {
-  --color-background: 16 16 16;
-  --color-foreground: 236 242 239;
-  --color-card: 22 22 22;
-  --color-card-foreground: 236 242 239;
-  --color-primary: 201 42 42;
-  --color-primary-foreground: 248 249 250;
-  --color-secondary: 22 22 22;
-  --color-secondary-foreground: 236 242 239;
-  --color-muted: 22 22 22;
-  --color-muted-foreground: 169 172 175;
-  --color-accent: 37 99 235;
-  --color-accent-foreground: 248 249 250;
-  --color-destructive: 122 30 30;
-  --color-border: 51 51 51;
-  --color-input: 22 22 22;
-  --color-ring: 37 99 235;
-  --color-faint: 78 86 93;
-  /* Kill primary-tinted page wash + stripes; lean on cool accent + neutral lift */
-  --body-glow-red-strong: 0;
-  --body-glow-red-soft: 0;
-  --body-stripe-red: 0;
-  --body-glow-blue: 0.14;
-  --body-glow-center: 0.03;
-  --body-stripe-blue: 0.038;
-  --glow-shadow-rgb: 37 99 235;
+html[data-bg-preview="moss-tint"] {
+  --background: #131816;
+  --color-background: 19 24 22;
+  --page-top-theme: #131816;
 }
 
 html {
@@ -200,7 +94,7 @@ html {
 }
 
 body {
-  font-family: var(--font-jakarta), var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-ui);
   min-height: 100%;
   min-height: 100dvh;
   background-color: transparent;
@@ -302,7 +196,9 @@ body {
   /*
    * Opaque bar + safe-area fill so no black band shows between nav and
    * home indicator / mobile browser chrome. Matches card surface, not page wash.
+   * z-index keeps the bar above `.page` when DOM/stacking order would otherwise bury it.
    */
+  z-index: 50;
   background-color: rgb(var(--color-card));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   overflow: visible;
@@ -315,12 +211,13 @@ body {
 /* NOTE: Avoid creating sibling stacking contexts here.
    Mobile nav uses fixed overlays from the sidebar; if <main> and the sidebar
    are both forced into equal z-index stacking contexts, DOM order can cause
-   <main> to sit above the sidebar and intercept clicks. */
+   <main> to sit above the sidebar and intercept clicks. BottomNav must render
+   after <main> (see AppShell.tsx) and outside `.app-shell` overflow clipping. */
 
 .sidebar {
   /* NOTE: do not set display here; responsive visibility is controlled in JSX */
   /*
-   * Top padding matches the approximate height of `.page-header` (title + subtitle + py-3),
+   * Top padding matches the approximate height of `.page-header` (title + subtitle + py-2.5),
    * so the first nav row lines up with the header band / horizontal rule to the right.
    */
   @apply w-64 flex-col gap-3 border-r border-border bg-secondary/80 px-4 pb-5 backdrop-blur-md;
@@ -375,42 +272,50 @@ html[data-nav-pending] .page {
 
 .page-header {
   @apply flex items-center justify-between border-b border-border;
-  padding-top: calc(0.625rem + env(safe-area-inset-top, 0px));
-  padding-bottom: 0.75rem;
+  padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.625rem;
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
 }
 
 @media (min-width: 768px) {
   .page-header {
-    padding-top: 0.75rem;
+    padding-top: 0.625rem;
   }
 }
 
 .page-title {
-  @apply text-[20px] font-extrabold leading-tight tracking-tight text-foreground sm:text-[22px];
+  @apply text-[20px] font-extrabold leading-none tracking-tight text-foreground sm:text-[22px];
 }
 
-/* Page chrome: Plus Jakarta extrabold, uppercase — matches PanelTitle scale (e.g. dashboard car name). */
+/* Page chrome: HK Grotesk Wide extrabold, uppercase — matches PanelTitle scale (e.g. dashboard car name). */
 :where(.page-title) {
-  font-family: var(--font-jakarta), system-ui, sans-serif;
-  font-style: normal;
+  font-family: var(--font-ui);
+  font-style: italic;
   text-transform: uppercase;
 }
 
-/* In-form / in-card headings: Plus Jakarta bold, normal case (write labels in Title case in JSX). */
+/* Session group headers on run history — page-title scale is too large; 11px ≈ 90% of text-xs. */
+.session-group-title {
+  font-family: var(--font-ui);
+  font-style: normal;
+  font-weight: 800;
+  @apply text-[13.915px] leading-none tracking-tight text-foreground;
+}
+
+/* In-form / in-card headings: HK Grotesk Wide bold, normal case (write labels in Title case in JSX). */
 .ui-title {
-  font-family: var(--font-jakarta), system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-weight: 700;
   font-style: normal;
   text-transform: none;
   @apply tracking-tight;
 }
 
-/* Strong emphasis (.ui-strong / .btn-brand): Plus Jakarta bold, normal case.
+/* Strong emphasis (.ui-strong / .btn-brand): HK Grotesk Wide bold, normal case.
    Sidebar nav now inherits the clean body font instead of italic-uppercase brand voice. */
 :where(.ui-strong, .btn-brand) {
-  font-family: var(--font-jakarta), system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-weight: 700;
   font-style: normal;
   text-transform: none;
@@ -435,13 +340,18 @@ html[data-nav-pending] .page {
 }
 
 .page-subtitle {
-  @apply text-sm font-normal tracking-[-0.004em] text-muted-foreground;
+  @apply mt-0 text-[13px] font-normal leading-snug tracking-[-0.004em] text-muted-foreground;
 }
 
 .page-body {
-  @apply flex-1 py-3 min-w-0;
+  @apply flex flex-1 flex-col gap-3 py-3 min-w-0;
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+
+/** Hints, save feedback, and compact supporting copy below labels. */
+.ui-caption {
+  @apply text-[11px] leading-snug text-muted-foreground;
 }
 
 /* Instant tap feedback on mobile nav, hub rows, and buttons */
@@ -463,6 +373,13 @@ input[type="search"]:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   @apply outline-none ring-2 ring-ring/35 ring-offset-0 ring-offset-background border-ring/45;
+}
+
+/** Dashboard action-item composite row — wrapper owns the border; input stays inert on focus. */
+.action-item-add-composite input[type="text"]:focus-visible,
+.action-item-add-composite input[type="search"]:focus-visible {
+  @apply outline-none ring-0 border-0 shadow-none;
+  box-shadow: none;
 }
 
 /* Warm espresso controls nested inside SurfaceCard panels (Log run, ingest, setup). */
@@ -508,11 +425,59 @@ html.video-overlay-fullscreen-active body {
 
 /* SurfaceCard — original hero radials on one layer; fade in on hover, subtle drift. */
 .surface-card-glow {
-  background-image:
-    radial-gradient(120% 140% at 100% 0%, rgba(255, 214, 10, 0.12), transparent 55%),
-    radial-gradient(120% 120% at 0% 110%, rgba(150, 108, 58, 0.22), transparent 60%);
+  background-image: var(--surface-card-glow-image);
   transform-origin: 50% 50%;
   animation: surface-card-glow-drift 14s ease-in-out infinite;
+}
+
+/* Primary actions — solid yellow fill, subtle top highlight, HK Grotesk Wide. */
+.primary-action-chip {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  line-height: 1;
+}
+
+/* Label + trailing icon — horizontal row (must use @apply so Tailwind v4 keeps these rules). */
+.primary-action-chip-content {
+  @apply inline-flex flex-row items-center gap-2 leading-none;
+}
+
+.primary-action-chip-icon {
+  @apply size-4 shrink-0 leading-none;
+}
+
+.primary-action-chip-icon-sm {
+  @apply size-3.5;
+}
+
+/* Dashboard hero + Engineer quick-fix CTA — !py beats base chip py-1.5 without fixed height stacking. */
+.primary-action-chip-prominent {
+  @apply !py-2.5 px-5 text-[13px] uppercase tracking-[0.12em];
+}
+
+.primary-action-chip-compact {
+  @apply h-7 min-h-7 !py-0 px-2 text-[11px] font-semibold normal-case;
+}
+
+.primary-action-chip-compact .primary-action-chip-content {
+  @apply gap-1.5;
+}
+
+.primary-action-chip::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
 }
 
 .surface-card-hairline {

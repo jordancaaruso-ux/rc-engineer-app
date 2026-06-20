@@ -90,7 +90,7 @@ export default async function SetupCalibrationDetailPage({
           ) : null}
         </div>
       </header>
-      <section className="page-body space-y-4 pb-6">
+      <section className="page-body pb-6">
         {canManage ? (
           <>
             <CalibrationChassisDefaultPanel

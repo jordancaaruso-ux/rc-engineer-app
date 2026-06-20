@@ -115,7 +115,7 @@ const ADD_RUN: PrimaryNavItem = {
   prefetch: false,
 };
 const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: BarChart3 };
-const GARAGE: PrimaryNavItem = { id: "garage", href: "/garage", label: "Garage", icon: Car };
+const GARAGE: PrimaryNavItem = { id: "garage", href: "/garage", label: "Manage", icon: Car };
 const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: Sparkles };
 const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: Settings };
 
@@ -143,7 +143,7 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
   },
   {
     href: "/videos/analysis/manual/new",
-    label: "Lap sync",
+    label: "Video analysis",
     description: "Review onboard footage and lap timing.",
     icon: Video,
   },
@@ -158,7 +158,7 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
 export const GARAGE_HUB_LINKS: NavHubLink[] = [
   {
     href: "/cars",
-    label: "Cars",
+    label: "Your cars",
     description: "Your cars — name each one and link it to a chassis type.",
     icon: Car,
   },

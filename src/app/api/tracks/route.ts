@@ -7,6 +7,10 @@ import { getFavouriteTrackIdsForUser, addTrackToFavourites } from "@/lib/track-f
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 import { communityTrackListWhere } from "@/lib/tracks/communityTrackAccess";
+import {
+  DOMINANT_TRACK_ORDER_BY,
+  dominantTrackByNameWhere,
+} from "@/lib/tracks/trackCatalogDominance";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -115,7 +119,8 @@ export async function POST(request: Request) {
     }
 
     const existing = await prisma.track.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
+      where: dominantTrackByNameWhere(name),
+      orderBy: DOMINANT_TRACK_ORDER_BY,
       select: {
         id: true,
         name: true,

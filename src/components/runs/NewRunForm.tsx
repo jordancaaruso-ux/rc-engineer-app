@@ -7,7 +7,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { Eyebrow } from "@/components/ui/panel";
+import { Eyebrow, PanelSubtitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
@@ -19,6 +19,7 @@ import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { tireSelectionFromTireSet, tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
 import { TireTypeCombobox, type TireTypeOption } from "@/components/tires/TireTypeCombobox";
+import { RunTireSelectionPanel } from "@/components/runs/RunTireSelectionPanel";
 import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
@@ -26,7 +27,7 @@ import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { CopyLastRunCard } from "@/components/runs/CopyLastRunCard";
 import { useCopyLastRunFormOptional } from "@/components/runs/CopyLastRunFormContext";
-import type { CopyPreviewRunRecord } from "@/lib/runs/getLastRunForCopyPreview";
+import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
@@ -267,7 +268,7 @@ function cloneSetupSnapshot(d: SetupSnapshotData): SetupSnapshotData {
   }
 }
 
-/** Which form areas were filled from copy-last-run (drives brief highlight feedback). */
+/** Which form areas were filled from copy-last-run (drives highlight until the driver touches the field). */
 type LastRunPrefillHighlights = {
   session?: boolean;
   event?: boolean;
@@ -278,8 +279,8 @@ type LastRunPrefillHighlights = {
   setup?: boolean;
 };
 
-function prefillFieldClass(active: boolean) {
-  return cn(active && "ring-2 ring-accent/40 transition-shadow duration-700");
+function prefillFieldClass(_active: boolean) {
+  return "";
 }
 
 function PrefillBadge({ show }: { show?: boolean }) {
@@ -390,7 +391,8 @@ export function NewRunForm(props: {
   const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
   /** Required 1-10 overall car rating; null until the driver sets one. Server enforces presence at "Run complete". */
   const [carRating, setCarRating] = useState<number | null>(null);
-  const [runDetailsTab, setRunDetailsTab] = useState<"car" | "track" | "tires">("tires");
+  type RunDetailsTab = "car" | "tires" | "battery" | "conditions" | "track";
+  const [runDetailsTab, setRunDetailsTab] = useState<RunDetailsTab>("car");
   const [trackSaveWarning, setTrackSaveWarning] = useState(false);
 
   const [showNewBatteryPanel, setShowNewBatteryPanel] = useState(false);
@@ -1307,12 +1309,6 @@ export function NewRunForm(props: {
   }, [props.initialCopyPreviewRun, externalCopyLastRunCard]);
 
   useEffect(() => {
-    if (!prefillHighlights) return;
-    const id = window.setTimeout(() => setPrefillHighlights(null), 6000);
-    return () => window.clearTimeout(id);
-  }, [prefillHighlights]);
-
-  useEffect(() => {
     migrateLegacyLoadedSetup();
   }, []);
 
@@ -1688,7 +1684,7 @@ export function NewRunForm(props: {
       setCopyCarWarning(`Last run used deleted car: ${r.car.name}. Please select a current car.`);
     } else if (r.carNameSnapshot) {
       setCopyCarWarning(`Last run used deleted car: ${r.carNameSnapshot}. Please select a current car.`);
-    } else {
+    } else if (nextCarId || r.car?.name || r.carNameSnapshot) {
       setCopyCarWarning("Last run car is no longer available. Please select a current car.");
     }
 
@@ -1762,9 +1758,6 @@ export function NewRunForm(props: {
     setSetupSource("previous_runs");
     setReplicateLast(true);
     setPrefillHighlights(highlights);
-    if (highlights.car) setRunDetailsTab("car");
-    else if (highlights.tires) setRunDetailsTab("tires");
-    else if (highlights.track) setRunDetailsTab("track");
     });
   }
 
@@ -2551,7 +2544,7 @@ export function NewRunForm(props: {
                   value="TESTING"
                   checked={sessionType === "TESTING"}
                   onChange={() => setSessionType("TESTING")}
-                  className="h-3 w-3 shrink-0 accent-red-500"
+                  className="h-3 w-3 shrink-0 accent-primary"
                 />
                 <span>Testing</span>
               </label>
@@ -2562,7 +2555,7 @@ export function NewRunForm(props: {
                   value="RACE_MEETING"
                   checked={sessionType === "RACE_MEETING"}
                   onChange={() => setSessionType("RACE_MEETING")}
-                  className="h-3 w-3 shrink-0 accent-red-500"
+                  className="h-3 w-3 shrink-0 accent-primary"
                 />
                 <span>Race Meeting</span>
               </label>
@@ -2866,6 +2859,14 @@ export function NewRunForm(props: {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Eyebrow dot="accent">Run details</Eyebrow>
+            <PrefillBadge
+              show={
+                prefillHighlights?.car ||
+                prefillHighlights?.track ||
+                prefillHighlights?.tires ||
+                prefillHighlights?.battery
+              }
+            />
             {isDraft ? (
               <span
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
@@ -2891,6 +2892,10 @@ export function NewRunForm(props: {
           // editors stay mounted only when the user hits Edit — this block
           // just shows enough for them to confirm nothing's amiss.
           <div className="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 text-[11px] sm:grid-cols-[5rem_1fr]">
+            <span className="text-muted-foreground">Car</span>
+            <span className="min-w-0 truncate font-medium text-foreground">
+              {selectedCar?.name ?? "—"}
+            </span>
             <span className="text-muted-foreground">Tires</span>
             <span className="min-w-0 truncate text-foreground/90">
               {(() => {
@@ -2907,10 +2912,6 @@ export function NewRunForm(props: {
                 return `${b.label}${b.packNumber != null ? ` #${b.packNumber}` : ""}`;
               })()}
             </span>
-            <span className="text-muted-foreground">Car</span>
-            <span className="min-w-0 truncate font-medium text-foreground">
-              {selectedCar?.name ?? "—"}
-            </span>
             <span className="text-muted-foreground">Track</span>
             <span className="min-w-0 truncate text-foreground/90">
               {tracksList.find((t) => t.id === trackId)?.name ?? "—"}
@@ -2926,20 +2927,6 @@ export function NewRunForm(props: {
           <button
             type="button"
             role="tab"
-            aria-selected={runDetailsTab === "tires"}
-            className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
-              runDetailsTab === "tires"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setRunDetailsTab("tires")}
-          >
-            Tires / batteries
-          </button>
-          <button
-            type="button"
-            role="tab"
             aria-selected={runDetailsTab === "car"}
             className={cn(
               "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
@@ -2950,6 +2937,48 @@ export function NewRunForm(props: {
             onClick={() => setRunDetailsTab("car")}
           >
             Car
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={runDetailsTab === "tires"}
+            className={cn(
+              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              runDetailsTab === "tires"
+                ? "border-accent text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setRunDetailsTab("tires")}
+          >
+            Tires
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={runDetailsTab === "battery"}
+            className={cn(
+              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              runDetailsTab === "battery"
+                ? "border-accent text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setRunDetailsTab("battery")}
+          >
+            Battery
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={runDetailsTab === "conditions"}
+            className={cn(
+              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              runDetailsTab === "conditions"
+                ? "border-accent text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setRunDetailsTab("conditions")}
+          >
+            Conditions
           </button>
           <button
             type="button"
@@ -2972,10 +3001,7 @@ export function NewRunForm(props: {
           <div className="space-y-3 pt-1">
             <div className="space-y-1 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Eyebrow dot="muted">Car</Eyebrow>
-                  <PrefillBadge show={prefillHighlights?.car} />
-                </div>
+                <Eyebrow dot="muted">Car</Eyebrow>
                 <Link
                   href="/cars"
                   className="btn-surface px-2 py-1 text-[11px]"
@@ -2984,7 +3010,10 @@ export function NewRunForm(props: {
                 </Link>
               </div>
               <select
-                className={cn("form-control w-full px-3 py-2 text-sm", prefillFieldClass(Boolean(prefillHighlights?.car)))}
+                className={cn(
+                  "form-control w-full px-3 py-2 text-sm",
+                  prefillFieldClass(Boolean(prefillHighlights?.car || copyCarWarning))
+                )}
                 value={carId}
                 onChange={(e) => {
                   const next = e.target.value;
@@ -3019,13 +3048,10 @@ export function NewRunForm(props: {
         ) : null}
 
         {runDetailsTab === "track" ? (
-          <div className="space-y-4 pt-1">
+          <div className="space-y-3 pt-1">
             <div className="space-y-1 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Eyebrow dot="muted">Track</Eyebrow>
-                  <PrefillBadge show={prefillHighlights?.track} />
-                </div>
+                <Eyebrow dot="muted">Track</Eyebrow>
                 <Link
                   href="/tracks"
                   className="btn-surface px-2 py-1 text-[11px]"
@@ -3110,128 +3136,42 @@ export function NewRunForm(props: {
         ) : null}
 
         {runDetailsTab === "tires" ? (
-          <div className="space-y-4 pt-1">
-            <div className="space-y-3 text-sm">
-              <div className="space-y-1">
-                <Eyebrow dot="muted">Tire type</Eyebrow>
-                <div className="text-[11px] text-muted-foreground leading-snug">
-                  Broad compound — e.g. Sweep D32. Add more in{" "}
-                  <Link href="/tires" className="text-accent underline">
-                    Garage → Tires
-                  </Link>
-                  .
-                </div>
-                <TireTypeCombobox
-                  value={selectedTireTypeId}
-                  onChange={(id) => {
-                    skipTireResolveRef.current = false;
-                    setSelectedTireTypeId(id);
-                    setTireSetId("");
-                  }}
-                  onSelectedTypeChange={setSelectedTireType}
-                  placeholder="Search tire type"
-                  aria-label="Tire type"
-                />
-              </div>
+          <div className="space-y-3 pt-1">
+            <RunTireSelectionPanel
+              tireSets={tireSets}
+              tireSetId={tireSetId}
+              onSelectExistingSet={(nextId, ts) => {
+                setTireSetId(nextId);
+                applyTireFieldsFromSet(ts);
+                applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
+                setCopyTireWarning(null);
+              }}
+              selectedTireTypeId={selectedTireTypeId}
+              onTireTypeIdChange={setSelectedTireTypeId}
+              onSelectedTireTypeChange={setSelectedTireType}
+              tireSetNumber={tireSetNumber}
+              onTireSetNumberChange={setTireSetNumber}
+              tireSpecificModel={tireSpecificModel}
+              onTireSpecificModelChange={setTireSpecificModel}
+              resolvingTireSet={resolvingTireSet}
+              runsCompleted={runsCompleted}
+              onRunsCompletedChange={setRunsCompleted}
+              onRunsCompletedUserTouched={() => {
+                tireRunUserTouchedRef.current = true;
+              }}
+              skipTireResolveRef={skipTireResolveRef}
+              onPrefillClear={() => setPrefillHighlights((h) => (h ? { ...h, tires: false } : h))}
+              copyTireWarning={copyTireWarning}
+              prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
+            />
+          </div>
+        ) : null}
 
-              {selectedTireTypeId ? (
-                <div className="space-y-1">
-                  <label className="block ui-label-meta font-medium">Specific model (optional)</label>
-                  <input
-                    className="form-control w-full px-3 py-2 text-sm"
-                    placeholder="e.g. premount, SKU, batch"
-                    value={tireSpecificModel}
-                    onChange={(e) => setTireSpecificModel(e.target.value)}
-                    aria-label="Specific tire model"
-                  />
-                </div>
-              ) : null}
-
-              <div className="space-y-1">
-                <label className="block ui-label-meta font-medium">Set number</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="w-full max-w-xs form-control px-3 py-2 text-sm"
-                  placeholder="e.g. 3"
-                  value={tireSetNumber}
-                  onChange={(e) => setTireSetNumber(e.target.value)}
-                  disabled={!selectedTireTypeId}
-                  aria-label="Tire set number"
-                />
-                {!selectedTireTypeId ? (
-                  <p className="text-[11px] text-muted-foreground">Select a tire type first.</p>
-                ) : resolvingTireSet ? (
-                  <p className="text-[11px] text-muted-foreground">Linking tire set…</p>
-                ) : null}
-              </div>
-
-              <div className={cn("space-y-1", prefillFieldClass(Boolean(prefillHighlights?.tires)))}>
-                <div className="flex items-center gap-2">
-                  <label className="block ui-label-meta font-medium">Or pick existing set</label>
-                  <PrefillBadge show={prefillHighlights?.tires} />
-                </div>
-                <select
-                  className="form-control w-full px-3 py-2 text-sm"
-                  value={tireSetId}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    const ts = tireSets.find((t) => t.id === nextId) ?? null;
-                    skipTireResolveRef.current = true;
-                    setTireSetId(nextId);
-                    if (ts) applyTireFieldsFromSet(ts);
-                    applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
-                    setCopyTireWarning(null);
-                    setPrefillHighlights((h) => (h ? { ...h, tires: false } : h));
-                  }}
-                  aria-label="Existing tire set"
-                >
-                  <option value="">—</option>
-                  {tireSets.map((ts) => (
-                    <option key={ts.id} value={ts.id}>
-                      {tireSetDisplayLine(ts)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {copyTireWarning ? (
-                <div className="text-[11px] text-muted-foreground">{copyTireWarning}</div>
-              ) : null}
-            </div>
-
-            {tireSetId ? (
-              <div className="space-y-1 text-sm">
-                <Eyebrow dot="muted">Prior runs on this set (before this log)</Eyebrow>
-                <input
-                  type="number"
-                  min={0}
-                  className="w-full max-w-md form-control px-3 py-2 text-sm"
-                  inputMode="numeric"
-                  value={runsCompleted}
-                  onChange={(e) => {
-                    tireRunUserTouchedRef.current = true;
-                    setRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)));
-                  }}
-                  aria-label="Prior runs on this tire set before this log"
-                />
-                <div className="text-[11px] text-muted-foreground">
-                  This log saves as{" "}
-                  <span className="font-medium text-foreground">tire run #{runsCompleted + 1}</span>
-                  {runsCompleted === 0
-                    ? " (first run on this set)."
-                    : runsCompleted === 1
-                      ? " (after 1 prior run on this set)."
-                      : ` (after ${runsCompleted} prior runs on this set).`}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="border-t border-border pt-4 space-y-2 text-sm">
+        {runDetailsTab === "battery" ? (
+          <div className="space-y-3 pt-1 text-sm">
+            <div className="space-y-2">
               <div className="flex items-end justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Eyebrow dot="muted">Battery pack</Eyebrow>
-                  <PrefillBadge show={prefillHighlights?.battery} />
-                </div>
+                <Eyebrow dot="muted">Battery pack</Eyebrow>
                 <button
                   type="button"
                   className="btn-surface px-3 py-1.5 text-xs"
@@ -3348,6 +3288,17 @@ export function NewRunForm(props: {
             ) : null}
           </div>
         ) : null}
+
+        {runDetailsTab === "conditions" ? (
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <Eyebrow dot="muted">Conditions</Eyebrow>
+              <PanelSubtitle>
+                Track conditions — weather integration coming soon.
+              </PanelSubtitle>
+            </div>
+          </div>
+        ) : null}
           </>
         )}
       </SurfaceCard>
@@ -3361,7 +3312,7 @@ export function NewRunForm(props: {
           isDraft && !setupSectionExpanded && setupBaselineData && "border-emerald-500/40",
           prefillFieldClass(Boolean(prefillHighlights?.setup))
         )}
-        contentClassName="space-y-4"
+        contentClassName="space-y-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -3378,7 +3329,7 @@ export function NewRunForm(props: {
             ) : null}
             {setupChangeCountSinceBaseline > 0 ? (
               <span
-                className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                className="inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
                 title="Number of parameters that differ from the loaded setup."
               >
                 {setupChangeCountSinceBaseline} change{setupChangeCountSinceBaseline === 1 ? "" : "s"} since loaded
@@ -3402,8 +3353,8 @@ export function NewRunForm(props: {
             // setup was already chosen when the draft was saved, so showing
             // "Choose a run…" here just looks unfinished.
             setupChangedRowsSinceBaseline.length > 0 ? (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
-                <div className="mb-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              <div className="rounded-md border border-border bg-muted/50 p-2 text-xs">
+                <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.28em] text-faint">
                   Changes from{" "}
                   {setupSource === "previous_runs" && loadedSetupRun
                     ? loadSetupControlLabel
@@ -3557,8 +3508,8 @@ export function NewRunForm(props: {
               </button>
             </div>
             {setupChangedRowsSinceBaseline.length > 0 ? (
-              <div className="max-w-2xl rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
-                <div className="mb-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              <div className="max-w-2xl rounded-md border border-border bg-muted/50 p-2 text-xs">
+                <div className="mb-1 text-[11px] font-medium text-muted-foreground">
                   Setup is{" "}
                   {setupSource === "previous_runs" && loadedSetupRun
                     ? `from ${loadSetupControlLabel}`
@@ -3829,50 +3780,9 @@ export function NewRunForm(props: {
         isDraftResume={isDraft}
       />
 
-      <label className="flex items-start gap-2 rounded-md border border-border/60 bg-surface-runna/40 px-3 py-2.5 text-xs cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={shareWithTeam}
-          onChange={(e) => setShareWithTeam(e.target.checked)}
-          className="mt-0.5 shrink-0"
-        />
-        <span>
-          <span className="font-medium text-foreground">Share this run with my teams</span>
-          <span className="block text-muted-foreground mt-1 leading-snug">
-            When off, people you share a team with will not see this run in Team Sessions or team-only Engineer lists.
-            One-way teammate links are unchanged.
-          </span>
-        </span>
-      </label>
-
       <SurfaceCard variant="panel" overflowHidden={false} contentClassName="space-y-3 text-sm">
         <Eyebrow dot="accent">Feedback</Eyebrow>
-        <div
-          ref={feedbackRequiredRef}
-          className={cn(
-            "space-y-2 rounded-md border bg-surface-runna/50 p-3 transition-[box-shadow,border-color]",
-            completeValidation.show
-              ? "border-amber-500/60 ring-2 ring-amber-500/30"
-              : "border-border/80"
-          )}
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div
-              className={cn(
-                "text-[11px] font-medium",
-                completeValidation.show
-                  ? "text-amber-800 dark:text-amber-200"
-                  : "text-muted-foreground"
-              )}
-            >
-              Required to complete
-            </div>
-            {completeValidation.show ? (
-              <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">
-                Fill highlighted fields
-              </span>
-            ) : null}
-          </div>
+        <div ref={feedbackRequiredRef} className="space-y-3">
           {completeValidation.show ? (
             <div
               role="alert"
@@ -3883,25 +3793,13 @@ export function NewRunForm(props: {
           ) : null}
           <div
             className={cn(
-              "rounded-md border px-3 py-2 transition-[box-shadow,border-color,background-color]",
-              completeValidation.carRating
-                ? "border-amber-500/70 bg-amber-500/10 ring-2 ring-amber-500/40"
-                : "border-border/80 bg-surface-runna/40"
+              completeValidation.carRating &&
+                "rounded-md ring-2 ring-amber-500/40 ring-offset-2 ring-offset-background"
             )}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div className="text-xs font-medium text-foreground">
-                Car rating{" "}
-                <span
-                  className={cn(
-                    "text-[10px] font-normal",
-                    completeValidation.carRating
-                      ? "font-medium text-amber-700 dark:text-amber-300"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  (1 awful → 10 perfect)
-                </span>
+                Car handling rating
               </div>
               <div
                 className={cn(
@@ -3920,7 +3818,7 @@ export function NewRunForm(props: {
             </div>
             <div
               role="radiogroup"
-              aria-label="Car rating 1 to 10"
+              aria-label="Car handling rating 1 to 10"
               className="mt-2 grid grid-cols-10 gap-1"
             >
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
@@ -3933,7 +3831,7 @@ export function NewRunForm(props: {
                     aria-checked={selected}
                     onClick={() => setCarRating((cur) => (cur === n ? null : n))}
                     className={cn(
-                      "rounded-md border px-0 py-1 text-xs font-medium tabular-nums transition",
+                      "rounded-md border px-0 py-1.5 text-[11px] font-medium tabular-nums transition",
                       selected
                         ? "border-accent bg-accent text-accent-foreground shadow-sm"
                         : completeValidation.carRating
@@ -3946,9 +3844,6 @@ export function NewRunForm(props: {
                 );
               })}
             </div>
-            <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-              The Engineer uses this as the anchor &quot;was the car good?&quot; signal when ranking past setups.
-            </p>
           </div>
           <FeelVsLastRunQuickPick
             value={handlingUi.feelVsLastRun}
@@ -4062,6 +3957,16 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
+      <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={shareWithTeam}
+          onChange={(e) => setShareWithTeam(e.target.checked)}
+          className="shrink-0 rounded border-border"
+        />
+        Share this run with my teams
+      </label>
+
       <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
         {editingCompletedRun ? (
           <>
@@ -4088,11 +3993,6 @@ export function NewRunForm(props: {
           </>
         ) : (
           <>
-            <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-sm">
-              <span className="font-medium text-foreground">Save draft</span> to come back and finish after the run.
-              <span className="mx-1 text-muted-foreground/60">·</span>
-              <span className="font-medium text-foreground">Run complete</span> when nothing else is left to add.
-            </p>
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"

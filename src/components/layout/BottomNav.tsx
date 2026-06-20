@@ -40,7 +40,7 @@ export const BottomNav = memo(function BottomNav() {
                 >
                   <span className="relative shrink-0">
                     {isEngineer ? (
-                      <EngineerNavIcon active={active} />
+                      <EngineerNavIcon />
                     ) : (
                       <Icon className="h-5 w-5" aria-hidden />
                     )}
@@ -51,7 +51,7 @@ export const BottomNav = memo(function BottomNav() {
                       />
                     ) : null}
                   </span>
-                  <span className="ui-title truncate text-[10px] leading-none">{item.label}</span>
+                  <span className="ui-title truncate text-[11px] leading-none">{item.label}</span>
                   <span
                     className={cn(
                       "h-1 w-1 rounded-full bg-accent",

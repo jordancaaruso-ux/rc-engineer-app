@@ -160,7 +160,7 @@ export function SurfaceCard({
 
           overflowHidden && "overflow-hidden",
 
-          isHero ? "p-4 sm:p-5" : "p-3",
+          "p-3",
 
           contentClassName
 

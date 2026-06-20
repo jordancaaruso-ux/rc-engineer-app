@@ -107,7 +107,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
         </div>
       </header>
 
-      <section className="page-body space-y-4">
+      <section className="page-body">
         {duplicateGroupCount > 0 ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             <div className="font-medium text-amber-200">Duplicate chassis names detected</div>
