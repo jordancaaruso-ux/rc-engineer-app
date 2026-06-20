@@ -341,8 +341,8 @@ export default async function RunHistoryPage({
           </div>
         </summary>
         <div className="min-w-0 max-w-full border-t border-border bg-muted/40">
-          <div className="min-w-0 max-w-full overflow-x-auto">
-            <table className="w-full text-sm min-w-[36rem] table-fixed">
+          <div className="min-w-0 max-w-full max-md:overflow-x-hidden md:overflow-x-auto">
+            <table className="w-full max-w-full text-sm table-fixed max-md:min-w-0">
               <RunHistoryColGroup layout={columnLayout} />
               <thead>
                 <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
@@ -374,7 +374,7 @@ export default async function RunHistoryPage({
                     <span className="md:hidden">Top 5</span>
                     <span className="hidden md:inline">Avg top 5</span>
                   </th>
-                  <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                  <th className="hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
                     <span className="md:hidden">Top 10</span>
                     <span className="hidden md:inline">Avg top 10</span>
                   </th>
@@ -382,7 +382,7 @@ export default async function RunHistoryPage({
                     Median
                   </th>
                   <th
-                    className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px] md:text-right"
+                    className="px-1 py-1.5 md:px-2 md:py-2 md:w-auto whitespace-nowrap max-md:text-[10px] md:text-right"
                     aria-label="Setup and laps"
                   />
                 </tr>
@@ -419,8 +419,15 @@ export default async function RunHistoryPage({
     return (
       <SurfaceCard variant="panel" contentClassName="p-0" className="min-w-0 max-w-full">
       <div className="min-w-0 max-w-full">
-        <div className="min-w-0 max-w-full overflow-x-auto">
-          <table className="w-full text-sm min-w-[36rem]">
+        <div className="min-w-0 max-w-full max-md:overflow-x-hidden md:overflow-x-auto">
+          <table className="w-full max-w-full text-sm table-fixed max-md:min-w-0">
+            <RunHistoryColGroup
+              layout={{
+                showReorderColumn: !teamMode,
+                showMemberColumn: teamMode,
+                showSessionColumn,
+              }}
+            />
             <thead>
               <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
                 {!teamMode ? (
@@ -445,13 +452,13 @@ export default async function RunHistoryPage({
                   <span className="md:hidden">Top 5</span>
                   <span className="hidden md:inline">Avg top 5</span>
                 </th>
-                <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                <th className="hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
                   <span className="md:hidden">Top 10</span>
                   <span className="hidden md:inline">Avg top 10</span>
                 </th>
                 <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">Median</th>
                 <th
-                  className="px-1 py-1.5 md:px-2 md:py-2 max-md:w-[26%] md:w-auto whitespace-nowrap max-md:text-[10px] md:text-right"
+                  className="px-1 py-1.5 md:px-2 md:py-2 md:w-auto whitespace-nowrap max-md:text-[10px] md:text-right"
                   aria-label="Setup and laps"
                 />
               </tr>

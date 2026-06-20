@@ -1,9 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  Battery,
   Calendar,
   Car,
   CircleDot,
+  Disc,
   GitCompare,
   History,
   Layers,
@@ -13,14 +15,13 @@ import {
   Settings,
   Sparkles,
   Video,
-  Wrench,
 } from "lucide-react";
 
 export type PrimaryNavId =
   | "dashboard"
   | "add-run"
   | "analysis"
-  | "garage"
+  | "assets"
   | "engineer"
   | "settings";
 
@@ -51,7 +52,7 @@ const ANALYSIS_PREFIXES = [
   "/analysis",
 ] as const;
 
-const GARAGE_PREFIXES = [
+const ASSETS_PREFIXES = [
   "/setup-sheet-models",
   "/setup-documents",
   "/setup-calibrations",
@@ -59,8 +60,11 @@ const GARAGE_PREFIXES = [
   "/setup",
   "/events",
   "/tracks",
+  "/tire-sets",
   "/tires",
+  "/batteries",
   "/cars",
+  "/assets",
   "/garage",
 ] as const;
 
@@ -91,7 +95,7 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
     { id: "dashboard", score: pathname === "/" ? 1 : 0 },
     { id: "add-run", score: addRunMatchScore(pathname) },
     { id: "analysis", score: sectionMatchScore(pathname, ANALYSIS_PREFIXES) },
-    { id: "garage", score: sectionMatchScore(pathname, GARAGE_PREFIXES) },
+    { id: "assets", score: sectionMatchScore(pathname, ASSETS_PREFIXES) },
     { id: "engineer", score: matchPrefixScore(pathname, "/engineer") },
     { id: "settings", score: Math.max(matchPrefixScore(pathname, "/settings"), matchPrefixScore(pathname, "/teams")) },
   ];
@@ -115,17 +119,17 @@ const ADD_RUN: PrimaryNavItem = {
   prefetch: false,
 };
 const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: BarChart3 };
-const GARAGE: PrimaryNavItem = { id: "garage", href: "/garage", label: "Manage", icon: Car };
+const ASSETS: PrimaryNavItem = { id: "assets", href: "/assets", label: "Assets", icon: Car };
 const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: Sparkles };
 const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: Settings };
 
-export const PRIMARY_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, GARAGE, ENGINEER, SETTINGS];
+export const PRIMARY_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSETS, ENGINEER, SETTINGS];
 
 /** Desktop sidebar: same six sections, natural top-to-bottom order. */
-export const DESKTOP_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, GARAGE, ENGINEER, SETTINGS];
+export const DESKTOP_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSETS, ENGINEER, SETTINGS];
 
-/** Mobile bottom bar: Add run centered between Analysis and Garage. */
-export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ADD_RUN, GARAGE, ENGINEER, SETTINGS];
+/** Mobile bottom bar: Add run centered between Analysis and Assets. */
+export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ADD_RUN, ASSETS, ENGINEER, SETTINGS];
 
 export type NavHubLink = {
   href: string;
@@ -155,41 +159,62 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
   },
 ];
 
-export const GARAGE_HUB_LINKS: NavHubLink[] = [
+export type NavHubSection = {
+  eyebrow: string;
+  links: NavHubLink[];
+};
+
+export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
   {
-    href: "/cars",
-    label: "Your cars",
-    description: "Your cars — name each one and link it to a chassis type.",
-    icon: Car,
+    eyebrow: "My assets",
+    links: [
+      {
+        href: "/cars",
+        label: "Cars",
+        description: "Your cars — name each one and link it to a chassis type.",
+        icon: Car,
+      },
+      {
+        href: "/tire-sets",
+        label: "Tires",
+        description: "Your tire sets and run wear history.",
+        icon: Disc,
+      },
+      {
+        href: "/batteries",
+        label: "Batteries",
+        description: "Your battery packs and run history.",
+        icon: Battery,
+      },
+    ],
   },
   {
-    href: "/setup-sheet-models",
-    label: "Chassis types",
-    description: "Shared setup sheet models per chassis (e.g. Mugen MTC3).",
-    icon: Layers,
-  },
-  {
-    href: "/tracks",
-    label: "Tracks",
-    description: "Tracks, layouts, and grip tags.",
-    icon: MapPin,
-  },
-  {
-    href: "/tires",
-    label: "Tires",
-    description: "Tire compounds and your tire sets.",
-    icon: CircleDot,
-  },
-  {
-    href: "/events",
-    label: "Events",
-    description: "Race weekends and practice days.",
-    icon: Calendar,
-  },
-  {
-    href: "/setup",
-    label: "Setup",
-    description: "Setup documents, calibrations, and bulk import.",
-    icon: Wrench,
+    eyebrow: "Global assets",
+    links: [
+      {
+        href: "/setup-sheet-models",
+        label: "Cars",
+        description: "Shared chassis types and setup sheet models (e.g. Mugen MTC3).",
+        icon: Layers,
+      },
+      {
+        href: "/tracks",
+        label: "Tracks",
+        description: "Tracks, layouts, and grip tags.",
+        icon: MapPin,
+      },
+      {
+        href: "/tires",
+        label: "Tires",
+        description: "Shared tire compound catalog (e.g. Sweep D32).",
+        icon: CircleDot,
+      },
+      {
+        href: "/events",
+        label: "Events",
+        description: "Race weekends and practice days.",
+        icon: Calendar,
+      },
+    ],
   },
 ];

@@ -217,7 +217,7 @@ body {
 .sidebar {
   /* NOTE: do not set display here; responsive visibility is controlled in JSX */
   /*
-   * Top padding matches the approximate height of `.page-header` (title + subtitle + py-2.5),
+   * Top padding matches the approximate height of `.page-header` (title + subtitle + py-3),
    * so the first nav row lines up with the header band / horizontal rule to the right.
    */
   @apply w-64 flex-col gap-3 border-r border-border bg-secondary/80 px-4 pb-5 backdrop-blur-md;
@@ -272,27 +272,32 @@ html[data-nav-pending] .page {
 
 .page-header {
   @apply flex items-center justify-between border-b border-border;
-  padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
-  padding-bottom: 0.625rem;
+  padding-top: calc(0.625rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.75rem;
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
 }
 
 @media (min-width: 768px) {
   .page-header {
-    padding-top: 0.625rem;
+    padding-top: 0.75rem;
   }
 }
 
-.page-title {
-  @apply text-[20px] font-extrabold leading-none tracking-tight text-foreground sm:text-[22px];
+/* Title + subtitle stack — one rhythm everywhere `.page-header` is used. */
+.page-header > div:has(.page-title) {
+  @apply flex min-w-0 flex-col gap-1;
 }
 
-/* Page chrome: HK Grotesk Wide extrabold, uppercase — matches PanelTitle scale (e.g. dashboard car name). */
+.page-title {
+  @apply text-[20px] font-bold leading-tight tracking-[-0.02em] text-foreground sm:text-[22px];
+}
+
+/* Page chrome: HK Grotesk Wide bold, sentence case — calmer than in-card PanelTitle extrabold. */
 :where(.page-title) {
   font-family: var(--font-ui);
-  font-style: italic;
-  text-transform: uppercase;
+  font-style: normal;
+  text-transform: none;
 }
 
 /* Session group headers on run history — page-title scale is too large; 11px ≈ 90% of text-xs. */
@@ -340,7 +345,7 @@ html[data-nav-pending] .page {
 }
 
 .page-subtitle {
-  @apply mt-0 text-[13px] font-normal leading-snug tracking-[-0.004em] text-muted-foreground;
+  @apply text-[13px] font-normal leading-relaxed tracking-normal text-muted-foreground;
 }
 
 .page-body {

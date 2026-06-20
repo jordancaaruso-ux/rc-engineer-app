@@ -87,7 +87,7 @@ export function Eyebrow({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {dot ? <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass(dot))} /> : null}
-      <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{children}</span>
+      <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-faint">{children}</span>
     </div>
   );
 }

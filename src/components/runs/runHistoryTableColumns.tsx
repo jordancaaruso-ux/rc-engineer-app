@@ -12,14 +12,15 @@ export function RunHistoryColGroup({ layout }: { layout: RunHistoryColumnLayout 
     <colgroup>
       {showReorderColumn ? <col className="hidden md:table-column w-6" /> : null}
       {showMemberColumn ? <col className="w-[15%]" /> : null}
-      <col className="w-[5.5rem]" />
+      <col className="max-md:w-[4.25rem] md:w-[5.5rem]" />
       {showSessionColumn ? <col /> : null}
       <col className="hidden md:table-column w-[14%]" />
-      <col className="w-[4.25rem]" />
-      <col className="w-[4.25rem]" />
-      <col className="w-[4.25rem]" />
-      <col className="w-[4.25rem]" />
-      <col className="max-md:w-[26%] md:w-[5.5rem]" />
+      <col className="max-md:w-[3.25rem] md:w-[4.25rem]" />
+      <col className="max-md:w-[3.25rem] md:w-[4.25rem]" />
+      {/* Avg top 10 hidden below md — saves horizontal space on narrow viewports */}
+      <col className="hidden md:table-column w-[4.25rem]" />
+      <col className="max-md:w-[3.25rem] md:w-[4.25rem]" />
+      <col className="max-md:w-[3.75rem] md:w-[5.5rem]" />
     </colgroup>
   );
 }

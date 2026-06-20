@@ -22,7 +22,7 @@ const PrimaryNavContext = createContext<PrimaryNavContextValue | null>(null);
 const PREFETCH_ROUTES = [
   "/",
   "/analysis",
-  "/garage",
+  "/assets",
   "/engineer",
   "/settings",
   "/cars",

@@ -229,7 +229,7 @@ export function RunTireSelectionPanel({
             <p className="text-[11px] text-muted-foreground leading-snug">
               Pick a compound you&apos;ve used, search the catalog, or add a new type in{" "}
               <Link href="/tires" className="text-accent underline">
-                Garage → Tires
+                Assets → Tires
               </Link>
               .
             </p>

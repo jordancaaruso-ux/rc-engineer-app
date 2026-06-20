@@ -92,7 +92,7 @@ HK Grotesk Wide (desktop, free from Hanken) and JetBrains Mono are SIL OFL. See 
 
 | Content | Treatment |
 |---------|-----------|
-| Page titles | HK Grotesk Wide 800 (`font-extrabold`), **uppercase** via CSS (`text-transform`). Same scale as `PanelTitle` (`20px` / `22px` sm). Class: `.page-title`. |
+| Page titles | HK Grotesk Wide **700** (`font-bold`), **sentence case** (Title case in JSX). Same scale as `PanelTitle` (`20px` / `22px` sm) but lighter weight so card headlines stay louder. Class: `.page-title`. |
 | Section labels / eyebrows | JetBrains Mono, **uppercase**, ~`tracking-[0.28em]`, `text-faint`. Use `<Eyebrow>`. |
 | Lap times, deltas, run IDs | JetBrains Mono, `tabular-nums`. Prefer `font-mono` over `font-sans tabular-nums`. |
 | Body / form copy | HK Grotesk Wide, 13–15px, `text-muted-foreground` for supporting lines |
@@ -150,7 +150,8 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 
 ### Page chrome
 
-- **Header:** `.page-header` + `h1.page-title` (see any Tier A page).
+- **Header:** `.page-header` + `h1.page-title` + `p.page-subtitle` — title block uses `gap-1` via `:has(.page-title)`; subtitle matches `PanelSubtitle` (`13px`, `leading-relaxed`, `text-muted-foreground`).
+- **Hierarchy:** page title (bold Wide, ink) → page subtitle (muted) → section `<Eyebrow>` (mono, faint, uppercase) — three distinct voices, no competing shout.
 - **Body:** `.page-body` with `max-w-*` as appropriate; `gap-3` between major blocks (locked in CSS).
 - **Mobile nav order (unchanged):** Dashboard · Analysis · **Add run (center)** · Garage · Engineer · Settings.
 
@@ -174,12 +175,12 @@ Ranked by daily use and trust impact. **Finish each tier before inventing screen
 
 | ID | Route | Hub | Rework focus | Status |
 |:--:|-------|-----|--------------|--------|
-| B1 | `/garage` | Garage | Hub grid — clear labels | ⬜ |
-| B2 | `/cars`, `/cars/[id]` | Garage | Entity list + detail pattern | ⬜ |
-| B3 | `/tracks`, `/tracks/[id]` | Garage | List + detail | ⬜ |
-| B4 | `/events`, `/events/[id]` | Garage | Dates, track, tires hierarchy | ⬜ |
-| B5 | `/tires` | Garage | Catalog without visual noise | ⬜ |
-| B6 | `/analysis` | Analysis | Hub — same pattern as Garage | ⬜ |
+| B1 | `/assets` | Assets | Hub — Eyebrow sections (My / Global assets) | 🟡 Partial |
+| B2 | `/cars`, `/cars/[id]` | Assets | Entity list + detail pattern | ⬜ |
+| B3 | `/tracks`, `/tracks/[id]` | Assets | List + detail | ⬜ |
+| B4 | `/events`, `/events/[id]` | Assets | Dates, track, tires hierarchy | ⬜ |
+| B5 | `/tires` | Assets | Catalog without visual noise | ⬜ |
+| B6 | `/analysis` | Analysis | Hub — same pattern as Assets | ⬜ |
 
 ### Tier C — Power user (inherit A/B language)
 
@@ -227,7 +228,7 @@ Before opening a PR or marking a screen “done”:
 - [ ] Primary actions use `Button` / `ButtonLink` primary (yellow + dark text).
 - [ ] Cards use `CardPanel` or `SurfaceCard`, not one-off `bg-card` wrappers with different radii.
 - [ ] Section labels use `<Eyebrow>` where the dashboard does.
-- [ ] Page title uses `.page-title` (uppercase via CSS).
+- [ ] Page title uses `.page-title` (sentence case in JSX; bold Wide — not uppercase).
 - [ ] Works at 390px width with bottom tab bar.
 - [ ] No behavior, routing, or API changes.
 - [ ] Yellow is not used for data meaning (only actions / focus).
@@ -260,5 +261,6 @@ Track these when prioritizing rework:
 
 | Date | Change |
 |------|--------|
+| 2026-06-20 | Page chrome pass — `.page-title` bold sentence case (700), restored header padding + title/subtitle gap; `.page-subtitle` aligned to `PanelSubtitle`; `Eyebrow` uses `text-faint` |
 | 2026-06-19 | Dashboard density pass — hero CTA bottom-align (`sm:items-end`); card padding ~20% tighter (`SurfaceCard` hero `p-4 sm:p-5`, panel `p-3`; `HeroPanel` `px-3 py-2.5`) |
 | 2026-06-19 | Initial doc — locked Technical v2 spec, journey map, rollout status from `design/visual-rework` branch |

@@ -542,18 +542,18 @@ export function RunHistoryTable({
               <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {avg5Display}
               </td>
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+              <td className="hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground whitespace-nowrap">
                 {avg10Display}
               </td>
               <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
                 {medianLapDisplay}
               </td>
               <td
-                className="px-1 py-1.5 md:px-2 md:py-2 align-middle max-md:w-[26%] md:text-right md:whitespace-nowrap"
+                className="px-1 py-1.5 md:px-2 md:py-2 align-middle md:text-right md:whitespace-nowrap"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <div className="flex flex-col items-stretch gap-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-1 md:justify-end">
+                <div className="flex flex-col items-stretch gap-0.5 max-md:w-full md:flex-row md:flex-wrap md:items-center md:justify-end md:gap-1">
                   <button
                     type="button"
                     onClick={() => setSetupModalRunId(run.id)}
@@ -579,7 +579,7 @@ export function RunHistoryTable({
             {isExpanded && (
               <tr className="border-b border-border/80">
                 <td colSpan={totalCols} className="px-2 py-3 md:px-4 md:py-4 align-top">
-                  <div className="min-w-0 w-full overflow-x-auto">
+                  <div className="min-w-0 w-full max-w-full overflow-x-hidden">
                     <RunDetail
                       run={run}
                       pickerRuns={allRunsDescending}

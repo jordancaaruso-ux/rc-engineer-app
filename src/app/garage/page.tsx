@@ -1,12 +1,5 @@
-import { NavHubPage } from "@/components/layout/NavHubPage";
-import { GARAGE_HUB_LINKS } from "@/components/layout/navConfig";
+import { redirect } from "next/navigation";
 
-export default function GarageHubPage() {
-  return (
-    <NavHubPage
-      title="Garage"
-      subtitle="Cars, tracks, tires, events, and setup tools."
-      links={GARAGE_HUB_LINKS}
-    />
-  );
+export default function GarageHubRedirectPage() {
+  redirect("/assets");
 }
