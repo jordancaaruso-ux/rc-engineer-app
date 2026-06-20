@@ -10,14 +10,14 @@ This document is the **single source of truth** for UI/visual work in JRC Race E
 
 ## North star sentence
 
-> A premium racing instrument: **warm-dark graphite** surfaces, **electric-but-confident yellow** for every action, **HK Grotesk Wide** for reading and **JetBrains Mono** for data. Friendly to learn, technical to trust — never cold, never gimmicky.
+> A premium racing instrument: **charcoal graphite** surfaces, **electric-but-confident yellow** for every action, **HK Grotesk Wide** for reading and **JetBrains Mono** for data. Friendly to learn, technical to trust — never cold, never gimmicky.
 
 ### Personality (locked)
 
 | Dimension | Direction |
 |-----------|-----------|
 | Tone | Friendly expert + premium. A hint of competition energy — **not** dated motorsport (no checkered flags, racing stripes, faux-carbon). |
-| Color | Yellow hero on warm espresso base. Inspired by electric sport on dark (DCL), warm editorial browns (FIFA World Cup dark mode) — **not** cold charcoal or club-race nostalgia. |
+| Color | Yellow hero on charcoal graphite base. Inspired by electric sport on dark (DCL) — **not** flat #000 or club-race nostalgia. A trace of warmth remains in ink tones so the shell never reads cold. |
 | Density | Balanced — scannable tables/lists without timing-software cramming. |
 | References | [Drone Champions League](https://www.awwwards.com/sites/drone-champions-league) (yellow signal on dark), FIFA World Cup 2026 dark palette (warm browns), Charles Leclerc site (technical type pairing). |
 
@@ -47,17 +47,17 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 | Token | Hex | Tailwind / CSS | Use |
 |-------|-----|----------------|-----|
-| `bg` | `#17130F` | `background`, `--color-background` | App background (flat) |
-| `surface` | `#1E1A15` | `card`, `--color-card` | Cards, panels |
-| `surface-inset` | `#1B1712` | `secondary`, `input`, `--color-secondary` | Inputs, inset areas |
-| `elevated` | `#241F18` | `muted`, `--color-muted` | Hover, menus, raised |
-| `line` | `#2C2823` | `border`, `--color-border` | Hairline borders, dividers |
-| `ink` | `#ECE7DF` | `foreground` | Primary text |
-| `ink-2` | `#A89C8B` | `muted-foreground` | Secondary text |
-| `ink-3` | `#6A645B` | `faint` | Labels, captions |
+| `bg` | `#121110` | `background`, `--color-background` | App background (flat) |
+| `surface` | `#181716` | `card`, `--color-card` | Cards, panels |
+| `surface-inset` | `#151413` | `secondary`, `input`, `--color-secondary` | Inputs, inset areas |
+| `elevated` | `#1E1D1C` | `muted`, `--color-muted` | Hover, menus, raised |
+| `line` | `#282726` | `border`, `--color-border` | Hairline borders, dividers |
+| `ink` | `#ECE9E4` | `foreground` | Primary text |
+| `ink-2` | `#A09D96` | `muted-foreground` | Secondary text |
+| `ink-3` | `#64625E` | `faint` | Labels, captions |
 | **`accent`** | **`#FFD60A`** | `primary`, `accent`, `ring` | **Brand + all primary actions** |
 | `accent-hover` | `#E6BE00` | `hover:bg-[#E6BE00]` on yellow CTAs | Pressed/hover yellow |
-| `accent-fg` | `#17130F` | `primary-foreground` | Text **on** yellow buttons |
+| `accent-fg` | `#121110` | `primary-foreground` | Text **on** yellow buttons |
 | `gain` | `#4FD089` | ad hoc / `panel.tsx` dot `gain` | Positive data (faster, improved) |
 | `loss` | `#E5644E` | `destructive` | Negative data, errors |
 
@@ -66,14 +66,14 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 - Red primary `#c92a2a` and blue accent `#2563eb` as brand colors.
 - Red/blue body mesh (`--body-glow-*`, `--body-stripe-*`) — set to `0` on default theme.
 - Dusty rose `#D9A299` accent.
-- Cool grey “runna” surfaces on user-facing screens (tokens warmed to espresso in `:root`).
+- Cool grey “runna” surfaces on user-facing screens (tokens neutralized to charcoal in `:root`).
 - Italic uppercase Montserrat page chrome.
 
 ### Color semantics
 
 - **Yellow = action only** (CTAs, focus rings, active nav). Never use yellow to mean “fast lap” or “good data.”
 - **Green / red = data deltas** (`gain` / `loss`).
-- **Dark text on yellow** — always `primary-foreground` (`#17130F`), never white on yellow.
+- **Dark text on yellow** — always `primary-foreground` (`#121110`), never white on yellow.
 
 ---
 
@@ -116,9 +116,9 @@ HK Grotesk Wide (desktop, free from Hanken) and JetBrains Mono are SIL OFL. See 
 | Button / input | 8px | `rounded-lg` |
 | Badge / chip | 6px | `rounded-md` |
 
-- **Borders:** 1px hairline `border-border` (`#2C2823`).
+- **Borders:** 1px hairline `border-border` (`#282726`).
 - **Spacing scale:** 4 · 8 · 12 · 16 · 20 · 24 · 32 · 48 (Tailwind default).
-- **Shadows:** subtle espresso depth on cards; yellow glow on hover via `SurfaceCard` (dashboard pattern).
+- **Shadows:** subtle charcoal depth on cards; yellow glow on hover via `SurfaceCard` (dashboard pattern).
 
 ---
 
@@ -126,7 +126,7 @@ HK Grotesk Wide (desktop, free from Hanken) and JetBrains Mono are SIL OFL. See 
 
 | Context | Treatment |
 |---------|-----------|
-| Default app shell | **Flat espresso** (`#17130F`) — no red/blue mesh |
+| Default app shell | **Flat charcoal** (`#121110`) — no red/blue mesh |
 | Login | Faded hero wash (yellow top glow + ember bottom + fine grain) on flat base |
 | Dashboard hero | `SurfaceCard variant="hero"` — warm glow on hover; static hero acceptable |
 | Data-heavy screens (sessions, setup, tables) | **Calm flat** — no photography, no strong gradients |
@@ -139,7 +139,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 
 | Primitive | File | When to use |
 |-----------|------|-------------|
-| `SurfaceCard` | `src/components/ui/SurfaceCard.tsx` | Base espresso surface; `hero` or `panel` variant |
+| `SurfaceCard` | `src/components/ui/SurfaceCard.tsx` | Base charcoal surface; `hero` or `panel` variant |
 | `CardPanel` | `src/components/ui/CardPanel.tsx` | Standard content card (wraps `SurfaceCard`) |
 | `HeroPanel` | `src/components/ui/HeroPanel.tsx` | Legacy hero wrapper — prefer `SurfaceCard variant="hero"` on new work |
 | `PanelTitle`, `PanelSubtitle`, `HubRowTitle` | `src/components/ui/panel.tsx` | Card headlines + supporting line; hub row labels |
@@ -261,6 +261,7 @@ Track these when prioritizing rework:
 
 | Date | Change |
 |------|--------|
+| 2026-06-20 | Palette shift — warm espresso → charcoal graphite (`#121110` base); neutralized page wash + card glow; ink tones slightly cooler; login hex aligned |
 | 2026-06-20 | Page chrome pass — `.page-title` bold sentence case (700), restored header padding + title/subtitle gap; `.page-subtitle` aligned to `PanelSubtitle`; `Eyebrow` uses `text-faint` |
 | 2026-06-19 | Dashboard density pass — hero CTA bottom-align (`sm:items-end`); card padding ~20% tighter (`SurfaceCard` hero `p-4 sm:p-5`, panel `p-3`; `HeroPanel` `px-3 py-2.5`) |
 | 2026-06-19 | Initial doc — locked Technical v2 spec, journey map, rollout status from `design/visual-rework` branch |

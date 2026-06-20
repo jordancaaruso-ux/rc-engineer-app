@@ -50,7 +50,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#17130f",
+  themeColor: "#121110",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }): ReactNode {
@@ -59,7 +59,7 @@ export default function RootLayout({ children }: { children: ReactNode }): React
       lang="en"
       className={`${inter.variable} ${montserrat.variable} ${jetBrainsMono.variable}`}
     >
-      <body className="min-h-[100dvh] font-sans font-normal antialiased">
+      <body className="min-h-[100dvh] bg-background font-sans font-normal antialiased">
         {/*
          * Single fixed wash at z-index 0 (never negative): duplicate fixed layers on
          * `html` + a div caused a visible seam below the island on iOS Safari.

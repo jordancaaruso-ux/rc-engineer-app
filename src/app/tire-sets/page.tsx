@@ -2,9 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { formatAssetMeta } from "@/lib/assets/formatAssetMeta";
 import { loadUserTireSetsForList } from "@/lib/assets/loadUserAssets";
-import { AssetListRow } from "@/components/assets/AssetListRow";
+import { MyTireSetsClient } from "@/components/assets/MyTireSetsClient";
 import { CardPanel } from "@/components/ui/CardPanel";
 
 export const revalidate = 30;
@@ -31,14 +30,22 @@ export default async function MyTireSetsPage(): Promise<ReactNode> {
   const user = await requireCurrentUser();
   const tireSets = await loadUserTireSetsForList(user.id);
 
+  const initialTireSets = tireSets.map((row) => ({
+    id: row.id,
+    displayLine: row.displayLine,
+    setNumber: row.setNumber,
+    initialRunCount: row.initialRunCount,
+    notes: row.notes,
+    tireType: row.tireType,
+    stats: row.stats,
+  }));
+
   return (
     <>
       <header className="page-header">
         <div>
           <h1 className="page-title">My tires</h1>
-          <p className="page-subtitle">
-            Tire sets you have logged on runs. Add new sets when you log a run.
-          </p>
+          <p className="page-subtitle">Tire sets you have logged or added here.</p>
         </div>
         <Link
           href="/assets"
@@ -48,36 +55,7 @@ export default async function MyTireSetsPage(): Promise<ReactNode> {
         </Link>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl space-y-3">
-          {tireSets.length === 0 ? (
-            <CardPanel contentClassName="text-sm text-muted-foreground">
-              No tire sets yet.{" "}
-              <Link href="/runs/new" prefetch className="text-primary hover:underline">
-                Log a run
-              </Link>{" "}
-              and pick or create a set.
-            </CardPanel>
-          ) : (
-            <ul className="flex flex-col gap-2.5">
-              {tireSets.map((row) => (
-                <li key={row.id}>
-                  <AssetListRow
-                    href={`/tire-sets/${row.id}`}
-                    title={row.displayLine}
-                    meta={formatAssetMeta(row.stats)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="ui-caption text-muted-foreground">
-            Tire compounds live in the{" "}
-            <Link href="/tires" prefetch className="text-primary hover:underline">
-              tire type catalog
-            </Link>
-            .
-          </p>
-        </div>
+        <MyTireSetsClient initialTireSets={initialTireSets} />
       </section>
     </>
   );

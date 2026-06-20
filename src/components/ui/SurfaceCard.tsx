@@ -2,21 +2,10 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-
-
-/** Espresso base shared by dashboard hero + panel cards. */
-
-const SURFACE_BASE = "#1b1712";
-
-
-
 export type SurfaceCardGlowMode = "hover" | "idle-drift" | "none";
 
-
-
 /**
-
- * Warm espresso surface. Flat by default; yellow/brown radial glow fades in on hover.
+ * Charcoal panel surface. Flat by default; yellow/neutral radial glow fades in on hover.
 
  * `hero` keeps slightly stronger shadow and rounded-2xl.
 
@@ -80,7 +69,7 @@ export function SurfaceCard({
 
       className={cn(
 
-        "group relative border border-border transition-[opacity,filter] duration-500",
+        "group relative border border-border bg-card transition-[opacity,filter] duration-500",
 
         radiusClass,
 
@@ -95,8 +84,6 @@ export function SurfaceCard({
         className
 
       )}
-
-      style={{ backgroundColor: SURFACE_BASE }}
 
     >
 

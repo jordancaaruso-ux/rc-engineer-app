@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 /**
- * Dashboard panel surface — flat espresso card; warm glow on hover (via SurfaceCard).
+ * Dashboard panel surface — flat charcoal card; glow on hover (via SurfaceCard).
  * Use SurfaceCard directly when you need `hero` variant or custom padding.
  */
 export function CardPanel({

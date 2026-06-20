@@ -18,8 +18,9 @@ import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/set
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { tireSelectionFromTireSet, tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
-import { TireTypeCombobox, type TireTypeOption } from "@/components/tires/TireTypeCombobox";
+import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { RunTireSelectionPanel } from "@/components/runs/RunTireSelectionPanel";
+import { QuickAddBatteryPanel } from "@/components/assets/QuickAddBatteryPanel";
 import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
@@ -27,6 +28,7 @@ import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { CopyLastRunCard } from "@/components/runs/CopyLastRunCard";
 import { useCopyLastRunFormOptional } from "@/components/runs/CopyLastRunFormContext";
+import { useTodayDraftRunOptional } from "@/components/layout/TodayDraftRunProvider";
 import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
@@ -311,6 +313,7 @@ export function NewRunForm(props: {
 }) {
   const router = useRouter();
   const copyLastRunCtx = useCopyLastRunFormOptional();
+  const todayDraftCtx = useTodayDraftRunOptional();
   const externalCopyLastRunCard = Boolean(copyLastRunCtx);
   const [carsList, setCarsList] = useState<CarOption[]>(props.cars);
   const tracks = props.tracks;
@@ -332,7 +335,6 @@ export function NewRunForm(props: {
   const [tireSets, setTireSets] = useState<TireSetOption[]>([]);
   const [tireSetId, setTireSetId] = useState<string>("");
   const [selectedTireTypeId, setSelectedTireTypeId] = useState<string>("");
-  const [selectedTireType, setSelectedTireType] = useState<TireTypeOption | null>(null);
   const [tireSetNumber, setTireSetNumber] = useState<string>("");
   const [tireSpecificModel, setTireSpecificModel] = useState("");
   const [resolvingTireSet, setResolvingTireSet] = useState(false);
@@ -396,10 +398,6 @@ export function NewRunForm(props: {
   const [trackSaveWarning, setTrackSaveWarning] = useState(false);
 
   const [showNewBatteryPanel, setShowNewBatteryPanel] = useState(false);
-  const [creatingBattery, setCreatingBattery] = useState(false);
-  const [newBatteryLabel, setNewBatteryLabel] = useState("");
-  const [newBatteryPackNumber, setNewBatteryPackNumber] = useState<string>("1");
-  const [newBatteryInitialRunCount, setNewBatteryInitialRunCount] = useState<number>(0);
 
   const [shareWithTeam, setShareWithTeam] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -455,6 +453,7 @@ export function NewRunForm(props: {
   const skipTireResolveRef = useRef(false);
   /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
   const pendingCompleteNavigationRef = useRef(false);
+  const pendingDraftNavigationRef = useRef(false);
   const [trackLocationPrompt, setTrackLocationPrompt] = useState<{
     trackId: string;
     trackName: string;
@@ -590,7 +589,6 @@ export function NewRunForm(props: {
       skipTireResolveRef.current = true;
       if (r.tireSet.tireType) {
         setSelectedTireTypeId(r.tireSet.tireType.id);
-        setSelectedTireType(r.tireSet.tireType);
       }
       setTireSetNumber(String(r.tireSet.setNumber ?? ""));
       setTireSpecificModel(r.tireSet.specificModel?.trim() ?? "");
@@ -796,17 +794,14 @@ export function NewRunForm(props: {
   function applyTireFieldsFromSet(ts: TireSetOption | null) {
     if (!ts) {
       setSelectedTireTypeId("");
-      setSelectedTireType(null);
       setTireSetNumber("");
       setTireSpecificModel("");
       return;
     }
     if (ts.tireType) {
       setSelectedTireTypeId(ts.tireType.id);
-      setSelectedTireType(ts.tireType);
     } else {
       setSelectedTireTypeId("");
-      setSelectedTireType(null);
     }
     setTireSetNumber(ts.setNumber != null && ts.setNumber >= 1 ? String(ts.setNumber) : "");
     setTireSpecificModel(ts.specificModel?.trim() ?? "");
@@ -1109,7 +1104,6 @@ export function NewRunForm(props: {
     if (sessionType === "RACE_MEETING" && ev.controlledTireTypeId) {
       skipTireResolveRef.current = true;
       setSelectedTireTypeId(ev.controlledTireTypeId);
-      if (ev.controlledTireType) setSelectedTireType(ev.controlledTireType);
       setTireSetId("");
       setTireSetNumber("");
       setTireSpecificModel("");
@@ -1924,69 +1918,6 @@ export function NewRunForm(props: {
     }
   }
 
-  async function createBattery(e?: React.MouseEvent) {
-    e?.preventDefault();
-    const label = newBatteryLabel.trim();
-    if (!label) {
-      setInlineError("Enter a battery label (e.g. LCG 6000mAh).");
-      return;
-    }
-    setInlineError(null);
-    setStatus(null);
-    setCreatingBattery(true);
-
-    const packRaw = newBatteryPackNumber.trim();
-    const packParsed = packRaw === "" ? NaN : parseInt(packRaw, 10);
-    const packNumber = Number.isFinite(packParsed) && packParsed >= 1 ? packParsed : 1;
-    const initialRunCount = newBatteryInitialRunCount >= 0 ? Math.floor(newBatteryInitialRunCount) : 0;
-
-    const runCreate = async (): Promise<{ battery: BatteryPackOption }> => {
-      const res = await fetch("/api/batteries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label,
-          packNumber,
-          initialRunCount,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = (data as { error?: string })?.error || `Server error (${res.status})`;
-        throw new Error(msg);
-      }
-      const battery = (data as { battery?: BatteryPackOption })?.battery;
-      if (!battery?.id) {
-        throw new Error("Invalid response: battery not returned.");
-      }
-      return { battery };
-    };
-
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Request timed out (15s). Try again.")), 15000)
-    );
-
-    try {
-      const { battery } = await Promise.race([runCreate(), timeout]);
-      setBatteries((prev) => [battery, ...prev]);
-      setBatteryId(battery.id);
-      batteryRunUserTouchedRef.current = true;
-      setBatteryRunsCompleted(initialRunCount);
-      setNewBatteryLabel("");
-      setNewBatteryPackNumber("1");
-      setNewBatteryInitialRunCount(0);
-      setShowNewBatteryPanel(false);
-      setStatus("Battery pack created — selected.");
-      setInlineError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to create battery";
-      setStatus(msg);
-      setInlineError(msg);
-    } finally {
-      setCreatingBattery(false);
-    }
-  }
-
   function buildImportedLapSetsFromIngest(current: LapIngestFormValue): Array<{
     sourceUrl: string | null;
     driverId: string | null;
@@ -2136,7 +2067,8 @@ export function NewRunForm(props: {
     opts: { bypassUnsavedSetupCheck?: boolean } = {}
   ) {
     e?.preventDefault();
-    if (pendingCompleteNavigationRef.current) return;
+    if (pendingCompleteNavigationRef.current || pendingDraftNavigationRef.current) return;
+    if (saving) return;
     setInlineError(null);
     setStatus(null);
     if (!carId) {
@@ -2370,6 +2302,7 @@ export function NewRunForm(props: {
       if (intent === "completed") {
         navigateAfterRunComplete(run.id);
       } else if (isEditing) {
+        await todayDraftCtx?.refreshDraft();
         const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
           `/api/runs/last?carId=${carId}`
         ).catch(() => ({ lastRun: null }));
@@ -2383,8 +2316,11 @@ export function NewRunForm(props: {
         // Prevents the tire/battery counters from re-anchoring on this
         // just-saved draft (which caused a double-increment when they
         // returned to finish it).
+        pendingDraftNavigationRef.current = true;
+        await todayDraftCtx?.refreshDraft();
         setTimeout(() => {
           router.push("/");
+          router.refresh();
         }, 600);
       }
     } catch (err) {
@@ -2393,7 +2329,9 @@ export function NewRunForm(props: {
       setInlineError(msg);
     } finally {
       if (!(intent === "completed" && pendingCompleteNavigationRef.current)) {
-        setSaving(false);
+        if (!(intent === "draft" && pendingDraftNavigationRef.current)) {
+          setSaving(false);
+        }
       }
     }
   }
@@ -2402,6 +2340,7 @@ export function NewRunForm(props: {
     pendingCompleteNavigationRef.current = true;
     setTimeout(() => {
       router.push(`/?suggestRun=${encodeURIComponent(runId)}`);
+      router.refresh();
     }, 600);
   }
 
@@ -3142,17 +3081,20 @@ export function NewRunForm(props: {
               tireSetId={tireSetId}
               onSelectExistingSet={(nextId, ts) => {
                 setTireSetId(nextId);
-                applyTireFieldsFromSet(ts);
+                if (!nextId) setTireSpecificModel("");
+                // Only hydrate type/set fields when picking a saved set — clearing the set id
+                // during new-set flow must not wipe a tire type the user just selected.
+                if (ts) applyTireFieldsFromSet(ts);
                 applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
                 setCopyTireWarning(null);
               }}
               selectedTireTypeId={selectedTireTypeId}
-              onTireTypeIdChange={setSelectedTireTypeId}
-              onSelectedTireTypeChange={setSelectedTireType}
+              onTireTypeIdChange={(id) => {
+                setSelectedTireTypeId(id);
+                if (!id) setTireSpecificModel("");
+              }}
               tireSetNumber={tireSetNumber}
               onTireSetNumberChange={setTireSetNumber}
-              tireSpecificModel={tireSpecificModel}
-              onTireSpecificModelChange={setTireSpecificModel}
               resolvingTireSet={resolvingTireSet}
               runsCompleted={runsCompleted}
               onRunsCompletedChange={setRunsCompleted}
@@ -3209,55 +3151,22 @@ export function NewRunForm(props: {
             </div>
 
             {showNewBatteryPanel && (
-              <div className="inset-panel p-3 space-y-3">
-                <div className="grid gap-2 md:grid-cols-2">
-                  <input
-                    className="form-control px-3 py-2 text-sm"
-                    placeholder="Label (e.g. LCG 6000mAh)"
-                    value={newBatteryLabel}
-                    onChange={(e) => setNewBatteryLabel(e.target.value)}
-                    aria-label="Battery label"
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    className="form-control px-3 py-2 text-sm"
-                    placeholder="Pack number"
-                    value={newBatteryPackNumber}
-                    onChange={(e) => setNewBatteryPackNumber(e.target.value)}
-                    aria-label="Pack number"
-                  />
-                </div>
-                <div className="space-y-1 text-sm">
-                  <Eyebrow dot="muted">Prior runs on this pack (before first log)</Eyebrow>
-                  <input
-                    type="number"
-                    min={0}
-                    className="form-control w-full px-3 py-2 text-sm"
-                    inputMode="numeric"
-                    value={newBatteryInitialRunCount}
-                    onChange={(e) =>
-                      setNewBatteryInitialRunCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-                    }
-                    aria-label="Prior runs on this battery pack before first log"
-                  />
-                  <div className="text-[11px] text-muted-foreground">
-                    First log on this pack will be{" "}
-                    <span className="font-medium text-foreground">battery run #{newBatteryInitialRunCount + 1}</span>.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={cn(
-                    buttonLinkClassName("primary"),
-                    (!newBatteryLabel.trim() || creatingBattery) && "opacity-60 pointer-events-none"
-                  )}
-                  onClick={(e) => createBattery(e)}
-                  disabled={!newBatteryLabel.trim() || creatingBattery}
-                >
-                  {creatingBattery ? "Adding…" : "Add battery pack"}
-                </button>
-              </div>
+              <QuickAddBatteryPanel
+                onCreated={(battery) => {
+                  setBatteries((prev) => [battery, ...prev]);
+                  setBatteryId(battery.id);
+                  batteryRunUserTouchedRef.current = true;
+                  setBatteryRunsCompleted(battery.initialRunCount ?? 0);
+                  applyTireBatteryToSetupSnapshot(tireSetIdRef.current, battery.id);
+                  setShowNewBatteryPanel(false);
+                  setCopyBatteryWarning(null);
+                  setStatus("Battery pack created — selected.");
+                }}
+                onCancel={() => {
+                  setShowNewBatteryPanel(false);
+                  setInlineError(null);
+                }}
+              />
             )}
 
             {!showNewBatteryPanel && batteryId ? (

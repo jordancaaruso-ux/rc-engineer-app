@@ -1,30 +1,14 @@
-import Link from "next/link";
 import type { NavHubLink, NavHubSection } from "@/components/layout/navConfig";
-import { ChevronRight } from "lucide-react";
-import { Eyebrow, HubRowTitle } from "@/components/ui/panel";
-import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { HubNavLink } from "@/components/layout/HubNavLink";
+import { Eyebrow } from "@/components/ui/panel";
 
-function HubLinkRow({ link }: { link: NavHubLink }) {
-  const Icon = link.icon;
+function HubLinkList({ links }: { links: NavHubLink[] }) {
   return (
-    <li>
-      <Link href={link.href} prefetch className="tap-active block">
-        <SurfaceCard variant="panel" contentClassName="flex items-center gap-3 px-4 py-3">
-          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-border bg-background/50 text-muted-foreground transition-colors group-hover:text-foreground">
-            <Icon className="size-[15px]" aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <HubRowTitle as="span" className="block">
-              {link.label}
-            </HubRowTitle>
-          </span>
-          <ChevronRight
-            className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
-            aria-hidden
-          />
-        </SurfaceCard>
-      </Link>
-    </li>
+    <ul className="flex flex-col gap-2.5">
+      {links.map((link) => (
+        <HubNavLink key={link.href} link={link} />
+      ))}
+    </ul>
   );
 }
 
@@ -54,19 +38,13 @@ export function NavHubPage({
                 <Eyebrow dot="muted">{section.eyebrow}</Eyebrow>
                 <ul className="flex flex-col gap-2.5">
                   {section.links.map((link) => (
-                    <HubLinkRow key={link.href} link={link} />
+                    <HubNavLink key={link.href} link={link} />
                   ))}
                 </ul>
               </div>
             ))
           : null}
-        {links ? (
-          <ul className="flex flex-col gap-2.5">
-            {links.map((link) => (
-              <HubLinkRow key={link.href} link={link} />
-            ))}
-          </ul>
-        ) : null}
+        {links ? <HubLinkList links={links} /> : null}
       </section>
     </>
   );

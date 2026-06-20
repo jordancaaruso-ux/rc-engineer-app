@@ -7,36 +7,36 @@
   /* Primary UI stack: Wide (self-hosted) → HK Grotesk (npm fallback) → legacy Inter. */
   --font-ui: "HK Grotesk Wide", "HK Grotesk", var(--font-sans), system-ui, sans-serif;
   /* Legacy single-hex aliases (some docs / snippets); UI uses Tailwind + rgb triplets below. */
-  --background: #17130f;
-  --foreground: #ece7df;
-  --surface: #1e1a15;
-  --secondary-bg: #1b1712;
-  --muted-fg: #a89c8b;
-  --faint: #6a645b;
-  --border: #2c2823;
+  --background: #121110;
+  --foreground: #ece9e4;
+  --surface: #181716;
+  --secondary-bg: #151413;
+  --muted-fg: #a09d96;
+  --faint: #64625e;
+  --border: #282726;
   --accent: #ffd60a;
   --primary: #ffd60a;
 
-  /* Technical v2 — warm espresso graphite + electric yellow. Dark text on yellow. */
-  --color-background: 23 19 15; /* #17130F */
-  --color-foreground: 236 231 223; /* #ECE7DF */
-  --color-card: 30 26 21; /* #1E1A15 */
-  --color-card-foreground: 236 231 223;
+  /* Technical v2 — charcoal graphite + electric yellow. Dark text on yellow. */
+  --color-background: 18 17 16; /* #121110 */
+  --color-foreground: 236 233 228; /* #ECE9E4 */
+  --color-card: 24 23 22; /* #181716 */
+  --color-card-foreground: 236 233 228;
   --color-primary: 255 214 10; /* #FFD60A */
-  --color-primary-foreground: 23 19 15; /* #17130F */
-  --color-secondary: 27 23 18; /* #1B1712 */
-  --color-secondary-foreground: 236 231 223;
-  --color-muted: 36 31 24; /* #241F18 */
-  --color-muted-foreground: 168 156 139; /* #A89C8B */
+  --color-primary-foreground: 18 17 16; /* #121110 */
+  --color-secondary: 21 20 19; /* #151413 */
+  --color-secondary-foreground: 236 233 228;
+  --color-muted: 30 29 28; /* #1E1D1C */
+  --color-muted-foreground: 160 157 150; /* #A09D96 */
   --color-accent: 255 214 10; /* #FFD60A */
-  --color-accent-foreground: 23 19 15; /* #17130F */
+  --color-accent-foreground: 18 17 16; /* #121110 */
   --color-destructive: 229 100 78; /* #E5644E */
-  --color-border: 44 40 35; /* #2C2823 */
-  --color-input: 27 23 18; /* #1B1712 */
+  --color-border: 40 39 38; /* #282726 */
+  --color-input: 21 20 19; /* #151413 */
   --color-ring: 255 214 10; /* #FFD60A */
-  --color-faint: 106 100 91; /* #6A645B */
+  --color-faint: 100 98 94; /* #64625E */
 
-  /* Flat espresso base — red/blue mesh retired. Faded hero lives only on login/dashboard. */
+  /* Flat charcoal base — red/blue mesh retired. Faded hero lives only on login/dashboard. */
   --body-glow-red-strong: 0;
   --body-glow-red-soft: 0;
   --body-glow-blue: 0;
@@ -48,14 +48,14 @@
   /* SurfaceCard hover glow. */
   --surface-card-glow-image:
     radial-gradient(120% 140% at 100% 0%, rgba(255, 214, 10, 0.12), transparent 55%),
-    radial-gradient(120% 120% at 0% 110%, rgba(150, 108, 58, 0.22), transparent 60%);
-  /* Safari `theme-color` + html overscroll fallback — espresso, matches the flat base. */
-  --page-top-theme: #17130f;
+    radial-gradient(120% 120% at 0% 110%, rgba(72, 68, 64, 0.14), transparent 60%);
+  /* Safari `theme-color` + html overscroll fallback — charcoal, matches the flat base. */
+  --page-top-theme: #121110;
 
-  /* Warm flat surfaces (espresso) — replaces the cool runna greys so panels stay on-palette. */
-  --color-surface-runna-deep: 22 18 14;
-  --color-surface-runna: 30 26 21;
-  --color-surface-runna-inset: 36 31 24;
+  /* Neutral flat surfaces — inset controls stay on-palette with card/muted layers. */
+  --color-surface-runna-deep: 15 15 14;
+  --color-surface-runna: 24 23 22;
+  --color-surface-runna-inset: 30 29 28;
 
   /* Mobile bottom tab bar (see BottomNav.tsx) */
   --mobile-tab-bar-height: 3.25rem;
@@ -117,9 +117,9 @@ body {
  * behind the Dynamic Island instead of leaving flat base color there.
  */
 /*
- * Technical v2 global wash — warm espresso depth so large areas never read dead-flat.
+ * Technical v2 global wash — charcoal depth so large areas never read dead-flat.
  * Layered (front→back): edge vignette for framing, a yellow "lit-from-above" whisper,
- * warm graphite-brown lifts top + bottom, and soft corner depth. Tuned subtle so it
+ * neutral graphite lifts top + bottom, and soft corner depth. Tuned subtle so it
  * adds richness in gutters without fighting content (cards stay solid `bg-card`).
  * The stronger faded hero still lives on login / dashboard, layered above this.
  */
@@ -138,15 +138,15 @@ body {
   background-image:
     radial-gradient(120% 120% at 50% 42%, transparent 52%, rgba(0, 0, 0, 0.32) 100%),
     radial-gradient(120% 78% at 50% -12%, rgba(255, 214, 10, 0.07), transparent 56%),
-    radial-gradient(135% 95% at 50% -22%, rgba(104, 74, 42, 0.26), transparent 60%),
-    radial-gradient(130% 85% at 50% 120%, rgba(74, 50, 30, 0.3), transparent 72%),
-    radial-gradient(75% 62% at 6% 4%, rgba(122, 86, 46, 0.14), transparent 60%),
-    radial-gradient(95% 85% at 102% 104%, rgba(150, 108, 58, 0.22), transparent 64%),
+    radial-gradient(135% 95% at 50% -22%, rgba(58, 54, 50, 0.18), transparent 60%),
+    radial-gradient(130% 85% at 50% 120%, rgba(44, 42, 40, 0.22), transparent 72%),
+    radial-gradient(75% 62% at 6% 4%, rgba(68, 64, 60, 0.10), transparent 60%),
+    radial-gradient(95% 85% at 102% 104%, rgba(72, 68, 64, 0.14), transparent 64%),
     radial-gradient(60% 52% at 100% 100%, rgba(255, 214, 10, 0.06), transparent 58%);
   background-repeat: no-repeat;
 }
 
-/* Fine grain so the warm wash has texture and never bands or reads as dead-flat. */
+/* Fine grain so the charcoal wash has texture and never bands or reads as dead-flat. */
 .page-bg::after {
   content: "";
   position: absolute;
@@ -167,7 +167,7 @@ body {
  * Elevated panel surface — the shared "lift" that makes cards siblings of the
  * dashboard hero instead of flat near-black rectangles. Warm top sheen + a
  * gradient that lifts the top edge + a soft drop shadow so panels read off the
- * espresso page background. `color-mix` keeps it on-palette across every theme.
+ * charcoal page background. `color-mix` keeps it on-palette across every theme.
  */
 .surface-1 {
   background-color: rgb(var(--color-card));
@@ -387,7 +387,7 @@ select:focus-visible {
   box-shadow: none;
 }
 
-/* Warm espresso controls nested inside SurfaceCard panels (Log run, ingest, setup). */
+/* Inset controls nested inside SurfaceCard panels (Log run, ingest, setup). */
 .form-control {
   @apply rounded-md border border-border bg-surface-runna-inset outline-none;
 }
@@ -519,7 +519,7 @@ html.video-overlay-fullscreen-active body {
 .surface-card-glow-idle {
   background-image:
     radial-gradient(120% 140% at 100% 0%, rgba(255, 214, 10, 0.14), transparent 55%),
-    radial-gradient(120% 120% at 0% 110%, rgba(150, 108, 58, 0.24), transparent 60%);
+    radial-gradient(120% 120% at 0% 110%, rgba(72, 68, 64, 0.16), transparent 60%);
   transform-origin: 50% 50%;
   animation: surface-card-glow-drift-idle 22s ease-in-out infinite;
 }

@@ -7,6 +7,7 @@ import { isHiddenNavRoute } from "@/components/layout/navConfig";
 import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
+import { RouteTransitionProvider } from "@/components/layout/RouteTransitionProvider";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -24,11 +25,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Sidebar />
           <main
             className={cn(
-              "page",
+              "page relative",
               "pb-[calc(var(--mobile-tab-bar-height)+env(safe-area-inset-bottom))] md:pb-0"
             )}
           >
-            {children}
+            <RouteTransitionProvider>{children}</RouteTransitionProvider>
           </main>
         </div>
         {/*

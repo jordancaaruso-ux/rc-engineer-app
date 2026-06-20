@@ -113,15 +113,15 @@ function LoginForm() {
   return (
     <div
       className="relative flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center overflow-hidden px-5 py-12"
-      style={{ backgroundColor: "#17130F", ...SANS }}
+      style={{ backgroundColor: "#121110", ...SANS }}
     >
-      {/* Faded hero wash — warm glow top, ember glow bottom (login/dashboard only). */}
+      {/* Faded hero wash — yellow glow top, neutral lift bottom (login/dashboard only). */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(115% 75% at 50% -8%, rgba(255,214,10,0.10), rgba(255,214,10,0) 55%), radial-gradient(90% 60% at 50% 115%, rgba(150,96,44,0.20), rgba(150,96,44,0) 70%)",
+            "radial-gradient(115% 75% at 50% -8%, rgba(255,214,10,0.10), rgba(255,214,10,0) 55%), radial-gradient(90% 60% at 50% 115%, rgba(72,68,64,0.14), rgba(72,68,64,0) 70%)",
         }}
       />
       {/* Fine grain for richness — very subtle. */}
@@ -143,7 +143,7 @@ function LoginForm() {
       <div className="relative z-10 w-full max-w-[400px]">
         {/* Brand lockup (type-based for now; logo asset rework is a separate step). */}
         <div className="flex flex-col items-center text-center">
-          <span className="text-[44px] font-extrabold leading-none tracking-tight text-[#ECE7DF]">
+          <span className="text-[44px] font-extrabold leading-none tracking-tight text-[#ECE9E4]">
             JRC
           </span>
           <span
@@ -154,18 +154,18 @@ function LoginForm() {
           </span>
         </div>
 
-        <div className="mt-9 rounded-2xl border border-[#241F1A] bg-[#161310]/70 p-6 shadow-[0_24px_70px_-28px_rgba(0,0,0,0.75)] backdrop-blur-sm">
+        <div className="mt-9 rounded-2xl border border-[#282726] bg-[#121110]/70 p-6 shadow-[0_24px_70px_-28px_rgba(0,0,0,0.75)] backdrop-blur-sm">
           <div className="mb-5 flex items-center justify-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-[#4FD089]" />
-            <span className="text-[10px] tracking-[0.3em] text-[#6A645B]" style={MONO}>
+            <span className="text-[10px] tracking-[0.3em] text-[#64625E]" style={MONO}>
               SECURE SIGN-IN
             </span>
           </div>
 
-          <h1 className="text-center text-[22px] font-bold tracking-tight text-[#ECE7DF]">
+          <h1 className="text-center text-[22px] font-bold tracking-tight text-[#ECE9E4]">
             Sign in
           </h1>
-          <p className="mx-auto mt-2 max-w-[19rem] text-center text-[13.5px] leading-relaxed text-[#A89C8B]">
+          <p className="mx-auto mt-2 max-w-[19rem] text-center text-[13.5px] leading-relaxed text-[#A09D96]">
             Only invited email addresses can sign in. Ask the app owner to add yours to the
             allowlist.
           </p>
@@ -174,7 +174,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => void signIn("google", { callbackUrl })}
-              className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-[#2C2823] bg-[#1E1A15] px-4 py-3 text-[14px] font-semibold text-[#ECE7DF] transition-colors hover:bg-[#241F18]"
+              className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-[#282726] bg-[#181716] px-4 py-3 text-[14px] font-semibold text-[#ECE9E4] transition-colors hover:bg-[#1E1D1C]"
             >
               <GoogleMark />
               Continue with Google
@@ -183,17 +183,17 @@ function LoginForm() {
 
           {showGoogle ? (
             <div className="my-5 flex items-center gap-3">
-              <span className="h-px flex-1 bg-[#2C2823]" />
-              <span className="text-[10px] tracking-[0.3em] text-[#6A645B]" style={MONO}>
+              <span className="h-px flex-1 bg-[#282726]" />
+              <span className="text-[10px] tracking-[0.3em] text-[#64625E]" style={MONO}>
                 OR
               </span>
-              <span className="h-px flex-1 bg-[#2C2823]" />
+              <span className="h-px flex-1 bg-[#282726]" />
             </div>
           ) : null}
 
           <form onSubmit={onSubmit} className={showGoogle ? "space-y-4" : "mt-6 space-y-4"}>
             <label className="block">
-              <span className="mb-2 block text-[10px] tracking-[0.25em] text-[#6A645B]" style={MONO}>
+              <span className="mb-2 block text-[10px] tracking-[0.25em] text-[#64625E]" style={MONO}>
                 EMAIL
               </span>
               <input
@@ -204,14 +204,14 @@ function LoginForm() {
                 autoComplete="email"
                 required
                 placeholder="you@example.com"
-                className="w-full rounded-lg border border-[#2C2823] bg-[#1B1712] px-3.5 py-3 text-[15px] text-[#ECE7DF] outline-none transition-colors placeholder:text-[#6A645B] focus:border-[#FFD60A]"
+                className="w-full rounded-lg border border-[#282726] bg-[#151413] px-3.5 py-3 text-[15px] text-[#ECE9E4] outline-none transition-colors placeholder:text-[#64625E] focus:border-[#FFD60A]"
               />
             </label>
             {error ? <p className="text-[13px] leading-snug text-[#E5644E]">{error}</p> : null}
             <button
               type="submit"
               disabled={pending}
-              className="w-full rounded-lg bg-[#FFD60A] px-4 py-3 text-[13px] font-bold uppercase tracking-[0.14em] text-[#17130F] transition-colors hover:bg-[#E6BE00] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg bg-[#FFD60A] px-4 py-3 text-[13px] font-bold uppercase tracking-[0.14em] text-[#121110] transition-colors hover:bg-[#E6BE00] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {pending ? "Sending…" : "Email me a link"}
             </button>
@@ -221,7 +221,7 @@ function LoginForm() {
         <p className="mt-7 text-center">
           <Link
             href="/"
-            className="text-[11px] tracking-[0.2em] text-[#6A645B] underline-offset-4 transition-colors hover:text-[#A89C8B] hover:underline"
+            className="text-[11px] tracking-[0.2em] text-[#64625E] underline-offset-4 transition-colors hover:text-[#A09D96] hover:underline"
             style={MONO}
           >
             ← BACK TO HOME
@@ -238,9 +238,9 @@ export default function LoginPage(): ReactNode {
       fallback={
         <div
           className="flex min-h-[100dvh] w-full flex-1 items-center justify-center"
-          style={{ backgroundColor: "#17130F" }}
+          style={{ backgroundColor: "#121110" }}
         >
-          <span className="text-[11px] tracking-[0.3em] text-[#6A645B]" style={MONO}>
+          <span className="text-[11px] tracking-[0.3em] text-[#64625E]" style={MONO}>
             LOADING…
           </span>
         </div>

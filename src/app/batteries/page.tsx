@@ -2,9 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { formatAssetMeta } from "@/lib/assets/formatAssetMeta";
 import { loadUserBatteriesForList } from "@/lib/assets/loadUserAssets";
-import { AssetListRow } from "@/components/assets/AssetListRow";
+import { MyBatteriesClient } from "@/components/assets/MyBatteriesClient";
 import { CardPanel } from "@/components/ui/CardPanel";
 
 export const revalidate = 30;
@@ -31,14 +30,21 @@ export default async function MyBatteriesPage(): Promise<ReactNode> {
   const user = await requireCurrentUser();
   const batteries = await loadUserBatteriesForList(user.id);
 
+  const initialBatteries = batteries.map((row) => ({
+    id: row.id,
+    displayLine: row.displayLine,
+    packNumber: row.packNumber,
+    initialRunCount: row.initialRunCount,
+    notes: row.notes,
+    stats: row.stats,
+  }));
+
   return (
     <>
       <header className="page-header">
         <div>
           <h1 className="page-title">My batteries</h1>
-          <p className="page-subtitle">
-            Battery packs you have logged on runs. Add new packs when you log a run.
-          </p>
+          <p className="page-subtitle">Battery packs you have logged or added here.</p>
         </div>
         <Link
           href="/assets"
@@ -48,29 +54,7 @@ export default async function MyBatteriesPage(): Promise<ReactNode> {
         </Link>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl space-y-3">
-          {batteries.length === 0 ? (
-            <CardPanel contentClassName="text-sm text-muted-foreground">
-              No batteries yet.{" "}
-              <Link href="/runs/new" prefetch className="text-primary hover:underline">
-                Log a run
-              </Link>{" "}
-              and pick or create a pack.
-            </CardPanel>
-          ) : (
-            <ul className="flex flex-col gap-2.5">
-              {batteries.map((row) => (
-                <li key={row.id}>
-                  <AssetListRow
-                    href={`/batteries/${row.id}`}
-                    title={row.displayLine}
-                    meta={formatAssetMeta(row.stats)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <MyBatteriesClient initialBatteries={initialBatteries} />
       </section>
     </>
   );

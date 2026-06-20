@@ -120,7 +120,7 @@ export function StatTile({
   className?: string;
 }) {
   return (
-    <div className={cn("bg-[#17130f]/55 px-3 py-2.5", className)}>
+    <div className={cn("bg-background/55 px-3 py-2.5", className)}>
       <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-faint">{label}</div>
       <div
         className={cn(

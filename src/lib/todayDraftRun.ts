@@ -8,8 +8,14 @@ function localTodayBounds(): { start: Date; end: Date } {
   return { start, end };
 }
 
+export type TodayDraftRun = {
+  id: string;
+  /** ISO instant when the draft was first saved (run `createdAt`). */
+  savedAt: string;
+};
+
 /** Latest incomplete run logged today (local calendar day), if any. */
-export async function getTodayDraftRunId(userId: string): Promise<string | null> {
+export async function getTodayDraftRun(userId: string): Promise<TodayDraftRun | null> {
   const { start, end } = localTodayBounds();
   const runs = await prisma.run.findMany({
     where: {
@@ -17,7 +23,15 @@ export async function getTodayDraftRunId(userId: string): Promise<string | null>
       createdAt: { gte: start, lt: end },
     },
     orderBy: { sortAt: "asc" },
-    select: { id: true, loggingComplete: true },
+    select: { id: true, createdAt: true, loggingComplete: true },
   });
-  return [...runs].reverse().find((r) => r.loggingComplete === false)?.id ?? null;
+  const draft = [...runs].reverse().find((r) => r.loggingComplete === false);
+  if (!draft) return null;
+  return { id: draft.id, savedAt: draft.createdAt.toISOString() };
+}
+
+/** @deprecated Prefer {@link getTodayDraftRun}. */
+export async function getTodayDraftRunId(userId: string): Promise<string | null> {
+  const draft = await getTodayDraftRun(userId);
+  return draft?.id ?? null;
 }

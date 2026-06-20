@@ -29,8 +29,8 @@ export const BG_PREVIEW_OPTIONS: ReadonlyArray<{
   {
     id: "espresso",
     label: "Espresso",
-    hint: "Ship default — warm brown graphite",
-    hex: "#17130F",
+    hint: "Ship default — charcoal graphite",
+    hex: "#121110",
   },
   {
     id: "butter-cream",

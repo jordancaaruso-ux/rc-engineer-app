@@ -1,20 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
-  Battery,
-  Calendar,
   Car,
-  CircleDot,
-  Disc,
-  GitCompare,
-  History,
-  Layers,
   LayoutDashboard,
-  MapPin,
   PlusCircle,
   Settings,
   Sparkles,
-  Video,
 } from "lucide-react";
 
 export type PrimaryNavId =
@@ -131,11 +122,23 @@ export const DESKTOP_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSE
 /** Mobile bottom bar: Add run centered between Analysis and Assets. */
 export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ADD_RUN, ASSETS, ENGINEER, SETTINGS];
 
+export type NavHubIconKey =
+  | "car"
+  | "disc"
+  | "battery"
+  | "layers"
+  | "map-pin"
+  | "circle-dot"
+  | "calendar"
+  | "history"
+  | "video"
+  | "git-compare";
+
 export type NavHubLink = {
   href: string;
   label: string;
   description: string;
-  icon: LucideIcon;
+  icon: NavHubIconKey;
 };
 
 export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
@@ -143,19 +146,19 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
     href: "/runs/history",
     label: "Sessions",
     description: "Browse and compare logged runs.",
-    icon: History,
+    icon: "history",
   },
   {
     href: "/videos/analysis/manual/new",
     label: "Video analysis",
     description: "Review onboard footage and lap timing.",
-    icon: Video,
+    icon: "video",
   },
   {
     href: "/setup/comparison",
     label: "Setup comparison",
     description: "Compare setups across runs and community data.",
-    icon: GitCompare,
+    icon: "git-compare",
   },
 ];
 
@@ -172,19 +175,19 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
         href: "/cars",
         label: "Cars",
         description: "Your cars — name each one and link it to a chassis type.",
-        icon: Car,
+        icon: "car",
       },
       {
         href: "/tire-sets",
         label: "Tires",
         description: "Your tire sets and run wear history.",
-        icon: Disc,
+        icon: "disc",
       },
       {
         href: "/batteries",
         label: "Batteries",
         description: "Your battery packs and run history.",
-        icon: Battery,
+        icon: "battery",
       },
     ],
   },
@@ -195,25 +198,25 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
         href: "/setup-sheet-models",
         label: "Cars",
         description: "Shared chassis types and setup sheet models (e.g. Mugen MTC3).",
-        icon: Layers,
+        icon: "layers",
       },
       {
         href: "/tracks",
         label: "Tracks",
         description: "Tracks, layouts, and grip tags.",
-        icon: MapPin,
+        icon: "map-pin",
       },
       {
         href: "/tires",
         label: "Tires",
         description: "Shared tire compound catalog (e.g. Sweep D32).",
-        icon: CircleDot,
+        icon: "circle-dot",
       },
       {
         href: "/events",
         label: "Events",
         description: "Race weekends and practice days.",
-        icon: Calendar,
+        icon: "calendar",
       },
     ],
   },

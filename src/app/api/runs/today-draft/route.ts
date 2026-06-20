@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getTodayDraftRunId } from "@/lib/todayDraftRun";
+import { getTodayDraftRun } from "@/lib/todayDraftRun";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -10,6 +10,9 @@ export async function GET() {
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const draftRunId = await getTodayDraftRunId(user.id);
-  return NextResponse.json({ draftRunId });
+  const draft = await getTodayDraftRun(user.id);
+  return NextResponse.json({
+    draftRunId: draft?.id ?? null,
+    draftSavedAt: draft?.savedAt ?? null,
+  });
 }

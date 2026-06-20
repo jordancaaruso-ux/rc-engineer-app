@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
 import { tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
@@ -26,11 +25,8 @@ type Props = {
   onSelectExistingSet: (setId: string, set: RunTireSetOption | null) => void;
   selectedTireTypeId: string;
   onTireTypeIdChange: (id: string) => void;
-  onSelectedTireTypeChange: (type: TireTypeOption | null) => void;
   tireSetNumber: string;
   onTireSetNumberChange: (value: string) => void;
-  tireSpecificModel: string;
-  onTireSpecificModelChange: (value: string) => void;
   resolvingTireSet: boolean;
   runsCompleted: number;
   onRunsCompletedChange: (value: number) => void;
@@ -56,11 +52,8 @@ export function RunTireSelectionPanel({
   onSelectExistingSet,
   selectedTireTypeId,
   onTireTypeIdChange,
-  onSelectedTireTypeChange,
   tireSetNumber,
   onTireSetNumberChange,
-  tireSpecificModel,
-  onTireSpecificModelChange,
   resolvingTireSet,
   runsCompleted,
   onRunsCompletedChange,
@@ -161,24 +154,19 @@ export function RunTireSelectionPanel({
     skipTireResolveRef.current = true;
     onSelectExistingSet("", null);
     onTireTypeIdChange("");
-    onSelectedTireTypeChange(null);
     onTireSetNumberChange("");
-    onTireSpecificModelChange("");
     setShowNewSetPanel(true);
   }
 
   function cancelNewSet() {
     setShowNewSetPanel(false);
     onTireTypeIdChange("");
-    onSelectedTireTypeChange(null);
     onTireSetNumberChange("");
-    onTireSpecificModelChange("");
   }
 
-  function pickRecentType(id: string, option: TireTypeOption) {
+  function pickRecentType(id: string) {
     skipTireResolveRef.current = false;
     onTireTypeIdChange(id);
-    onSelectedTireTypeChange(option);
     onSelectExistingSet("", null);
   }
 
@@ -226,13 +214,6 @@ export function RunTireSelectionPanel({
         <div className="inset-panel p-3 space-y-3">
           <div className="space-y-1">
             <div className="ui-title text-xs text-muted-foreground">New tire set</div>
-            <p className="text-[11px] text-muted-foreground leading-snug">
-              Pick a compound you&apos;ve used, search the catalog, or add a new type in{" "}
-              <Link href="/tires" className="text-accent underline">
-                Assets → Tires
-              </Link>
-              .
-            </p>
           </div>
 
           {recentTypes.length > 0 ? (
@@ -244,7 +225,7 @@ export function RunTireSelectionPanel({
                     key={t.id}
                     type="button"
                     className={chipClass(selectedTireTypeId === t.id)}
-                    onClick={() => pickRecentType(t.id, t)}
+                    onClick={() => pickRecentType(t.id)}
                   >
                     {t.displayName}
                   </button>
@@ -254,7 +235,7 @@ export function RunTireSelectionPanel({
           ) : null}
 
           <div className="space-y-1">
-            <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-faint">Search catalog</div>
+            <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-faint">Tire type</div>
             <TireTypeCombobox
               value={selectedTireTypeId}
               onChange={(id) => {
@@ -262,25 +243,13 @@ export function RunTireSelectionPanel({
                 onTireTypeIdChange(id);
                 onSelectExistingSet("", null);
               }}
-              onSelectedTypeChange={onSelectedTireTypeChange}
-              placeholder="Search tire type"
+              placeholder="Search or add tire type"
               aria-label="Tire type"
             />
           </div>
 
           {selectedTireTypeId ? (
             <>
-              <div className="space-y-1">
-                <label className="block ui-label-meta font-medium">Specific model (optional)</label>
-                <input
-                  className="form-control w-full px-3 py-2 text-sm"
-                  placeholder="e.g. premount, SKU, batch"
-                  value={tireSpecificModel}
-                  onChange={(e) => onTireSpecificModelChange(e.target.value)}
-                  aria-label="Specific tire model"
-                />
-              </div>
-
               <div className="space-y-1">
                 <label className="block ui-label-meta font-medium">Set number</label>
                 <input
