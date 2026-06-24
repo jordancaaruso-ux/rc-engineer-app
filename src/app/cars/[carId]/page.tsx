@@ -5,6 +5,8 @@ import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CarDeleteClient } from "@/components/cars/CarDeleteClient";
 import {
   CarSetupSheetModelCard,
@@ -19,9 +21,12 @@ export default async function CarDetailPage(props: {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Car</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/cars" />
+            <div>
+              <h1 className="page-title">Car</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -54,16 +59,13 @@ export default async function CarDetailPage(props: {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Car</h1>
-            <p className="page-subtitle">Not found.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/cars" />
+            <div>
+              <h1 className="page-title">Car</h1>
+              <p className="page-subtitle">Not found.</p>
+            </div>
           </div>
-          <Link
-            href="/cars"
-            className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
-          >
-            Back
-          </Link>
         </header>
       </>
     );
@@ -157,16 +159,13 @@ export default async function CarDetailPage(props: {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">{car.name}</h1>
-          <p className="page-subtitle">Car details and safe delete.</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/cars" />
+          <div>
+            <h1 className="page-title">{car.name}</h1>
+            <p className="page-subtitle">Car details and safe delete.</p>
+          </div>
         </div>
-        <Link
-          href="/cars"
-          className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
-        >
-          Back
-        </Link>
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
@@ -199,7 +198,7 @@ export default async function CarDetailPage(props: {
 
           {car.setupSheetTemplate && !car.setupSheetModelId ? (
             <CardPanel contentClassName="text-sm space-y-2">
-              <div className="ui-title text-sm text-muted-foreground">Community tuning archetypes</div>
+              <Eyebrow>Community tuning archetypes</Eyebrow>
               <p className="text-xs text-muted-foreground">
                 Compare this car&apos;s latest setup against low / medium / high grip medians pooled from every
                 community-eligible upload sharing this setup sheet template.
@@ -214,7 +213,7 @@ export default async function CarDetailPage(props: {
           ) : null}
 
           <CardPanel contentClassName="space-y-3">
-            <div className="ui-title text-sm text-muted-foreground">Tires used with this car</div>
+            <Eyebrow>Tires used with this car</Eyebrow>
             {tireSetsOnCar.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No tire sets linked on runs for this car yet. Log a run and select a tire set.
@@ -241,7 +240,7 @@ export default async function CarDetailPage(props: {
           </CardPanel>
 
           <CardPanel contentClassName="space-y-3">
-            <div className="ui-title text-sm text-muted-foreground">Batteries used with this car</div>
+            <Eyebrow>Batteries used with this car</Eyebrow>
             {batteriesOnCar.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No batteries linked on runs for this car yet. Log a run and select a battery pack.

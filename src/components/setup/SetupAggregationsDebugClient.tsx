@@ -201,14 +201,14 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
 
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead className="border-b border-border bg-muted/40 text-xs ui-title text-muted-foreground">
+          <thead className="border-b border-border bg-muted/40">
             <tr>
-              <th className="p-2">Car</th>
-              <th className="p-2">Parameter</th>
-              <th className="p-2">Type</th>
-              <th className="p-2">N</th>
-              <th className="p-2">Stats</th>
-              <th className="p-2">Updated</th>
+              <th className="table-col-header p-2">Car</th>
+              <th className="table-col-header p-2">Parameter</th>
+              <th className="table-col-header p-2">Type</th>
+              <th className="table-col-header p-2">N</th>
+              <th className="table-col-header p-2">Stats</th>
+              <th className="table-col-header p-2">Updated</th>
             </tr>
           </thead>
           <tbody>

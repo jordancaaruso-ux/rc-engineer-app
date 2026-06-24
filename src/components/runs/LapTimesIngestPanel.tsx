@@ -41,7 +41,7 @@ export type LapIngestFormValue = {
   parserId: string | null;
   /** Structured laps + warnings from URL import (e.g. LiveRC) — legacy single-primary; first URL block overrides. */
   urlLapRows?: LapImportLapRow[] | null;
-  /** Multiple URL imports: one block per Import click; each maps to a persisted ImportedLapTimeSession. */
+  /** At most one URL import per run; maps to a persisted ImportedLapTimeSession. */
   urlImportBlocks: UrlImportBlock[];
 };
 
@@ -110,6 +110,20 @@ function blockLabelTimeIso(block: UrlImportBlock): string {
   });
 }
 
+function sortSessionsNewestFirst<T>(items: T[], getIso: (item: T) => string | null): T[] {
+  return [...items].sort((a, b) => {
+    const ta = getIso(a) ? new Date(getIso(a)!).getTime() : 0;
+    const tb = getIso(b) ? new Date(getIso(b)!).getTime() : 0;
+    return tb - ta;
+  });
+}
+
+function formatSessionWhen(iso: string | null, sessionTime: string | null): string | null {
+  if (iso?.trim()) return formatRunCreatedAtDateTime(iso.trim());
+  if (sessionTime?.trim()) return sessionTime.trim();
+  return null;
+}
+
 function primaryLapTextFromFirstBlock(blocks: UrlImportBlock[]): string {
   const first = blocks[0];
   if (!first?.sessionDrivers?.length) return "";
@@ -139,6 +153,79 @@ type ScanDayCandidate = {
 
 const RECENT_RUNS_COLLAPSED = 3;
 const RECENT_RUNS_MAX = 10;
+
+const REPLACE_IMPORT_CONFIRM =
+  "Replace current import? Lap times from the session you imported earlier will be removed.";
+
+function SessionImportListRow({
+  title,
+  when,
+  bestLapSeconds,
+  timingSource,
+  isActive,
+  actionLabel,
+  disabled,
+  onClick,
+}: {
+  title: string;
+  when: string | null;
+  bestLapSeconds: number | null;
+  timingSource?: "liverc" | "speedhive";
+  isActive: boolean;
+  actionLabel: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className={cn(
+        "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
+        isActive
+          ? "border-accent/50 bg-accent/10"
+          : "border-border bg-surface-runna hover:bg-surface-runna-inset",
+        disabled && "opacity-60 pointer-events-none"
+      )}
+      onClick={onClick}
+    >
+      <span className="min-w-0">
+        <span className="block truncate font-medium text-foreground">{title}</span>
+        {when ? <span className="block truncate text-[10px] text-muted-foreground">{when}</span> : null}
+      </span>
+      <span className="shrink-0 flex flex-col items-end gap-0.5">
+        {bestLapSeconds != null ? (
+          <span className="flex flex-col items-end leading-tight">
+            <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Best</span>
+            <span className="font-mono text-[12px] font-medium tabular-nums text-foreground">
+              {formatLap(bestLapSeconds)}
+            </span>
+          </span>
+        ) : null}
+        {timingSource ? (
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide",
+              timingSource === "speedhive"
+                ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+            )}
+          >
+            {timingSource === "speedhive" ? "Speedhive" : "LiveRC"}
+          </span>
+        ) : null}
+        {isActive ? (
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-foreground">
+            <span aria-hidden>✓</span>
+            Imported
+          </span>
+        ) : (
+          <span className="ui-title text-[10px] text-muted-foreground">{actionLabel}</span>
+        )}
+      </span>
+    </button>
+  );
+}
 
 /** One scan-status line — prefer server hint; fall back to totals when all are imported. */
 function resolveScanStatusMessage(opts: {
@@ -332,26 +419,29 @@ export function LapTimesIngestPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
   }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, lapImportEventId, editingRunId]);
 
-  const importedSourceUrls = useMemo(
-    () => new Set(value.urlImportBlocks.map((b) => b.sourceUrl.trim()).filter(Boolean)),
-    [value.urlImportBlocks]
-  );
+  const activeImportBlock = value.urlImportBlocks[0] ?? null;
+  const activeImportUrl = activeImportBlock?.sourceUrl.trim() ?? "";
 
-  const hasLinkedLapImport = value.urlImportBlocks.length > 0;
+  const hasLinkedLapImport = Boolean(activeImportBlock);
   const showDraftLapSavedStyle = Boolean(isDraftResume && hasLinkedLapImport);
 
-  const scanCandidatesExcludingLinked = useMemo(() => {
+  const sortedDayScanCandidates = useMemo(() => {
     if (!dayScanCandidates?.length) return [];
-    return dayScanCandidates.filter((c) => !importedSourceUrls.has(c.sessionUrl.trim()));
-  }, [dayScanCandidates, importedSourceUrls]);
+    return sortSessionsNewestFirst(dayScanCandidates, (c) => c.sessionCompletedAtIso);
+  }, [dayScanCandidates]);
+
+  const sortedEventRaceSessions = useMemo(() => {
+    if (!eventRaceSessions?.length) return [];
+    return sortSessionsNewestFirst(eventRaceSessions, (c) => c.sessionCompletedAtIso);
+  }, [eventRaceSessions]);
 
   const visibleDayScanCandidates = useMemo(() => {
-    if (!scanCandidatesExcludingLinked.length) return [];
+    if (!sortedDayScanCandidates.length) return [];
     const limit = showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED;
-    return scanCandidatesExcludingLinked.slice(0, limit);
-  }, [scanCandidatesExcludingLinked, showAllRecentRuns]);
+    return sortedDayScanCandidates.slice(0, limit);
+  }, [sortedDayScanCandidates, showAllRecentRuns]);
 
-  const canExpandRecentRuns = scanCandidatesExcludingLinked.length > RECENT_RUNS_COLLAPSED;
+  const canExpandRecentRuns = sortedDayScanCandidates.length > RECENT_RUNS_COLLAPSED;
 
   function selectTab(id: IngestTab) {
     setTab(id);
@@ -478,13 +568,38 @@ export function LapTimesIngestPanel({
     }
   }
 
+  function confirmReplaceIfNeeded(targetUrl: string): boolean {
+    if (!activeImportBlock) return true;
+    const currentUrl = activeImportUrl;
+    const nextUrl = targetUrl.trim();
+    if (!nextUrl || currentUrl === nextUrl) return true;
+    return window.confirm(REPLACE_IMPORT_CONFIRM);
+  }
+
+  function clearImport() {
+    onChange({
+      ...value,
+      urlImportBlocks: [],
+      sourceKind: "manual",
+      sourceDetail: null,
+      parserId: null,
+      urlLapRows: null,
+      manualText: "",
+      manualLapRows: null,
+    });
+    setActivePreviewKey(null);
+    setUrlMessage(null);
+  }
+
   async function importFromDayCandidate(c: ScanDayCandidate) {
+    if (!confirmReplaceIfNeeded(c.sessionUrl)) return;
     setUrlInput(c.sessionUrl);
     setDayScanMessage(null);
     await fetchUrlPreviewWithUrl(c.sessionUrl);
   }
 
   async function importFromEventRaceRow(c: EventRaceSessionRow) {
+    if (!confirmReplaceIfNeeded(c.sessionUrl)) return;
     setUrlInput(c.sessionUrl);
     setUrlMessage(null);
     await fetchUrlPreviewWithUrl(c.sessionUrl);
@@ -505,6 +620,7 @@ export function LapTimesIngestPanel({
       setUrlMessage("Paste a timing/results URL first.");
       return;
     }
+    if (!confirmReplaceIfNeeded(url)) return;
     await runUrlImport(url);
   }
 
@@ -559,86 +675,70 @@ export function LapTimesIngestPanel({
         return;
       }
 
-      let nextBlocks = [...value.urlImportBlocks];
-      let combinedMessage: string | null = null;
+      const row = successes[0]!;
+      const parserId = row.parserId ?? "http_timing_v1";
+      const combinedMessage = row.message ?? null;
 
-      for (const row of successes) {
-        const parserId = row.parserId ?? "http_timing_v1";
-        const message = row.message ?? null;
-        if (combinedMessage == null && message) combinedMessage = message;
+      const sessionDriversRaw = row.sessionDrivers ?? [];
+      const sessionDrivers = Array.isArray(sessionDriversRaw)
+        ? sessionDriversRaw.filter((d) => d && typeof d.driverId === "string" && Array.isArray(d.laps))
+        : [];
+      const topLaps = row.laps ?? [];
+      const lapRowsFromApi = row.lapRows;
 
-        const sessionDriversRaw = row.sessionDrivers ?? [];
-        const sessionDrivers = Array.isArray(sessionDriversRaw)
-          ? sessionDriversRaw.filter((d) => d && typeof d.driverId === "string" && Array.isArray(d.laps))
-          : [];
-        const topLaps = row.laps ?? [];
-        const lapRowsFromApi = row.lapRows;
+      const autoSelectIds =
+        sessionDrivers.length === 0
+          ? []
+          : sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
+            ? [sessionDrivers[0].driverId]
+            : [pickPrimarySessionDriver(sessionDrivers, { liveRcDriverId, liveRcDriverName }).driverId];
 
-        const autoSelectIds =
-          sessionDrivers.length === 0
-            ? []
-            : sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
-              ? [sessionDrivers[0].driverId]
-              : [pickPrimarySessionDriver(sessionDrivers, { liveRcDriverId, liveRcDriverName }).driverId];
+      const recordedAt = row.recordedAt ?? new Date().toISOString();
+      const sessionCompletedAtIso =
+        typeof row.sessionCompletedAtIso === "string" && row.sessionCompletedAtIso.trim()
+          ? row.sessionCompletedAtIso.trim()
+          : null;
+      const sessionCompletedAtDbIso =
+        typeof row.sessionCompletedAtDbIso === "string" && row.sessionCompletedAtDbIso.trim()
+          ? row.sessionCompletedAtDbIso.trim()
+          : null;
 
-        const recordedAt = row.recordedAt ?? new Date().toISOString();
-        const sessionCompletedAtIso =
-          typeof row.sessionCompletedAtIso === "string" && row.sessionCompletedAtIso.trim()
-            ? row.sessionCompletedAtIso.trim()
-            : null;
-        const sessionCompletedAtDbIso =
-          typeof row.sessionCompletedAtDbIso === "string" && row.sessionCompletedAtDbIso.trim()
-            ? row.sessionCompletedAtDbIso.trim()
-            : null;
+      const sourceUrl = typeof row.url === "string" && row.url.trim() ? row.url.trim() : url;
 
-        const sourceUrl =
-          typeof row.url === "string" && row.url.trim() ? row.url.trim() : url;
+      const newBlock: UrlImportBlock = {
+        blockId: crypto.randomUUID(),
+        importedSessionId: row.importedSessionId,
+        sourceUrl,
+        parserId,
+        recordedAt,
+        sessionCompletedAtDbIso,
+        sessionCompletedAtIso,
+        sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : [],
+        selectedDriverIds: autoSelectIds,
+        driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : {},
+        urlLapRows:
+          Array.isArray(lapRowsFromApi) && lapRowsFromApi.length > 0 && lapRowsFromApi.length === topLaps.length
+            ? lapRowsFromApi
+            : null,
+      };
 
-        const newBlock: UrlImportBlock = {
-          blockId: crypto.randomUUID(),
-          importedSessionId: row.importedSessionId,
-          sourceUrl,
-          parserId,
-          recordedAt,
-          sessionCompletedAtDbIso,
-          sessionCompletedAtIso,
-          sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : [],
-          selectedDriverIds: autoSelectIds,
-          driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : {},
-          urlLapRows:
-            Array.isArray(lapRowsFromApi) && lapRowsFromApi.length > 0 && lapRowsFromApi.length === topLaps.length
-              ? lapRowsFromApi
-              : null,
-        };
-
-        nextBlocks = [...nextBlocks, newBlock];
-      }
-
-      const detail =
-        nextBlocks.length === 1
-          ? nextBlocks[0]!.sourceUrl
-          : `${nextBlocks.length} timing URLs`;
+      const nextBlocks = [newBlock];
 
       onChange({
         ...value,
         manualText: primaryLapTextFromFirstBlock(nextBlocks),
         sourceKind: "url",
-        sourceDetail: detail,
-        parserId: nextBlocks[0]?.parserId ?? successes[0]!.parserId ?? "liverc_deterministic_v1",
-        urlLapRows: nextBlocks[0]?.urlLapRows ?? null,
+        sourceDetail: newBlock.sourceUrl,
+        parserId: newBlock.parserId ?? "liverc_deterministic_v1",
+        urlLapRows: newBlock.urlLapRows ?? null,
         urlImportBlocks: nextBlocks,
       });
-      const lastBlock = nextBlocks[nextBlocks.length - 1];
-      const pid = lastBlock?.selectedDriverIds?.[0];
-      if (lastBlock && pid) {
-        setActivePreviewKey(`${lastBlock.blockId}:${pid}`);
+      const pid = newBlock.selectedDriverIds?.[0];
+      if (pid) {
+        setActivePreviewKey(`${newBlock.blockId}:${pid}`);
       }
       setUrlInput("");
-      if (successes.length > 1) {
-        setUrlMessage(`Imported ${successes.length} race sessions from the event page.${combinedMessage ? ` ${combinedMessage}` : ""}`);
-      } else {
-        setUrlMessage(combinedMessage);
-      }
+      setUrlMessage(combinedMessage);
       setDayScanCandidates((prev) =>
         prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
       );
@@ -648,33 +748,6 @@ export function LapTimesIngestPanel({
     } finally {
       setUrlBusy(false);
     }
-  }
-
-  function removeBlock(blockId: string) {
-    const next = value.urlImportBlocks.filter((b) => b.blockId !== blockId);
-    if (next.length === 0) {
-      onChange({
-        ...value,
-        urlImportBlocks: [],
-        sourceKind: "manual",
-        sourceDetail: null,
-        parserId: null,
-        urlLapRows: null,
-        manualText: value.manualText,
-      });
-      setActivePreviewKey(null);
-      return;
-    }
-    onChange({
-      ...value,
-      urlImportBlocks: next,
-      sourceKind: "url",
-      manualText: primaryLapTextFromFirstBlock(next),
-      sourceDetail: next.length === 1 ? next[0]!.sourceUrl : `${next.length} timing URLs`,
-      parserId: next[0]?.parserId ?? null,
-      urlLapRows: next[0]?.urlLapRows ?? null,
-    });
-    setActivePreviewKey(null);
   }
 
   /** One primary driver per block (whose laps are edited / drive the run). Click a row to switch. */
@@ -710,30 +783,73 @@ export function LapTimesIngestPanel({
     };
   }
 
-  const linkedRunRows = useMemo(() => {
-    return value.urlImportBlocks.map((block) => {
-      const primaryId = block.selectedDriverIds?.[0] ?? block.sessionDrivers[0]?.driverId ?? null;
-      const driver = primaryId
-        ? block.sessionDrivers.find((d) => d.driverId === primaryId) ?? null
-        : null;
-      const stats = driver ? statsForDriver(block, driver) : null;
-      const label = driver
-        ? formatDriverSessionLabel(driver.driverName, blockLabelTimeIso(block))
-        : block.sourceUrl;
-      const timingSource = block.parserId.toLowerCase().includes("speedhive")
-        ? ("speedhive" as const)
-        : block.parserId.toLowerCase().includes("liverc")
-          ? ("liverc" as const)
-          : undefined;
-      return {
-        key: block.blockId,
-        label,
-        when: formatRunCreatedAtDateTime(blockLabelTimeIso(block)),
-        bestLapSeconds: stats?.bestLap ?? null,
-        timingSource,
-      };
-    });
-  }, [value.urlImportBlocks]);
+  const activeImportPreview = useMemo(() => {
+    const block = activeImportBlock;
+    if (!block) return null;
+    const primaryId = block.selectedDriverIds?.[0] ?? block.sessionDrivers[0]?.driverId ?? null;
+    const driver = primaryId ? block.sessionDrivers.find((d) => d.driverId === primaryId) ?? null : null;
+    const stats = driver ? statsForDriver(block, driver) : null;
+    const title = driver
+      ? formatDriverSessionLabel(driver.driverName, blockLabelTimeIso(block))
+      : block.sourceUrl;
+    const timingSource = block.parserId.toLowerCase().includes("speedhive")
+      ? ("speedhive" as const)
+      : block.parserId.toLowerCase().includes("liverc")
+        ? ("liverc" as const)
+        : undefined;
+    return {
+      title,
+      when: formatRunCreatedAtDateTime(blockLabelTimeIso(block)),
+      bestLapSeconds: stats?.bestLap ?? null,
+      timingSource,
+    };
+  }, [activeImportBlock, value.urlImportBlocks]);
+
+  const trackScanDisplayRows = useMemo(() => {
+    type Row = {
+      key: string;
+      sessionUrl: string;
+      title: string;
+      when: string | null;
+      bestLapSeconds: number | null;
+      timingSource?: "liverc" | "speedhive";
+      isActive: boolean;
+      candidate: ScanDayCandidate | null;
+    };
+    const rows: Row[] = visibleDayScanCandidates.map((c) => ({
+      key: c.sessionId,
+      sessionUrl: c.sessionUrl,
+      title: c.driverName?.trim() || "Run",
+      when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime),
+      bestLapSeconds: c.bestLapSeconds ?? null,
+      timingSource: c.timingSource,
+      isActive: activeImportUrl === c.sessionUrl.trim(),
+      candidate: c,
+    }));
+    if (activeImportBlock && activeImportUrl && !rows.some((r) => r.sessionUrl.trim() === activeImportUrl)) {
+      rows.unshift({
+        key: activeImportBlock.blockId,
+        sessionUrl: activeImportUrl,
+        title: activeImportPreview?.title ?? activeImportUrl,
+        when: activeImportPreview?.when ?? null,
+        bestLapSeconds: activeImportPreview?.bestLapSeconds ?? null,
+        timingSource: activeImportPreview?.timingSource,
+        isActive: true,
+        candidate: null,
+      });
+    }
+    return rows;
+  }, [
+    visibleDayScanCandidates,
+    activeImportBlock,
+    activeImportUrl,
+    activeImportPreview,
+  ]);
+
+  function bestLapForActiveEventRow(sessionUrl: string): number | null {
+    if (!activeImportBlock || activeImportUrl !== sessionUrl.trim()) return null;
+    return activeImportPreview?.bestLapSeconds ?? null;
+  }
 
   function toggleLapInclusion(blockId: string, driverId: string, lapIndex: number) {
     const blocks = value.urlImportBlocks.map((b) => {
@@ -777,6 +893,15 @@ export function LapTimesIngestPanel({
             <span aria-hidden>✓</span>
             <span>Saved from draft</span>
           </span>
+        ) : null}
+        {hasLinkedLapImport && isUrlTab(tab) ? (
+          <button
+            type="button"
+            className="ml-auto shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1 text-[11px] font-medium text-muted-foreground hover:bg-surface-runna-inset hover:text-foreground transition"
+            onClick={clearImport}
+          >
+            Clear import
+          </button>
         ) : null}
       </div>
       <div
@@ -872,38 +997,27 @@ export function LapTimesIngestPanel({
                 </button>
               </div>
               {eventRaceBusy ? <p className="ui-label-meta">Loading sessions…</p> : null}
-              {eventRaceSessions && eventRaceSessions.length > 0 ? (
+              {sortedEventRaceSessions.length > 0 ? (
                 <ul className="space-y-1">
-                  {eventRaceSessions.map((c) => {
-                    const added = value.urlImportBlocks.some(
-                      (b) => b.sourceUrl.trim() === c.sessionUrl.trim()
-                    );
-                    const title =
-                      c.listLinkText?.trim() || "Race session";
+                  {sortedEventRaceSessions.map((c) => {
+                    const isActive = activeImportUrl === c.sessionUrl.trim();
+                    const title = c.listLinkText?.trim() || "Race session";
+                    const when = formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime);
+                    const bestLap = bestLapForActiveEventRow(c.sessionUrl);
                     return (
                       <li key={c.sessionUrl}>
-                        <button
-                          type="button"
-                          disabled={urlBusy || added}
-                          className={cn(
-                            "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
-                            added || urlBusy
-                              ? "border-border bg-surface-runna opacity-70 cursor-not-allowed"
-                              : "border-border bg-surface-runna hover:bg-surface-runna-inset"
-                          )}
-                          onClick={() => void importFromEventRaceRow(c)}
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate font-medium text-foreground">
-                              {title}
-                              {c.sessionTime ? ` · ${c.sessionTime}` : ""}
-                            </span>
-                            <span className="block truncate text-[10px] text-muted-foreground">{c.sessionUrl}</span>
-                          </span>
-                          <span className="shrink-0 ui-title text-[10px] text-muted-foreground">
-                            {added ? "Added" : c.alreadyImported ? "Import again" : "Import"}
-                          </span>
-                        </button>
+                        <SessionImportListRow
+                          title={title}
+                          when={when}
+                          bestLapSeconds={bestLap}
+                          isActive={isActive}
+                          actionLabel={c.alreadyImported ? "Import again" : "Import"}
+                          disabled={urlBusy}
+                          onClick={() => {
+                            if (isActive) return;
+                            void importFromEventRaceRow(c);
+                          }}
+                        />
                       </li>
                     );
                   })}
@@ -947,18 +1061,14 @@ export function LapTimesIngestPanel({
                               .filter(Boolean)
                               .join(", ")}…`
                           : "Checking timing sources…"
-                      : linkedRunRows.length > 0
-                        ? `${linkedRunRows.length} run${linkedRunRows.length === 1 ? "" : "s"} linked to this draft${
-                            visibleDayScanCandidates.length > 0
-                              ? ` · ${visibleDayScanCandidates.length} more to import`
-                              : ""
-                          }`
-                        : scanCandidatesExcludingLinked.length > 0
+                      : hasLinkedLapImport
+                        ? "One session imported — pick another to replace it (newest first)."
+                        : sortedDayScanCandidates.length > 0
                           ? scanTotals &&
                             scanTotals.unimported > visibleDayScanCandidates.length &&
                             !showAllRecentRuns
-                            ? `Showing ${visibleDayScanCandidates.length} of ${scanTotals.unimported} unimported runs (newest first)`
-                            : `${scanCandidatesExcludingLinked.length} recent run${scanCandidatesExcludingLinked.length === 1 ? "" : "s"} to import`
+                            ? `Showing ${visibleDayScanCandidates.length} of ${scanTotals.unimported} runs (newest first)`
+                            : `${sortedDayScanCandidates.length} recent run${sortedDayScanCandidates.length === 1 ? "" : "s"} to import`
                           : null}
                   </p>
                 </div>
@@ -981,110 +1091,26 @@ export function LapTimesIngestPanel({
                     : "Set your driver name in Settings (LiveRC and/or Speedhive transponder / name) so we can find your sessions."}
                 </p>
               ) : null}
-              {linkedRunRows.length > 0 || visibleDayScanCandidates.length > 0 ? (
+              {trackScanDisplayRows.length > 0 ? (
                 <div className="space-y-1">
                   <ul className="space-y-1">
-                    {linkedRunRows.map((row) => (
+                    {trackScanDisplayRows.map((row) => (
                       <li key={row.key}>
-                        <div
-                          className={cn(
-                            "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs",
-                            "border-emerald-500/45 bg-emerald-500/10"
-                          )}
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate font-medium text-foreground">{row.label}</span>
-                            {row.when ? (
-                              <span className="block truncate text-[10px] text-muted-foreground">{row.when}</span>
-                            ) : null}
-                          </span>
-                          <span className="shrink-0 flex flex-col items-end gap-0.5">
-                            {row.bestLapSeconds != null ? (
-                              <span className="flex flex-col items-end leading-tight">
-                                <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                                  Best
-                                </span>
-                                <span className="text-[12px] font-semibold tabular-nums text-foreground">
-                                  {formatLap(row.bestLapSeconds)}
-                                </span>
-                              </span>
-                            ) : null}
-                            {row.timingSource ? (
-                              <span
-                                className={cn(
-                                  "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide",
-                                  row.timingSource === "speedhive"
-                                    ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
-                                    : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
-                                )}
-                              >
-                                {row.timingSource === "speedhive" ? "Speedhive" : "LiveRC"}
-                              </span>
-                            ) : null}
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
-                              <span aria-hidden>✓</span>
-                              Linked
-                            </span>
-                          </span>
-                        </div>
+                        <SessionImportListRow
+                          title={row.title}
+                          when={row.when}
+                          bestLapSeconds={row.bestLapSeconds}
+                          timingSource={row.timingSource}
+                          isActive={row.isActive}
+                          actionLabel="Import"
+                          disabled={urlBusy}
+                          onClick={() => {
+                            if (row.isActive || !row.candidate) return;
+                            void importFromDayCandidate(row.candidate);
+                          }}
+                        />
                       </li>
                     ))}
-                    {visibleDayScanCandidates.map((c) => {
-                      const when = c.timingSource
-                        ? null
-                        : c.sessionTime ??
-                          (c.sessionCompletedAtIso
-                            ? formatRunCreatedAtDateTime(c.sessionCompletedAtIso)
-                            : null);
-                      return (
-                        <li key={c.sessionId}>
-                          <button
-                            type="button"
-                            disabled={urlBusy}
-                            className={cn(
-                              "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
-                              "border-border bg-surface-runna hover:bg-surface-runna-inset",
-                              urlBusy && "opacity-60 pointer-events-none"
-                            )}
-                            onClick={() => void importFromDayCandidate(c)}
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate font-medium text-foreground">
-                                {c.driverName || "Run"}
-                              </span>
-                              {when ? (
-                                <span className="block truncate text-[10px] text-muted-foreground">{when}</span>
-                              ) : null}
-                            </span>
-                            <span className="shrink-0 flex flex-col items-end gap-0.5">
-                              {c.bestLapSeconds != null ? (
-                                <span className="flex flex-col items-end leading-tight">
-                                  <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                                    Best
-                                  </span>
-                                  <span className="text-[12px] font-semibold tabular-nums text-foreground">
-                                    {formatLap(c.bestLapSeconds)}
-                                  </span>
-                                </span>
-                              ) : null}
-                              {c.timingSource ? (
-                                <span
-                                  className={cn(
-                                    "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide",
-                                    c.timingSource === "speedhive"
-                                      ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
-                                      : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
-                                  )}
-                                >
-                                  {c.timingSource === "speedhive" ? "Speedhive" : "LiveRC"}
-                                </span>
-                              ) : null}
-                              <span className="ui-title text-[10px] text-muted-foreground">Import</span>
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
                   </ul>
                   {canExpandRecentRuns ? (
                     <button
@@ -1094,7 +1120,7 @@ export function LapTimesIngestPanel({
                     >
                       {showAllRecentRuns
                         ? "Show fewer runs"
-                        : `Show more runs (${Math.min(RECENT_RUNS_MAX, scanCandidatesExcludingLinked.length) - RECENT_RUNS_COLLAPSED} more)`}
+                        : `Show more runs (${Math.min(RECENT_RUNS_MAX, sortedDayScanCandidates.length) - RECENT_RUNS_COLLAPSED} more)`}
                     </button>
                   ) : null}
                 </div>
@@ -1171,46 +1197,46 @@ export function LapTimesIngestPanel({
             </button>
           </div>
 
-          {value.urlImportBlocks.map((block, blockIndex) => (
-            <div key={block.blockId} className="space-y-2 rounded-lg border border-border bg-surface-runna p-2" data-import-index={blockIndex}>
+          {activeImportBlock ? (
+            <div
+              key={activeImportBlock.blockId}
+              className="space-y-2 rounded-lg border border-accent/35 bg-accent/5 p-2"
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="ui-title text-[10px] text-muted-foreground">
-                    Import {blockIndex + 1} · {formatRunCreatedAtDateTime(blockLabelTimeIso(block))}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground break-all">{block.sourceUrl}</div>
+                  <Eyebrow>
+                    Imported · {formatRunCreatedAtDateTime(blockLabelTimeIso(activeImportBlock))}
+                  </Eyebrow>
+                  <div className="text-[11px] text-muted-foreground break-all">{activeImportBlock.sourceUrl}</div>
                 </div>
-                <button
-                  type="button"
-                  className="shrink-0 rounded-md border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-surface-runna-inset"
-                  onClick={() => removeBlock(block.blockId)}
-                >
-                  Remove
-                </button>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-accent/40 bg-accent/10 px-2 py-1 text-[10px] font-medium text-foreground">
+                  <span aria-hidden>✓</span>
+                  Active
+                </span>
               </div>
 
-              {block.sessionDrivers.length > 0 ? (
+              {activeImportBlock.sessionDrivers.length > 0 ? (
                 <>
                   <div className="space-y-2">
-                    {block.sessionDrivers.map((d) => {
-                      const key = `${block.blockId}:${d.driverId}`;
+                    {activeImportBlock.sessionDrivers.map((d) => {
+                      const key = `${activeImportBlock.blockId}:${d.driverId}`;
                       const isPreview = activePreviewKey === key;
-                      const isPrimaryForRun = block.selectedDriverIds?.[0] === d.driverId;
-                      const stats = statsForDriver(block, d);
-                      const primaryLabel = formatDriverSessionLabel(d.driverName, blockLabelTimeIso(block));
+                      const isPrimaryForRun = activeImportBlock.selectedDriverIds?.[0] === d.driverId;
+                      const stats = statsForDriver(activeImportBlock, d);
+                      const primaryLabel = formatDriverSessionLabel(d.driverName, blockLabelTimeIso(activeImportBlock));
                       return (
                         <div
                           key={d.driverId}
                           role="button"
                           tabIndex={0}
                           onClick={() => {
-                            selectPrimaryDriverForBlock(block.blockId, d.driverId, blockIndex);
+                            selectPrimaryDriverForBlock(activeImportBlock.blockId, d.driverId, 0);
                             setActivePreviewKey(key);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              selectPrimaryDriverForBlock(block.blockId, d.driverId, blockIndex);
+                              selectPrimaryDriverForBlock(activeImportBlock.blockId, d.driverId, 0);
                               setActivePreviewKey(key);
                             }
                           }}
@@ -1255,7 +1281,7 @@ export function LapTimesIngestPanel({
                       const keys = activePreviewKey?.split(":");
                       const bId = keys?.[0];
                       const dId = keys?.[1];
-                      const blk = bId ? value.urlImportBlocks.find((x) => x.blockId === bId) : null;
+                      const blk = bId === activeImportBlock.blockId ? activeImportBlock : null;
                       const active = blk && dId ? blk.sessionDrivers.find((x) => x.driverId === dId) ?? null : null;
                       if (!blk || !active) return <div className="text-[11px] text-muted-foreground">—</div>;
                       const rows =
@@ -1306,7 +1332,7 @@ export function LapTimesIngestPanel({
                 </>
               ) : null}
             </div>
-          ))}
+          ) : null}
 
           {urlMessage ? (
             <p

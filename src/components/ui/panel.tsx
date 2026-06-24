@@ -23,7 +23,7 @@ function dotClass(dot: Dot): string {
   }
 }
 
-/** Card headline — same weight/style as the hero title, one step smaller. */
+/** Card headline — Inter extrabold (locked hero voice). */
 export function PanelTitle({
   children,
   className,
@@ -45,7 +45,7 @@ export function PanelTitle({
   );
 }
 
-/** Nav hub row label — between body copy and card titles. */
+/** Nav hub row label — Inter semibold (`.hub-row-title` in globals.css). */
 export function HubRowTitle({
   children,
   className,
@@ -58,7 +58,7 @@ export function HubRowTitle({
   return (
     <Tag
       className={cn(
-        "text-[17px] font-extrabold leading-tight tracking-tight text-foreground sm:text-[18px]",
+        "hub-row-title text-[17px] text-foreground sm:text-[18px]",
         className
       )}
     >
@@ -87,7 +87,7 @@ export function Eyebrow({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {dot ? <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass(dot))} /> : null}
-      <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-faint">{children}</span>
+      <span className="type-data-label">{children}</span>
     </div>
   );
 }
@@ -121,7 +121,7 @@ export function StatTile({
 }) {
   return (
     <div className={cn("bg-background/55 px-3 py-2.5", className)}>
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-faint">{label}</div>
+      <div className="type-data-label">{label}</div>
       <div
         className={cn(
           "mt-1 font-mono text-[18px] font-medium tabular-nums",

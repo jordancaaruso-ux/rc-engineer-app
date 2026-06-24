@@ -11,6 +11,7 @@ import { listModelParameters } from "@/lib/setupSheetModels/modelCalibrationMapp
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 
 export function SetupCalibrationModelSidebar(props: {
@@ -79,7 +80,7 @@ export function SetupCalibrationModelSidebar(props: {
   return (
     <div className="space-y-3 text-xs">
       <CardPanel className="border-primary/30 bg-primary/10" contentClassName="p-3">
-        <div className="ui-title text-[11px] text-accent">Map PDF to parameters</div>
+        <Eyebrow dot="accent">Map PDF to parameters</Eyebrow>
         <ol className="mt-2 list-decimal space-y-1 pl-4 text-[11px] text-muted-foreground">
           <li>Click one or more PDF controls on the left</li>
           <li>
@@ -125,7 +126,7 @@ export function SetupCalibrationModelSidebar(props: {
 
       <CardPanel contentClassName="p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="ui-title text-[11px] text-muted-foreground">Parameters</div>
+          <Eyebrow>Parameters</Eyebrow>
           <div className="flex gap-1">
             {(["unmapped", "all"] as const).map((f) => (
               <button

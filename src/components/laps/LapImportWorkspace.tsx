@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import type { ImportedSessionFieldStatsPreviewV1 } from "@/lib/lapImport/computeImportedSessionFieldStats";
@@ -160,7 +161,7 @@ export function LapImportWorkspace() {
   return (
     <div className="max-w-3xl space-y-4">
       <CardPanel className="max-w-3xl" contentClassName="space-y-3">
-        <div className="text-xs ui-title text-muted-foreground">Import from URLs</div>
+        <Eyebrow>Import from URLs</Eyebrow>
         <p className="text-[11px] text-muted-foreground leading-snug">
           Paste LiveRC (or other supported) timing links — one per line. LiveRC event hub URLs expand to each race result.
           Use <code className="text-[10px]">?eventId=…</code> on this page to filter by that event&apos;s race classes. Failed lines do not cancel the rest.
@@ -202,7 +203,7 @@ export function LapImportWorkspace() {
       </CardPanel>
 
       <div className="space-y-2.5">
-        <div className="text-xs ui-title text-muted-foreground">Imported sessions</div>
+        <Eyebrow>Imported sessions</Eyebrow>
         {listErr ? <p className="text-[11px] text-destructive">{listErr}</p> : null}
         {!listErr && sessions.length === 0 ? (
           <CardPanel contentClassName="text-[11px] text-muted-foreground">

@@ -9,11 +9,13 @@ import {
   ChevronRight,
   CircleDot,
   Disc,
+  FlaskConical,
   GitCompare,
   History,
   Layers,
   MapPin,
   Video,
+  Wrench,
 } from "lucide-react";
 import type { NavHubIconKey, NavHubLink } from "@/components/layout/navConfig";
 import { useRouteTransition } from "@/components/layout/RouteTransitionProvider";
@@ -27,10 +29,12 @@ const HUB_ICON_MAP: Record<NavHubIconKey, LucideIcon> = {
   layers: Layers,
   "map-pin": MapPin,
   "circle-dot": CircleDot,
+  flask: FlaskConical,
   calendar: Calendar,
   history: History,
   video: Video,
   "git-compare": GitCompare,
+  wrench: Wrench,
 };
 
 export function HubNavLink({ link }: { link: NavHubLink }) {
@@ -43,7 +47,10 @@ export function HubNavLink({ link }: { link: NavHubLink }) {
         href={link.href}
         prefetch
         className="tap-active block"
-        onClick={() => beginTransition(link.href)}
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          beginTransition(link.href);
+        }}
       >
         <SurfaceCard variant="panel" contentClassName="flex items-center gap-3 px-4 py-3">
           <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-border bg-background/50 text-muted-foreground transition-colors group-hover:text-foreground">

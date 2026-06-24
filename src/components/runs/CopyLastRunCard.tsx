@@ -66,7 +66,7 @@ export function CopyLastRunCard({
             {summary}
           </p>
           {applied ? (
-            <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-faint">
+            <p className="mt-1.5 type-data-label">
               Applied
             </p>
           ) : disabled ? (

@@ -17,6 +17,7 @@ import { getEffectiveFieldCatalog } from "@/lib/setupDocuments/fieldMap";
 import { mappedFieldKeys } from "@/lib/setupDocuments/normalize";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
@@ -858,7 +859,7 @@ export function SetupDocumentReviewClient({
           <div className="mt-2 rounded border border-accent/35 bg-accent/10 px-3 py-2 text-sm text-accent-foreground space-y-2">
             <p>{autoPickUserNote}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <Link href="/cars/new/setup" className="underline text-accent-foreground hover:text-foreground">
+              <Link href="/setup-sheet-models/new/setup" className="underline text-accent-foreground hover:text-foreground">
                 Add car &amp; setup sheet
               </Link>
               <a
@@ -887,11 +888,11 @@ export function SetupDocumentReviewClient({
 
         {!showDebug && (awaitingCalibration || calibrationSelectionChanged) ? (
           <div className="mt-3 rounded border border-border/70 bg-muted/40 p-3 space-y-2">
-            <div className="ui-title text-[11px] text-muted-foreground">Calibration</div>
+            <Eyebrow>Calibration</Eyebrow>
             {calibrationPicker.totalCount === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No calibrations yet.{" "}
-                <Link href="/cars/new/setup" className="underline hover:text-foreground">
+                <Link href="/setup-sheet-models/new/setup" className="underline hover:text-foreground">
                   Run the car wizard
                 </Link>{" "}
                 or{" "}
@@ -953,7 +954,7 @@ export function SetupDocumentReviewClient({
         {showDebug ? (
         <>
         <div className="mt-3 rounded border border-border/70 bg-muted/30 p-2 text-xs">
-          <div className="ui-title text-[11px] text-muted-foreground">Import diagnostics</div>
+          <Eyebrow>Import diagnostics</Eyebrow>
           <div className="mt-1 grid grid-cols-1 gap-1.5 text-[11px] text-muted-foreground md:grid-cols-2">
             <div>
               <span className="text-foreground">Import status:</span>{" "}
@@ -1175,7 +1176,7 @@ export function SetupDocumentReviewClient({
           </span>
         </div>
         <div className="mt-3 rounded border border-border/70 bg-muted/40 p-2">
-          <div className="ui-title text-[11px] text-muted-foreground">Apply saved template</div>
+          <Eyebrow>Apply saved template</Eyebrow>
           <p className="mt-1 text-[10px] text-muted-foreground">
             Saved templates map editable PDF text (and optional regions) to setup fields. Choose one and confirm to prefill.
           </p>
@@ -1300,7 +1301,7 @@ export function SetupDocumentReviewClient({
         <div className={mode === "manual" ? "xl:sticky xl:top-4 xl:self-start" : ""}>
           <CardPanel contentClassName="p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="ui-title text-xs text-muted-foreground">Original sheet</div>
+              <Eyebrow>Original sheet</Eyebrow>
               <button
                 type="button"
                 className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted"
@@ -1318,9 +1319,9 @@ export function SetupDocumentReviewClient({
         <div className="space-y-3">
           <div className={mode === "manual" ? "xl:sticky xl:top-4 xl:z-10" : ""}>
             <CardPanel contentClassName="p-3">
-              <div className="ui-title text-xs text-muted-foreground">
+              <Eyebrow>
                 {mode === "manual" ? "Edit structured setup" : "Review parsed setup"}
-              </div>
+              </Eyebrow>
               {liveDoc.parsedSetupManuallyEdited ? (
                 <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
                   This document includes saved manual corrections to structured fields.
@@ -1382,7 +1383,7 @@ export function SetupDocumentReviewClient({
               </div>
               {showDebug ? (
               <div className="mt-3 rounded border border-border/70 bg-muted/40 p-2">
-                <div className="ui-title text-[11px] text-muted-foreground">New text template</div>
+                <Eyebrow>New text template</Eyebrow>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <input
                     className="min-w-[18rem] rounded-md border border-border bg-card px-2 py-1.5 text-xs"
@@ -1424,7 +1425,7 @@ export function SetupDocumentReviewClient({
 
           {showDebug ? (
           <CardPanel contentClassName="p-3">
-            <div className="ui-title text-xs text-muted-foreground">Extracted text</div>
+            <Eyebrow>Extracted text</Eyebrow>
             <div className="mt-1 rounded border border-border/70 bg-muted/40 p-2 text-[11px] text-muted-foreground">
               <div>Text length: {(liveDoc.extractedText ?? "").length}</div>
               <div>Mapped field count: {mappedKeys.length}</div>

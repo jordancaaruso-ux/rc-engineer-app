@@ -4,7 +4,6 @@ import { useEffect, useMemo, useTransition, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EngineerCompareAndPattern } from "@/components/engineer/EngineerCompareLazy";
 import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/engineer/EngineerChatPanel";
-import { EngineerQuickFixStrip } from "@/components/engineer/EngineerQuickFixStrip";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow, PanelSubtitle } from "@/components/ui/panel";
@@ -46,7 +45,6 @@ export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-3">
-      <EngineerQuickFixStrip />
       <SurfaceCard variant="panel" contentClassName="flex gap-1 p-1">
         <button
           type="button"

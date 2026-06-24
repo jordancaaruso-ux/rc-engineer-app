@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/panel";
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
@@ -46,7 +47,7 @@ export function TrackDeleteClient(props: {
 
   return (
     <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-2">
-      <div className="ui-title text-sm text-muted-foreground">Delete track</div>
+      <Eyebrow>Delete track</Eyebrow>
 
       {props.asAdmin ? (
         <p className="text-xs text-amber-700 dark:text-amber-400">

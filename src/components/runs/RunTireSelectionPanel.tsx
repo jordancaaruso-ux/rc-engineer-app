@@ -124,13 +124,22 @@ export function RunTireSelectionPanel({
     }
   }, [addingTireSet, tireSetId, showNewSetPanel]);
 
+  // Dropdown shows every user-owned set from the parent catalog. `/api/tire-sets/recent`
+  // only affects sort order (recently used on any run first), not membership.
   const sortedSets = useMemo(() => {
+    const byId = new Map<string, RunTireSetOption>();
+    for (const ts of tireSets) byId.set(ts.id, ts);
+    for (const rs of recentSets) {
+      if (!byId.has(rs.id)) byId.set(rs.id, rs);
+    }
     const recentIds = new Set(recentSets.map((s) => s.id));
-    const recentInCatalog = recentSets.filter((rs) => tireSets.some((ts) => ts.id === rs.id));
-    const rest = tireSets
+    const recentFirst = recentSets
+      .map((rs) => byId.get(rs.id))
+      .filter((ts): ts is RunTireSetOption => ts != null);
+    const rest = [...byId.values()]
       .filter((ts) => !recentIds.has(ts.id))
       .sort((a, b) => tireSetDisplayLine(a).localeCompare(tireSetDisplayLine(b)));
-    return [...recentInCatalog, ...rest];
+    return [...recentFirst, ...rest];
   }, [tireSets, recentSets]);
 
   function handleSelectSet(nextId: string) {
@@ -198,12 +207,12 @@ export function RunTireSelectionPanel({
                 id: ts.id,
                 label: tireSetDisplayLine(ts),
               }))}
-              placeholder={tireSets.length === 0 ? "No saved sets yet" : "Select tire set…"}
-              disabled={tireSets.length === 0}
+              placeholder={sortedSets.length === 0 ? "No saved sets yet" : "Select tire set…"}
+              disabled={sortedSets.length === 0}
               aria-label="Tire set"
             />
 
-            {tireSets.length === 0 ? (
+            {sortedSets.length === 0 ? (
               <p className="text-[11px] text-muted-foreground leading-snug">
                 No tire sets saved yet. Tap <span className="font-medium text-foreground">New set</span> to log
                 your first compound.
@@ -216,7 +225,7 @@ export function RunTireSelectionPanel({
       {showNewSetPanel ? (
         <div className="inset-panel p-3 space-y-3">
           <div className="space-y-1">
-            <div className="ui-title text-xs text-muted-foreground">New tire set</div>
+            <Eyebrow>New tire set</Eyebrow>
           </div>
 
           {recentTypes.length > 0 ? (

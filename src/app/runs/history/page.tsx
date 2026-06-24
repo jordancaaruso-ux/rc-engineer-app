@@ -5,7 +5,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getMyNameSetting } from "@/lib/appSettings";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
-import { RunHistoryColGroup } from "@/components/runs/runHistoryTableColumns";
+import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
@@ -24,10 +24,12 @@ import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { loadUserScopedEvents } from "@/lib/events/eventParticipation";
 import { assertUserInTeam, listTeamMemberUserIds, listTeamsForUser } from "@/lib/teamAccess";
 import type { Prisma } from "@prisma/client";
+import { cn } from "@/lib/utils";
 
 import { perfSpan } from "@/lib/perfLog";
 
@@ -42,6 +44,7 @@ const runHistoryInclude = {
   car: { select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true } },
   track: { select: { id: true, name: true } },
   tireSet: { select: { id: true, label: true, setNumber: true } },
+  additiveType: { select: { id: true, displayName: true } },
   event: {
     select: {
       name: true,
@@ -151,9 +154,12 @@ export default async function RunHistoryPage({
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Sessions</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/analysis" />
+            <div>
+              <h1 className="page-title">Sessions</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -306,6 +312,7 @@ export default async function RunHistoryPage({
       showMemberColumn: teamMode,
       showSessionColumn,
     };
+    const colSpan = computeRunHistoryColSpan(columnLayout);
     return (
       <SurfaceCard
         key={group.id}
@@ -325,27 +332,28 @@ export default async function RunHistoryPage({
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 leading-none">
               <span className="session-group-title">{group.title}</span>
-              <span className="ui-title text-xs leading-none text-muted-foreground">{group.type}</span>
+              <span className="text-xs font-semibold leading-none text-muted-foreground">{group.type}</span>
               {group.trackName ? (
-                <span className="ui-title text-xs leading-none text-muted-foreground">
+                <span className="text-xs font-semibold leading-none text-muted-foreground">
                   · {group.trackName}
                 </span>
               ) : null}
-              <span className="ui-title text-xs leading-none text-muted-foreground tabular-nums">
+              <span className="type-timestamp leading-none">
                 {group.dateLabel}
               </span>
             </div>
-            <span className="ui-title shrink-0 text-xs leading-none text-muted-foreground tabular-nums">
+            <span className="type-timestamp shrink-0 leading-none">
               {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
             </span>
           </div>
         </summary>
         <div className="min-w-0 max-w-full border-t border-border bg-muted/40">
           <div className="min-w-0 max-w-full max-md:overflow-x-hidden md:overflow-x-auto">
-            <table className="w-full max-w-full text-sm table-fixed max-md:min-w-0">
+            <table className="w-full max-w-full text-sm md:table-fixed">
               <RunHistoryColGroup layout={columnLayout} />
               <thead>
-                <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
+                <RunHistoryMobileHeaderRow colSpan={colSpan} />
+                <tr className="hidden md:table-row border-b border-border bg-muted/70 text-left">
                   {!teamMode ? (
                     <th
                       className="hidden md:table-cell w-6 px-1 py-2"
@@ -353,36 +361,35 @@ export default async function RunHistoryPage({
                     />
                   ) : null}
                   {teamMode ? (
-                    <th className="px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
+                    <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
                       <span className="hidden sm:inline">Member</span>
                       <span className="sm:hidden">Who</span>
                     </th>
                   ) : null}
-                  <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                  <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
                     Date
                   </th>
                   {showSessionColumn ? (
-                    <th className="px-2 py-1.5 md:px-3 md:py-2 min-w-0">
+                    <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 min-w-0">
                       Session
                     </th>
                   ) : null}
-                  <th className="hidden md:table-cell px-4 py-2">Car</th>
-                  <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                  <th className="table-col-header hidden md:table-cell px-4 py-2">Car</th>
+                  <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
                     Best
                   </th>
-                  <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                  <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
                     <span className="md:hidden">Top 5</span>
                     <span className="hidden md:inline">Avg top 5</span>
                   </th>
-                  <th className="hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
-                    <span className="md:hidden">Top 10</span>
-                    <span className="hidden md:inline">Avg top 10</span>
+                  <th className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                    Avg top 10
                   </th>
-                  <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                  <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
                     Median
                   </th>
                   <th
-                    className="px-1 py-1.5 md:px-2 md:py-2 md:w-auto whitespace-nowrap max-md:text-[10px] md:text-right"
+                    className={cn(RUN_HISTORY_ACTION_CELL_CLASS, "text-[10px]")}
                     aria-label="Setup and laps"
                   />
                 </tr>
@@ -416,20 +423,23 @@ export default async function RunHistoryPage({
 
   function renderFlatRunList() {
     const showSessionColumn = runs.some((r) => formatRunSessionDisplay(r) !== "—");
+    const columnLayout = {
+      showReorderColumn: !teamMode,
+      showMemberColumn: teamMode,
+      showSessionColumn,
+    };
+    const colSpan = computeRunHistoryColSpan(columnLayout);
     return (
       <SurfaceCard variant="panel" contentClassName="p-0" className="min-w-0 max-w-full">
       <div className="min-w-0 max-w-full">
         <div className="min-w-0 max-w-full max-md:overflow-x-hidden md:overflow-x-auto">
-          <table className="w-full max-w-full text-sm table-fixed max-md:min-w-0">
+          <table className="w-full max-w-full text-sm md:table-fixed">
             <RunHistoryColGroup
-              layout={{
-                showReorderColumn: !teamMode,
-                showMemberColumn: teamMode,
-                showSessionColumn,
-              }}
+              layout={columnLayout}
             />
             <thead>
-              <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
+              <RunHistoryMobileHeaderRow colSpan={colSpan} />
+              <tr className="hidden md:table-row border-b border-border bg-muted/70 text-left">
                 {!teamMode ? (
                   <th
                     className="hidden md:table-cell w-6 px-1 py-2"
@@ -437,28 +447,29 @@ export default async function RunHistoryPage({
                   />
                 ) : null}
                 {teamMode ? (
-                  <th className="px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
+                  <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
                     <span className="hidden sm:inline">Member</span>
                     <span className="sm:hidden">Who</span>
                   </th>
                 ) : null}
-                <th className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">Date</th>
+                <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">Date</th>
                 {showSessionColumn ? (
-                  <th className="px-2 py-1.5 md:px-3 md:py-2 min-w-0">Session</th>
+                  <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 min-w-0">Session</th>
                 ) : null}
-                <th className="hidden md:table-cell px-4 py-2">Car</th>
-                <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">Best</th>
-                <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
+                <th className="table-col-header hidden md:table-cell px-4 py-2">Car</th>
+                <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">Best</th>
+                <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
                   <span className="md:hidden">Top 5</span>
                   <span className="hidden md:inline">Avg top 5</span>
                 </th>
-                <th className="hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">
-                  <span className="md:hidden">Top 10</span>
-                  <span className="hidden md:inline">Avg top 10</span>
+                <th className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                  Avg top 10
                 </th>
-                <th className="px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap max-md:text-[10px]">Median</th>
+                <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                  Median
+                </th>
                 <th
-                  className="px-1 py-1.5 md:px-2 md:py-2 md:w-auto whitespace-nowrap max-md:text-[10px] md:text-right"
+                  className={cn(RUN_HISTORY_ACTION_CELL_CLASS, "text-[10px]")}
                   aria-label="Setup and laps"
                 />
               </tr>
@@ -509,9 +520,12 @@ export default async function RunHistoryPage({
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">{pageTitle}</h1>
-            <p className="page-subtitle">{pageSubtitle}</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/analysis" />
+            <div>
+              <h1 className="page-title">{pageTitle}</h1>
+              <p className="page-subtitle">{pageSubtitle}</p>
+            </div>
           </div>
         </header>
       <section className="page-body min-w-0 max-w-full">
@@ -528,9 +542,12 @@ export default async function RunHistoryPage({
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">{pageTitle}</h1>
-          <p className="page-subtitle">{pageSubtitle}</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/analysis" />
+          <div>
+            <h1 className="page-title">{pageTitle}</h1>
+            <p className="page-subtitle">{pageSubtitle}</p>
+          </div>
         </div>
       </header>
       <section className="page-body min-w-0 max-w-full">

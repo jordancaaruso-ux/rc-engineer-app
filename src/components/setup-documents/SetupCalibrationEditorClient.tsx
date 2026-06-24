@@ -48,6 +48,7 @@ import { SetupCalibrationQuickParamsPanel } from "@/components/setup-documents/S
 import { SetupCalibrationLinkParameterDialog } from "@/components/setup-documents/SetupCalibrationLinkParameterDialog";
 import { SetupCalibrationModelSidebar } from "@/components/setup-documents/SetupCalibrationModelSidebar";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import {
   buildGroupedRuleFromAssignments,
@@ -2788,7 +2789,7 @@ export function SetupCalibrationEditorClient({
         />
       ) : null}
       <CardPanel contentClassName="p-3">
-        <div className="ui-title text-xs text-muted-foreground">Calibration mapping profile</div>
+        <Eyebrow>Calibration mapping profile</Eyebrow>
         <p className="mt-1 text-[11px] text-muted-foreground">
           {modelLinkedMode ? (
             <>
@@ -2956,7 +2957,7 @@ export function SetupCalibrationEditorClient({
               <div className="sticky top-0 z-[3] border-b border-border bg-card/95 p-2 backdrop-blur-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <div className="ui-title text-xs text-muted-foreground">Calibration canvas</div>
+                    <Eyebrow>Calibration canvas</Eyebrow>
                     <div className="mt-0.5 text-[11px] text-muted-foreground">
                       Use tools to create mappings directly on the PDF. Editing happens in the inspector.
                     </div>
@@ -3112,7 +3113,7 @@ export function SetupCalibrationEditorClient({
             <div className="rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="ui-title text-xs text-muted-foreground">Inspector</div>
+                  <Eyebrow>Inspector</Eyebrow>
                   <div className="mt-0.5 text-[11px] text-muted-foreground">
                     {selectedSheetField ? (
                       <span className="font-mono text-foreground/80">{selectedSheetField.sourceType}</span>
@@ -3294,7 +3295,7 @@ export function SetupCalibrationEditorClient({
                 <div className="mt-4 border-t border-border pt-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <div className="ui-title text-[11px] text-muted-foreground">Extracted fields (debug)</div>
+                      <Eyebrow>Extracted fields (debug)</Eyebrow>
                       <div className="mt-0.5 text-[10px] text-muted-foreground">
                         {pdfFormRows.length} fields · {mappedSheetPdfFieldNames.size} mapped in full-sheet
                       </div>
@@ -3398,7 +3399,7 @@ export function SetupCalibrationEditorClient({
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="ui-title text-xs text-muted-foreground">AcroForm map</div>
+                <Eyebrow>AcroForm map</Eyebrow>
                 <p className="mt-0.5 max-w-xl text-[11px] text-muted-foreground">
                   {modelLinkedMode
                     ? "Click PDF controls to select them, then link to a parameter in the side panel."
@@ -3660,7 +3661,7 @@ export function SetupCalibrationEditorClient({
         ) : tab === "text" ? (
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="ui-title text-xs text-muted-foreground">Printed text (secondary)</div>
+              <Eyebrow>Printed text (secondary)</Eyebrow>
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <label className="flex items-center gap-1 text-muted-foreground">
                   Line ε
@@ -3767,7 +3768,7 @@ export function SetupCalibrationEditorClient({
         ) : (
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="mb-2 flex items-center justify-between">
-              <div className="ui-title text-xs text-muted-foreground">Region fallback</div>
+              <Eyebrow>Region fallback</Eyebrow>
               <div className="flex items-center gap-2 text-xs">
                 <button
                   type="button"
@@ -3919,7 +3920,7 @@ export function SetupCalibrationEditorClient({
           ) : tab === "form" ? (
             <>
               <div className="mb-3 space-y-3 rounded border border-border/80 bg-muted/25 p-3 text-xs">
-                <div className="ui-title text-[11px] text-foreground/90">Add a custom field</div>
+                <Eyebrow>Add a custom field</Eyebrow>
                 <p className="text-[10px] leading-relaxed text-muted-foreground">
                   <span className="font-medium text-foreground/85">Many of many</span> (independent checkboxes): pick that shape,
                   optionally one name per line (same order as your PDF clicks), select 2+ PDF controls, continue, name each option
@@ -4024,7 +4025,7 @@ export function SetupCalibrationEditorClient({
 
               <div className="mb-3 rounded border border-sky-500/35 bg-sky-500/10 p-3 text-xs">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="text-[10px] ui-title text-muted-foreground">Selected setup field</div>
+                  <Eyebrow>Selected setup field</Eyebrow>
                   {activeSetupFieldKey ? (
                     <button
                       type="button"
@@ -4367,7 +4368,7 @@ export function SetupCalibrationEditorClient({
                 </div>
               ) : null}
 
-              <div className="ui-title text-xs text-muted-foreground">Map this PDF control</div>
+              <Eyebrow>Map this PDF control</Eyebrow>
               <p className="mt-1 text-[10px] text-muted-foreground">
                 Unmapped: click the PDF to add/remove from the selection (count is in <strong>Add a custom field</strong>).
                 Mapped: click to open that setup field. One widget: link or create a single field below. Two or more: use
@@ -4416,7 +4417,7 @@ export function SetupCalibrationEditorClient({
 
                   {selectedAcroAppKeys.length > 0 ? (
                     <div className="space-y-2 border-t border-border pt-2">
-                      <div className="text-[10px] ui-title text-muted-foreground">App mapping</div>
+                      <Eyebrow>App mapping</Eyebrow>
                       {selectedAcroAppKeys.map((k) => {
                         const rule = formFieldMappings[k];
                         const label = mergedLabelMap[k] ?? k;
@@ -4463,7 +4464,7 @@ export function SetupCalibrationEditorClient({
                     </div>
                   ) : (
                     <div className="space-y-2 border-t border-border pt-2">
-                      <div className="text-[10px] ui-title text-muted-foreground">Map this PDF control</div>
+                      <Eyebrow>Map this PDF control</Eyebrow>
                       {!activeSetupFieldKey && !showAddMappingForm && !showCreateFieldForm ? (
                         <div className="flex flex-col gap-2">
                           <button
@@ -4621,9 +4622,9 @@ export function SetupCalibrationEditorClient({
                   <div className="max-h-[45vh] space-y-3 overflow-auto">
             {catalogByGroup.order.map((groupTitle) => (
               <div key={groupTitle} className="space-y-1">
-                <div className="sticky top-0 z-[1] bg-card/95 py-1 text-[10px] ui-title text-muted-foreground backdrop-blur-sm">
+                <Eyebrow className="sticky top-0 z-[1] bg-card/95 py-1 backdrop-blur-sm">
                   {groupTitle}
-                </div>
+                </Eyebrow>
                 <div className="space-y-1">
                   {(catalogByGroup.map.get(groupTitle) ?? []).map((field) => {
                     const isSelected = activeSetupFieldKey === field.key;
@@ -4688,7 +4689,7 @@ export function SetupCalibrationEditorClient({
             </>
           ) : (
             <>
-              <div className="ui-title text-xs text-muted-foreground">Setup fields</div>
+              <Eyebrow>Setup fields</Eyebrow>
               {tab === "text" ? (
                 <div className="mt-2 space-y-2 rounded border border-border/60 bg-muted/30 p-2 text-[11px]">
                   <div className="text-muted-foreground">Anchor (optional)</div>
@@ -4713,9 +4714,9 @@ export function SetupCalibrationEditorClient({
               <div className="mt-2 max-h-[60vh] space-y-3 overflow-auto">
                 {catalogByGroup.order.map((groupTitle) => (
                   <div key={groupTitle} className="space-y-1">
-                    <div className="sticky top-0 z-[1] bg-card/95 py-1 text-[10px] ui-title text-muted-foreground backdrop-blur-sm">
+                    <Eyebrow className="sticky top-0 z-[1] bg-card/95 py-1 backdrop-blur-sm">
                       {groupTitle}
-                    </div>
+                    </Eyebrow>
                     <div className="space-y-1">
                       {(catalogByGroup.map.get(groupTitle) ?? []).map((field) => {
                         const isSelected = activeSetupFieldKey === field.key;

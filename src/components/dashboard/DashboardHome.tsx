@@ -155,7 +155,7 @@ function FeaturedMeetingCard({
           <StatTile label="Best lap" value={formatLap(featuredEvent.latest?.bestLap ?? null)} accent className="py-2" />
           <StatTile label="Avg top 5" value={formatLap(featuredEvent.latest?.avgTop5 ?? null)} className="py-2" />
           <div className="col-span-2 bg-background/55 px-3 py-2 sm:col-span-1">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-faint">Notes</div>
+            <div className="type-data-label">Notes</div>
             <div className="mt-1 line-clamp-2 break-words text-[13px] leading-relaxed text-muted-foreground">
               {featuredEvent.latest?.notesPreview ?? "—"}
             </div>

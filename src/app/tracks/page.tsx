@@ -5,6 +5,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { TrackList } from "@/components/tracks/TrackList";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 
 /** Favourites + global track list — revalidated on track mutations. */
 export const revalidate = 30;
@@ -14,9 +15,12 @@ export default async function TracksPage(): Promise<ReactNode> {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Tracks</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/assets" />
+            <div>
+              <h1 className="page-title">Tracks</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -59,11 +63,14 @@ export default async function TracksPage(): Promise<ReactNode> {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">Tracks</h1>
-          <p className="page-subtitle">
-            Search the community track catalog. Add a track only if you cannot find it.
-          </p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/assets" />
+          <div>
+            <h1 className="page-title">Tracks</h1>
+            <p className="page-subtitle">
+              Search the community track catalog. Add a track only if you cannot find it.
+            </p>
+          </div>
         </div>
       </header>
       <section className="page-body">

@@ -1,11 +1,8 @@
 @config "../../tailwind.config.ts";
 @import "tailwindcss";
-@import "./hk-grotesk-wide.css";
 
 :root {
   color-scheme: dark;
-  /* Primary UI stack: Wide (self-hosted) → HK Grotesk (npm fallback) → legacy Inter. */
-  --font-ui: "HK Grotesk Wide", "HK Grotesk", var(--font-sans), system-ui, sans-serif;
   /* Legacy single-hex aliases (some docs / snippets); UI uses Tailwind + rgb triplets below. */
   --background: #121110;
   --foreground: #ece9e4;
@@ -229,8 +226,8 @@ body {
 }
 
 .sidebar-nav a {
-  @apply flex items-center justify-between rounded-lg border border-transparent px-3 py-1.5 text-muted-foreground hover:border-accent/25 hover:bg-card/60 hover:text-foreground;
-  transition-property: border-color, background-color;
+  @apply flex items-center rounded-lg border border-transparent px-3 py-1.5 hover:bg-card/40;
+  transition-property: background-color, color;
   transition-duration: 150ms;
   -webkit-tap-highlight-color: transparent;
 }
@@ -240,13 +237,12 @@ body {
 }
 
 .sidebar-nav a[data-active="true"] {
-  @apply border-border bg-card text-foreground shadow-glow-sm;
+  @apply border-transparent bg-transparent;
   transition-duration: 0ms;
 }
 
-.sidebar-nav a[data-active="true"] .nav-active-indicator {
-  transition-property: width;
-  transition-duration: 150ms;
+.sidebar-nav a[data-active="true"]:hover {
+  @apply bg-card/40;
 }
 
 .sidebar-footer {
@@ -285,40 +281,87 @@ html[data-nav-pending] .page {
 }
 
 /* Title + subtitle stack — one rhythm everywhere `.page-header` is used. */
-.page-header > div:has(.page-title) {
+.page-header > div:has(> .page-title) {
   @apply flex min-w-0 flex-col gap-1;
 }
 
 .page-title {
-  @apply text-[20px] font-bold leading-tight tracking-[-0.02em] text-foreground sm:text-[22px];
+  @apply text-[20px] font-semibold tracking-tight text-foreground sm:text-[22px];
 }
 
-/* Page chrome: HK Grotesk Wide bold, sentence case — calmer than in-card PanelTitle extrabold. */
-:where(.page-title) {
-  font-family: var(--font-ui);
-  font-style: normal;
-  text-transform: none;
+.hub-row-title {
+  @apply font-semibold tracking-tight;
 }
 
-/* Session group headers on run history — page-title scale is too large; 11px ≈ 90% of text-xs. */
 .session-group-title {
   font-family: var(--font-ui);
-  font-style: normal;
-  font-weight: 800;
+  font-weight: 700;
   @apply text-[13.915px] leading-none tracking-tight text-foreground;
 }
 
-/* In-form / in-card headings: HK Grotesk Wide bold, normal case (write labels in Title case in JSX). */
-.ui-title {
+/* Primary nav — weight step only (Airbnb-style active yellow). */
+.bottom-nav .nav-tab-label {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  @apply tracking-tight;
+}
+
+.bottom-nav a[data-active="true"] .nav-tab-label {
+  font-weight: 700;
+}
+
+.sidebar-nav .nav-sidebar-label {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  @apply tracking-tight;
+}
+
+.sidebar-nav a[data-active="true"] .nav-sidebar-label {
+  font-weight: 700;
+}
+
+.ui-title:is(.text-sm, .text-base, .text-lg, .text-xl) {
   font-family: var(--font-ui);
   font-weight: 700;
+  @apply tracking-tight;
+}
+
+.run-details-tab {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  @apply tracking-tight;
+}
+
+.ui-title {
+  font-family: var(--font-ui);
+  font-weight: 600;
   font-style: normal;
   text-transform: none;
   @apply tracking-tight;
 }
 
-/* Strong emphasis (.ui-strong / .btn-brand): HK Grotesk Wide bold, normal case.
-   Sidebar nav now inherits the clean body font instead of italic-uppercase brand voice. */
+:where(.section-title) {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  @apply text-sm leading-snug tracking-tight text-foreground;
+}
+
+/* Mono uppercase micro labels — Eyebrow, StatTile labels, table column headers. One tracking value. */
+.type-data-label {
+  @apply font-mono text-[10px] uppercase tracking-[0.28em] text-faint;
+}
+
+/* Timestamps and IDs — mono data voice without uppercase/tracking. */
+.type-timestamp {
+  @apply font-mono text-[10px] tabular-nums text-faint;
+}
+
+/* Table column headers — mono faint uppercase (sessions, compare, archetypes). */
+.table-col-header {
+  @apply font-mono text-[10px] uppercase tracking-[0.28em] text-faint font-normal;
+}
+
+/* Strong emphasis (.ui-strong / .btn-brand): Inter bold, normal case. */
 :where(.ui-strong, .btn-brand) {
   font-family: var(--font-ui);
   font-weight: 700;
@@ -326,7 +369,7 @@ html[data-nav-pending] .page {
   text-transform: none;
 }
 
-/* Field / filter labels — Inter medium, not hairline Montserrat at 10px. */
+/* Field / filter labels — Inter medium. */
 .ui-label-caps {
   @apply text-xs font-medium tracking-normal text-muted-foreground;
 }
@@ -435,7 +478,7 @@ html.video-overlay-fullscreen-active body {
   animation: surface-card-glow-drift 14s ease-in-out infinite;
 }
 
-/* Primary actions — solid yellow fill, subtle top highlight, HK Grotesk Wide. */
+/* Primary actions — solid yellow fill, subtle top highlight, Inter. */
 .primary-action-chip {
   position: relative;
   isolation: isolate;
@@ -457,7 +500,7 @@ html.video-overlay-fullscreen-active body {
   @apply size-3.5;
 }
 
-/* Dashboard hero + Engineer quick-fix CTA — !py beats base chip py-1.5 without fixed height stacking. */
+/* Dashboard hero primary CTA — !py beats base chip py-1.5 without fixed height stacking. */
 .primary-action-chip-prominent {
   @apply !py-2.5 px-5 text-[13px] uppercase tracking-[0.12em];
 }

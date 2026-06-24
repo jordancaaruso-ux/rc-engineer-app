@@ -13,7 +13,11 @@ import {
   resolveSetupSnapshot,
 } from "@/lib/setup/resolveSetupSnapshot";
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
-import { tireSelectionFromTireSet } from "@/lib/tires/tireSelectionFromSet";
+import {
+  applyRunContextToSetupSnapshot,
+  parseWarmerTimingMinutes,
+} from "@/lib/runs/applyRunContextToSetupSnapshot";
+import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysForCar";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
@@ -32,6 +36,8 @@ type RunUpsertBody = {
   trackId?: string | null;
   tireSetId?: string | null;
   tireRunNumber?: number;
+  additiveTypeId?: string | null;
+  warmerTimingMinutes?: number | null;
   batteryId?: string | null;
   batteryRunNumber?: number;
   setupData?: unknown;
@@ -325,13 +331,56 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     return NextResponse.json({ error: "Battery not found" }, { status: 400 });
   }
 
-  const tireValue = tireSet ? tireSelectionFromTireSet(tireSet) : undefined;
-  const batteryLabel = battery ? `${battery.label}${battery.packNumber != null ? ` #${battery.packNumber}` : ""}` : "";
-  resolvedData = normalizeSetupSnapshotForStorage({
-    ...resolvedData,
-    tires: tireValue || undefined,
-    battery: batteryLabel || undefined,
+  const additiveTypeId =
+    typeof body.additiveTypeId === "string" && body.additiveTypeId.trim()
+      ? body.additiveTypeId.trim()
+      : null;
+  const additiveType = additiveTypeId
+    ? await prisma.additiveType.findUnique({
+        where: { id: additiveTypeId },
+        select: { id: true, displayName: true },
+      })
+    : null;
+  if (additiveTypeId && !additiveType) {
+    return NextResponse.json({ error: "Additive type not found" }, { status: 400 });
+  }
+
+  if (loggingComplete && body.eventId && body.sessionType === "RACE_MEETING") {
+    const participation = await prisma.eventParticipation.findUnique({
+      where: {
+        userId_eventId: { userId: params.userId, eventId: body.eventId },
+      },
+      select: { controlledAdditiveTypeId: true },
+    });
+    if (participation?.controlledAdditiveTypeId && !additiveTypeId) {
+      return NextResponse.json(
+        { error: "This event requires an additive selection to complete the run." },
+        { status: 400 }
+      );
+    }
+  }
+
+  const warmerTimingMinutes = parseWarmerTimingMinutes(body.warmerTimingMinutes);
+
+  const carForSheetKeys = await prisma.car.findFirst({
+    where: { id: carId, userId: params.userId },
+    select: { setupSheetModelId: true, setupSheetTemplate: true },
   });
+  const sheetKeys = carForSheetKeys
+    ? await getSetupSheetFieldKeysForCarRow(params.userId, carForSheetKeys)
+    : new Set<string>();
+
+  const batteryLabel = battery ? `${battery.label}${battery.packNumber != null ? ` #${battery.packNumber}` : ""}` : "";
+  resolvedData = normalizeSetupSnapshotForStorage(
+    applyRunContextToSetupSnapshot({
+      resolvedData,
+      sheetKeys,
+      tireSet,
+      batteryLabel,
+      additiveDisplayName: additiveType?.displayName ?? null,
+      warmerTimingMinutes,
+    })
+  );
 
   const setupSnapshot = await prisma.setupSnapshot.create({
     data: {
@@ -409,6 +458,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         trackNameSnapshot: track?.name ?? null,
         tireSetId: body.tireSetId ?? null,
         tireRunNumber,
+        additiveTypeId,
+        warmerTimingMinutes,
         batteryId: body.batteryId ?? null,
         batteryRunNumber,
         setupSnapshotId: setupSnapshot.id,
@@ -451,6 +502,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       trackNameSnapshot: track?.name ?? null,
       tireSetId: body.tireSetId ?? null,
       tireRunNumber,
+      additiveTypeId,
+      warmerTimingMinutes,
       batteryId: body.batteryId ?? null,
       batteryRunNumber,
       setupSnapshotId: setupSnapshot.id,

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import {
   computeFieldImportSessionFromSets,
   type FieldImportSession,
@@ -29,7 +30,7 @@ export function ImportedFieldSessionCard({ importedLapSets }: { importedLapSets:
 
   return (
     <CardPanel contentClassName="space-y-2">
-      <div className="ui-title text-sm text-muted-foreground">Imported session — field</div>
+      <Eyebrow>Imported session — field</Eyebrow>
       <p className="text-[11px] leading-snug text-muted-foreground">
         Same timing import, multiple drivers. Rank and gap use each driver&apos;s best included lap vs the session
         best. Fade is mean(second half) − mean(first half) of included laps (needs ≥4 laps); positive means slower

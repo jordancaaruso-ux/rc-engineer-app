@@ -8,6 +8,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/panel";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 
 function promptHref(p: DetectedRunPrompt): string {
@@ -55,9 +56,7 @@ export function DetectedRunPromptsBanner({
   return (
     <div className="rounded-lg border border-accent/40 bg-accent/5 p-3 shadow-sm shadow-black/20">
       <div className="space-y-0.5">
-        <div className="text-[10px] ui-title text-muted-foreground">
-          Detected sessions
-        </div>
+        <Eyebrow>Detected sessions</Eyebrow>
         <p className="text-[10px] leading-snug text-muted-foreground">
           Dismiss hides a session from this list without deleting the imported timing data.
         </p>
@@ -91,10 +90,10 @@ export function DetectedRunPromptsBanner({
                 <div className="mt-0.5 font-medium text-foreground break-words">{sessionTitle}</div>
                 <div className="mt-1 space-y-0.5 text-muted-foreground">
                   <div>
-                    <span className="text-[10px] ui-title text-muted-foreground/90">
+                    <span className="type-data-label text-muted-foreground/90">
                       {p.sessionTimeIsImportFallback ? "Imported" : "Session time"}
                     </span>
-                    <span className="ml-1.5 font-mono tabular-nums text-foreground/90">
+                    <span className="ml-1.5">
                       <RelativeTime
                         iso={p.sessionCompletedAtIso}
                         fallback={whenFallback}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
 import { ButtonLink, buttonLinkClassName, primaryButtonClassName } from "@/components/ui/ButtonLink";
 import { HeroPanel } from "@/components/ui/HeroPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { SectionMetaInline, SectionTitle } from "@/components/ui/SectionTitle";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +52,7 @@ function SuggestionsReady({
       </ul>
       {suggestions.tryNextSession.length > 0 ? (
         <div className="rounded-md border border-border/80 bg-muted/30 px-2 py-1.5">
-          <div className="ui-title text-[10px] text-muted-foreground mb-1">Next session</div>
+          <Eyebrow className="mb-1">Next session</Eyebrow>
           <ul className="list-decimal space-y-0.5 pl-4 text-muted-foreground">
             {suggestions.tryNextSession.map((t, i) => (
               <li key={i}>{t}</li>

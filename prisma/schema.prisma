@@ -28,6 +28,7 @@ model User {
   tracks          Track[]
   tireSets        TireSet[]
   tireTypesCreated TireType[] @relation("TireTypeCreatedBy")
+  additiveTypesCreated AdditiveType[] @relation("AdditiveTypeCreatedBy")
   batteries       Battery[]
   snapshots       SetupSnapshot[]
   events          Event[]
@@ -353,11 +354,31 @@ model EventParticipation {
   controlledTireType   TireType? @relation(fields: [controlledTireTypeId], references: [id], onDelete: SetNull)
   controlledTireTypeId String?
 
+  controlledAdditiveType   AdditiveType? @relation(fields: [controlledAdditiveTypeId], references: [id], onDelete: SetNull)
+  controlledAdditiveTypeId String?
+
   /** When set, prefer this event on the dashboard among active meetings. */
   pinnedAt DateTime?
 
   @@unique([userId, eventId])
   @@index([eventId])
+}
+
+/** Global tire additive catalog (shared across all users). */
+model AdditiveType {
+  id          String   @id @default(cuid())
+  displayName String
+  /** Unique product code — canonical identity. */
+  modelCode   String   @unique
+  createdAt   DateTime @default(now())
+
+  createdBy   User?   @relation("AdditiveTypeCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+
+  runs                 Run[]
+  eventParticipations  EventParticipation[]
+
+  @@index([displayName])
 }
 
 /** Global tire product catalog (shared across all users). */
@@ -735,6 +756,12 @@ model Run {
 
   // Auto-increments per tire set based on last run with that set.
   tireRunNumber Int      @default(1)
+
+  additiveType   AdditiveType? @relation(fields: [additiveTypeId], references: [id], onDelete: SetNull)
+  additiveTypeId String?
+
+  /** Optional warmer timing in minutes (independent of additive selection). */
+  warmerTimingMinutes Int?
 
   battery   Battery? @relation(fields: [batteryId], references: [id])
   batteryId String?

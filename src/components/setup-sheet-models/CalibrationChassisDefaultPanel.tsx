@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 type ModelRow = {
   id: string;
@@ -102,7 +103,7 @@ export function CalibrationChassisDefaultPanel(props: Props) {
 
   return (
     <CardPanel contentClassName="px-4 py-3 text-sm">
-      <div className="ui-title text-xs text-accent">Chassis type &amp; default calibration</div>
+      <Eyebrow dot="accent">Chassis type &amp; default calibration</Eyebrow>
       <p className="mt-1 text-xs text-muted-foreground max-w-2xl">
         Link this profile to a chassis type (e.g. Mugen MTC3) and mark it as the default so uploads
         auto-select it when the PDF matches. If you have duplicate chassis types,{" "}

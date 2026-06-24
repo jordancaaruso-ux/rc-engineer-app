@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   RUN_DATETIME_LOCALE,
   RUN_DISPLAY_DATETIME_OPTIONS,
@@ -80,6 +81,7 @@ export function RelativeTime({
   /** IANA zone for `sessions` date-only labels and calendar-day cutoff (optional). */
   timeZone?: string | null;
 }) {
+  const resolvedClassName = cn("type-timestamp", className);
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date>(() => new Date());
 
@@ -90,16 +92,16 @@ export function RelativeTime({
     return () => window.clearInterval(id);
   }, [display]);
 
-  if (!iso) return <span className={className}>{fallback}</span>;
+  if (!iso) return <span className={resolvedClassName}>{fallback}</span>;
 
   const dt = iso instanceof Date ? iso : new Date(iso);
   if (Number.isNaN(dt.getTime())) {
-    return <span className={className}>{fallback}</span>;
+    return <span className={resolvedClassName}>{fallback}</span>;
   }
 
   if (!mounted) {
     return (
-      <span className={className} suppressHydrationWarning>
+      <span className={resolvedClassName} suppressHydrationWarning>
         {fallback}
       </span>
     );
@@ -110,14 +112,14 @@ export function RelativeTime({
 
   if (display === "exact") {
     return (
-      <span className={className} title={dt.toISOString()}>
+      <span className={resolvedClassName} title={dt.toISOString()}>
         {exact}
       </span>
     );
   }
   if (display === "combo") {
     return (
-      <span className={className} title={dt.toISOString()}>
+      <span className={resolvedClassName} title={dt.toISOString()}>
         {relative} · {exact}
       </span>
     );
@@ -131,13 +133,13 @@ export function RelativeTime({
         ? formatRunCreatedAtDateTime(dt, timeZone)
         : exact;
     return (
-      <span className={className} title={titleExact}>
+      <span className={resolvedClassName} title={titleExact}>
         {label}
       </span>
     );
   }
   return (
-    <span className={className} title={exact}>
+    <span className={resolvedClassName} title={exact}>
       {relative}
     </span>
   );

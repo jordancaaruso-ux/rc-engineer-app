@@ -52,8 +52,8 @@ const config: Config = {
         sm: "0.25rem"
       },
       fontFamily: {
-        sans: ["var(--font-ui)", "system-ui", "sans-serif"],
-        display: ["var(--font-ui)", "system-ui", "sans-serif"],
+        /** Inter — body, nav, page titles, hero PanelTitle, controls */
+        sans: ["var(--font-ui)", "Inter", "system-ui", "sans-serif"],
         mono: ["var(--font-mono-jb)", "JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
       },
       boxShadow: {

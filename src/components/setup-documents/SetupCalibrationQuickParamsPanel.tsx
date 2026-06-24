@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import type { CustomSetupFieldDefinition } from "@/lib/setupCalibrations/types";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import { CUSTOM_FIELD_SECTION_PRESETS } from "@/lib/setupCalibrations/customFieldCatalog";
@@ -98,7 +99,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
         onClick={() => setOpen((o) => !o)}
       >
         <div>
-          <div className="ui-title text-xs text-accent">Quick add parameters</div>
+          <Eyebrow dot="accent">Quick add parameters</Eyebrow>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             Name the field, pick a value type, add it — then map each row to an AcroForm control (dropdown or use the
             Form tab and click the PDF).
@@ -213,7 +214,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
 
           {customOnly.length > 0 ? (
             <div className="space-y-2">
-              <div className="ui-title text-[10px] text-muted-foreground">Your custom parameters</div>
+              <Eyebrow>Your custom parameters</Eyebrow>
               <ul className="flex max-h-56 flex-col gap-2 overflow-y-auto">
                 {customOnly.map((def) => {
                   const mapped = ruleHasFormMapping(formFieldMappings[def.key]);

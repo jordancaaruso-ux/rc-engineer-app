@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 type TeamRow = { id: string; name: string; role: string };
 
@@ -289,9 +290,7 @@ export function TeamsClient() {
 
               {isAdmin ? (
                 <form onSubmit={handleAddMember} className="border-t border-border pt-3 space-y-2">
-                  <h3 className="text-xs ui-title text-muted-foreground">
-                    Add member (existing account email, allowlisted)
-                  </h3>
+                  <Eyebrow>Add member (existing account email, allowlisted)</Eyebrow>
                   <div className="flex flex-wrap gap-2">
                     <input
                       className="flex-1 min-w-[200px] rounded-md border border-border bg-background px-2 py-1.5 text-sm"
@@ -313,7 +312,7 @@ export function TeamsClient() {
               ) : null}
 
               <div className="border-t border-border pt-3">
-                <h3 className="text-xs ui-title text-muted-foreground mb-2">Members</h3>
+                <Eyebrow className="mb-2">Members</Eyebrow>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>

@@ -41,6 +41,7 @@ export async function mergeEvents(input: { winnerId: string; loserId: string }):
         notes: true,
         controlledTireLabel: true,
         controlledTireTypeId: true,
+        controlledAdditiveTypeId: true,
         pinnedAt: true,
       },
     });
@@ -57,6 +58,7 @@ export async function mergeEvents(input: { winnerId: string; loserId: string }):
             notes: part.notes ?? undefined,
             controlledTireLabel: part.controlledTireLabel ?? undefined,
             controlledTireTypeId: part.controlledTireTypeId ?? undefined,
+            controlledAdditiveTypeId: part.controlledAdditiveTypeId ?? undefined,
             pinnedAt: part.pinnedAt ?? undefined,
           },
         });
@@ -68,6 +70,7 @@ export async function mergeEvents(input: { winnerId: string; loserId: string }):
             notes: part.notes,
             controlledTireLabel: part.controlledTireLabel,
             controlledTireTypeId: part.controlledTireTypeId,
+            controlledAdditiveTypeId: part.controlledAdditiveTypeId,
             pinnedAt: part.pinnedAt,
           },
         });

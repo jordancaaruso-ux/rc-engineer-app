@@ -17,10 +17,20 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
-import { tireSelectionFromTireSet, tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
+import { tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
+import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 import { RunTireSelectionPanel } from "@/components/runs/RunTireSelectionPanel";
+import { RunTirePrepPanel } from "@/components/runs/RunTirePrepPanel";
+import { RunAdditiveTimingPanel } from "@/components/runs/RunAdditiveTimingPanel";
 import { QuickAddBatteryPanel } from "@/components/assets/QuickAddBatteryPanel";
+import { collectSetupSheetTemplateKeys } from "@/lib/setupSheetModels/collectTemplateKeys";
+import { applyRunContextToSetupSnapshot, parseWarmerTimingMinutes } from "@/lib/runs/applyRunContextToSetupSnapshot";
+import { tirePrepGroupsForSheetKeys } from "@/lib/tires/tirePrepFields";
+import {
+  formatAdditiveTimingLine,
+  formatTirePrepSummaryFromSnapshot,
+} from "@/lib/runs/runTireContextDisplay";
 import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
@@ -33,6 +43,7 @@ import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
+import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { primaryLapRowsFromRun } from "@/lib/lapAnalysis";
@@ -48,6 +59,7 @@ import {
 } from "@/components/runs/LapTimesIngestPanel";
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
+import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
 import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDialog";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
@@ -70,6 +82,7 @@ import {
   uiStateFromParsed,
   type HandlingAssessmentUiState,
 } from "@/lib/runHandlingAssessment";
+import { mergeUniqueById } from "@/lib/assets/mergeAssetLists";
 
 type CarOption = {
   id: string;
@@ -116,6 +129,8 @@ type EventOption = {
   controlledTireLabel?: string | null;
   controlledTireTypeId?: string | null;
   controlledTireType?: { id: string; displayName: string; modelCode: string } | null;
+  controlledAdditiveTypeId?: string | null;
+  controlledAdditiveType?: { id: string; displayName: string; modelCode: string } | null;
   track?: { id: string; name: string; location?: string | null } | null;
 };
 
@@ -134,6 +149,9 @@ type LastRun = {
   eventId: string | null;
   tireSetId: string | null;
   tireRunNumber: number;
+  additiveTypeId?: string | null;
+  warmerTimingMinutes?: number | null;
+  additiveType?: { id: string; displayName: string; modelCode: string } | null;
   setupSnapshot: { id: string; data: unknown };
   event?: EventOption | null;
   track?: { id: string; name: string } | null;
@@ -340,6 +358,11 @@ export function NewRunForm(props: {
   const [resolvingTireSet, setResolvingTireSet] = useState(false);
   const [addTireSetError, setAddTireSetError] = useState<string | null>(null);
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
+  const [additiveTypeId, setAdditiveTypeId] = useState<string>("");
+  const [warmerTimingMinutes, setWarmerTimingMinutes] = useState<string>("");
+  const [additiveTypesById, setAdditiveTypesById] = useState<
+    Record<string, { id: string; displayName: string }>
+  >({});
   const [batteries, setBatteries] = useState<BatteryPackOption[]>([]);
   const [batteryId, setBatteryId] = useState<string>("");
   const [batteryRunsCompleted, setBatteryRunsCompleted] = useState<number>(0);
@@ -354,12 +377,18 @@ export function NewRunForm(props: {
   const [newEventPracticeUrl, setNewEventPracticeUrl] = useState("");
   const [newEventResultsUrl, setNewEventResultsUrl] = useState("");
   const [newEventControlledTireTypeId, setNewEventControlledTireTypeId] = useState("");
+  const [newEventControlAdditiveEnabled, setNewEventControlAdditiveEnabled] = useState(false);
+  const [newEventControlledAdditiveTypeId, setNewEventControlledAdditiveTypeId] = useState("");
   /** When logging a race meeting, timing URLs (stored on the Event; edited here, PATCH on save). */
   const [eventPracticeTimingUrl, setEventPracticeTimingUrl] = useState("");
   const [eventRaceTimingUrl, setEventRaceTimingUrl] = useState("");
   const [eventControlledTireTypeId, setEventControlledTireTypeId] = useState("");
+  const [eventControlAdditiveEnabled, setEventControlAdditiveEnabled] = useState(false);
+  const [eventControlledAdditiveTypeId, setEventControlledAdditiveTypeId] = useState("");
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsLoadError, setEventsLoadError] = useState<string | null>(null);
 
   const [replicateLast, setReplicateLast] = useState(false);
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
@@ -410,7 +439,8 @@ export function NewRunForm(props: {
     show: boolean;
     carRating: boolean;
     feelVsLastRun: boolean;
-  }>({ show: false, carRating: false, feelVsLastRun: false });
+    additive: boolean;
+  }>({ show: false, carRating: false, feelVsLastRun: false, additive: false });
 
   const [copyCarWarning, setCopyCarWarning] = useState<string | null>(null);
   const [copyTrackWarning, setCopyTrackWarning] = useState<string | null>(null);
@@ -447,6 +477,10 @@ export function NewRunForm(props: {
 
   const tireSetIdRef = useRef(tireSetId);
   tireSetIdRef.current = tireSetId;
+  const additiveTypeIdRef = useRef(additiveTypeId);
+  additiveTypeIdRef.current = additiveTypeId;
+  const warmerTimingMinutesRef = useRef(warmerTimingMinutes);
+  warmerTimingMinutesRef.current = warmerTimingMinutes;
   const batteryIdRef = useRef(batteryId);
   batteryIdRef.current = batteryId;
   const tireRunUserTouchedRef = useRef(false);
@@ -600,6 +634,21 @@ export function NewRunForm(props: {
     // +1 to the tire/battery slot on every save, producing the "+2 per
     // draft→complete cycle" behavior.
     setRunsCompleted(Math.max(0, (r.tireRunNumber ?? 1) - 1));
+    setAdditiveTypeId(r.additiveTypeId ?? r.additiveType?.id ?? "");
+    setWarmerTimingMinutes(
+      r.warmerTimingMinutes != null && Number.isFinite(r.warmerTimingMinutes)
+        ? String(Math.floor(r.warmerTimingMinutes))
+        : ""
+    );
+    if (r.additiveType) {
+      setAdditiveTypesById((prev) => ({
+        ...prev,
+        [r.additiveType!.id]: {
+          id: r.additiveType!.id,
+          displayName: r.additiveType!.displayName,
+        },
+      }));
+    }
     setBatteryId(r.batteryId ?? "");
     setBatteryRunsCompleted(Math.max(0, (r.batteryRunNumber ?? 1) - 1));
     if (typeof r.practiceDayUrl === "string") setPracticeDayUrl(r.practiceDayUrl);
@@ -806,23 +855,6 @@ export function NewRunForm(props: {
     setTireSpecificModel(ts.specificModel?.trim() ?? "");
   }
 
-  function applyTireBatteryToSetupSnapshot(nextTireSetId: string, nextBatteryId: string) {
-    const tire = nextTireSetId ? tireSets.find((t) => t.id === nextTireSetId) ?? null : null;
-    const bat = nextBatteryId ? batteries.find((b) => b.id === nextBatteryId) ?? null : null;
-    const tireValue = tire ? tireSelectionFromTireSet(tire) : undefined;
-    const batLabel = bat ? `${bat.label}${bat.packNumber != null ? ` #${bat.packNumber}` : ""}` : "";
-    setSetupData((prev) => {
-      const nextTires = tireValue || undefined;
-      const nextBattery = batLabel || undefined;
-      if (prev.tires === nextTires && prev.battery === nextBattery) return prev;
-      return applyDerivedFieldsToSnapshot({
-        ...prev,
-        tires: nextTires,
-        battery: nextBattery,
-      });
-    });
-  }
-
   const addTireSet = useCallback(async () => {
     if (!selectedTireTypeId) return;
     const setParsed = parseInt(tireSetNumber.trim(), 10);
@@ -860,13 +892,6 @@ export function NewRunForm(props: {
     }
   }, [selectedTireTypeId, tireSetNumber, tireSpecificModel]);
 
-  // Deterministic sync: snapshot tires/battery always mirror the run context selections,
-  // including on initial load and when option lists arrive async.
-  useEffect(() => {
-    applyTireBatteryToSetupSnapshot(tireSetId, batteryId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tireSetId, batteryId, tireSets, batteries]);
-
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
 
@@ -896,6 +921,85 @@ export function NewRunForm(props: {
     }
     return getDefaultSetupSheetTemplate();
   }, [modelTemplate, selectedCar?.setupSheetTemplate]);
+
+  const sheetFieldKeys = useMemo(
+    () => collectSetupSheetTemplateKeys(setupTemplate),
+    [setupTemplate]
+  );
+  const tirePrepGroups = useMemo(
+    () => tirePrepGroupsForSheetKeys(sheetFieldKeys),
+    [sheetFieldKeys]
+  );
+
+  const applyRunContextToSetupSnapshotLocal = useCallback(
+    (
+      nextTireSetId: string,
+      nextBatteryId: string,
+      nextAdditiveTypeId: string,
+      nextWarmerTimingMinutes: string
+    ) => {
+      const tire = nextTireSetId ? tireSets.find((t) => t.id === nextTireSetId) ?? null : null;
+      const bat = nextBatteryId ? batteries.find((b) => b.id === nextBatteryId) ?? null : null;
+      const additive =
+        nextAdditiveTypeId ? additiveTypesById[nextAdditiveTypeId] ?? null : null;
+      setSetupData((prev) => {
+        const next = applyRunContextToSetupSnapshot({
+          resolvedData: prev,
+          sheetKeys: sheetFieldKeys,
+          tireSet: tire,
+          batteryLabel: bat ? `${bat.label}${bat.packNumber != null ? ` #${bat.packNumber}` : ""}` : "",
+          additiveDisplayName: additive?.displayName ?? null,
+          warmerTimingMinutes: parseWarmerTimingMinutes(nextWarmerTimingMinutes),
+        });
+        if (JSON.stringify(next) === JSON.stringify(prev)) return prev;
+        return applyDerivedFieldsToSnapshot(next);
+      });
+    },
+    [tireSets, batteries, additiveTypesById, sheetFieldKeys]
+  );
+
+  function applyTireBatteryToSetupSnapshot(nextTireSetId: string, nextBatteryId: string) {
+    applyRunContextToSetupSnapshotLocal(
+      nextTireSetId,
+      nextBatteryId,
+      additiveTypeIdRef.current,
+      warmerTimingMinutesRef.current
+    );
+  }
+
+  function applyAdditiveTimingToSetupSnapshot(nextAdditiveTypeId: string, nextWarmerTimingMinutes: string) {
+    applyRunContextToSetupSnapshotLocal(
+      tireSetIdRef.current,
+      batteryIdRef.current,
+      nextAdditiveTypeId,
+      nextWarmerTimingMinutes
+    );
+  }
+
+  function toggleTirePrepKey(key: string, checked: boolean) {
+    setSetupData((prev) =>
+      applyDerivedFieldsToSnapshot({
+        ...prev,
+        [key]: checked ? "1" : "",
+      })
+    );
+  }
+
+  // Deterministic sync: snapshot tires/battery/additive always mirror run context selections.
+  useEffect(() => {
+    applyRunContextToSetupSnapshotLocal(
+      tireSetId,
+      batteryId,
+      additiveTypeId,
+      warmerTimingMinutes
+    );
+  }, [
+    tireSetId,
+    batteryId,
+    additiveTypeId,
+    warmerTimingMinutes,
+    applyRunContextToSetupSnapshotLocal,
+  ]);
 
   const loadedSetupRun = useMemo(
     () => (loadSetupSelection ? pickerRuns.find((r) => r.id === loadSetupSelection) ?? null : null),
@@ -930,12 +1034,13 @@ export function NewRunForm(props: {
       const carOk = carRating != null && carRating >= 1 && carRating <= 10;
       const feelOk = !feelVsLastRunEligible || handlingUi.feelVsLastRun != null;
       if (carOk && feelOk) {
-        return { show: false, carRating: false, feelVsLastRun: false };
+        return { show: false, carRating: false, feelVsLastRun: false, additive: false };
       }
       return {
         show: true,
         carRating: prev.carRating && !carOk,
         feelVsLastRun: prev.feelVsLastRun && !feelOk,
+        additive: prev.additive,
       };
     });
   }, [carRating, handlingUi.feelVsLastRun, feelVsLastRunEligible]);
@@ -958,25 +1063,10 @@ export function NewRunForm(props: {
 
   const needsEvent = sessionType === "RACE_MEETING";
 
-  const eventSelectGroups = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const upcoming = events
-      .filter((ev) => {
-        const start = new Date(ev.startDate);
-        start.setHours(0, 0, 0, 0);
-        return start >= today;
-      })
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-    const past = events
-      .filter((ev) => {
-        const start = new Date(ev.startDate);
-        start.setHours(0, 0, 0, 0);
-        return start < today;
-      })
-      .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-    return { upcoming, past };
-  }, [events]);
+  const eventSelectGroups = useMemo(
+    () => splitEventsForPicker(events),
+    [events]
+  );
 
   const selectedEventForRun = useMemo(
     () => (needsEvent && eventId ? events.find((e) => e.id === eventId) ?? null : null),
@@ -1084,11 +1174,27 @@ export function NewRunForm(props: {
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
     setEventControlledTireTypeId(ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "");
+    const nextControlledAdditiveId =
+      ev.controlledAdditiveTypeId?.trim() ?? ev.controlledAdditiveType?.id ?? "";
+    setEventControlAdditiveEnabled(Boolean(nextControlledAdditiveId));
+    setEventControlledAdditiveTypeId(nextControlledAdditiveId);
     if (sessionType === "RACE_MEETING" && ev.controlledTireTypeId) {
       setSelectedTireTypeId(ev.controlledTireTypeId);
       setTireSetId("");
       setTireSetNumber("");
       setTireSpecificModel("");
+    }
+    if (sessionType === "RACE_MEETING" && nextControlledAdditiveId) {
+      setAdditiveTypeId(nextControlledAdditiveId);
+      if (ev.controlledAdditiveType) {
+        setAdditiveTypesById((prev) => ({
+          ...prev,
+          [ev.controlledAdditiveType!.id]: {
+            id: ev.controlledAdditiveType!.id,
+            displayName: ev.controlledAdditiveType!.displayName,
+          },
+        }));
+      }
     }
   }
 
@@ -1117,6 +1223,8 @@ export function NewRunForm(props: {
       controlledTireLabel: (raw.controlledTireLabel as string | null) ?? null,
       controlledTireTypeId: (raw.controlledTireTypeId as string | null) ?? null,
       controlledTireType: (raw.controlledTireType as EventOption["controlledTireType"]) ?? null,
+      controlledAdditiveTypeId: (raw.controlledAdditiveTypeId as string | null) ?? null,
+      controlledAdditiveType: (raw.controlledAdditiveType as EventOption["controlledAdditiveType"]) ?? null,
       track: (raw.track as EventOption["track"]) ?? null,
     };
   }
@@ -1477,6 +1585,26 @@ export function NewRunForm(props: {
     return () => window.clearTimeout(t);
   }, [setupData, carId]);
 
+  // All user-owned tire sets / batteries (includes assets with zero runs — not car-scoped).
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      jsonFetch<{ tireSets: TireSetOption[] }>(`/api/tire-sets`),
+      jsonFetch<{ batteries: BatteryPackOption[] }>(`/api/batteries`),
+    ])
+      .then(([{ tireSets }, { batteries }]) => {
+        if (!alive) return;
+        setTireSets((prev) => mergeUniqueById(prev, tireSets ?? []));
+        setBatteries((prev) => mergeUniqueById(prev, batteries ?? []));
+      })
+      .catch(() => {
+        /* keep in-session additions */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (!carId) {
       setReplicateLoaded(true);
@@ -1494,8 +1622,8 @@ export function NewRunForm(props: {
           jsonFetch<{ lastRun: LastRun | null }>(`/api/runs/last?carId=${carId}`),
         ]);
         if (!alive) return;
-        setTireSets(tireSets);
-        setBatteries(batteries);
+        setTireSets((prev) => mergeUniqueById(prev, tireSets ?? []));
+        setBatteries((prev) => mergeUniqueById(prev, batteries ?? []));
         setLastRun(lastRun);
 
         if (replicateLast && lastRun) {
@@ -1578,39 +1706,33 @@ export function NewRunForm(props: {
   useEffect(() => {
     if (!needsEvent) return;
     let alive = true;
-    jsonFetch<{ events: EventOption[] }>("/api/events")
+    setEventsLoading(true);
+    setEventsLoadError(null);
+    jsonFetch<{ events: EventOption[] }>("/api/events", { cache: "no-store" })
       .then(({ events: list }) => {
         if (!alive) return;
         const all = list ?? [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const upcoming = all
-          .filter((ev) => {
-            const start = new Date(ev.startDate);
-            start.setHours(0, 0, 0, 0);
-            return start >= today;
-          })
-          .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-        const past = all
-          .filter((ev) => {
-            const start = new Date(ev.startDate);
-            start.setHours(0, 0, 0, 0);
-            return start < today;
-          })
-          .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-        const sorted = [...upcoming, ...past];
-        setEvents(sorted);
+        setEvents(all);
+        const { upcoming } = splitEventsForPicker(all);
         setEventId((current) => {
           if (current) return current;
           if (upcoming.length > 0) return upcoming[0].id;
           return "";
         });
       })
-      .catch(() => {
+      .catch((err) => {
         if (!alive) return;
         setEvents([]);
+        setEventsLoadError(
+          err instanceof Error ? err.message : "Could not load events — try again."
+        );
+      })
+      .finally(() => {
+        if (alive) setEventsLoading(false);
       });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [needsEvent]);
 
   useEffect(() => {
@@ -1635,6 +1757,8 @@ export function NewRunForm(props: {
       setEventPracticeTimingUrl("");
       setEventRaceTimingUrl("");
       setEventControlledTireTypeId("");
+      setEventControlAdditiveEnabled(false);
+      setEventControlledAdditiveTypeId("");
       return;
     }
     const ev = events.find((e) => e.id === eventId);
@@ -1642,6 +1766,10 @@ export function NewRunForm(props: {
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
     setEventControlledTireTypeId(ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "");
+    const nextControlledAdditiveId =
+      ev.controlledAdditiveTypeId?.trim() ?? ev.controlledAdditiveType?.id ?? "";
+    setEventControlAdditiveEnabled(Boolean(nextControlledAdditiveId));
+    setEventControlledAdditiveTypeId(nextControlledAdditiveId);
   }, [needsEvent, eventId, events]);
 
   function applyCopyFromPreview() {
@@ -1686,6 +1814,27 @@ export function NewRunForm(props: {
     } else {
       setCopyTireWarning(null);
     }
+
+    const nextAdditiveId = r.additiveTypeId ?? r.additiveType?.id ?? "";
+    if (nextAdditiveId) {
+      setAdditiveTypeId(nextAdditiveId);
+      if (r.additiveType) {
+        setAdditiveTypesById((prev) => ({
+          ...prev,
+          [r.additiveType!.id]: {
+            id: r.additiveType!.id,
+            displayName: r.additiveType!.displayName,
+          },
+        }));
+      }
+    } else {
+      setAdditiveTypeId("");
+    }
+    setWarmerTimingMinutes(
+      r.warmerTimingMinutes != null && Number.isFinite(r.warmerTimingMinutes)
+        ? String(Math.floor(r.warmerTimingMinutes))
+        : ""
+    );
 
     const nextBatId = r.batteryId || r.battery?.id || "";
     if (nextBatId && batteries.some((b) => b.id === nextBatId)) {
@@ -1866,6 +2015,9 @@ export function NewRunForm(props: {
           practiceSourceUrl: newEventPracticeUrl.trim() || null,
           resultsSourceUrl: newEventResultsUrl.trim() || null,
           controlledTireTypeId: newEventControlledTireTypeId.trim() || null,
+          controlledAdditiveTypeId: newEventControlAdditiveEnabled
+            ? newEventControlledAdditiveTypeId.trim() || null
+            : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1891,6 +2043,8 @@ export function NewRunForm(props: {
       setNewEventPracticeUrl("");
       setNewEventResultsUrl("");
       setNewEventControlledTireTypeId("");
+      setNewEventControlAdditiveEnabled(false);
+      setNewEventControlledAdditiveTypeId("");
       setShowNewEventPanel(false);
       setStatus("Event created — selected.");
     } catch (err) {
@@ -2070,24 +2224,34 @@ export function NewRunForm(props: {
       const missingCarRating = carRating == null || carRating < 1 || carRating > 10;
       const missingFeelVsLastRun =
         feelVsLastRunEligible && handlingUi.feelVsLastRun == null;
-      if (missingCarRating || missingFeelVsLastRun) {
+      const requiresControlledAdditive = Boolean(
+        needsEvent &&
+          eventId &&
+          eventControlAdditiveEnabled &&
+          eventControlledAdditiveTypeId.trim()
+      );
+      const missingAdditive = requiresControlledAdditive && !additiveTypeId.trim();
+      if (missingCarRating || missingFeelVsLastRun || missingAdditive) {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
         if (missingFeelVsLastRun) {
           parts.push("pick how this run felt vs your last run on this car");
         }
+        if (missingAdditive) parts.push("select the required additive on the Tires tab");
         setCompleteValidation({
           show: true,
           carRating: missingCarRating,
           feelVsLastRun: missingFeelVsLastRun,
+          additive: missingAdditive,
         });
         setInlineError(`Before Run complete: ${parts.join(" and ")}.`);
+        if (missingAdditive) setRunDetailsTab("tires");
         window.requestAnimationFrame(() => {
           feedbackRequiredRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
         });
         return;
       }
-      setCompleteValidation({ show: false, carRating: false, feelVsLastRun: false });
+      setCompleteValidation({ show: false, carRating: false, feelVsLastRun: false, additive: false });
     }
     // Surface unsaved setup edits before we write — the driver gets to review
     // exactly what they changed vs. the loaded baseline. Continuing from the
@@ -2115,7 +2279,7 @@ export function NewRunForm(props: {
         const primary = selectedOrdered[0] ?? null;
 
         if (!primary) {
-          setInlineError("Select at least one driver in your first imported session.");
+          setInlineError("Select at least one driver in your imported session.");
           setSaving(false);
           return;
         }
@@ -2149,6 +2313,8 @@ export function NewRunForm(props: {
           trackId: resolvedTrackId || null,
           tireSetId: tireSetId || null,
           tireRunNumber: Math.max(1, runsCompleted + 1),
+          additiveTypeId: additiveTypeId || null,
+          warmerTimingMinutes: parseWarmerTimingMinutes(warmerTimingMinutes),
           batteryId: batteryId || null,
           batteryRunNumber: Math.max(1, batteryRunsCompleted + 1),
           setupData: applyDerivedFieldsToSnapshot(setupData),
@@ -2231,6 +2397,7 @@ export function NewRunForm(props: {
               ? lapIngest.urlImportBlocks
                   .map((b) => b.importedSessionId.trim())
                   .filter(Boolean)
+                  .slice(0, 1)
               : [],
         })
       });
@@ -2257,6 +2424,7 @@ export function NewRunForm(props: {
         const p = eventPracticeTimingUrl.trim() || null;
         const r = eventRaceTimingUrl.trim() || null;
         const c = eventControlledTireTypeId.trim() || null;
+        const a = eventControlAdditiveEnabled ? eventControlledAdditiveTypeId.trim() || null : null;
         void fetch(`/api/events/${encodeURIComponent(eventId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -2264,6 +2432,7 @@ export function NewRunForm(props: {
             practiceSourceUrl: p,
             resultsSourceUrl: r,
             controlledTireTypeId: c,
+            controlledAdditiveTypeId: a,
           }),
         })
           .then((res) => {
@@ -2271,7 +2440,13 @@ export function NewRunForm(props: {
             setEvents((prev) =>
               prev.map((e) =>
                 e.id === eventId
-                  ? { ...e, practiceSourceUrl: p, resultsSourceUrl: r, controlledTireTypeId: c }
+                  ? {
+                      ...e,
+                      practiceSourceUrl: p,
+                      resultsSourceUrl: r,
+                      controlledTireTypeId: c,
+                      controlledAdditiveTypeId: a,
+                    }
                   : e
               )
             );
@@ -2452,6 +2627,9 @@ export function NewRunForm(props: {
                 {eventControlledTireTypeId.trim() ? (
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">Spec tire set</span>
                 ) : null}
+                {eventControlAdditiveEnabled && eventControlledAdditiveTypeId.trim() ? (
+                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">Spec additive set</span>
+                ) : null}
               </div>
             )}
           </div>
@@ -2481,11 +2659,6 @@ export function NewRunForm(props: {
                 <span>Race Meeting</span>
               </label>
             </div>
-            {sessionType === "TESTING" ? (
-              <p className="mt-3 text-[11px] text-muted-foreground">
-                Lap times are loaded from the track&apos;s LiveRC URL when you pick a track below.
-              </p>
-            ) : null}
           </>
         )}
       </SurfaceCard>
@@ -2554,6 +2727,22 @@ export function NewRunForm(props: {
             ) : null}
           </select>
 
+          {eventsLoading ? (
+            <p className="text-[11px] text-muted-foreground">Loading events…</p>
+          ) : null}
+          {eventsLoadError ? (
+            <p className="text-[11px] text-destructive">{eventsLoadError}</p>
+          ) : null}
+          {!eventsLoading && !eventsLoadError && events.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">
+              No events yet — use <span className="font-medium">New event</span> above or create one on the{" "}
+              <Link href="/events" className="underline underline-offset-2">
+                Events
+              </Link>{" "}
+              page. Planned meetings work without a LiveRC link; you can log a draft days ahead.
+            </p>
+          ) : null}
+
           {eventId ? (
             <div className="mt-2 space-y-2 text-sm">
               <div className="space-y-1">
@@ -2610,10 +2799,46 @@ export function NewRunForm(props: {
                   aria-label="Event spec tire type"
                 />
               </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={eventControlAdditiveEnabled}
+                    onChange={(e) => {
+                      setEventControlAdditiveEnabled(e.target.checked);
+                      if (!e.target.checked) {
+                        setEventControlledAdditiveTypeId("");
+                      } else if (
+                        sessionType === "RACE_MEETING" &&
+                        eventControlledAdditiveTypeId.trim()
+                      ) {
+                        setAdditiveTypeId(eventControlledAdditiveTypeId.trim());
+                      }
+                    }}
+                    className="h-3 w-3 shrink-0 accent-primary"
+                  />
+                  <span>Control additive</span>
+                </label>
+                {eventControlAdditiveEnabled ? (
+                  <AdditiveTypeCombobox
+                    value={eventControlledAdditiveTypeId}
+                    onChange={(id) => {
+                      setEventControlledAdditiveTypeId(id);
+                      if (id && sessionType === "RACE_MEETING") {
+                        setAdditiveTypeId(id);
+                      }
+                    }}
+                    placeholder="Search spec additive"
+                    aria-label="Event spec additive type"
+                    allowInlineCreate={false}
+                  />
+                ) : null}
+              </div>
               <p className="text-[11px] text-muted-foreground">
                 Saved on the event when you save this run. Lap times → URL uses the practice link when your
                 meeting session is Practice; otherwise it prefers the race/results link (either link can be
-                scanned). Spec tire pre-selects that compound when you log tires for this event.
+                scanned). Spec tire pre-selects that compound when you log tires for this event. Control additive
+                requires an additive selection when you complete a run.
               </p>
             </div>
           ) : null}
@@ -2702,6 +2927,29 @@ export function NewRunForm(props: {
                   placeholder="Search spec tire type"
                   aria-label="Event spec tire type"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newEventControlAdditiveEnabled}
+                    onChange={(e) => {
+                      setNewEventControlAdditiveEnabled(e.target.checked);
+                      if (!e.target.checked) setNewEventControlledAdditiveTypeId("");
+                    }}
+                    className="h-3 w-3 shrink-0 accent-primary"
+                  />
+                  <span>Control additive</span>
+                </label>
+                {newEventControlAdditiveEnabled ? (
+                  <AdditiveTypeCombobox
+                    value={newEventControlledAdditiveTypeId}
+                    onChange={setNewEventControlledAdditiveTypeId}
+                    placeholder="Search spec additive"
+                    aria-label="Event spec additive type"
+                    allowInlineCreate={false}
+                  />
+                ) : null}
               </div>
               {isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate) ? (
                 <p className="text-[11px] text-destructive">
@@ -2820,8 +3068,17 @@ export function NewRunForm(props: {
             <span className="min-w-0 truncate text-foreground/90">
               {(() => {
                 const t = tireSets.find((x) => x.id === tireSetId);
-                if (!t) return "—";
-                return tireSetDisplayLine(t);
+                const base = t ? tireSetDisplayLine(t) : "—";
+                const extras: string[] = [];
+                const additive = formatAdditiveTimingLine(
+                  additiveTypeId ? additiveTypesById[additiveTypeId] ?? null : null,
+                  parseWarmerTimingMinutes(warmerTimingMinutes)
+                );
+                if (additive) extras.push(additive);
+                const prep = formatTirePrepSummaryFromSnapshot(setupData);
+                if (prep) extras.push(prep);
+                if (extras.length === 0) return base;
+                return `${base}${base !== "—" ? " · " : ""}${extras.join(" · ")}`;
               })()}
             </span>
             <span className="text-muted-foreground">Battery</span>
@@ -2849,7 +3106,7 @@ export function NewRunForm(props: {
             role="tab"
             aria-selected={runDetailsTab === "car"}
             className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px",
               runDetailsTab === "car"
                 ? "border-accent text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -2863,7 +3120,7 @@ export function NewRunForm(props: {
             role="tab"
             aria-selected={runDetailsTab === "tires"}
             className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px",
               runDetailsTab === "tires"
                 ? "border-accent text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -2877,7 +3134,7 @@ export function NewRunForm(props: {
             role="tab"
             aria-selected={runDetailsTab === "battery"}
             className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px",
               runDetailsTab === "battery"
                 ? "border-accent text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -2891,7 +3148,7 @@ export function NewRunForm(props: {
             role="tab"
             aria-selected={runDetailsTab === "conditions"}
             className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
+              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px",
               runDetailsTab === "conditions"
                 ? "border-accent text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -2905,7 +3162,7 @@ export function NewRunForm(props: {
             role="tab"
             aria-selected={runDetailsTab === "track"}
             className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px rounded-t-md",
+              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px rounded-t-md",
               runDetailsTab === "track"
                 ? "border-accent text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -3093,6 +3350,41 @@ export function NewRunForm(props: {
               copyTireWarning={copyTireWarning}
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
             />
+            <RunTirePrepPanel
+              prepGroups={tirePrepGroups}
+              setupData={setupData}
+              onToggle={toggleTirePrepKey}
+            />
+            <RunAdditiveTimingPanel
+              additiveTypeId={additiveTypeId}
+              onAdditiveTypeIdChange={(id) => {
+                setAdditiveTypeId(id);
+                if (id && !additiveTypesById[id]) {
+                  void fetch("/api/additive-types?limit=200", { cache: "no-store" })
+                    .then((r) => r.json())
+                    .then((data: { additiveTypes?: Array<{ id: string; displayName: string }> }) => {
+                      const hit = (data.additiveTypes ?? []).find((t) => t.id === id);
+                      if (hit) {
+                        setAdditiveTypesById((prev) => ({ ...prev, [id]: hit }));
+                      }
+                    })
+                    .catch(() => {});
+                }
+                applyAdditiveTimingToSetupSnapshot(id, warmerTimingMinutesRef.current);
+              }}
+              warmerTimingMinutes={warmerTimingMinutes}
+              onWarmerTimingMinutesChange={(value) => {
+                setWarmerTimingMinutes(value);
+                applyAdditiveTimingToSetupSnapshot(additiveTypeIdRef.current, value);
+              }}
+              requireAdditive={
+                needsEvent &&
+                Boolean(eventId) &&
+                eventControlAdditiveEnabled &&
+                Boolean(eventControlledAdditiveTypeId.trim())
+              }
+              highlightMissing={completeValidation.additive}
+            />
           </div>
         ) : null}
 
@@ -3225,7 +3517,7 @@ export function NewRunForm(props: {
             ) : null}
             {setupChangeCountSinceBaseline > 0 ? (
               <span
-                className="inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                className="type-data-label inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-0.5 text-muted-foreground"
                 title="Number of parameters that differ from the loaded setup."
               >
                 {setupChangeCountSinceBaseline} change{setupChangeCountSinceBaseline === 1 ? "" : "s"} since loaded
@@ -3250,7 +3542,7 @@ export function NewRunForm(props: {
             // "Choose a run…" here just looks unfinished.
             setupChangedRowsSinceBaseline.length > 0 ? (
               <div className="rounded-md border border-border bg-muted/50 p-2 text-xs">
-                <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.28em] text-faint">
+                <div className="type-data-label mb-1">
                   Changes from{" "}
                   {setupSource === "previous_runs" && loadedSetupRun
                     ? loadSetupControlLabel
@@ -3687,60 +3979,11 @@ export function NewRunForm(props: {
               {inlineError ?? "Complete the highlighted fields below before Run complete."}
             </div>
           ) : null}
-          <div
-            className={cn(
-              completeValidation.carRating &&
-                "rounded-md ring-2 ring-amber-500/40 ring-offset-2 ring-offset-background"
-            )}
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <div className="text-xs font-medium text-foreground">
-                Car handling rating
-              </div>
-              <div
-                className={cn(
-                  "text-[11px]",
-                  completeValidation.carRating
-                    ? "font-medium text-amber-700 dark:text-amber-300"
-                    : "text-muted-foreground"
-                )}
-              >
-                {carRating == null
-                  ? completeValidation.carRating
-                    ? "Pick a rating"
-                    : "Not rated"
-                  : `${carRating} / 10`}
-              </div>
-            </div>
-            <div
-              role="radiogroup"
-              aria-label="Car handling rating 1 to 10"
-              className="mt-2 grid grid-cols-10 gap-1"
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
-                const selected = carRating === n;
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setCarRating((cur) => (cur === n ? null : n))}
-                    className={cn(
-                      "rounded-md border px-0 py-1.5 text-[11px] font-medium tabular-nums transition",
-                      selected
-                        ? "border-accent bg-accent text-accent-foreground shadow-sm"
-                        : completeValidation.carRating
-                          ? "border-amber-500/50 bg-amber-500/5 text-foreground hover:bg-amber-500/10"
-                          : "border-border bg-surface-runna-inset text-foreground hover:bg-surface-runna"
-                    )}
-                  >
-                    {n}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <CarHandlingRatingQuickPick
+            value={carRating}
+            onChange={(n) => setCarRating((cur) => (cur === n ? null : n))}
+            highlightMissing={completeValidation.carRating}
+          />
           <FeelVsLastRunQuickPick
             value={handlingUi.feelVsLastRun}
             onChange={(feelVsLastRun) =>

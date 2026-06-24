@@ -6,6 +6,7 @@ import { EngineerNavIcon } from "@/components/layout/EngineerNavIcon";
 import { PrimaryNavLink } from "@/components/layout/PrimaryNavLink";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
+import { cn } from "@/lib/utils";
 
 export const Sidebar = memo(function Sidebar() {
   const { activeId } = usePrimaryNav();
@@ -27,19 +28,25 @@ export const Sidebar = memo(function Sidebar() {
               item={item}
               href={href}
               data-active={active ? "true" : "false"}
-              className="tap-active group min-h-9 gap-2 touch-manipulation"
+              className={cn(
+                "tap-active min-h-9 touch-manipulation",
+                active ? "text-primary" : "text-muted-foreground"
+              )}
             >
               <span className="flex min-w-0 items-center gap-2">
-                {isEngineer ? (
-                  <EngineerNavIcon className="h-4 w-4" />
-                ) : (
-                  <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                )}
-                <span className="truncate">{item.label}</span>
+                <span className={cn("shrink-0", active ? "opacity-100" : "opacity-75")}>
+                  {isEngineer ? (
+                    <EngineerNavIcon active={active} className="h-4 w-4" />
+                  ) : (
+                    <Icon
+                      className="h-4 w-4"
+                      strokeWidth={active ? 2.25 : 1.75}
+                      aria-hidden
+                    />
+                  )}
+                </span>
+                <span className="nav-sidebar-label truncate">{item.label}</span>
               </span>
-              {active ? (
-                <span className="nav-active-indicator h-1 w-6 shrink-0 rounded-full bg-primary group-hover:w-10" />
-              ) : null}
             </PrimaryNavLink>
           );
         })}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
@@ -44,7 +45,7 @@ export function TrackFavouriteClient(props: {
 
   return (
     <CardPanel contentClassName="space-y-2">
-      <div className="ui-title text-sm text-muted-foreground">Favourites</div>
+      <Eyebrow>Favourites</Eyebrow>
       <p className="text-sm text-muted-foreground">
         Tracks are shared reference data. Adding or removing from favourites only changes your quick-access list; it does not affect run history.
       </p>

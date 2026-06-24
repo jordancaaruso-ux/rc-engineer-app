@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { TrackCameraProfileEditor } from "@/components/videoAnalysis/TrackCameraProfileEditor";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 
 type Profile = { id: string; name: string; sectorLines: unknown[] };
 
@@ -39,13 +39,13 @@ export default function TrackVideoAnalysisPage() {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">{trackName || "Track"}</h1>
-          <p className="page-subtitle">Camera profile & sector lines</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/videos/analysis/manual/new" />
+          <div>
+            <h1 className="page-title">{trackName || "Track"}</h1>
+            <p className="page-subtitle">Camera profile & sector lines</p>
+          </div>
         </div>
-        <Link href="/videos/analysis/manual/new" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted self-start">
-          ← Hub
-        </Link>
       </header>
       <section className="page-body">
         <div className="flex flex-wrap gap-2">

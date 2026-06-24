@@ -7,9 +7,12 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { formatEventDate } from "@/lib/formatDate";
+import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
+import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 
 type TrackOption = { id: string; name: string; location?: string | null };
 
@@ -24,6 +27,8 @@ type EventItem = {
   hasLiveRcLink?: boolean;
   controlledTireTypeId?: string | null;
   controlledTireType?: { id: string; displayName: string; modelCode: string } | null;
+  controlledAdditiveTypeId?: string | null;
+  controlledAdditiveType?: { id: string; displayName: string; modelCode: string } | null;
   track: { id: string; name: string; location?: string | null } | null;
   trackLabel?: string | null;
   isLegacyTrack?: boolean;
@@ -39,23 +44,7 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 }
 
 function splitEvents(events: EventItem[]) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const upcoming: EventItem[] = [];
-  const past: EventItem[] = [];
-  for (const ev of events) {
-    const endDay = new Date(ev.endDate);
-    endDay.setHours(0, 0, 0, 0);
-    if (endDay.getTime() >= today.getTime()) upcoming.push(ev);
-    else past.push(ev);
-  }
-  upcoming.sort(
-    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-  );
-  past.sort(
-    (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-  );
-  return { upcoming, past };
+  return splitEventsForPicker(events);
 }
 
 function EventSection({
@@ -72,7 +61,7 @@ function EventSection({
   return (
     <section className="space-y-2">
       <div>
-        <h2 className="ui-title text-sm tracking-tight text-foreground">{title}</h2>
+        <Eyebrow>{title}</Eyebrow>
         {subtitle ? <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p> : null}
       </div>
       {events.length === 0 ? (
@@ -145,6 +134,8 @@ export function EventList({
   const [practiceSourceUrl, setPracticeSourceUrl] = useState("");
   const [resultsSourceUrl, setResultsSourceUrl] = useState("");
   const [controlledTireTypeId, setControlledTireTypeId] = useState("");
+  const [controlAdditiveEnabled, setControlAdditiveEnabled] = useState(false);
+  const [controlledAdditiveTypeId, setControlledAdditiveTypeId] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -216,6 +207,7 @@ export function EventList({
           practiceSourceUrl: practiceSourceUrl.trim() || null,
           resultsSourceUrl: resultsSourceUrl.trim() || null,
           controlledTireTypeId: controlledTireTypeId.trim() || null,
+          controlledAdditiveTypeId: controlAdditiveEnabled ? controlledAdditiveTypeId.trim() || null : null,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -242,6 +234,8 @@ export function EventList({
       setPracticeSourceUrl("");
       setResultsSourceUrl("");
       setControlledTireTypeId("");
+      setControlAdditiveEnabled(false);
+      setControlledAdditiveTypeId("");
       setMessage("Event created.");
       router.refresh();
     } catch (err) {
@@ -255,7 +249,7 @@ export function EventList({
     <div className="space-y-8">
       <SurfaceCard variant="panel" overflowHidden={false}>
         <form onSubmit={handleAdd} className="space-y-3">
-        <div className="ui-title text-sm text-muted-foreground">New event</div>
+        <Eyebrow>New event</Eyebrow>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
@@ -350,6 +344,29 @@ export function EventList({
             placeholder="Search spec tire type"
             aria-label="Event spec tire type"
           />
+        </div>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={controlAdditiveEnabled}
+              onChange={(e) => {
+                setControlAdditiveEnabled(e.target.checked);
+                if (!e.target.checked) setControlledAdditiveTypeId("");
+              }}
+              className="h-3.5 w-3.5 shrink-0 accent-primary"
+            />
+            <span>Control additive</span>
+          </label>
+          {controlAdditiveEnabled ? (
+            <AdditiveTypeCombobox
+              value={controlledAdditiveTypeId}
+              onChange={setControlledAdditiveTypeId}
+              placeholder="Search spec additive"
+              aria-label="Event spec additive type"
+              allowInlineCreate={false}
+            />
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <button

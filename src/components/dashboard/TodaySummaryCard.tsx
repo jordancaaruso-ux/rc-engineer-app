@@ -38,7 +38,7 @@ export function TodaySummaryCard({
     <SurfaceCard contentClassName="p-0">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
         <Eyebrow dot="muted">{hasActiveEvent ? "This event" : "Today"}</Eyebrow>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-faint">
+        <div className="type-data-label">
           {todayRunCount === 0
             ? "No runs yet"
             : `${todayRunCount} run${todayRunCount === 1 ? "" : "s"} logged today`}
@@ -179,7 +179,7 @@ function TodayChangesPanel({
               >
                 {block.runLabel}
               </Link>
-              <div className="text-[10px] tabular-nums text-muted-foreground">
+              <div className="text-[10px] type-timestamp">
                 {formatRunCreatedAtDateTime(block.when, displayTimeZone)}
               </div>
             </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { useRouter, useSearchParams } from "next/navigation";
 import { emptyManualSession } from "@/lib/manualVideoAnalysis/types";
 
@@ -149,9 +150,6 @@ function NewLapSyncForm() {
       </button>
 
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
-      <Link href="/videos" className="text-xs underline">
-        ← Videos
-      </Link>
     </CardPanel>
   );
 }
@@ -160,11 +158,14 @@ export default function NewManualVideoAnalysisPage() {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">Video analysis</h1>
-          <p className="page-subtitle">
-            Watch your video, optionally link LiveRC laps, anchor SF, and compare drivers.
-          </p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/analysis" />
+          <div>
+            <h1 className="page-title">Video analysis</h1>
+            <p className="page-subtitle">
+              Watch your video, optionally link LiveRC laps, anchor SF, and compare drivers.
+            </p>
+          </div>
         </div>
       </header>
       <section className="page-body">

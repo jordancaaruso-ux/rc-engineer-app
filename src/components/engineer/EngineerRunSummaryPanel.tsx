@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 const quickAskBtnClass =
   "inline-flex items-center rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition disabled:opacity-40 disabled:cursor-not-allowed";
@@ -86,7 +87,7 @@ export function EngineerRunSummaryPanel({
   return (
     <CardPanel contentClassName="p-0">
       <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
-        <div className="ui-title text-[10px] text-muted-foreground">Engineer summary</div>
+        <Eyebrow>Engineer summary</Eyebrow>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           {cached && !compareRunId?.trim() ? <span>cached</span> : null}
         </div>
@@ -148,7 +149,7 @@ export function EngineerRunSummaryPanel({
 
           {summary.setupChanges.length > 0 ? (
             <div className="space-y-1">
-              <div className="text-[10px] ui-title text-muted-foreground">Key setup changes</div>
+              <Eyebrow>Key setup changes</Eyebrow>
               <ul className="space-y-1 list-disc pl-4 text-foreground/90">
                 {summary.setupChanges.map((s) => (
                   <li key={s.key}>

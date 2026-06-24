@@ -9,27 +9,32 @@ import {
 
 type Props = {
   value: FeelVsLastRun | null;
-  onChange: (next: FeelVsLastRun | null) => void;
+  onChange?: (next: FeelVsLastRun | null) => void;
   /** Prior run on this car exists — selection required at Run complete. */
   eligible: boolean;
   /** Run complete was blocked — draw attention to this picker. */
   highlightMissing?: boolean;
+  readOnly?: boolean;
 };
 
 function quickPickButtonClass(
   selected: boolean,
   value: FeelVsLastRun,
-  highlightMissing: boolean
+  highlightMissing: boolean,
+  readOnly: boolean
 ): string {
   if (!selected) {
     return cn(
-      "rounded-md border px-2 py-1.5 text-[11px] font-medium transition flex-1 min-w-0",
-      highlightMissing
-        ? "border-amber-500/50 bg-amber-500/5 text-foreground hover:bg-amber-500/10"
-        : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground",
-      value < 0 && "hover:border-destructive/40 hover:bg-destructive/10",
-      value === 0 && "hover:bg-muted/80",
-      value > 0 && "hover:border-emerald-500/50 hover:bg-emerald-500/5"
+      "rounded-md border px-2 py-1.5 text-[11px] font-medium flex-1 min-w-0",
+      !readOnly && "transition",
+      readOnly
+        ? "border-border bg-surface-runna-inset text-muted-foreground"
+        : highlightMissing
+          ? "border-amber-500/50 bg-amber-500/5 text-foreground hover:bg-amber-500/10"
+          : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground",
+      !readOnly && value < 0 && "hover:border-destructive/40 hover:bg-destructive/10",
+      !readOnly && value === 0 && "hover:bg-muted/80",
+      !readOnly && value > 0 && "hover:border-emerald-500/50 hover:bg-emerald-500/5"
     );
   }
   return cn(
@@ -45,6 +50,7 @@ export function FeelVsLastRunQuickPick({
   onChange,
   eligible,
   highlightMissing = false,
+  readOnly = false,
 }: Props) {
   const displayValue = eligible ? value : value ?? 0;
   const needsPick = eligible && value == null;
@@ -56,6 +62,7 @@ export function FeelVsLastRunQuickPick({
       className={cn(
         highlightMissing &&
           needsPick &&
+          !readOnly &&
           "rounded-md ring-2 ring-amber-500/40 ring-offset-2 ring-offset-background"
       )}
     >
@@ -77,7 +84,8 @@ export function FeelVsLastRunQuickPick({
       <div
         role="radiogroup"
         aria-label="Compared to last run with this car"
-        className="mt-2 flex flex-wrap gap-1"
+        aria-readonly={readOnly || undefined}
+        className={cn("mt-2 flex flex-wrap gap-1", readOnly && "pointer-events-none")}
       >
         {FEEL_VS_LAST_RUN_QUICK_OPTIONS.map(({ value: n, label }) => {
           const selected = displayValue === n;
@@ -87,8 +95,12 @@ export function FeelVsLastRunQuickPick({
               type="button"
               role="radio"
               aria-checked={selected}
-              className={quickPickButtonClass(selected, n, highlightMissing && needsPick)}
-              onClick={() => onChange(eligible && value === n ? null : n)}
+              disabled={readOnly}
+              tabIndex={readOnly ? -1 : undefined}
+              className={quickPickButtonClass(selected, n, highlightMissing && needsPick, readOnly)}
+              onClick={
+                readOnly ? undefined : () => onChange?.(eligible && value === n ? null : n)
+              }
             >
               {label}
             </button>

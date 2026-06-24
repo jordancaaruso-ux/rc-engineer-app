@@ -18,7 +18,7 @@ export const BottomNav = memo(function BottomNav() {
       aria-label="Primary"
     >
       <div className="overflow-visible border-t border-border bg-card">
-        <ul className="mx-auto grid h-[var(--mobile-tab-bar-height)] max-w-lg grid-cols-6 overflow-visible px-1">
+        <ul className="mx-auto grid h-[var(--mobile-tab-bar-height)] max-w-lg grid-cols-6 overflow-visible px-0.5">
           {MOBILE_NAV.map((item) => {
             const active = activeId === item.id;
             const href =
@@ -27,22 +27,32 @@ export const BottomNav = memo(function BottomNav() {
             const isEngineer = item.id === "engineer";
 
             return (
-              <li key={item.id} className="flex flex-col items-center justify-end pb-1.5">
+              <li key={item.id} className="flex min-w-0 flex-col items-center justify-center">
                 <PrimaryNavLink
                   item={item}
                   href={href}
+                  data-active={active ? "true" : "false"}
                   aria-current={active ? "page" : undefined}
                   aria-label={item.id === "add-run" ? item.label : undefined}
                   className={cn(
-                    "tap-active flex min-h-11 min-w-0 flex-col items-center justify-end gap-1 px-1 touch-manipulation",
-                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                    "tap-active flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 touch-manipulation",
+                    active ? "text-primary" : "text-muted-foreground"
                   )}
                 >
-                  <span className="relative shrink-0">
+                  <span
+                    className={cn(
+                      "relative shrink-0",
+                      active ? "opacity-100" : "opacity-75"
+                    )}
+                  >
                     {isEngineer ? (
-                      <EngineerNavIcon />
+                      <EngineerNavIcon active={active} />
                     ) : (
-                      <Icon className="h-5 w-5" aria-hidden />
+                      <Icon
+                        className="h-[22px] w-[22px]"
+                        strokeWidth={active ? 2.25 : 1.75}
+                        aria-hidden
+                      />
                     )}
                     {item.smartDraft && draftRunId ? (
                       <span
@@ -51,14 +61,9 @@ export const BottomNav = memo(function BottomNav() {
                       />
                     ) : null}
                   </span>
-                  <span className="ui-title truncate text-[11px] leading-none">{item.label}</span>
-                  <span
-                    className={cn(
-                      "h-1 w-1 rounded-full bg-accent",
-                      active ? "opacity-100" : "opacity-0"
-                    )}
-                    aria-hidden
-                  />
+                  <span className="nav-tab-label truncate text-[10px] leading-tight">
+                    {item.label}
+                  </span>
                 </PrimaryNavLink>
               </li>
             );

@@ -129,10 +129,12 @@ export type NavHubIconKey =
   | "layers"
   | "map-pin"
   | "circle-dot"
+  | "flask"
   | "calendar"
   | "history"
   | "video"
-  | "git-compare";
+  | "git-compare"
+  | "wrench";
 
 export type NavHubLink = {
   href: string;
@@ -189,6 +191,12 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
         description: "Your battery packs and run history.",
         icon: "battery",
       },
+      {
+        href: "/setup",
+        label: "Setup",
+        description: "Setup documents, calibrations, and bulk import.",
+        icon: "wrench",
+      },
     ],
   },
   {
@@ -211,6 +219,12 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
         label: "Tires",
         description: "Shared tire compound catalog (e.g. Sweep D32).",
         icon: "circle-dot",
+      },
+      {
+        href: "/additives",
+        label: "Additives",
+        description: "Shared tire additive catalog (e.g. Mighty Gripper - Yellow).",
+        icon: "flask",
       },
       {
         href: "/events",

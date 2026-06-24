@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { SetupSheetModelSchemaPageClient } from "@/components/setup-sheet-models/SetupSheetModelSchemaPageClient";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +16,20 @@ type Props = {
 export default async function SetupSheetModelSchemaPage({ params, searchParams }: Props) {
   if (!hasDatabaseUrl()) {
     return (
-      <section className="page-body">
-        <p className="text-sm text-muted-foreground">Database not configured.</p>
-      </section>
+      <>
+        <header className="page-header">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/setup-sheet-models" />
+            <div>
+              <h1 className="page-title">Chassis schema</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
+          </div>
+        </header>
+        <section className="page-body">
+          <p className="text-sm text-muted-foreground">Database not configured.</p>
+        </section>
+      </>
     );
   }
   const user = await getAuthenticatedApiUser();
@@ -34,40 +45,63 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
   });
   if (!model) {
     return (
-      <section className="page-body">
-        <p className="text-sm text-destructive">Sheet model not found.</p>
-        <Link href="/cars" className="text-sm text-accent hover:underline mt-2 inline-block">
-          Back to cars
-        </Link>
-      </section>
+      <>
+        <header className="page-header">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/setup-sheet-models" />
+            <div>
+              <h1 className="page-title">Chassis schema</h1>
+              <p className="page-subtitle">Sheet model not found.</p>
+            </div>
+          </div>
+        </header>
+        <section className="page-body">
+          <p className="text-sm text-destructive">Sheet model not found.</p>
+        </section>
+      </>
     );
   }
 
   const schema = parseSetupSheetModelSchema(model.schemaJson);
   if (!schema) {
     return (
-      <section className="page-body">
-        <p className="text-sm text-destructive">Invalid schema data.</p>
-      </section>
+      <>
+        <header className="page-header">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/setup-sheet-models" />
+            <div>
+              <h1 className="page-title">{model.name}</h1>
+              <p className="page-subtitle">Invalid schema data.</p>
+            </div>
+          </div>
+        </header>
+        <section className="page-body">
+          <p className="text-sm text-destructive">Invalid schema data.</p>
+        </section>
+      </>
     );
   }
 
   return (
-    <section className="page-body max-w-6xl">
-      <div>
-        <Link href="/cars" className="text-xs text-muted-foreground hover:text-foreground">
-          ← Cars
-        </Link>
-        <h1 className="ui-title mt-2 text-lg">{model.name}</h1>
-        <p className="text-xs text-muted-foreground font-mono">{model.slug}</p>
-      </div>
-      <SetupSheetModelSchemaPageClient
-        modelId={model.id}
-        modelName={model.name}
-        initialSchema={schema}
-        initialTab={initialTab}
-        returnTo={returnTo}
-      />
-    </section>
+    <>
+      <header className="page-header">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/setup-sheet-models" />
+          <div>
+            <h1 className="page-title">{model.name}</h1>
+            <p className="page-subtitle font-mono text-xs">{model.slug}</p>
+          </div>
+        </div>
+      </header>
+      <section className="page-body max-w-6xl">
+        <SetupSheetModelSchemaPageClient
+          modelId={model.id}
+          modelName={model.name}
+          initialSchema={schema}
+          initialTab={initialTab}
+          returnTo={returnTo}
+        />
+      </section>
+    </>
   );
 }

@@ -142,20 +142,6 @@ export function CarList({
 
   return (
     <div className="space-y-4">
-      <CardPanel>
-        <Eyebrow>New car with custom setup sheet</Eyebrow>
-        <p className="ui-caption mt-1">
-          Define parameters for a car model (e.g. Mugen MTC3), upload a PDF, and calibrate — without inheriting the
-          Awesomatix A800 sheet.
-        </p>
-        <Link
-          href="/cars/new/setup"
-          className={cn(buttonLinkClassName("primary"), "mt-3 inline-flex text-sm")}
-        >
-          Start setup wizard
-        </Link>
-      </CardPanel>
-
       <CardPanel contentClassName="p-4">
       <form onSubmit={handleAdd} className="space-y-3">
         <Eyebrow>Add car (quick)</Eyebrow>

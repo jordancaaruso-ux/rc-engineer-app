@@ -5,9 +5,9 @@ function Shimmer({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-muted/60 ${className ?? ""}`} />;
 }
 
-/** Branded full-page shell — keeps warm espresso visible during route transitions. */
+/** Branded full-page shell — keeps charcoal base visible during route transitions. */
 export function PageLoadingShell({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
+  return <div className="flex min-h-0 flex-1 flex-col bg-background">{children}</div>;
 }
 
 export function loadingSkeletonForPath(path: string): ReactNode {

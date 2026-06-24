@@ -193,9 +193,6 @@ export function TireSetSelect({
               />
             ) : null}
           </div>
-          {hasScrollableList ? (
-            <p className="ui-caption border-t border-border px-3 py-1.5">Scroll for more</p>
-          ) : null}
         </div>
       ) : null}
     </div>

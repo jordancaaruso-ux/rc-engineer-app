@@ -37,6 +37,7 @@ const PERSONAL_PATCH_KEYS = new Set([
   "notes",
   "controlledTireLabel",
   "controlledTireTypeId",
+  "controlledAdditiveTypeId",
   "pinned",
 ]);
 
@@ -192,6 +193,7 @@ export async function PATCH(
     notes?: string | null;
     controlledTireLabel?: string | null;
     controlledTireTypeId?: string | null;
+    controlledAdditiveTypeId?: string | null;
     pinnedAt?: Date | null;
   } = {};
 
@@ -204,6 +206,12 @@ export async function PATCH(
       : body.controlledTireTypeId === null
         ? null
         : optString(body.controlledTireTypeId);
+  const controlledAdditiveTypeId =
+    body.controlledAdditiveTypeId === undefined
+      ? undefined
+      : body.controlledAdditiveTypeId === null
+        ? null
+        : optString(body.controlledAdditiveTypeId);
 
   if (controlledTireLabel !== undefined) participationData.controlledTireLabel = controlledTireLabel;
   if (controlledTireTypeId !== undefined) {
@@ -217,6 +225,18 @@ export async function PATCH(
       }
     }
     participationData.controlledTireTypeId = controlledTireTypeId;
+  }
+  if (controlledAdditiveTypeId !== undefined) {
+    if (controlledAdditiveTypeId) {
+      const at = await prisma.additiveType.findUnique({
+        where: { id: controlledAdditiveTypeId },
+        select: { id: true },
+      });
+      if (!at) {
+        return NextResponse.json({ error: "Additive type not found" }, { status: 400 });
+      }
+    }
+    participationData.controlledAdditiveTypeId = controlledAdditiveTypeId;
   }
 
   if (body.pinned === true) {

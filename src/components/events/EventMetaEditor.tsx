@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
+import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 
 type TrackOption = { id: string; name: string; location?: string | null };
 
@@ -21,6 +22,7 @@ type Props = {
   initialEndDate: string | Date;
   initialNotes: string | null;
   initialControlledTireTypeId: string | null;
+  initialControlledAdditiveTypeId: string | null;
   runCount: number;
 };
 
@@ -33,6 +35,12 @@ export function EventMetaEditor(props: Props) {
   const [endDate, setEndDate] = useState(eventDateToYmd(props.initialEndDate));
   const [notes, setNotes] = useState(props.initialNotes ?? "");
   const [controlledTireTypeId, setControlledTireTypeId] = useState(props.initialControlledTireTypeId ?? "");
+  const [controlAdditiveEnabled, setControlAdditiveEnabled] = useState(
+    Boolean(props.initialControlledAdditiveTypeId)
+  );
+  const [controlledAdditiveTypeId, setControlledAdditiveTypeId] = useState(
+    props.initialControlledAdditiveTypeId ?? ""
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -82,6 +90,7 @@ export function EventMetaEditor(props: Props) {
           endDate,
           notes: notes.trim() || null,
           controlledTireTypeId: controlledTireTypeId.trim() || null,
+          controlledAdditiveTypeId: controlAdditiveEnabled ? controlledAdditiveTypeId.trim() || null : null,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -194,6 +203,29 @@ export function EventMetaEditor(props: Props) {
           placeholder="Search spec tire type"
           aria-label="Event spec tire type"
         />
+      </div>
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={controlAdditiveEnabled}
+            onChange={(e) => {
+              setControlAdditiveEnabled(e.target.checked);
+              if (!e.target.checked) setControlledAdditiveTypeId("");
+            }}
+            className="h-3.5 w-3.5 shrink-0 accent-primary"
+          />
+          <span>Control additive</span>
+        </label>
+        {controlAdditiveEnabled ? (
+          <AdditiveTypeCombobox
+            value={controlledAdditiveTypeId}
+            onChange={setControlledAdditiveTypeId}
+            placeholder="Search spec additive"
+            aria-label="Event spec additive type"
+            allowInlineCreate={false}
+          />
+        ) : null}
       </div>
       <div className="flex items-center gap-2">
         <button

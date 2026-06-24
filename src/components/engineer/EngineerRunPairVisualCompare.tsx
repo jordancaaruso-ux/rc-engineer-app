@@ -16,6 +16,7 @@ import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 export type EngineerByIdsRunRow = {
   id: string;
@@ -92,11 +93,11 @@ function LapPairTable({
     <CardPanel contentClassName="p-0 overflow-x-auto">
       <table className="w-full min-w-[320px] text-[11px]">
         <thead>
-          <tr className="border-b border-border bg-muted/70 text-left text-[10px] font-medium text-muted-foreground">
-            <th className="px-2 py-1.5">Lap</th>
-            <th className="px-2 py-1.5">{labelA}</th>
-            <th className="px-2 py-1.5">{labelB}</th>
-            <th className="px-2 py-1.5">Δ (B−A)</th>
+          <tr className="border-b border-border bg-muted/70 text-left">
+            <th className="table-col-header px-2 py-1.5">Lap</th>
+            <th className="table-col-header px-2 py-1.5">{labelA}</th>
+            <th className="table-col-header px-2 py-1.5">{labelB}</th>
+            <th className="table-col-header px-2 py-1.5">Δ (B−A)</th>
           </tr>
         </thead>
         <tbody>
@@ -237,12 +238,12 @@ export function EngineerRunPairVisualCompare({
       {runA && runB ? (
         <>
           <div>
-            <h4 className="ui-title text-[10px] text-muted-foreground mb-1.5">Lap times</h4>
+            <Eyebrow className="mb-1.5">Lap times</Eyebrow>
             <LapPairTable runA={runA} runB={runB} labelA={labelA} labelB={labelB} />
           </div>
 
           <div>
-            <h4 className="ui-title text-[10px] text-muted-foreground mb-1.5">Setup (side by side)</h4>
+            <Eyebrow className="mb-1.5">Setup (side by side)</Eyebrow>
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               <CardPanel contentClassName="min-w-0">
                 <div className="mb-1 text-[10px] font-medium text-muted-foreground truncate" title={labelA}>

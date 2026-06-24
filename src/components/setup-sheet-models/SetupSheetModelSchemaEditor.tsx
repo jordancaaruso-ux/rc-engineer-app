@@ -27,6 +27,7 @@ import {
 } from "@/lib/setupSheetModels/universalParameters";
 import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import { awesomatixFieldKeyCollisionWarning } from "@/lib/setupSheetModels/awesomatixFieldKeyCollision";
+import { Eyebrow } from "@/components/ui/panel";
 
 const KIND_OPTIONS: { value: SchemaParameterKind; label: string }[] = [
   { value: "number", label: "Number" },
@@ -223,7 +224,7 @@ export function SetupSheetModelSchemaEditor(props: {
         return (
         <div key={secId} className="rounded-lg border border-border bg-card/80 p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="ui-title text-xs text-muted-foreground">{sectionTitle(secId)}</div>
+            <Eyebrow>{sectionTitle(secId)}</Eyebrow>
             {!readOnly && sectionSelected.length > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                 <span className="text-muted-foreground">{sectionSelected.length} selected</span>
@@ -448,7 +449,7 @@ export function SetupSheetModelSchemaEditor(props: {
             </button>
           ) : (
             <div className="space-y-3 text-xs">
-              <div className="ui-title text-[11px] text-foreground/90">New parameter</div>
+              <Eyebrow>New parameter</Eyebrow>
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-muted-foreground">
                   Label *

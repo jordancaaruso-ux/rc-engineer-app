@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/panel";
 import {
   BG_PREVIEW_OPTIONS,
   BG_PREVIEW_STORAGE_KEY,
@@ -67,9 +68,9 @@ export function ThemePreviewSwitcher({ placement = "floating" }: ThemePreviewSwi
           role="dialog"
           aria-label="Background preview"
         >
-          <div className="px-2 py-1 text-[10px] ui-title text-muted-foreground">
+          <Eyebrow className="px-2 py-1">
             Background preview (local only)
-          </div>
+          </Eyebrow>
           <ul className="mt-1 space-y-0.5">
             {BG_PREVIEW_OPTIONS.map((opt) => {
               const selected = active === opt.id;

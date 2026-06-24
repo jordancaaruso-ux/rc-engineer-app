@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
+import { Eyebrow } from "@/components/ui/panel";
 import { postSetupDocumentUpload } from "@/lib/setupDocuments/setupDocumentUploadClient";
 import { buildGenericPresetSchema } from "@/lib/setupSheetModels/genericPresetSchema";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
@@ -219,7 +220,7 @@ export function CarSetupWizardClient() {
 
       {step === "car" && (
         <div className="space-y-4 rounded-lg border border-border bg-card p-4">
-          <h2 className="ui-title text-sm">Car & setup sheet model</h2>
+          <Eyebrow>Car & setup sheet model</Eyebrow>
           <label className="block text-xs text-muted-foreground">
             Car name *
             <input
@@ -317,7 +318,7 @@ export function CarSetupWizardClient() {
 
       {step === "schema" && schema && (
         <div className="space-y-4 rounded-lg border border-border bg-card p-4">
-          <h2 className="ui-title text-sm">Configure parameters</h2>
+          <Eyebrow>Configure parameters</Eyebrow>
           <p className="text-[11px] text-muted-foreground">
             Start from generic touring preset. Add parameters and types (e.g. numeric ARB vs one-of-many thicknesses).
           </p>
@@ -335,7 +336,7 @@ export function CarSetupWizardClient() {
 
       {step === "upload" && (
         <div className="space-y-4 rounded-lg border border-border bg-card p-4">
-          <h2 className="ui-title text-sm">Upload example setup PDF</h2>
+          <Eyebrow>Upload example setup PDF</Eyebrow>
           <p className="text-[11px] text-muted-foreground">
             We will create a calibration profile linked to this model. Map PDF fields on the next screen.
           </p>
@@ -386,9 +387,9 @@ export function CarSetupWizardClient() {
           <button
             type="button"
             className="text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => router.push("/cars")}
+            onClick={() => router.push("/setup-sheet-models")}
           >
-            Back to cars
+            Back to chassis types
           </button>
         </div>
       )}

@@ -6,9 +6,7 @@ import { formatLap } from "@/lib/runLaps";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { SectionMetaInline } from "@/components/ui/SectionTitle";
 import { Eyebrow, PanelSubtitle, PanelTitle, StatStrip, StatTile } from "@/components/ui/panel";
-import { EngineerQuickFixButton } from "@/components/engineer/EngineerQuickFixButton";
 
 function formatCarRating(rating: number | null | undefined): string {
   if (typeof rating !== "number" || !Number.isFinite(rating) || rating < 1 || rating > 10) {
@@ -27,6 +25,19 @@ export function DashboardPreviousRunCard({
   const viewRunHref = recentRun
     ? `/runs/history?focusRun=${encodeURIComponent(recentRun.id)}`
     : null;
+  const runLoggingComplete =
+    Boolean(recentRun?.loggingCompletedAt) || recentRun?.loggingComplete === true;
+  const formattedRunDate =
+    recentRun
+      ? formatRunCreatedAtDateTime(
+          resolveRunDisplayInstant({
+            createdAt: recentRun.createdAt,
+            sessionCompletedAt: recentRun.sessionCompletedAt,
+            loggingCompletedAt: recentRun.loggingCompletedAt,
+          }),
+          displayTimeZone
+        )
+      : null;
 
   return (
     <CardPanel className={viewRunHref ? "relative" : undefined}>
@@ -44,44 +55,20 @@ export function DashboardPreviousRunCard({
               <PanelTitle as="h3" className="shrink-0">
                 {recentRun.carName}
               </PanelTitle>
-              <SectionMetaInline className="min-w-0 truncate">
-                {recentRun.trackName ?? "No track"} · {recentRun.sessionLabel}
-              </SectionMetaInline>
-            </div>
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
-              <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-faint">When</span>
-              <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
-                {formatRunCreatedAtDateTime(
-                  resolveRunDisplayInstant({
-                    createdAt: recentRun.createdAt,
-                    sessionCompletedAt: recentRun.sessionCompletedAt,
-                    loggingCompletedAt: recentRun.loggingCompletedAt,
-                  }),
-                  displayTimeZone
-                )}
+              <span className="min-w-0 truncate text-[13px] leading-relaxed text-muted-foreground">
+                {recentRun.trackName ?? "No track"} · {recentRun.sessionLabel} · {formattedRunDate}
               </span>
-              {recentRun.eventName ? (
-                <>
-                  <span className="text-faint" aria-hidden>
-                    ·
-                  </span>
-                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-faint">Event</span>
-                  <span className="ui-caption truncate">{recentRun.eventName}</span>
-                </>
-              ) : null}
             </div>
-            <StatStrip className="grid-cols-3">
-              <StatTile label="Best lap" value={formatLap(recentRun.bestLap)} accent className="py-2" />
-              <StatTile label="Avg top 5" value={formatLap(recentRun.avgTop5)} className="py-2" />
-              <StatTile label="Car rating" value={formatCarRating(recentRun.carRating)} className="py-2" />
-            </StatStrip>
-            <div
-              className="pointer-events-auto"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <EngineerQuickFixButton runId={recentRun.id} />
-            </div>
+            {recentRun.eventName ? (
+              <PanelSubtitle className="mt-0">{recentRun.eventName}</PanelSubtitle>
+            ) : null}
+            {runLoggingComplete ? (
+              <StatStrip className="grid-cols-3">
+                <StatTile label="Best lap" value={formatLap(recentRun.bestLap)} accent className="py-2" />
+                <StatTile label="Avg top 5" value={formatLap(recentRun.avgTop5)} className="py-2" />
+                <StatTile label="Car rating" value={formatCarRating(recentRun.carRating)} className="py-2" />
+              </StatStrip>
+            ) : null}
           </div>
         </>
       ) : (

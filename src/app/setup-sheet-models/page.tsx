@@ -15,6 +15,9 @@ import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAu
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { isAuthorizedCatalogSlug } from "@/lib/setupSheetModels/catalogSuppression";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { Eyebrow } from "@/components/ui/panel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 
 function countDuplicateGroups(models: SetupSheetModelPickerRow[]): number {
   const byNorm = new Map<string, number>();
@@ -31,9 +34,12 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Chassis types</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/assets" />
+            <div>
+              <h1 className="page-title">Chassis types</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
       </>
@@ -98,16 +104,30 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">Chassis types</h1>
-          <p className="page-subtitle">
-            One setup sheet model per chassis (e.g. Mugen MTC3). Uploads and the car wizard use the
-            row marked <span className="text-foreground">Used in pickers</span> when names duplicate.
-          </p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/assets" />
+          <div>
+            <h1 className="page-title">Chassis types</h1>
+            <p className="page-subtitle">
+              One setup sheet model per chassis (e.g. Mugen MTC3). Uploads and the car wizard use the
+              row marked <span className="text-foreground">Used in pickers</span> when names duplicate.
+            </p>
+          </div>
         </div>
       </header>
 
       <section className="page-body">
+        <CardPanel className="max-w-2xl">
+          <Eyebrow>New car with custom setup sheet</Eyebrow>
+          <p className="ui-caption mt-1">
+            Define parameters for a car model (e.g. Mugen MTC3), upload a PDF, and calibrate — without inheriting the
+            Awesomatix A800 sheet.
+          </p>
+          <ButtonLink href="/setup-sheet-models/new/setup" className="mt-3 inline-flex text-sm">
+            Start setup wizard
+          </ButtonLink>
+        </CardPanel>
+
         {duplicateGroupCount > 0 ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             <div className="font-medium text-amber-200">Duplicate chassis names detected</div>
@@ -227,11 +247,6 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
           </ul>
         )}
 
-        <p className="text-xs text-muted-foreground">
-          <Link href="/setup" className="hover:text-foreground underline">
-            ← Back to Setup
-          </Link>
-        </p>
       </section>
     </>
   );

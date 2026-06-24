@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Eyebrow } from "@/components/ui/panel";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
@@ -375,7 +376,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="ui-title text-sm text-muted-foreground">Pick two setups</div>
+          <Eyebrow>Pick two setups</Eyebrow>
           <div className="flex items-center gap-3">
             <button
               type="button"

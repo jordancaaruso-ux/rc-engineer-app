@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 type CarOption = { id: string; name: string };
 
@@ -196,7 +197,7 @@ export function BulkImportHubClient({
     <div className="space-y-6">
       <CardPanel className="max-w-2xl" contentClassName="space-y-3">
         <form onSubmit={createBatch} className="space-y-3">
-        <div className="ui-title text-xs text-muted-foreground">New import batch</div>
+        <Eyebrow>New import batch</Eyebrow>
         <p className="text-xs text-muted-foreground">
           Name the batch, choose a car, then add PDFs from disk, or paste a PetitRC URL (e.g. Awesomatix hub), or both.
           Open each file later to pick a calibration and parse.
@@ -238,7 +239,7 @@ export function BulkImportHubClient({
           </label>
         )}
         <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-2">
-          <div className="text-[10px] ui-title text-muted-foreground">PetitRC (optional)</div>
+          <Eyebrow>PetitRC (optional)</Eyebrow>
           <label className="block text-xs">
             <span className="text-muted-foreground">Car setup sheet URL</span>
             <input
@@ -344,7 +345,7 @@ export function BulkImportHubClient({
       </CardPanel>
 
       <div className="space-y-2.5">
-        <div className="ui-title text-xs text-muted-foreground">Recent batches</div>
+        <Eyebrow>Recent batches</Eyebrow>
         {initialBatches.length === 0 ? (
           <CardPanel contentClassName="text-sm text-muted-foreground">No batches yet.</CardPanel>
         ) : (

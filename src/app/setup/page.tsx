@@ -11,6 +11,7 @@ import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAu
 import { SetupRunPdfReviewClient } from "@/components/setup/SetupRunPdfReviewClient";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 
 type SetupPageSearchParams = {
   created?: string;
@@ -61,9 +62,12 @@ export default async function SetupPage({
       return (
         <>
           <header className="page-header">
-            <div>
-              <h1 className="page-title">Review setup for PDF</h1>
-              <p className="page-subtitle">Database not configured.</p>
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <PageBackLink href="/assets" />
+              <div>
+                <h1 className="page-title">Review setup for PDF</h1>
+                <p className="page-subtitle">Database not configured.</p>
+              </div>
             </div>
           </header>
           <section className="page-body">
@@ -82,9 +86,12 @@ export default async function SetupPage({
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Setup</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/assets" />
+            <div>
+              <h1 className="page-title">Setup</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -160,9 +167,12 @@ export default async function SetupPage({
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">Setup</h1>
-          <p className="page-subtitle">One place for setup sheets, run setups, and calibration tools.</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/assets" />
+          <div>
+            <h1 className="page-title">Setup</h1>
+            <p className="page-subtitle">One place for setup sheets, run setups, and calibration tools.</p>
+          </div>
         </div>
       </header>
 

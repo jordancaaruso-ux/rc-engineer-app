@@ -12,6 +12,8 @@ import {
   ACTIVE_SETUP_CHANGED_EVENT,
 } from "@/lib/activeSetupContext";
 import { displayRunNotes } from "@/lib/runNotes";
+import { Eyebrow } from "@/components/ui/panel";
+import { formatRunTiresDetailLine } from "@/lib/runs/runTireContextDisplay";
 
 export type CompareRunShape = {
   id: string;
@@ -41,6 +43,8 @@ export type CompareRunShape = {
   handlingProblems?: string | null;
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   tireRunNumber: number;
+  additiveType?: { id: string; displayName: string } | null;
+  warmerTimingMinutes?: number | null;
   setupSnapshot?: { id: string; data?: unknown } | null;
   /** On-track session instant when known (import / timing). */
   sessionCompletedAt?: Date | string | null;
@@ -172,14 +176,12 @@ export function RunComparePanel({
       onClick={(e) => e.stopPropagation()}
     >
       <div>
-        <h3 className="ui-title text-xs text-muted-foreground">
-          Compare setup
-        </h3>
+        <Eyebrow>Compare setup</Eyebrow>
         <p className="text-xs text-muted-foreground mt-1">{sourceNote}</p>
       </div>
 
       <div className="space-y-2">
-        <span className="ui-title text-sm text-muted-foreground">Compare to</span>
+        <Eyebrow>Compare to</Eyebrow>
         <div className="flex flex-wrap gap-2">
           <ModeChip
             active={mode === "current_setup"}
@@ -226,11 +228,11 @@ export function RunComparePanel({
         <>
           <div className="grid gap-4 sm:grid-cols-2 text-xs">
             <div className="rounded-md border border-border bg-muted/70 p-3 space-y-1">
-              <div className="ui-title text-sm text-muted-foreground">This run (history)</div>
+              <Eyebrow>This run (history)</Eyebrow>
               <div className="font-mono text-[11px] break-words">{formatRunPickerLine(baseRun)}</div>
             </div>
             <div className="rounded-md border border-border bg-muted/70 p-3 space-y-1">
-              <div className="ui-title text-sm text-muted-foreground normal-case">{rightLabel}</div>
+              <Eyebrow>{rightLabel}</Eyebrow>
               {mode === "current_setup" ? (
                 <p className="text-muted-foreground text-[11px]">
                   Values from Log your run (last saved locally).
@@ -266,24 +268,26 @@ export function RunComparePanel({
 
           <div className="grid gap-3 sm:grid-cols-2 text-xs">
             <div>
-              <span className="ui-title text-sm text-muted-foreground">Tires · this run</span>
+              <Eyebrow>Tires · this run</Eyebrow>
               <p className="mt-1">
-                {baseRun.tireSet
-                  ? `${baseRun.tireSet.label} · Set ${baseRun.tireSet.setNumber ?? "—"} · Run ${baseRun.tireRunNumber}`
-                  : "—"}
+                {formatRunTiresDetailLine({
+                  tireSet: baseRun.tireSet,
+                  tireRunNumber: baseRun.tireRunNumber,
+                  additiveType: baseRun.additiveType,
+                  warmerTimingMinutes: baseRun.warmerTimingMinutes,
+                  setupSnapshotData: baseRun.setupSnapshot?.data,
+                })}
               </p>
             </div>
             <div>
-              <span className="ui-title text-sm text-muted-foreground">Tires · {rightLabel}</span>
+              <Eyebrow>Tires · {rightLabel}</Eyebrow>
               <p className="mt-1">{tiresRight}</p>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="ui-title text-xs text-muted-foreground">
-                Setup values
-              </h4>
+              <Eyebrow>Setup values</Eyebrow>
               <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -302,10 +306,10 @@ export function RunComparePanel({
             <div className="overflow-x-auto rounded-md border border-border">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/70 text-left text-xs text-muted-foreground ui-title">
-                    <th className="px-3 py-2">Parameter</th>
-                    <th className="px-3 py-2">This run</th>
-                    <th className="px-3 py-2">{rightLabel}</th>
+                  <tr className="border-b border-border bg-muted/70 text-left">
+                    <th className="table-col-header px-3 py-2">Parameter</th>
+                    <th className="table-col-header px-3 py-2">This run</th>
+                    <th className="table-col-header px-3 py-2">{rightLabel}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -394,7 +398,7 @@ function LapBlock({
 }) {
   return (
     <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs">
-      <div className="ui-title text-sm text-muted-foreground">{title}</div>
+      <Eyebrow>{title}</Eyebrow>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
         <span>
           This run: <span className="font-mono text-foreground">{left}</span>
@@ -411,7 +415,7 @@ function NoteBlock({ title, text }: { title: string; text?: string | null }) {
   const v = text?.trim() || "—";
   return (
     <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs">
-      <div className="ui-title text-sm text-muted-foreground">{title}</div>
+      <Eyebrow>{title}</Eyebrow>
       <p className="mt-1 whitespace-pre-wrap text-foreground">{v}</p>
     </div>
   );

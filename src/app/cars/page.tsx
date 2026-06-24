@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { CarList } from "@/components/cars/CarList";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 
@@ -15,9 +16,12 @@ export default async function CarManagerPage(): Promise<ReactNode> {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Car Manager</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/assets" />
+            <div>
+              <h1 className="page-title">Car Manager</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -75,11 +79,14 @@ export default async function CarManagerPage(): Promise<ReactNode> {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">Car Manager</h1>
-          <p className="page-subtitle">
-            Create and manage cars. You need at least one car to log a run.
-          </p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/assets" />
+          <div>
+            <h1 className="page-title">Car Manager</h1>
+            <p className="page-subtitle">
+              Create and manage cars. You need at least one car to log a run.
+            </p>
+          </div>
         </div>
       </header>
       <section className="page-body">

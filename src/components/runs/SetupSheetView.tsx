@@ -13,6 +13,7 @@ import {
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import type { CompareColumnRole } from "@/lib/setupCompare/compareHighlight";
 import { getDifferenceColor } from "@/lib/setupCompare/differenceColor";
+import { Eyebrow } from "@/components/ui/panel";
 
 const SetupSheetStructured = dynamic(
   () => import("@/components/runs/SetupSheetStructured").then((m) => ({ default: m.SetupSheetStructured })),
@@ -196,9 +197,9 @@ function GroupBlock({
         className
       )}
     >
-      <div className="px-2 py-1.5 bg-surface-runna-inset border-b border-border text-center text-[11px] ui-title tracking-tight">
+      <Eyebrow className="justify-center border-b border-border bg-surface-runna-inset px-2 py-1.5">
         {title}
-      </div>
+      </Eyebrow>
       <div className="flex-1 divide-y divide-border/30">{children}</div>
     </div>
   );

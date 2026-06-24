@@ -6,6 +6,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
@@ -136,9 +137,9 @@ export function TrackList({
       {searchLooksUnmatched || showAddForm ? (
         <CardPanel>
         <form onSubmit={handleAdd} className="space-y-3">
-          <div className="ui-title text-sm text-muted-foreground">
+          <Eyebrow>
             {searchLooksUnmatched ? "Cannot find it? Add a new track" : "Add track"}
-          </div>
+          </Eyebrow>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
@@ -230,7 +231,7 @@ export function TrackList({
       )}
 
       <div>
-        <div className="ui-title text-sm text-muted-foreground mb-2">Tracks</div>
+        <Eyebrow className="mb-2">Tracks</Eyebrow>
         {filteredTracks.length === 0 ? (
           <CardPanel className="bg-muted/70 text-sm text-muted-foreground">
             {search.trim() ? "No tracks match your search." : "No tracks yet. Add one above or from Log your run."}

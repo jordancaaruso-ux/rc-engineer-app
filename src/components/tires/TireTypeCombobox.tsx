@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/panel";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 
 export type TireTypeOption = {
@@ -334,7 +335,7 @@ export function TireTypeCombobox({
           onSubmit={createTireType}
           className="absolute z-20 mt-1 w-full rounded-md border border-border bg-card shadow-md p-3 space-y-2 text-sm"
         >
-          <div className="ui-title text-xs text-muted-foreground">New tire type</div>
+          <Eyebrow>New tire type</Eyebrow>
           <input
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
             placeholder="e.g. Sweep D32"

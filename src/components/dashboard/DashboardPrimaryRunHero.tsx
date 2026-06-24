@@ -52,7 +52,7 @@ export function DashboardPrimaryRunHero({
           </PanelTitle>
           {heroBlurb ? <PanelSubtitle className="mt-1.5">{heroBlurb}</PanelSubtitle> : null}
           {todayDraftRunId && todayDraftSavedAt ? (
-            <div className="mt-1.5 font-mono text-[10px] tabular-nums text-faint">
+            <div className="mt-1.5 type-timestamp">
               Saved{" "}
               <RelativeTime
                 iso={todayDraftSavedAt}

@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, Suspense } from "react";
-import Link from "next/link";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 
 function NewJobForm() {
   const sp = useSearchParams();
@@ -69,9 +69,6 @@ function NewJobForm() {
         Create job
       </button>
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
-      <Link href="/videos/analysis" className="text-xs underline">
-        ← Hub
-      </Link>
     </div>
   );
 }
@@ -80,8 +77,11 @@ export default function NewVideoAnalysisJobPage() {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">New analysis job</h1>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/analysis" />
+          <div>
+            <h1 className="page-title">New analysis job</h1>
+          </div>
         </div>
       </header>
       <section className="page-body">

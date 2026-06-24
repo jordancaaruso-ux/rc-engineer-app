@@ -1,5 +1,6 @@
 import type { BetweenRunRecentSessionSnapshotV1 } from "@/lib/engineerPhase5/betweenRunHints/betweenRunHintTypes";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/ui/panel";
 
 function fmtSec(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
@@ -35,9 +36,7 @@ export function BetweenRunRecentSessionsThings({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="text-[10px] ui-title text-muted-foreground">
-        Recent sessions (newest first)
-      </div>
+      <Eyebrow>Recent sessions (newest first)</Eyebrow>
       <div className="grid gap-2 sm:grid-cols-1">
         {sessions.map((s, idx) => {
           return (
@@ -78,9 +77,7 @@ export function BetweenRunRecentSessionsThings({
               </div>
               {s.setupChangesFromPrevious.length > 0 ? (
                 <div className="mt-1.5">
-                  <div className="text-[9px] ui-title text-muted-foreground">
-                    Setup changes
-                  </div>
+                  <Eyebrow>Setup changes</Eyebrow>
                   <ul className="mt-0.5 list-disc space-y-0.5 pl-3.5 text-muted-foreground">
                     {s.setupChangesFromPrevious.map((line, i) => (
                       <li key={i}>{line}</li>

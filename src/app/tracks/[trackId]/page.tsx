@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { isTrackFavourite } from "@/lib/track-favourites";
 import { hasDatabaseUrl } from "@/lib/env";
-import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { TrackFavouriteClient } from "@/components/tracks/TrackFavouriteClient";
 import { TrackLiveRcUrlEditor } from "@/components/tracks/TrackLiveRcUrlEditor";
 import { TrackSpeedhiveUrlEditor } from "@/components/tracks/TrackSpeedhiveUrlEditor";
@@ -22,9 +23,12 @@ export default async function TrackDetailPage(props: {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Track</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/tracks" />
+            <div>
+              <h1 className="page-title">Track</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -60,16 +64,13 @@ export default async function TrackDetailPage(props: {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Track</h1>
-            <p className="page-subtitle">Not found.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/tracks" />
+            <div>
+              <h1 className="page-title">Track</h1>
+              <p className="page-subtitle">Not found.</p>
+            </div>
           </div>
-          <Link
-            href="/tracks"
-            className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
-          >
-            Back
-          </Link>
         </header>
       </>
     );
@@ -87,16 +88,13 @@ export default async function TrackDetailPage(props: {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">{track.name}</h1>
-          <p className="page-subtitle">Track details. Add or remove from your favourites.</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/tracks" />
+          <div>
+            <h1 className="page-title">{track.name}</h1>
+            <p className="page-subtitle">Track details. Add or remove from your favourites.</p>
+          </div>
         </div>
-        <Link
-          href="/tracks"
-          className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
-        >
-          Back
-        </Link>
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
@@ -128,7 +126,7 @@ export default async function TrackDetailPage(props: {
               />
 
               <CardPanel contentClassName="text-sm">
-                <div className="ui-title text-sm text-muted-foreground mb-2">GPS location</div>
+                <Eyebrow className="mb-2">GPS location</Eyebrow>
                 <TrackLocationEditor
                   trackId={track.id}
                   trackName={track.name}

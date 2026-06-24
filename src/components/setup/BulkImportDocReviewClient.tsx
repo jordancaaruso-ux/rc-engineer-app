@@ -9,6 +9,7 @@ import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { getA800rrSetupSheetTemplateWithDisplayPreferences } from "@/lib/setupCalibrations/customFieldCatalog";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
+import { Eyebrow } from "@/components/ui/panel";
 
 type ReviewStatus = "UNSET" | "NOT_CONFIRMED" | "CONFIRMED_ACCURATE";
 
@@ -193,7 +194,7 @@ export function BulkImportDocReviewClient(input: {
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="ui-title text-xs text-muted-foreground">Calibration & parse</div>
+        <Eyebrow>Calibration & parse</Eyebrow>
         {input.calibrations.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             No calibrations saved.{" "}
@@ -250,9 +251,7 @@ export function BulkImportDocReviewClient(input: {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-border bg-card overflow-hidden min-h-[420px] flex flex-col">
-          <div className="border-b border-border px-3 py-2 ui-title text-xs text-muted-foreground">
-            PDF
-          </div>
+          <Eyebrow className="border-b border-border px-3 py-2">PDF</Eyebrow>
           <div className="flex-1 min-h-[360px] bg-muted/20">
             {input.mimeType === "application/pdf" ? (
               <iframe title={input.originalFilename} src={previewUrl} className="h-full min-h-[360px] w-full border-0" />
@@ -264,7 +263,7 @@ export function BulkImportDocReviewClient(input: {
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="border-b border-border px-3 py-2 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="ui-title text-xs text-muted-foreground">Parsed setup</div>
+              <Eyebrow>Parsed setup</Eyebrow>
               {input.parsedSetupManuallyEdited ? (
                 <div className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
                   Includes manual field corrections (structured keys, not PDF widgets).
@@ -327,7 +326,7 @@ export function BulkImportDocReviewClient(input: {
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="ui-title text-xs text-muted-foreground">Dataset review</div>
+        <Eyebrow>Dataset review</Eyebrow>
         <div className="text-sm">
           Parse status:{" "}
           <span className={parseOk ? "text-foreground" : "text-destructive"}>{input.parseStatus}</span>
@@ -369,9 +368,9 @@ export function BulkImportDocReviewClient(input: {
       </div>
 
       <div className="rounded-lg border border-border bg-card p-3">
-        <div className="ui-title text-xs text-muted-foreground mb-1">
+        <Eyebrow className="mb-1">
           Diagnostics / warnings (raw)
-        </div>
+        </Eyebrow>
         <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-[10px] text-muted-foreground">{diagStr || "—"}</pre>
       </div>
     </div>

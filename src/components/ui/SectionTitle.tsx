@@ -10,7 +10,7 @@ export function SectionTitle({
   className?: string;
   children: ReactNode;
 }) {
-  return <Tag className={cn("text-sm font-semibold text-foreground", className)}>{children}</Tag>;
+  return <Tag className={cn("section-title", className)}>{children}</Tag>;
 }
 
 export function SectionMeta({

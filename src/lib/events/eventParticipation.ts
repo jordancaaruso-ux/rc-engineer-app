@@ -10,6 +10,8 @@ export const EVENT_PARTICIPATION_TIRE_SELECT = {
   modelCode: true,
 } as const;
 
+export const EVENT_PARTICIPATION_ADDITIVE_SELECT = EVENT_PARTICIPATION_TIRE_SELECT;
+
 export const EVENT_LIST_INCLUDE = {
   track: { select: { id: true, name: true, location: true } },
   participations: {
@@ -19,8 +21,10 @@ export const EVENT_LIST_INCLUDE = {
       notes: true,
       controlledTireLabel: true,
       controlledTireTypeId: true,
+      controlledAdditiveTypeId: true,
       pinnedAt: true,
       controlledTireType: { select: EVENT_PARTICIPATION_TIRE_SELECT },
+      controlledAdditiveType: { select: EVENT_PARTICIPATION_ADDITIVE_SELECT },
     },
   },
 } as const;
@@ -32,6 +36,7 @@ export async function ensureEventParticipation(input: {
   notes?: string | null;
   controlledTireLabel?: string | null;
   controlledTireTypeId?: string | null;
+  controlledAdditiveTypeId?: string | null;
 }): Promise<void> {
   const existing = await prisma.eventParticipation.findUnique({
     where: { userId_eventId: { userId: input.userId, eventId: input.eventId } },
@@ -46,6 +51,7 @@ export async function ensureEventParticipation(input: {
       notes: input.notes?.trim() || null,
       controlledTireLabel: input.controlledTireLabel?.trim() || null,
       controlledTireTypeId: input.controlledTireTypeId?.trim() || null,
+      controlledAdditiveTypeId: input.controlledAdditiveTypeId?.trim() || null,
     },
   });
 }
@@ -104,6 +110,8 @@ export type EventWithUserParticipation = {
     controlledTireLabel: string | null;
     controlledTireTypeId: string | null;
     controlledTireType: { id: string; displayName: string; modelCode: string } | null;
+    controlledAdditiveTypeId: string | null;
+    controlledAdditiveType: { id: string; displayName: string; modelCode: string } | null;
     pinnedAt: Date | null;
   } | null;
 };
@@ -116,6 +124,8 @@ export function participationForUser<
     controlledTireTypeId: string | null;
     pinnedAt: Date | null;
     controlledTireType: { id: string; displayName: string; modelCode: string } | null;
+    controlledAdditiveTypeId: string | null;
+    controlledAdditiveType: { id: string; displayName: string; modelCode: string } | null;
   },
 >(participations: T[], userId: string): T | null {
   return participations.find((p) => p.userId === userId) ?? null;
@@ -143,6 +153,8 @@ export function mapEventForUser<
       controlledTireTypeId: string | null;
       pinnedAt: Date | null;
       controlledTireType: { id: string; displayName: string; modelCode: string } | null;
+      controlledAdditiveTypeId: string | null;
+      controlledAdditiveType: { id: string; displayName: string; modelCode: string } | null;
     }>;
   },
 >(event: E, userId: string) {
@@ -156,6 +168,8 @@ export function mapEventForUser<
     controlledTireLabel: mine?.controlledTireLabel ?? null,
     controlledTireTypeId: mine?.controlledTireTypeId ?? null,
     controlledTireType: mine?.controlledTireType ?? null,
+    controlledAdditiveTypeId: mine?.controlledAdditiveTypeId ?? null,
+    controlledAdditiveType: mine?.controlledAdditiveType ?? null,
     pinnedAt: mine?.pinnedAt ?? null,
     hasLiveRcLink: Boolean(event.resultsSourceUrl?.trim() || event.practiceSourceUrl?.trim()),
   };

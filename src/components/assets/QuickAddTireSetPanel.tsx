@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { TireTypeCombobox, type TireTypeOption } from "@/components/tires/TireTypeCombobox";
 import { createTireSetApi, type TireSetApiRow } from "@/lib/assets/createAssetApi";
+import { Eyebrow } from "@/components/ui/panel";
 
 export function QuickAddTireSetPanel({
   onCreated,
@@ -60,7 +61,7 @@ export function QuickAddTireSetPanel({
   return (
     <form onSubmit={handleSubmit} className={cn("inset-panel p-3 space-y-3", className)}>
       <div className="space-y-1">
-        <div className="ui-title text-xs text-muted-foreground">New tire set</div>
+        <Eyebrow>New tire set</Eyebrow>
         <p className="text-[11px] text-muted-foreground leading-snug">
           Search the catalog or type a new compound — tap <span className="font-medium text-foreground">Create…</span>{" "}
           in the list if it is not there yet.
@@ -68,7 +69,7 @@ export function QuickAddTireSetPanel({
       </div>
 
       <div className="space-y-1">
-        <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-faint">Tire type</div>
+        <div className="type-data-label">Tire type</div>
         <TireTypeCombobox
           value={tireTypeId}
           onChange={setTireTypeId}
@@ -109,7 +110,7 @@ export function QuickAddTireSetPanel({
           </div>
 
           <div className="space-y-1 text-sm">
-            <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-faint">
+            <div className="type-data-label">
               Prior runs on this set (before first log)
             </div>
             <input

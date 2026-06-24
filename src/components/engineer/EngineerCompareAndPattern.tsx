@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { EngineerRunPairVisualCompare } from "@/components/engineer/EngineerRunPairVisualCompare";
 import { formatLap } from "@/lib/runLaps";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 type CarOpt = { id: string; name: string };
 type EventOpt = { id: string; name: string };
@@ -463,7 +464,7 @@ export function EngineerCompareAndPattern({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <CardPanel overflowHidden={false} contentClassName="space-y-2">
-            <div className="text-[10px] ui-title text-muted-foreground">Target</div>
+            <Eyebrow>Target</Eyebrow>
             <div className="space-y-1">
               <label className="text-[10px] text-muted-foreground">Select car</label>
               <select
@@ -496,7 +497,7 @@ export function EngineerCompareAndPattern({
 
           <CardPanel overflowHidden={false} contentClassName="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-[10px] ui-title text-muted-foreground">Comparison</div>
+              <Eyebrow>Comparison</Eyebrow>
               <div className="flex rounded-md border border-border p-0.5 bg-muted/40">
                 <button
                   type="button"
@@ -633,7 +634,7 @@ export function EngineerCompareAndPattern({
 
       {runIdUrl && compareRunIdUrl ? (
         <div className="border-t border-border pt-3 space-y-2">
-          <div className="text-xs ui-title text-muted-foreground">URL selection · setup &amp; laps</div>
+          <Eyebrow>URL selection · setup &amp; laps</Eyebrow>
           <p className="text-[11px] text-muted-foreground">
             Target session (<span className="font-mono">runId</span>) vs comparison session (
             <span className="font-mono">compareRunId</span>).
@@ -648,7 +649,7 @@ export function EngineerCompareAndPattern({
       ) : null}
 
       <div className="border-t border-border pt-3 space-y-2">
-        <div className="text-xs ui-title text-muted-foreground">Pattern digest (one car)</div>
+        <Eyebrow>Pattern digest (one car)</Eyebrow>
         <p className="text-[11px] text-muted-foreground">
           Chronological series with lap metrics and setup keys changed vs the previous run in the list. Uses session time
           when known. Highlight shows best single lap in the series.
@@ -743,13 +744,13 @@ export function EngineerCompareAndPattern({
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[480px] text-[10px]">
                   <thead>
-                    <tr className="border-b border-border bg-muted/60 text-left font-medium text-muted-foreground">
-                      <th className="px-1.5 py-1">When</th>
-                      <th className="px-1.5 py-1">Track</th>
-                      <th className="px-1.5 py-1">Best</th>
-                      <th className="px-1.5 py-1">Avg 5</th>
-                      <th className="px-1.5 py-1">Avg 10</th>
-                      <th className="px-1.5 py-1">Setup Δ keys</th>
+                    <tr className="border-b border-border bg-muted/60 text-left">
+                      <th className="table-col-header px-1.5 py-1">When</th>
+                      <th className="table-col-header px-1.5 py-1">Track</th>
+                      <th className="table-col-header px-1.5 py-1">Best</th>
+                      <th className="table-col-header px-1.5 py-1">Avg 5</th>
+                      <th className="table-col-header px-1.5 py-1">Avg 10</th>
+                      <th className="table-col-header px-1.5 py-1">Setup Δ keys</th>
                     </tr>
                   </thead>
                   <tbody>

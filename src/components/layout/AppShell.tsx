@@ -15,7 +15,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const hideNav = isHiddenNavRoute(pathname);
 
   if (hideNav) {
-    return <main className="page">{children}</main>;
+    return <main className="page bg-background">{children}</main>;
   }
 
   return (
@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Sidebar />
           <main
             className={cn(
-              "page relative",
+              "page relative bg-background",
               "pb-[calc(var(--mobile-tab-bar-height)+env(safe-area-inset-bottom))] md:pb-0"
             )}
           >

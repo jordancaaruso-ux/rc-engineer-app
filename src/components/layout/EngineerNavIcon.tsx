@@ -22,31 +22,36 @@ function sparklePath(cx: number, cy: number, r: number): string {
 
 type EngineerNavIconProps = {
   className?: string;
+  /** Heavier stroke when tab is active (matches Lucide active weight). */
+  active?: boolean;
 };
 
-const SPARKLE_STROKE = {
-  fill: "none" as const,
-  stroke: "currentColor",
-  strokeWidth: 1.75,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
+function sparkleStroke(active?: boolean) {
+  return {
+    fill: "none" as const,
+    stroke: "currentColor",
+    strokeWidth: active ? 2.25 : 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+}
 
 /**
  * Engineer nav mark: outline spark cluster (one large spark + two companions).
  * Stroke-only so it inherits nav link color — muted when inactive, foreground
  * when active — matching Lucide icons in the bottom bar and sidebar.
  */
-export function EngineerNavIcon({ className }: EngineerNavIconProps) {
+export function EngineerNavIcon({ className, active }: EngineerNavIconProps) {
+  const stroke = sparkleStroke(active);
   return (
     <svg
       viewBox="0 0 24 24"
-      className={cn("h-5 w-5 shrink-0", className)}
+      className={cn("h-[22px] w-[22px] shrink-0", className)}
       aria-hidden
     >
-      <path d={sparklePath(9, 13.4, 6.8)} {...SPARKLE_STROKE} />
-      <path d={sparklePath(17.6, 7, 3.3)} {...SPARKLE_STROKE} />
-      <path d={sparklePath(19.4, 15.8, 2.2)} {...SPARKLE_STROKE} />
+      <path d={sparklePath(9, 13.4, 6.8)} {...stroke} />
+      <path d={sparklePath(17.6, 7, 3.3)} {...stroke} />
+      <path d={sparklePath(19.4, 15.8, 2.2)} {...stroke} />
     </svg>
   );
 }

@@ -231,30 +231,30 @@ export function GripArchetypesClient(props: Props) {
             <thead className="bg-muted/60 text-muted-foreground">
               <tr>
                 <th
-                  className="px-2 py-2 text-left cursor-pointer"
+                  className="table-col-header px-2 py-2 text-left cursor-pointer"
                   onClick={() => clickSort("param")}
                 >
                   Parameter {sortKey === "param" ? (sortDir === "asc" ? "▲" : "▼") : ""}
                 </th>
-                <th className="px-2 py-2 text-right">Your value</th>
+                <th className="table-col-header px-2 py-2 text-right">Your value</th>
                 {GRIP_COLUMNS.map((c) => (
                   <th
                     key={c.key}
-                    className="px-2 py-2 text-right cursor-pointer whitespace-nowrap"
+                    className="table-col-header px-2 py-2 text-right cursor-pointer whitespace-nowrap"
                     onClick={() => clickSort(c.key)}
                   >
                     {c.label} {sortKey === c.key ? (sortDir === "asc" ? "▲" : "▼") : ""}
                   </th>
                 ))}
                 <th
-                  className="px-2 py-2 text-right cursor-pointer whitespace-nowrap"
+                  className="table-col-header px-2 py-2 text-right cursor-pointer whitespace-nowrap"
                   onClick={() => clickSort("lowMedDelta")}
                   title="Medium median minus Low median"
                 >
                   Δ L→M {sortKey === "lowMedDelta" ? (sortDir === "asc" ? "▲" : "▼") : ""}
                 </th>
                 <th
-                  className="px-2 py-2 text-right cursor-pointer whitespace-nowrap"
+                  className="table-col-header px-2 py-2 text-right cursor-pointer whitespace-nowrap"
                   onClick={() => clickSort("medHighDelta")}
                   title="High median minus Medium median"
                 >

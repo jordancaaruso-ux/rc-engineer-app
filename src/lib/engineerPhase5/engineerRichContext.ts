@@ -47,6 +47,9 @@ export type EngineerRichContextV1 = {
     modelCode: string | null;
     setNumber: number;
     tireRunNumber: number;
+    additiveType: string | null;
+    additiveTypeModelCode: string | null;
+    warmerTimingMinutes: number | null;
   };
   track: null | {
     id: string;
@@ -133,6 +136,8 @@ const runSelectRich = {
   id: true,
   raceClass: true,
   tireRunNumber: true,
+  additiveTypeId: true,
+  warmerTimingMinutes: true,
   carId: true,
   trackId: true,
   eventId: true,
@@ -154,6 +159,9 @@ const runSelectRich = {
       initialRunCount: true,
       tireType: { select: { displayName: true, modelCode: true } },
     },
+  },
+  additiveType: {
+    select: { displayName: true, modelCode: true },
   },
   importedLapSets: {
     select: {
@@ -403,8 +411,22 @@ export async function buildEngineerRichContextV1(params: {
           modelCode: run.tireSet.tireType?.modelCode ?? null,
           setNumber: run.tireSet.setNumber,
           tireRunNumber: run.tireRunNumber,
+          additiveType: run.additiveType?.displayName ?? null,
+          additiveTypeModelCode: run.additiveType?.modelCode ?? null,
+          warmerTimingMinutes: run.warmerTimingMinutes ?? null,
         }
-      : null,
+      : run.additiveType || run.warmerTimingMinutes != null
+        ? {
+            id: "",
+            label: "",
+            modelCode: null,
+            setNumber: 0,
+            tireRunNumber: run.tireRunNumber,
+            additiveType: run.additiveType?.displayName ?? null,
+            additiveTypeModelCode: run.additiveType?.modelCode ?? null,
+            warmerTimingMinutes: run.warmerTimingMinutes ?? null,
+          }
+        : null,
     track: run.track
       ? {
           id: run.track.id,

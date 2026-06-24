@@ -411,7 +411,10 @@ export async function loadDashboardHomeModel(
   const [scopedEvents, recentRun, todaysRuns, priorRun, incompleteRunsRows] = await Promise.all([
     loadUserScopedEvents({ userId, take: 40 }),
     prisma.run.findFirst({
-      where: { userId },
+      where: {
+        userId,
+        OR: [{ loggingCompletedAt: { not: null } }, { loggingComplete: true }],
+      },
       orderBy: { sortAt: "desc" },
       select: recentRunSelect,
     }),

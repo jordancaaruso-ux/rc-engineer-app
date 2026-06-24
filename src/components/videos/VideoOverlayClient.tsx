@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { Eyebrow } from "@/components/ui/panel";
 import {
   buildOverlayTransform,
   buildTransformOrigin,
@@ -460,7 +461,7 @@ export function VideoOverlayClient() {
         >
           {!isFullscreen ? (
             <SurfaceCard overflowHidden={false} contentClassName="space-y-4">
-              <div className="ui-title flex items-center justify-between text-xs text-muted-foreground">
+              <Eyebrow className="justify-between">
                 <span>Overlay player</span>
                 {isMobile ? (
                   <button
@@ -471,7 +472,7 @@ export function VideoOverlayClient() {
                     Fullscreen
                   </button>
                 ) : null}
-              </div>
+              </Eyebrow>
 
               {playerBlock}
               {transport}

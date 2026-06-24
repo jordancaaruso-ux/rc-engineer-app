@@ -6,6 +6,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { loadUserTireSetDetail } from "@/lib/assets/loadUserAssets";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow, StatStrip, StatTile } from "@/components/ui/panel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { TireSetDeleteClient } from "@/components/assets/AssetDeleteClient";
 
 export default async function TireSetDetailPage(props: {
@@ -15,9 +16,12 @@ export default async function TireSetDetailPage(props: {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Tire set</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/tire-sets" />
+            <div>
+              <h1 className="page-title">Tire set</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -37,16 +41,13 @@ export default async function TireSetDetailPage(props: {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Tire set</h1>
-            <p className="page-subtitle">Not found.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/tire-sets" />
+            <div>
+              <h1 className="page-title">Tire set</h1>
+              <p className="page-subtitle">Not found.</p>
+            </div>
           </div>
-          <Link
-            href="/tire-sets"
-            className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
-          >
-            Back
-          </Link>
         </header>
       </>
     );
@@ -57,23 +58,18 @@ export default async function TireSetDetailPage(props: {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">{displayLine}</h1>
-          <p className="page-subtitle">Tire set details and run history.</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/tire-sets" />
+          <div>
+            <h1 className="page-title">{displayLine}</h1>
+            <p className="page-subtitle">Tire set details and run history.</p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <TireSetDeleteClient
-            tireSetId={tireSet.id}
-            displayLine={displayLine}
-            runCount={stats.runCount}
-          />
-          <Link
-            href="/tire-sets"
-            className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
-          >
-            Back
-          </Link>
-        </div>
+        <TireSetDeleteClient
+          tireSetId={tireSet.id}
+          displayLine={displayLine}
+          runCount={stats.runCount}
+        />
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">

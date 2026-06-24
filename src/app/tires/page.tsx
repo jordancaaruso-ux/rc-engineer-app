@@ -6,6 +6,7 @@ import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
 import { TireGaragePanel } from "@/components/tires/TireGaragePanel";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 
 export const revalidate = 30;
 
@@ -14,9 +15,12 @@ export default async function TiresPage(): Promise<ReactNode> {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Tires</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/assets" />
+            <div>
+              <h1 className="page-title">Tires</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -42,9 +46,12 @@ export default async function TiresPage(): Promise<ReactNode> {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">Tires</h1>
-          <p className="page-subtitle">Tire type catalog.</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/assets" />
+          <div>
+            <h1 className="page-title">Tires</h1>
+            <p className="page-subtitle">Tire type catalog.</p>
+          </div>
         </div>
       </header>
       <section className="page-body">

@@ -7,11 +7,13 @@ import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveR
 import {
   ensureEventParticipation,
   EVENT_LIST_INCLUDE,
+  loadUserScopedEvents,
   mapEventForUser,
 } from "@/lib/events/eventParticipation";
 import { findEventByTrackAndResultsUrl } from "@/lib/events/findEventForLiveRc";
-import { eventIdsInScopeForUser } from "@/lib/events/eventParticipation";
 import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -55,21 +57,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ suggestedEvent: null });
   }
 
-  const scopedIds = await eventIdsInScopeForUser(user.id);
-  if (scopedIds.length === 0) {
-    return NextResponse.json({ events: [] });
-  }
+  const events = await loadUserScopedEvents({ userId: user.id, take: 120 });
 
-  const events = await prisma.event.findMany({
-    where: { id: { in: scopedIds } },
-    orderBy: { startDate: "desc" },
-    take: 50,
-    include: EVENT_LIST_INCLUDE,
-  });
-
-  return NextResponse.json({
-    events: events.map((e) => mapEventForUser(e, user.id)),
-  });
+  return NextResponse.json({ events });
 }
 
 export async function POST(request: Request) {
@@ -92,6 +82,7 @@ export async function POST(request: Request) {
       resultsSourceUrl?: string | null;
       controlledTireLabel?: string | null;
       controlledTireTypeId?: string | null;
+      controlledAdditiveTypeId?: string | null;
     };
 
     const name = body.name?.trim();
@@ -145,6 +136,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
       }
     }
+    const controlledAdditiveTypeId = body.controlledAdditiveTypeId?.trim() || null;
+    if (controlledAdditiveTypeId) {
+      const at = await prisma.additiveType.findUnique({
+        where: { id: controlledAdditiveTypeId },
+        select: { id: true },
+      });
+      if (!at) {
+        return NextResponse.json({ error: "Additive type not found" }, { status: 400 });
+      }
+    }
 
     if (resultsSourceUrl) {
       const existing = await findEventByTrackAndResultsUrl(trackId, resultsSourceUrl);
@@ -155,6 +156,7 @@ export async function POST(request: Request) {
           notes: body.notes,
           controlledTireLabel,
           controlledTireTypeId,
+          controlledAdditiveTypeId,
         });
         const event = await prisma.event.findUnique({
           where: { id: existing.id },
@@ -192,6 +194,7 @@ export async function POST(request: Request) {
       notes: body.notes,
       controlledTireLabel,
       controlledTireTypeId,
+      controlledAdditiveTypeId,
     });
 
     const withParts = await prisma.event.findUnique({

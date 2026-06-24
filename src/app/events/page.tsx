@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { EventList } from "@/components/events/EventList";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { loadUserScopedEvents } from "@/lib/events/eventParticipation";
 
 /** Match /tracks + /runs/new: always load user events/tracks fresh (avoids stale static RSC for selectors). */
@@ -14,9 +15,12 @@ export default async function EventsPage(): Promise<ReactNode> {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">Events</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/assets" />
+            <div>
+              <h1 className="page-title">Events</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -41,11 +45,14 @@ export default async function EventsPage(): Promise<ReactNode> {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">Events</h1>
-          <p className="page-subtitle">
-            Create and manage race meetings and events. Link events to tracks and use them when logging runs.
-          </p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/assets" />
+          <div>
+            <h1 className="page-title">Events</h1>
+            <p className="page-subtitle">
+              Create and manage race meetings and events. Link events to tracks and use them when logging runs.
+            </p>
+          </div>
         </div>
       </header>
       <section className="page-body">

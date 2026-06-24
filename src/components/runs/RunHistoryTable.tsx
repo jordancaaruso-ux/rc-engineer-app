@@ -9,10 +9,14 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { compareSetupField } from "@/lib/setupCompare/compare";
-import { formatHandlingAssessmentDetailLines } from "@/lib/runHandlingAssessment";
+import { formatHandlingAssessmentDetailLines, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 import { formatLapSourceSummary, tryReadLapSourceUrl } from "@/lib/lapSession/display";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
+import {
+  formatAdditiveTimingLine,
+  formatTirePrepSummaryFromSnapshot,
+} from "@/lib/runs/runTireContextDisplay";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import {
   computeMistakeLaps,
@@ -29,8 +33,8 @@ import {
 } from "@/lib/lapAnalysis";
 import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
 import Link from "next/link";
+import { Cog, List, SquarePen, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import type {
   EngineerRunSummaryV2,
   ImportedSessionFieldStatsEngineerCompactV1,
@@ -38,7 +42,17 @@ import type {
 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { EngineerQuickFixButton } from "@/components/engineer/EngineerQuickFixButton";
+import { Eyebrow } from "@/components/ui/panel";
+import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
+import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
+import {
+  computeRunHistoryColSpan,
+  RUN_HISTORY_ACTION_CELL_CLASS,
+  RUN_HISTORY_DATA_CLASS,
+  RUN_HISTORY_MOBILE_ACTIONS_CLASS,
+  RunHistoryMobileColumns,
+  RunHistoryMobileRowShell,
+} from "@/components/runs/runHistoryTableColumns";
 
 type Run = {
   id: string;
@@ -77,9 +91,12 @@ type Run = {
   driverNotes?: string | null;
   handlingProblems?: string | null;
   handlingAssessmentJson?: unknown;
+  carRating?: number | null;
   car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
   track?: { id: string; name: string } | null;
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
+  additiveType?: { id: string; displayName: string } | null;
+  warmerTimingMinutes?: number | null;
   event?: { name: string; track?: { name: string } | null } | null;
   setupSnapshot?: { id: string; data?: unknown } | null;
   lapSession?: unknown;
@@ -125,15 +142,19 @@ function CompactField({
   label,
   value,
   children,
+  valueClassName,
 }: {
   label: string;
   value?: string;
   children?: React.ReactNode;
+  valueClassName?: string;
 }) {
   return (
     <div className="min-w-0 max-w-full sm:max-w-[220px] sm:min-w-[5.5rem]">
       <div className="ui-label-caps">{label}</div>
-      <div className="ui-body-tight break-words">{children ?? value ?? "—"}</div>
+      <div className={cn(valueClassName ?? RUN_HISTORY_DATA_CLASS, "break-words")}>
+        {children ?? value ?? "—"}
+      </div>
     </div>
   );
 }
@@ -161,7 +182,7 @@ function LapStatChip({
   const inner = (
     <>
       <div className={cn("ui-label-caps", "text-[9px] leading-none mb-0.5")}>{label}</div>
-      <div className="ui-body-tight tabular-nums tracking-tight leading-tight">{value}</div>
+      <div className={RUN_HISTORY_DATA_CLASS}>{value}</div>
     </>
   );
   if (expandable && onToggle) {
@@ -188,8 +209,56 @@ function LapStatChip({
 
 type ExpandedLapStat = "best" | "avg5" | "avg10" | "mistakes" | null;
 
-/** Main sessions grid columns (date, car, best, avg5, avg10, median, setup/laps). */
-const SESSION_TABLE_BODY_COLS_WITHOUT_SESSION = 7;
+function RunHistoryActionButtons({
+  onSetup,
+  onLaps,
+  layout,
+  className,
+}: {
+  onSetup: () => void;
+  onLaps: () => void;
+  layout: "mobile" | "desktop";
+  className?: string;
+}) {
+  const mobile = layout === "mobile";
+  return (
+    <div
+      className={cn(
+        mobile
+          ? RUN_HISTORY_MOBILE_ACTIONS_CLASS
+          : "inline-flex w-fit flex-row flex-wrap items-center justify-end gap-1",
+        className
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSetup}
+        aria-label="View setup"
+        className={cn(
+          mobile
+            ? "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/80 transition"
+            : "ui-strong shrink-0 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[10px] text-foreground hover:bg-muted/80 transition"
+        )}
+        title="View setup sheet for this run; compare to another run from the modal"
+      >
+        {mobile ? <Cog className="h-4 w-4" aria-hidden /> : "View setup"}
+      </button>
+      <button
+        type="button"
+        onClick={onLaps}
+        aria-label="View laps"
+        className={cn(
+          mobile
+            ? "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/80 transition"
+            : "ui-strong shrink-0 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[10px] text-foreground hover:bg-muted/80 transition"
+        )}
+        title="Open lap column compare for this run"
+      >
+        {mobile ? <List className="h-4 w-4" aria-hidden /> : "Lap times"}
+      </button>
+    </div>
+  );
+}
 
 function setupFieldLabel(key: string): string {
   const f = DEFAULT_SETUP_FIELDS.find((d) => d.key === key);
@@ -317,12 +386,12 @@ export function RunHistoryTable({
     setExpandedId((prev) => (prev === runId ? null : runId));
   }
 
-  const totalCols =
-    (enableReorder ? 1 : 0) +
-    (showMemberColumn ? 1 : 0) +
-    SESSION_TABLE_BODY_COLS_WITHOUT_SESSION +
-    (showSessionColumn ? 1 : 0) +
-    (showComparePairColumn ? 1 : 0);
+  const totalCols = computeRunHistoryColSpan({
+    showReorderColumn: enableReorder,
+    showMemberColumn,
+    showSessionColumn,
+    showComparePairColumn,
+  });
 
   async function commitReorder(draggedId: string, targetId: string, edge: "above" | "below") {
     if (draggedId === targetId) return;
@@ -492,6 +561,70 @@ export function RunHistoryTable({
               )}
               aria-expanded={isExpanded}
             >
+              <td colSpan={totalCols} className="md:hidden align-middle p-0">
+                <RunHistoryMobileRowShell>
+                  <RunHistoryMobileColumns
+                    date={
+                      <>
+                        <span
+                          className={cn(RUN_HISTORY_DATA_CLASS, "block leading-snug text-foreground")}
+                          title={formatRunCreatedAtDateTime(runInstant, displayTimeZone)}
+                        >
+                          {formatRunDateCompact(runInstant, displayTimeZone)}
+                        </span>
+                        {showMemberColumn && memberLabel ? (
+                          <span
+                            className="mt-0.5 block truncate text-[9px] text-muted-foreground"
+                            title={memberLabel}
+                          >
+                            {memberLabel}
+                          </span>
+                        ) : null}
+                        {showSessionColumn ? (
+                          <span className="mt-0.5 block min-w-0 truncate text-[9px] text-muted-foreground leading-tight">
+                            {sessionDisplay === "—" ? "" : sessionDisplay}
+                          </span>
+                        ) : null}
+                        {run.loggingComplete === false ? (
+                          <span
+                            className="mt-0.5 inline-block rounded border border-amber-500/40 bg-amber-500/10 px-0.5 py-px text-[8px] ui-title text-amber-900 dark:text-amber-100"
+                            title="Logging not marked complete"
+                          >
+                            Draft
+                          </span>
+                        ) : null}
+                      </>
+                    }
+                    best={
+                      <span className={cn(RUN_HISTORY_DATA_CLASS, "text-foreground")}>
+                        {bestLapDisplay}
+                      </span>
+                    }
+                    top5={
+                      <span className={cn(RUN_HISTORY_DATA_CLASS, "text-foreground")}>
+                        {avg5Display}
+                      </span>
+                    }
+                    median={
+                      <span className={cn(RUN_HISTORY_DATA_CLASS, "text-foreground")}>
+                        {medianLapDisplay}
+                      </span>
+                    }
+                    actions={
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <RunHistoryActionButtons
+                          layout="mobile"
+                          onSetup={() => setSetupModalRunId(run.id)}
+                          onLaps={() => setLapModalRunId(run.id)}
+                        />
+                      </div>
+                    }
+                  />
+                </RunHistoryMobileRowShell>
+              </td>
               {enableReorder ? (
                 <td
                   className="hidden md:table-cell w-6 px-1 py-1.5 md:py-2 align-middle text-center text-muted-foreground"
@@ -505,19 +638,19 @@ export function RunHistoryTable({
               ) : null}
               {showMemberColumn ? (
                 <td
-                  className="px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs text-muted-foreground max-w-[4.5rem] md:max-w-[10rem] truncate"
+                  className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs text-muted-foreground max-w-[4.5rem] md:max-w-[10rem] truncate"
                   title={memberLabel ?? ""}
                 >
                   {memberLabel}
                 </td>
               ) : null}
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-[10px] md:text-xs text-foreground leading-snug tabular-nums max-md:whitespace-normal md:whitespace-nowrap">
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground leading-snug md:whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 <span title={formatRunCreatedAtDateTime(runInstant, displayTimeZone)}>
                   {formatRunDateCompact(runInstant, displayTimeZone)}
                 </span>
               </td>
               {showSessionColumn ? (
-                <td className="px-2 py-1.5 md:px-3 md:py-2 min-w-0 align-middle">
+                <td className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 min-w-0 align-middle">
                   <div className="flex flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
                     <span className="text-xs text-foreground leading-snug line-clamp-1 break-words min-w-0">
                       {sessionDisplay === "—" ? "" : sessionDisplay}
@@ -536,50 +669,35 @@ export function RunHistoryTable({
               <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
                 {carDisplay}
               </td>
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 {bestLapDisplay}
               </td>
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 {avg5Display}
               </td>
-              <td className="hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground whitespace-nowrap">
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 {avg10Display}
               </td>
-              <td className="px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-xs md:text-sm tabular-nums tracking-tight text-foreground max-md:whitespace-normal md:whitespace-nowrap">
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 {medianLapDisplay}
               </td>
               <td
-                className="px-1 py-1.5 md:px-2 md:py-2 align-middle md:text-right md:whitespace-nowrap"
+                className={cn(RUN_HISTORY_ACTION_CELL_CLASS, "align-middle")}
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <div className="flex flex-col items-stretch gap-0.5 max-md:w-full md:flex-row md:flex-wrap md:items-center md:justify-end md:gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setSetupModalRunId(run.id)}
-                    className="ui-strong rounded-md border border-border bg-background px-1 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition max-md:leading-tight"
-                    title="View setup sheet for this run; compare to another run from the modal"
-                  >
-                    <span className="md:hidden">Setup</span>
-                    <span className="hidden md:inline">View setup</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLapModalRunId(run.id)}
-                    className="ui-strong rounded-md border border-border bg-background px-1 py-0.5 md:px-2 md:py-1 text-[9px] md:text-[10px] text-foreground hover:bg-muted/80 transition max-md:leading-tight"
-                    title="Open lap column compare for this run"
-                  >
-                    <span className="md:hidden">Laps</span>
-                    <span className="hidden md:inline">Lap times</span>
-                  </button>
-                </div>
+                <RunHistoryActionButtons
+                  layout="desktop"
+                  onSetup={() => setSetupModalRunId(run.id)}
+                  onLaps={() => setLapModalRunId(run.id)}
+                />
               </td>
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>
             {isExpanded && (
               <tr className="border-b border-border/80">
-                <td colSpan={totalCols} className="px-2 py-3 md:px-4 md:py-4 align-top">
-                  <div className="min-w-0 w-full max-w-full overflow-x-hidden">
+                <td colSpan={totalCols} className="w-0 p-0 align-top">
+                  <div className="min-w-0 max-w-full overflow-x-hidden px-2 py-3 md:px-4 md:py-4">
                     <RunDetail
                       run={run}
                       pickerRuns={allRunsDescending}
@@ -856,10 +974,39 @@ function RunDetail({
   );
   const sourceUrl = tryReadLapSourceUrl(run.lapSession);
   const sourceSummary = formatLapSourceSummary(run.lapSession);
-  const handlingDetailsText = handlingDetails(run);
+  const carRatingDisplay = useMemo(() => {
+    const rating = run.carRating;
+    if (typeof rating === "number" && Number.isFinite(rating) && rating >= 1 && rating <= 10) {
+      return Math.round(rating);
+    }
+    return null;
+  }, [run.carRating]);
+  const feelVsLastRun = useMemo(() => {
+    const parsed = parseHandlingAssessmentJson(run.handlingAssessmentJson);
+    const feel = parsed?.feelVsLastRun ?? null;
+    return feel;
+  }, [run.handlingAssessmentJson]);
+  const handlingDetailsText = useMemo(() => {
+    const text = handlingDetails(run);
+    return text
+      .split("\n")
+      .filter((line) => !line.startsWith("Feel vs last run:"))
+      .join("\n")
+      .trim();
+  }, [run]);
 
   const runInstant = resolveRunDisplayInstant(run);
   const dateTimeLabel = formatRunCreatedAtDateTime(runInstant, displayTimeZone);
+  const setupSnapshotData = setupDataByRunId[run.id] ?? run.setupSnapshot?.data;
+  const tireSetDisplay = run.tireSet
+    ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
+    : "—";
+  const tirePrepParts: string[] = [];
+  const additiveLine = formatAdditiveTimingLine(run.additiveType, run.warmerTimingMinutes);
+  if (additiveLine) tirePrepParts.push(additiveLine);
+  const prepSummary = formatTirePrepSummaryFromSnapshot(setupSnapshotData);
+  if (prepSummary) tirePrepParts.push(prepSummary);
+  const tirePrepDisplay = tirePrepParts.length > 0 ? tirePrepParts.join(" · ") : "—";
 
   return (
     <CardPanel contentClassName="space-y-3 text-sm min-w-0 w-full">
@@ -874,22 +1021,20 @@ function RunDetail({
           <CompactField label="Label" value={run.sessionLabel?.trim() || "—"} />
           <CompactField label="Car" value={carDisplay} />
           <CompactField label="Track" value={trackDisplay} />
-          <CompactField
-            label="Tire set"
-            value={
-              run.tireSet
-                ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
-                : "—"
-            }
-          />
+          <div className="flex flex-col gap-2 min-w-0 max-w-full sm:max-w-[220px] sm:min-w-[5.5rem]">
+            <CompactField label="Tire set" value={tireSetDisplay} />
+            <CompactField label="Tire prep" value={tirePrepDisplay} />
+          </div>
         </div>
         {allowRunMutations ? (
           <Link
             href={`/runs/${encodeURIComponent(run.id)}/edit`}
-            className={cn(buttonLinkClassName("primary"), "no-underline shrink-0 text-xs")}
+            aria-label="Edit run"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground no-underline hover:bg-muted/80 transition"
+            title="Edit run"
             onClick={(e) => e.stopPropagation()}
           >
-            Edit run
+            <SquarePen className="h-4 w-4" aria-hidden />
           </Link>
         ) : null}
       </div>
@@ -897,7 +1042,6 @@ function RunDetail({
       <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-4 min-w-0">
         <div className="shrink-0 space-y-2 min-w-0">
           <div className="space-y-1">
-            <div className="ui-label-caps">You</div>
             <div className="flex flex-wrap gap-1 md:gap-1.5">
               <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
               <LapStatChip
@@ -948,7 +1092,7 @@ function RunDetail({
               />
             </div>
             {expandedLapStat && expandedLapStatDetail ? (
-              <p className="text-[10px] font-mono text-muted-foreground leading-snug break-words">
+              <p className={cn(RUN_HISTORY_DATA_CLASS, "text-muted-foreground leading-snug break-words")}>
                 {expandedLapStatDetail}
               </p>
             ) : null}
@@ -995,7 +1139,7 @@ function RunDetail({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="ui-label-caps">All laps ({laps.length})</div>
           {laps.length > 0 ? (
-            <div className="flex flex-wrap gap-x-2 gap-y-1 font-mono text-[11px] max-h-24 overflow-y-auto rounded border border-border bg-muted/60 px-2 py-1.5">
+            <div className={cn("flex flex-wrap gap-x-2 gap-y-1 max-h-24 overflow-y-auto rounded border border-border bg-muted/60 px-2 py-1.5", RUN_HISTORY_DATA_CLASS)}>
               {(ownRows.length === laps.length
                 ? ownRows
                 : laps.map((t, i) => ({
@@ -1044,7 +1188,7 @@ function RunDetail({
               })}
             </div>
           ) : (
-            <div className="text-xs text-muted-foreground">—</div>
+            <div className={cn(RUN_HISTORY_DATA_CLASS, "text-muted-foreground")}>—</div>
           )}
         </div>
       </div>
@@ -1053,7 +1197,12 @@ function RunDetail({
         <details className="group">
           <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] [&::-webkit-details-marker]:hidden">
             <span className="ui-label-caps text-[9px] text-muted-foreground/80 shrink-0">Lap source</span>
-            <span className="text-muted-foreground/90 truncate min-w-0 max-w-[min(100%,320px)]">
+            <span
+              className={cn(
+                RUN_HISTORY_DATA_CLASS,
+                "text-muted-foreground/90 truncate min-w-0 max-w-[min(100%,320px)]"
+              )}
+            >
               {sourceSummary ?? "—"}
             </span>
             {sourceUrl ? (
@@ -1068,7 +1217,10 @@ function RunDetail({
                 href={sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block break-all text-[10px] text-accent/90 underline underline-offset-2"
+                className={cn(
+                  RUN_HISTORY_DATA_CLASS,
+                  "inline-block break-all text-accent/90 underline underline-offset-2"
+                )}
                 title={sourceUrl}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -1086,6 +1238,14 @@ function RunDetail({
           multiline
           emptyAsDash
         />
+        <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+          <CarHandlingRatingQuickPick value={carRatingDisplay} readOnly />
+          <FeelVsLastRunQuickPick
+            value={feelVsLastRun}
+            eligible={previousRunOnCar != null}
+            readOnly
+          />
+        </div>
         {handlingDetailsText ? (
           <DetailRow
             label="Handling details"
@@ -1094,9 +1254,6 @@ function RunDetail({
             emptyAsDash
           />
         ) : null}
-        <div onClick={(e) => e.stopPropagation()}>
-          <EngineerQuickFixButton runId={run.id} compact />
-        </div>
       </div>
 
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
@@ -1116,8 +1273,13 @@ function RunDetail({
               >
                 <span className="text-muted-foreground shrink-0">{row.label}</span>
                 <div className="min-w-0 text-right sm:text-left">
-                  <span className="font-mono text-foreground">{row.value}</span>
-                  <span className="block text-[10px] text-muted-foreground sm:inline sm:ml-2">
+                  <span className={cn(RUN_HISTORY_DATA_CLASS, "text-foreground")}>{row.value}</span>
+                  <span
+                    className={cn(
+                      RUN_HISTORY_DATA_CLASS,
+                      "block text-muted-foreground sm:inline sm:ml-2"
+                    )}
+                  >
                     was {row.previousValue}
                   </span>
                 </div>
@@ -1131,10 +1293,11 @@ function RunDetail({
               type="button"
               onClick={handleDeleteRun}
               disabled={deleting}
-              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-[11px] font-medium text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
+              aria-label={deleting ? "Deleting run" : "Delete run"}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
               title="Permanently delete this run"
             >
-              {deleting ? "Deleting…" : "Delete run"}
+              <Trash2 className="h-4 w-4" aria-hidden />
             </button>
           </div>
         ) : null}
@@ -1158,8 +1321,16 @@ function DetailRow({
   const show = emptyAsDash && !value.trim() ? "—" : value;
   return (
     <div>
-      <span className="ui-title text-[11px] text-muted-foreground">{label}</span>
-      <div className={multiline ? "mt-0.5 whitespace-pre-wrap break-words text-foreground" : "mt-0.5 break-words text-foreground"}>{show}</div>
+      <Eyebrow>{label}</Eyebrow>
+      <div
+        className={cn(
+          RUN_HISTORY_DATA_CLASS,
+          "mt-0.5 text-foreground",
+          multiline && "whitespace-pre-wrap break-words"
+        )}
+      >
+        {show}
+      </div>
     </div>
   );
 }

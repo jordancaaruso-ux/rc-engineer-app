@@ -17,6 +17,7 @@ import {
   rowLabel,
 } from "@/lib/setupSheetModels/layoutEditorOps";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { Eyebrow } from "@/components/ui/panel";
 
 type RowDragId = `${string}:${number}`;
 type SectionDragId = `section:${string}`;
@@ -222,7 +223,7 @@ export function SetupSheetModelLayoutEditor(props: {
                           }
                         />
                       ) : (
-                        <span className="ui-title text-xs text-muted-foreground">{sec.title}</span>
+                        <Eyebrow>{sec.title}</Eyebrow>
                       )}
                       <span className="font-mono text-[10px] text-muted-foreground">{sec.id}</span>
                       {!readOnly && sectionSelected.length > 0 ? (

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 type CarOption = { id: string; name: string };
@@ -203,7 +204,7 @@ export function BulkImportBatchClient({
           </p>
         ) : (
           <label className="text-xs">
-            <div className="ui-title text-xs text-muted-foreground mb-1">Car for new PDFs</div>
+            <Eyebrow className="mb-1">Car for new PDFs</Eyebrow>
             <select
               className="mt-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
               value={uploadCarId}
@@ -220,7 +221,7 @@ export function BulkImportBatchClient({
           </label>
         )}
         <div>
-          <div className="ui-title text-xs text-muted-foreground mb-1">Add PDFs</div>
+          <Eyebrow className="mb-1">Add PDFs</Eyebrow>
           <input
             type="file"
             accept="application/pdf"

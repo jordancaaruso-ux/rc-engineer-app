@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ChevronRight, Users } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 export function SettingsNavSection() {
   return (
     <div className="mt-8 space-y-6 border-t border-border pt-8">
       <div>
-        <h2 className="ui-title text-sm text-foreground">Workspace</h2>
+        <Eyebrow>Workspace</Eyebrow>
         <ul className="mt-2 flex flex-col gap-2">
           <li>
             <Link href="/teams" className="tap-active block">

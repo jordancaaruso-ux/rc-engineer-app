@@ -23,8 +23,7 @@ export function QuickAddBatteryPanel({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     const trimmed = label.trim();
     if (!trimmed) {
       setError("Enter a battery label (e.g. LCG 6000mAh).");
@@ -54,10 +53,17 @@ export function QuickAddBatteryPanel({
     }
   }
 
+  function handleEnterKey(e: React.KeyboardEvent) {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    if (!label.trim() || creating) return;
+    void handleSubmit();
+  }
+
   return (
-    <form onSubmit={handleSubmit} className={cn("inset-panel p-3 space-y-3", className)}>
+    <div className={cn("inset-panel p-3 space-y-3", className)}>
       <div className="space-y-1">
-        <div className="ui-title text-xs text-muted-foreground">New battery pack</div>
+        <Eyebrow>New battery pack</Eyebrow>
         <p className="text-[11px] text-muted-foreground leading-snug">
           Label and pack number — saved to your assets immediately.
         </p>
@@ -69,6 +75,7 @@ export function QuickAddBatteryPanel({
           placeholder="Label (e.g. LCG 6000mAh)"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
+          onKeyDown={handleEnterKey}
           aria-label="Battery label"
           autoFocus
         />
@@ -79,6 +86,7 @@ export function QuickAddBatteryPanel({
           placeholder="Pack number"
           value={packNumber}
           onChange={(e) => setPackNumber(e.target.value)}
+          onKeyDown={handleEnterKey}
           aria-label="Pack number"
         />
       </div>
@@ -103,7 +111,7 @@ export function QuickAddBatteryPanel({
       {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={!label.trim() || creating}>
+        <Button type="button" disabled={!label.trim() || creating} onClick={() => void handleSubmit()}>
           {creating ? "Adding…" : submitLabel}
         </Button>
         {onCancel ? (
@@ -117,6 +125,6 @@ export function QuickAddBatteryPanel({
           </button>
         ) : null}
       </div>
-    </form>
+    </div>
   );
 }

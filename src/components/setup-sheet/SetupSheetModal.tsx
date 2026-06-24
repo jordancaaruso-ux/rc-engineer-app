@@ -13,6 +13,7 @@ import {
 import { filterRunsForTeamSetupComparePicker } from "@/lib/setupCompare/teamSetupComparePicker";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
+import { Eyebrow } from "@/components/ui/panel";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import {
@@ -377,9 +378,7 @@ export function SetupSheetModal({
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1 space-y-2">
-                  <span className="ui-title text-xs text-muted-foreground">
-                    Compare to
-                  </span>
+                  <Eyebrow>Compare to</Eyebrow>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"

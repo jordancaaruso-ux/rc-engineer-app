@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { loadUserTireSetsForList } from "@/lib/assets/loadUserAssets";
 import { MyTireSetsClient } from "@/components/assets/MyTireSetsClient";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 
 export const revalidate = 30;
 
@@ -13,9 +13,12 @@ export default async function MyTireSetsPage(): Promise<ReactNode> {
     return (
       <>
         <header className="page-header">
-          <div>
-            <h1 className="page-title">My tires</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/assets" />
+            <div>
+              <h1 className="page-title">My tires</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -43,16 +46,13 @@ export default async function MyTireSetsPage(): Promise<ReactNode> {
   return (
     <>
       <header className="page-header">
-        <div>
-          <h1 className="page-title">My tires</h1>
-          <p className="page-subtitle">Tire sets you have logged or added here.</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/assets" />
+          <div>
+            <h1 className="page-title">My tires</h1>
+            <p className="page-subtitle">Tire sets you have logged or added here.</p>
+          </div>
         </div>
-        <Link
-          href="/assets"
-          className="rounded-md border border-border bg-card px-4 py-2 text-xs hover:bg-muted transition"
-        >
-          Back
-        </Link>
       </header>
       <section className="page-body">
         <MyTireSetsClient initialTireSets={initialTireSets} />
