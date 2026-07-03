@@ -38,14 +38,16 @@ export function formatTirePrepSummaryFromSnapshot(data: unknown): string | null 
 }
 
 export function formatRunTiresDetailLine(params: {
-  tireSet: { label: string; setNumber: number | null } | null | undefined;
+  tireSet: { label: string } | null | undefined;
   tireRunNumber: number;
   additiveType?: { displayName: string } | null;
   warmerTimingMinutes?: number | null;
   setupSnapshotData?: unknown;
 }): string {
+  // Wear-first identity: the compound + which run this was on the set. Set numbers are
+  // internal counters and anchors are retired — neither belongs in run detail lines.
   const base = params.tireSet
-    ? `${params.tireSet.label} · Set ${params.tireSet.setNumber ?? "—"} · Run ${params.tireRunNumber}`
+    ? `${params.tireSet.label} · run ${params.tireRunNumber}`
     : "—";
   const extras: string[] = [];
   const additive = formatAdditiveTimingLine(params.additiveType, params.warmerTimingMinutes);

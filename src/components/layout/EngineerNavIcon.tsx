@@ -24,6 +24,8 @@ type EngineerNavIconProps = {
   className?: string;
   /** Heavier stroke when tab is active (matches Lucide active weight). */
   active?: boolean;
+  /** Solid-fill sparks — matches the dock's Phosphor fill-when-active icons. */
+  filled?: boolean;
 };
 
 function sparkleStroke(active?: boolean) {
@@ -41,8 +43,16 @@ function sparkleStroke(active?: boolean) {
  * Stroke-only so it inherits nav link color — muted when inactive, foreground
  * when active — matching Lucide icons in the bottom bar and sidebar.
  */
-export function EngineerNavIcon({ className, active }: EngineerNavIconProps) {
-  const stroke = sparkleStroke(active);
+export function EngineerNavIcon({ className, active, filled }: EngineerNavIconProps) {
+  const stroke = filled
+    ? {
+        fill: "currentColor" as const,
+        stroke: "currentColor",
+        strokeWidth: 1,
+        strokeLinecap: "round" as const,
+        strokeLinejoin: "round" as const,
+      }
+    : sparkleStroke(active);
   return (
     <svg
       viewBox="0 0 24 24"

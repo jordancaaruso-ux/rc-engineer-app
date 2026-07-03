@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Sora, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 
 import Script from "next/script";
 
@@ -22,9 +22,9 @@ import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
 
 
-/** UI sans — Inter for all body, nav, titles, and controls. */
+/** UI sans — Sora for all body, nav, titles, and controls (display voice; JetBrains Mono is data). */
 
-const inter = Inter({
+const sora = Sora({
 
   subsets: ["latin"],
 
@@ -32,6 +32,13 @@ const inter = Inter({
 
   weight: ["400", "500", "600", "700", "800"],
 
+});
+
+/** Display — Space Grotesk; page-title voice only (technical instrument register). */
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "700"],
+  variable: "--font-display",
 });
 
 
@@ -94,7 +101,7 @@ export default function RootLayout({ children }: { children: ReactNode }): React
 
       lang="en"
 
-      className={`${inter.variable} ${jetBrainsMono.variable}`}
+      className={`${sora.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable}`}
 
     >
 
@@ -110,7 +117,19 @@ export default function RootLayout({ children }: { children: ReactNode }): React
 
          */}
 
-        <div className="page-bg" aria-hidden="true" />
+        <div className="page-bg" aria-hidden="true">
+
+          <div className="page-bg-img" />
+
+          <div className="page-bg-tint" />
+
+          <div className="page-bg-warm" />
+
+          <div className="page-bg-dark" />
+
+          <div className="page-bg-vig" />
+
+        </div>
 
         <div className="app-root">
 

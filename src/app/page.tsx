@@ -31,6 +31,10 @@ export default async function DashboardPage(): Promise<ReactNode> {
     getExplicitTimeZoneForRunFormatting(),
   ]);
   const model = await getCachedDashboardHomeModel(user.id, displayTimeZone);
+  /* First name only — the greeting should read like a race engineer saying hi, not a mail merge. */
+  const greetingName = user.name?.trim().split(/\s+/)[0] ?? null;
 
-  return <DashboardHome model={model} displayTimeZone={displayTimeZone} />;
+  return (
+    <DashboardHome model={model} displayTimeZone={displayTimeZone} greetingName={greetingName} />
+  );
 }

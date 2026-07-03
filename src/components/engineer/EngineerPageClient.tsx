@@ -71,7 +71,7 @@ export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?
       {mainTab === "chat" ? (
         <SurfaceCard variant="panel" overflowHidden={false} contentClassName={cn("p-0", isPending && "opacity-90")}>
           <div className="border-b border-border/80 px-4 py-3 md:px-5">
-            <Eyebrow dot="accent">Ask the Engineer</Eyebrow>
+            <Eyebrow>Ask the Engineer</Eyebrow>
             <PanelSubtitle className="mt-1.5">Grounded in your KB and recent runs.</PanelSubtitle>
           </div>
           <EngineerChatPanel

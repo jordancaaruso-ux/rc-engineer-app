@@ -25,7 +25,8 @@ async function parseJsonError(res: Response): Promise<string> {
 
 export async function createTireSetApi(input: {
   tireTypeId: string;
-  setNumber: number;
+  /** Optional — the server auto-assigns the next number for this compound when omitted. */
+  setNumber?: number;
   initialRunCount?: number;
   specificModel?: string | null;
   insertLabel?: string | null;

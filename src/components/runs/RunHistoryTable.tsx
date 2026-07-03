@@ -13,10 +13,7 @@ import { formatHandlingAssessmentDetailLines, parseHandlingAssessmentJson } from
 import { formatLapSourceSummary, tryReadLapSourceUrl } from "@/lib/lapSession/display";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
-import {
-  formatAdditiveTimingLine,
-  formatTirePrepSummaryFromSnapshot,
-} from "@/lib/runs/runTireContextDisplay";
+import { formatAdditiveTimingLine } from "@/lib/runs/runTireContextDisplay";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import {
   computeMistakeLaps,
@@ -33,13 +30,8 @@ import {
 } from "@/lib/lapAnalysis";
 import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
 import Link from "next/link";
-import { Cog, List, SquarePen, Trash2 } from "lucide-react";
+import { List, SquarePen, Trash2, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type {
-  EngineerRunSummaryV2,
-  ImportedSessionFieldStatsEngineerCompactV1,
-  PaceVsFieldMetricId,
-} from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
@@ -117,15 +109,6 @@ type Run = {
     }>;
   }>;
 };
-
-function fieldMeanSecondsFromAnalysis(
-  fs: ImportedSessionFieldStatsEngineerCompactV1 | null | undefined,
-  metric: PaceVsFieldMetricId
-): number | null {
-  const row = fs?.paceVsFieldMeanAnalysis?.find((m) => m.metric === metric);
-  const v = row?.fieldMeanSeconds;
-  return v != null && Number.isFinite(v) ? v : null;
-}
 
 function formatLapSourceLinkText(url: string): string {
   try {
@@ -241,7 +224,7 @@ function RunHistoryActionButtons({
         )}
         title="View setup sheet for this run; compare to another run from the modal"
       >
-        {mobile ? <Cog className="h-4 w-4" aria-hidden /> : "View setup"}
+        {mobile ? <Wrench className="h-4 w-4" aria-hidden /> : "View setup"}
       </button>
       <button
         type="button"
@@ -759,9 +742,6 @@ function RunDetail({
   allowRunMutations?: boolean;
 }) {
   const router = useRouter();
-  const [runSessionSummary, setRunSessionSummary] = useState<EngineerRunSummaryV2 | null>(null);
-  const [runSessionSummaryLoading, setRunSessionSummaryLoading] = useState(false);
-  const [runSessionSummaryErr, setRunSessionSummaryErr] = useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [setupDataByRunId, setSetupDataByRunId] = useState<Record<string, unknown>>({});
@@ -773,42 +753,6 @@ function RunDetail({
 
   useEffect(() => {
     setSetupDataByRunId({});
-  }, [run.id]);
-
-  useEffect(() => {
-    setRunSessionSummary(null);
-    setRunSessionSummaryErr(null);
-    setRunSessionSummaryLoading(false);
-  }, [run.id]);
-
-  useEffect(() => {
-    let alive = true;
-    const rid = run.id;
-    setRunSessionSummaryLoading(true);
-    setRunSessionSummaryErr(null);
-    fetch(`/api/runs/${encodeURIComponent(rid)}/engineer-summary`, { cache: "no-store" })
-      .then(async (res) => {
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          summary?: EngineerRunSummaryV2;
-        };
-        if (!res.ok) throw new Error(data.error ?? `Failed (${res.status})`);
-        return data.summary ?? null;
-      })
-      .then((summary) => {
-        if (!alive) return;
-        setRunSessionSummary(summary);
-      })
-      .catch((err) => {
-        if (!alive) return;
-        setRunSessionSummaryErr(err instanceof Error ? err.message : "Could not load session summary.");
-      })
-      .finally(() => {
-        if (alive) setRunSessionSummaryLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
   }, [run.id]);
 
   async function handleDeleteRun() {
@@ -842,7 +786,6 @@ function RunDetail({
     return pickerRuns.filter((r) => r.car?.id === run.carId);
   }, [pickerRuns, run.carId]);
   const carDisplay = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
-  const trackDisplay = run.track?.name ?? run.trackNameSnapshot ?? "—";
   const laps = normalizeLapTimes(run.lapTimes);
   const meetingType =
     run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE"
@@ -965,13 +908,6 @@ function RunDetail({
     lapDash.avgTop10,
     mistakeSummary,
   ]);
-  const fieldStats = runSessionSummary?.importedSessionFieldStats;
-  const showFieldMetricRow = Boolean(
-    fieldStats &&
-      fieldStats.driverCount >= 2 &&
-      fieldStats.paceVsFieldMeanAnalysis != null &&
-      fieldStats.paceVsFieldMeanAnalysis.length > 0
-  );
   const sourceUrl = tryReadLapSourceUrl(run.lapSession);
   const sourceSummary = formatLapSourceSummary(run.lapSession);
   const carRatingDisplay = useMemo(() => {
@@ -997,34 +933,24 @@ function RunDetail({
 
   const runInstant = resolveRunDisplayInstant(run);
   const dateTimeLabel = formatRunCreatedAtDateTime(runInstant, displayTimeZone);
-  const setupSnapshotData = setupDataByRunId[run.id] ?? run.setupSnapshot?.data;
   const tireSetDisplay = run.tireSet
-    ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
+    ? `${run.tireSet.label} · run ${run.tireRunNumber}`
     : "—";
-  const tirePrepParts: string[] = [];
+  // Tire prep = additive + warmer timing only. Compound toggles (ST205, ABH,
+  // AT15, …) are setup-sheet parameters, not tire prep — they live on the setup
+  // sheet and are intentionally excluded here.
   const additiveLine = formatAdditiveTimingLine(run.additiveType, run.warmerTimingMinutes);
-  if (additiveLine) tirePrepParts.push(additiveLine);
-  const prepSummary = formatTirePrepSummaryFromSnapshot(setupSnapshotData);
-  if (prepSummary) tirePrepParts.push(prepSummary);
-  const tirePrepDisplay = tirePrepParts.length > 0 ? tirePrepParts.join(" · ") : "—";
+  const tirePrepDisplay = additiveLine ?? "—";
 
   return (
     <CardPanel contentClassName="space-y-3 text-sm min-w-0 w-full">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
         <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3 min-w-0 flex-1">
           <CompactField label="Date / time" value={dateTimeLabel} />
-          <CompactField
-            label="Session type"
-            value={run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE" ? "Race Meeting" : "Testing"}
-          />
-          {hasMeetingType ? <CompactField label="Meeting session" value={meetingType} /> : null}
-          <CompactField label="Label" value={run.sessionLabel?.trim() || "—"} />
+          {hasMeetingType ? <CompactField label="Session" value={meetingType} /> : null}
           <CompactField label="Car" value={carDisplay} />
-          <CompactField label="Track" value={trackDisplay} />
-          <div className="flex flex-col gap-2 min-w-0 max-w-full sm:max-w-[220px] sm:min-w-[5.5rem]">
-            <CompactField label="Tire set" value={tireSetDisplay} />
-            <CompactField label="Tire prep" value={tirePrepDisplay} />
-          </div>
+          <CompactField label="Tire set" value={tireSetDisplay} />
+          <CompactField label="Tire prep" value={tirePrepDisplay} />
         </div>
         {allowRunMutations ? (
           <Link
@@ -1098,42 +1024,6 @@ function RunDetail({
             ) : null}
           </div>
 
-          {runSessionSummaryLoading ? (
-            <p className="text-[10px] text-muted-foreground">Loading session field data…</p>
-          ) : null}
-          {runSessionSummaryErr ? (
-            <p className="text-[10px] text-muted-foreground">
-              Field averages unavailable ({runSessionSummaryErr}).
-            </p>
-          ) : null}
-
-          {showFieldMetricRow && fieldStats ? (
-            <div className="space-y-1">
-              <div className="ui-label-caps">Others (session average)</div>
-              <div className="flex flex-wrap gap-1 md:gap-1.5">
-                <LapStatChip label="Laps" value="—" title="Not aggregated for the field" />
-                <LapStatChip label="Stint" value="—" title="Not aggregated for the field" />
-                <LapStatChip
-                  label="Best lap"
-                  value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "best"))}
-                />
-                <LapStatChip
-                  label="Avg top 5"
-                  value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "avg_top_5"))}
-                />
-                <LapStatChip
-                  label="Avg top 10"
-                  value={formatLap(fieldMeanSecondsFromAnalysis(fieldStats, "avg_top_10"))}
-                />
-                <LapStatChip
-                  label="Median"
-                  title="Median of entrants’ avg top 10 (typical sustained pace in session)"
-                  value={formatLap(fieldStats.fieldMedianAvgTop10Seconds)}
-                />
-                <LapStatChip label="Consistency" value="—" title="Not aggregated for the field" />
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <div className="min-w-0 flex-1 space-y-1">
@@ -1237,6 +1127,7 @@ function RunDetail({
           value={runNotesOnly(run) || "—"}
           multiline
           emptyAsDash
+          prose
         />
         <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
           <CarHandlingRatingQuickPick value={carRatingDisplay} readOnly />
@@ -1312,11 +1203,14 @@ function DetailRow({
   value,
   multiline,
   emptyAsDash,
+  prose,
 }: {
   label: string;
   value: string;
   multiline?: boolean;
   emptyAsDash?: boolean;
+  /** Render the value in the UI sans (Sora) instead of the mono data class — for prose like notes. */
+  prose?: boolean;
 }) {
   const show = emptyAsDash && !value.trim() ? "—" : value;
   return (
@@ -1324,7 +1218,7 @@ function DetailRow({
       <Eyebrow>{label}</Eyebrow>
       <div
         className={cn(
-          RUN_HISTORY_DATA_CLASS,
+          prose ? "text-[13px] leading-relaxed" : RUN_HISTORY_DATA_CLASS,
           "mt-0.5 text-foreground",
           multiline && "whitespace-pre-wrap break-words"
         )}

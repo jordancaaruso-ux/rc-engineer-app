@@ -20,13 +20,11 @@ import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
-import { RunTireSelectionPanel } from "@/components/runs/RunTireSelectionPanel";
-import { RunTirePrepPanel } from "@/components/runs/RunTirePrepPanel";
+import { RunTireSelectionPanel, type NewTireSetIntent } from "@/components/runs/RunTireSelectionPanel";
 import { RunAdditiveTimingPanel } from "@/components/runs/RunAdditiveTimingPanel";
 import { QuickAddBatteryPanel } from "@/components/assets/QuickAddBatteryPanel";
 import { collectSetupSheetTemplateKeys } from "@/lib/setupSheetModels/collectTemplateKeys";
 import { applyRunContextToSetupSnapshot, parseWarmerTimingMinutes } from "@/lib/runs/applyRunContextToSetupSnapshot";
-import { tirePrepGroupsForSheetKeys } from "@/lib/tires/tirePrepFields";
 import {
   formatAdditiveTimingLine,
   formatTirePrepSummaryFromSnapshot,
@@ -352,11 +350,13 @@ export function NewRunForm(props: {
   const [trackId, setTrackId] = useState<string>("");
   const [tireSets, setTireSets] = useState<TireSetOption[]>([]);
   const [tireSetId, setTireSetId] = useState<string>("");
-  const [selectedTireTypeId, setSelectedTireTypeId] = useState<string>("");
-  const [tireSetNumber, setTireSetNumber] = useState<string>("");
-  const [tireSpecificModel, setTireSpecificModel] = useState("");
-  const [resolvingTireSet, setResolvingTireSet] = useState(false);
-  const [addTireSetError, setAddTireSetError] = useState<string | null>(null);
+  /** NEW-set choice — pure form state; the set row is created when the run is saved. */
+  const [newTireSetIntent, setNewTireSetIntent] = useState<NewTireSetIntent | null>(null);
+  /** Compound the picker should activate (event spec tire); never forces a selection. */
+  const [preferredTireType, setPreferredTireType] = useState<{
+    id: string;
+    displayName: string;
+  } | null>(null);
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
   const [additiveTypeId, setAdditiveTypeId] = useState<string>("");
   const [warmerTimingMinutes, setWarmerTimingMinutes] = useState<string>("");
@@ -477,6 +477,8 @@ export function NewRunForm(props: {
 
   const tireSetIdRef = useRef(tireSetId);
   tireSetIdRef.current = tireSetId;
+  const newTireSetIntentRef = useRef(newTireSetIntent);
+  newTireSetIntentRef.current = newTireSetIntent;
   const additiveTypeIdRef = useRef(additiveTypeId);
   additiveTypeIdRef.current = additiveTypeId;
   const warmerTimingMinutesRef = useRef(warmerTimingMinutes);
@@ -485,6 +487,11 @@ export function NewRunForm(props: {
   batteryIdRef.current = batteryId;
   const tireRunUserTouchedRef = useRef(false);
   const batteryRunUserTouchedRef = useRef(false);
+  /** Clear NEW-set intent (ref synced immediately so snapshot writes in the same tick see it). */
+  const clearNewTireSetIntent = useCallback(() => {
+    setNewTireSetIntent(null);
+    newTireSetIntentRef.current = null;
+  }, []);
   /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
   const pendingCompleteNavigationRef = useRef(false);
   const pendingDraftNavigationRef = useRef(false);
@@ -619,13 +626,7 @@ export function NewRunForm(props: {
     setEventId(r.eventId ?? "");
     setRaceClass((r.raceClass ?? "").trim());
     setTireSetId(r.tireSetId ?? "");
-    if (r.tireSet) {
-      if (r.tireSet.tireType) {
-        setSelectedTireTypeId(r.tireSet.tireType.id);
-      }
-      setTireSetNumber(String(r.tireSet.setNumber ?? ""));
-      setTireSpecificModel(r.tireSet.specificModel?.trim() ?? "");
-    }
+    clearNewTireSetIntent();
     // `runsCompleted` is always the count of *prior* runs on this tire set —
     // save() sends `runsCompleted + 1`. When hydrating an existing run we want
     // that re-save to preserve the run's current tireRunNumber, not bump it,
@@ -685,7 +686,7 @@ export function NewRunForm(props: {
     // Setup sheet collapsed so the user sees the "Saved from draft" summary
     // with diff rows, and can hit Edit only if something needs to change.
     setSetupSectionExpanded(false);
-  }, [editRun, carsList]);
+  }, [editRun, carsList, clearNewTireSetIntent]);
 
   useEffect(() => {
     const p = dashboardPrefill;
@@ -824,6 +825,7 @@ export function NewRunForm(props: {
 
     setEventId(r.eventId ?? "");
     setTireSetId(r.tireSetId ?? "");
+    clearNewTireSetIntent();
     setRunsCompleted(r.tireRunNumber ?? 0);
     setBatteryId(r.batteryId ?? "");
     setBatteryRunsCompleted(r.batteryRunNumber ?? 0);
@@ -837,60 +839,7 @@ export function NewRunForm(props: {
     setNotes("");
     setLapIngest(defaultLapIngestValue());
     setReplicateLast(false);
-  }, [dashboardPrefill, carsList]);
-
-  function applyTireFieldsFromSet(ts: TireSetOption | null) {
-    if (!ts) {
-      setSelectedTireTypeId("");
-      setTireSetNumber("");
-      setTireSpecificModel("");
-      return;
-    }
-    if (ts.tireType) {
-      setSelectedTireTypeId(ts.tireType.id);
-    } else {
-      setSelectedTireTypeId("");
-    }
-    setTireSetNumber(ts.setNumber != null && ts.setNumber >= 1 ? String(ts.setNumber) : "");
-    setTireSpecificModel(ts.specificModel?.trim() ?? "");
-  }
-
-  const addTireSet = useCallback(async () => {
-    if (!selectedTireTypeId) return;
-    const setParsed = parseInt(tireSetNumber.trim(), 10);
-    if (!Number.isFinite(setParsed) || setParsed < 1) {
-      setAddTireSetError("Enter a valid set number.");
-      return;
-    }
-    setResolvingTireSet(true);
-    setAddTireSetError(null);
-    try {
-      const res = await fetch("/api/tire-sets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tireTypeId: selectedTireTypeId,
-          setNumber: setParsed,
-          specificModel: tireSpecificModel.trim() || null,
-        }),
-      });
-      const data = (await res.json()) as { tireSet?: TireSetOption; error?: string };
-      if (!res.ok || !data.tireSet?.id) {
-        setAddTireSetError(data.error?.trim() || "Failed to add tire set.");
-        return;
-      }
-      setTireSets((prev) => {
-        const rest = prev.filter((t) => t.id !== data.tireSet!.id);
-        return [data.tireSet!, ...rest];
-      });
-      setTireSetId(data.tireSet.id);
-      applyTireBatteryToSetupSnapshot(data.tireSet.id, batteryIdRef.current);
-    } catch {
-      setAddTireSetError("Failed to add tire set.");
-    } finally {
-      setResolvingTireSet(false);
-    }
-  }, [selectedTireTypeId, tireSetNumber, tireSpecificModel]);
+  }, [dashboardPrefill, carsList, clearNewTireSetIntent]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
@@ -926,11 +875,6 @@ export function NewRunForm(props: {
     () => collectSetupSheetTemplateKeys(setupTemplate),
     [setupTemplate]
   );
-  const tirePrepGroups = useMemo(
-    () => tirePrepGroupsForSheetKeys(sheetFieldKeys),
-    [sheetFieldKeys]
-  );
-
   const applyRunContextToSetupSnapshotLocal = useCallback(
     (
       nextTireSetId: string,
@@ -938,7 +882,16 @@ export function NewRunForm(props: {
       nextAdditiveTypeId: string,
       nextWarmerTimingMinutes: string
     ) => {
-      const tire = nextTireSetId ? tireSets.find((t) => t.id === nextTireSetId) ?? null : null;
+      // NEW-set intent has no row yet — a synthetic set keeps the sheet's tire line honest.
+      const intent = newTireSetIntentRef.current;
+      const tire = nextTireSetId
+        ? tireSets.find((t) => t.id === nextTireSetId) ?? null
+        : intent
+          ? {
+              label: intent.displayName,
+              tireType: { id: intent.tireTypeId, displayName: intent.displayName, modelCode: "" },
+            }
+          : null;
       const bat = nextBatteryId ? batteries.find((b) => b.id === nextBatteryId) ?? null : null;
       const additive =
         nextAdditiveTypeId ? additiveTypesById[nextAdditiveTypeId] ?? null : null;
@@ -976,16 +929,9 @@ export function NewRunForm(props: {
     );
   }
 
-  function toggleTirePrepKey(key: string, checked: boolean) {
-    setSetupData((prev) =>
-      applyDerivedFieldsToSnapshot({
-        ...prev,
-        [key]: checked ? "1" : "",
-      })
-    );
-  }
 
   // Deterministic sync: snapshot tires/battery/additive always mirror run context selections.
+  // `newTireSetIntent` is read via ref inside the callback; it's a dep so intent toggles re-sync.
   useEffect(() => {
     applyRunContextToSetupSnapshotLocal(
       tireSetId,
@@ -995,6 +941,7 @@ export function NewRunForm(props: {
     );
   }, [
     tireSetId,
+    newTireSetIntent,
     batteryId,
     additiveTypeId,
     warmerTimingMinutes,
@@ -1179,10 +1126,14 @@ export function NewRunForm(props: {
     setEventControlAdditiveEnabled(Boolean(nextControlledAdditiveId));
     setEventControlledAdditiveTypeId(nextControlledAdditiveId);
     if (sessionType === "RACE_MEETING" && ev.controlledTireTypeId) {
-      setSelectedTireTypeId(ev.controlledTireTypeId);
+      // Spec-tire event: steer the picker to that compound. Never forces NEW — the
+      // driver's most recent set of the spec compound is usually the right pick.
       setTireSetId("");
-      setTireSetNumber("");
-      setTireSpecificModel("");
+      clearNewTireSetIntent();
+      const display = ev.controlledTireType?.displayName ?? ev.controlledTireLabel ?? "";
+      if (display) {
+        setPreferredTireType({ id: ev.controlledTireTypeId, displayName: display });
+      }
     }
     if (sessionType === "RACE_MEETING" && nextControlledAdditiveId) {
       setAdditiveTypeId(nextControlledAdditiveId);
@@ -1643,6 +1594,7 @@ export function NewRunForm(props: {
           const prevTireId = lastRun.tireSetId ?? "";
           const validTireId = prevTireId && tireSets.some((ts) => ts.id === prevTireId) ? prevTireId : "";
           setTireSetId(validTireId);
+          clearNewTireSetIntent();
           setRunsCompleted(validTireId ? (lastRun.tireRunNumber ?? 0) : 0);
           const prevBatId = lastRun.batteryId ?? "";
           const validBatId = prevBatId && batteries.some((b) => b.id === prevBatId) ? prevBatId : "";
@@ -1670,7 +1622,7 @@ export function NewRunForm(props: {
     return () => {
       alive = false;
     };
-  }, [carId, replicateLast]);
+  }, [carId, replicateLast, clearNewTireSetIntent]);
 
   // replicateLast still powers "copy from last run for this car" behavior after the initial copy decision.
   useEffect(() => {
@@ -1689,6 +1641,7 @@ export function NewRunForm(props: {
     setEventId(lastRun.eventId ?? "");
     const prevTireId = lastRun.tireSetId ?? "";
     setTireSetId(prevTireId);
+    clearNewTireSetIntent();
     setRunsCompleted(prevTireId ? (lastRun.tireRunNumber ?? 0) : 0);
     const prevBatId = lastRun.batteryId ?? "";
     setBatteryId(prevBatId);
@@ -1701,7 +1654,7 @@ export function NewRunForm(props: {
     setActiveSetupData(nextSetup, carId || null);
     setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
     setSetupBaselineData(cloneSetupSnapshot(nextSetup));
-  }, [replicateLast, lastRun, carId]);
+  }, [replicateLast, lastRun, carId, clearNewTireSetIntent]);
 
   useEffect(() => {
     if (!needsEvent) return;
@@ -1806,6 +1759,7 @@ export function NewRunForm(props: {
     const nextTireId = r.tireSetId || r.tireSet?.id || "";
     if (nextTireId && tireSets.some((ts) => ts.id === nextTireId)) {
       setTireSetId(nextTireId);
+      clearNewTireSetIntent();
       setRunsCompleted(r.tireRunNumber ?? 0);
       setCopyTireWarning(null);
       highlights.tires = true;
@@ -2292,8 +2246,10 @@ export function NewRunForm(props: {
         lapTimes = parseLapTimes(lapIngest.manualText);
       }
       const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
-      const { run, promptMarkTrackLocation } = await jsonFetch<{
+      const { run, tireSet: createdTireSet, promptMarkTrackLocation } = await jsonFetch<{
         run: { id: string; createdAt: string };
+        /** Present when the server minted a NEW set for this run (create-on-save). */
+        tireSet?: TireSetOption | null;
         promptMarkTrackLocation?: { trackId: string; trackName: string } | null;
       }>("/api/runs", {
         method: isEditing ? "PUT" : "POST",
@@ -2312,6 +2268,15 @@ export function NewRunForm(props: {
           eventId: needsEvent ? (eventId || null) : null,
           trackId: resolvedTrackId || null,
           tireSetId: tireSetId || null,
+          // v2 create-on-save: a NEW-set choice materializes only when the run persists;
+          // nudged prior runs land as the set's initialRunCount so derived counts stay right.
+          newTireSet:
+            !tireSetId && newTireSetIntent
+              ? {
+                  tireTypeId: newTireSetIntent.tireTypeId,
+                  initialRunCount: Math.max(0, Math.floor(runsCompleted)),
+                }
+              : undefined,
           tireRunNumber: Math.max(1, runsCompleted + 1),
           additiveTypeId: additiveTypeId || null,
           warmerTimingMinutes: parseWarmerTimingMinutes(warmerTimingMinutes),
@@ -2401,6 +2366,15 @@ export function NewRunForm(props: {
               : [],
         })
       });
+
+      // Adopt the server-minted set immediately: any follow-up save must link the same
+      // set, never create a second one.
+      if (createdTireSet?.id) {
+        const minted = createdTireSet;
+        setTireSets((prev) => (prev.some((t) => t.id === minted.id) ? prev : [minted, ...prev]));
+        setTireSetId(minted.id);
+        clearNewTireSetIntent();
+      }
 
       if (intent === "completed" && promptMarkTrackLocation) {
         setTrackLocationPrompt({
@@ -2566,7 +2540,7 @@ export function NewRunForm(props: {
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Eyebrow dot="accent">Session type</Eyebrow>
+            <Eyebrow>Session type</Eyebrow>
             <PrefillBadge show={prefillHighlights?.session} />
             {isDraft ? (
               <span
@@ -2681,7 +2655,7 @@ export function NewRunForm(props: {
         <SurfaceCard variant="panel" overflowHidden={false} className={prefillFieldClass(Boolean(prefillHighlights?.event))} contentClassName="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <Eyebrow dot="accent">Event / Race meeting</Eyebrow>
+              <Eyebrow>Event / Race meeting</Eyebrow>
               <PrefillBadge show={prefillHighlights?.event} />
             </div>
             <button
@@ -2789,10 +2763,13 @@ export function NewRunForm(props: {
                   onChange={(id) => {
                     setEventControlledTireTypeId(id);
                     if (id && sessionType === "RACE_MEETING") {
-                      setSelectedTireTypeId(id);
                       setTireSetId("");
-                      setTireSetNumber("");
-                      setTireSpecificModel("");
+                      clearNewTireSetIntent();
+                    }
+                  }}
+                  onSelectedTypeChange={(option) => {
+                    if (option && sessionType === "RACE_MEETING") {
+                      setPreferredTireType({ id: option.id, displayName: option.displayName });
                     }
                   }}
                   placeholder="Search spec tire type"
@@ -3026,7 +3003,7 @@ export function NewRunForm(props: {
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Eyebrow dot="accent">Run details</Eyebrow>
+            <Eyebrow>Run details</Eyebrow>
             <PrefillBadge
               show={
                 prefillHighlights?.car ||
@@ -3068,7 +3045,11 @@ export function NewRunForm(props: {
             <span className="min-w-0 truncate text-foreground/90">
               {(() => {
                 const t = tireSets.find((x) => x.id === tireSetId);
-                const base = t ? tireSetDisplayLine(t) : "—";
+                const base = t
+                  ? tireSetDisplayLine(t)
+                  : newTireSetIntent
+                    ? `${newTireSetIntent.displayName} · new set`
+                    : "—";
                 const extras: string[] = [];
                 const additive = formatAdditiveTimingLine(
                   additiveTypeId ? additiveTypesById[additiveTypeId] ?? null : null,
@@ -3319,28 +3300,30 @@ export function NewRunForm(props: {
               tireSetId={tireSetId}
               onSelectExistingSet={(nextId, ts) => {
                 setTireSetId(nextId);
-                setAddTireSetError(null);
-                if (!nextId) setTireSpecificModel("");
-                // Only hydrate type/set fields when picking a saved set — clearing the set id
-                // during new-set flow must not wipe a tire type the user just selected.
-                if (ts) applyTireFieldsFromSet(ts);
+                clearNewTireSetIntent();
+                // Sets known only to the picker must land in the catalog so snapshot
+                // lookups (tires line on the sheet) resolve them.
+                if (ts) {
+                  setTireSets((prev) =>
+                    prev.some((t) => t.id === ts.id) ? prev : [ts, ...prev]
+                  );
+                }
                 applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
                 setCopyTireWarning(null);
               }}
-              selectedTireTypeId={selectedTireTypeId}
-              onTireTypeIdChange={(id) => {
-                setSelectedTireTypeId(id);
-                setAddTireSetError(null);
-                if (!id) setTireSpecificModel("");
+              newSetIntent={newTireSetIntent}
+              onNewSetIntentChange={(intent) => {
+                setNewTireSetIntent(intent);
+                newTireSetIntentRef.current = intent;
+                if (intent) {
+                  setTireSetId("");
+                  tireRunUserTouchedRef.current = false;
+                  setRunsCompleted(0);
+                  setCopyTireWarning(null);
+                }
+                applyTireBatteryToSetupSnapshot(intent ? "" : tireSetIdRef.current, batteryIdRef.current);
               }}
-              tireSetNumber={tireSetNumber}
-              onTireSetNumberChange={(value) => {
-                setTireSetNumber(value);
-                setAddTireSetError(null);
-              }}
-              addingTireSet={resolvingTireSet}
-              addTireSetError={addTireSetError}
-              onAddTireSet={() => void addTireSet()}
+              preferredTireType={preferredTireType}
               runsCompleted={runsCompleted}
               onRunsCompletedChange={setRunsCompleted}
               onRunsCompletedUserTouched={() => {
@@ -3349,11 +3332,6 @@ export function NewRunForm(props: {
               onPrefillClear={() => setPrefillHighlights((h) => (h ? { ...h, tires: false } : h))}
               copyTireWarning={copyTireWarning}
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
-            />
-            <RunTirePrepPanel
-              prepGroups={tirePrepGroups}
-              setupData={setupData}
-              onToggle={toggleTirePrepKey}
             />
             <RunAdditiveTimingPanel
               additiveTypeId={additiveTypeId}
@@ -3504,7 +3482,7 @@ export function NewRunForm(props: {
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Eyebrow dot="accent">Setup</Eyebrow>
+            <Eyebrow>Setup</Eyebrow>
             <PrefillBadge show={prefillHighlights?.setup} />
             {isDraft && !setupSectionExpanded && setupBaselineData ? (
               <span
@@ -3969,7 +3947,7 @@ export function NewRunForm(props: {
       />
 
       <SurfaceCard variant="panel" overflowHidden={false} contentClassName="space-y-3 text-sm">
-        <Eyebrow dot="accent">Feedback</Eyebrow>
+        <Eyebrow>Feedback</Eyebrow>
         <div ref={feedbackRequiredRef} className="space-y-3">
           {completeValidation.show ? (
             <div

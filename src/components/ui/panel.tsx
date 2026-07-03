@@ -8,22 +8,7 @@ import { cn } from "@/lib/utils";
  * (JetBrains Mono, tabular) for numbers — the "instrument panel" feel.
  */
 
-type Dot = "accent" | "gain" | "loss" | "muted";
-
-function dotClass(dot: Dot): string {
-  switch (dot) {
-    case "gain":
-      return "bg-[#4FD089]";
-    case "loss":
-      return "bg-[#E5644E]";
-    case "muted":
-      return "bg-faint";
-    default:
-      return "bg-primary";
-  }
-}
-
-/** Card headline — Inter extrabold (locked hero voice). */
+/** Card headline — Sora bold (hero voice; 700, sentence case). */
 export function PanelTitle({
   children,
   className,
@@ -36,7 +21,7 @@ export function PanelTitle({
   return (
     <Tag
       className={cn(
-        "text-[20px] font-extrabold leading-tight tracking-tight text-foreground sm:text-[22px]",
+        "text-[20px] font-bold leading-tight tracking-tight text-foreground sm:text-[22px]",
         className
       )}
     >
@@ -77,17 +62,16 @@ export function PanelSubtitle({ children, className }: { children: ReactNode; cl
 /** Mono uppercase tracked section label with an optional accent tick. */
 export function Eyebrow({
   children,
-  dot,
   className,
 }: {
   children: ReactNode;
-  dot?: Dot;
+  /** Retained for call-site compatibility; leading dots were removed from the label system. */
+  dot?: "accent" | "gain" | "loss" | "muted";
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      {dot ? <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass(dot))} /> : null}
-      <span className="type-data-label">{children}</span>
+    <div className={cn("flex items-center", className)}>
+      <span className="eyebrow-label">{children}</span>
     </div>
   );
 }

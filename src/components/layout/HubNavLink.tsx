@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -37,9 +38,13 @@ const HUB_ICON_MAP: Record<NavHubIconKey, LucideIcon> = {
   wrench: Wrench,
 };
 
+/** Past this many px of movement, the gesture is a scroll, not a tap. */
+const SCROLL_CANCEL_THRESHOLD_PX = 10;
+
 export function HubNavLink({ link }: { link: NavHubLink }) {
-  const { beginTransition } = useRouteTransition();
+  const { beginTransition, cancelTransition } = useRouteTransition();
   const Icon = HUB_ICON_MAP[link.icon];
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
 
   return (
     <li>
@@ -49,7 +54,28 @@ export function HubNavLink({ link }: { link: NavHubLink }) {
         className="tap-active block"
         onPointerDown={(event) => {
           if (event.button !== 0) return;
+          pointerStartRef.current = { x: event.clientX, y: event.clientY };
           beginTransition(link.href);
+        }}
+        onPointerMove={(event) => {
+          // A scroll drag starts as a pointerdown on the card; once it moves past
+          // the threshold, dismiss the overlay so it can't strand over the page.
+          const start = pointerStartRef.current;
+          if (!start) return;
+          if (
+            Math.abs(event.clientX - start.x) > SCROLL_CANCEL_THRESHOLD_PX ||
+            Math.abs(event.clientY - start.y) > SCROLL_CANCEL_THRESHOLD_PX
+          ) {
+            pointerStartRef.current = null;
+            cancelTransition();
+          }
+        }}
+        onPointerCancel={() => {
+          pointerStartRef.current = null;
+          cancelTransition();
+        }}
+        onClick={() => {
+          pointerStartRef.current = null;
         }}
       >
         <SurfaceCard variant="panel" contentClassName="flex items-center gap-3 px-4 py-3">

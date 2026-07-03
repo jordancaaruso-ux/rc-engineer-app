@@ -8,7 +8,8 @@ export type PickPrimarySessionDriverOpts = {
 
 /**
  * Pick which timing row is "yours" for URL import defaults.
- * LiveRC race rows carry real `data-driver-id` values that match Settings → LiveRC driver ID.
+ * Prefers the stored LiveRC driver id, but only when the matched row's name also agrees —
+ * the id is event-scoped and can collide across events, so a name mismatch defeats it.
  */
 export function pickPrimarySessionDriver(
   drivers: LapUrlSessionDriver[],
@@ -21,15 +22,22 @@ export function pickPrimarySessionDriver(
     return drivers[0]!;
   }
 
-  const idWant = opts.liveRcDriverId?.trim();
-  if (idWant) {
-    const byId = drivers.find((d) => d.driverId.trim() === idWant);
-    if (byId) return byId;
-  }
-
   const nameWant = opts.liveRcDriverName?.trim()
     ? normalizeLiveRcDriverNameForMatch(opts.liveRcDriverName.trim())
     : "";
+
+  // LiveRC `data-driver-id` is a per-event entry index, not a stable per-user id
+  // (see resolveCanonicalLiveRcDriverId). A stored id from one event can collide with a
+  // different driver's entry at another event, so only trust the id when the matched row's
+  // name also matches — when a name is known. Fall back to name match otherwise.
+  const idWant = opts.liveRcDriverId?.trim();
+  if (idWant) {
+    const byId = drivers.find((d) => d.driverId.trim() === idWant);
+    if (byId && (!nameWant || normalizeLiveRcDriverNameForMatch(byId.driverName) === nameWant)) {
+      return byId;
+    }
+  }
+
   if (nameWant) {
     const byName = drivers.find((d) => normalizeLiveRcDriverNameForMatch(d.driverName) === nameWant);
     if (byName) return byName;

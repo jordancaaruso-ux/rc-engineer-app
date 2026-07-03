@@ -20,35 +20,32 @@ export function QuickAddTireSetPanel({
 }) {
   const [tireTypeId, setTireTypeId] = useState("");
   const [selectedType, setSelectedType] = useState<TireTypeOption | null>(null);
-  const [setNumber, setSetNumber] = useState("");
   const [specificModel, setSpecificModel] = useState("");
   const [initialRunCount, setInitialRunCount] = useState(0);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const setParsed = parseInt(setNumber.trim(), 10);
-  const canSubmit = Boolean(tireTypeId && Number.isFinite(setParsed) && setParsed >= 1);
+  const canSubmit = Boolean(tireTypeId);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!tireTypeId || !canSubmit) {
-      setError("Pick a tire type and set number.");
+      setError("Pick a tire type.");
       return;
     }
 
     setCreating(true);
     setError(null);
     try {
+      // No set number sent: the server auto-assigns the next number for this compound.
       const tireSet = await createTireSetApi({
         tireTypeId,
-        setNumber: setParsed,
         initialRunCount: initialRunCount >= 0 ? Math.floor(initialRunCount) : 0,
         specificModel: specificModel.trim() || null,
       });
       onCreated(tireSet);
       setTireTypeId("");
       setSelectedType(null);
-      setSetNumber("");
       setSpecificModel("");
       setInitialRunCount(0);
     } catch (err) {
@@ -92,20 +89,6 @@ export function QuickAddTireSetPanel({
               value={specificModel}
               onChange={(e) => setSpecificModel(e.target.value)}
               aria-label="Specific tire model"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block ui-label-meta font-medium">Set number</label>
-            <input
-              type="number"
-              min={1}
-              className="w-full max-w-xs form-control px-3 py-2 text-sm"
-              placeholder="e.g. 3"
-              value={setNumber}
-              onChange={(e) => setSetNumber(e.target.value)}
-              aria-label="Tire set number"
-              autoFocus
             />
           </div>
 

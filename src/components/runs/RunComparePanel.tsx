@@ -167,7 +167,7 @@ export function RunComparePanel({
     mode === "current_setup"
       ? "—"
       : baselineRun && baselineRun.tireSet
-        ? `${baselineRun.tireSet.label} · Set ${baselineRun.tireSet.setNumber ?? "—"} · Run ${baselineRun.tireRunNumber}`
+        ? `${baselineRun.tireSet.label} · run ${baselineRun.tireRunNumber}`
         : "—";
 
   return (

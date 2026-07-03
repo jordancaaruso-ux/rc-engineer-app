@@ -154,6 +154,18 @@ type ScanDayCandidate = {
 const RECENT_RUNS_COLLAPSED = 3;
 const RECENT_RUNS_MAX = 10;
 
+/** A row in the unified "Sessions to import" list (event race + track scan, deduped). */
+type ImportPickerCandidate = {
+  key: string;
+  sessionUrl: string;
+  title: string;
+  when: string | null;
+  bestLapSeconds: number | null;
+  timingSource?: "liverc" | "speedhive";
+  alreadyImported: boolean;
+  sortIso: string | null;
+};
+
 const REPLACE_IMPORT_CONFIRM =
   "Replace current import? Lap times from the session you imported earlier will be removed.";
 
@@ -435,13 +447,46 @@ export function LapTimesIngestPanel({
     return sortSessionsNewestFirst(eventRaceSessions, (c) => c.sessionCompletedAtIso);
   }, [eventRaceSessions]);
 
-  const visibleDayScanCandidates = useMemo(() => {
-    if (!sortedDayScanCandidates.length) return [];
-    const limit = showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED;
-    return sortedDayScanCandidates.slice(0, limit);
-  }, [sortedDayScanCandidates, showAllRecentRuns]);
+  // One import list: event race sessions (matched by LiveRC driver ID — precise) merged with
+  // track scan candidates (practice + results across LiveRC + Speedhive, matched by name/transponder),
+  // deduped by session URL. Event rows win on dedupe so ID precision is preserved.
+  const mergedImportCandidates = useMemo<ImportPickerCandidate[]>(() => {
+    const byUrl = new Map<string, ImportPickerCandidate>();
+    for (const c of sortedEventRaceSessions) {
+      const url = c.sessionUrl.trim();
+      if (!url) continue;
+      byUrl.set(url, {
+        key: `event:${url}`,
+        sessionUrl: c.sessionUrl,
+        title: c.listLinkText?.trim() || "Race session",
+        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime),
+        bestLapSeconds: null,
+        timingSource: "liverc",
+        alreadyImported: c.alreadyImported,
+        sortIso: c.sessionCompletedAtIso,
+      });
+    }
+    for (const c of sortedDayScanCandidates) {
+      const url = c.sessionUrl.trim();
+      if (!url || byUrl.has(url)) continue;
+      byUrl.set(url, {
+        key: `track:${c.sessionId}`,
+        sessionUrl: c.sessionUrl,
+        title: c.driverName?.trim() || "Run",
+        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime),
+        bestLapSeconds: c.bestLapSeconds ?? null,
+        timingSource: c.timingSource,
+        alreadyImported: c.alreadyImported,
+        sortIso: c.sessionCompletedAtIso,
+      });
+    }
+    return sortSessionsNewestFirst(Array.from(byUrl.values()), (r) => r.sortIso);
+  }, [sortedEventRaceSessions, sortedDayScanCandidates]);
 
-  const canExpandRecentRuns = sortedDayScanCandidates.length > RECENT_RUNS_COLLAPSED;
+  const canExpandImportRows = mergedImportCandidates.length > RECENT_RUNS_COLLAPSED;
+
+  // Total for the status line — the track scan may report more unimported sessions than it returns rows for.
+  const importPickerTotal = Math.max(mergedImportCandidates.length, scanTotals?.unimported ?? 0);
 
   function selectTab(id: IngestTab) {
     setTab(id);
@@ -591,18 +636,18 @@ export function LapTimesIngestPanel({
     setUrlMessage(null);
   }
 
-  async function importFromDayCandidate(c: ScanDayCandidate) {
-    if (!confirmReplaceIfNeeded(c.sessionUrl)) return;
-    setUrlInput(c.sessionUrl);
+  async function importFromSessionUrl(sessionUrl: string) {
+    if (!confirmReplaceIfNeeded(sessionUrl)) return;
+    setUrlInput(sessionUrl);
+    setUrlMessage(null);
     setDayScanMessage(null);
-    await fetchUrlPreviewWithUrl(c.sessionUrl);
+    await fetchUrlPreviewWithUrl(sessionUrl);
   }
 
-  async function importFromEventRaceRow(c: EventRaceSessionRow) {
-    if (!confirmReplaceIfNeeded(c.sessionUrl)) return;
-    setUrlInput(c.sessionUrl);
-    setUrlMessage(null);
-    await fetchUrlPreviewWithUrl(c.sessionUrl);
+  /** Refresh both discovery sources behind the unified import list. */
+  function refreshImportSources() {
+    void loadEventRaceSessions();
+    if (hasTrackDiscovery) void scanDayUrl();
   }
 
   async function fetchUrlPreviewWithUrl(explicit: string) {
@@ -805,7 +850,8 @@ export function LapTimesIngestPanel({
     };
   }, [activeImportBlock, value.urlImportBlocks]);
 
-  const trackScanDisplayRows = useMemo(() => {
+  // Visible slice of the merged list (collapsed/expanded), with the active import always surfaced.
+  const importPickerRows = useMemo(() => {
     type Row = {
       key: string;
       sessionUrl: string;
@@ -813,19 +859,23 @@ export function LapTimesIngestPanel({
       when: string | null;
       bestLapSeconds: number | null;
       timingSource?: "liverc" | "speedhive";
+      alreadyImported: boolean;
       isActive: boolean;
-      candidate: ScanDayCandidate | null;
     };
-    const rows: Row[] = visibleDayScanCandidates.map((c) => ({
-      key: c.sessionId,
-      sessionUrl: c.sessionUrl,
-      title: c.driverName?.trim() || "Run",
-      when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime),
-      bestLapSeconds: c.bestLapSeconds ?? null,
-      timingSource: c.timingSource,
-      isActive: activeImportUrl === c.sessionUrl.trim(),
-      candidate: c,
-    }));
+    const limit = showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED;
+    const rows: Row[] = mergedImportCandidates.slice(0, limit).map((c) => {
+      const isActive = activeImportUrl === c.sessionUrl.trim();
+      return {
+        key: c.key,
+        sessionUrl: c.sessionUrl,
+        title: c.title,
+        when: c.when,
+        bestLapSeconds: isActive ? activeImportPreview?.bestLapSeconds ?? c.bestLapSeconds : c.bestLapSeconds,
+        timingSource: c.timingSource,
+        alreadyImported: c.alreadyImported,
+        isActive,
+      };
+    });
     if (activeImportBlock && activeImportUrl && !rows.some((r) => r.sessionUrl.trim() === activeImportUrl)) {
       rows.unshift({
         key: activeImportBlock.blockId,
@@ -834,22 +884,18 @@ export function LapTimesIngestPanel({
         when: activeImportPreview?.when ?? null,
         bestLapSeconds: activeImportPreview?.bestLapSeconds ?? null,
         timingSource: activeImportPreview?.timingSource,
+        alreadyImported: false,
         isActive: true,
-        candidate: null,
       });
     }
     return rows;
   }, [
-    visibleDayScanCandidates,
+    mergedImportCandidates,
+    showAllRecentRuns,
     activeImportBlock,
     activeImportUrl,
     activeImportPreview,
   ]);
-
-  function bestLapForActiveEventRow(sessionUrl: string): number | null {
-    if (!activeImportBlock || activeImportUrl !== sessionUrl.trim()) return null;
-    return activeImportPreview?.bestLapSeconds ?? null;
-  }
 
   function toggleLapInclusion(blockId: string, driverId: string, lapIndex: number) {
     const blocks = value.urlImportBlocks.map((b) => {
@@ -973,68 +1019,7 @@ export function LapTimesIngestPanel({
 
       {tab === "url-auto" ? (
         <div className="space-y-2 text-sm">
-          {lapImportEventId?.trim() ? (
-            <div className="space-y-2 rounded-md border border-accent/35 bg-accent/5 p-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <Eyebrow dot="accent">Your sessions at this event</Eyebrow>
-                  <p className="mt-1 ui-label-meta">
-                    Uses your LiveRC <span className="text-foreground/90">driver ID</span> from each result table (not
-                    just name), so you are not mixed up with someone else on another main. IDs are saved automatically in
-                    Settings when unambiguous; clear there if wrong.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={eventRaceBusy}
-                  className={cn(
-                    "shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1.5 text-[11px] font-medium hover:bg-surface-runna-inset transition",
-                    eventRaceBusy && "opacity-60 pointer-events-none"
-                  )}
-                  onClick={() => void loadEventRaceSessions()}
-                >
-                  {eventRaceBusy ? "Refreshing…" : "Refresh"}
-                </button>
-              </div>
-              {eventRaceBusy ? <p className="ui-label-meta">Loading sessions…</p> : null}
-              {sortedEventRaceSessions.length > 0 ? (
-                <ul className="space-y-1">
-                  {sortedEventRaceSessions.map((c) => {
-                    const isActive = activeImportUrl === c.sessionUrl.trim();
-                    const title = c.listLinkText?.trim() || "Race session";
-                    const when = formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime);
-                    const bestLap = bestLapForActiveEventRow(c.sessionUrl);
-                    return (
-                      <li key={c.sessionUrl}>
-                        <SessionImportListRow
-                          title={title}
-                          when={when}
-                          bestLapSeconds={bestLap}
-                          isActive={isActive}
-                          actionLabel={c.alreadyImported ? "Import again" : "Import"}
-                          disabled={urlBusy}
-                          onClick={() => {
-                            if (isActive) return;
-                            void importFromEventRaceRow(c);
-                          }}
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-              {!eventRaceBusy && eventRaceSessions !== null && eventRaceSessions.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {eventRaceHint ??
-                    "No pending race sessions — add a LiveRC results URL on the event, or every session may already have a run logged."}
-                </p>
-              ) : null}
-              {!eventRaceBusy && eventRaceHint && eventRaceSessions && eventRaceSessions.length > 0 ? (
-                <p className="ui-label-meta">{eventRaceHint}</p>
-              ) : null}
-            </div>
-          ) : null}
-          {hasTrackDiscovery ? (
+          {hasTrackDiscovery || lapImportEventId?.trim() ? (
             <div
               className={cn(
                 "space-y-2 rounded-md border p-2",
@@ -1045,56 +1030,49 @@ export function LapTimesIngestPanel({
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <Eyebrow dot="muted">Recent runs at this track</Eyebrow>
+                  <Eyebrow>Sessions to import</Eyebrow>
                   <p className="mt-1 ui-label-meta">
-                    {dayScanBusy
-                      ? [
-                          hasLiveRcTrack && "LiveRC",
-                          hasSpeedhiveTrack && "Speedhive",
-                        ]
-                          .filter(Boolean)
-                          .join(", ")
-                          ? `Checking ${[
-                              hasLiveRcTrack && "LiveRC",
-                              hasSpeedhiveTrack && "Speedhive",
-                            ]
-                              .filter(Boolean)
-                              .join(", ")}…`
-                          : "Checking timing sources…"
+                    {eventRaceBusy || dayScanBusy
+                      ? `Checking ${
+                          [
+                            (hasLiveRcTrack || lapImportEventId?.trim()) && "LiveRC",
+                            hasSpeedhiveTrack && "Speedhive",
+                          ]
+                            .filter(Boolean)
+                            .join(", ") || "timing sources"
+                        }…`
                       : hasLinkedLapImport
                         ? "One session imported — pick another to replace it (newest first)."
-                        : sortedDayScanCandidates.length > 0
-                          ? scanTotals &&
-                            scanTotals.unimported > visibleDayScanCandidates.length &&
-                            !showAllRecentRuns
-                            ? `Showing ${visibleDayScanCandidates.length} of ${scanTotals.unimported} runs (newest first)`
-                            : `${sortedDayScanCandidates.length} recent run${sortedDayScanCandidates.length === 1 ? "" : "s"} to import`
-                          : null}
+                        : importPickerTotal > 0
+                          ? !showAllRecentRuns && importPickerTotal > RECENT_RUNS_COLLAPSED
+                            ? `Showing ${Math.min(RECENT_RUNS_COLLAPSED, importPickerTotal)} of ${importPickerTotal} sessions (newest first)`
+                            : `${importPickerTotal} session${importPickerTotal === 1 ? "" : "s"} to import`
+                          : "Practice and event sessions at this track, newest first."}
                   </p>
                 </div>
                 <button
                   type="button"
-                  disabled={dayScanBusy}
+                  disabled={eventRaceBusy || dayScanBusy}
                   className={cn(
                     "shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1.5 text-[11px] font-medium hover:bg-surface-runna-inset transition",
-                    dayScanBusy && "opacity-60 pointer-events-none"
+                    (eventRaceBusy || dayScanBusy) && "opacity-60 pointer-events-none"
                   )}
-                  onClick={() => void scanDayUrl()}
+                  onClick={() => refreshImportSources()}
                 >
-                  {dayScanBusy ? "Refreshing…" : "Refresh"}
+                  {eventRaceBusy || dayScanBusy ? "Refreshing…" : "Refresh"}
                 </button>
               </div>
-              {!dayScanHasDriverName ? (
+              {hasTrackDiscovery && !dayScanHasDriverName ? (
                 <p className="text-[11px] text-muted-foreground">
                   {hasSpeedhiveTrack && !hasLiveRcTrack
                     ? "Set your MYLAPS transponder number and/or Speedhive driver name in Settings so we can find your sessions at this track."
                     : "Set your driver name in Settings (LiveRC and/or Speedhive transponder / name) so we can find your sessions."}
                 </p>
               ) : null}
-              {trackScanDisplayRows.length > 0 ? (
+              {importPickerRows.length > 0 ? (
                 <div className="space-y-1">
                   <ul className="space-y-1">
-                    {trackScanDisplayRows.map((row) => (
+                    {importPickerRows.map((row) => (
                       <li key={row.key}>
                         <SessionImportListRow
                           title={row.title}
@@ -1102,33 +1080,38 @@ export function LapTimesIngestPanel({
                           bestLapSeconds={row.bestLapSeconds}
                           timingSource={row.timingSource}
                           isActive={row.isActive}
-                          actionLabel="Import"
+                          actionLabel={row.alreadyImported ? "Import again" : "Import"}
                           disabled={urlBusy}
                           onClick={() => {
-                            if (row.isActive || !row.candidate) return;
-                            void importFromDayCandidate(row.candidate);
+                            if (row.isActive) return;
+                            void importFromSessionUrl(row.sessionUrl);
                           }}
                         />
                       </li>
                     ))}
                   </ul>
-                  {canExpandRecentRuns ? (
+                  {canExpandImportRows ? (
                     <button
                       type="button"
                       className="w-full rounded-md border border-dashed border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-surface-runna-inset transition"
                       onClick={() => setShowAllRecentRuns((prev) => !prev)}
                     >
                       {showAllRecentRuns
-                        ? "Show fewer runs"
-                        : `Show more runs (${Math.min(RECENT_RUNS_MAX, sortedDayScanCandidates.length) - RECENT_RUNS_COLLAPSED} more)`}
+                        ? "Show fewer sessions"
+                        : `Show more sessions (${Math.min(RECENT_RUNS_MAX, mergedImportCandidates.length) - RECENT_RUNS_COLLAPSED} more)`}
                     </button>
                   ) : null}
                 </div>
               ) : null}
-              {dayScanMessage && !dayScanBusy ? (
-                <p className="rounded-md border border-border bg-muted/50 px-2 py-1.5 text-[11px] text-muted-foreground">
-                  {dayScanMessage}
+              {!eventRaceBusy && !dayScanBusy && mergedImportCandidates.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {dayScanMessage ??
+                    eventRaceHint ??
+                    "No sessions found yet — check your driver name in Settings, or add a LiveRC/Speedhive URL on the track or event."}
                 </p>
+              ) : null}
+              {eventRaceHint && mergedImportCandidates.length > 0 ? (
+                <p className="ui-label-meta">{eventRaceHint}</p>
               ) : null}
               {discoveryDebug ? (
                 <div className="border-t border-border pt-2">

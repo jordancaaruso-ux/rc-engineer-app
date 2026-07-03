@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node \"/c/Users/Jordan/AppData/Local/Temp/claude/c--Users-Jordan-Documents-rc-engineer-app/a634c754-cd81-44a6-8a22-62e38ba78d5d/scratchpad/strip-accent-dots.cjs\")",
+      "Bash(npx dotenv-cli *)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Jordan\\.claude"
+    ]
+  }
+}

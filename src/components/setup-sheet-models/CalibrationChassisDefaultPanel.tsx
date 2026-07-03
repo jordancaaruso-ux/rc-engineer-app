@@ -103,7 +103,7 @@ export function CalibrationChassisDefaultPanel(props: Props) {
 
   return (
     <CardPanel contentClassName="px-4 py-3 text-sm">
-      <Eyebrow dot="accent">Chassis type &amp; default calibration</Eyebrow>
+      <Eyebrow>Chassis type &amp; default calibration</Eyebrow>
       <p className="mt-1 text-xs text-muted-foreground max-w-2xl">
         Link this profile to a chassis type (e.g. Mugen MTC3) and mark it as the default so uploads
         auto-select it when the PDF matches. If you have duplicate chassis types,{" "}

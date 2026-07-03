@@ -10,7 +10,7 @@ This document is the **single source of truth** for UI/visual work in JRC Race E
 
 ## North star sentence
 
-> A premium racing instrument: **charcoal graphite** surfaces, **electric-but-confident yellow** for every action, **Inter** for all UI type, **JetBrains Mono** for data. Two voices — friendly prose to learn, mono instrument panel to trust — never cold, never gimmicky.
+> A premium racing instrument: **charcoal graphite** surfaces, **electric-but-confident yellow** for every action, **Sora** for all UI type, **JetBrains Mono** for data. Two voices — friendly prose to learn, mono instrument panel to trust — never cold, never gimmicky.
 
 ### Personality (locked)
 
@@ -85,41 +85,41 @@ Loaded in `src/app/layout.tsx`:
 
 | Tier | Font | Weights used | CSS hook |
 |------|------|--------------|----------|
-| **1 — UI sans** | **Inter** (Google Fonts via `next/font`) | 400 body · 500 inactive nav · 600 micro headings · 700 sections/nav active/buttons · **800 hero `PanelTitle`** · **600 semibold entity names** | `--font-ui`, `font-sans`, `PanelTitle`, `.page-title`, `.hub-row-title` / `HubRowTitle`, `.section-title`, `.session-group-title`, `.run-details-tab`, `.ui-title`, `.ui-label-*`, `.ui-control`, `.primary-action-chip`, nav labels, chat body + speaker tags |
+| **1 — UI sans** | **Sora** (Google Fonts via `next/font`) | 400 body · 500 inactive nav · 600 micro headings · 700 sections/nav active/buttons/**hero `PanelTitle`** · **600 semibold entity names** | `--font-ui`, `font-sans`, `PanelTitle`, `.page-title`, `.hub-row-title` / `HubRowTitle`, `.section-title`, `.session-group-title`, `.run-details-tab`, `.ui-title`, `.ui-label-*`, `.ui-control`, `.primary-action-chip`, nav labels, chat body + speaker tags |
 | **2 — Data** | **JetBrains Mono** | 400–500 labels/values · 500 stat values | `font-mono`, `.type-data-label`, `.type-timestamp`, `.table-col-header`, `<Eyebrow>`, `<StatTile>` |
 
-Inter and JetBrains Mono are SIL OFL.
+Sora and JetBrains Mono are SIL OFL.
 
 ### Element → tier matrix (locked)
 
 | Element | Tier | Size | Weight | Case / tracking |
 |---------|------|------|--------|-----------------|
-| Page title (`.page-title`) | Inter | 20–22px | **600 semibold** | Sentence · `tracking-tight` |
-| Hub row title (`HubRowTitle`, `.hub-row-title`) | Inter | 17–18px | **600 semibold** | Sentence · `tracking-tight` |
-| Hero card title (`PanelTitle`) | Inter | 20–22px | **800** | Sentence · `tracking-tight` |
-| Section header (`.section-title`, `SectionTitle`, `.run-details-tab`) | Inter | 13–14px | 700 | Sentence · `tracking-tight` |
-| Primary nav label (bottom + sidebar) | Inter | 10px | 500 inactive / 700 active | Sentence · `tracking-tight` |
+| Page title (`.page-title`) | **Space Grotesk** (`--font-display`) | 22–30px (`clamp`) | **700 bold** | Sentence · `-0.01em` · corner-bracket pseudo-elements (9px, muted ink at full strength, stretch title height, never yellow) |
+| Hub row title (`HubRowTitle`, `.hub-row-title`) | Sora | 17–18px | **600 semibold** | Sentence · `tracking-tight` |
+| Hero card title (`PanelTitle`) | Sora | 20–22px | **700** | Sentence · `tracking-tight` |
+| Section header (`.section-title`, `SectionTitle`, `.run-details-tab`) | Sora | 13–14px | 700 | Sentence · `tracking-tight` |
+| Primary nav label (sidebar only — mobile dock is icon-only since 2026-07-03) | Sora | 10px | 500 inactive / 700 active | Sentence · `tracking-tight` |
 | Section label / eyebrow (`<Eyebrow>`, `.type-data-label`, StatTile label) | JetBrains Mono | 10px | 400 | **Uppercase** · **`0.28em`** |
 | Table column header (`.table-col-header`) | JetBrains Mono | 10px | 400 | **Uppercase** · **`0.28em`** · faint |
 | Stat value (`StatTile` value) | JetBrains Mono | 18px | 500 | Tabular nums |
 | Timestamps (`.type-timestamp`, `<RelativeTime>`) | JetBrains Mono | 10px | 400 | Sentence · tabular nums · faint |
 | Lap times, deltas, run IDs, setup values | JetBrains Mono | varies | 400–500 | Tabular nums |
-| Body / form copy | Inter | 13–15px | 400 | Sentence |
-| Page subtitle (`.page-subtitle`, `PanelSubtitle`) | Inter | 13px | 400 | Sentence |
-| Entity names in lists (`.ui-title` semibold) | Inter | 13–14px | 600 | Sentence |
-| Chat speaker tags (`You` / `Engineer`) | Inter | 10px | 600 | Sentence — **not** Eyebrow |
-| Chat body / prose summaries | Inter | 13–15px | 400 | Sentence — inline numbers stay Inter |
-| Primary CTA label (`.primary-action-chip`) | Inter | 11–13px | 700 | Hero: optional uppercase `0.12em` |
-| Caption / hint (`.ui-caption`) | Inter | 11px | 400 | Sentence |
+| Body / form copy | Sora | 13–15px | 400 | Sentence |
+| Page subtitle (`.page-subtitle`, `PanelSubtitle`) | Sora | 13px | 400 | Sentence |
+| Entity names in lists (`.ui-title` semibold) | Sora | 13–14px | 600 | Sentence |
+| Chat speaker tags (`You` / `Engineer`) | Sora | 10px | 600 | Sentence — **not** Eyebrow |
+| Chat body / prose summaries | Sora | 13–15px | 400 | Sentence — inline numbers stay Sora |
+| Primary CTA label (`.primary-action-chip`) | Sora | 11–13px | 700 | Hero: optional uppercase `0.12em` |
+| Caption / hint (`.ui-caption`) | Sora | 11px | 400 | Sentence |
 
 ### Rules
 
 1. **Never mix tiers on the same semantic role** — e.g. section labels are always `<Eyebrow>` (mono), never `.ui-title`.
-2. **No separate display font** — page titles use Inter weight/size hierarchy only (semibold), not a third typeface.
+2. **One display face, one place** — Space Grotesk (`--font-display`) is used for `.page-title` only (uppercase, corner brackets). Everything else is Sora or JetBrains Mono; do not spread the display face to cards, nav, or body.
 3. **Mono tracking is always `0.28em`** for uppercase micro labels (`.type-data-label`, `.table-col-header`). Do not use `0.2em` / `0.14em` one-offs.
 4. **Prefer `font-mono` over `font-sans tabular-nums`** for numeric data (setup sheet values, tables, metrics).
 5. **Do not set inline `fontFamily`** in components — globals + shared classes win.
-6. **Chat inline numbers stay Inter** — only dedicated metric/setup/table/timestamp surfaces use mono.
+6. **Chat inline numbers stay Sora** — only dedicated metric/setup/table/timestamp surfaces use mono.
 
 ### Retired (removed June 2026)
 
@@ -146,10 +146,10 @@ Inter and JetBrains Mono are SIL OFL.
 
 | Context | Treatment |
 |---------|-----------|
-| Default app shell | **Flat charcoal** (`#121110`) — no red/blue mesh |
-| Login | Faded hero wash (yellow top glow + ember bottom + fine grain) on flat base |
-| Dashboard hero | `SurfaceCard variant="hero"` — warm glow on hover; static hero acceptable |
-| Data-heavy screens (sessions, setup, tables) | **Calm flat** — no photography, no strong gradients |
+| App shell (all screens) | **TITC sunset photo wash** — `public/brand/track-hero.jpg` on `.page-bg` children (`-img/-tint/-warm/-dark/-vig` in `layout.tsx`). Knobs live as `--tune-*` vars in `:root` (final in-app tune 2026-07-03: **blur 16px · yellow 0.15 · dark 0.76**); fixed position, same clarity everywhere. Charcoal gradients on `.page-bg` remain as the loading fallback. Dev-only `AppearanceTuner` (AppShell) overrides the vars live. |
+| Cards / panels | **Liquid glass** — `SurfaceCard` uses `.glass-card`: `card/`**0.7** + `backdrop-blur(`**78px**`) saturate(1.3)`, white/0.10 border, specular top rim. Legibility over the photo is the tuning limit — do not drop card alpha below ~0.6. |
+| Mobile dock | Liquid glass pill — `card/0.42` + `backdrop-blur(30px) saturate(1.7)`, white/0.14 border, bright inset rim (`BottomNav.tsx`). |
+| Retired (2026-07-03) | ~~Flat-charcoal-only shell; "no photography on data screens"~~ — superseded by the uniform photo wash + glass surfaces. |
 
 ---
 
@@ -171,7 +171,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 ### Page chrome
 
 - **Header:** `.page-header` + `h1.page-title` + `p.page-subtitle` — title block uses `gap-1` via `:has(.page-title)`; subtitle matches `PanelSubtitle` (`13px`, `leading-relaxed`, `text-muted-foreground`).
-- **Hierarchy:** page title (Inter semibold) → page subtitle (Inter muted) → section `<Eyebrow>` (mono, faint, uppercase) — hero `PanelTitle` (Inter 800 sentence case) stays the in-card headline voice.
+- **Hierarchy:** page title (Sora **uppercase**, bold) → page subtitle (Sora muted) → section `<Eyebrow>` (mono, faint, uppercase) — hero `PanelTitle` (Sora 700 sentence case) stays the in-card headline voice.
 - **Body:** `.page-body` with `max-w-*` as appropriate; `gap-3` between major blocks (locked in CSS).
 - **Mobile nav order (unchanged):** Dashboard · Analysis · **Add run (center)** · Garage · Engineer · Settings.
 
@@ -201,7 +201,7 @@ Ranked by daily use and trust impact. **Finish each tier before inventing screen
 | B4 | `/events`, `/events/[id]` | Assets | Dates, track, tires hierarchy | ⬜ |
 | B5 | `/tires` | Assets | Catalog without visual noise | ⬜ |
 | B5b | `/additives` | Assets | Additive catalog — mirrors `/tires` | ⬜ |
-| B6 | `/analysis` | Analysis | Hub — same pattern as Assets | ⬜ |
+| B6 | `/analysis` | Analysis | Debrief surface — session trend chart, recent-runs accordion, video + setup-compare doors | ✅ Rebuilt as debrief (July 2026; panel primitives throughout) |
 
 ### Tier C — Power user (inherit A/B language)
 
@@ -232,8 +232,8 @@ Foundations (globals.css tokens + fonts)
 | Layer | File(s) | Notes |
 |-------|---------|-------|
 | CSS tokens | `src/app/globals.css` `:root` | Technical v2 palette; flat mesh |
-| Tailwind | `tailwind.config.ts` | Semantic colors; Inter + JetBrains in `fontFamily` |
-| Fonts | `src/app/layout.tsx` | `--font-ui` (Inter), `--font-mono-jb` |
+| Tailwind | `tailwind.config.ts` | Semantic colors; Sora + JetBrains in `fontFamily` |
+| Fonts | `src/app/layout.tsx` | `--font-ui` (Sora), `--font-mono-jb` |
 | Panel DNA | `src/components/ui/panel.tsx` | Eyebrow, StatStrip, StatTile |
 | Surfaces | `src/components/ui/SurfaceCard.tsx` | Prefer tokens over hardcoded `#1b1712` when refactoring |
 | Theme preview | `html[data-theme-preview=...]` in `globals.css` | Dev-only; still has legacy red/blue — update or remove when touching |
@@ -249,7 +249,7 @@ Before opening a PR or marking a screen “done”:
 - [ ] Primary actions use `Button` / `ButtonLink` primary (yellow + dark text).
 - [ ] Cards use `CardPanel` or `SurfaceCard`, not one-off `bg-card` wrappers with different radii.
 - [ ] Section labels use `<Eyebrow>` where the dashboard does.
-- [ ] Page title uses `.page-title` (Inter semibold sentence case).
+- [ ] Page title uses `.page-title` (Sora bold, **UPPERCASE** +0.02em).
 - [ ] Works at 390px width with bottom tab bar.
 - [ ] No behavior, routing, or API changes.
 - [ ] Yellow is not used for data meaning (only actions / focus).
@@ -261,11 +261,11 @@ Before opening a PR or marking a screen “done”:
 Track these when prioritizing rework:
 
 1. **Login** — ✅ Inter + semantic tokens (June 2026 typography pass).
-2. **Logo** — `JrcRaceEngineerLogo.tsx` still red/blue gradient; type-based lockup on login is placeholder until yellow/brown asset ships.
+2. **Logo** — still off-brand, but the colors are in the **asset**, not the component: `JrcRaceEngineerLogo.tsx` just renders `public/brand/jrc-race-engineer-logo.svg`, which is a red→purple→blue gradient (`#ff2d6d`→`#39a8ff`). Fix = replace that SVG with a yellow/warm-dark lockup (the component needs no change).
 3. **Partial primitive adoption** — `panel.tsx` only on dashboard + partial engineer; 37+ other routes use ad-hoc patterns.
 4. **Numeric typography** — setup sheet values migrated to `font-mono`; Tier C routes may still have stragglers.
 5. **Theme preview switcher** — alternate themes still reference old red/blue palette; section label uses `<Eyebrow>`.
-6. **Legacy font cleanup** — Heebo + HK Grotesk Wide retired (June 2026); Inter two-voice system locked. Tier C section labels migrated to `<Eyebrow>` (June 2026 pass); remaining `ui-title` is entity names, field labels, badges, and chat speaker tags only.
+6. **Legacy font cleanup** — Heebo + HK Grotesk Wide retired (June 2026); Sora + JetBrains two-voice system locked (Sora replaced Inter 2026-07-03). Tier C section labels migrated to `<Eyebrow>` (June 2026 pass); remaining `ui-title` is entity names, field labels, badges, and chat speaker tags only.
 7. **Figma** — screen templates for Tier A were planned but blocked by MCP rate limits; code-first rollout proceeded without full Figma component library.
 
 ---
@@ -282,6 +282,11 @@ Track these when prioritizing rework:
 
 | Date | Change |
 |------|--------|
+| 2026-07-03 | **Mobile bottom nav → floating dock** — icon-only rounded pill floating above the screen edge (blurred `bg-card/90` + top sheen + charcoal shadow), Phosphor icons regular→**fill** when active (Gauge / ChartBar / PlusCircle / Car / GearSix; `EngineerNavIcon` gained a `filled` variant), sliding yellow top-edge indicator (2px, soft glow, 200ms). Labels retired on the mobile dock (sidebar labels unchanged); `--mobile-tab-bar-height` 3.25 → 4.75rem (dock + float gap clearance). Desktop sidebar untouched (still Lucide + labels). |
+| 2026-07-03 | **Photo wash + liquid glass** — TITC sunset (`track-hero.jpg`, 52KB) as the global fixed background (blur 8 · yellow .3 · dark .4, user-tuned via artifact sliders); `SurfaceCard` → `.glass-card` (0.7 alpha, 35px backdrop blur); dock pill → liquid glass (0.42, 30px). Replaces flat-charcoal shell; "calm flat / no photography" rule retired. `suppressHydrationWarning` added to SurfaceCard for the external `--focus` writes. |
+| 2026-07-03 | **Page-title treatment** — Space Grotesk 700 sentence case, 22–30px (`--font-display`, next/font), framed by drafting-style corner brackets (CSS pseudo-elements, muted ink, full title height — per approved artifact). Fraunces/Instrument Serif cursive trials rejected. Eyebrows split from stat labels: `<Eyebrow>` yellow (`.eyebrow-label`), `.type-data-label` stays faint. All Eyebrow leading dots removed. Page glow un-occluded (`bg-background` dropped from `main` + route-transition wrapper). |
+| 2026-07-03 | **Type system → Sora** — replaced Inter as the UI/display voice (`next/font`, `--font-ui`); JetBrains Mono unchanged. Montserrat evaluated and rejected (too ubiquitous — reads like TestLogger). Page titles now **UPPERCASE** (+0.02em; sentence-case retired for `.page-title`); `PanelTitle` unified 800 → **700** so dashboard cards stop being a weight outlier. Login "JRC" wordmark stays 800 (brand lockup, not chrome). |
+| 2026-07-03 | Corrected Known Gaps #2 (logo) — off-brand colors live in the SVG asset `public/brand/jrc-race-engineer-logo.svg`, not inline in `JrcRaceEngineerLogo.tsx` |
 | 2026-06-20 | Palette shift — warm espresso → charcoal graphite (`#121110` base); neutralized page wash + card glow; ink tones slightly cooler; login hex aligned |
 | 2026-06-20 | Page chrome pass — `.page-title` Inter semibold sentence case; restored header padding + title/subtitle gap; `.page-subtitle` aligned to `PanelSubtitle`; `Eyebrow` uses `text-faint` |
 | 2026-06-24 | Tier C typography pass — migrate setup/bulk-import/calibration/tracks/events/teams/video section labels from `.ui-title` to `<Eyebrow>`; table debug headers use `.table-col-header` |

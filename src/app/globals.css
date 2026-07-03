@@ -42,10 +42,6 @@
   --body-stripe-blue: 0;
   /* boxShadow.glow / glow-sm — subtle yellow lift on active chrome. */
   --glow-shadow-rgb: 255 214 10;
-  /* SurfaceCard hover glow. */
-  --surface-card-glow-image:
-    radial-gradient(120% 140% at 100% 0%, rgba(255, 214, 10, 0.12), transparent 55%),
-    radial-gradient(120% 120% at 0% 110%, rgba(72, 68, 64, 0.14), transparent 60%);
   /* Safari `theme-color` + html overscroll fallback — charcoal, matches the flat base. */
   --page-top-theme: #121110;
 
@@ -54,8 +50,22 @@
   --color-surface-runna: 24 23 22;
   --color-surface-runna-inset: 30 29 28;
 
-  /* Mobile bottom tab bar (see BottomNav.tsx) */
-  --mobile-tab-bar-height: 3.25rem;
+  /*
+   * Mobile bottom dock (see BottomNav.tsx) — clearance the page reserves under
+   * scrolling content: 3.5rem dock + 0.75rem float gap + 0.5rem breathing room.
+   */
+  --mobile-tab-bar-height: 4.75rem;
+
+  /*
+   * Appearance knobs — referenced by the photo wash + glass surfaces below.
+   * Defaults are the shipped values; the dev-only AppearanceTuner overrides
+   * them live so the founder can dial the look in the real app.
+   */
+  --tune-bg-blur: 16px;
+  --tune-bg-dark: 0.76;
+  --tune-bg-yellow: 0.15;
+  --tune-glass-alpha: 0.7;
+  --tune-glass-blur: 78px;
 }
 
 /* Dev background preview — `data-bg-preview` overrides page base only (see Settings). */
@@ -134,13 +144,73 @@ body {
   background-color: rgb(var(--color-background));
   background-image:
     radial-gradient(120% 120% at 50% 42%, transparent 52%, rgba(0, 0, 0, 0.32) 100%),
-    radial-gradient(120% 78% at 50% -12%, rgba(255, 214, 10, 0.07), transparent 56%),
+    radial-gradient(150% 100% at 50% -10%, rgba(255, 214, 10, 0.13), transparent 62%),
     radial-gradient(135% 95% at 50% -22%, rgba(58, 54, 50, 0.18), transparent 60%),
     radial-gradient(130% 85% at 50% 120%, rgba(44, 42, 40, 0.22), transparent 72%),
     radial-gradient(75% 62% at 6% 4%, rgba(68, 64, 60, 0.10), transparent 60%),
     radial-gradient(95% 85% at 102% 104%, rgba(72, 68, 64, 0.14), transparent 64%),
-    radial-gradient(60% 52% at 100% 100%, rgba(255, 214, 10, 0.06), transparent 58%);
+    radial-gradient(72% 62% at 100% 100%, rgba(255, 214, 10, 0.10), transparent 60%);
   background-repeat: no-repeat;
+}
+
+/*
+ * TITC sunset scene — uniform blurred + yellow-tinted photo wash (founder-tuned
+ * in-app 2026-07-03: blur 16px · yellow 0.15 · dark 0.76 — see `--tune-*`).
+ * Fixed and the same clarity everywhere;
+ * child layers stack blend modes a single element can't. The charcoal
+ * gradients on `.page-bg` remain the fallback while the photo loads.
+ */
+.page-bg-img {
+  position: absolute;
+  inset: -24px;
+  background: url("/brand/track-hero.jpg") center / cover no-repeat;
+  filter: blur(var(--tune-bg-blur)) saturate(0.6) brightness(0.92);
+}
+
+.page-bg-tint {
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--color-accent));
+  mix-blend-mode: soft-light;
+  opacity: var(--tune-bg-yellow);
+}
+
+.page-bg-warm {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: overlay;
+  opacity: calc(var(--tune-bg-yellow) * 0.6);
+  background: radial-gradient(120% 90% at 50% 8%, rgb(var(--color-accent) / 0.9), transparent 60%);
+}
+
+.page-bg-dark {
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--color-background) / var(--tune-bg-dark));
+}
+
+.page-bg-vig {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(130% 120% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.45));
+}
+
+/*
+ * Liquid-glass card surface (founder-tuned in-app 2026-07-03: 0.7 card alpha ·
+ * 78px backdrop blur — see `--tune-*`).
+ * Reads as frosted glass over the photo wash; the high alpha keeps stat values
+ * legible and degrades to near-solid charcoal where backdrop-filter is
+ * unsupported. Owns the border color + full shadow stack (specular top rim).
+ */
+.glass-card {
+  background-color: rgb(var(--color-card) / var(--tune-glass-alpha));
+  /* Standard property only — the build auto-generates -webkit- for Safari. */
+  backdrop-filter: blur(var(--tune-glass-blur)) saturate(1.3);
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 -1px 0 rgb(0 0 0 / 0.2),
+    0 24px 55px -26px rgb(0 0 0 / 0.7);
 }
 
 /* Fine grain so the charcoal wash has texture and never bands or reads as dead-flat. */
@@ -191,14 +261,13 @@ body {
 
 .bottom-nav {
   /*
-   * Opaque bar + safe-area fill so no black band shows between nav and
-   * home indicator / mobile browser chrome. Matches card surface, not page wash.
-   * z-index keeps the bar above `.page` when DOM/stacking order would otherwise bury it.
+   * Floating dock — the pill inside BottomNav.tsx carries its own blurred
+   * surface, border, and shadow; this wrapper stays transparent so page
+   * content scrolls behind the float gap. Bottom offset / safe-area handled
+   * by Tailwind classes on the nav element.
+   * z-index keeps the dock above `.page` when DOM/stacking order would otherwise bury it.
    */
   z-index: 50;
-  background-color: rgb(var(--color-card));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  overflow: visible;
 }
 
 .bottom-nav a {
@@ -266,12 +335,26 @@ html[data-nav-pending] .page {
   }
 }
 
+/*
+ * Page header — no divider line (the bracketed title is the only chrome).
+ * Vertical rhythm is balanced: gap above the title (padding-top) equals the
+ * gap below it to the first card (padding-bottom + .page-body pt-2 = 12px).
+ */
 .page-header {
-  @apply flex items-center justify-between border-b border-border;
-  padding-top: calc(0.625rem + env(safe-area-inset-top, 0px));
-  padding-bottom: 0.75rem;
+  @apply relative flex items-center justify-center;
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.25rem;
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+
+/* Centered page chrome: title sits in the middle of the screen; the back
+   control (if any) is pinned to the far left so the title stays truly centered. */
+.page-header a[aria-label="Back"] {
+  position: absolute;
+  left: max(1.25rem, env(safe-area-inset-left));
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 @media (min-width: 768px) {
@@ -282,11 +365,95 @@ html[data-nav-pending] .page {
 
 /* Title + subtitle stack — one rhythm everywhere `.page-header` is used. */
 .page-header > div:has(> .page-title) {
-  @apply flex min-w-0 flex-col gap-1;
+  @apply flex min-w-0 flex-col items-center gap-1;
 }
 
+/* Center the title on screen. Matches both the direct title block and the
+   `flex-1` wrapper that also holds the (now absolutely-pinned) back control. */
+.page-header > div:has(.page-title) {
+  @apply justify-center text-center;
+}
+
+/* Descriptive subtitle retired from page chrome — the centered title stands alone. */
+.page-header .page-subtitle {
+  display: none;
+}
+
+/*
+ * Dashboard header — richer than other pages (interviewed 2026-07-03):
+ * left-aligned bracketed title + time-of-day greeting, mono date chip in the
+ * right slot, comfortable air so the sunset wash breathes. Scope: dashboard
+ * only; every other page keeps the compact centered band above. */
+.page-header-dashboard {
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .page-header-dashboard {
+    padding-top: 1.5rem;
+  }
+}
+
+.page-header-dashboard > div:has(> .page-title) {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.page-header-dashboard .page-title {
+  justify-content: flex-start;
+}
+
+.page-greeting {
+  @apply text-[13px] leading-relaxed text-muted-foreground;
+  margin-top: 2px;
+}
+
+.page-header-chip {
+  font-family: var(--font-mono-jb), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(var(--color-muted-foreground));
+  white-space: nowrap;
+  padding-bottom: 7px;
+}
+
+/*
+ * Page title — Space Grotesk sentence case framed by drafting-style corner
+ * brackets (per approved artifact: 9px brackets, full title height, muted ink).
+ * Pseudo-elements, no markup change. Yellow deliberately NOT used — reserved
+ * for actions.
+ */
 .page-title {
-  @apply text-[20px] font-semibold tracking-tight text-foreground sm:text-[22px];
+  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-weight: 700;
+  font-size: clamp(22px, 4vw, 30px);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  @apply text-foreground;
+}
+
+.page-title::before,
+.page-title::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 9px;
+  border-block: 1.5px solid rgb(var(--color-muted-foreground));
+}
+
+.page-title::before {
+  border-left: 1.5px solid rgb(var(--color-muted-foreground));
+}
+
+.page-title::after {
+  border-right: 1.5px solid rgb(var(--color-muted-foreground));
 }
 
 .hub-row-title {
@@ -297,17 +464,6 @@ html[data-nav-pending] .page {
   font-family: var(--font-ui);
   font-weight: 700;
   @apply text-[13.915px] leading-none tracking-tight text-foreground;
-}
-
-/* Primary nav — weight step only (Airbnb-style active yellow). */
-.bottom-nav .nav-tab-label {
-  font-family: var(--font-ui);
-  font-weight: 500;
-  @apply tracking-tight;
-}
-
-.bottom-nav a[data-active="true"] .nav-tab-label {
-  font-weight: 700;
 }
 
 .sidebar-nav .nav-sidebar-label {
@@ -351,6 +507,11 @@ html[data-nav-pending] .page {
   @apply font-mono text-[10px] uppercase tracking-[0.28em] text-faint;
 }
 
+/* Card eyebrow — same mono micro-label, but yellow (accent). Stat/table labels stay faint via .type-data-label. */
+.eyebrow-label {
+  @apply font-mono text-[10px] uppercase tracking-[0.28em] text-primary;
+}
+
 /* Timestamps and IDs — mono data voice without uppercase/tracking. */
 .type-timestamp {
   @apply font-mono text-[10px] tabular-nums text-faint;
@@ -361,7 +522,7 @@ html[data-nav-pending] .page {
   @apply font-mono text-[10px] uppercase tracking-[0.28em] text-faint font-normal;
 }
 
-/* Strong emphasis (.ui-strong / .btn-brand): Inter bold, normal case. */
+/* Strong emphasis (.ui-strong / .btn-brand): Sora bold, normal case. */
 :where(.ui-strong, .btn-brand) {
   font-family: var(--font-ui);
   font-weight: 700;
@@ -369,7 +530,7 @@ html[data-nav-pending] .page {
   text-transform: none;
 }
 
-/* Field / filter labels — Inter medium. */
+/* Field / filter labels — Sora medium. */
 .ui-label-caps {
   @apply text-xs font-medium tracking-normal text-muted-foreground;
 }
@@ -378,7 +539,7 @@ html[data-nav-pending] .page {
   @apply text-xs font-medium text-muted-foreground leading-snug;
 }
 
-/* Inputs, selects, compact controls — Inter at 14px. */
+/* Inputs, selects, compact controls — Sora at 14px. */
 .ui-control {
   @apply text-sm font-normal leading-snug;
 }
@@ -392,12 +553,12 @@ html[data-nav-pending] .page {
 }
 
 .page-body {
-  @apply flex flex-1 flex-col gap-3 py-3 min-w-0;
+  @apply flex flex-1 flex-col gap-3 pt-2 pb-3 min-w-0;
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
 }
 
-/** Hints, save feedback, and compact supporting copy below labels. */
+/* Hints, save feedback, and compact supporting copy below labels. */
 .ui-caption {
   @apply text-[11px] leading-snug text-muted-foreground;
 }
@@ -471,14 +632,7 @@ html.video-overlay-fullscreen-active body {
   overflow: hidden;
 }
 
-/* SurfaceCard — original hero radials on one layer; fade in on hover, subtle drift. */
-.surface-card-glow {
-  background-image: var(--surface-card-glow-image);
-  transform-origin: 50% 50%;
-  animation: surface-card-glow-drift 14s ease-in-out infinite;
-}
-
-/* Primary actions — solid yellow fill, subtle top highlight, Inter. */
+/* Primary actions — solid yellow fill, subtle top highlight, Sora. */
 .primary-action-chip {
   position: relative;
   isolation: isolate;
@@ -528,54 +682,4 @@ html.video-overlay-fullscreen-active body {
   );
 }
 
-.surface-card-hairline {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 214, 10, 0.55),
-    transparent
-  );
-}
-
-@keyframes surface-card-glow-drift {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1.06);
-  }
-  50% {
-    transform: translate(-1.2%, 0.8%) scale(1.08);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .surface-card-glow {
-    animation: none;
-    transform: scale(1.06);
-  }
-  .surface-card-glow-idle {
-    animation: none;
-    transform: scale(1.06);
-  }
-}
-
-/* Always-visible slow drift — signals an interactive tappable card (e.g. copy last run). */
-.surface-card-glow-idle {
-  background-image:
-    radial-gradient(120% 140% at 100% 0%, rgba(255, 214, 10, 0.14), transparent 55%),
-    radial-gradient(120% 120% at 0% 110%, rgba(72, 68, 64, 0.16), transparent 60%);
-  transform-origin: 50% 50%;
-  animation: surface-card-glow-drift-idle 22s ease-in-out infinite;
-}
-
-@keyframes surface-card-glow-drift-idle {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1.06);
-  }
-  33% {
-    transform: translate(-1.5%, 1%) scale(1.085);
-  }
-  66% {
-    transform: translate(1%, -0.8%) scale(1.07);
-  }
-}
+/* Hairline / glow surfaces retired June 2026 — cards use `.glass-card` (frosted). */

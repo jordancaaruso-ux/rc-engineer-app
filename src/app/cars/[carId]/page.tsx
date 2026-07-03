@@ -225,10 +225,7 @@ export default async function CarDetailPage(props: {
                     key={ts.id}
                     className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
                   >
-                    <span className="text-foreground">
-                      {ts.label}
-                      {ts.setNumber != null ? ` · Set #${ts.setNumber}` : ""}
-                    </span>
+                    <span className="text-foreground">{ts.label}</span>
                     <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
                       {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} on this car · set
                       total {globalTireCount.get(ts.id) ?? "—"}

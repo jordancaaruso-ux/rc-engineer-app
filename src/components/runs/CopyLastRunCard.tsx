@@ -37,7 +37,6 @@ export function CopyLastRunCard({
     >
       <SurfaceCard
         variant="panel"
-        glowMode={inactive ? "none" : "idle-drift"}
         muted={applied}
         className={cn(
           "transition-shadow duration-300",
@@ -56,7 +55,7 @@ export function CopyLastRunCard({
           <Copy className="h-4 w-4" strokeWidth={2} />
         </span>
         <div className="min-w-0 flex-1">
-          <Eyebrow dot="accent">Last run</Eyebrow>
+          <Eyebrow>Last run</Eyebrow>
           <p
             className={cn(
               "mt-2 text-[13px] leading-relaxed break-words",

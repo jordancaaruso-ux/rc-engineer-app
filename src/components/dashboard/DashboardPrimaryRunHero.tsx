@@ -38,7 +38,7 @@ export function DashboardPrimaryRunHero({
 
   return (
     <SurfaceCard variant="hero">
-      <Eyebrow dot="accent">
+      <Eyebrow>
         {todayRunCount > 0
           ? `Today · ${todayRunCount} run${todayRunCount === 1 ? "" : "s"}`
           : "Today"}
@@ -46,7 +46,7 @@ export function DashboardPrimaryRunHero({
 
       <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          {todayDraftRunId ? <Eyebrow dot="accent">Unfinished run</Eyebrow> : null}
+          {todayDraftRunId ? <Eyebrow>Unfinished run</Eyebrow> : null}
           <PanelTitle as="h2" className="mt-1">
             {primaryAction.label}
           </PanelTitle>

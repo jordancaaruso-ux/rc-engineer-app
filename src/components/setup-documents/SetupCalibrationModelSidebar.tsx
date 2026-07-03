@@ -80,7 +80,7 @@ export function SetupCalibrationModelSidebar(props: {
   return (
     <div className="space-y-3 text-xs">
       <CardPanel className="border-primary/30 bg-primary/10" contentClassName="p-3">
-        <Eyebrow dot="accent">Map PDF to parameters</Eyebrow>
+        <Eyebrow>Map PDF to parameters</Eyebrow>
         <ol className="mt-2 list-decimal space-y-1 pl-4 text-[11px] text-muted-foreground">
           <li>Click one or more PDF controls on the left</li>
           <li>

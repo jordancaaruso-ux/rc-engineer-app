@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { GripVertical, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
@@ -258,22 +258,22 @@ export function ActionItemListPanel({
                   }
                 }}
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1",
+                  "flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5",
                   draggingId === i.id && "opacity-50",
                   showDropAbove && "shadow-[inset_0_2px_0_0_rgb(var(--color-primary))]",
                   showDropBelow && "shadow-[inset_0_-2px_0_0_rgb(var(--color-primary))]"
                 )}
               >
                 <div
-                  className="shrink-0 cursor-grab select-none px-0.5 text-xs leading-none text-muted-foreground"
+                  className="shrink-0 cursor-grab select-none px-0.5 leading-none text-muted-foreground/70"
                   title="Drag to reorder"
                   aria-label="Drag to reorder"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  ⋮⋮
+                  <GripVertical className="size-4" strokeWidth={2} aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-base leading-snug text-foreground whitespace-pre-wrap break-words">
+                  <p className="text-sm font-medium leading-snug tracking-tight text-foreground whitespace-pre-wrap break-words">
                     {i.text}
                   </p>
                 </div>

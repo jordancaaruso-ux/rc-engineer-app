@@ -16,6 +16,7 @@ import { loadingSkeletonForPath } from "@/components/ui/PageSkeletons";
 
 type RouteTransitionContextValue = {
   beginTransition: (href: string) => void;
+  cancelTransition: () => void;
 };
 
 const RouteTransitionContext = createContext<RouteTransitionContextValue | null>(null);
@@ -31,6 +32,13 @@ function pathsMatch(current: string, target: string): boolean {
 
 /** Minimum overlay hold so pathname can commit before segment loading.tsx paints. */
 const OVERLAY_MIN_HOLD_MS = 180;
+
+/**
+ * Backstop: if `beginTransition` paints the overlay but navigation never commits
+ * (e.g. a touch `pointerdown` that turns into a scroll, not a tap), self-dismiss
+ * so the overlay can't strand and hide the whole page.
+ */
+const OVERLAY_MAX_HOLD_MS = 1500;
 
 export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -50,10 +58,23 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
     });
   }, [pathname]);
 
+  const cancelTransition = useCallback(() => {
+    setShowOverlay(false);
+    setPendingHref(null);
+  }, []);
+
   useLayoutEffect(() => {
     if (!pendingHref || !showOverlay) return;
     const current = normalizePath(pathname ?? "");
-    if (!pathsMatch(current, pendingHref)) return;
+    if (!pathsMatch(current, pendingHref)) {
+      // Navigation hasn't committed. If it never does (scroll gesture, cancelled
+      // tap), force-dismiss so the overlay can't strand and hide the page.
+      const strandGuard = window.setTimeout(() => {
+        setShowOverlay(false);
+        setPendingHref(null);
+      }, OVERLAY_MAX_HOLD_MS);
+      return () => window.clearTimeout(strandGuard);
+    }
 
     // Pathname can update before App Router mounts segment loading.tsx — hold the
     // branded skeleton until a minimum dwell + extra paints so <main> never gaps.
@@ -88,13 +109,13 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   }, [pathname, pendingHref, showOverlay]);
 
   const value = useMemo(
-    (): RouteTransitionContextValue => ({ beginTransition }),
-    [beginTransition]
+    (): RouteTransitionContextValue => ({ beginTransition, cancelTransition }),
+    [beginTransition, cancelTransition]
   );
 
   return (
     <RouteTransitionContext.Provider value={value}>
-      <div className="flex min-h-[100dvh] flex-1 flex-col bg-background md:min-h-0">
+      <div className="flex min-h-[100dvh] flex-1 flex-col md:min-h-0">
         {children}
       </div>
       {showOverlay && pendingHref ? (

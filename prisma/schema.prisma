@@ -402,7 +402,7 @@ model TireSet {
   id         String   @id @default(cuid())
   /** Denormalized display label; legacy rows may use this without tireTypeId. */
   label      String
-  setNumber  Int      @default(1) // individual set number
+  setNumber  Int      @default(1) // internal per-compound counter (max+1 on create) — never shown as identity
   initialRunCount Int @default(0) // optional starting run count (usually 0)
   /** Optional insert (e.g. medium soft). */
   insertLabel String?

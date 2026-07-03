@@ -99,7 +99,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
         onClick={() => setOpen((o) => !o)}
       >
         <div>
-          <Eyebrow dot="accent">Quick add parameters</Eyebrow>
+          <Eyebrow>Quick add parameters</Eyebrow>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             Name the field, pick a value type, add it — then map each row to an AcroForm control (dropdown or use the
             Form tab and click the PDF).

@@ -61,13 +61,13 @@ export async function POST(request: Request) {
 
     const tireTypeId = body.tireTypeId?.trim();
     if (tireTypeId) {
-      const setNumber =
+      // `setNumber` is now optional: when omitted we auto-assign the next number for this
+      // compound (max + 1). An explicit number is still honored — used by edit / copy-last-run
+      // flows that intentionally target a specific existing set (idempotent create below).
+      const explicitSetNumber =
         typeof body.setNumber === "number" && Number.isFinite(body.setNumber) && body.setNumber >= 1
           ? Math.floor(body.setNumber)
           : null;
-      if (setNumber == null) {
-        return NextResponse.json({ error: "setNumber is required when tireTypeId is set" }, { status: 400 });
-      }
 
       const tireType = await prisma.tireType.findUnique({
         where: { id: tireTypeId },
@@ -77,28 +77,41 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
       }
 
-      const existing = await prisma.tireSet.findFirst({
-        where: { userId: user.id, tireTypeId, setNumber },
-        select: TIRE_SET_SELECT,
-      });
-      if (existing) {
-        const needsUpdate =
-          (specificModel != null && specificModel !== existing.specificModel) ||
-          (insertLabel && insertLabel !== existing.insertLabel) ||
-          (wheelLabel && wheelLabel !== existing.wheelLabel);
-        const updated = needsUpdate
-          ? await prisma.tireSet.update({
-              where: { id: existing.id },
-              data: {
-                specificModel: specificModel ?? existing.specificModel,
-                insertLabel: insertLabel ?? existing.insertLabel,
-                wheelLabel: wheelLabel ?? existing.wheelLabel,
-              },
-              select: TIRE_SET_SELECT,
-            })
-          : existing;
-        return NextResponse.json({ tireSet: updated }, { status: 200 });
+      // Only the explicit-number path dedups onto an existing set. Auto-assign always mints a
+      // fresh set (next number) so "New set" never silently reuses a physically different set.
+      if (explicitSetNumber != null) {
+        const existing = await prisma.tireSet.findFirst({
+          where: { userId: user.id, tireTypeId, setNumber: explicitSetNumber },
+          select: TIRE_SET_SELECT,
+        });
+        if (existing) {
+          const needsUpdate =
+            (specificModel != null && specificModel !== existing.specificModel) ||
+            (insertLabel && insertLabel !== existing.insertLabel) ||
+            (wheelLabel && wheelLabel !== existing.wheelLabel);
+          const updated = needsUpdate
+            ? await prisma.tireSet.update({
+                where: { id: existing.id },
+                data: {
+                  specificModel: specificModel ?? existing.specificModel,
+                  insertLabel: insertLabel ?? existing.insertLabel,
+                  wheelLabel: wheelLabel ?? existing.wheelLabel,
+                },
+                select: TIRE_SET_SELECT,
+              })
+            : existing;
+          return NextResponse.json({ tireSet: updated }, { status: 200 });
+        }
       }
+
+      const setNumber =
+        explicitSetNumber ??
+        ((
+          await prisma.tireSet.aggregate({
+            where: { userId: user.id, tireTypeId },
+            _max: { setNumber: true },
+          })
+        )._max.setNumber ?? 0) + 1;
 
       const tireSet = await prisma.tireSet.create({
         data: {

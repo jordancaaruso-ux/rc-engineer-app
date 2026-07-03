@@ -8,14 +8,23 @@ import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
 import { RouteTransitionProvider } from "@/components/layout/RouteTransitionProvider";
+import { AppearanceTuner } from "@/components/dev/AppearanceTuner";
 import { cn } from "@/lib/utils";
+
+/** Dev-only: live sliders for wash/glass knobs. Compiled out of production. */
+const showTuner = process.env.NODE_ENV === "development";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const hideNav = isHiddenNavRoute(pathname);
 
   if (hideNav) {
-    return <main className="page bg-background">{children}</main>;
+    return (
+      <main className="page bg-background">
+        {children}
+        {showTuner ? <AppearanceTuner /> : null}
+      </main>
+    );
   }
 
   return (
@@ -25,7 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Sidebar />
           <main
             className={cn(
-              "page relative bg-background",
+              "page relative",
               "pb-[calc(var(--mobile-tab-bar-height)+env(safe-area-inset-bottom))] md:pb-0"
             )}
           >
@@ -37,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
          * so fixed positioning is not clipped on iOS. See globals.css stacking note.
          */}
         <BottomNav />
+        {showTuner ? <AppearanceTuner /> : null}
       </PrimaryNavProvider>
     </TodayDraftRunProvider>
   );

@@ -1,12 +1,67 @@
-import { NavHubPage } from "@/components/layout/NavHubPage";
+import type { ReactNode } from "react";
+import { requireCurrentUser } from "@/lib/currentUser";
+import { hasDatabaseUrl } from "@/lib/env";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
+import { loadAnalysisHomeModel } from "@/lib/analysis/loadAnalysisHomeModel";
+import { SessionTrendCard } from "@/components/analysis/SessionTrendCard";
+import { RecentRunsCard } from "@/components/analysis/RecentRunsCard";
+import { AnalysisVideoCard } from "@/components/analysis/AnalysisVideoCard";
+import { HubNavLink } from "@/components/layout/HubNavLink";
 import { ANALYSIS_HUB_LINKS } from "@/components/layout/navConfig";
+import { CardPanel } from "@/components/ui/CardPanel";
 
-export default function AnalysisHubPage() {
+/**
+ * Analysis debrief — the "review the day" surface: session trend chart,
+ * last four runs, latest video analysis, and the setup-comparison door.
+ */
+export default async function AnalysisHubPage(): Promise<ReactNode> {
+  if (!hasDatabaseUrl()) {
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <h1 className="page-title">Analysis</h1>
+            <p className="page-subtitle">Database not configured.</p>
+          </div>
+        </header>
+        <section className="page-body">
+          <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
+            Set <span className="font-mono">DATABASE_URL</span> in{" "}
+            <span className="font-mono">.env</span> to load your analysis.
+          </CardPanel>
+        </section>
+      </>
+    );
+  }
+
+  const [user, displayTimeZone] = await Promise.all([
+    requireCurrentUser(),
+    getExplicitTimeZoneForRunFormatting(),
+  ]);
+  const model = await loadAnalysisHomeModel(user.id, displayTimeZone);
+
+  const setupComparisonLink = ANALYSIS_HUB_LINKS.find(
+    (link) => link.href === "/setup/comparison"
+  );
+
   return (
-    <NavHubPage
-      title="Analysis"
-      subtitle="Sessions, video, and setup comparison."
-      links={ANALYSIS_HUB_LINKS}
-    />
+    <>
+      <header className="page-header">
+        <div className="min-w-0">
+          <h1 className="page-title">Analysis</h1>
+          <p className="page-subtitle">Your recent form and what&apos;s working.</p>
+        </div>
+      </header>
+      <section className="page-body flex max-w-2xl flex-col gap-3">
+        <SessionTrendCard trend={model.trend} />
+        <RecentRunsCard runs={model.recentRuns} />
+        <AnalysisVideoCard video={model.video} />
+        {setupComparisonLink ? (
+          <ul className="flex flex-col gap-2.5">
+            <HubNavLink link={setupComparisonLink} />
+          </ul>
+        ) : null}
+      </section>
+    </>
   );
 }

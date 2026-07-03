@@ -272,7 +272,7 @@ export function A800RRSetupSheet({ run, className }: { run: A800RRSetupSheetRun;
   const carName = run.car?.name ?? run.carNameSnapshot ?? "";
   const sessionLabel = run.sessionLabel?.trim() || formatRunSessionDisplay(run);
   const tiresLabel = run.tireSet
-    ? `${run.tireSet.label} · Set ${run.tireSet.setNumber ?? "—"} · Run ${run.tireRunNumber}`
+    ? `${run.tireSet.label} · run ${run.tireRunNumber}`
     : fieldValue(setupData, "tires_setup") || "";
 
   return (
