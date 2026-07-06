@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
-import { legacyTemplateFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
+import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function GET(
@@ -122,8 +122,8 @@ export async function PATCH(
         return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
       }
       data.setupSheetModelId = model.id;
-      const legacy = legacyTemplateFromModelSlug(model.slug);
-      if (legacy) data.setupSheetTemplate = legacy;
+      // Keep the template key in sync with the model — community aggregations bucket by it.
+      data.setupSheetTemplate = templateKeyFromModelSlug(model.slug);
     }
   }
   if (Object.keys(data).length === 0) {

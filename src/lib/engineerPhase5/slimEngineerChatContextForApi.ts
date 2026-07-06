@@ -230,6 +230,9 @@ const SLIM_PASSES: SlimPass[] = [
     ctx.runCatalog = null;
     ctx.patternDigest = null;
     ctx.resolvedScopeTireSteps = null;
+    if (isRecord(ctx.setupOutcomeMemory) && Array.isArray(ctx.setupOutcomeMemory.rows)) {
+      ctx.setupOutcomeMemory = { ...ctx.setupOutcomeMemory, rows: ctx.setupOutcomeMemory.rows.slice(0, 6) };
+    }
     if (isRecord(ctx.richEngineerContext) && isRecord(ctx.richEngineerContext.setupVsSpread)) {
       const rows = ctx.richEngineerContext.setupVsSpread.rows;
       if (Array.isArray(rows) && rows.length > 22) {
@@ -243,6 +246,14 @@ const SLIM_PASSES: SlimPass[] = [
         };
       }
     }
+  },
+  // Caveat-only memory goes before pairwise evidence: setupOutcomeMemory may never drive
+  // or change a suggestion (prompt contract), while engineerSummary / spread rows carry
+  // the what-changed and vs-field specifics that keep advice non-generic — measured
+  // 2026-07-06: outcome-memory rows were 40%+ of a tight payload while engineerSummary
+  // was nulled, and the bench diagnose case went generic.
+  (ctx) => {
+    ctx.setupOutcomeMemory = null;
   },
   (ctx) => {
     ctx.engineerSummary = null;

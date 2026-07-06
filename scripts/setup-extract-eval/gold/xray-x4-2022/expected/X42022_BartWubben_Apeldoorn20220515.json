@@ -1,0 +1,141 @@
+{
+  "status": "verified",
+  "note": "Transcribed by Claude from the sheet image 2026-07-06; founder-verified spot-on 2026-07-06.",
+  "fields": {
+    "race": "TOS Apeldoorn",
+    "track": "AMCA",
+    "driver_name": "Bart Wubben",
+    "date": "15-5-2022",
+    "track_temperature": "25",
+    "qual_position": "13",
+    "final_position": "13",
+    "best_laptime": "16.2",
+    "track_surface": "asphalt",
+    "track_layout": "fast",
+    "traction": "medium",
+    "solid_axle": "yes",
+    "gear_diff_oil_front": "",
+    "gear_diff_oil_rear": "8000",
+    "pinion": "42",
+    "spur_gear": "100",
+    "final_drive_ratio": "4.52",
+    "spring_front": "2.5-2.8",
+    "spring_rear": "2.7",
+    "shock_oil_front": "350",
+    "shock_oil_rear": "350",
+    "rebound_front": "0",
+    "rebound_rear": "0",
+    "foam_inserts_front": "no",
+    "foam_inserts_rear": "no",
+    "pistons_front": "4 holes",
+    "pistons_rear": "4 holes",
+    "piston_hole_front": "1.1",
+    "piston_hole_rear": "1.1",
+    "shock_length_front": "",
+    "shock_length_rear": "",
+    "arb_front": "1.2",
+    "arb_rear": "1.2",
+    "tires_front": "matrix 36",
+    "tires_rear": "matrix 36",
+    "additive_front": "MR33 V3",
+    "additive_rear": "MR33 V3",
+    "additive_timing_front": "15min",
+    "additive_timing_rear": "15min",
+    "total_weight": "1320",
+    "weight_balance_front": "49",
+    "weight_balance_rear": "51",
+    "motor": "ETS",
+    "motor_timing": "",
+    "esc": "ETS",
+    "batteries": "LRP",
+    "body": "Wolverine",
+    "wing": "STD",
+    "body_height_front": {
+      "value": "x",
+      "accept": [
+        ""
+      ]
+    },
+    "body_mount_upper": "",
+    "body_height_rear": "",
+    "wing_side_plate": "yes",
+    "front_caster": {
+      "value": "3",
+      "accept": [
+        "3°",
+        "3 deg"
+      ]
+    },
+    "rear_caster": {
+      "value": "3.5",
+      "accept": [
+        "3.5°"
+      ]
+    },
+    "bump_steer": "3.5",
+    "fr_susp_height": {
+      "value": "x",
+      "accept": [
+        ""
+      ]
+    },
+    "fr_susp_shim": {
+      "value": "x",
+      "accept": [
+        ""
+      ]
+    },
+    "toe_gain": "5",
+    "shim_ff": "2",
+    "shim_fr": "2",
+    "shim_rf": "3",
+    "shim_rr": "3",
+    "ride_height_front": "5.4",
+    "ride_height_rear": "5.4",
+    "servo_saver_or_horn": "",
+    "camber_front": "2",
+    "body_stop_front": "yes",
+    "body_stop_front_height": {
+      "value": "x",
+      "accept": [
+        ""
+      ]
+    },
+    "front_brace": "no",
+    "bulkhead_shims": "yes",
+    "front_shock_position": "1",
+    "driveshaft_front": "",
+    "driveshaft_front_type": "std",
+    "downstop_front": "5.6",
+    "front_hub": "",
+    "camber_rear": "2",
+    "rear_body_post": "horizontal",
+    "rear_shock_position": "1",
+    "driveshaft_rear": "",
+    "driveshaft_rear_type": "std",
+    "downstop_rear": "4.5",
+    "rear_hub": "composite",
+    "rear_hub_shim": "1",
+    "toe_out_front": "0.5",
+    "toe_in_rear": "2.5",
+    "ackermann_shim": "1",
+    "diff_position_front": "up",
+    "diff_position_rear": "up",
+    "upper_arm_front": "standard",
+    "upper_arm_rear": "standard",
+    "steering_bridge": "",
+    "top_deck_flex": "",
+    "top_deck_thickness": "2.0mm",
+    "offset_front": "-0.5mm",
+    "offset_rear": "standard",
+    "top_deck_splitted": "yes",
+    "steering_lock": "27",
+    "steering_shim": "0",
+    "chassis": "graphite",
+    "t_brace": "",
+    "front_arms": "medium",
+    "rear_arms": "hard",
+    "steering_plate": "standard",
+    "comments": "Pretty good base setup, needs more steering to be faster. PSS made it not faster."
+  }
+}

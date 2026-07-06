@@ -5,6 +5,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { canManageCalibration } from "@/lib/setupCalibrations/calibrationAccess";
+import { canEditSetupSheetModel } from "@/lib/setupSheetModels/modelAccess";
 import { normalizeSetupSheetModelSchemaFields } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import {
   invalidateAuthorizedSetupSheetCatalogCache,
@@ -22,17 +23,7 @@ function normalizeSchema(schema: SetupSheetModelSchema | null): SetupSheetModelS
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
-/**
- * Models are global. Only an admin — or the creator while the model is still unauthorized — may
- * edit a shared model's name/schema or delete it. Authorizing a model is admin-only.
- */
-function canEditModel(
-  user: { id: string; email: string | null },
-  model: { userId: string | null; isAuthorized: boolean }
-): boolean {
-  if (isAuthAdminEmail(user.email)) return true;
-  return model.userId === user.id && !model.isAuthorized;
-}
+const canEditModel = canEditSetupSheetModel;
 
 export async function GET(_request: Request, ctx: RouteCtx) {
   if (!hasDatabaseUrl()) {

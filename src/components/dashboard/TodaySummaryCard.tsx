@@ -129,7 +129,7 @@ function TodayBestPanel({
   }
   return (
     <div className="space-y-2.5">
-      <StatStrip className="grid-cols-2">
+      <StatStrip gridClassName="grid-cols-2">
         <StatTile label="Best lap" value={formatLap(todayBestLap)} accent />
         <StatTile label="Best avg top 5" value={formatLap(todayBestAvgTop5)} />
       </StatStrip>

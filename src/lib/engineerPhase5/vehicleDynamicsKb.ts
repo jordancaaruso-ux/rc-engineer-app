@@ -100,6 +100,60 @@ type ScoredChunk = {
   snippet: VehicleDynamicsKbSnippet;
 };
 
+export type FullVehicleDynamicsKb = {
+  /** All KB files concatenated with `=== vehicle-dynamics/<file> ===` separators. */
+  markdown: string;
+  /** Filenames included, sorted (stable order keeps the prompt-cache prefix stable). */
+  files: string[];
+  totalChars: number;
+};
+
+let fullKbCache: FullVehicleDynamicsKb | null = null;
+let fullKbLoadPromise: Promise<FullVehicleDynamicsKb> | null = null;
+
+/**
+ * Whole-corpus load for full-KB-in-context advice turns (ENGINEER_NORTH_STAR.md, KB
+ * architecture): every `.md` under `content/vehicle-dynamics/` except README, sorted by
+ * filename so the concatenation is byte-stable across requests. Cached per process like
+ * the retrieval index.
+ */
+export async function loadFullVehicleDynamicsKb(): Promise<FullVehicleDynamicsKb> {
+  if (fullKbCache) return fullKbCache;
+  if (!fullKbLoadPromise) {
+    fullKbLoadPromise = (async () => {
+      let files: string[] = [];
+      try {
+        files = (await fs.readdir(KB_DIR))
+          .filter((f) => f.endsWith(".md") && f.toLowerCase() !== "readme.md")
+          .sort();
+      } catch {
+        const empty = { markdown: "", files: [], totalChars: 0 };
+        fullKbCache = empty;
+        return empty;
+      }
+      const parts: string[] = [];
+      const included: string[] = [];
+      for (const file of files) {
+        let raw = "";
+        try {
+          raw = await fs.readFile(path.join(KB_DIR, file), "utf8");
+        } catch {
+          continue;
+        }
+        const body = raw.trim();
+        if (!body) continue;
+        parts.push(`=== vehicle-dynamics/${file} ===\n\n${body}`);
+        included.push(file);
+      }
+      const markdown = parts.join("\n\n");
+      const out = { markdown, files: included, totalChars: markdown.length };
+      fullKbCache = out;
+      return out;
+    })();
+  }
+  return fullKbLoadPromise;
+}
+
 type KbIndexEntry = {
   title: string;
   body: string;

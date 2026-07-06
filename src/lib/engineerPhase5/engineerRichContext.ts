@@ -9,6 +9,13 @@ import { buildParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffec
 import type { ParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/types";
 import { formatGripTagsForDisplay, formatLayoutTagsForDisplay } from "@/lib/trackMetaTags";
 import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
+import {
+  describeSky,
+  formatConditionsSummary,
+  isConditionsEmpty,
+} from "@/lib/weather/conditions";
+import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
+import { temperatureBand, temperatureBandLabel } from "@/lib/weather/temperatureBands";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import {
@@ -59,6 +66,22 @@ export type EngineerRichContextV1 = {
     layoutTags: string[];
     gripSummary: string;
     layoutSummary: string;
+  };
+  /** Named layout ran this session (descriptive), plus optional CW/CCW direction. */
+  layout: string | null;
+  direction: "CW" | "CCW" | null;
+  /** Weather / conditions captured for the anchor run (metric); null when none logged. */
+  conditions: null | {
+    summary: string | null;
+    airTempC: number | null;
+    trackTempC: number | null;
+    temperatureBand: "cool" | "mild" | "warm" | "hot" | null;
+    temperatureBandLabel: string | null;
+    sky: string | null;
+    wet: boolean | null;
+    humidityPct: number | null;
+    windKph: number | null;
+    source: string | null;
   };
   /**
    * Linked `ImportedLapTimeSession.fieldStatsJson` on this run (full parsed field); null when unlinked or empty.
@@ -138,6 +161,15 @@ const runSelectRich = {
   tireRunNumber: true,
   additiveTypeId: true,
   warmerTimingMinutes: true,
+  conditionsAirTempC: true,
+  conditionsTrackTempC: true,
+  conditionsCloudCoverPct: true,
+  conditionsWeatherCode: true,
+  conditionsHumidityPct: true,
+  conditionsWindKph: true,
+  conditionsWindDirDeg: true,
+  conditionsSource: true,
+  conditionsObservedAt: true,
   carId: true,
   trackId: true,
   eventId: true,
@@ -150,6 +182,9 @@ const runSelectRich = {
   track: {
     select: { id: true, name: true, location: true, gripTags: true, layoutTags: true },
   },
+  trackLayout: { select: { name: true } },
+  trackLayoutNameSnapshot: true,
+  trackDirection: true,
   event: { select: { id: true, raceClass: true } },
   tireSet: {
     select: {
@@ -225,6 +260,9 @@ export async function buildEngineerRichContextV1(params: {
       sessionClass: { label: null, source: "none" },
       tires: null,
       track: null,
+      layout: null,
+      direction: null,
+      conditions: null,
       importedSessionFieldStats: null,
       runPacingContext: null,
       setupVsSpread: {
@@ -335,6 +373,7 @@ export async function buildEngineerRichContextV1(params: {
           userId: params.userId,
           carId: run.carId,
           conditionSignature: conditionSig,
+          temperatureBand: temperatureBand(run.conditionsAirTempC),
           spreadRows: spread.rows,
         })
       : null;
@@ -438,6 +477,26 @@ export async function buildEngineerRichContextV1(params: {
           layoutSummary: formatLayoutTagsForDisplay(run.track.layoutTags ?? []),
         }
       : null,
+    layout: run.trackLayout?.name ?? run.trackLayoutNameSnapshot ?? null,
+    direction: run.trackDirection ?? null,
+    conditions: (() => {
+      const c = runConditionsFromRecord(run);
+      if (isConditionsEmpty(c)) return null;
+      const band = temperatureBand(c.airTempC);
+      const sky = describeSky(c.weatherCode, c.cloudCoverPct);
+      return {
+        summary: formatConditionsSummary(c),
+        airTempC: c.airTempC,
+        trackTempC: c.trackTempC,
+        temperatureBand: band,
+        temperatureBandLabel: band ? temperatureBandLabel(band) : null,
+        sky: sky?.label ?? null,
+        wet: sky?.wet ?? null,
+        humidityPct: c.humidityPct,
+        windKph: c.windKph,
+        source: c.source,
+      };
+    })(),
     importedSessionFieldStats,
     runPacingContext,
     setupVsSpread: {

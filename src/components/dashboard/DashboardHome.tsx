@@ -4,7 +4,8 @@ import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
 import { DashboardPreviousRunCard } from "@/components/dashboard/DashboardPreviousRunCard";
-import { DashboardPrimaryRunHero } from "@/components/dashboard/DashboardPrimaryRunHero";
+import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
+import { IdeasSheetFab } from "@/components/dashboard/IdeasSheetFab";
 import { DashboardEngineerSuggestionsSection } from "@/components/dashboard/DashboardEngineerSuggestionsSection";
 import { SHOW_DASHBOARD_ENGINEER_SUGGESTIONS } from "@/lib/featureFlags";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
@@ -52,6 +53,7 @@ export function DashboardHome({
     recentRun,
     thingsToTry,
     thingsToDo,
+    summary,
     todayRunCount,
     todayDraftRunId,
     todayDraftSavedAt,
@@ -72,7 +74,8 @@ export function DashboardHome({
       </header>
 
       <section className="page-body max-w-3xl">
-        <DashboardPrimaryRunHero
+        <DashboardSummaryCard
+          summary={summary}
           todayRunCount={todayRunCount}
           serverDraftRunId={todayDraftRunId}
           serverDraftSavedAt={todayDraftSavedAt}
@@ -102,7 +105,9 @@ export function DashboardHome({
           <FeaturedMeetingCard featuredEvent={featuredEvent} />
         ) : null}
 
-        <CardPanel contentClassName="space-y-3">
+        {/* Desktop keeps the inline Try/Do card (there's room + no FAB); mobile
+            gets the same lists via the bottom-left Ideas sheet below. */}
+        <CardPanel className="hidden md:block" contentClassName="space-y-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <ActionItemListPanel
               list="try"
@@ -121,6 +126,8 @@ export function DashboardHome({
           </div>
         </CardPanel>
       </section>
+
+      <IdeasSheetFab thingsToTry={thingsToTry} thingsToDo={thingsToDo} />
     </>
   );
 }
@@ -182,10 +189,13 @@ function FeaturedMeetingCard({
       </div>
 
       {featuredEvent.runCount > 0 ? (
-        <StatStrip className={isActive ? "mt-2.5 grid-cols-2 sm:grid-cols-3" : "relative z-10 mt-2.5 grid-cols-2 sm:grid-cols-3 pointer-events-none"}>
+        <StatStrip
+          className={isActive ? "mt-2.5" : "relative z-10 mt-2.5 pointer-events-none"}
+          gridClassName="grid-cols-2 sm:grid-cols-3"
+        >
           <StatTile label="Best lap" value={formatLap(featuredEvent.latest?.bestLap ?? null)} accent className="py-2" />
           <StatTile label="Avg top 5" value={formatLap(featuredEvent.latest?.avgTop5 ?? null)} className="py-2" />
-          <div className="col-span-2 bg-background/55 px-3 py-2 sm:col-span-1">
+          <div className="col-span-2 border-l border-t border-border px-3 py-2 sm:col-span-1">
             <div className="type-data-label">Notes</div>
             <div className="mt-1 line-clamp-2 break-words text-[13px] leading-relaxed text-muted-foreground">
               {featuredEvent.latest?.notesPreview ?? "—"}

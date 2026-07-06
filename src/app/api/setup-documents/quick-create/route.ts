@@ -14,7 +14,7 @@ import {
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
-import { legacyTemplateFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
+import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import type { RepickOutcome } from "@/lib/setupCalibrations/autoPickCalibration";
 import {
   applyPostFingerprintPickLinks,
@@ -129,7 +129,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     setupSheetModelId = modelRow.id;
     carSetupSheetModelName = modelRow.name;
-    setupSheetTemplate = legacyTemplateFromModelSlug(modelRow.slug) ?? modelRow.slug;
+    setupSheetTemplate = templateKeyFromModelSlug(modelRow.slug);
   }
 
   if (explicitCarIdProvided) {
@@ -150,7 +150,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       setupSheetModelId = carRow.setupSheetModel.id;
       carSetupSheetModelName = carRow.setupSheetModel.name;
       setupSheetTemplate =
-        legacyTemplateFromModelSlug(carRow.setupSheetModel.slug) ?? carRow.setupSheetModel.slug;
+        templateKeyFromModelSlug(carRow.setupSheetModel.slug);
     } else if (!setupSheetTemplate) {
       setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carId);
     }
@@ -270,7 +270,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       detectedModelName = cal.setupSheetModel.name;
       setupSheetModelId = detectedModelId;
       setupSheetTemplate =
-        legacyTemplateFromModelSlug(cal.setupSheetModel.slug) ?? cal.setupSheetModel.slug;
+        templateKeyFromModelSlug(cal.setupSheetModel.slug);
     }
   }
 

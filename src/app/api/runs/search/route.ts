@@ -7,6 +7,7 @@ import { canViewPeerRuns, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
 import {
   applyRunHistoryPostFilters,
   buildRunHistoryPrismaWhere,
+  computeChangedKeysByRun,
   parseRunHistoryFilters,
   sortRunsForHistory,
 } from "@/lib/runs/runHistoryFilters";
@@ -80,8 +81,12 @@ export async function GET(request: Request) {
     },
   });
 
+  // Setup data is inline on these rows; changed-keys diffing only when the filter asks for it.
+  const changedKeysByRunId = filters.setupChangedField
+    ? computeChangedKeysByRun(runs)
+    : undefined;
   const filtered = sortRunsForHistory(
-    applyRunHistoryPostFilters(runs, filters, displayTimeZone),
+    applyRunHistoryPostFilters(runs, filters, displayTimeZone, { changedKeysByRunId }),
     filters.sort
   );
 

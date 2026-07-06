@@ -121,8 +121,9 @@ export default async function SetupDocumentDetailPage({
       reviewSetupTemplate = buildSetupSheetTemplateFromParsedSchema(model.id, model.name, model.schema);
       docSetupSheetModelName = model.name;
     }
-    const modelRow = await prisma.setupSheetModel.findFirst({
-      where: { id: modelIdForTemplate, userId: user.id },
+    // Setup sheet models are global — never scope this read by userId.
+    const modelRow = await prisma.setupSheetModel.findUnique({
+      where: { id: modelIdForTemplate },
       select: { defaultCalibrationId: true },
     });
     defaultCalibrationIdForDocModel = modelRow?.defaultCalibrationId ?? null;

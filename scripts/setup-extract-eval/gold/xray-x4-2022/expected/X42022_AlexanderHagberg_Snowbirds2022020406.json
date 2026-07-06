@@ -1,0 +1,171 @@
+{
+  "status": "verified",
+  "note": "Transcribed by Claude from the sheet image 2026-07-06; founder-verified spot-on 2026-07-06.",
+  "fields": {
+    "race": "2022 Snowbird Nationals",
+    "track": "Wyndham Resort",
+    "driver_name": "Alexander Hagberg",
+    "date": "02/06/22",
+    "track_temperature": "",
+    "qual_position": "2",
+    "final_position": "3",
+    "best_laptime": "9.2",
+    "track_surface": "carpet",
+    "track_layout": "mixed",
+    "traction": "medium",
+    "solid_axle": "yes",
+    "gear_diff_oil_front": "",
+    "gear_diff_oil_rear": "8000",
+    "pinion": "28",
+    "spur_gear": "110",
+    "final_drive_ratio": "",
+    "spring_front": "2.5-2.8",
+    "spring_rear": "2.5-2.8",
+    "shock_oil_front": "450",
+    "shock_oil_rear": "450",
+    "rebound_front": "0",
+    "rebound_rear": "0",
+    "foam_inserts_front": "no",
+    "foam_inserts_rear": "no",
+    "pistons_front": "pss",
+    "pistons_rear": "pss",
+    "piston_hole_front": "",
+    "piston_hole_rear": "",
+    "shock_length_front": "8.5",
+    "shock_length_rear": {
+      "value": "9.0",
+      "accept": [
+        "9"
+      ]
+    },
+    "arb_front": "1.3",
+    "arb_rear": "1.3",
+    "tires_front": "Jaco Blue",
+    "tires_rear": "Jaco Blue",
+    "additive_front": "Mighty Gripper V3 Yellow",
+    "additive_rear": "Mighty Gripper V3 Yellow",
+    "additive_timing_front": "7",
+    "additive_timing_rear": "7",
+    "total_weight": "1330",
+    "weight_balance_front": "50",
+    "weight_balance_rear": "50",
+    "motor": "HW G3 5.0T",
+    "motor_timing": "",
+    "esc": "XR10 PRO G2S",
+    "batteries": "Sunpadow 3800 LCG",
+    "body": "Twister UL",
+    "wing": "Twister 0.5",
+    "body_height_front": "67",
+    "body_mount_upper": "29.5",
+    "body_height_rear": "64.5",
+    "wing_side_plate": "yes",
+    "front_caster": {
+      "value": "4",
+      "accept": [
+        "4°",
+        "4 deg"
+      ]
+    },
+    "rear_caster": {
+      "value": "2.5",
+      "accept": [
+        "2.5°"
+      ]
+    },
+    "bump_steer": "2.5",
+    "fr_susp_height": "19",
+    "fr_susp_shim": "6",
+    "toe_gain": "6",
+    "shim_ff": "2.5",
+    "shim_fr": "2.5",
+    "shim_rf": {
+      "value": "3.0",
+      "accept": [
+        "3"
+      ]
+    },
+    "shim_rr": {
+      "value": "3.0",
+      "accept": [
+        "3"
+      ]
+    },
+    "ride_height_front": {
+      "value": "5.0",
+      "accept": [
+        "5"
+      ]
+    },
+    "ride_height_rear": "5.2",
+    "servo_saver_or_horn": "servo horn",
+    "camber_front": {
+      "value": "2.0",
+      "accept": [
+        "2"
+      ]
+    },
+    "body_stop_front": "yes",
+    "body_stop_front_height": "11.7",
+    "front_brace": "no",
+    "bulkhead_shims": "yes",
+    "front_shock_position": "2",
+    "driveshaft_front": {
+      "value": "58mm",
+      "accept": [
+        "58"
+      ]
+    },
+    "driveshaft_front_type": "bearing",
+    "downstop_front": "5.8",
+    "front_hub": "alu",
+    "camber_rear": {
+      "value": "2.0",
+      "accept": [
+        "2"
+      ]
+    },
+    "rear_body_post": "horizontal",
+    "rear_shock_position": "2",
+    "driveshaft_rear": {
+      "value": "54mm",
+      "accept": [
+        "54"
+      ]
+    },
+    "driveshaft_rear_type": "bearing",
+    "downstop_rear": {
+      "value": "4.0",
+      "accept": [
+        "4"
+      ]
+    },
+    "rear_hub": "composite",
+    "rear_hub_shim": "1.5",
+    "toe_out_front": "1.5",
+    "toe_in_rear": {
+      "value": "3.0",
+      "accept": [
+        "3"
+      ]
+    },
+    "ackermann_shim": "1",
+    "diff_position_front": "down",
+    "diff_position_rear": "up",
+    "upper_arm_front": "standard",
+    "upper_arm_rear": "standard",
+    "steering_bridge": "no",
+    "top_deck_flex": "",
+    "top_deck_thickness": "",
+    "offset_front": "-0.5mm",
+    "offset_rear": "-0.5mm",
+    "top_deck_splitted": "yes",
+    "steering_lock": "27",
+    "steering_shim": "7.5",
+    "chassis": "alu flex",
+    "t_brace": "",
+    "front_arms": "hard",
+    "rear_arms": "hard",
+    "steering_plate": "standard",
+    "comments": "Rear topdeck (301073) on the front, cut 2nd and 3rd bridge."
+  }
+}

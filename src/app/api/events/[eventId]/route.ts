@@ -26,6 +26,8 @@ function optString(v: unknown): string | null | undefined {
 const SHARED_PATCH_KEYS = new Set([
   "name",
   "trackId",
+  "trackLayoutId",
+  "trackDirection",
   "startDate",
   "endDate",
   "practiceSourceUrl",
@@ -117,6 +119,39 @@ export async function PATCH(
     eventData.trackNameSnapshot = linkFields.trackNameSnapshot;
     eventData.trackLocationSnapshot = linkFields.trackLocationSnapshot;
     eventData.legacyTrackJson = Prisma.DbNull;
+    // A layout belongs to a track — changing the track invalidates it unless the
+    // caller sets a new one in the same request.
+    if (trackId !== existing.trackId && body.trackLayoutId === undefined) {
+      eventData.trackLayoutId = null;
+      eventData.trackLayoutNameSnapshot = null;
+    }
+  }
+
+  if (body.trackLayoutId !== undefined) {
+    const layoutId = optString(body.trackLayoutId);
+    const resolvedTrackId =
+      typeof eventData.trackId === "string" ? eventData.trackId : existing.trackId;
+    if (!layoutId) {
+      eventData.trackLayoutId = null;
+      eventData.trackLayoutNameSnapshot = null;
+    } else {
+      const layout = resolvedTrackId
+        ? await prisma.trackLayout.findFirst({
+            where: { id: layoutId, trackId: resolvedTrackId },
+            select: { id: true, name: true },
+          })
+        : null;
+      if (!layout) {
+        return NextResponse.json({ error: "Layout not found for this track" }, { status: 400 });
+      }
+      eventData.trackLayoutId = layout.id;
+      eventData.trackLayoutNameSnapshot = layout.name;
+    }
+  }
+
+  if (body.trackDirection !== undefined) {
+    eventData.trackDirection =
+      body.trackDirection === "CW" || body.trackDirection === "CCW" ? body.trackDirection : null;
   }
 
   const nextStart =

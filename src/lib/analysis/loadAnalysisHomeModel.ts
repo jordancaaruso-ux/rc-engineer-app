@@ -17,6 +17,7 @@ import {
   type AnalysisTrendRun,
   type AnalysisVideoModel,
 } from "@/lib/analysis/analysisHomeModel";
+import { computeTireIndicatorsByRunId } from "@/lib/runs/tireSetChange";
 
 /** Runs fetched for the recent-runs card; extras beyond 4 feed the delta-vs-previous lookback. */
 const RECENT_RUNS_LOOKBACK = 12;
@@ -38,6 +39,8 @@ const analysisRunSelect = {
   sessionLabel: true,
   carNameSnapshot: true,
   car: { select: { name: true } },
+  tireRunNumber: true,
+  tireSet: { select: { id: true, label: true } },
   event: { select: { name: true } },
   lapTimes: true,
   lapSession: true,
@@ -85,6 +88,10 @@ async function loadTrendModel(
     })
   );
 
+  // Computed on the full (unfiltered) newest-first window so the first scoped
+  // run still compares against the run before it where possible.
+  const tireIndicatorsByRunId = computeTireIndicatorsByRunId(rows);
+
   const scoped = rows
     .filter((run) => runMatchesScope(run, scope, timeZone))
     .reverse(); // chronological
@@ -106,6 +113,7 @@ async function loadTrendModel(
       shortLabel: shortRunLabel(run, index),
       createdAtIso: run.createdAt.toISOString(),
       metrics,
+      tireIndicator: tireIndicatorsByRunId.get(run.id) ?? null,
     });
   }
 
@@ -139,6 +147,9 @@ async function loadRecentRuns(userId: string, timeZone: string): Promise<Analysi
   if (rows.length === 0) return [];
 
   const withMetrics = rows.map((run) => ({ run, metrics: computeAnalysisRunMetrics(run) }));
+  // Same lookback window as the delta-vs-previous math; a swap older than the
+  // window simply isn't flagged as changed.
+  const tireIndicatorsByRunId = computeTireIndicatorsByRunId(rows);
   const deltaRows = withMetrics.map(({ run, metrics }) => ({
     carId: run.carId,
     trackId: run.trackId,
@@ -174,6 +185,7 @@ async function loadRecentRuns(userId: string, timeZone: string): Promise<Analysi
         : "";
     return {
       id: run.id,
+      carId: run.carId,
       title: runRowTitle({ ...run, carName: carNameOf(run) }),
       subLabel: `${formatRunCreatedAtDateTime(run.createdAt, timeZone)}${lapsPart}`,
       metrics,
@@ -182,6 +194,7 @@ async function loadRecentRuns(userId: string, timeZone: string): Promise<Analysi
         metrics.best,
         pbKey ? pbMins.get(pbKey) ?? null : null
       ),
+      tireIndicator: tireIndicatorsByRunId.get(run.id) ?? null,
     };
   });
 }

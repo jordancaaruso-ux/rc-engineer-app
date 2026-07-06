@@ -3,6 +3,7 @@ import "server-only";
 import { SetupAggregationScopeType, SetupAggregationValueType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
+import { withTemperatureBand } from "@/lib/trackConditionSignature";
 import type { EngineerSetupSpreadRow } from "@/lib/engineerPhase5/setupSpreadForEngineer";
 import type { NumericStats } from "@/lib/setupAggregations/numericStats";
 
@@ -110,9 +111,15 @@ export async function buildConditionalSetupEmpiricalV1(params: {
   userId: string;
   carId: string | null;
   conditionSignature: string;
+  /** Optional air-temp band; when set, prefer the temp-specific bucket per parameter. */
+  temperatureBand?: string | null;
   spreadRows: EngineerSetupSpreadRow[];
 }): Promise<ConditionalSetupEmpiricalV1 | null> {
   if (!params.carId?.trim()) return null;
+
+  const tempSignature = params.temperatureBand
+    ? withTemperatureBand(params.conditionSignature, params.temperatureBand)
+    : null;
 
   const siblingCarIds = await carIdsSharingSetupTemplate(params.userId, params.carId);
   const keys = params.spreadRows
@@ -147,7 +154,9 @@ export async function buildConditionalSetupEmpiricalV1(params: {
       where: {
         carId: { in: siblingCarIds },
         scopeType: SetupAggregationScopeType.CAR_PARAMETER_CONDITION,
-        scopeKey: params.conditionSignature,
+        scopeKey: tempSignature
+          ? { in: [tempSignature, params.conditionSignature] }
+          : params.conditionSignature,
         parameterKey: { in: keys },
       },
       select: {
@@ -156,17 +165,25 @@ export async function buildConditionalSetupEmpiricalV1(params: {
         sampleCount: true,
         numericStatsJson: true,
         carId: true,
+        scopeKey: true,
       },
     }),
   ]);
 
   const bestOverall = bestByKeyFromAgg(overallAgg);
-  const bestCond = bestByKeyFromAgg(condAgg);
+  // Prefer the temperature-specific bucket per parameter; fall back to the
+  // temp-agnostic bucket when the band is sparse.
+  const bestCondTemp = tempSignature
+    ? bestByKeyFromAgg(condAgg.filter((r) => r.scopeKey === tempSignature))
+    : new Map<string, (typeof condAgg)[number]>();
+  const bestCondBase = bestByKeyFromAgg(condAgg.filter((r) => r.scopeKey === params.conditionSignature));
+  let usedTemperatureBucket = false;
 
   const outRows: ConditionalSetupEmpiricalRow[] = [];
   for (const key of keys) {
     const o = bestOverall.get(key);
-    const c = bestCond.get(key);
+    const cTemp = bestCondTemp.get(key);
+    const c = cTemp && cTemp.sampleCount >= MIN_CONDITION_SAMPLES ? cTemp : bestCondBase.get(key);
     if (!o || !c || o.valueType !== SetupAggregationValueType.NUMERIC || c.valueType !== SetupAggregationValueType.NUMERIC) {
       continue;
     }
@@ -174,6 +191,7 @@ export async function buildConditionalSetupEmpiricalV1(params: {
     const oStats = parseNumericStats(o.numericStatsJson);
     const cStats = parseNumericStats(c.numericStatsJson);
     if (!oStats || !cStats) continue;
+    if (c === cTemp) usedTemperatureBucket = true;
     outRows.push({
       parameterKey: key,
       overallMedian: oStats.median,
@@ -187,8 +205,12 @@ export async function buildConditionalSetupEmpiricalV1(params: {
   outRows.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 
   const hasEnoughData = outRows.length > 0;
+  const tempClause =
+    usedTemperatureBucket && params.temperatureBand
+      ? ` Some parameters use the narrower ${params.temperatureBand}-temperature bucket at this track condition; the rest fall back to all-temperature runs.`
+      : "";
   const note = hasEnoughData
-    ? `Empirical medians from your logged runs whose track matches this grip/layout signature (${params.conditionSignature}), compared to your overall garage medians for the same setup template. Per-parameter run counts may differ; conditionSampleCount is the bucket depth for that parameter.`
+    ? `Empirical medians from your logged runs whose track matches this grip/layout signature (${params.conditionSignature}), compared to your overall garage medians for the same setup template.${tempClause} Per-parameter run counts may differ; conditionSampleCount is the bucket depth for that parameter.`
     : `Not enough runs in this track-condition bucket (need at least ${MIN_CONDITION_SAMPLES} samples per parameter for numeric medians). Tag tracks consistently and log more runs to populate conditional stats.`;
 
   return {

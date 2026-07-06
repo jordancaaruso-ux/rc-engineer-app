@@ -86,6 +86,12 @@ function lapAt(series: ComparisonSeries, lapNumber: number): LapRow | undefined 
   return series.laps.find((l) => l.lapNumber === lapNumber);
 }
 
+/** Gain green / loss red for delta text where there is no background tint (header metrics). */
+function deltaTextClass(delta: number): string {
+  if (!Number.isFinite(delta) || Math.abs(delta) < 1e-9) return "text-foreground/80";
+  return delta > 0 ? "text-destructive" : "text-[#4FD089]";
+}
+
 function MetricBlock({
   label,
   value,
@@ -102,7 +108,9 @@ function MetricBlock({
       <div className="text-[10px] text-muted-foreground">{label}</div>
       <div className="font-mono text-[11px] text-foreground">{value}</div>
       {showDelta && delta != null && Number.isFinite(delta) ? (
-        <div className="text-[10px] font-mono text-foreground/80 tabular-nums">{formatLapDelta(delta)}</div>
+        <div className={cn("text-[10px] font-mono tabular-nums", deltaTextClass(delta))}>
+          {formatLapDelta(delta)}
+        </div>
       ) : null}
     </div>
   );
@@ -129,7 +137,7 @@ function ColumnHeaderBlock({
         <div className="text-[9px] text-muted-foreground leading-tight line-clamp-2">{meta.metaLine}</div>
       ) : null}
       <SetupHint series={series} run={meta.setupRun} onView={onViewSetup} />
-      <div className="mt-1.5 space-y-1.5">
+      <div className="mt-1 space-y-1">
         <MetricBlock
           label="Best"
           value={formatLap(series.bestLap)}
@@ -523,11 +531,14 @@ export function LapComparisonColumnGrid({
         memberDisplayByUserId={memberDisplayByUserId}
       />
 
-      <div className="flex flex-wrap gap-4 items-end">
+      <div className="space-y-3 sm:max-w-[520px]">
         <div className="space-y-1">
-          <label className="text-sm font-medium text-muted-foreground">Target</label>
+          <label className="ui-label-caps" htmlFor="lap-compare-target">
+            Target
+          </label>
           <select
-            className="rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none max-w-[min(100%,min(360px,100vw))]"
+            id="lap-compare-target"
+            className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
             value={targetId}
             onChange={(e) => setTargetId(e.target.value)}
             aria-label="Target series"
@@ -539,16 +550,16 @@ export function LapComparisonColumnGrid({
             ))}
           </select>
         </div>
-        <div className="space-y-2 min-w-[200px] max-w-[min(100%,480px)] flex-1">
-          <div className="text-sm font-medium text-muted-foreground">Compare against</div>
-          <div className="flex flex-wrap gap-3">
-            <div className="space-y-0.5">
+        <div className="space-y-2">
+          <div className="ui-label-caps">Compare against</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="min-w-0 space-y-0.5">
               <label className="text-[10px] text-muted-foreground" htmlFor="lap-compare-scope">
                 Scope
               </label>
               <select
                 id="lap-compare-scope"
-                className="rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none max-w-[200px]"
+                className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
                 value={compareScope}
                 onChange={(e) => setCompareScope(e.target.value as typeof compareScope)}
               >
@@ -557,7 +568,7 @@ export function LapComparisonColumnGrid({
                 <option value="all">All</option>
               </select>
             </div>
-            <div className="space-y-0.5 min-w-[140px] flex-1">
+            <div className="min-w-0 space-y-0.5">
               <label className="text-[10px] text-muted-foreground" htmlFor="lap-compare-driver">
                 Driver
               </label>
@@ -612,16 +623,18 @@ export function LapComparisonColumnGrid({
       </div>
 
       <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full text-xs border-collapse min-w-[480px]">
+        {/* No forced min-width: Lap + target + one comparison fit a 390px phone;
+            additional comparison columns overflow into sideways scroll. */}
+        <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-border bg-muted/80">
-              <th className="text-left text-sm font-medium text-muted-foreground px-2 py-2 align-bottom sticky left-0 bg-muted/80 z-10">
+              <th className="w-9 text-left text-xs sm:text-sm font-medium text-muted-foreground px-1.5 sm:px-2 py-2 align-bottom sticky left-0 bg-muted/80 z-10">
                 Lap
               </th>
               {targetSeries ? (
                 <th
                   key={targetSeries.id}
-                  className="text-left px-2 py-2 align-bottom border-l border-border min-w-[108px] bg-muted/70"
+                  className="text-left px-1.5 sm:px-2 py-1.5 sm:py-2 align-bottom border-l border-border min-w-[108px] bg-muted/70"
                 >
                   <ColumnHeaderBlock
                     series={targetSeries}
@@ -637,7 +650,7 @@ export function LapComparisonColumnGrid({
                 return (
                   <th
                     key={s.id}
-                    className="text-left px-2 py-2 align-bottom border-l border-border min-w-[108px]"
+                    className="text-left px-1.5 sm:px-2 py-1.5 sm:py-2 align-bottom border-l border-border min-w-[108px]"
                   >
                     <ColumnHeaderBlock
                       series={s}
@@ -654,17 +667,38 @@ export function LapComparisonColumnGrid({
           <tbody>
             {lapNumbers.map((lapNum) => {
               const tLap = targetSeries ? lapAt(targetSeries, lapNum) : undefined;
+              const targetOk = tLap != null && tLap.isIncluded && tLap.lapNumber !== 0;
+              // Mirror tint: target colors the opposite way vs the fastest
+              // included comparison lap in this row (green when the target
+              // was quicker, red when it was slower).
+              let fastestComparisonSeconds: number | null = null;
+              for (const s of comparisonSeries) {
+                const lap = lapAt(s, lapNum);
+                if (!lap || !lap.isIncluded || lap.lapNumber === 0) continue;
+                if (
+                  fastestComparisonSeconds == null ||
+                  lap.lapTimeSeconds < fastestComparisonSeconds
+                ) {
+                  fastestComparisonSeconds = lap.lapTimeSeconds;
+                }
+              }
+              const targetMirrorStyle =
+                targetOk && fastestComparisonSeconds != null
+                  ? getDeltaStyle(tLap.lapTimeSeconds - fastestComparisonSeconds)
+                  : undefined;
               return (
                 <tr key={lapNum} className="border-b border-border/80 hover:bg-muted/50">
-                  <td className="px-2 py-1 text-sm font-medium text-muted-foreground sticky left-0 bg-background/95 z-10">
+                  <td className="px-1.5 sm:px-2 py-1 text-xs sm:text-sm font-medium text-muted-foreground sticky left-0 bg-background/95 z-10">
                     {lapNum}
                   </td>
                   {targetSeries ? (
                     <td
                       className={cn(
-                        "px-2 py-1 font-mono border-l border-border bg-muted/60",
+                        "px-1.5 sm:px-2 py-1 font-mono border-l border-border",
+                        !targetMirrorStyle && "bg-muted/60",
                         tLap && (!tLap.isIncluded || tLap.lapNumber === 0) && "opacity-50 line-through"
                       )}
+                      style={targetMirrorStyle}
                     >
                       {tLap ? `${tLap.lapTimeSeconds.toFixed(3)}` : "—"}
                       {tLap && !tLap.isIncluded ? (
@@ -678,14 +712,13 @@ export function LapComparisonColumnGrid({
                       return (
                         <td
                           key={s.id}
-                          className="px-2 py-1 text-sm font-medium text-muted-foreground border-l border-border"
+                          className="px-1.5 sm:px-2 py-1 text-xs sm:text-sm font-medium text-muted-foreground border-l border-border"
                         >
                           —
                         </td>
                       );
                     }
                     const excluded = !lap.isIncluded || lap.lapNumber === 0;
-                    const targetOk = tLap && tLap.isIncluded && tLap.lapNumber !== 0;
                     const delta =
                       !excluded && targetOk ? lap.lapTimeSeconds - tLap.lapTimeSeconds : null;
                     const showDelta = !excluded && delta != null && Number.isFinite(delta);
@@ -695,7 +728,7 @@ export function LapComparisonColumnGrid({
                       <td
                         key={s.id}
                         className={cn(
-                          "px-2 py-1 font-mono border-l border-border align-top",
+                          "px-1.5 sm:px-2 py-1 font-mono border-l border-border align-top",
                           excluded && "opacity-50 line-through text-muted-foreground"
                         )}
                         style={cellStyle}

@@ -53,10 +53,11 @@ export const RUN_HISTORY_MOBILE_ACTIONS_CLASS = "flex shrink-0 flex-row gap-0.5"
 /** Outer actions cell — shrink-0 so flex spacer width matches header and body rows. */
 export const RUN_HISTORY_MOBILE_ACTIONS_SLOT_CLASS = "shrink-0";
 
-/** Invisible twin buttons so header reserves the same width as data-row action buttons. */
+/** Invisible twins (tire indicator + setup + laps) so header reserves the same width as data-row actions. */
 export function RunHistoryMobileActionsPlaceholder() {
   return (
     <div className={RUN_HISTORY_MOBILE_ACTIONS_CLASS} aria-hidden>
+      <div className="h-8 w-8 shrink-0" />
       <div className="h-8 w-8 shrink-0" />
       <div className="h-8 w-8 shrink-0" />
     </div>

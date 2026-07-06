@@ -2,17 +2,15 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { AccountMenu } from "@/components/layout/AccountMenu";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { LogRunFab } from "@/components/layout/LogRunFab";
 import { isHiddenNavRoute } from "@/components/layout/navConfig";
 import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
 import { RouteTransitionProvider } from "@/components/layout/RouteTransitionProvider";
-import { AppearanceTuner } from "@/components/dev/AppearanceTuner";
 import { cn } from "@/lib/utils";
-
-/** Dev-only: live sliders for wash/glass knobs. Compiled out of production. */
-const showTuner = process.env.NODE_ENV === "development";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -22,7 +20,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <main className="page bg-background">
         {children}
-        {showTuner ? <AppearanceTuner /> : null}
       </main>
     );
   }
@@ -44,9 +41,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/*
          * After <main> and outside `.app-shell` (overflow-x-hidden → scroll container)
          * so fixed positioning is not clipped on iOS. See globals.css stacking note.
+         * Mobile-only floating chrome: the dock (destinations), the Log-run FAB
+         * (primary action), and the account avatar (Settings + account).
          */}
         <BottomNav />
-        {showTuner ? <AppearanceTuner /> : null}
+        <LogRunFab />
+        <AccountMenu />
       </PrimaryNavProvider>
     </TodayDraftRunProvider>
   );

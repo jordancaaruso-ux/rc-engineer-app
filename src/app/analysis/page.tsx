@@ -53,8 +53,8 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body flex max-w-2xl flex-col gap-3">
-        <SessionTrendCard trend={model.trend} />
         <RecentRunsCard runs={model.recentRuns} />
+        <SessionTrendCard trend={model.trend} />
         <AnalysisVideoCard video={model.video} />
         {setupComparisonLink ? (
           <ul className="flex flex-col gap-2.5">

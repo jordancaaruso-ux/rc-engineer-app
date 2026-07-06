@@ -25,6 +25,7 @@ import { coerceFeelVsLastRunForCompleteRun, parseHandlingAssessmentJson } from "
 import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
 import { ensureEventParticipation } from "@/lib/events/eventParticipation";
+import { normalizeRunConditionsInput, NULL_RUN_CONDITIONS_COLUMNS } from "@/lib/weather/runConditionsRecord";
 
 type RunUpsertBody = {
   runId?: string;
@@ -34,6 +35,8 @@ type RunUpsertBody = {
   meetingSessionCode?: string | null;
   eventId?: string | null;
   trackId?: string | null;
+  trackLayoutId?: string | null;
+  trackDirection?: "CW" | "CCW" | null;
   tireSetId?: string | null;
   /**
    * v2 create-on-save: when set (and `tireSetId` absent) the server mints the tire set at
@@ -117,6 +120,11 @@ type RunUpsertBody = {
    * TeammateLink peers are unaffected. Default true when omitted.
    */
   shareWithTeam?: boolean;
+  /**
+   * Weather / conditions captured for this session (metric `RunConditions` shape).
+   * Present-but-empty (or null) clears the stored reading on update; absent leaves it unchanged.
+   */
+  conditions?: unknown;
 };
 
 function normalizeCarRating(raw: unknown): number | null {
@@ -226,6 +234,14 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   }
 
   const shareWithTeam = body.shareWithTeam === false ? false : true;
+
+  // Weather conditions: normalize + clamp untrusted input. `null` when the key
+  // is absent (leave unchanged on update); an all-null record when sent empty
+  // (clears the stored reading on update).
+  const conditionsColumns =
+    "conditions" in body
+      ? (normalizeRunConditionsInput(body.conditions) ?? NULL_RUN_CONDITIONS_COLUMNS)
+      : null;
 
   const tireRunNumberFromBody =
     typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
@@ -476,6 +492,20 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     return NextResponse.json({ error: "Track not found" }, { status: 400 });
   }
 
+  // Layout must belong to the run's track. Snapshot the name so it survives layout deletion.
+  const trackLayout =
+    body.trackLayoutId && body.trackId
+      ? await prisma.trackLayout.findFirst({
+          where: { id: body.trackLayoutId, trackId: body.trackId },
+          select: { id: true, name: true },
+        })
+      : null;
+  if (body.trackLayoutId && !trackLayout) {
+    return NextResponse.json({ error: "Layout not found for this track" }, { status: 400 });
+  }
+  const trackDirection =
+    body.trackDirection === "CW" || body.trackDirection === "CCW" ? body.trackDirection : null;
+
   const event = body.eventId
     ? await prisma.event.findFirst({
         where: { id: body.eventId },
@@ -518,6 +548,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         eventId: body.eventId ?? null,
         trackId: body.trackId ?? null,
         trackNameSnapshot: track?.name ?? null,
+        trackLayoutId: trackLayout?.id ?? null,
+        trackLayoutNameSnapshot: trackLayout?.name ?? null,
+        trackDirection,
         tireSetId,
         tireRunNumber,
         additiveTypeId,
@@ -545,6 +578,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         loggingComplete,
         loggingCompletedAt: loggingComplete ? new Date() : null,
         shareWithTeam,
+        ...(conditionsColumns ?? {}),
       } as PrismaTypes.RunUncheckedCreateInput,
       select: { id: true, createdAt: true },
     });
@@ -562,6 +596,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       eventId: body.eventId ?? null,
       trackId: body.trackId ?? null,
       trackNameSnapshot: track?.name ?? null,
+      trackLayoutId: trackLayout?.id ?? null,
+      trackLayoutNameSnapshot: trackLayout?.name ?? null,
+      trackDirection,
       tireSetId,
       tireRunNumber,
       additiveTypeId,
@@ -586,6 +623,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       engineerSummaryComputedAt: null,
       sessionCompletedAt: sessionCompletedAtResolved,
       loggingComplete,
+      ...(conditionsColumns ?? {}),
     };
     if (loggingComplete && existing.loggingComplete === false && existing.loggingCompletedAt == null) {
       updateData.loggingCompletedAt = new Date();

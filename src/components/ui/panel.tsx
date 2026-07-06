@@ -76,16 +76,37 @@ export function Eyebrow({
   );
 }
 
-/** Hairline-separated container for StatTile cells (instrument-panel strip). */
-export function StatStrip({ children, className }: { children: ReactNode; className?: string }) {
+/**
+ * Hairline-separated container for StatTile cells (instrument-panel strip).
+ *
+ * The strip *itself* carries the translucent `/45` glass fill — the exact same
+ * surface as the pace/Today strips — so every cell shows `/45` composited
+ * directly over the card, never over an opaque divider plane. That keeps the
+ * cell shade pixel-identical to the standalone strips. Dividers are drawn as
+ * top/left cell borders (see `StatTile`); the inner grid is offset by 1px so the
+ * outer cells' borders tuck under the frame, leaving single interior hairlines
+ * that stay correct even when the grid wraps (e.g. a 2×2 metric block).
+ *
+ * @param gridClassName grid-template classes for the cells (`grid-cols-3`, …).
+ * @param className spacing / positioning for the strip frame (`mt-3`, …).
+ */
+export function StatStrip({
+  children,
+  className,
+  gridClassName,
+}: {
+  children: ReactNode;
+  className?: string;
+  gridClassName?: string;
+}) {
   return (
     <div
       className={cn(
-        "grid gap-px overflow-hidden rounded-xl border border-border bg-border",
+        "overflow-hidden rounded-xl border border-border bg-background/45",
         className
       )}
     >
-      {children}
+      <div className={cn("grid -ml-px -mt-px", gridClassName)}>{children}</div>
     </div>
   );
 }
@@ -104,7 +125,7 @@ export function StatTile({
   className?: string;
 }) {
   return (
-    <div className={cn("bg-background/55 px-3 py-2.5", className)}>
+    <div className={cn("border-l border-t border-border px-3 py-2.5", className)}>
       <div className="type-data-label">{label}</div>
       <div
         className={cn(

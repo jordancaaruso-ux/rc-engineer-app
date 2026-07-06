@@ -9,10 +9,7 @@ import { getActiveSetupCarId, getActiveSetupData } from "@/lib/activeSetupContex
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
-import {
-  SETUP_SHEET_TEMPLATE_A800RR,
-  canonicalSetupSheetTemplateId,
-} from "@/lib/setupSheetTemplateId";
+import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { compareSetupSnapshots } from "@/lib/setupCompare/compare";
@@ -88,6 +85,8 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   const [aId, setAId] = useState<string>("");
   const [bId, setBId] = useState<string>("");
   const [compareTemplate, setCompareTemplate] = useState<SetupSheetTemplate>(A800RR_SETUP_SHEET_V1);
+  /** Community-aggregation bucket key for side A's car (model slug); null = unknown, skip lookups. */
+  const [compareTemplateKey, setCompareTemplateKey] = useState<string | null>(null);
 
   const reloadSources = useCallback(async () => {
     if (!dbReady) return;
@@ -185,16 +184,21 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   useEffect(() => {
     if (!compareCarId) {
       setCompareTemplate(A800RR_SETUP_SHEET_V1);
+      setCompareTemplateKey(null);
       return;
     }
     let cancelled = false;
     fetch(`/api/cars/${compareCarId}/setup-sheet-template?view=analysis`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d: { template?: SetupSheetTemplate }) => {
-        if (!cancelled && d.template) setCompareTemplate(d.template);
+      .then((d: { template?: SetupSheetTemplate; templateKey?: string | null }) => {
+        if (cancelled) return;
+        if (d.template) setCompareTemplate(d.template);
+        setCompareTemplateKey(d.templateKey ?? null);
       })
       .catch(() => {
-        if (!cancelled) setCompareTemplate(A800RR_SETUP_SHEET_V1);
+        if (cancelled) return;
+        setCompareTemplate(A800RR_SETUP_SHEET_V1);
+        setCompareTemplateKey(null);
       });
     return () => {
       cancelled = true;
@@ -247,19 +251,22 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
     router.push(`/engineer?${params.toString()}`);
   }, [engineerCompareState, router]);
 
-  /** Community IQR uses the same (template, surface, grip) buckets as `CommunitySetupParameterAggregation`. */
+  /**
+   * Community IQR uses the same (template, surface, grip) buckets as
+   * `CommunitySetupParameterAggregation`. Null = unknown or cross-chassis — skip community
+   * lookups rather than color deltas with another chassis' spread.
+   */
   const communityTemplateKey = useMemo(() => {
-    if (aKind !== "run" || bKind !== "run" || !aId || !bId) {
-      return SETUP_SHEET_TEMPLATE_A800RR;
+    if (aKind === "run" && bKind === "run" && aId && bId) {
+      const runA = runs.find((r) => r.id === aId) ?? null;
+      const runB = runs.find((r) => r.id === bId) ?? null;
+      const tA = canonicalSetupSheetTemplateId(runA?.car?.setupSheetTemplate ?? null);
+      const tB = canonicalSetupSheetTemplateId(runB?.car?.setupSheetTemplate ?? null);
+      if (tA && tB && tA !== tB) return null;
+      return tA ?? tB ?? compareTemplateKey;
     }
-    const runA = runs.find((r) => r.id === aId) ?? null;
-    const runB = runs.find((r) => r.id === bId) ?? null;
-    if (!runA || !runB) return SETUP_SHEET_TEMPLATE_A800RR;
-    const tA = canonicalSetupSheetTemplateId(runA.car?.setupSheetTemplate ?? null);
-    const tB = canonicalSetupSheetTemplateId(runB.car?.setupSheetTemplate ?? null);
-    if (tA && tB && tA !== tB) return null;
-    return tA ?? tB ?? SETUP_SHEET_TEMPLATE_A800RR;
-  }, [aKind, bKind, aId, bId, runs]);
+    return compareTemplateKey;
+  }, [aKind, bKind, aId, bId, runs, compareTemplateKey]);
   const [trackSurface, setTrackSurface] = useState<TrackSurface>("asphalt");
   const [gripLevel, setGripLevel] = useState<GripBucket>(GRIP_BUCKET_ANY);
 

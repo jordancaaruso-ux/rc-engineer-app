@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Disc } from "lucide-react";
 import type { AnalysisTrendModel, AnalysisTrendRun } from "@/lib/analysis/analysisHomeModel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
+import { formatTireIndicatorTitle } from "@/lib/runs/tireSetChange";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,11 +33,16 @@ const SERIES: Array<{ key: SeriesKey; name: string; color: string; width: number
   { key: "median", name: "Median", color: "#E5644E", width: 2 },
 ];
 
-const CHART_HEIGHT = 200;
+const CHART_HEIGHT = 216;
 const PAD_LEFT = 38;
 const PAD_RIGHT = 14;
 const PAD_TOP = 14;
-const PAD_BOTTOM = 26;
+/** Bottom band: tire indicator row + x-axis run labels. */
+const PAD_BOTTOM = 42;
+/** Top of the 12px tire icons, between the plot and the run labels. */
+const TIRE_ROW_TOP = CHART_HEIGHT - PAD_BOTTOM + 4;
+/** Minimum px between runs before the tire row thins to changed-set runs only. */
+const TIRE_ROW_MIN_SPACING = 18;
 
 function seconds(value: number | null | undefined, digits = 3): string {
   return value == null ? "—" : value.toFixed(digits);
@@ -241,7 +248,11 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
             onPointerCancel={() => {
               pointerDownRef.current = null;
             }}
-            onPointerLeave={() => setHoverIndex(null)}
+            onPointerLeave={(event) => {
+              // Touch pointers "leave" the moment the finger lifts — keep the
+              // tooltip up so it can be read and a second tap can open the run.
+              if (event.pointerType === "mouse") setHoverIndex(null);
+            }}
             onClick={handleClick}
           >
             {geometry.ticks.map((tick) => (
@@ -284,6 +295,46 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                 </text>
               );
             })}
+
+            {(() => {
+              // Tire row: same icon language as run rows — Disc + corner run
+              // count, bright when the set changed, faint when unchanged. On
+              // dense sessions it thins to changed-set runs only.
+              const withTires = carRuns
+                .map((run, index) => ({ run, index }))
+                .filter(({ run }) => run.tireIndicator != null);
+              if (withTires.length === 0) return null;
+              const spacing =
+                carRuns.length > 1
+                  ? (chartWidth - PAD_LEFT - PAD_RIGHT) / (carRuns.length - 1)
+                  : chartWidth;
+              const shown =
+                spacing >= TIRE_ROW_MIN_SPACING
+                  ? withTires
+                  : withTires.filter(({ run }) => run.tireIndicator!.changed);
+              return shown.map(({ run, index }) => {
+                const indicator = run.tireIndicator!;
+                const x = geometry.xAt(index);
+                return (
+                  <g
+                    key={`tire-${run.id}`}
+                    className={indicator.changed ? "text-foreground" : "text-faint"}
+                  >
+                    <title>{formatTireIndicatorTitle(indicator)}</title>
+                    <Disc x={x - 6} y={TIRE_ROW_TOP} width={12} height={12} aria-hidden />
+                    {indicator.runNumber != null ? (
+                      <text
+                        x={x + 5}
+                        y={TIRE_ROW_TOP + 13}
+                        className="fill-current font-mono text-[7px] tabular-nums"
+                      >
+                        {indicator.runNumber}
+                      </text>
+                    ) : null}
+                  </g>
+                );
+              });
+            })()}
 
             {hoverIndex != null ? (
               <line
@@ -370,6 +421,21 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                   </span>
                 </div>
               ))}
+              {hoverRun.tireIndicator ? (
+                <div className="mt-1 flex items-center gap-1 border-t border-border pt-1">
+                  <TireIndicatorIcon
+                    indicator={hoverRun.tireIndicator}
+                    size="sm"
+                    className="-my-1 -ml-1.5"
+                  />
+                  <span className="min-w-0 truncate text-[10.5px] text-muted-foreground">
+                    {hoverRun.tireIndicator.setLabel}
+                    {hoverRun.tireIndicator.runNumber != null
+                      ? ` · run ${hoverRun.tireIndicator.runNumber}`
+                      : ""}
+                  </span>
+                </div>
+              ) : null}
               <div className="mt-1 flex items-center gap-1 border-t border-border pt-1 text-[10.5px] font-semibold text-muted-foreground">
                 Open run
                 <ChevronRight className="h-3 w-3 text-primary" aria-hidden />

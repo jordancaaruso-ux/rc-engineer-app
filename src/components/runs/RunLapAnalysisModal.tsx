@@ -178,7 +178,7 @@ export function RunLapAnalysisModal({
             Close
           </button>
         </div>
-        <div className="overflow-y-auto p-3 min-h-0 flex-1">
+        <div className="overflow-y-auto p-2 sm:p-3 min-h-0 flex-1">
           {importedLapsError ? (
             <p className="text-xs text-destructive mb-2">{importedLapsError}</p>
           ) : null}

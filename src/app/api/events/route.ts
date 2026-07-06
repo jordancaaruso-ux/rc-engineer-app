@@ -75,6 +75,8 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       name?: string;
       trackId?: string | null;
+      trackLayoutId?: string | null;
+      trackDirection?: "CW" | "CCW" | null;
       startDate?: string;
       endDate?: string;
       notes?: string | null;
@@ -100,6 +102,18 @@ export async function POST(request: Request) {
     if (!track) {
       return NextResponse.json({ error: "Track not found" }, { status: 400 });
     }
+
+    const trackLayout = body.trackLayoutId
+      ? await prisma.trackLayout.findFirst({
+          where: { id: body.trackLayoutId, trackId },
+          select: { id: true, name: true },
+        })
+      : null;
+    if (body.trackLayoutId && !trackLayout) {
+      return NextResponse.json({ error: "Layout not found for this track" }, { status: 400 });
+    }
+    const trackDirection =
+      body.trackDirection === "CW" || body.trackDirection === "CCW" ? body.trackDirection : null;
 
     const startDate = body.startDate ? parseEventDateYmd(body.startDate) : new Date();
     const endDate = body.endDate ? parseEventDateYmd(body.endDate) : new Date(startDate);
@@ -180,6 +194,9 @@ export async function POST(request: Request) {
         trackId,
         trackNameSnapshot: track.name,
         trackLocationSnapshot: track.location,
+        trackLayoutId: trackLayout?.id ?? null,
+        trackLayoutNameSnapshot: trackLayout?.name ?? null,
+        trackDirection,
         startDate,
         endDate,
         practiceSourceUrl,

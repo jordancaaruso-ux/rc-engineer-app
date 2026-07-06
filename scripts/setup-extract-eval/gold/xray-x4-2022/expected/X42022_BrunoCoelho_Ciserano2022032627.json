@@ -1,0 +1,147 @@
+{
+  "status": "verified",
+  "note": "Transcribed by Claude from the sheet image 2026-07-06; founder-verified spot-on 2026-07-06.",
+  "fields": {
+    "race": "Race Of Champions",
+    "track": "Ciserano",
+    "driver_name": "Bruno Coelho",
+    "date": "27/03/2022",
+    "track_temperature": {
+      "value": "18°C",
+      "accept": [
+        "18"
+      ]
+    },
+    "qual_position": "1st",
+    "final_position": "1st",
+    "best_laptime": "11.7",
+    "track_surface": "asphalt",
+    "track_layout": "mixed",
+    "traction": "high",
+    "solid_axle": "yes",
+    "gear_diff_oil_front": "",
+    "gear_diff_oil_rear": {
+      "value": "10k",
+      "accept": [
+        "10000"
+      ]
+    },
+    "pinion": "28",
+    "spur_gear": "110",
+    "final_drive_ratio": "",
+    "spring_front": "2.5-2.8",
+    "spring_rear": "2.7",
+    "shock_oil_front": "375",
+    "shock_oil_rear": "400",
+    "rebound_front": "0",
+    "rebound_rear": "0",
+    "foam_inserts_front": "no",
+    "foam_inserts_rear": "no",
+    "pistons_front": "4 holes",
+    "pistons_rear": "4 holes",
+    "piston_hole_front": "1.1",
+    "piston_hole_rear": "1.1",
+    "shock_length_front": "9",
+    "shock_length_rear": "9",
+    "arb_front": "1.2",
+    "arb_rear": "1.2",
+    "tires_front": "",
+    "tires_rear": "",
+    "additive_front": "",
+    "additive_rear": "",
+    "additive_timing_front": "",
+    "additive_timing_rear": "",
+    "total_weight": "1325",
+    "weight_balance_front": "50",
+    "weight_balance_rear": "50",
+    "motor": "Hobbywing 5.0T",
+    "motor_timing": "",
+    "esc": "Hobbywing XR10 G2S",
+    "batteries": "Sunpadow 3800",
+    "body": "Twister UL",
+    "wing": "STD",
+    "body_height_front": "67.5",
+    "body_mount_upper": {
+      "value": "7 hole+Oring",
+      "accept": [
+        "7 hole + Oring",
+        "7 hole+O-ring"
+      ]
+    },
+    "body_height_rear": "62.5",
+    "wing_side_plate": "yes",
+    "front_caster": {
+      "value": "4",
+      "accept": [
+        "4°",
+        "4 deg"
+      ]
+    },
+    "rear_caster": {
+      "value": "2.5",
+      "accept": [
+        "2.5°"
+      ]
+    },
+    "bump_steer": "4",
+    "fr_susp_height": "19",
+    "fr_susp_shim": "8",
+    "toe_gain": "4.5",
+    "shim_ff": "0.5",
+    "shim_fr": "1",
+    "shim_rf": "1.5",
+    "shim_rr": "1.5",
+    "ride_height_front": "5",
+    "ride_height_rear": "5.2",
+    "servo_saver_or_horn": "servo horn",
+    "camber_front": "1.8",
+    "body_stop_front": "yes",
+    "body_stop_front_height": "17",
+    "front_brace": "no",
+    "bulkhead_shims": "yes",
+    "front_shock_position": "1",
+    "driveshaft_front": {
+      "value": "58mm",
+      "accept": [
+        "58"
+      ]
+    },
+    "driveshaft_front_type": "bearing",
+    "downstop_front": "5.8",
+    "front_hub": "composite",
+    "camber_rear": "2.5",
+    "rear_body_post": "horizontal",
+    "rear_shock_position": "1",
+    "driveshaft_rear": {
+      "value": "54mm",
+      "accept": [
+        "54"
+      ]
+    },
+    "driveshaft_rear_type": "bearing",
+    "downstop_rear": "4.2",
+    "rear_hub": "composite",
+    "rear_hub_shim": "1.5",
+    "toe_out_front": "1.2",
+    "toe_in_rear": "2.5",
+    "ackermann_shim": "0",
+    "diff_position_front": "down",
+    "diff_position_rear": "down",
+    "upper_arm_front": "standard",
+    "upper_arm_rear": "standard",
+    "steering_bridge": "no",
+    "top_deck_flex": "none",
+    "top_deck_thickness": "2.0mm",
+    "offset_front": "-0.5mm",
+    "offset_rear": "-0.5mm",
+    "top_deck_splitted": "yes",
+    "steering_lock": "26",
+    "steering_shim": "",
+    "chassis": "graphite",
+    "t_brace": "",
+    "front_arms": "hard",
+    "rear_arms": "hard",
+    "steering_plate": "standard",
+    "comments": ""
+  }
+}

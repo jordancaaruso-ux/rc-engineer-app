@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   DEFAULT_RUN_HISTORY_FILTERS,
@@ -39,7 +39,10 @@ type SessionsFilterBarProps = {
   cars: Option[];
   tracks: Option[];
   events: Option[];
-  tireSets: Option[];
+  /** Tire type identities (id = displayName-or-legacy-label; label may add a set count). */
+  tireTypes: Option[];
+  /** Setup parameter keys present across the loaded runs (id = setup key). */
+  setupFields: Option[];
   teamId: string | null;
   focusRun: string | null;
   viewAll: boolean;
@@ -127,7 +130,8 @@ export function SessionsFilterBar({
   cars,
   tracks,
   events,
-  tireSets,
+  tireTypes,
+  setupFields,
   teamId,
   focusRun,
   viewAll,
@@ -145,15 +149,23 @@ export function SessionsFilterBar({
     return parseRunHistoryFilters(raw);
   }, [searchParams]);
 
+  const [isPending, startTransition] = useTransition();
+
   const pushFilters = useCallback(
-    (next: RunHistoryFilters) => {
+    (next: RunHistoryFilters, opts?: { replace?: boolean }) => {
       const base: Record<string, string> = {};
       if (teamId) base.teamId = teamId;
       if (focusRun) base.focusRun = focusRun;
       if (viewAll || runHistoryFiltersActive(next)) base.viewAll = "1";
       const sp = filtersToSearchParams(next, base);
       const q = sp.toString();
-      router.push(q ? `${pathname}?${q}` : pathname);
+      const url = q ? `${pathname}?${q}` : pathname;
+      // Transition so `isPending` can surface "results updating" feedback.
+      startTransition(() => {
+        // Live-typing updates replace so Back doesn't step through every keystroke.
+        if (opts?.replace) router.replace(url);
+        else router.push(url);
+      });
     },
     [router, pathname, teamId, focusRun, viewAll]
   );
@@ -162,29 +174,89 @@ export function SessionsFilterBar({
     pushFilters({ ...filters, ...partial });
   };
 
+  // Live-as-you-type search: keep a local value for instant echo, and debounce
+  // the URL push (each push is a server round-trip that re-runs the matcher).
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const [queryText, setQueryText] = useState(filters.q ?? "");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sync local text when the query changes elsewhere (e.g. Clear, back button).
+  const lastPushedQuery = useRef(filters.q ?? "");
+  useEffect(() => {
+    if ((filters.q ?? "") !== lastPushedQuery.current) {
+      lastPushedQuery.current = filters.q ?? "";
+      setQueryText(filters.q ?? "");
+    }
+  }, [filters.q]);
+
+  const pushQuery = useCallback(
+    (value: string) => {
+      const next = value.trim() || null;
+      if (next === (filtersRef.current.q ?? null)) return;
+      lastPushedQuery.current = next ?? "";
+      pushFilters({ ...filtersRef.current, q: next }, { replace: true });
+    },
+    [pushFilters]
+  );
+
+  const onQueryChange = (value: string) => {
+    setQueryText(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => pushQuery(value), 250);
+  };
+
+  const flushQuery = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    pushQuery(queryText);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const clearFilters = () => {
     pushFilters({ ...DEFAULT_RUN_HISTORY_FILTERS, layout: filters.layout, sort: filters.sort });
   };
 
   const filtersActive = runHistoryFiltersActive(filters);
-  const [panelOpen, setPanelOpen] = useState(filtersActive);
+  const filtersActiveExcludingQuery =
+    filters.carIds.length > 0 ||
+    filters.trackIds.length > 0 ||
+    filters.tireTypes.length > 0 ||
+    Boolean(filters.eventId) ||
+    Boolean(filters.dateFrom) ||
+    Boolean(filters.dateTo) ||
+    Boolean(filters.sessionType) ||
+    Boolean(filters.meetingSessionType) ||
+    filters.bestLapMin != null ||
+    filters.bestLapMax != null ||
+    Boolean(filters.raceClass) ||
+    Boolean(filters.setupField) ||
+    Boolean(filters.setupChangedField) ||
+    filters.status !== "all";
+
+  // The panel only auto-opens for structured filters (e.g. arriving via a
+  // filtered URL) — never while typing a text query, which would be jarring.
+  const [panelOpen, setPanelOpen] = useState(filtersActiveExcludingQuery);
   const [sessionHydrated, setSessionHydrated] = useState(false);
-  const prevFiltersActive = useRef(filtersActive);
+  const prevStructuredActive = useRef(filtersActiveExcludingQuery);
 
   useEffect(() => {
     if (!sessionHydrated) {
       setSessionHydrated(true);
-      if (!filtersActive && readFilterPanelSessionOpen()) {
+      if (!filtersActiveExcludingQuery && readFilterPanelSessionOpen()) {
         setPanelOpen(true);
       }
-      prevFiltersActive.current = filtersActive;
+      prevStructuredActive.current = filtersActiveExcludingQuery;
       return;
     }
-    if (!prevFiltersActive.current && filtersActive) {
+    if (!prevStructuredActive.current && filtersActiveExcludingQuery) {
       setPanelOpen(true);
     }
-    prevFiltersActive.current = filtersActive;
-  }, [filtersActive, sessionHydrated]);
+    prevStructuredActive.current = filtersActiveExcludingQuery;
+  }, [filtersActiveExcludingQuery, sessionHydrated]);
 
   const openPanel = () => {
     setPanelOpen(true);
@@ -201,46 +273,138 @@ export function SessionsFilterBar({
     else openPanel();
   };
 
-  const filtersActiveExcludingQuery =
-    filters.carIds.length > 0 ||
-    filters.trackIds.length > 0 ||
-    filters.tireSetIds.length > 0 ||
-    Boolean(filters.eventId) ||
-    Boolean(filters.dateFrom) ||
-    Boolean(filters.dateTo) ||
-    Boolean(filters.sessionType) ||
-    Boolean(filters.meetingSessionType) ||
-    filters.bestLapMin != null ||
-    filters.bestLapMax != null ||
-    Boolean(filters.raceClass) ||
-    filters.status !== "all";
+  // One chip per active filter so what's applied — and how to undo it — is
+  // always visible without opening the panel.
+  const activeChips: { key: string; label: string; onRemove: () => void }[] = [];
+  const optionLabel = (options: Option[], id: string) =>
+    options.find((o) => o.id === id)?.label ?? id;
+  if (filters.q) {
+    activeChips.push({ key: "q", label: `“${filters.q}”`, onRemove: () => patch({ q: null }) });
+  }
+  for (const id of filters.carIds) {
+    activeChips.push({
+      key: `car-${id}`,
+      label: optionLabel(cars, id),
+      onRemove: () => patch({ carIds: filters.carIds.filter((x) => x !== id) }),
+    });
+  }
+  for (const id of filters.trackIds) {
+    activeChips.push({
+      key: `track-${id}`,
+      label: optionLabel(tracks, id),
+      onRemove: () => patch({ trackIds: filters.trackIds.filter((x) => x !== id) }),
+    });
+  }
+  for (const id of filters.tireTypes) {
+    activeChips.push({
+      key: `tires-${id}`,
+      // Chip shows the identity itself, not the "· N sets" dropdown label.
+      label: id,
+      onRemove: () => patch({ tireTypes: filters.tireTypes.filter((x) => x !== id) }),
+    });
+  }
+  if (filters.eventId) {
+    activeChips.push({
+      key: "event",
+      label: optionLabel(events, filters.eventId),
+      onRemove: () => patch({ eventId: null }),
+    });
+  }
+  if (filters.dateFrom || filters.dateTo) {
+    activeChips.push({
+      key: "dates",
+      label: `${filters.dateFrom ?? "…"} → ${filters.dateTo ?? "…"}`,
+      onRemove: () => patch({ dateFrom: null, dateTo: null }),
+    });
+  }
+  if (filters.sessionType) {
+    activeChips.push({
+      key: "sessionType",
+      label: filters.sessionType === "TESTING" ? "Testing" : "Race meeting",
+      onRemove: () => patch({ sessionType: null }),
+    });
+  }
+  if (filters.meetingSessionType) {
+    activeChips.push({
+      key: "meeting",
+      label: filters.meetingSessionType.charAt(0) + filters.meetingSessionType.slice(1).toLowerCase(),
+      onRemove: () => patch({ meetingSessionType: null }),
+    });
+  }
+  if (filters.raceClass) {
+    activeChips.push({
+      key: "class",
+      label: `Class ${filters.raceClass}`,
+      onRemove: () => patch({ raceClass: null }),
+    });
+  }
+  if (filters.bestLapMin != null || filters.bestLapMax != null) {
+    activeChips.push({
+      key: "laps",
+      label: `Best ${filters.bestLapMin ?? "…"}–${filters.bestLapMax ?? "…"}s`,
+      onRemove: () => patch({ bestLapMin: null, bestLapMax: null }),
+    });
+  }
+  if (filters.setupField) {
+    const fieldLabel = optionLabel(setupFields, filters.setupField);
+    const condition =
+      filters.setupOp === "between" && (filters.setupValue || filters.setupValue2)
+        ? ` ${filters.setupValue ?? "…"}–${filters.setupValue2 ?? "…"}`
+        : filters.setupValue
+          ? ` ${filters.setupOp === "gte" ? "≥" : filters.setupOp === "lte" ? "≤" : "="} ${filters.setupValue}`
+          : "";
+    activeChips.push({
+      key: "setupValue",
+      label: `Setup: ${fieldLabel}${condition}`,
+      onRemove: () =>
+        patch({ setupField: null, setupOp: "eq", setupValue: null, setupValue2: null }),
+    });
+  }
+  if (filters.setupChangedField) {
+    const dirArrow =
+      filters.setupChangedDir === "up" ? " ↑" : filters.setupChangedDir === "down" ? " ↓" : "";
+    activeChips.push({
+      key: "setupChanged",
+      label: `Changed: ${optionLabel(setupFields, filters.setupChangedField)}${dirArrow}`,
+      onRemove: () => patch({ setupChangedField: null, setupChangedDir: "any" }),
+    });
+  }
+  if (filters.status !== "all") {
+    activeChips.push({
+      key: "status",
+      label: filters.status === "draft" ? "Drafts" : "Complete",
+      onRemove: () => patch({ status: "all" }),
+    });
+  }
 
   return (
     <div className="w-full min-w-0 space-y-2">
       <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
         <div className="action-item-add-composite flex min-w-0 flex-1 items-stretch rounded-lg border border-border bg-card">
           <div className={primarySegmentLeadingClassName()} aria-hidden>
-            <Search className="size-4" strokeWidth={2.5} />
+            {isPending ? (
+              <Loader2 className="size-4 animate-spin" strokeWidth={2.5} />
+            ) : (
+              <Search className="size-4" strokeWidth={2.5} />
+            )}
           </div>
           <label htmlFor="sessions-search" className="sr-only">
             Search sessions
           </label>
           <input
             id="sessions-search"
-            key={filters.q ?? ""}
             type="search"
-            placeholder="Track, car, tires, notes…"
+            placeholder="Track, car, tires, setup, notes…"
             className="min-w-0 flex-1 border-0 bg-transparent px-2.5 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-            defaultValue={filters.q ?? ""}
+            value={queryText}
+            onChange={(e) => onQueryChange(e.currentTarget.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                patch({ q: e.currentTarget.value.trim() || null });
+                e.preventDefault();
+                flushQuery();
               }
             }}
-            onBlur={(e) => {
-              const v = e.currentTarget.value.trim() || null;
-              if (v !== filters.q) patch({ q: v });
-            }}
+            onBlur={flushQuery}
           />
           <button
             type="button"
@@ -269,6 +433,33 @@ export function SessionsFilterBar({
           </Button>
         ) : null}
       </div>
+
+      {activeChips.length > 0 ? (
+        <div
+          className={`flex flex-wrap items-center gap-1.5 transition-opacity ${isPending ? "opacity-60" : ""}`}
+          aria-live="polite"
+        >
+          <span className="ui-label-meta shrink-0">
+            {isPending ? "Updating…" : "Filtering by"}
+          </span>
+          {activeChips.map((chip) => (
+            <span
+              key={chip.key}
+              className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-xs text-foreground"
+            >
+              <span className="min-w-0 truncate">{chip.label}</span>
+              <button
+                type="button"
+                onClick={chip.onRemove}
+                aria-label={`Remove filter ${chip.label}`}
+                className="tap-active -mr-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:text-foreground"
+              >
+                <X className="size-3" strokeWidth={2.5} aria-hidden />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {panelOpen ? (
         <CardPanel contentClassName="p-3 space-y-3">
@@ -319,11 +510,124 @@ export function SessionsFilterBar({
 
           {advancedOpen ? (
             <div className="flex flex-wrap items-end gap-3 border-t border-border pt-3">
+          <div className="space-y-1 min-w-[10rem]">
+            <label className={labelClass}>Setup value</label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <select
+                className={`min-w-[8rem] ${controlClass}`}
+                value={filters.setupField ?? ""}
+                onChange={(e) =>
+                  patch({
+                    setupField: e.target.value || null,
+                    setupOp: "eq",
+                    setupValue: null,
+                    setupValue2: null,
+                  })
+                }
+              >
+                <option value="">Any field</option>
+                {setupFields.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className={`${controlClass} disabled:opacity-50`}
+                disabled={!filters.setupField}
+                value={filters.setupOp}
+                aria-label="Setup value condition"
+                onChange={(e) =>
+                  patch({
+                    setupOp:
+                      e.target.value === "gte" ||
+                      e.target.value === "lte" ||
+                      e.target.value === "between"
+                        ? e.target.value
+                        : "eq",
+                    setupValue2: null,
+                  })
+                }
+              >
+                <option value="eq">=</option>
+                <option value="gte">≥</option>
+                <option value="lte">≤</option>
+                <option value="between">between</option>
+              </select>
+              <input
+                type={filters.setupOp === "eq" ? "text" : "number"}
+                step="any"
+                className={`w-24 ${controlClass} disabled:opacity-50`}
+                placeholder={filters.setupOp === "between" ? "min" : "value"}
+                disabled={!filters.setupField}
+                defaultValue={filters.setupValue ?? ""}
+                key={`setupValue-${filters.setupField ?? "none"}-${filters.setupOp}-${filters.setupValue ?? ""}`}
+                onBlur={(e) => patch({ setupValue: e.target.value.trim() || null })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter")
+                    patch({ setupValue: e.currentTarget.value.trim() || null });
+                }}
+              />
+              {filters.setupOp === "between" ? (
+                <input
+                  type="number"
+                  step="any"
+                  className={`w-24 ${controlClass} disabled:opacity-50`}
+                  placeholder="max"
+                  disabled={!filters.setupField}
+                  defaultValue={filters.setupValue2 ?? ""}
+                  key={`setupValue2-${filters.setupField ?? "none"}-${filters.setupValue2 ?? ""}`}
+                  onBlur={(e) => patch({ setupValue2: e.target.value.trim() || null })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter")
+                      patch({ setupValue2: e.currentTarget.value.trim() || null });
+                  }}
+                />
+              ) : null}
+            </div>
+          </div>
+          <div className="space-y-1 min-w-[10rem]">
+            <label className={labelClass}>Setup item changed</label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <select
+                className={`min-w-[8rem] ${controlClass}`}
+                value={filters.setupChangedField ?? ""}
+                onChange={(e) =>
+                  patch({ setupChangedField: e.target.value || null, setupChangedDir: "any" })
+                }
+              >
+                <option value="">Any change</option>
+                {setupFields.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className={`${controlClass} disabled:opacity-50`}
+                disabled={!filters.setupChangedField}
+                value={filters.setupChangedDir}
+                aria-label="Change direction"
+                onChange={(e) =>
+                  patch({
+                    setupChangedDir:
+                      e.target.value === "up" || e.target.value === "down"
+                        ? e.target.value
+                        : "any",
+                  })
+                }
+              >
+                <option value="any">any change</option>
+                <option value="up">increased</option>
+                <option value="down">decreased</option>
+              </select>
+            </div>
+          </div>
           <MultiSelect
-            label="Tire sets"
-            options={tireSets}
-            selectedIds={filters.tireSetIds}
-            onChange={(tireSetIds) => patch({ tireSetIds })}
+            label="Tire types"
+            options={tireTypes}
+            selectedIds={filters.tireTypes}
+            onChange={(next) => patch({ tireTypes: next })}
           />
           <div className="space-y-1 min-w-[10rem]">
             <label className={labelClass}>Event</label>

@@ -399,7 +399,12 @@ export function SetupSheetModelSchemaEditor(props: {
                       type="button"
                       className="text-[10px] text-rose-300 hover:underline"
                       onClick={() => {
-                        if (window.confirm(`Remove parameter "${f.displayLabel}"?`)) removeField(f.key);
+                        if (
+                          window.confirm(
+                            `Remove parameter "${f.displayLabel}"?\n\nThis sheet is shared by every car of this chassis type. Values already logged under "${f.key}" stay stored on past runs but will no longer be shown on setup sheets, compares, or community stats.`
+                          )
+                        )
+                          removeField(f.key);
                       }}
                     >
                       Remove

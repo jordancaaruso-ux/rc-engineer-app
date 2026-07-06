@@ -173,7 +173,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 - **Header:** `.page-header` + `h1.page-title` + `p.page-subtitle` — title block uses `gap-1` via `:has(.page-title)`; subtitle matches `PanelSubtitle` (`13px`, `leading-relaxed`, `text-muted-foreground`).
 - **Hierarchy:** page title (Sora **uppercase**, bold) → page subtitle (Sora muted) → section `<Eyebrow>` (mono, faint, uppercase) — hero `PanelTitle` (Sora 700 sentence case) stays the in-card headline voice.
 - **Body:** `.page-body` with `max-w-*` as appropriate; `gap-3` between major blocks (locked in CSS).
-- **Mobile nav order (unchanged):** Dashboard · Analysis · **Add run (center)** · Garage · Engineer · Settings.
+- **Mobile dock (2026-07-06):** Dashboard · Analysis · Assets · Engineer · Teams — five destinations. **Add run** is a floating yellow pill (bottom-right, `LogRunFab`); **Settings** lives behind the top-right account avatar (`AccountMenu`). Desktop sidebar keeps Add run + Settings and gains Teams.
 
 ---
 
@@ -282,6 +282,7 @@ Track these when prioritizing rework:
 
 | Date | Change |
 |------|--------|
+| 2026-07-06 | **Dock → 5 destinations + floating action + account avatar** — Founder-interviewed nav restructure. **Add run** left the dock for a floating yellow `Log run` pill (bottom-right, 48px, draft-aware green dot, `LogRunFab`; suppressed on run + setup create/edit routes via `shouldShowLogRunFab`). **Settings** left the dock for a top-right account avatar menu (`AccountMenu` — Settings · Privacy · Sign out, `useSession` face). **Teams** took the freed slot. Mobile dock is now `Dashboard · Analysis · Assets · Engineer · Teams` (grid-cols-6 → 5). Desktop sidebar unchanged apart from gaining Teams. |
 | 2026-07-03 | **Mobile bottom nav → floating dock** — icon-only rounded pill floating above the screen edge (blurred `bg-card/90` + top sheen + charcoal shadow), Phosphor icons regular→**fill** when active (Gauge / ChartBar / PlusCircle / Car / GearSix; `EngineerNavIcon` gained a `filled` variant), sliding yellow top-edge indicator (2px, soft glow, 200ms). Labels retired on the mobile dock (sidebar labels unchanged); `--mobile-tab-bar-height` 3.25 → 4.75rem (dock + float gap clearance). Desktop sidebar untouched (still Lucide + labels). |
 | 2026-07-03 | **Photo wash + liquid glass** — TITC sunset (`track-hero.jpg`, 52KB) as the global fixed background (blur 8 · yellow .3 · dark .4, user-tuned via artifact sliders); `SurfaceCard` → `.glass-card` (0.7 alpha, 35px backdrop blur); dock pill → liquid glass (0.42, 30px). Replaces flat-charcoal shell; "calm flat / no photography" rule retired. `suppressHydrationWarning` added to SurfaceCard for the external `--focus` writes. |
 | 2026-07-03 | **Page-title treatment** — Space Grotesk 700 sentence case, 22–30px (`--font-display`, next/font), framed by drafting-style corner brackets (CSS pseudo-elements, muted ink, full title height — per approved artifact). Fraunces/Instrument Serif cursive trials rejected. Eyebrows split from stat labels: `<Eyebrow>` yellow (`.eyebrow-label`), `.type-data-label` stays faint. All Eyebrow leading dots removed. Page glow un-occluded (`bg-background` dropped from `main` + route-transition wrapper). |

@@ -12,6 +12,7 @@ import {
 import { geometryDerivedScalarObservations } from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
 import { GRIP_BUCKET_ANY, gripBucketsForDoc } from "@/lib/setupAggregations/gripBuckets";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
+import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import {
   UNIVERSAL_TOURING_TEMPLATE_ID,
   isUniversalTouringTuningParameter,
@@ -90,9 +91,20 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
   }
   const cars = await prisma.car.findMany({
     where: { id: { in: [...carIdSet] } },
-    select: { id: true, setupSheetTemplate: true },
+    select: {
+      id: true,
+      setupSheetTemplate: true,
+      setupSheetModel: { select: { slug: true } },
+    },
   });
-  const templateByCarId = new Map(cars.map((c) => [c.id, c.setupSheetTemplate]));
+  // Prefer the linked model's slug (canonical template key); fall back to the stored string for
+  // cars that predate model links. For A800RR both are the same value.
+  const templateByCarId = new Map(
+    cars.map((c) => [
+      c.id,
+      c.setupSheetModel?.slug ? templateKeyFromModelSlug(c.setupSheetModel.slug) : c.setupSheetTemplate,
+    ])
+  );
 
   // key = `${template}\x1e${surface}\x1e${gripBucket}` -> per-parameter observation buckets.
   // A single doc may land in multiple grip buckets (always `any`, plus one per matching traction tag).

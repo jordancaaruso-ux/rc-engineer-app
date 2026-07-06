@@ -26,6 +26,7 @@ model User {
   cars            Car[]
   runs            Run[]
   tracks          Track[]
+  trackLayouts    TrackLayout[]
   tireSets        TireSet[]
   tireTypesCreated TireType[] @relation("TireTypeCreatedBy")
   additiveTypesCreated AdditiveType[] @relation("AdditiveTypeCreatedBy")
@@ -203,10 +204,8 @@ model SetupSheetModel {
   defaultCalibrationId String?                @unique
   defaultCalibration   SetupSheetCalibration? @relation("ModelDefaultCalibration", fields: [defaultCalibrationId], references: [id], onDelete: SetNull)
 
-  // NOTE: a global @@unique([slug]) is intentionally deferred until the one-time dedupe
-  // (scripts/dedupe-setup-sheet-models.ts) has collapsed per-user duplicates in every environment.
+  @@unique([slug])
   @@index([userId, updatedAt])
-  @@index([slug])
 }
 
 /// Catalog slugs removed by an admin — global seed must not recreate them.
@@ -263,11 +262,40 @@ model Track {
 
   runs            Run[]
   events          Event[]
+  layouts         TrackLayout[]
   favouriteTracks FavouriteTrack[]
   cameraProfiles  TrackCameraProfile[]
   videoAssets     VideoAsset[]
   videoAnalysisJobs VideoAnalysisJob[]
   locationRunPromptDismissals TrackLocationRunPromptDismissal[]
+}
+
+/**
+ * A named physical layout of a track (freeform, user-created). A track can have
+ * several (e.g. "Club layout", "Nats config"). Direction (CW/CCW) is chosen per
+ * run/event, not stored on the layout. Descriptive only — layouts do NOT change
+ * community-aggregation / condition-scope buckets (see trackConditionSignature.ts).
+ */
+model TrackLayout {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name      String
+  sortOrder Int      @default(0)
+  notes     String?
+
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  runs   Run[]
+  events Event[]
+
+  @@index([trackId, sortOrder])
+  @@index([userId])
 }
 
 /** Per-user: do not show the Run-complete GPS modal again for this track. */
@@ -307,6 +335,14 @@ model Event {
 
   track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
   trackId String?
+
+  /** Layout the venue ran for this meeting; runs in the event default to it. */
+  trackLayout   TrackLayout? @relation(fields: [trackLayoutId], references: [id], onDelete: SetNull)
+  trackLayoutId String?
+  /** Preserved when the linked TrackLayout row is deleted. */
+  trackLayoutNameSnapshot String?
+  /** Optional running direction for the meeting. */
+  trackDirection TrackDirection?
 
   /** Preserved when the linked Track row is deleted. */
   trackNameSnapshot     String?
@@ -726,6 +762,12 @@ enum SessionType {
   RACE_MEETING
 }
 
+/** Optional running direction for a track layout (clockwise / counter-clockwise). */
+enum TrackDirection {
+  CW
+  CCW
+}
+
 model Run {
   id                   String   @id @default(cuid())
   createdAt            DateTime @default(now())
@@ -744,6 +786,14 @@ model Run {
 
   track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
   trackId String?
+
+  /** Named layout ran this session (descriptive; not part of aggregation buckets). */
+  trackLayout   TrackLayout? @relation(fields: [trackLayoutId], references: [id], onDelete: SetNull)
+  trackLayoutId String?
+  /** Preserved when the linked TrackLayout row is deleted (mirrors trackNameSnapshot). */
+  trackLayoutNameSnapshot String?
+  /** Optional running direction for this session. */
+  trackDirection TrackDirection?
 
   event   Event?  @relation(fields: [eventId], references: [id])
   eventId String?
@@ -877,6 +927,30 @@ model Run {
    * moves on to a new day.
    */
   practiceDayUrl String?
+
+  /**
+   * Weather / conditions captured for this session. Auto-fetched from the track's
+   * pinned coordinates (else device location) at the session's actual time via
+   * Open-Meteo, then user-editable. Stored canonical metric (°C, %, km/h). All
+   * nullable: indoor runs, pre-feature runs, and drafts may omit them.
+   * `conditionsAirTempC` powers the Engineer's condition context + the
+   * temperature-band axis of CAR_PARAMETER_CONDITION aggregations.
+   */
+  conditionsAirTempC     Float?
+  /** Manual track/surface-temp probe reading — never from the weather API. */
+  conditionsTrackTempC   Float?
+  conditionsCloudCoverPct Int?
+  /** WMO weather interpretation code (0 clear … 3 overcast … 95 thunderstorm). */
+  conditionsWeatherCode  Int?
+  conditionsHumidityPct  Int?
+  conditionsWindKph      Float?
+  conditionsWindDirDeg   Int?
+  /** Provenance: `open-meteo-forecast` | `open-meteo-archive` | `manual`. */
+  conditionsSource       String?
+  conditionsLatitude     Float?
+  conditionsLongitude    Float?
+  /** The instant the weather reading represents (hour bucket at the session time). */
+  conditionsObservedAt   DateTime?
 
   betweenRunHint EngineerBetweenRunHint?
   dashboardSuggestion EngineerDashboardSuggestion?

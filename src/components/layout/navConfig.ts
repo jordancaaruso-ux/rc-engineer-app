@@ -6,6 +6,7 @@ import {
   PlusCircle,
   Settings,
   Sparkles,
+  Users,
 } from "lucide-react";
 
 export type PrimaryNavId =
@@ -14,6 +15,7 @@ export type PrimaryNavId =
   | "analysis"
   | "assets"
   | "engineer"
+  | "teams"
   | "settings";
 
 export type PrimaryNavItem = {
@@ -34,6 +36,25 @@ export function isHiddenNavRoute(pathname: string | null | undefined): boolean {
   if (pathname === "/privacy") return true;
   if (pathname.startsWith("/api/")) return true;
   return false;
+}
+
+/**
+ * Routes where the floating "Log run" FAB is suppressed because the user is
+ * already inside a create/edit flow with its own bottom-anchored primary action
+ * (so a second floating CTA would collide or confuse). Deliberately narrow —
+ * the FAB stays available on lists, hubs, dashboard, analysis, and engineer.
+ * Extend this list as new form surfaces with sticky Save bars appear.
+ */
+const LOG_RUN_FAB_HIDDEN_PATTERNS: readonly RegExp[] = [
+  /^\/runs\/new(?:\/|$)/, // logging a run — you're already here
+  /^\/runs\/[^/]+\/edit(?:\/|$)/, // editing a run
+  /^\/setup-sheet-models\/[^/]+\/schema(?:\/|$)/, // schema editor (own Save)
+  /^\/setup-documents\/[^/]+(?:\/|$)/, // setup document editor (own Save)
+];
+
+export function shouldShowLogRunFab(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return !LOG_RUN_FAB_HIDDEN_PATTERNS.some((re) => re.test(pathname));
 }
 
 const ANALYSIS_PREFIXES = [
@@ -88,7 +109,8 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
     { id: "analysis", score: sectionMatchScore(pathname, ANALYSIS_PREFIXES) },
     { id: "assets", score: sectionMatchScore(pathname, ASSETS_PREFIXES) },
     { id: "engineer", score: matchPrefixScore(pathname, "/engineer") },
-    { id: "settings", score: Math.max(matchPrefixScore(pathname, "/settings"), matchPrefixScore(pathname, "/teams")) },
+    { id: "teams", score: matchPrefixScore(pathname, "/teams") },
+    { id: "settings", score: matchPrefixScore(pathname, "/settings") },
   ];
 
   let best: { id: PrimaryNavId; score: number } | null = null;
@@ -112,15 +134,20 @@ const ADD_RUN: PrimaryNavItem = {
 const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: BarChart3 };
 const ASSETS: PrimaryNavItem = { id: "assets", href: "/assets", label: "Assets", icon: Car };
 const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: Sparkles };
+const TEAMS: PrimaryNavItem = { id: "teams", href: "/teams", label: "Teams", icon: Users };
 const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: Settings };
 
-export const PRIMARY_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSETS, ENGINEER, SETTINGS];
+export const PRIMARY_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSETS, ENGINEER, TEAMS, SETTINGS];
 
-/** Desktop sidebar: same six sections, natural top-to-bottom order. */
-export const DESKTOP_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSETS, ENGINEER, SETTINGS];
+/** Desktop sidebar: full section list, natural top-to-bottom order. */
+export const DESKTOP_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSETS, ENGINEER, TEAMS, SETTINGS];
 
-/** Mobile bottom bar: Add run centered between Analysis and Assets. */
-export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ADD_RUN, ASSETS, ENGINEER, SETTINGS];
+/**
+ * Mobile bottom dock: five pure destinations. `Add run` is now a floating pill
+ * FAB (`LogRunFab`) and `Settings` lives behind the account avatar
+ * (`AccountMenu`), so neither sits in the dock. See `shouldShowLogRunFab`.
+ */
+export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ASSETS, ENGINEER, TEAMS];
 
 export type NavHubIconKey =
   | "car"

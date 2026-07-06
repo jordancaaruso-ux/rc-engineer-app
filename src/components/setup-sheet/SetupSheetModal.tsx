@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { createPortal } from "react-dom";
+import { GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
+import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
+import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
 import {
   formatRunPickerLine,
   formatRunPickerLineWithDriver,
@@ -16,16 +18,8 @@ import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { Eyebrow } from "@/components/ui/panel";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
-import {
-  canonicalSetupSheetTemplateId,
-  isA800RRCar,
-  SETUP_SHEET_TEMPLATE_A800RR,
-} from "@/lib/setupSheetTemplateId";
+import { canonicalSetupSheetTemplateId, isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { GRIP_BUCKET_ANY } from "@/lib/setupAggregations/gripBuckets";
-import {
-  getActiveSetupData,
-  ACTIVE_SETUP_CHANGED_EVENT,
-} from "@/lib/activeSetupContext";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import {
@@ -59,8 +53,6 @@ export type SetupSheetModalRun = {
   lapTimes?: unknown;
 };
 
-type CompareMode = "this_run_only" | "current_setup" | "choose_run";
-
 export function SetupSheetModal({
   open,
   onClose,
@@ -79,11 +71,10 @@ export function SetupSheetModal({
   viewerUserId?: string | null;
   memberDisplayByUserId?: Record<string, string>;
 }) {
-  const [mode, setMode] = useState<CompareMode>("this_run_only");
+  const [compareOpen, setCompareOpen] = useState(false);
   const [otherRunId, setOtherRunId] = useState("");
   const [comparePickerRuns, setComparePickerRuns] = useState<SetupSheetModalRun[]>([]);
   const [comparePickerLoading, setComparePickerLoading] = useState(false);
-  const [activeTick, setActiveTick] = useState(0);
   const [numericAggregationByKey, setNumericAggregationByKey] = useState<Map<
     string,
     NumericAggregationCompareSlice
@@ -109,7 +100,7 @@ export function SetupSheetModal({
 
   useEffect(() => {
     if (!open) return;
-    setMode("this_run_only");
+    setCompareOpen(false);
     setOtherRunId("");
     setBaselineSetupData(null);
     setBaselineSetupLoading(false);
@@ -139,12 +130,6 @@ export function SetupSheetModal({
     };
   }, [open, run?.id, run?.setupSnapshot?.id, run?.setupSnapshot?.data]);
 
-  useEffect(() => {
-    const bump = () => setActiveTick((t) => t + 1);
-    window.addEventListener(ACTIVE_SETUP_CHANGED_EVENT, bump);
-    return () => window.removeEventListener(ACTIVE_SETUP_CHANGED_EVENT, bump);
-  }, []);
-
   const carId = run?.car?.id ?? run?.carId ?? null;
 
   useEffect(() => {
@@ -169,15 +154,14 @@ export function SetupSheetModal({
     };
   }, [open, carId]);
 
+  // Community stats bucket by the car's template key (model slug). No fallback: showing another
+  // chassis' spread would color compare deltas with wrong data.
   const communityTemplateKey = useMemo(() => {
-    return (
-      canonicalSetupSheetTemplateId(run?.car?.setupSheetTemplate ?? null) ??
-      SETUP_SHEET_TEMPLATE_A800RR
-    );
+    return canonicalSetupSheetTemplateId(run?.car?.setupSheetTemplate ?? null);
   }, [run?.car?.setupSheetTemplate]);
 
   useEffect(() => {
-    if (!open) {
+    if (!open || !communityTemplateKey) {
       setNumericAggregationByKey(null);
       return;
     }
@@ -201,13 +185,6 @@ export function SetupSheetModal({
       alive = false;
     };
   }, [open, communityTemplateKey]);
-
-  // PDF viewer intentionally removed from Analyse run (Setup is app-native / parsed-first).
-
-  const activeSetup = useMemo(() => {
-    void activeTick;
-    return getActiveSetupData();
-  }, [activeTick]);
 
   const fallbackPickerRuns = pickerRuns ?? [];
 
@@ -275,12 +252,12 @@ export function SetupSheetModal({
     [runs, run?.id]
   );
   const baselineRun = useMemo(() => {
-    if (mode !== "choose_run" || !otherRunId) return null;
+    if (!compareOpen || !otherRunId) return null;
     return runs.find((r) => r.id === otherRunId) ?? null;
-  }, [mode, otherRunId, runs]);
+  }, [compareOpen, otherRunId, runs]);
 
   useEffect(() => {
-    if (!open || mode !== "choose_run" || !otherRunId || !baselineRun) {
+    if (!open || !compareOpen || !otherRunId || !baselineRun) {
       setBaselineSetupData(null);
       setBaselineSetupLoading(false);
       return;
@@ -308,7 +285,7 @@ export function SetupSheetModal({
     return () => {
       alive = false;
     };
-  }, [open, mode, otherRunId, baselineRun]);
+  }, [open, compareOpen, otherRunId, baselineRun]);
 
   const runSetup = useMemo<SetupSnapshotData>(
     () => normalizeSetupData(loadedSetupData ?? run?.setupSnapshot?.data ?? {}),
@@ -316,32 +293,59 @@ export function SetupSheetModal({
   );
 
   const baselineValue = useMemo<SetupSnapshotData | null>(() => {
-    if (mode === "this_run_only") return null;
-    if (mode === "choose_run") {
-      if (!otherRunId || baselineSetupLoading || baselineSetupData === null) return null;
-      return normalizeSetupData(baselineSetupData);
+    if (!compareOpen || !otherRunId || baselineSetupLoading || baselineSetupData === null) {
+      return null;
     }
-    if (mode === "current_setup" && activeSetup) {
-      return normalizeSetupData(activeSetup);
-    }
-    return null;
-  }, [mode, otherRunId, baselineSetupLoading, baselineSetupData, activeSetup]);
+    return normalizeSetupData(baselineSetupData);
+  }, [compareOpen, otherRunId, baselineSetupLoading, baselineSetupData]);
 
-  const compareActive = mode !== "this_run_only" && baselineValue != null;
+  const compareActive = baselineValue != null;
+
+  // "What changed this session" — diff vs the previous run on the same car,
+  // mirroring the Sessions expanded-row preview. Same-car neighbours come from
+  // the compare picker list (sorted newest → oldest, anchor run included).
+  const previousRunOnCar = useMemo(() => {
+    if (!run || !carId) return null;
+    const sameCar = runs.filter((r) => (r.car?.id ?? r.carId) === carId);
+    const idx = sameCar.findIndex((r) => r.id === run.id);
+    if (idx < 0) return null;
+    return sameCar[idx + 1] ?? null;
+  }, [runs, run, carId]);
+
+  const [previousSetupData, setPreviousSetupData] = useState<unknown | null>(null);
+  useEffect(() => {
+    if (!open || !previousRunOnCar?.setupSnapshot?.id) {
+      setPreviousSetupData(null);
+      return;
+    }
+    if (previousRunOnCar.setupSnapshot.data !== undefined) {
+      setPreviousSetupData(previousRunOnCar.setupSnapshot.data);
+      return;
+    }
+    let alive = true;
+    void fetch(`/api/runs/${encodeURIComponent(previousRunOnCar.id)}/setup-snapshot`)
+      .then((res) => res.json())
+      .then((payload: { setupSnapshot?: { data?: unknown } }) => {
+        if (alive) setPreviousSetupData(payload.setupSnapshot?.data ?? {});
+      })
+      .catch(() => {
+        if (alive) setPreviousSetupData(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, previousRunOnCar?.id, previousRunOnCar?.setupSnapshot?.id, previousRunOnCar?.setupSnapshot?.data]);
+
+  const changedSincePrevious = useMemo(() => {
+    if (!previousRunOnCar?.setupSnapshot?.id || previousSetupData == null) return null;
+    return setupChangedRowsSincePrevious(runSetup, previousSetupData);
+  }, [previousRunOnCar, previousSetupData, runSetup]);
 
   const template = useMemo(() => {
     if (modelTemplate) return modelTemplate;
     if (isA800RRCar(run?.car?.setupSheetTemplate)) return A800RR_SETUP_SHEET_V1;
     return getDefaultSetupSheetTemplate();
   }, [modelTemplate, run?.car?.setupSheetTemplate]);
-
-  const hasActiveSetup = useMemo(() => {
-    if (!activeSetup) return false;
-    return Object.keys(activeSetup).some((k) => {
-      const v = activeSetup[k];
-      return v != null && String(v).trim() !== "";
-    });
-  }, [activeSetup]);
 
   if (!open || !portalReady) return null;
 
@@ -376,57 +380,43 @@ export function SetupSheetModal({
             <p className="text-sm text-muted-foreground">No run data.</p>
           ) : (
             <>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Eyebrow>Compare to</Eyebrow>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMode("this_run_only");
-                        setOtherRunId("");
-                      }}
-                      className={cn(
-                        "rounded-md border px-3 py-1.5 text-xs font-medium transition",
-                        mode === "this_run_only"
-                          ? "border-accent bg-accent/15 text-foreground"
-                          : "border-border bg-card hover:bg-muted/90"
-                      )}
-                    >
-                      This run
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMode("current_setup")}
-                      className={cn(
-                        "rounded-md border px-3 py-1.5 text-xs font-medium transition",
-                        mode === "current_setup"
-                          ? "border-accent bg-accent/15 text-foreground"
-                          : "border-border bg-card hover:bg-muted/90"
-                      )}
-                    >
-                      Current setup
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMode("choose_run")}
-                      disabled={otherRuns.length === 0}
-                      className={cn(
-                        "rounded-md border px-3 py-1.5 text-xs font-medium transition",
-                        otherRuns.length === 0
-                          ? "border-border/80 text-muted-foreground/50 cursor-not-allowed"
-                          : mode === "choose_run"
-                            ? "border-accent bg-accent/15 text-foreground"
-                            : "border-border bg-card hover:bg-muted/90"
-                      )}
-                    >
-                      Choose run
-                    </button>
-                    {mode === "choose_run" && comparePickerLoading && (
-                      <span className="text-[11px] text-muted-foreground">Loading runs…</span>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Eyebrow>Setup vs previous run</Eyebrow>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCompareOpen((wasOpen) => {
+                        if (wasOpen) setOtherRunId("");
+                        return !wasOpen;
+                      });
+                    }}
+                    aria-pressed={compareOpen}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition",
+                      compareOpen
+                        ? "border-accent bg-accent/15 text-foreground"
+                        : "border-border bg-card hover:bg-muted/90"
                     )}
-                    {mode === "choose_run" && !comparePickerLoading && otherRuns.length > 0 && (
-                      <div className="min-w-0 w-full max-w-md sm:w-auto sm:min-w-[12rem]">
+                    title="Compare this run's setup to another run"
+                  >
+                    <GitCompare className="h-3.5 w-3.5" aria-hidden />
+                    Compare to another run
+                  </button>
+                </div>
+                {comparePickerLoading ||
+                (run.setupSnapshot?.id != null && loadedSetupData == null) ||
+                (previousRunOnCar?.setupSnapshot?.id != null && previousSetupData == null) ? (
+                  <p className="text-muted-foreground text-xs">Loading changes…</p>
+                ) : (
+                  <SetupChangedSincePreviousList rows={changedSincePrevious} />
+                )}
+                {compareOpen ? (
+                  <div className="space-y-2 pt-1">
+                    {comparePickerLoading ? (
+                      <span className="text-[11px] text-muted-foreground">Loading runs…</span>
+                    ) : otherRuns.length > 0 ? (
+                      <div className="min-w-0 w-full max-w-md">
                         <RunPickerSelect
                           label=""
                           runs={otherRuns as RunPickerRun[]}
@@ -436,50 +426,26 @@ export function SetupSheetModal({
                           formatLine={formatPickerLine as (run: RunPickerRun) => string}
                         />
                       </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No other runs on this setup sheet yet. Log a run on your car with the same sheet model, or
+                        ask your teammate to share more sessions.
+                      </p>
                     )}
+                    {otherRunId && baselineSetupLoading ? (
+                      <p className="text-xs text-muted-foreground">Loading comparison setup…</p>
+                    ) : null}
+                    {compareActive && baselineRun ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Showing this run&apos;s setup vs {formatPickerLine(baselineRun)}. Changed fields show{" "}
+                        <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
+                        <span className="text-destructive/90">Darker red</span> = larger difference vs
+                        community spread for that parameter; parameters without enough community samples use a
+                        fixed lighter red.
+                      </p>
+                    ) : null}
                   </div>
-                  {mode === "choose_run" && !comparePickerLoading && otherRuns.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      No other runs on this setup sheet yet. Log a run on your car with the same sheet model, or ask
-                      your teammate to share more sessions.
-                    </p>
-                  )}
-                  {mode === "choose_run" && otherRunId && baselineSetupLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading comparison setup…</p>
-                  ) : null}
-                  {mode === "current_setup" && !hasActiveSetup && (
-                    <p className="text-xs text-amber-600/90 dark:text-amber-400/90">
-                      No current setup. Use the Setup page or Log your run to set one.
-                    </p>
-                  )}
-                  {compareActive && baselineRun ? (
-                    <p className="text-[11px] text-muted-foreground">
-                      Showing this run&apos;s setup vs {formatPickerLine(baselineRun)}. Changed fields show{" "}
-                      <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
-                      <span className="text-destructive/90">Darker red</span> = larger difference vs
-                      community spread for that parameter; parameters without enough community samples use a fixed
-                      lighter red.
-                    </p>
-                  ) : compareActive && mode === "current_setup" ? (
-                    <p className="text-[11px] text-muted-foreground">
-                      Compared to your current setup. Changed fields show{" "}
-                      <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
-                      <span className="text-destructive/90">Darker red</span> = larger difference vs
-                      community spread{hasActiveSetup ? "." : " (no current setup loaded)."}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 flex-col gap-1.5 sm:items-end sm:pl-2">
-                  {run.userId && (!viewerUserId || run.userId === viewerUserId) ? (
-                    <Link
-                      href={`/setup?runId=${encodeURIComponent(run.id)}&pdfReview=1`}
-                      onClick={onClose}
-                      className="rounded-md border border-border bg-card px-3 py-1.5 text-center text-xs font-medium hover:bg-muted/90 transition"
-                    >
-                      Turn into a PDF
-                    </Link>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
 
               <SetupSheetView

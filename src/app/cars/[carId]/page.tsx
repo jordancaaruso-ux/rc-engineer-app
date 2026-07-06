@@ -135,9 +135,10 @@ export default async function CarDetailPage(props: {
     }
   }
 
+  // Setup sheet models are global — never scope this read by userId.
   const modelRow = car.setupSheetModelId
-    ? await prisma.setupSheetModel.findFirst({
-        where: { id: car.setupSheetModelId, userId: user.id },
+    ? await prisma.setupSheetModel.findUnique({
+        where: { id: car.setupSheetModelId },
         select: {
           defaultCalibrationId: true,
           defaultCalibration: {

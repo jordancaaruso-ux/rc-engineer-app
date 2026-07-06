@@ -14,6 +14,7 @@ export const EVENT_PARTICIPATION_ADDITIVE_SELECT = EVENT_PARTICIPATION_TIRE_SELE
 
 export const EVENT_LIST_INCLUDE = {
   track: { select: { id: true, name: true, location: true } },
+  trackLayout: { select: { id: true, name: true } },
   participations: {
     select: {
       id: true,

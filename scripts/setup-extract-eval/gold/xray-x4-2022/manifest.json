@@ -1,0 +1,16 @@
+{
+  "style": "xray-x4-2022",
+  "sheetLabel": "Xray X4'22 setup sheet (VER.01)",
+  "source": "https://site.petitrc.com/reglages/xray/setupx4/",
+  "blankAcroFormPdf": "files/X42022_blank.pdf",
+  "sheets": [
+    { "file": "files/X42022_BrunoCoelho_Ciserano2022032627.png", "format": "image_digital", "expected": true, "notes": "Asphalt, Race of Champions" },
+    { "file": "files/X42022_AlexanderHagberg_Snowbirds2022020406.png", "format": "image_digital", "expected": true, "notes": "Carpet, Snowbirds; PSS pistons, comments filled" },
+    { "file": "files/X42022_AlexandreDuchet_Besancon2022042324.png", "format": "image_digital", "expected": true, "notes": "Asphalt, French Nats; pinion/spur swapped on original" },
+    { "file": "files/X42022_BartWubben_Apeldoorn20220515.png", "format": "image_digital", "expected": true, "notes": "Asphalt; literal X placeholders, many blanks" },
+    { "file": "files/X42022_CoryParsons_Valkaria20220227.png", "format": "image_digital", "expected": true, "notes": "US club race; vertical body post, empty toe-in" },
+    { "file": "files/X42022_AlessioMenicucci_Fontanellato20220612.png", "format": "image_digital", "expected": false, "notes": "Extra — no gold yet" },
+    { "file": "files/X42022_DavidPerez_GuiaDeIsora20220807.png", "format": "image_digital", "expected": false, "notes": "Extra — no gold yet" },
+    { "file": "files/X42022_BrianStewart_Geelong20221204.jpg", "format": "image_digital_jpg", "expected": false, "notes": "Extra — JPEG variant, no gold yet" }
+  ]
+}

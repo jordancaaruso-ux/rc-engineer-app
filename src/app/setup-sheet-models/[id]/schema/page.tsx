@@ -3,6 +3,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { canEditSetupSheetModel } from "@/lib/setupSheetModels/modelAccess";
 import { SetupSheetModelSchemaPageClient } from "@/components/setup-sheet-models/SetupSheetModelSchemaPageClient";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 
@@ -39,9 +40,10 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
   const sp = await searchParams;
   const returnTo = typeof sp.returnTo === "string" ? sp.returnTo.trim() : null;
   const initialTab = sp.tab === "parameters" ? "parameters" : "layout";
-  const model = await prisma.setupSheetModel.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true, name: true, slug: true, schemaJson: true },
+  // Models are global — load by id only; edit rights are computed separately.
+  const model = await prisma.setupSheetModel.findUnique({
+    where: { id },
+    select: { id: true, name: true, slug: true, schemaJson: true, userId: true, isAuthorized: true },
   });
   if (!model) {
     return (
@@ -100,6 +102,7 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
           initialSchema={schema}
           initialTab={initialTab}
           returnTo={returnTo}
+          canEdit={canEditSetupSheetModel(user, model)}
         />
       </section>
     </>

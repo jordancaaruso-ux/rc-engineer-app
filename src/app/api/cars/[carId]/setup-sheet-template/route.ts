@@ -3,7 +3,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import type { SetupSheetTemplateView } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
-import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateForCar";
+import { getSetupSheetTemplateAndKeyForCar } from "@/lib/setupSheetModels/getTemplateForCar";
 
 type RouteCtx = { params: Promise<{ carId: string }> };
 
@@ -28,9 +28,9 @@ export async function GET(request: Request, ctx: RouteCtx) {
   });
   if (!car) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const template = await getSetupSheetTemplateForCar(user.id, car, view);
+  const { template, templateKey } = await getSetupSheetTemplateAndKeyForCar(user.id, car, view);
   return NextResponse.json(
-    { template },
+    { template, templateKey },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

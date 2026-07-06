@@ -5,7 +5,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { canViewPeerRuns } from "@/lib/teammateRunAccess";
 import { SETUP_SHEET_TEMPLATE_A800RR, canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
-import { legacyTemplateFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
+import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -68,8 +68,8 @@ export async function POST(request: Request) {
       if (!model) {
         return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
       }
-      const legacy = legacyTemplateFromModelSlug(model.slug);
-      if (legacy) setupSheetTemplate = legacy;
+      // Keep the template key in sync with the model — community aggregations bucket by it.
+      setupSheetTemplate = templateKeyFromModelSlug(model.slug);
     }
     const car = await prisma.car.create({
       data: {

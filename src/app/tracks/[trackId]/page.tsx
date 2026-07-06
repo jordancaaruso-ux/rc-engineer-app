@@ -14,6 +14,7 @@ import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotS
 import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
+import { TrackLayoutsEditor } from "@/components/tracks/TrackLayoutsEditor";
 import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
 
 export default async function TrackDetailPage(props: {
@@ -76,11 +77,16 @@ export default async function TrackDetailPage(props: {
     );
   }
 
-  const [runCount, totalRunCount, eventCount, isFavourite] = await Promise.all([
+  const [runCount, totalRunCount, eventCount, isFavourite, layouts] = await Promise.all([
     prisma.run.count({ where: { trackId, userId: user.id } }),
     prisma.run.count({ where: { trackId } }),
     prisma.event.count({ where: { trackId } }),
     isTrackFavourite(user.id, trackId),
+    prisma.trackLayout.findMany({
+      where: { trackId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true, name: true, notes: true, sortOrder: true },
+    }),
   ]);
   const canManage = canManageCommunityTrack(user, track);
   const deleteAsAdmin = canManage && track.userId !== user.id;
@@ -141,6 +147,8 @@ export default async function TrackDetailPage(props: {
                 initialGripTags={track.gripTags}
                 initialLayoutTags={track.layoutTags}
               />
+
+              <TrackLayoutsEditor trackId={track.id} initialLayouts={layouts} />
 
               <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useRef, useEffect, useState } from "react";
+import { Fragment, useRef, useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 export type TrackOption = {
@@ -60,6 +61,33 @@ export function TrackCombobox({
   const [highlightIndex, setHighlightIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  // The menu is rendered in a portal on <body> so it escapes the card's
+  // backdrop-blur stacking context (otherwise its lower half hides behind the
+  // following setup card). Position is anchored to the input's viewport rect.
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const updateMenuPos = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setMenuPos({ top: r.bottom + 4, left: r.left, width: r.width });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setMenuPos(null);
+      return;
+    }
+    updateMenuPos();
+    const onReflow = () => updateMenuPos();
+    // Capture phase so scrolls in any ancestor container keep the menu anchored.
+    window.addEventListener("scroll", onReflow, true);
+    window.addEventListener("resize", onReflow);
+    return () => {
+      window.removeEventListener("scroll", onReflow, true);
+      window.removeEventListener("resize", onReflow);
+    };
+  }, [isOpen, updateMenuPos]);
 
   const selectedTrack = value ? (tracks.find((t) => t.id === value) ?? favouriteTracks.find((t) => t.id === value)) : null;
   const selectedLabel = selectedTrack ? (selectedTrack.location ? `${selectedTrack.name} (${selectedTrack.location})` : selectedTrack.name) : "";
@@ -96,9 +124,11 @@ export function TrackCombobox({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      // The list lives in a body portal, so check it explicitly alongside the input.
+      if (containerRef.current?.contains(target)) return;
+      if (listRef.current?.contains(target)) return;
+      setIsOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -161,12 +191,14 @@ export function TrackCombobox({
         aria-controls="track-combobox-list"
         disabled={disabled}
       />
-      {isOpen && (
+      {isOpen && menuPos && typeof document !== "undefined"
+        ? createPortal(
         <ul
           id="track-combobox-list"
           ref={listRef}
           role="listbox"
-          className="absolute z-10 mt-1 w-full max-h-56 overflow-auto rounded-md border border-border bg-secondary shadow-md py-1 text-sm"
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, width: menuPos.width }}
+          className="z-50 max-h-56 overflow-auto rounded-md border border-border bg-secondary shadow-lg py-1 text-sm"
         >
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-muted-foreground">
@@ -217,8 +249,10 @@ export function TrackCombobox({
               })}
             </>
           )}
-        </ul>
-      )}
+        </ul>,
+          document.body
+        )
+        : null}
     </div>
   );
 }

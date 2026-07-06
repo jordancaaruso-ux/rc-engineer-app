@@ -105,9 +105,11 @@ export function alignLapsByNumber(seriesList: ComparisonSeries[]): number[] {
 export const DELTA_MAX_ABS_RANGE = 1.0;
 
 /**
- * Smooth opacity gradient vs target (comparison columns only).
- * delta = comparison − target (positive = slower → red, negative → blue tint).
- * alpha = 0.05 + normalized * 0.8 where normalized = min(|delta| / maxAbs, 1).
+ * Smooth opacity gradient for lap-cell tints (target and comparison columns).
+ * delta = cell − anchor: positive = slower → loss red (#E5644E), negative =
+ * faster → gain green (#4FD089), the north-star data-delta semantics.
+ * alpha = 0.06 + normalized * 0.44 where normalized = min(|delta| / maxAbs, 1)
+ * — capped at 0.5 so light mono text stays legible over the tint.
  */
 export function getDeltaStyle(
   delta: number,
@@ -118,14 +120,14 @@ export function getDeltaStyle(
   }
   const absDelta = Math.abs(delta);
   const normalized = Math.min(absDelta / maxAbsDelta, 1);
-  const alpha = 0.05 + normalized * 0.8;
+  const alpha = 0.06 + normalized * 0.44;
   if (absDelta < 1e-9) {
     return { backgroundColor: "rgba(128, 128, 128, 0.06)" };
   }
   if (delta > 0) {
-    return { backgroundColor: `rgba(255, 0, 0, ${alpha})` };
+    return { backgroundColor: `rgba(229, 100, 78, ${alpha})` };
   }
-  return { backgroundColor: `rgba(37, 99, 235, ${alpha})` };
+  return { backgroundColor: `rgba(79, 208, 137, ${alpha})` };
 }
 
 export type SummaryMetricDeltas = {

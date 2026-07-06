@@ -75,7 +75,7 @@ export default async function BatteryDetailPage(props: {
         <div className="max-w-2xl space-y-4">
           <CardPanel contentClassName="space-y-3">
             <Eyebrow dot="muted">Overview</Eyebrow>
-            <StatStrip className="grid-cols-2 sm:grid-cols-3">
+            <StatStrip gridClassName="grid-cols-2 sm:grid-cols-3">
               <StatTile label="Runs logged" value={String(stats.runCount)} className="py-2" />
               <StatTile
                 label="Latest pack run"

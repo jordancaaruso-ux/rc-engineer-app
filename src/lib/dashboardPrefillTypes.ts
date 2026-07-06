@@ -7,6 +7,9 @@ export type DashboardSerializedRun = {
   carId?: string;
   car?: { id: string; name: string } | null;
   trackId: string | null;
+  trackLayoutId?: string | null;
+  trackLayout?: { id: string; name: string } | null;
+  trackDirection?: "CW" | "CCW" | null;
   eventId: string | null;
   tireSetId: string | null;
   tireRunNumber: number;

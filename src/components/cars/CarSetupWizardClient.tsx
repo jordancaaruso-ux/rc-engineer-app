@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
+import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/panel";
 import { postSetupDocumentUpload } from "@/lib/setupDocuments/setupDocumentUploadClient";
 import { buildGenericPresetSchema } from "@/lib/setupSheetModels/genericPresetSchema";
+import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { customFieldDefinitionsFromModelSchema } from "@/lib/setupSheetModels/customFieldDefinitionsFromSchema";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
@@ -33,6 +35,19 @@ export function CarSetupWizardClient() {
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Chassis types are shared globally; a name that matches an existing model reuses it, so catch
+  // the match up front instead of silently discarding parameter edits at save time.
+  const pendingNewModelName = newModelName.trim() || chassis.trim();
+  const existingModelMatch =
+    modelMode === "new" && pendingNewModelName
+      ? models.find(
+          (m) =>
+            normalizeSetupSheetModelName(m.name) ===
+            normalizeSetupSheetModelName(pendingNewModelName)
+        ) ?? null
+      : null;
 
   useEffect(() => {
     fetch("/api/setup-sheet-models")
@@ -70,7 +85,9 @@ export function CarSetupWizardClient() {
     if (!res.ok) throw new Error((data as { error?: string }).error || "Failed to create sheet model");
     const model = (data as { model: { id: string }; reused?: boolean }).model;
     if ((data as { reused?: boolean }).reused) {
-      setError(`Using existing sheet model “${name}” (same chassis type already defined).`);
+      setNotice(
+        `“${name}” already exists as a shared chassis type, so your car uses it. Your parameter edits were not applied to the shared sheet.`
+      );
     }
     return model.id;
   }
@@ -103,18 +120,10 @@ export function CarSetupWizardClient() {
     return (data as { car: { id: string } }).car.id;
   }
 
-  async function handleCarStepNext() {
+  async function continueWithModelId(mid: string) {
     setError(null);
     setBusy(true);
     try {
-      let mid = modelMode === "existing" ? selectedModelId : null;
-      if (modelMode === "new") {
-        if (!schema) ensureSchemaForNewModel();
-        setStep("schema");
-        setBusy(false);
-        return;
-      }
-      if (!mid) throw new Error("Select a setup sheet model.");
       setModelId(mid);
       const cid = await createCar(mid);
       setCarId(cid);
@@ -124,6 +133,29 @@ export function CarSetupWizardClient() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleCarStepNext() {
+    if (modelMode === "existing") {
+      if (!selectedModelId) {
+        setError("Select a setup sheet model.");
+        return;
+      }
+      await continueWithModelId(selectedModelId);
+      return;
+    }
+    // "New" mode: a name matching an existing shared chassis reuses it — skip the parameter
+    // step entirely instead of discarding the user's edits at save time.
+    if (existingModelMatch) {
+      setNotice(
+        `“${existingModelMatch.name}” already exists as a shared chassis type — your car will use it.`
+      );
+      await continueWithModelId(existingModelMatch.id);
+      return;
+    }
+    setError(null);
+    if (!schema) ensureSchemaForNewModel();
+    setStep("schema");
   }
 
   async function handleSchemaStepNext() {
@@ -217,6 +249,9 @@ export function CarSetupWizardClient() {
       {error ? (
         <div className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-foreground">{error}</div>
       ) : null}
+      {notice ? (
+        <div className="rounded border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{notice}</div>
+      ) : null}
 
       {step === "car" && (
         <div className="space-y-4 rounded-lg border border-border bg-card p-4">
@@ -273,6 +308,12 @@ export function CarSetupWizardClient() {
                 }}
                 placeholder="e.g. Mugen MTC3"
               />
+              {existingModelMatch ? (
+                <span className="mt-1 block text-[11px] text-accent">
+                  “{existingModelMatch.name}” already exists as a shared chassis type — your car
+                  will use it and skip the parameter step.
+                </span>
+              ) : null}
             </label>
           ) : (
             <>
@@ -298,21 +339,9 @@ export function CarSetupWizardClient() {
               ) : null}
             </>
           )}
-          <button
-            type="button"
-            className="rounded border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium disabled:opacity-50"
-            disabled={busy}
-            onClick={() => {
-              if (modelMode === "new") {
-                ensureSchemaForNewModel();
-                setStep("schema");
-              } else {
-                void handleCarStepNext();
-              }
-            }}
-          >
-            Continue
-          </button>
+          <Button disabled={busy} onClick={() => void handleCarStepNext()} className="text-sm">
+            {existingModelMatch ? "Use existing & continue" : "Continue"}
+          </Button>
         </div>
       )}
 
@@ -323,14 +352,9 @@ export function CarSetupWizardClient() {
             Start from generic touring preset. Add parameters and types (e.g. numeric ARB vs one-of-many thicknesses).
           </p>
           <SetupSheetModelSchemaEditor schema={schema} onChange={setSchema} />
-          <button
-            type="button"
-            className="rounded border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium disabled:opacity-50"
-            disabled={busy}
-            onClick={() => void handleSchemaStepNext()}
-          >
+          <Button disabled={busy} onClick={() => void handleSchemaStepNext()} className="text-sm">
             {busy ? "Saving…" : "Save & continue to PDF upload"}
-          </button>
+          </Button>
         </div>
       )}
 

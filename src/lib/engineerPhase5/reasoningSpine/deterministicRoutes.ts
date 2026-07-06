@@ -12,6 +12,7 @@ import { matchTracksForEngineerQuery } from "@/lib/engineerPhase5/matchTrackForE
 import { buildConditionalSetupEmpiricalV1 } from "@/lib/engineerPhase5/conditionalSetupForEngineer";
 import { buildSetupSpreadForEngineer } from "@/lib/engineerPhase5/setupSpreadForEngineer";
 import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
+import { temperatureBand } from "@/lib/weather/temperatureBands";
 import { listSetupKeysChangedBetweenSnapshots } from "@/lib/setupCompare/listSetupKeysChangedBetweenSnapshots";
 import { compareSetupField } from "@/lib/setupCompare/compare";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
@@ -152,6 +153,7 @@ export async function tryAnswerPlanningQuery(input: {
       meetingSessionCode: true,
       carId: true,
       tireRunNumber: true,
+      conditionsAirTempC: true,
       setupSnapshot: { select: { data: true } },
       car: { select: { name: true } },
       track: { select: { name: true, gripTags: true, layoutTags: true } },
@@ -220,6 +222,7 @@ export async function tryAnswerPlanningQuery(input: {
         userId: input.userId,
         carId: newest.carId,
         conditionSignature: sig,
+        temperatureBand: temperatureBand(newest.conditionsAirTempC),
         spreadRows: spread.rows,
       });
       const top = empirical?.hasEnoughData ? empirical.rows.slice(0, 5) : [];

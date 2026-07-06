@@ -1,9 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import {
-  SETUP_SHEET_MODEL_SLUG_A800RR,
-  SETUP_SHEET_TEMPLATE_A800RR,
-  isA800RRCar,
-} from "@/lib/setupSheetTemplateId";
+import { SETUP_SHEET_MODEL_SLUG_A800RR, isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 export type ResolvedSetupSheetModel = {
@@ -62,8 +58,4 @@ export async function canonicalSetupSheetModelIdForUserCarId(
   return resolved?.id ?? null;
 }
 
-/** Legacy template string for documents that still use setupSheetTemplate. */
-export function legacyTemplateFromModelSlug(slug: string): string | null {
-  if (slug === SETUP_SHEET_MODEL_SLUG_A800RR) return SETUP_SHEET_TEMPLATE_A800RR;
-  return null;
-}
+export { templateKeyFromModelSlug } from "@/lib/setupSheetTemplateId";

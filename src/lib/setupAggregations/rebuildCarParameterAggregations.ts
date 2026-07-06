@@ -1,7 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { SetupAggregationScopeType, SetupAggregationValueType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
+import { encodeTrackConditionSignature, withTemperatureBand } from "@/lib/trackConditionSignature";
+import { temperatureBand } from "@/lib/weather/temperatureBands";
 import type { SetupSnapshotValue } from "@/lib/runSetup";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 import {
@@ -70,6 +71,7 @@ async function buildCarParameterConditionRowsFromRuns(
     },
     select: {
       carId: true,
+      conditionsAirTempC: true,
       setupSnapshot: { select: { data: true } },
       track: { select: { gripTags: true, layoutTags: true } },
     },
@@ -86,18 +88,25 @@ async function buildCarParameterConditionRowsFromRuns(
     const tuningOnly = filterTuningKeysOnly(normalized);
     if (countNonEmptyKeys(tuningOnly) < MIN_DISTINCT_KEYS_FOR_ELIGIBILITY) continue;
 
-    const conditionSig = encodeTrackConditionSignature(run.track.gripTags, run.track.layoutTags);
-    const bk = `${run.carId}\x1e${conditionSig}`;
-    let keyMap = buckets.get(bk);
-    if (!keyMap) {
-      keyMap = new Map();
-      buckets.set(bk, keyMap);
-    }
+    // Emit into the temp-agnostic bucket always, plus the temperature-band
+    // bucket when this run carries an air-temp reading. Reads prefer the
+    // temp-specific bucket and fall back to the base one.
+    const baseSig = encodeTrackConditionSignature(run.track.gripTags, run.track.layoutTags);
+    const band = temperatureBand(run.conditionsAirTempC);
+    const sigs = band ? [baseSig, withTemperatureBand(baseSig, band)] : [baseSig];
 
-    for (const [key, val] of Object.entries(tuningOnly)) {
-      const obs = extractObservation(key, val);
-      if (!obs) continue;
-      getOrCreateBucket(keyMap, key, obs);
+    for (const sig of sigs) {
+      const bk = `${run.carId}\x1e${sig}`;
+      let keyMap = buckets.get(bk);
+      if (!keyMap) {
+        keyMap = new Map();
+        buckets.set(bk, keyMap);
+      }
+      for (const [key, val] of Object.entries(tuningOnly)) {
+        const obs = extractObservation(key, val);
+        if (!obs) continue;
+        getOrCreateBucket(keyMap, key, obs);
+      }
     }
   }
 

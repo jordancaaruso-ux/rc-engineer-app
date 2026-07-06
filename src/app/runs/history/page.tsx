@@ -11,13 +11,18 @@ import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
 import { buildRunHistoryGroups, type RunHistoryGroup } from "@/lib/runs/buildRunHistoryGroups";
 import {
-  applyRunHistoryPostFilters,
+  applyRunHistoryPostFiltersWithReasons,
   buildRunHistoryPrismaWhere,
+  computeChangedKeysByRun,
   filtersToSearchParams,
   parseRunHistoryFilters,
   runHistoryFiltersActive,
   sortRunsForHistory,
+  type MatchReason,
 } from "@/lib/runs/runHistoryFilters";
+import { normalizeSetupData } from "@/lib/runSetup";
+import { isDocumentMetadataField } from "@/lib/setupCalibrations/calibrationFieldCatalog";
+import { setupFieldLabel } from "@/lib/setupCompare/changedSincePrevious";
 import { compareRunTimestamp } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
@@ -43,7 +48,14 @@ export const revalidate = 30;
 const runHistoryInclude = {
   car: { select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true } },
   track: { select: { id: true, name: true } },
-  tireSet: { select: { id: true, label: true, setNumber: true } },
+  tireSet: {
+    select: {
+      id: true,
+      label: true,
+      setNumber: true,
+      tireType: { select: { displayName: true } },
+    },
+  },
   additiveType: { select: { id: true, displayName: true } },
   event: {
     select: {
@@ -191,7 +203,8 @@ export default async function RunHistoryPage({
   let filterCars: { id: string; label: string }[] = [];
   let filterTracks: { id: string; label: string }[] = [];
   let filterEvents: { id: string; label: string }[] = [];
-  let filterTireSets: { id: string; label: string }[] = [];
+  let filterTireTypes: { id: string; label: string }[] = [];
+  let filterSetupFields: { id: string; label: string }[] = [];
 
   if (teamId) {
     const allowed = await assertUserInTeam(teamId, user.id);
@@ -262,22 +275,70 @@ export default async function RunHistoryPage({
       prisma.tireSet.findMany({
         where: { userId: user.id },
         orderBy: [{ label: "asc" }, { setNumber: "asc" }],
-        select: { id: true, label: true, setNumber: true },
+        select: { id: true, label: true, tireType: { select: { displayName: true } } },
       }),
     ]);
     filterCars = cars.map((c) => ({ id: c.id, label: c.name }));
     filterTracks = tracks.map((t) => ({ id: t.id, label: t.name }));
     filterEvents = scopedEvents.map((e) => ({ id: e.id, label: e.name }));
-    filterTireSets = tireSets.map((ts) => ({
-      id: ts.id,
-      label: `${ts.label}${ts.setNumber != null ? ` #${ts.setNumber}` : ""}`,
-    }));
+    // Group physical sets into tire *types*: linked type name, else legacy label.
+    const tireTypeCounts = new Map<string, number>();
+    for (const ts of tireSets) {
+      const identity = ts.tireType?.displayName ?? ts.label;
+      tireTypeCounts.set(identity, (tireTypeCounts.get(identity) ?? 0) + 1);
+    }
+    filterTireTypes = [...tireTypeCounts.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([identity, count]) => ({
+        id: identity,
+        label: `${identity} · ${count} set${count === 1 ? "" : "s"}`,
+      }));
   }
 
+  // Server-side setup parameters for the loaded runs — powers smart search over
+  // setup values, the "setup changed" filter, and the setup-field pickers. Kept
+  // server-side (not serialized to the client; RunDetail still fetches per-run).
+  const setupSnapshotIds = [...new Set(runs.map((r) => r.setupSnapshotId).filter(Boolean))];
+  const setupSnaps = setupSnapshotIds.length
+    ? await perfSpan("fetchRunHistorySetupData", () =>
+        prisma.setupSnapshot.findMany({
+          where: { id: { in: setupSnapshotIds } },
+          select: { id: true, data: true },
+        })
+      )
+    : [];
+  const setupDataBySnapshotId = new Map<string, unknown>(
+    setupSnaps.map((s) => [s.id, s.data as unknown])
+  );
+  const setupDataByRunId = new Map<string, unknown>(
+    runs.map((r) => [r.id, setupDataBySnapshotId.get(r.setupSnapshotId)])
+  );
+  const setupFieldKeys = new Set<string>();
+  for (const data of setupDataByRunId.values()) {
+    for (const key of Object.keys(normalizeSetupData(data))) {
+      // Sheet header fields (name/race/track/date…) aren't setup parameters.
+      if (!isDocumentMetadataField(key)) setupFieldKeys.add(key);
+    }
+  }
+  filterSetupFields = [...setupFieldKeys]
+    .map((key) => ({ id: key, label: setupFieldLabel(key) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   const dbMatchedCount = runs.length;
-  runs = sortRunsForHistory(
-    applyRunHistoryPostFilters<RunInGroup>(runs, filters, displayTimeZone),
-    filters.sort
+  // Changed-keys diffing is O(runs × setup keys) — only pay for it when the
+  // "setup item changed" filter is actually in play.
+  const changedKeysByRunId = filters.setupChangedField
+    ? computeChangedKeysByRun<RunInGroup>(runs, { setupDataByRunId })
+    : undefined;
+  const matchResult = applyRunHistoryPostFiltersWithReasons<RunInGroup>(
+    runs,
+    filters,
+    displayTimeZone,
+    { setupDataByRunId, changedKeysByRunId }
+  );
+  runs = sortRunsForHistory(matchResult.runs, filters.sort);
+  const matchReasonsById: Record<string, MatchReason[]> = Object.fromEntries(
+    matchResult.reasonsById
   );
   const matchedRunCount = runs.length;
 
@@ -349,7 +410,7 @@ export default async function RunHistoryPage({
         </summary>
         <div className="min-w-0 max-w-full border-t border-border bg-muted/40">
           <div className="min-w-0 max-w-full max-md:overflow-x-hidden md:overflow-x-auto">
-            <table className="w-full max-w-full text-sm md:table-fixed">
+            <table className="w-full max-w-full text-sm table-fixed">
               <RunHistoryColGroup layout={columnLayout} />
               <thead>
                 <RunHistoryMobileHeaderRow colSpan={colSpan} />
@@ -406,6 +467,7 @@ export default async function RunHistoryPage({
                   memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
                   showMemberColumn={teamMode}
                   showSessionColumn={showSessionColumn}
+                  matchReasonsById={matchReasonsById}
                   initialExpandedRunId={
                     focusRunId && group.runs.some((r) => r.id === focusRunId)
                       ? focusRunId
@@ -486,6 +548,7 @@ export default async function RunHistoryPage({
                 memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
                 showMemberColumn={teamMode}
                 showSessionColumn={showSessionColumn}
+                matchReasonsById={matchReasonsById}
                 initialExpandedRunId={focusRunId}
               />
             </tbody>
@@ -583,7 +646,8 @@ export default async function RunHistoryPage({
             cars={filterCars}
             tracks={filterTracks}
             events={filterEvents}
-            tireSets={filterTireSets}
+            tireTypes={filterTireTypes}
+            setupFields={filterSetupFields}
             teamId={teamId}
             focusRun={focusRunId}
             viewAll={viewAll}

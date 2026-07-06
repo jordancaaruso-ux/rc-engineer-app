@@ -2,16 +2,26 @@ import type { Prisma } from "@prisma/client";
 import { getBestLap, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLocalCalendarDate } from "@/lib/engineerPhase5/localCalendarInTimeZone";
+import { normalizeSetupData } from "@/lib/runSetup";
+import { parseNumericFromSetupString } from "@/lib/setup/parseSetupNumeric";
+import { isDocumentMetadataField } from "@/lib/setupCalibrations/calibrationFieldCatalog";
+import { setupFieldLabel } from "@/lib/setupCompare/changedSincePrevious";
+import { compareSetupField } from "@/lib/setupCompare/compare";
 
 export type RunHistorySort = "completed_desc" | "completed_asc" | "best_lap_asc" | "best_lap_desc";
 export type RunHistoryLayout = "grouped" | "flat";
 export type RunHistoryStatus = "all" | "draft" | "complete";
+/** Setup-value comparison. `eq` is contains-text; the rest compare parsed numbers. */
+export type SetupValueOp = "eq" | "gte" | "lte" | "between";
+/** Direction constraint for the setup-changed filter (numeric fields). */
+export type SetupChangedDir = "any" | "up" | "down";
 
 export type RunHistoryFilters = {
   q: string | null;
   carIds: string[];
   trackIds: string[];
-  tireSetIds: string[];
+  /** Tire *type* identities: `tireType.displayName` when linked, else the set's label (legacy sets). */
+  tireTypes: string[];
   eventId: string | null;
   dateFrom: string | null;
   dateTo: string | null;
@@ -20,6 +30,16 @@ export type RunHistoryFilters = {
   bestLapMin: number | null;
   bestLapMax: number | null;
   raceClass: string | null;
+  /** Setup-value filter: setup field key to look for (e.g. `toe_front`). */
+  setupField: string | null;
+  setupOp: SetupValueOp;
+  /** For `eq`: contains-text. For `gte`/`lte`: the bound. For `between`: the lower bound. */
+  setupValue: string | null;
+  /** For `between`: the upper bound. */
+  setupValue2: string | null;
+  /** Setup-change filter: keep only runs where this field changed vs the previous run on the same car. */
+  setupChangedField: string | null;
+  setupChangedDir: SetupChangedDir;
   status: RunHistoryStatus;
   sort: RunHistorySort;
   layout: RunHistoryLayout;
@@ -29,7 +49,7 @@ export const DEFAULT_RUN_HISTORY_FILTERS: RunHistoryFilters = {
   q: null,
   carIds: [],
   trackIds: [],
-  tireSetIds: [],
+  tireTypes: [],
   eventId: null,
   dateFrom: null,
   dateTo: null,
@@ -38,6 +58,12 @@ export const DEFAULT_RUN_HISTORY_FILTERS: RunHistoryFilters = {
   bestLapMin: null,
   bestLapMax: null,
   raceClass: null,
+  setupField: null,
+  setupOp: "eq",
+  setupValue: null,
+  setupValue2: null,
+  setupChangedField: null,
+  setupChangedDir: "any",
   status: "all",
   sort: "completed_desc",
   layout: "grouped",
@@ -85,6 +111,27 @@ function parseLayout(raw: string): RunHistoryLayout {
   return raw === "flat" ? "flat" : "grouped";
 }
 
+function parseSetupOp(raw: string): SetupValueOp {
+  if (raw === "gte" || raw === "lte" || raw === "between") return raw;
+  return "eq";
+}
+
+function parseSetupChangedDir(raw: string): SetupChangedDir {
+  if (raw === "up" || raw === "down") return raw;
+  return "any";
+}
+
+/** Tire-type identities are URI-encoded per item so names containing commas survive the list. */
+function parseEncodedList(raw: string): string[] {
+  return parseIdList(raw).map((s) => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  });
+}
+
 /** Merge legacy single-id params with multi-select lists. */
 export function parseRunHistoryFilters(
   searchParams: Record<string, SearchParamValue>
@@ -98,7 +145,7 @@ export function parseRunHistoryFilters(
     ...parseIdList(firstParam(searchParams.trackIds)),
     ...(firstParam(searchParams.trackId) ? [firstParam(searchParams.trackId)] : []),
   ];
-  const tireSetIds = parseIdList(firstParam(searchParams.tireSetIds));
+  const tireTypes = parseEncodedList(firstParam(searchParams.tireTypes));
   const eventId = firstParam(searchParams.eventId) || null;
   const dateFrom = firstParam(searchParams.dateFrom) || null;
   const dateTo = firstParam(searchParams.dateTo) || null;
@@ -107,6 +154,12 @@ export function parseRunHistoryFilters(
   const bestLapMin = parseOptionalFloat(firstParam(searchParams.bestLapMin));
   const bestLapMax = parseOptionalFloat(firstParam(searchParams.bestLapMax));
   const raceClass = firstParam(searchParams.raceClass) || null;
+  const setupField = firstParam(searchParams.setupField) || null;
+  const setupOp = parseSetupOp(firstParam(searchParams.setupOp));
+  const setupValue = firstParam(searchParams.setupValue) || null;
+  const setupValue2 = firstParam(searchParams.setupValue2) || null;
+  const setupChangedField = firstParam(searchParams.setupChangedField) || null;
+  const setupChangedDir = parseSetupChangedDir(firstParam(searchParams.setupChangedDir));
   const status = parseStatus(firstParam(searchParams.status));
   const sort = parseSort(firstParam(searchParams.sort));
   const layout = parseLayout(firstParam(searchParams.layout));
@@ -115,7 +168,7 @@ export function parseRunHistoryFilters(
     q,
     carIds: [...new Set(carIds)],
     trackIds: [...new Set(trackIds)],
-    tireSetIds,
+    tireTypes,
     eventId,
     dateFrom,
     dateTo,
@@ -124,6 +177,13 @@ export function parseRunHistoryFilters(
     bestLapMin,
     bestLapMax,
     raceClass,
+    setupField,
+    setupOp: setupField ? setupOp : "eq",
+    // Values with no field to anchor them are meaningless — drop them.
+    setupValue: setupField ? setupValue : null,
+    setupValue2: setupField && setupOp === "between" ? setupValue2 : null,
+    setupChangedField,
+    setupChangedDir: setupChangedField ? setupChangedDir : "any",
     status,
     sort,
     layout,
@@ -135,7 +195,7 @@ export function runHistoryFiltersActive(filters: RunHistoryFilters): boolean {
     Boolean(filters.q) ||
     filters.carIds.length > 0 ||
     filters.trackIds.length > 0 ||
-    filters.tireSetIds.length > 0 ||
+    filters.tireTypes.length > 0 ||
     Boolean(filters.eventId) ||
     Boolean(filters.dateFrom) ||
     Boolean(filters.dateTo) ||
@@ -144,6 +204,8 @@ export function runHistoryFiltersActive(filters: RunHistoryFilters): boolean {
     filters.bestLapMin != null ||
     filters.bestLapMax != null ||
     Boolean(filters.raceClass) ||
+    Boolean(filters.setupField) ||
+    Boolean(filters.setupChangedField) ||
     filters.status !== "all"
   );
 }
@@ -161,7 +223,10 @@ export function filtersToSearchParams(
   setOrDelete("q", filters.q);
   setOrDelete("carIds", filters.carIds.length ? filters.carIds.join(",") : null);
   setOrDelete("trackIds", filters.trackIds.length ? filters.trackIds.join(",") : null);
-  setOrDelete("tireSetIds", filters.tireSetIds.length ? filters.tireSetIds.join(",") : null);
+  setOrDelete(
+    "tireTypes",
+    filters.tireTypes.length ? filters.tireTypes.map(encodeURIComponent).join(",") : null
+  );
   setOrDelete("eventId", filters.eventId);
   setOrDelete("dateFrom", filters.dateFrom);
   setOrDelete("dateTo", filters.dateTo);
@@ -170,6 +235,18 @@ export function filtersToSearchParams(
   setOrDelete("bestLapMin", filters.bestLapMin != null ? String(filters.bestLapMin) : null);
   setOrDelete("bestLapMax", filters.bestLapMax != null ? String(filters.bestLapMax) : null);
   setOrDelete("raceClass", filters.raceClass);
+  setOrDelete("setupField", filters.setupField);
+  setOrDelete("setupOp", filters.setupField && filters.setupOp !== "eq" ? filters.setupOp : null);
+  setOrDelete("setupValue", filters.setupField ? filters.setupValue : null);
+  setOrDelete(
+    "setupValue2",
+    filters.setupField && filters.setupOp === "between" ? filters.setupValue2 : null
+  );
+  setOrDelete("setupChangedField", filters.setupChangedField);
+  setOrDelete(
+    "setupChangedDir",
+    filters.setupChangedField && filters.setupChangedDir !== "any" ? filters.setupChangedDir : null
+  );
   setOrDelete("status", filters.status !== "all" ? filters.status : null);
   setOrDelete("sort", filters.sort !== "completed_desc" ? filters.sort : null);
   setOrDelete("layout", filters.layout !== "grouped" ? filters.layout : null);
@@ -187,7 +264,15 @@ export function buildRunHistoryPrismaWhere(
   const where: Prisma.RunWhereInput = { ...baseWhere };
   if (filters.carIds.length) where.carId = { in: filters.carIds };
   if (filters.trackIds.length) where.trackId = { in: filters.trackIds };
-  if (filters.tireSetIds.length) where.tireSetId = { in: filters.tireSetIds };
+  if (filters.tireTypes.length) {
+    // Identity = linked tireType.displayName when present, else the legacy set label.
+    where.tireSet = {
+      OR: [
+        { tireType: { displayName: { in: filters.tireTypes } } },
+        { tireTypeId: null, label: { in: filters.tireTypes } },
+      ],
+    };
+  }
   if (filters.eventId) where.eventId = filters.eventId;
   if (filters.sessionType) where.sessionType = filters.sessionType;
   if (filters.meetingSessionType) {
@@ -202,6 +287,7 @@ export function buildRunHistoryPrismaWhere(
 }
 
 export type RunForHistoryFilter = {
+  id?: string;
   createdAt: Date;
   sessionCompletedAt: Date | null;
   loggingCompletedAt: Date | null;
@@ -215,16 +301,487 @@ export type RunForHistoryFilter = {
   driverNotes: string | null;
   handlingProblems: string | null;
   car?: { name: string } | null;
+  carId?: string | null;
   carNameSnapshot: string | null;
   track?: { name: string } | null;
   trackNameSnapshot: string | null;
   event?: { name: string } | null;
-  tireSet?: { label: string; setNumber: number | null } | null;
+  tireSet?: {
+    label: string;
+    setNumber: number | null;
+    tireType?: { displayName: string } | null;
+  } | null;
+  additiveType?: { displayName: string } | null;
+  handlingAssessmentJson?: unknown;
+  /** Setup parameters JSON; may be attached inline or supplied via `setupDataByRunId`. */
+  setupSnapshot?: { id?: string; data?: unknown } | null;
+  importedLapSets?: Array<{
+    driverName?: string | null;
+    displayName?: string | null;
+    surname?: string | null;
+    isPrimaryUser?: boolean;
+  }>;
+};
+
+/** A single reason a run matched the active search/setup filters, shown in the UI. */
+export type MatchReasonKind =
+  | "car"
+  | "track"
+  | "event"
+  | "session"
+  | "class"
+  | "tires"
+  | "additive"
+  | "driver"
+  | "note"
+  | "setup"
+  | "changed";
+
+export type MatchReason = { kind: MatchReasonKind; text: string };
+
+/** Old → new values for one setup key that changed vs the previous run. */
+export type SetupChangedDelta = { prev: unknown; cur: unknown };
+
+/** Extra inputs the matcher needs that aren't always attached to the run row itself. */
+export type RunHistoryMatchOptions = {
+  /** runId → setup parameters JSON (preferred over `run.setupSnapshot.data` when present). */
+  setupDataByRunId?: Map<string, unknown>;
+  /** runId → changed setup keys (with old/new values) vs the previous run on the same car. */
+  changedKeysByRunId?: Map<string, Map<string, SetupChangedDelta>>;
 };
 
 function runBestLapSeconds(run: RunForHistoryFilter): number | null {
   if (run.bestLapSeconds != null && Number.isFinite(run.bestLapSeconds)) return run.bestLapSeconds;
   return getBestLap(primaryLapRowsFromRun(run));
+}
+
+function resolveSetupData(run: RunForHistoryFilter, opts?: RunHistoryMatchOptions): unknown {
+  if (opts?.setupDataByRunId && run.id) {
+    const d = opts.setupDataByRunId.get(run.id);
+    if (d !== undefined) return d;
+  }
+  return run.setupSnapshot?.data;
+}
+
+// ---------------------------------------------------------------------------
+// Smart text search: tokenized AND across fields, typo tolerance, synonyms.
+// ---------------------------------------------------------------------------
+
+/**
+ * Bidirectional synonym groups. Each token expands to include every other word
+ * in its group so e.g. searching "wet" also finds notes that say "damp"/"rain".
+ * Kept intentionally small and RC-setup specific; extend deliberately.
+ */
+const SYNONYM_GROUPS: string[][] = [
+  ["wet", "damp", "rain", "rainy", "raining"],
+  ["dry", "dusty"],
+  ["hot", "warm", "heat"],
+  ["cold", "cool", "chilly"],
+  ["understeer", "push", "pushing", "tight", "understeering"],
+  ["oversteer", "loose", "spin", "spinning", "oversteering"],
+  ["grip", "traction", "grippy"],
+  ["low-grip", "greasy", "slippery", "slick"],
+  ["qualifying", "quals", "qual", "q"],
+  ["practice", "prac"],
+  ["race", "final", "main"],
+  ["battery", "batt", "pack"],
+  ["motor", "engine"],
+];
+
+const SYNONYM_LOOKUP: Map<string, Set<string>> = (() => {
+  const map = new Map<string, Set<string>>();
+  for (const group of SYNONYM_GROUPS) {
+    for (const word of group) {
+      const set = map.get(word) ?? new Set<string>();
+      for (const other of group) set.add(other);
+      map.set(word, set);
+    }
+  }
+  return map;
+})();
+
+function tokenizeQuery(q: string): string[] {
+  return q
+    .toLowerCase()
+    .split(/[\s,]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
+/** Cheap capped Levenshtein — returns a distance, bailing out once it exceeds `max`. */
+function levenshteinWithin(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  const prev = new Array<number>(b.length + 1);
+  const curr = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    let rowMin = curr[0];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+      if (curr[j] < rowMin) rowMin = curr[j];
+    }
+    if (rowMin > max) return max + 1;
+    for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
+  }
+  return prev[b.length];
+}
+
+/** Typo tolerance thresholds: none for very short tokens, 1 for medium, 2 for long. */
+function fuzzyThresholdFor(token: string): number {
+  if (token.length <= 3) return 0;
+  if (token.length <= 6) return 1;
+  return 2;
+}
+
+/**
+ * Does `token` (or one of its synonyms) occur in `fieldText`?
+ * Direct substring first (fast, covers most cases); then a word-level fuzzy
+ * pass so single-character typos still hit.
+ */
+function tokenHitsField(token: string, fieldText: string): boolean {
+  const variants = SYNONYM_LOOKUP.get(token);
+  const needles = variants ? [token, ...variants] : [token];
+  for (const needle of needles) {
+    if (fieldText.includes(needle)) return true;
+  }
+  const threshold = fuzzyThresholdFor(token);
+  if (threshold === 0) return false;
+  const words = fieldText.split(/[^a-z0-9.]+/i).filter(Boolean);
+  for (const word of words) {
+    if (word.startsWith(token)) return true;
+    if (levenshteinWithin(token, word, threshold) <= threshold) return true;
+  }
+  return false;
+}
+
+type SearchField = { kind: MatchReasonKind; text: string; label?: string; value?: string };
+
+function pushField(
+  fields: SearchField[],
+  kind: MatchReasonKind,
+  text: string | null | undefined,
+  extra?: { label?: string; value?: string }
+) {
+  const t = text?.trim();
+  if (t) fields.push({ kind, text: t, ...extra });
+}
+
+/** Everything about a run that free-text search can match against. */
+function runSearchFields(run: RunForHistoryFilter, setupData: unknown): SearchField[] {
+  const fields: SearchField[] = [];
+  pushField(fields, "car", run.car?.name);
+  pushField(fields, "car", run.carNameSnapshot);
+  pushField(fields, "track", run.track?.name);
+  pushField(fields, "track", run.trackNameSnapshot);
+  pushField(fields, "event", run.event?.name);
+  pushField(fields, "session", run.sessionLabel);
+  pushField(fields, "class", run.raceClass);
+  if (run.tireSet) {
+    const setNo = run.tireSet.setNumber != null ? ` #${run.tireSet.setNumber}` : "";
+    const typeName = run.tireSet.tireType?.displayName;
+    pushField(
+      fields,
+      "tires",
+      `${run.tireSet.label}${setNo}${typeName && typeName !== run.tireSet.label ? ` ${typeName}` : ""}`
+    );
+  }
+  pushField(fields, "additive", run.additiveType?.displayName);
+  for (const set of run.importedLapSets ?? []) {
+    if (set.isPrimaryUser) continue;
+    pushField(fields, "driver", set.displayName || set.driverName || set.surname || null);
+  }
+  pushField(fields, "note", run.notes);
+  pushField(fields, "note", run.driverNotes);
+  pushField(fields, "note", run.handlingProblems);
+  pushField(fields, "note", handlingAssessmentText(run.handlingAssessmentJson));
+
+  const obj = normalizeSetupData(setupData);
+  for (const key of Object.keys(obj)) {
+    // Sheet header/context fields (track, race, date, …) duplicate run-level
+    // data and would make e.g. a track-name query hit every setup carried over
+    // from that track. Free text only searches real setup parameters.
+    if (isDocumentMetadataField(key)) continue;
+    const raw = obj[key];
+    if (raw == null) continue;
+    const value = Array.isArray(raw) ? raw.join(", ") : String(raw);
+    if (!value.trim()) continue;
+    const label = setupFieldLabel(key);
+    pushField(fields, "setup", `${label} ${value}`, { label, value });
+  }
+  return fields;
+}
+
+/** Flatten a handling-assessment JSON blob into a searchable string (best-effort). */
+function handlingAssessmentText(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const parts: string[] = [];
+  const walk = (v: unknown) => {
+    if (v == null) return;
+    if (typeof v === "string") {
+      parts.push(v);
+    } else if (Array.isArray(v)) {
+      for (const item of v) walk(item);
+    } else if (typeof v === "object") {
+      for (const val of Object.values(v as Record<string, unknown>)) walk(val);
+    }
+  };
+  walk(json);
+  return parts.join(" ").trim() || null;
+}
+
+/** Short snippet around the first matched token, for note fields. */
+function snippetAround(text: string, tokens: string[]): string {
+  const lower = text.toLowerCase();
+  let idx = -1;
+  for (const token of tokens) {
+    const at = lower.indexOf(token);
+    if (at >= 0 && (idx < 0 || at < idx)) idx = at;
+  }
+  if (idx < 0) return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+  const start = Math.max(0, idx - 24);
+  const end = Math.min(text.length, idx + 36);
+  return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
+}
+
+type TextMatchResult = { matched: boolean; reasons: MatchReason[] };
+
+/**
+ * Tokenized AND match: every token must hit some field. Returns compact,
+ * deduped reasons describing which fields explained the match.
+ */
+function matchTextQuery(
+  run: RunForHistoryFilter,
+  q: string,
+  setupData: unknown
+): TextMatchResult {
+  const tokens = tokenizeQuery(q);
+  if (tokens.length === 0) return { matched: true, reasons: [] };
+  const fields = runSearchFields(run, setupData).map((f) => ({
+    ...f,
+    lower: f.text.toLowerCase(),
+  }));
+
+  const matchedFields = new Set<(typeof fields)[number]>();
+  for (const token of tokens) {
+    let tokenHit = false;
+    for (const field of fields) {
+      if (tokenHitsField(token, field.lower)) {
+        tokenHit = true;
+        matchedFields.add(field);
+      }
+    }
+    if (!tokenHit) return { matched: false, reasons: [] };
+  }
+
+  const reasons: MatchReason[] = [];
+  const seen = new Set<string>();
+  for (const field of matchedFields) {
+    const text = field.kind === "note" ? snippetAround(field.text, tokens) : field.text;
+    const key = `${field.kind}:${text.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    reasons.push({ kind: field.kind, text });
+  }
+  return { matched: true, reasons: reasons.slice(0, 5) };
+}
+
+/** Numeric read of a stored setup value ("500cst" → 500, "-2,0°" → -2). */
+function setupValueAsNumber(raw: unknown): number | null {
+  if (raw == null) return null;
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  if (Array.isArray(raw)) return null;
+  return parseNumericFromSetupString(raw);
+}
+
+/**
+ * Setup-value filter. `eq` keeps contains-text semantics; `gte`/`lte`/`between`
+ * parse the stored value numerically and skip runs where no number can be read.
+ * Bounds left empty degrade gracefully (a bound-less op = "field has any value").
+ */
+function matchSetupValue(
+  filters: RunHistoryFilters,
+  setupData: unknown
+): { matched: boolean; reason: MatchReason | null } {
+  if (!filters.setupField) return { matched: true, reason: null };
+  const obj = normalizeSetupData(setupData);
+  const raw = obj[filters.setupField];
+  if (raw == null) return { matched: false, reason: null };
+  const value = Array.isArray(raw) ? raw.join(", ") : String(raw);
+  if (!value.trim()) return { matched: false, reason: null };
+
+  if (filters.setupOp === "eq") {
+    const wanted = filters.setupValue?.trim().toLowerCase();
+    if (wanted && !value.toLowerCase().includes(wanted)) {
+      return { matched: false, reason: null };
+    }
+  } else {
+    const lower =
+      filters.setupOp === "lte" ? null : parseOptionalFloat(filters.setupValue ?? "");
+    const upper =
+      filters.setupOp === "gte"
+        ? null
+        : parseOptionalFloat(
+            (filters.setupOp === "between" ? filters.setupValue2 : filters.setupValue) ?? ""
+          );
+    if (lower != null || upper != null) {
+      const n = setupValueAsNumber(raw);
+      if (n == null) return { matched: false, reason: null };
+      if (lower != null && n < lower) return { matched: false, reason: null };
+      if (upper != null && n > upper) return { matched: false, reason: null };
+    }
+  }
+
+  const label = setupFieldLabel(filters.setupField);
+  return { matched: true, reason: { kind: "setup", text: `${label} ${value}` } };
+}
+
+function formatChangedValue(raw: unknown): string {
+  if (raw == null) return "—";
+  const s = Array.isArray(raw) ? raw.join(", ") : String(raw);
+  return s.trim() || "—";
+}
+
+/**
+ * Setup-change filter: run must have changed `setupChangedField` vs the previous
+ * run on its car; `up`/`down` additionally require both values to parse as
+ * numbers and to have moved in that direction.
+ */
+function matchSetupChanged(
+  run: RunForHistoryFilter,
+  filters: RunHistoryFilters,
+  opts?: RunHistoryMatchOptions
+): { matched: boolean; reason: MatchReason | null } {
+  if (!filters.setupChangedField) return { matched: true, reason: null };
+  const changed = run.id ? opts?.changedKeysByRunId?.get(run.id) : undefined;
+  const delta = changed?.get(filters.setupChangedField);
+  if (!delta) return { matched: false, reason: null };
+  if (filters.setupChangedDir !== "any") {
+    const prevN = setupValueAsNumber(delta.prev);
+    const curN = setupValueAsNumber(delta.cur);
+    if (prevN == null || curN == null) return { matched: false, reason: null };
+    if (filters.setupChangedDir === "up" && !(curN > prevN)) return { matched: false, reason: null };
+    if (filters.setupChangedDir === "down" && !(curN < prevN)) return { matched: false, reason: null };
+  }
+  const label = setupFieldLabel(filters.setupChangedField);
+  return {
+    matched: true,
+    reason: {
+      kind: "changed",
+      text: `${label} ${formatChangedValue(delta.prev)} → ${formatChangedValue(delta.cur)}`,
+    },
+  };
+}
+
+/** Full per-run evaluation: keep decision + accumulated match reasons. */
+function evaluateRun(
+  run: RunForHistoryFilter,
+  filters: RunHistoryFilters,
+  timeZone: string,
+  opts?: RunHistoryMatchOptions
+): { keep: boolean; reasons: MatchReason[] } {
+  const reasons: MatchReason[] = [];
+  if (!runInDateWindow(run, filters.dateFrom, filters.dateTo, timeZone)) {
+    return { keep: false, reasons };
+  }
+  const setupData = resolveSetupData(run, opts);
+
+  if (filters.q) {
+    const text = matchTextQuery(run, filters.q, setupData);
+    if (!text.matched) return { keep: false, reasons };
+    reasons.push(...text.reasons);
+  }
+
+  const setupVal = matchSetupValue(filters, setupData);
+  if (!setupVal.matched) return { keep: false, reasons };
+  if (setupVal.reason) reasons.push(setupVal.reason);
+
+  const setupChanged = matchSetupChanged(run, filters, opts);
+  if (!setupChanged.matched) return { keep: false, reasons };
+  if (setupChanged.reason) reasons.push(setupChanged.reason);
+
+  const best = runBestLapSeconds(run);
+  if (filters.bestLapMin != null && (best == null || best < filters.bestLapMin)) {
+    return { keep: false, reasons };
+  }
+  if (filters.bestLapMax != null && (best == null || best > filters.bestLapMax)) {
+    return { keep: false, reasons };
+  }
+  return { keep: true, reasons };
+}
+
+/**
+ * Compute, per run, which setup keys changed vs the previous (older) run on the
+ * same car — the same "Setup vs previous run" semantics shown in run details.
+ * Runs may arrive in any order; ordering is derived from the display instant.
+ */
+export function computeChangedKeysByRun<T extends RunForHistoryFilter>(
+  runs: T[],
+  opts?: RunHistoryMatchOptions
+): Map<string, Map<string, SetupChangedDelta>> {
+  const result = new Map<string, Map<string, SetupChangedDelta>>();
+  const byCar = new Map<string, T[]>();
+  for (const run of runs) {
+    if (!run.id) continue;
+    const carKey = run.carId ?? "__no_car__";
+    const list = byCar.get(carKey) ?? [];
+    list.push(run);
+    byCar.set(carKey, list);
+  }
+  for (const [, list] of byCar) {
+    // Oldest → newest so each run compares to the one before it.
+    const ordered = [...list].sort(
+      (a, b) => resolveRunDisplayInstant(a).getTime() - resolveRunDisplayInstant(b).getTime()
+    );
+    for (let i = 1; i < ordered.length; i++) {
+      const cur = ordered[i]!;
+      const prev = ordered[i - 1]!;
+      const curData = normalizeSetupData(resolveSetupData(cur, opts));
+      const prevData = normalizeSetupData(resolveSetupData(prev, opts));
+      const keys = new Set([...Object.keys(curData), ...Object.keys(prevData)]);
+      const changed = new Map<string, SetupChangedDelta>();
+      for (const key of keys) {
+        const cmp = compareSetupField({
+          key,
+          a: curData[key],
+          b: prevData[key],
+          numericAggregationByKey: null,
+        });
+        if (!cmp.areEqual) changed.set(key, { prev: prevData[key], cur: curData[key] });
+      }
+      if (cur.id && changed.size > 0) result.set(cur.id, changed);
+    }
+  }
+  return result;
+}
+
+export function applyRunHistoryPostFilters<T extends RunForHistoryFilter>(
+  runs: T[],
+  filters: RunHistoryFilters,
+  timeZone: string,
+  opts?: RunHistoryMatchOptions
+): T[] {
+  return runs.filter((run) => evaluateRun(run, filters, timeZone, opts).keep);
+}
+
+/** Like {@link applyRunHistoryPostFilters} but also returns per-run match reasons. */
+export function applyRunHistoryPostFiltersWithReasons<T extends RunForHistoryFilter>(
+  runs: T[],
+  filters: RunHistoryFilters,
+  timeZone: string,
+  opts?: RunHistoryMatchOptions
+): { runs: T[]; reasonsById: Map<string, MatchReason[]> } {
+  const kept: T[] = [];
+  const reasonsById = new Map<string, MatchReason[]>();
+  const explain = Boolean(filters.q || filters.setupField || filters.setupChangedField);
+  for (const run of runs) {
+    const { keep, reasons } = evaluateRun(run, filters, timeZone, opts);
+    if (!keep) continue;
+    kept.push(run);
+    if (explain && run.id && reasons.length > 0) reasonsById.set(run.id, reasons);
+  }
+  return { runs: kept, reasonsById };
 }
 
 function runInDateWindow(
@@ -246,46 +803,6 @@ function runInDateWindow(
   if (dateFrom && ymd < dateFrom) return false;
   if (dateTo && ymd > dateTo) return false;
   return true;
-}
-
-function runMatchesTextQuery(run: RunForHistoryFilter, q: string): boolean {
-  const needle = q.trim().toLowerCase();
-  if (!needle) return true;
-  const tireLabel = run.tireSet
-    ? `${run.tireSet.label}${run.tireSet.setNumber != null ? ` #${run.tireSet.setNumber}` : ""}`
-    : "";
-  const hay = [
-    run.car?.name,
-    run.carNameSnapshot,
-    run.track?.name,
-    run.trackNameSnapshot,
-    run.event?.name,
-    run.sessionLabel,
-    run.raceClass,
-    tireLabel,
-    run.notes,
-    run.driverNotes,
-    run.handlingProblems,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return hay.includes(needle);
-}
-
-export function applyRunHistoryPostFilters<T extends RunForHistoryFilter>(
-  runs: T[],
-  filters: RunHistoryFilters,
-  timeZone: string
-): T[] {
-  return runs.filter((run) => {
-    if (!runInDateWindow(run, filters.dateFrom, filters.dateTo, timeZone)) return false;
-    if (filters.q && !runMatchesTextQuery(run, filters.q)) return false;
-    const best = runBestLapSeconds(run);
-    if (filters.bestLapMin != null && (best == null || best < filters.bestLapMin)) return false;
-    if (filters.bestLapMax != null && (best == null || best > filters.bestLapMax)) return false;
-    return true;
-  });
 }
 
 export function sortRunsForHistory<T extends RunForHistoryFilter>(

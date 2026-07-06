@@ -25,12 +25,29 @@ export function canonicalSetupSheetTemplateId(raw: string | null | undefined): s
   return t;
 }
 
+/**
+ * Canonical `setupSheetTemplate` key for a setup sheet model: the model slug. Community
+ * aggregations, manufacturer baselines, and compare views all bucket by this key. For the A800RR
+ * the slug equals the historical template string, so existing data keys are unchanged.
+ */
+export function templateKeyFromModelSlug(slug: string): string {
+  if (slug === SETUP_SHEET_MODEL_SLUG_A800RR) return SETUP_SHEET_TEMPLATE_A800RR;
+  return slug;
+}
+
 export function isA800RRCar(template: string | null | undefined): boolean {
   return canonicalSetupSheetTemplateId(template ?? null) === SETUP_SHEET_TEMPLATE_A800RR;
 }
 
 /** Short label for car lists and setup UX (“car type” for structured setup features). */
 export function labelForSetupSheetTemplate(template: string | null | undefined): string {
-  if (canonicalSetupSheetTemplateId(template ?? null) === SETUP_SHEET_TEMPLATE_A800RR) return "Awesomatix A800RR";
-  return "No setup template";
+  const canonical = canonicalSetupSheetTemplateId(template ?? null);
+  if (canonical === SETUP_SHEET_TEMPLATE_A800RR) return "Awesomatix A800RR";
+  if (!canonical) return "No setup template";
+  // Template keys are model slugs (e.g. mugen_mtc3) — prettify for display.
+  return canonical
+    .split("_")
+    .filter(Boolean)
+    .map((part) => (/\d/.test(part) ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join(" ");
 }

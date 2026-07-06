@@ -1,0 +1,145 @@
+{
+  "status": "verified",
+  "note": "Transcribed by Claude from the sheet image 2026-07-06; founder-verified spot-on 2026-07-06.",
+  "fields": {
+    "race": "vts race 1",
+    "track": "valkaria rc raceway",
+    "driver_name": "Cory Parsons",
+    "date": "2/27/2022",
+    "track_temperature": "",
+    "qual_position": "1",
+    "final_position": "1",
+    "best_laptime": {
+      "value": "12.90",
+      "accept": [
+        "12.9"
+      ]
+    },
+    "track_surface": "asphalt",
+    "track_layout": "mixed",
+    "traction": "medium",
+    "solid_axle": "yes",
+    "gear_diff_oil_front": "",
+    "gear_diff_oil_rear": {
+      "value": "5k",
+      "accept": [
+        "5000"
+      ]
+    },
+    "pinion": "22",
+    "spur_gear": "84",
+    "final_drive_ratio": "",
+    "spring_front": "xray 2.5-2.8",
+    "spring_rear": "xray 2.7",
+    "shock_oil_front": "kit",
+    "shock_oil_rear": "kit",
+    "rebound_front": "0",
+    "rebound_rear": "0",
+    "foam_inserts_front": "no",
+    "foam_inserts_rear": "no",
+    "pistons_front": "4 holes",
+    "pistons_rear": "4 holes",
+    "piston_hole_front": "1.1",
+    "piston_hole_rear": "1.1",
+    "shock_length_front": {
+      "value": "9mm",
+      "accept": [
+        "9"
+      ]
+    },
+    "shock_length_rear": {
+      "value": "9mm",
+      "accept": [
+        "9"
+      ]
+    },
+    "arb_front": "1.1",
+    "arb_rear": "1.1",
+    "tires_front": "xpress 40",
+    "tires_rear": "xpress 40",
+    "additive_front": "mg",
+    "additive_rear": "black",
+    "additive_timing_front": "15",
+    "additive_timing_rear": "min",
+    "total_weight": "1324",
+    "weight_balance_front": "50",
+    "weight_balance_rear": "50",
+    "motor": "dash 5.0",
+    "motor_timing": "",
+    "esc": "dash",
+    "batteries": "6k",
+    "body": "dbx .5",
+    "wing": "dbx .7",
+    "body_height_front": "63",
+    "body_mount_upper": "",
+    "body_height_rear": "",
+    "wing_side_plate": "no",
+    "front_caster": {
+      "value": "4",
+      "accept": [
+        "4°",
+        "4 deg"
+      ]
+    },
+    "rear_caster": {
+      "value": "1.5",
+      "accept": [
+        "1.5°"
+      ]
+    },
+    "bump_steer": "3",
+    "fr_susp_height": "18",
+    "fr_susp_shim": "4",
+    "toe_gain": {
+      "value": "5mm",
+      "accept": [
+        "5"
+      ]
+    },
+    "shim_ff": "2.5",
+    "shim_fr": "2.5",
+    "shim_rf": "3.5",
+    "shim_rr": "3.5",
+    "ride_height_front": "5.2",
+    "ride_height_rear": "5.6",
+    "servo_saver_or_horn": "servo horn",
+    "camber_front": "1.5",
+    "body_stop_front": "yes",
+    "body_stop_front_height": "",
+    "front_brace": "no",
+    "bulkhead_shims": "yes",
+    "front_shock_position": "1",
+    "driveshaft_front": "",
+    "driveshaft_front_type": "std",
+    "downstop_front": "5.4",
+    "front_hub": "composite",
+    "camber_rear": "1.5",
+    "rear_body_post": "vertical",
+    "rear_shock_position": "",
+    "driveshaft_rear": "",
+    "driveshaft_rear_type": "std",
+    "downstop_rear": "4.4",
+    "rear_hub": "composite",
+    "rear_hub_shim": ".5",
+    "toe_out_front": ".5",
+    "toe_in_rear": "",
+    "ackermann_shim": "0",
+    "diff_position_front": "down",
+    "diff_position_rear": "",
+    "upper_arm_front": "standard",
+    "upper_arm_rear": "standard",
+    "steering_bridge": "no",
+    "top_deck_flex": "",
+    "top_deck_thickness": "",
+    "offset_front": "standard",
+    "offset_rear": "-0.5mm",
+    "top_deck_splitted": "yes",
+    "steering_lock": "27",
+    "steering_shim": "kit",
+    "chassis": "graphite",
+    "t_brace": "alu",
+    "front_arms": "medium",
+    "rear_arms": "medium",
+    "steering_plate": "standard"
+  }
+}

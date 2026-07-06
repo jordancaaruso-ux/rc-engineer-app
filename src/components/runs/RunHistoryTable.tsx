@@ -8,12 +8,21 @@ import { formatRunCreatedAtDateTime, formatRunDateCompact } from "@/lib/formatDa
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
-import { compareSetupField } from "@/lib/setupCompare/compare";
+import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
+import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
 import { formatHandlingAssessmentDetailLines, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 import { formatLapSourceSummary, tryReadLapSourceUrl } from "@/lib/lapSession/display";
+import { formatConditionsChip } from "@/lib/weather/conditions";
+import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
+import type { MatchReason } from "@/lib/runs/runHistoryFilters";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { formatAdditiveTimingLine } from "@/lib/runs/runTireContextDisplay";
+import {
+  computeTireIndicatorsByRunId,
+  type RunTireIndicator,
+} from "@/lib/runs/tireSetChange";
+import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import {
   computeMistakeLaps,
@@ -30,7 +39,7 @@ import {
 } from "@/lib/lapAnalysis";
 import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
 import Link from "next/link";
-import { List, SquarePen, Trash2, Wrench } from "lucide-react";
+import { SquarePen, Timer, Trash2, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -84,6 +93,12 @@ type Run = {
   handlingProblems?: string | null;
   handlingAssessmentJson?: unknown;
   carRating?: number | null;
+  conditionsAirTempC?: number | null;
+  conditionsTrackTempC?: number | null;
+  conditionsCloudCoverPct?: number | null;
+  conditionsWeatherCode?: number | null;
+  conditionsHumidityPct?: number | null;
+  conditionsWindKph?: number | null;
   car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
   track?: { id: string; name: string } | null;
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
@@ -195,11 +210,13 @@ type ExpandedLapStat = "best" | "avg5" | "avg10" | "mistakes" | null;
 function RunHistoryActionButtons({
   onSetup,
   onLaps,
+  tireIndicator,
   layout,
   className,
 }: {
   onSetup: () => void;
   onLaps: () => void;
+  tireIndicator: RunTireIndicator | null;
   layout: "mobile" | "desktop";
   className?: string;
 }) {
@@ -213,6 +230,12 @@ function RunHistoryActionButtons({
         className
       )}
     >
+      {tireIndicator ? (
+        <TireIndicatorIcon indicator={tireIndicator} size={mobile ? "md" : "sm"} />
+      ) : mobile ? (
+        // Fixed-width slot so stat columns stay aligned across rows.
+        <span className="h-8 w-8 shrink-0" aria-hidden />
+      ) : null}
       <button
         type="button"
         onClick={onSetup}
@@ -237,15 +260,10 @@ function RunHistoryActionButtons({
         )}
         title="Open lap column compare for this run"
       >
-        {mobile ? <List className="h-4 w-4" aria-hidden /> : "Lap times"}
+        {mobile ? <Timer className="h-4 w-4" aria-hidden /> : "Lap times"}
       </button>
     </div>
   );
-}
-
-function setupFieldLabel(key: string): string {
-  const f = DEFAULT_SETUP_FIELDS.find((d) => d.key === key);
-  return f ? f.label + (f.unit ? ` (${f.unit})` : "") : key.replace(/_/g, " ");
 }
 
 function setupRows(data: unknown): { label: string; value: string }[] {
@@ -279,33 +297,6 @@ function handlingDetails(run: Pick<Run, "handlingProblems" | "handlingAssessment
   return lines.join("\n");
 }
 
-/** Inline analysis preview: only fields that differ from the previous run on the same car (compare semantics). */
-function setupChangedRowsSincePrevious(current: unknown, previous: unknown): {
-  label: string;
-  value: string;
-  previousValue: string;
-}[] {
-  const cur = normalizeSetupData(current);
-  const prev = normalizeSetupData(previous);
-  const keys = new Set([...Object.keys(cur), ...Object.keys(prev)]);
-  const rows: { label: string; value: string; previousValue: string }[] = [];
-  for (const key of [...keys].sort()) {
-    const cmp = compareSetupField({
-      key,
-      a: cur[key],
-      b: prev[key],
-      numericAggregationByKey: null,
-    });
-    if (cmp.areEqual) continue;
-    rows.push({
-      label: setupFieldLabel(key),
-      value: cmp.normalizedA,
-      previousValue: cmp.normalizedB,
-    });
-  }
-  return rows;
-}
-
 export function RunHistoryTable({
   runs,
   allRunsDescending,
@@ -319,6 +310,7 @@ export function RunHistoryTable({
   memberDisplayByUserId,
   showMemberColumn = false,
   showSessionColumn = true,
+  matchReasonsById,
 }: {
   runs: Run[];
   allRunsDescending: CompareRunShape[];
@@ -345,6 +337,8 @@ export function RunHistoryTable({
   memberDisplayByUserId?: Record<string, string>;
   showMemberColumn?: boolean;
   showSessionColumn?: boolean;
+  /** runId → why the run matched the active search/setup filters (search only). */
+  matchReasonsById?: Record<string, MatchReason[]>;
 }) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(() => {
@@ -368,6 +362,20 @@ export function RunHistoryTable({
   function toggleRow(runId: string) {
     setExpandedId((prev) => (prev === runId ? null : runId));
   }
+
+  /** Newest-first across all loaded runs (crosses day/event group boundaries). */
+  const tireIndicatorsByRunId = useMemo(
+    () =>
+      computeTireIndicatorsByRunId(
+        allRunsDescending.map((r) => ({
+          id: r.id,
+          carId: r.carId ?? r.car?.id ?? null,
+          tireRunNumber: r.tireRunNumber,
+          tireSet: r.tireSet ?? null,
+        }))
+      ),
+    [allRunsDescending]
+  );
 
   const totalCols = computeRunHistoryColSpan({
     showReorderColumn: enableReorder,
@@ -448,6 +456,7 @@ export function RunHistoryTable({
       ) : null}
       {runs.map((run) => {
         const isExpanded = expandedId === run.id;
+        const runMatchReasons = matchReasonsById?.[run.id];
         const memberLabel =
           showMemberColumn && run.userId
             ? memberDisplayByUserId?.[run.userId] ?? "—"
@@ -538,6 +547,8 @@ export function RunHistoryTable({
               }}
               className={cn(
                 "border-b border-border/80 hover:bg-muted/50 cursor-pointer select-none",
+                // When the match-reason chips row follows, it carries the divider.
+                runMatchReasons && runMatchReasons.length > 0 && !isExpanded && "border-b-0",
                 isDragging && "opacity-50",
                 showDropAbove && "shadow-[inset_0_2px_0_0_var(--color-primary,#2563eb)]",
                 showDropBelow && "shadow-[inset_0_-2px_0_0_var(--color-primary,#2563eb)]"
@@ -602,6 +613,7 @@ export function RunHistoryTable({
                           layout="mobile"
                           onSetup={() => setSetupModalRunId(run.id)}
                           onLaps={() => setLapModalRunId(run.id)}
+                          tireIndicator={tireIndicatorsByRunId.get(run.id) ?? null}
                         />
                       </div>
                     }
@@ -673,10 +685,18 @@ export function RunHistoryTable({
                   layout="desktop"
                   onSetup={() => setSetupModalRunId(run.id)}
                   onLaps={() => setLapModalRunId(run.id)}
+                  tireIndicator={tireIndicatorsByRunId.get(run.id) ?? null}
                 />
               </td>
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>
+            {runMatchReasons && runMatchReasons.length > 0 && !isExpanded ? (
+              <tr className="border-b border-border/80">
+                <td colSpan={totalCols} className="px-2 pb-1.5 pt-0 md:px-3">
+                  <MatchReasonChips reasons={runMatchReasons} />
+                </td>
+              </tr>
+            ) : null}
             {isExpanded && (
               <tr className="border-b border-border/80">
                 <td colSpan={totalCols} className="w-0 p-0 align-top">
@@ -910,6 +930,7 @@ function RunDetail({
   ]);
   const sourceUrl = tryReadLapSourceUrl(run.lapSession);
   const sourceSummary = formatLapSourceSummary(run.lapSession);
+  const conditionsChip = formatConditionsChip(runConditionsFromRecord(run));
   const carRatingDisplay = useMemo(() => {
     const rating = run.carRating;
     if (typeof rating === "number" && Number.isFinite(rating) && rating >= 1 && rating <= 10) {
@@ -997,6 +1018,13 @@ function RunDetail({
                 onToggle={() => toggleLapStat("avg10")}
               />
               <LapStatChip label="Median" value={formatLap(lapDash.median)} />
+              {conditionsChip ? (
+                <LapStatChip
+                  label="Conditions"
+                  value={conditionsChip.value}
+                  title={conditionsChip.title}
+                />
+              ) : null}
               <LapStatChip
                 label="Consistency"
                 title="100 − CV; higher = more consistent laps"
@@ -1149,35 +1177,9 @@ function RunDetail({
 
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
         <div className="ui-label-caps">Setup vs previous run</div>
-        {setupPreview.mode === "no_baseline" ? (
-          <p className="text-muted-foreground text-xs">
-            No earlier run on this car to diff against.
-          </p>
-        ) : setupPreview.rows.length === 0 ? (
-          <p className="text-muted-foreground text-xs">No setup changes since your previous run on this car.</p>
-        ) : (
-          <div className="rounded-md border border-border bg-muted/70 divide-y divide-border max-h-48 overflow-y-auto">
-            {setupPreview.rows.map((row) => (
-              <div
-                key={`${row.label}:${row.value}:${row.previousValue}`}
-                className="px-3 py-2 flex flex-col gap-0.5 text-xs sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"
-              >
-                <span className="text-muted-foreground shrink-0">{row.label}</span>
-                <div className="min-w-0 text-right sm:text-left">
-                  <span className={cn(RUN_HISTORY_DATA_CLASS, "text-foreground")}>{row.value}</span>
-                  <span
-                    className={cn(
-                      RUN_HISTORY_DATA_CLASS,
-                      "block text-muted-foreground sm:inline sm:ml-2"
-                    )}
-                  >
-                    was {row.previousValue}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <SetupChangedSincePreviousList
+          rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
+        />
         {allowRunMutations ? (
           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
             <button
@@ -1195,6 +1197,42 @@ function RunDetail({
         {deleteError ? <p className="text-[11px] text-destructive">{deleteError}</p> : null}
       </div>
     </CardPanel>
+  );
+}
+
+const MATCH_REASON_LABEL: Record<MatchReason["kind"], string> = {
+  car: "Car",
+  track: "Track",
+  event: "Event",
+  session: "Session",
+  class: "Class",
+  tires: "Tires",
+  additive: "Additive",
+  driver: "Driver",
+  note: "Note",
+  setup: "Setup",
+  changed: "Changed",
+};
+
+/** "Why it matched" pills shown under a run row during an active search. */
+function MatchReasonChips({ reasons }: { reasons: MatchReason[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {reasons.map((reason, i) => (
+        <span
+          key={`${reason.kind}-${i}`}
+          className={cn(
+            "inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/60 px-1.5 py-0.5",
+            reason.kind === "changed" && "border-foreground/30 bg-muted"
+          )}
+        >
+          <span className="type-data-label shrink-0 text-[8px] text-muted-foreground">
+            {MATCH_REASON_LABEL[reason.kind]}
+          </span>
+          <span className="min-w-0 truncate text-[11px] text-foreground/90">{reason.text}</span>
+        </span>
+      ))}
+    </div>
   );
 }
 

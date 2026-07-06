@@ -10,6 +10,7 @@ import {
   extractImageRawDataFromFile,
   mapExtractedImageWithCalibration,
 } from "@/lib/setupCalibrations/imageExtractPipeline";
+import { runAiExtractionForImageDoc } from "@/lib/setupExtractAi/runAiExtractionForImageDoc";
 import { SetupDocumentImportStages, type SetupDocumentImportStage } from "@/lib/setupDocuments/importStages";
 import type { SetupDocumentParsedResult } from "@/lib/setupDocuments/types";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
@@ -613,11 +614,68 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       });
       await finishStage({ docId: doc.id, stage, status: "PROCESSING" });
     } else {
-      // Image upload without an image calibration → still need manual review (calibration wizard).
+      // Image upload without an image calibration.
       stage = SetupDocumentImportStages.FIELD_MAPPING_STARTED;
       await startStage({ docId: doc.id, stage: SetupDocumentImportStages.FIELD_MAPPING_STARTED, status: "PROCESSING" });
+
+      // Stage-1 AI vision extraction (SETUP_UPLOAD_NORTH_STAR.md) — additive and flag-gated.
+      // Only runs when SETUP_AI_EXTRACT=1; any skip/failure falls back to the existing
+      // manual-review dead-end, so the shipped behavior is unchanged until enabled + verified.
+      let aiRan = false;
+      if (process.env.SETUP_AI_EXTRACT === "1") {
+        try {
+          const modelRow = await prisma.setupDocument.findUnique({
+            where: { id: doc.id },
+            select: { setupSheetModelId: true, setupSheetTemplate: true },
+          });
+          const ai = await withTimeout(
+            runAiExtractionForImageDoc({
+              file,
+              mimeType: doc.mimeType,
+              userId: doc.userId,
+              setupSheetModelId: modelRow?.setupSheetModelId ?? null,
+              setupSheetTemplate: modelRow?.setupSheetTemplate ?? null,
+            }),
+            300000,
+            "runAiExtractionForImageDoc"
+          );
+          if (ai.ran) {
+            aiRan = true;
+            normalizedParsedData = normalizeParsedSetupData(ai.parsedData);
+            await prisma.setupDocument.update({
+              where: { id: doc.id },
+              data: {
+                parseStatus: ai.importedCount >= 10 ? "PARSED" : ai.importedCount > 0 ? "PARTIAL" : "FAILED",
+                importOutcome: "COMPLETED_WITH_WARNINGS",
+                importDiagnosticJson: {
+                  kind: "ai_extraction_diagnostic_v1",
+                  filename: doc.originalFilename,
+                  model: ai.modelName,
+                  schemaLabel: ai.schemaLabel,
+                  fieldCount: ai.fieldCount,
+                  importedCount: ai.importedCount,
+                  flaggedKeys: ai.flaggedKeys,
+                  disagreedKeys: ai.disagreedKeys,
+                  confidence: ai.confidence,
+                } as object,
+              },
+            });
+          } else {
+            await appendDebugLog(doc.id, { at: nowIso(), stage: "ai_extract", event: "info", data: { skipped: ai.skippedReason } });
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          await appendDebugLog(doc.id, { at: nowIso(), stage: "ai_extract", event: "error", data: { error: msg.slice(0, 500) } });
+        }
+      }
+
       stage = SetupDocumentImportStages.FIELD_MAPPING_COMPLETED;
-      await finishStage({ docId: doc.id, stage: SetupDocumentImportStages.FIELD_MAPPING_STARTED, status: "PROCESSING" });
+      await finishStage({
+        docId: doc.id,
+        stage: SetupDocumentImportStages.FIELD_MAPPING_STARTED,
+        status: "PROCESSING",
+        extra: aiRan ? { aiExtraction: true } : undefined,
+      });
       await startStage({ docId: doc.id, stage: SetupDocumentImportStages.FIELD_MAPPING_COMPLETED, status: "PROCESSING" });
       await finishStage({ docId: doc.id, stage: SetupDocumentImportStages.FIELD_MAPPING_COMPLETED, status: "PROCESSING" });
     }

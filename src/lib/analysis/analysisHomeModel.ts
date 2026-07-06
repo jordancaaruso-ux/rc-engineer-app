@@ -1,6 +1,7 @@
 import { getAverageTopN, getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
+import type { RunTireIndicator } from "@/lib/runs/tireSetChange";
 
 /**
  * Analysis debrief home model — pure types + shaping helpers shared by the
@@ -26,6 +27,8 @@ export type AnalysisTrendRun = {
   shortLabel: string;
   createdAtIso: string;
   metrics: AnalysisRunMetrics;
+  /** Tire set + wear for this run; null when no set was logged. */
+  tireIndicator: RunTireIndicator | null;
 };
 
 export type AnalysisCarOption = { carId: string | null; carName: string };
@@ -42,6 +45,8 @@ export type AnalysisTrendModel = {
 
 export type AnalysisRecentRun = {
   id: string;
+  /** Null → no wrench; the setup modal needs a car to resolve sheet + previous run. */
+  carId: string | null;
   /** "Qualifying · Q2 · A800 RR" */
   title: string;
   /** "3/7/26, 4:20 pm · 18 clean laps" — formatted server-side. */
@@ -51,6 +56,8 @@ export type AnalysisRecentRun = {
   bestDeltaVsPrev: number | null;
   /** Best lap equals the user's fastest at this car + track combo. */
   isTrackCarPb: boolean;
+  /** Tire set + wear for this run; null when no set was logged. */
+  tireIndicator: RunTireIndicator | null;
 };
 
 export type AnalysisVideoModel =

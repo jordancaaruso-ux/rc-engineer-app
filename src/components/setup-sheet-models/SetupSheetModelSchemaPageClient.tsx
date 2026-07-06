@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
 import { SetupSheetModelLayoutEditor } from "@/components/setup-sheet-models/SetupSheetModelLayoutEditor";
 import { SetupSheetModelLivePreview } from "@/components/setup-sheet-models/SetupSheetModelLivePreview";
 import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
@@ -16,9 +17,12 @@ export function SetupSheetModelSchemaPageClient(props: {
   initialSchema: SetupSheetModelSchema;
   initialTab?: SetupSheetModelEditorTab;
   returnTo?: string | null;
+  /** False when the model is shared/curated and this user may only view it. */
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const returnTo = props.returnTo?.trim() || null;
+  const canEdit = props.canEdit !== false;
   const [tab, setTab] = useState<SetupSheetModelEditorTab>(
     props.initialTab === "layout" ? "layout" : "parameters"
   );
@@ -52,9 +56,16 @@ export function SetupSheetModelSchemaPageClient(props: {
 
   return (
     <div className="space-y-4">
+      {!canEdit ? (
+        <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          This chassis type is shared and curated, so its parameters are view-only here. Ask an
+          admin to change its name or parameters.
+        </div>
+      ) : null}
+
       {returnTo ? (
-        <div className="rounded-lg border border-sky-500/35 bg-sky-500/10 px-3 py-2 text-xs">
-          <Link href={returnTo} className="font-medium text-sky-200 hover:text-sky-100">
+        <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+          <Link href={returnTo} className="font-medium text-accent hover:underline">
             ← Back to calibration
           </Link>
           <p className="mt-1 text-[11px] text-muted-foreground">
@@ -89,13 +100,16 @@ export function SetupSheetModelSchemaPageClient(props: {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="min-w-0 space-y-4">
+        <fieldset
+          disabled={!canEdit}
+          className={`min-w-0 space-y-4 border-0 p-0 m-0 ${canEdit ? "" : "pointer-events-none select-none"}`}
+        >
           {tab === "layout" ? (
             <SetupSheetModelLayoutEditor schema={schema} onChange={setSchema} />
           ) : (
             <SetupSheetModelSchemaEditor schema={schema} onChange={setSchema} />
           )}
-        </div>
+        </fieldset>
         <SetupSheetModelLivePreview
           modelId={props.modelId}
           modelName={props.modelName}
@@ -104,14 +118,11 @@ export function SetupSheetModelSchemaPageClient(props: {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="rounded-md border border-sky-500/60 bg-sky-500/15 px-4 py-2 text-sm font-medium disabled:opacity-50"
-          onClick={save}
-          disabled={saving}
-        >
-          {saving ? "Saving…" : "Save setup sheet"}
-        </button>
+        {canEdit ? (
+          <Button onClick={save} disabled={saving} className="text-sm">
+            {saving ? "Saving…" : "Save setup sheet"}
+          </Button>
+        ) : null}
         {status ? <span className="text-xs text-muted-foreground">{status}</span> : null}
         {returnTo ? (
           <Link

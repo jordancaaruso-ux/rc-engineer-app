@@ -58,14 +58,13 @@
 
   /*
    * Appearance knobs — referenced by the photo wash + glass surfaces below.
-   * Defaults are the shipped values; the dev-only AppearanceTuner overrides
-   * them live so the founder can dial the look in the real app.
+   * These are the shipped values.
    */
-  --tune-bg-blur: 16px;
-  --tune-bg-dark: 0.76;
-  --tune-bg-yellow: 0.15;
-  --tune-glass-alpha: 0.7;
-  --tune-glass-blur: 78px;
+  --tune-bg-blur: 12px;
+  --tune-bg-dark: 0.6;
+  --tune-bg-yellow: 0;
+  --tune-glass-alpha: 0.6;
+  --tune-glass-blur: 30px;
 }
 
 /* Dev background preview — `data-bg-preview` overrides page base only (see Settings). */
@@ -154,8 +153,8 @@ body {
 }
 
 /*
- * TITC sunset scene — uniform blurred + yellow-tinted photo wash (founder-tuned
- * in-app 2026-07-03: blur 16px · yellow 0.15 · dark 0.76 — see `--tune-*`).
+ * TITC sunset scene — uniform blurred photo wash (founder-tuned
+ * 2026-07-06: blur 12px · yellow 0 · dark 0.6 — see `--tune-*`).
  * Fixed and the same clarity everywhere;
  * child layers stack blend modes a single element can't. The charcoal
  * gradients on `.page-bg` remain the fallback while the photo loads.
@@ -196,8 +195,8 @@ body {
 }
 
 /*
- * Liquid-glass card surface (founder-tuned in-app 2026-07-03: 0.7 card alpha ·
- * 78px backdrop blur — see `--tune-*`).
+ * Liquid-glass card surface (founder-tuned 2026-07-06: 0.6 card alpha ·
+ * 30px backdrop blur — see `--tune-*`).
  * Reads as frosted glass over the photo wash; the high alpha keeps stat values
  * legible and degrades to near-solid charcoal where backdrop-filter is
  * unsupported. Owns the border color + full shadow stack (specular top rim).
@@ -338,12 +337,12 @@ html[data-nav-pending] .page {
 /*
  * Page header — no divider line (the bracketed title is the only chrome).
  * Vertical rhythm is balanced: gap above the title (padding-top) equals the
- * gap below it to the first card (padding-bottom + .page-body pt-2 = 12px).
+ * gap below it to the first card (padding-bottom + .page-body pt-2 = 24px).
  */
 .page-header {
   @apply relative flex items-center justify-center;
-  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
-  padding-bottom: 0.25rem;
+  padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 1rem;
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
 }
@@ -359,7 +358,7 @@ html[data-nav-pending] .page {
 
 @media (min-width: 768px) {
   .page-header {
-    padding-top: 0.75rem;
+    padding-top: 1.5rem;
   }
 }
 
@@ -385,16 +384,10 @@ html[data-nav-pending] .page {
  * right slot, comfortable air so the sunset wash breathes. Scope: dashboard
  * only; every other page keeps the compact centered band above. */
 .page-header-dashboard {
+  /* Spacing now inherited from base .page-header (both comfortable, 2026-07-05);
+     dashboard only overrides layout: left title + greeting, chip in right slot. */
   justify-content: space-between;
   align-items: flex-end;
-  padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
-  padding-bottom: 1rem;
-}
-
-@media (min-width: 768px) {
-  .page-header-dashboard {
-    padding-top: 1.5rem;
-  }
 }
 
 .page-header-dashboard > div:has(> .page-title) {

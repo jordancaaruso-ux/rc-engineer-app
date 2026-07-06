@@ -1,7 +1,8 @@
 import type { ActionItemSourceType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
-import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
+import { computeIncludedLapMetricsFromRun, getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
+import { computeDashboardSummary, type DashboardSummary, type SummaryRunInput } from "@/lib/dashboardSummary";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
@@ -38,6 +39,7 @@ function localTodayBounds(): { start: Date; end: Date } {
 const runPrefillInclude = (userId: string) =>
   ({
   track: { select: { id: true, name: true } },
+  trackLayout: { select: { id: true, name: true } },
   car: { select: { id: true, name: true } },
   tireSet: { select: { id: true, label: true, setNumber: true } },
   battery: { select: { id: true, label: true, packNumber: true } },
@@ -69,6 +71,9 @@ function serializeRunForPrefill(
     carId: string | null;
     car: { id: string; name: string } | null;
     trackId: string | null;
+    trackLayoutId: string | null;
+    trackLayout: { id: string; name: string } | null;
+    trackDirection: "CW" | "CCW" | null;
     eventId: string | null;
     tireSetId: string | null;
     tireRunNumber: number;
@@ -105,6 +110,9 @@ function serializeRunForPrefill(
     carId: run.carId ?? undefined,
     car: run.car,
     trackId: run.trackId,
+    trackLayoutId: run.trackLayoutId,
+    trackLayout: run.trackLayout,
+    trackDirection: run.trackDirection,
     eventId: run.eventId,
     tireSetId: run.tireSetId,
     tireRunNumber: run.tireRunNumber,
@@ -297,6 +305,8 @@ export type DashboardHomeModel = {
     /** 1–10 car handling rating from the feedback section; null when not rated. */
     carRating: number | null;
   };
+  /** Rolling 30-day reflective summary (runs / laps / wheel time / cadence / per-track pace). */
+  summary: DashboardSummary;
   /** Cached dashboard Engineer suggestions for the latest run (peek on SSR). Client sync-fetches when null. */
   engineerSuggestionsInitial: DashboardEngineerSuggestionPayloadV1 | null;
   /** Latest run id eligible for dashboard Engineer suggestions (requires car + completed logging). */
@@ -402,13 +412,17 @@ export async function loadDashboardHomeModel(
 ): Promise<DashboardHomeModel> {
   return perfSpan("loadDashboardHomeModel", async () => {
   const { start: todayStart, end: todayEnd } = localTodayBounds();
+  // Rolling summary covers a 30-day current window + 30-day prior for deltas. Fetch
+  // a little wider (62d) on sortAt so runs whose effective instant is near the edge
+  // aren't dropped before JS buckets them precisely by display instant.
+  const summaryFetchStart = new Date(Date.now() - 62 * 24 * 60 * 60 * 1000);
 
   // Fire-and-forget: LiveRC fetches + Prisma writes; can take 1–2s. Dashboard no
   // longer shows detected-session prompts, but background sync keeps event lap
   // sources fresh for next features / pages.
   void syncRecentEventLapSources(userId).catch(() => {});
 
-  const [scopedEvents, recentRun, todaysRuns, priorRun, incompleteRunsRows] = await Promise.all([
+  const [scopedEvents, recentRun, todaysRuns, priorRun, incompleteRunsRows, summaryRunRows] = await Promise.all([
     loadUserScopedEvents({ userId, take: 40 }),
     prisma.run.findFirst({
       where: {
@@ -459,8 +473,55 @@ export async function loadDashboardHomeModel(
       take: 5,
       select: incompleteRunSelect,
     }),
+    // Completed runs in the last ~62 days for the rolling summary. Kept lean:
+    // lap arrays (for lap count + wheel time), stored best lap, and the track+class
+    // pace-comparability key.
+    prisma.run.findMany({
+      where: {
+        userId,
+        OR: [{ loggingCompletedAt: { not: null } }, { loggingComplete: true }],
+        sortAt: { gte: summaryFetchStart },
+      },
+      orderBy: { sortAt: "asc" },
+      select: {
+        id: true,
+        createdAt: true,
+        sessionCompletedAt: true,
+        loggingCompletedAt: true,
+        sortAt: true,
+        lapTimes: true,
+        lapSession: true,
+        bestLapSeconds: true,
+        raceClass: true,
+        trackId: true,
+        track: { select: { name: true } },
+      },
+    }),
   ]);
   const hasRunToday = todaysRuns.length > 0;
+
+  const summaryInputs: SummaryRunInput[] = summaryRunRows.map((r) => {
+    const included = getIncludedLaps(primaryLapRowsFromRun(r));
+    const drivingSeconds = included.reduce((sum, l) => sum + l.lapTimeSeconds, 0);
+    const storedBest = typeof r.bestLapSeconds === "number" ? r.bestLapSeconds : null;
+    const bestLapSeconds =
+      storedBest ?? (included.length ? Math.min(...included.map((l) => l.lapTimeSeconds)) : null);
+    return {
+      effectiveAt: resolveRunDisplayInstant({
+        createdAt: r.createdAt,
+        sessionCompletedAt: r.sessionCompletedAt,
+        loggingCompletedAt: r.loggingCompletedAt,
+        sortAt: r.sortAt,
+      }),
+      lapCount: included.length,
+      drivingSeconds,
+      bestLapSeconds,
+      trackId: r.trackId,
+      trackName: r.track?.name ?? null,
+      className: r.raceClass,
+    };
+  });
+  const summary = computeDashboardSummary(summaryInputs, new Date(), timeZone);
 
   const actionItemSelect = {
     id: true,
@@ -677,6 +738,7 @@ export async function loadDashboardHomeModel(
         .find((r) => r.loggingComplete === false)?.createdAt.toISOString() ?? null,
     todaysChanges,
     recentRun: recent,
+    summary,
     engineerSuggestionsInitial: null,
     engineerSuggestionsPrimaryRunId,
   };

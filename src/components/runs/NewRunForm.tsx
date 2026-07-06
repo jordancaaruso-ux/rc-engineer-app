@@ -17,6 +17,7 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
+import { RunLayoutPicker } from "@/components/runs/RunLayoutPicker";
 import { tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
@@ -68,6 +69,8 @@ import {
 } from "@/components/runs/LiveRcRaceMeetingPrompt";
 import { defaultEventDatesForLiveRcDetection } from "@/lib/lapWatch/liveRcMeetingDates";
 import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getCurrentPosition";
+import { RunConditionsSection } from "@/components/runs/RunConditionsSection";
+import { EMPTY_RUN_CONDITIONS, isConditionsEmpty, type RunConditions } from "@/lib/weather/conditions";
 import {
   DEFAULT_TRACK_PROXIMITY_RADIUS_M,
   pickTrackFromPosition,
@@ -116,6 +119,10 @@ type EventOption = {
   id: string;
   name: string;
   trackId: string | null;
+  /** Layout the venue ran for this meeting; runs default to it. */
+  trackLayoutId?: string | null;
+  trackLayout?: { id: string; name: string } | null;
+  trackDirection?: "CW" | "CCW" | null;
   startDate: string;
   endDate: string;
   notes?: string | null;
@@ -144,6 +151,9 @@ type LastRun = {
   carNameSnapshot?: string | null;
   trackId: string | null;
   trackNameSnapshot?: string | null;
+  trackLayoutId?: string | null;
+  trackLayout?: { id: string; name: string } | null;
+  trackDirection?: "CW" | "CCW" | null;
   eventId: string | null;
   tireSetId: string | null;
   tireRunNumber: number;
@@ -205,6 +215,8 @@ type LastRun = {
   loggingComplete?: boolean;
   /** When false, mutual team members do not see this run in team Sessions / team-only Engineer lists. */
   shareWithTeam?: boolean;
+  /** Weather / conditions captured for this session (metric); populated when editing. */
+  conditions?: RunConditions | null;
 };
 
 type DownloadedSetupOption = {
@@ -348,6 +360,10 @@ export function NewRunForm(props: {
   const [carId, setCarId] = useState<string>(props.cars[0]?.id ?? "");
   const [tracksList, setTracksList] = useState<TrackOption[]>(tracks);
   const [trackId, setTrackId] = useState<string>("");
+  /** Named layout ran this session (descriptive; empty = none). */
+  const [trackLayoutId, setTrackLayoutId] = useState<string>("");
+  /** Optional running direction for this session. */
+  const [trackDirection, setTrackDirection] = useState<"" | "CW" | "CCW">("");
   const [tireSets, setTireSets] = useState<TireSetOption[]>([]);
   const [tireSetId, setTireSetId] = useState<string>("");
   /** NEW-set choice — pure form state; the set row is created when the run is saved. */
@@ -372,6 +388,8 @@ export function NewRunForm(props: {
   const [showNewEventPanel, setShowNewEventPanel] = useState(false);
   const [newEventName, setNewEventName] = useState("");
   const [newEventTrackId, setNewEventTrackId] = useState<string>("");
+  const [newEventLayoutId, setNewEventLayoutId] = useState<string>("");
+  const [newEventDirection, setNewEventDirection] = useState<"" | "CW" | "CCW">("");
   const [newEventStartDate, setNewEventStartDate] = useState("");
   const [newEventEndDate, setNewEventEndDate] = useState("");
   const [newEventPracticeUrl, setNewEventPracticeUrl] = useState("");
@@ -507,6 +525,8 @@ export function NewRunForm(props: {
   const [trackAutoDetectLoading, setTrackAutoDetectLoading] = useState(false);
   const trackTabAutoDetectDoneRef = useRef(false);
   const trackPickedManuallyRef = useRef(false);
+  /** True once the user has hand-picked a layout/direction; suppresses event auto-fill. */
+  const layoutPickedManuallyRef = useRef(false);
   const [liveRcMeeting, setLiveRcMeeting] = useState<LiveRcMeetingDetection | null>(null);
   const [liveRcMeetingBusy, setLiveRcMeetingBusy] = useState(false);
   const dismissedLiveRcMeetingRef = useRef<Set<string>>(new Set());
@@ -531,6 +551,10 @@ export function NewRunForm(props: {
   ]);
   const editRun = props.editRun ?? null;
   const isEditing = Boolean(editRun?.id);
+  const [conditions, setConditions] = useState<RunConditions>(
+    () => editRun?.conditions ?? { ...EMPTY_RUN_CONDITIONS }
+  );
+  const conditionsAutoFetchKeyRef = useRef<string | null>(null);
   /**
    * True when we're editing a run that was saved as a draft (user hit "Save
    * draft" earlier and hasn't marked it complete yet). Drives the amber
@@ -608,6 +632,9 @@ export function NewRunForm(props: {
       setCarId(nextCarId);
     }
     setTrackId(r.trackId ?? "");
+    setTrackLayoutId(r.trackLayoutId ?? r.trackLayout?.id ?? "");
+    setTrackDirection(r.trackDirection ?? "");
+    layoutPickedManuallyRef.current = true;
 
     if (r.sessionType === "RACE_MEETING" || r.sessionType === "PRACTICE") {
       setSessionType("RACE_MEETING");
@@ -808,6 +835,9 @@ export function NewRunForm(props: {
     }
 
     setTrackId(r.trackId ?? "");
+    setTrackLayoutId(r.trackLayoutId ?? r.trackLayout?.id ?? "");
+    setTrackDirection(r.trackDirection ?? "");
+    layoutPickedManuallyRef.current = true;
 
     if (r.sessionType === "RACE_MEETING" || r.sessionType === "PRACTICE") {
       setSessionType("RACE_MEETING");
@@ -1102,6 +1132,39 @@ export function NewRunForm(props: {
     }, 800);
     return () => window.clearTimeout(t);
   }, [isEditing, trackLockedToEvent, trackId, tracksGpsFingerprint, runTrackAutoDetect]);
+
+  // Effortless capture: silently pull conditions for a pinned track as soon as
+  // one is selected — no permission prompt, no need to open the Conditions tab.
+  // (Device-location fallback stays an explicit tap in RunConditionsSection.)
+  useEffect(() => {
+    if (isEditing) return;
+    if (!isConditionsEmpty(conditions)) return;
+    const resolvedId =
+      trackId.trim() ||
+      (trackLockedToEvent && selectedEventForRun?.trackId ? String(selectedEventForRun.trackId) : "");
+    if (!resolvedId) return;
+    const t = tracksList.find((x) => x.id === resolvedId);
+    if (!t || !trackHasMarkedLocation(t) || t.latitude == null || t.longitude == null) return;
+    const sets = buildImportedLapSetsFromIngest(lapIngest);
+    const primary = sets.find((s) => s.isPrimaryUser) ?? sets[0];
+    const atIso = primary?.sessionCompletedAt ?? null;
+    const key = `${t.id}:${t.latitude.toFixed(3)},${t.longitude.toFixed(3)}:${atIso ?? "now"}`;
+    if (conditionsAutoFetchKeyRef.current === key) return;
+    conditionsAutoFetchKeyRef.current = key;
+    const params = new URLSearchParams({ lat: String(t.latitude), lon: String(t.longitude) });
+    if (atIso) params.set("at", atIso);
+    let cancelled = false;
+    fetch(`/api/weather?${params.toString()}`)
+      .then((r) => r.json())
+      .then((d: { conditions?: RunConditions }) => {
+        if (cancelled || !d?.conditions) return;
+        setConditions((prev) => (isConditionsEmpty(prev) ? d.conditions! : prev));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditing, conditions, trackId, trackLockedToEvent, selectedEventForRun, tracksList, lapIngest]);
 
   useEffect(() => {
     if (runDetailsTab !== "track") return;
@@ -1579,6 +1642,9 @@ export function NewRunForm(props: {
 
         if (replicateLast && lastRun) {
           setTrackId(lastRun.trackId ?? "");
+          setTrackLayoutId(lastRun.trackLayoutId ?? lastRun.trackLayout?.id ?? "");
+          setTrackDirection(lastRun.trackDirection ?? "");
+          layoutPickedManuallyRef.current = true;
           if (lastRun.sessionType === "RACE_MEETING" || lastRun.sessionType === "PRACTICE") {
             setSessionType("RACE_MEETING");
             const sub = lastRun.meetingSessionType as MeetingSessionType | undefined;
@@ -1628,6 +1694,9 @@ export function NewRunForm(props: {
   useEffect(() => {
     if (!replicateLast || !lastRun) return;
     setTrackId(lastRun.trackId ?? "");
+    setTrackLayoutId(lastRun.trackLayoutId ?? lastRun.trackLayout?.id ?? "");
+    setTrackDirection(lastRun.trackDirection ?? "");
+    layoutPickedManuallyRef.current = true;
     if (lastRun.sessionType === "RACE_MEETING" || lastRun.sessionType === "PRACTICE") {
       setSessionType("RACE_MEETING");
       const sub = lastRun.meetingSessionType as MeetingSessionType | undefined;
@@ -1702,6 +1771,13 @@ export function NewRunForm(props: {
     if (trackId !== evTrackId) {
       setTrackId(evTrackId);
       setCopyTrackWarning(null);
+    }
+    // Runs in an event default to the event's layout + direction. Rare that a
+    // session differs, so we auto-fill but leave it editable — once the user
+    // hand-picks a layout/direction we stop overriding.
+    if (!layoutPickedManuallyRef.current) {
+      setTrackLayoutId(selected.trackLayoutId ?? "");
+      setTrackDirection(selected.trackDirection ?? "");
     }
   }, [eventId, events, needsEvent, trackId]);
 
@@ -1964,6 +2040,8 @@ export function NewRunForm(props: {
         body: JSON.stringify({
           name,
           trackId: newEventTrackId || null,
+          trackLayoutId: newEventLayoutId || null,
+          trackDirection: newEventDirection || null,
           startDate: start,
           endDate: end,
           practiceSourceUrl: newEventPracticeUrl.trim() || null,
@@ -2267,6 +2345,8 @@ export function NewRunForm(props: {
           meetingSessionCode: needsEvent && meetingSessionType === "OTHER" && meetingSessionCustom ? meetingSessionCustom.trim() : null,
           eventId: needsEvent ? (eventId || null) : null,
           trackId: resolvedTrackId || null,
+          trackLayoutId: trackLayoutId || null,
+          trackDirection: trackDirection || null,
           tireSetId: tireSetId || null,
           // v2 create-on-save: a NEW-set choice materializes only when the run persists;
           // nudged prior runs land as the set's initialRunCount so derived counts stay right.
@@ -2355,6 +2435,7 @@ export function NewRunForm(props: {
           ),
           carRating,
           shareWithTeam,
+          conditions: isConditionsEmpty(conditions) ? null : conditions,
           sessionLabel: null,
           importedLapSets,
           importedLapTimeSessionIds:
@@ -2473,6 +2554,43 @@ export function NewRunForm(props: {
       router.push(`/?suggestRun=${encodeURIComponent(runId)}`);
       router.refresh();
     }, 600);
+  }
+
+  // Track (with coords) + session time feeding the Conditions tab's weather fetch.
+  const conditionsTrack = (() => {
+    const resolvedId =
+      trackId.trim() ||
+      (trackLockedToEvent && selectedEventForRun?.trackId ? String(selectedEventForRun.trackId) : "");
+    if (!resolvedId) return null;
+    const t = tracksList.find((x) => x.id === resolvedId);
+    return t
+      ? { id: t.id, name: t.name, latitude: t.latitude ?? null, longitude: t.longitude ?? null }
+      : null;
+  })();
+  const conditionsSessionAtIso = (() => {
+    const sets = buildImportedLapSetsFromIngest(lapIngest);
+    const primary = sets.find((s) => s.isPrimaryUser) ?? sets[0];
+    return primary?.sessionCompletedAt ?? null;
+  })();
+  async function handleSaveTrackPin(coords: { latitude: number; longitude: number }) {
+    if (!conditionsTrack) return;
+    const res = await fetch(`/api/tracks/${conditionsTrack.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        locationSource: "device",
+      }),
+    });
+    if (!res.ok) throw new Error("Failed to save track location");
+    setTracksList((prev) =>
+      prev.map((t) =>
+        t.id === conditionsTrack.id
+          ? { ...t, latitude: coords.latitude, longitude: coords.longitude }
+          : t
+      )
+    );
   }
 
   return (
@@ -2835,6 +2953,9 @@ export function NewRunForm(props: {
                   value={newEventTrackId}
                   onChange={(e) => {
                     setNewEventTrackId(e.target.value);
+                    // Layout belongs to a track; reset when the track changes.
+                    setNewEventLayoutId("");
+                    setNewEventDirection("");
                     setEventError(null);
                   }}
                   aria-label="Event track"
@@ -2847,6 +2968,17 @@ export function NewRunForm(props: {
                     </option>
                   ))}
                 </select>
+                {newEventTrackId ? (
+                  <div className="mt-2">
+                    <RunLayoutPicker
+                      trackId={newEventTrackId}
+                      layoutId={newEventLayoutId}
+                      direction={newEventDirection}
+                      onLayoutChange={setNewEventLayoutId}
+                      onDirectionChange={setNewEventDirection}
+                    />
+                  </div>
+                ) : null}
               </div>
               <input
                 className="form-control w-full px-3 py-2 text-sm"
@@ -3239,6 +3371,11 @@ export function NewRunForm(props: {
                     onChange={(id) => {
                       trackPickedManuallyRef.current = true;
                       setTrackId(id);
+                      // Layout belongs to a track; clear it so a stale layout from the
+                      // previous track can't be submitted, and re-allow event auto-fill.
+                      setTrackLayoutId("");
+                      setTrackDirection("");
+                      layoutPickedManuallyRef.current = false;
                       setCopyTrackWarning(null);
                       setNearbyTrackSuggestions([]);
                       setTrackAutoDetectMessage(null);
@@ -3279,6 +3416,9 @@ export function NewRunForm(props: {
                     onSelect={(id) => {
                       trackPickedManuallyRef.current = true;
                       setTrackId(id);
+                      setTrackLayoutId("");
+                      setTrackDirection("");
+                      layoutPickedManuallyRef.current = false;
                       setCopyTrackWarning(null);
                       setNearbyTrackSuggestions([]);
                       setTrackAutoDetectMessage(null);
@@ -3290,6 +3430,25 @@ export function NewRunForm(props: {
             {copyTrackWarning && (
               <div className="text-[11px] text-muted-foreground">{copyTrackWarning}</div>
             )}
+            {trackId.trim() ? (
+              <RunLayoutPicker
+                trackId={trackId}
+                layoutId={trackLayoutId}
+                direction={trackDirection}
+                onLayoutChange={(id) => {
+                  layoutPickedManuallyRef.current = true;
+                  setTrackLayoutId(id);
+                }}
+                onDirectionChange={(dir) => {
+                  layoutPickedManuallyRef.current = true;
+                  setTrackDirection(dir);
+                }}
+                inheritedFromEvent={Boolean(
+                  selectedEventForRun?.trackLayoutId &&
+                    trackLayoutId === selectedEventForRun.trackLayoutId
+                )}
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -3456,14 +3615,13 @@ export function NewRunForm(props: {
         ) : null}
 
         {runDetailsTab === "conditions" ? (
-          <div className="space-y-3 pt-1">
-            <div className="space-y-1.5">
-              <Eyebrow dot="muted">Conditions</Eyebrow>
-              <PanelSubtitle>
-                Track conditions — weather integration coming soon.
-              </PanelSubtitle>
-            </div>
-          </div>
+          <RunConditionsSection
+            value={conditions}
+            onChange={setConditions}
+            track={conditionsTrack}
+            sessionAtIso={conditionsSessionAtIso}
+            onSaveTrackPin={handleSaveTrackPin}
+          />
         ) : null}
           </>
         )}

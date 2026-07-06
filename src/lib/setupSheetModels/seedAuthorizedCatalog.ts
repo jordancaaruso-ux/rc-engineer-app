@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import {
   SETUP_SHEET_MODEL_SLUG_A800RR,
   SETUP_SHEET_TEMPLATE_A800RR,
+  templateKeyFromModelSlug,
 } from "@/lib/setupSheetTemplateId";
 import { AUTHORIZED_CHASSIS_CATALOG } from "@/lib/setupSheetModels/authorizedCatalog";
 import { buildA800SeedSchema } from "@/lib/setupSheetModels/seedA800Model";
@@ -48,14 +49,17 @@ export async function ensureAuthorizedSetupSheetCatalog(): Promise<void> {
     if (suppressed.has(entry.slug)) continue;
     const found = bySlug.get(entry.slug);
     if (!found) {
-      await prisma.setupSheetModel.create({
-        data: {
+      // Slug is globally unique — upsert so concurrent cold starts can't race a duplicate insert.
+      await prisma.setupSheetModel.upsert({
+        where: { slug: entry.slug },
+        create: {
           name: entry.name,
           slug: entry.slug,
           schemaJson: entry.buildSchema() as object,
           isAuthorized: true,
           userId: null,
         },
+        update: { isAuthorized: true },
       });
       continue;
     }
@@ -75,7 +79,28 @@ export async function ensureAuthorizedSetupSheetCatalog(): Promise<void> {
   }
 
   await linkLegacyA800Cars();
+  await syncCarTemplateKeysFromModels();
   ensured = true;
+}
+
+/**
+ * Keep `Car.setupSheetTemplate` (the community-aggregation bucket key) in sync with the linked
+ * model's slug. Backfills cars created before non-A800 models wrote the key.
+ */
+async function syncCarTemplateKeysFromModels(): Promise<void> {
+  const models = await prisma.setupSheetModel.findMany({
+    select: { id: true, slug: true },
+  });
+  for (const model of models) {
+    const key = templateKeyFromModelSlug(model.slug);
+    await prisma.car.updateMany({
+      where: {
+        setupSheetModelId: model.id,
+        OR: [{ setupSheetTemplate: null }, { setupSheetTemplate: { not: key } }],
+      },
+      data: { setupSheetTemplate: key },
+    });
+  }
 }
 
 /** Point legacy A800 cars (any user) at the global A800 model so they resolve a setup sheet. */

@@ -12,6 +12,7 @@ import {
   type SetupSheetModelPickerRow,
 } from "@/lib/setupSheetModels/pickerModels";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
+import { canEditSetupSheetModel } from "@/lib/setupSheetModels/modelAccess";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { isAuthorizedCatalogSlug } from "@/lib/setupSheetModels/catalogSuppression";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -109,8 +110,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
           <div>
             <h1 className="page-title">Chassis types</h1>
             <p className="page-subtitle">
-              One setup sheet model per chassis (e.g. Mugen MTC3). Uploads and the car wizard use the
-              row marked <span className="text-foreground">Used in pickers</span> when names duplicate.
+              One shared setup sheet per chassis (e.g. Mugen MTC3), used by every car of that type.
             </p>
           </div>
         </div>
@@ -128,16 +128,13 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
           </ButtonLink>
         </CardPanel>
 
-        {duplicateGroupCount > 0 ? (
+        {isAdmin && duplicateGroupCount > 0 ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             <div className="font-medium text-amber-200">Duplicate chassis names detected</div>
             <p className="mt-1 text-xs text-amber-100/90 max-w-3xl">
-              You have multiple rows with the same name (often from running the setup wizard more than
-              once). Keep the row with your cars, default calibration, and calibrations — usually the
-              one marked <strong className="font-medium">Used in pickers</strong> — then delete the
-              rest. Open your trusted calibration and use{" "}
-              <strong className="font-medium">Set as chassis default</strong> on the keeper row first
-              if needed.
+              Legacy rows share a name. Run{" "}
+              <code className="font-mono text-[11px]">npx tsx scripts/dedupe-setup-sheet-models.ts</code>{" "}
+              (dry-run first) to merge them; new duplicates can no longer be created.
             </p>
           </div>
         ) : null}
@@ -154,9 +151,8 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
               const dupCount = pickerRows.filter(
                 (r) => normalizeSetupSheetModelName(r.name) === norm
               ).length;
-              const isDuplicate = dupCount > 1 && !isRecommended;
               const isGlobal = m.isAuthorized;
-              const canManage = isAdmin || (m.userId === user.id && !m.isAuthorized);
+              const canManage = canEditSetupSheetModel(user, m);
 
               return (
                 <li key={m.id}>
@@ -167,11 +163,6 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                       {isRecommended && dupCount > 1 ? (
                         <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-200">
                           Used in pickers
-                        </span>
-                      ) : null}
-                      {isDuplicate ? (
-                        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
-                          Duplicate — safe to delete
                         </span>
                       ) : null}
                       {isGlobal ? (

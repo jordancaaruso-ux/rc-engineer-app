@@ -63,7 +63,7 @@ export function DashboardPreviousRunCard({
               <PanelSubtitle className="mt-0">{recentRun.eventName}</PanelSubtitle>
             ) : null}
             {runLoggingComplete ? (
-              <StatStrip className="grid-cols-3">
+              <StatStrip gridClassName="grid-cols-3">
                 <StatTile label="Best lap" value={formatLap(recentRun.bestLap)} accent className="py-2" />
                 <StatTile label="Avg top 5" value={formatLap(recentRun.avgTop5)} className="py-2" />
                 <StatTile label="Car rating" value={formatCarRating(recentRun.carRating)} className="py-2" />

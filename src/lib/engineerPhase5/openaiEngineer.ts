@@ -38,6 +38,10 @@ import {
 } from "@/lib/engineerPhase5/engineerChatMode";
 import { reasoningSpineSystemPromptAddon } from "@/lib/engineerPhase5/reasoningSpine/narrationPrompt";
 import type { ReasoningSpineV1 } from "@/lib/engineerPhase5/reasoningSpine/types";
+import {
+  buildFullKbSystemBlock,
+  replaceRetrievedKbWithFullKbPointer,
+} from "@/lib/engineerPhase5/fullKbInContext";
 /**
  * Some models (GPT-5 family, o-series) only allow the default sampler — sending temperature≠1 errors.
  * Omit `temperature` in the request body for those; OpenAI uses its default.
@@ -99,6 +103,18 @@ function contextBudgetCharsForTier(tier: EngineerChatContextTier): number {
     return Number.isFinite(n) && n > 2000 ? n : 10_000;
   }
   return ENGINEER_CHAT_CONTEXT_MAX_CHARS;
+}
+
+/**
+ * Context-JSON budget while the full-KB system block is attached. The KB (~10K tokens)
+ * plus system prompt + tools (~15K) leaves roughly this much JSON under a 30K-TPM org
+ * cap — measured 2026-07-06: a 32K-char JSON alongside the KB was rejected outright
+ * ("request too large"). The slim passes compact the JSON to fit; the full budget is
+ * restored whenever the KB block is dropped.
+ */
+function fullKbContextBudgetChars(): number {
+  const n = Number(process.env.ENGINEER_FULL_KB_CONTEXT_MAX_CHARS);
+  return Number.isFinite(n) && n > 2000 ? n : 14_000;
 }
 
 function mustGetKey(): string {
@@ -217,7 +233,7 @@ Setup comparison (focusedRunPair.setupComparison when comparable is true): Read 
 
 When the user asks about setup or lap differences between the focused runs: (1) State compare→primary direction in plain words when citing shims (e.g. "compare 3.0 mm → primary 3.5 mm = raised on primary"). Say "no change" only when values normalize equal (e.g. 2 vs 2.0). (2) FF/FR/RF/RR label bulkhead inner pickups (see columnReadingNote); merged axle rows describe both pickups on that axle once when they match. (3) For **numeric handling deltas** on the focused pair, start from **handlingCrossRunDeltaBlock** when present, then connect setup moves to feel using **focusedRunPair.setupCompareKbSnippets** and **richEngineerContext.vehicleDynamicsKb**—paraphrase naturally. (4) Upper outer without rcEffectHint: do not assert a definite RC direction unless KB says so; net inner+outer sets the link line.
 
-If "richEngineerContext" is present, use it for structured grounding: car (including setupSheetTemplate), sessionClass (from the run vs the event), tires, track (gripTags/layoutTags multi-select with gripSummary/layoutSummary for display), **runPacingContext** (tire wear index + **fieldPaceAvgTop10** vs session field mean when linked timing exists — **session context** after **lapOutcome** vs reference), **manufacturerBaseline** (official PDF baseline when listed—see MANUFACTURER BASELINE block), **importedSessionFieldStats** (linked timing-session aggregates on the anchor run—field **driverCount**, **matchedYou** gaps vs session-best best / avg-top-5 / avg-top-10, and **paceVsFieldMeanAnalysis** for vs **session mean** + rank per metric when present; same JSON shape as **engineerSummary.importedSessionFieldStats**), setupVsSpread (chassis/suspension tuning parameters only—numeric bands prefer community_eligible_uploads when setupVsSpread.communitySpreadAvailable and each row's spreadSource say so: that is all users' uploads flagged for aggregations sharing the sheet template, bucketed by track surface AND grip level via setupVsSpread.communityContext; DEFAULT BEHAVIOUR: unless the user explicitly names a grip level, treat the primary spread and percentile bands as the "any grip" archetype; each numeric row also carries communityGripLevel showing which grip bucket actually served the primary band—"low"/"medium"/"high" when the run had a traction tag, "any" otherwise or when the run-specific bucket had <10 samples for that parameter; in addition each numeric row may carry gripTrend, a partial record of low/medium/high/any buckets with {sampleCount, median, mean, p25, p75, iqr, stdDev, min, max}; alongside it each numeric row carries gripTrendSignal: a deterministic verdict you MUST prefer over re-deriving magnitude from raw medians. gripTrendSignal has {endpoints (the two grip buckets compared, e.g. ["low","high"] or ["low","medium"]), delta (median_endpointHigh − median_endpointLow, in native units), scale (max of the two endpoint IQRs, with a small floor), score (delta / scale, signed, the legacy IQR-ratio), cliffsDelta (non-parametric effect size in [-1, +1]; positive = high-bucket values dominate; |d| bands: < 0.147 negligible, < 0.33 small, < 0.474 medium, ≥ 0.474 large; null when pre-Phase-1 row without histogram), cliffsInterpretation ("negligible"|"small"|"medium"|"large"|null matching cliffsDelta), quartilesDisjoint (true when the middle-50% of one endpoint bucket is entirely above/below the other's — very strong "most of one bucket runs clear of the other"), minMeaningfulDelta (per-parameter floor in native units — e.g. 1000 cSt for diff_oil, 0.25° for camber; derived from trendMinimumDeltas.ts), meetsMinMeaningfulDelta (|delta| >= minMeaningfulDelta), magnitude ("flat"|"slight"|"material", fused from Cliff's delta + the min-delta gate + quartilesDisjoint bump), direction ("up"|"down"|"flat" from endpointLow to endpointHigh), monotonic (true when all three grip buckets are monotonic, null when only two buckets exist). **gripSpreadContrast** (null or object): set when medians do **not** show a material shift across the same two grip endpoints as gripTrendSignal, but the **IQRs differ** (more or less field scatter in one grip vs another). Carries {endpoints, iqrRatio, widerIn, iqrByEndpoint, magnitude: "slight"|"material", skewNote?}. **Prefer citing this** when the user asks about variance, scatter, or "everyone does something different" in one condition — e.g. similar medians in low vs high grip but much wider IQR in low. RULES: (a) For **median** trend lines: do NOT claim a **median** grip trend when gripTrendSignal.magnitude === "flat" or meetsMinMeaningfulDelta === false — say "no measurable **median** shift across grip in the dataset" for that, or omit the **median** trend. **gripSpreadContrast does not override (a) for medians;** you may and should still describe **spread** (IQR) differences when gripSpreadContrast is non-null. (b) Only emphasise a **median** trend ("clearly rises/falls with grip") when gripTrendSignal.magnitude === "material"; for "slight" hedge ("a touch", "slight drift", "weak signal"). (c) When cliffsInterpretation === "large" OR quartilesDisjoint === true, you may say the shift is "clearly above/below" — those are strong non-overlap signals. (d) When reporting numbers, cite the actual bucket medians AND note IQR when the shift looks small relative to spread (e.g. "median drifts 0.1 mm but IQR is ±0.3 mm — flat within spread"). (e) When monotonic === false across three buckets, say the middle bucket disagrees (e.g. "low/high move together but medium sits outside the line — small sample or bimodal"). (f) A missing gripTrend means no bucket cleared the 10-sample threshold; say so rather than invent a trend. Each spread block carries mean and iqr alongside the percentiles; when mean and median disagree by more than half an IQR the bucket is skewed — mention it rather than reporting the median as "typical". Each spread block also carries topValues (top-5 exact values in the bucket with count and frequency) and distinctValueCount. When a single topValue takes ≥ 50% frequency, PREFER reporting the modal value (e.g. "most people run 7k diff oil (62% of low-grip uploads)") over the median — this is more actionable than a smeared central-tendency number. For two-bucket trend talk, you may also contrast modal values across endpoints when they differ (e.g. "low-grip mode is 5k (45%), high-grip mode is 7k (55%)"). otherwise spreadSource your_garage uses your cars with that template), conditionalSetupEmpirical (optional: your own logged runs bucketed by this track's grip/layout tag signature—median per parameter in that bucket vs your overall garage medians; only trust rows when hasEnoughData is true and respect conditionSampleCount), and vehicleDynamicsKb (retrieved excerpts of general RC vehicle dynamics). Treat conditionalSetupEmpirical as user garage data; treat setupVsSpread community bands as pooled eligible-upload statistics (not "your" uploads only) for the user's surface+grip context; treat vehicleDynamicsKb as general theory—not measured user data, and never assert a grip-vs-parameter trend from theory if gripTrend data is available that contradicts or doesn't support it. For "where is my setup vs typical", prefer setupVsSpread.positionBand and spread percentiles, and state the communityContext label (template · surface · grip level) when citing community numbers so the user knows which archetype you're comparing against. Use conditionalSetupEmpirical for "what you usually run when grip/layout looks like this track" when hasEnoughData is true. Do not treat excluded fields as setup deltas for suggestions unless the user explicitly asks about them.
+If "richEngineerContext" is present, use it for structured grounding: car (including setupSheetTemplate), sessionClass (from the run vs the event), tires, track (gripTags/layoutTags multi-select with gripSummary/layoutSummary for display), **runPacingContext** (tire wear index + **fieldPaceAvgTop10** vs session field mean when linked timing exists — **session context** after **lapOutcome** vs reference), **manufacturerBaseline** (official PDF baseline when listed—see MANUFACTURER BASELINE block), **importedSessionFieldStats** (linked timing-session aggregates on the anchor run—field **driverCount**, **matchedYou** gaps vs session-best best / avg-top-5 / avg-top-10, and **paceVsFieldMeanAnalysis** for vs **session mean** + rank per metric when present; same JSON shape as **engineerSummary.importedSessionFieldStats**), setupVsSpread (chassis/suspension tuning parameters only—numeric bands prefer community_eligible_uploads when setupVsSpread.communitySpreadAvailable and each row's spreadSource say so: that is all users' uploads flagged for aggregations sharing the sheet template, bucketed by track surface AND grip level via setupVsSpread.communityContext; DEFAULT BEHAVIOUR: unless the user explicitly names a grip level, treat the primary spread and percentile bands as the "any grip" archetype; each numeric row also carries communityGripLevel showing which grip bucket actually served the primary band—"low"/"medium"/"high" when the run had a traction tag, "any" otherwise or when the run-specific bucket had <10 samples for that parameter; in addition each numeric row may carry gripTrend, a partial record of low/medium/high/any buckets with {sampleCount, median, mean, p25, p75, iqr, stdDev, min, max}; alongside it each numeric row carries gripTrendSignal: a deterministic verdict you MUST prefer over re-deriving magnitude from raw medians. gripTrendSignal has {endpoints (the two grip buckets compared, e.g. ["low","high"] or ["low","medium"]), delta (median_endpointHigh − median_endpointLow, in native units), scale (max of the two endpoint IQRs, with a small floor), score (delta / scale, signed, the legacy IQR-ratio), cliffsDelta (non-parametric effect size in [-1, +1]; positive = high-bucket values dominate; |d| bands: < 0.147 negligible, < 0.33 small, < 0.474 medium, ≥ 0.474 large; null when pre-Phase-1 row without histogram), cliffsInterpretation ("negligible"|"small"|"medium"|"large"|null matching cliffsDelta), quartilesDisjoint (true when the middle-50% of one endpoint bucket is entirely above/below the other's — very strong "most of one bucket runs clear of the other"), minMeaningfulDelta (per-parameter floor in native units — e.g. 1000 cSt for diff_oil, 0.25° for camber; derived from trendMinimumDeltas.ts), meetsMinMeaningfulDelta (|delta| >= minMeaningfulDelta), magnitude ("flat"|"slight"|"material", fused from Cliff's delta + the min-delta gate + quartilesDisjoint bump), direction ("up"|"down"|"flat" from endpointLow to endpointHigh), monotonic (true when all three grip buckets are monotonic, null when only two buckets exist). **gripSpreadContrast** (null or object): set when medians do **not** show a material shift across the same two grip endpoints as gripTrendSignal, but the **IQRs differ** (more or less field scatter in one grip vs another). Carries {endpoints, iqrRatio, widerIn, iqrByEndpoint, magnitude: "slight"|"material", skewNote?}. **Prefer citing this** when the user asks about variance, scatter, or "everyone does something different" in one condition — e.g. similar medians in low vs high grip but much wider IQR in low. RULES: (a) For **median** trend lines: do NOT claim a **median** grip trend when gripTrendSignal.magnitude === "flat" or meetsMinMeaningfulDelta === false — say "no measurable **median** shift across grip in the dataset" for that, or omit the **median** trend. **gripSpreadContrast does not override (a) for medians;** you may and should still describe **spread** (IQR) differences when gripSpreadContrast is non-null. (b) Only emphasise a **median** trend ("clearly rises/falls with grip") when gripTrendSignal.magnitude === "material"; for "slight" hedge ("a touch", "slight drift", "weak signal"). (c) When cliffsInterpretation === "large" OR quartilesDisjoint === true, you may say the shift is "clearly above/below" — those are strong non-overlap signals. (d) When reporting numbers, cite the actual bucket medians AND note IQR when the shift looks small relative to spread (e.g. "median drifts 0.1 mm but IQR is ±0.3 mm — flat within spread"). (e) When monotonic === false across three buckets, say the middle bucket disagrees (e.g. "low/high move together but medium sits outside the line — small sample or bimodal"). (f) A missing gripTrend means no bucket cleared the 10-sample threshold; say so rather than invent a trend. Each spread block carries mean and iqr alongside the percentiles; when mean and median disagree by more than half an IQR the bucket is skewed — mention it rather than reporting the median as "typical". Each spread block also carries topValues (top-5 exact values in the bucket with count and frequency) and distinctValueCount. When a single topValue takes ≥ 50% frequency, PREFER reporting the modal value (e.g. "most people run 7k diff oil (62% of low-grip uploads)") over the median — this is more actionable than a smeared central-tendency number. For two-bucket trend talk, you may also contrast modal values across endpoints when they differ (e.g. "low-grip mode is 5k (45%), high-grip mode is 7k (55%)"). otherwise spreadSource your_garage uses your cars with that template), conditionalSetupEmpirical (optional: your own logged runs bucketed by this track's grip/layout tag signature—median per parameter in that bucket vs your overall garage medians; only trust rows when hasEnoughData is true and respect conditionSampleCount), and vehicleDynamicsKb (KB excerpts — when the full KB ships as a system message above, this field is just a pointer to it; read the files there). Treat conditionalSetupEmpirical as user garage data; treat setupVsSpread community bands as pooled eligible-upload statistics (not "your" uploads only) for the user's surface+grip context; treat vehicleDynamicsKb as general theory—not measured user data, and never assert a grip-vs-parameter trend from theory if gripTrend data is available that contradicts or doesn't support it. For "where is my setup vs typical", prefer setupVsSpread.positionBand and spread percentiles, and state the communityContext label (template · surface · grip level) when citing community numbers so the user knows which archetype you're comparing against. Use conditionalSetupEmpirical for "what you usually run when grip/layout looks like this track" when hasEnoughData is true. Do not treat excluded fields as setup deltas for suggestions unless the user explicitly asks about them.
 
 PARAMETER EFFECT INDEX (Phase B): When richEngineerContext.parameterIntentMatches is non-null and matches.length > 0, it lists KB-cited parameters ordered by catalog effect strength for the detected outcome intent (outcome, direction, matchedPhrase), each with recommendedMoveDirection, hedgedDirectionAtPosition, kbSource, and kbSection. Prefer this list for ordering and ranking concrete knob suggestions versus ad-hoc keyword retrieval; still write mechanism and hedge language from vehicleDynamicsKb snippets (cite kbSource/kbSection per row when discussing those parameters). When parameterIntentMatches is non-null but matches.length === 0, a goal-shaped intent was detected but the catalog has no approved entries yet—use vehicleDynamicsKb and setupVsSpread as usual. When parameterIntentMatches is null, no structured outcome intent matched.
 
@@ -462,7 +478,12 @@ async function postChatCompletion(
     if (useStream) {
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-        if (isOpenAiTpmRateLimitError(data, res.status) && attempt < maxAttempts - 1) {
+        // "Request too large" never resolves by waiting — surface it so callers can shrink.
+        if (
+          !isContextTooLargeOpenAiError(data) &&
+          isOpenAiTpmRateLimitError(data, res.status) &&
+          attempt < maxAttempts - 1
+        ) {
           await sleepMs(computeOpenAiRetryDelayMs(parseOpenAiRetryAfterMs(data), attempt));
           continue;
         }
@@ -473,7 +494,11 @@ async function postChatCompletion(
     }
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (res.ok) return { ok: true, status: res.status, data };
-    if (isOpenAiTpmRateLimitError(data, res.status) && attempt < maxAttempts - 1) {
+    if (
+      !isContextTooLargeOpenAiError(data) &&
+      isOpenAiTpmRateLimitError(data, res.status) &&
+      attempt < maxAttempts - 1
+    ) {
       await sleepMs(computeOpenAiRetryDelayMs(parseOpenAiRetryAfterMs(data), attempt));
       continue;
     }
@@ -659,18 +684,42 @@ export async function generateEngineerChatReplyWithTools(params: {
     usage.completionCalls += 1;
   };
 
+  // Full-KB-in-context (ENGINEER_NORTH_STAR.md): full-tier advice turns carry the whole
+  // vehicle-dynamics corpus as the FIRST system message — a static, byte-stable prefix so
+  // OpenAI prompt caching amortizes it (the spine addon at the tail of the prompt varies
+  // per turn; anything after it never caches). When active, per-turn retrieved excerpts in
+  // the serialized context are swapped for a pointer; `workingContext` keeps the real
+  // snippets so the fallback path and returned contextJson are unaffected.
+  let fullKb = tier === "full" ? await buildFullKbSystemBlock() : null;
+  const baseContextBudgetChars = contextBudgetChars;
+  if (fullKb) contextBudgetChars = Math.min(contextBudgetChars, fullKbContextBudgetChars());
+  const sysIdx = () => (fullKb ? 1 : 0);
+  const ctxIdx = () => (fullKb ? 2 : 1);
+  const contextSystemContent = (label = "Context (JSON):") =>
+    formatEngineerChatContextSystemMessage(
+      fullKb ? replaceRetrievedKbWithFullKbPointer(workingContext) : workingContext,
+      label,
+      contextBudgetChars
+    );
+  /** Degrade to retrieval snippets when the KB block makes the request unfittable. */
+  const dropFullKb = (reason: string) => {
+    if (!fullKb) return;
+    console.warn(`[engineer-chat] full-KB block dropped (${reason}) — retrieval snippets restored`);
+    fullKb = null;
+    contextBudgetChars = baseContextBudgetChars;
+    messagesApi.splice(0, 1);
+    messagesApi[ctxIdx()] = { role: "system", content: contextSystemContent() };
+  };
+
   const messagesApi: ChatCompletionMessage[] = [
+    ...(fullKb ? [{ role: "system" as const, content: fullKb.content }] : []),
     {
       role: "system",
       content: systemPrompt + TOOL_INSTRUCTIONS,
     },
     {
       role: "system",
-      content: formatEngineerChatContextSystemMessage(
-        workingContext,
-        "Context (JSON):",
-        contextBudgetChars
-      ),
+      content: contextSystemContent(),
     },
     ...safeMsgs.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
   ];
@@ -679,17 +728,13 @@ export async function generateEngineerChatReplyWithTools(params: {
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const opts = getEngineerChatModelAndTemperature(tier, mode);
     systemPrompt = chatSystemPromptForContext(tier, workingContext, mode);
-    messagesApi[0] = {
+    messagesApi[sysIdx()] = {
       role: "system",
       content: systemPrompt + TOOL_INSTRUCTIONS,
     };
-    messagesApi[1] = {
+    messagesApi[ctxIdx()] = {
       role: "system",
-      content: formatEngineerChatContextSystemMessage(
-        workingContext,
-        "Context (JSON):",
-        contextBudgetChars
-      ),
+      content: contextSystemContent(),
     };
 
     const useTools = true;
@@ -698,16 +743,24 @@ export async function generateEngineerChatReplyWithTools(params: {
       ...(useTools ? { tools: TOOLS, tool_choice: "auto" as const } : { tool_choice: "none" as const }),
     });
     let res = await postChatCompletion(apiKey, bodyObj, params.onToken);
+    if (!res.ok && fullKb && isContextTooLargeOpenAiError(res.data)) {
+      // The KB block is the largest removable piece — drop it (restoring retrieval
+      // snippets in the context) before shrinking the context JSON budget.
+      dropFullKb("request too large");
+      res = await postChatCompletion(apiKey, bodyObj, params.onToken);
+    }
     if (!res.ok && isContextTooLargeOpenAiError(res.data) && contextBudgetChars > 10_000) {
       contextBudgetChars = Math.floor(contextBudgetChars * 0.5);
-      messagesApi[1] = {
+      messagesApi[ctxIdx()] = {
         role: "system",
-        content: formatEngineerChatContextSystemMessage(
-          workingContext,
-          "Context (JSON):",
-          contextBudgetChars
-        ),
+        content: contextSystemContent(),
       };
+      res = await postChatCompletion(apiKey, bodyObj, params.onToken);
+    }
+    if (!res.ok && fullKb && isOpenAiTpmRateLimitError(res.data, res.status)) {
+      // Retries with backoff already ran inside postChatCompletion; a still-failing 429
+      // with the KB attached may be a request that can never fit the org TPM cap.
+      dropFullKb("persistent rate limit");
       res = await postChatCompletion(apiKey, bodyObj, params.onToken);
     }
     if (!res.ok) {
@@ -764,13 +817,9 @@ export async function generateEngineerChatReplyWithTools(params: {
             runId: applied.focusedRunPair.primaryRunId,
             compareRunId: applied.focusedRunPair.compareRunId,
           };
-          messagesApi[1] = {
+          messagesApi[ctxIdx()] = {
             role: "system",
-            content: formatEngineerChatContextSystemMessage(
-              workingContext,
-              "Context (JSON) — updated after apply_engineer_focus:",
-              contextBudgetChars
-            ),
+            content: contextSystemContent("Context (JSON) — updated after apply_engineer_focus:"),
           };
           messagesApi.push({
             role: "tool",

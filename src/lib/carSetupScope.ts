@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
-import { legacyTemplateFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
+import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import type { SetupSheetScope } from "@/lib/setupCompare/setupSheetScope";
 
 /**
@@ -71,7 +71,7 @@ export async function canonicalSetupTemplateForUserCarId(
   });
   if (!car) return null;
   if (car.setupSheetModel?.slug) {
-    return legacyTemplateFromModelSlug(car.setupSheetModel.slug) ?? car.setupSheetModel.slug;
+    return templateKeyFromModelSlug(car.setupSheetModel.slug);
   }
   return canonicalSetupSheetTemplateId(car.setupSheetTemplate ?? null);
 }

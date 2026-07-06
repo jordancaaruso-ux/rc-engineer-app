@@ -7,6 +7,7 @@ import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import { RunVideoAnalysisSection } from "@/components/videoAnalysis/RunVideoAnalysisSection";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
+import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +51,17 @@ export default async function EditRunPage({
       trackId: true,
       track: { select: { id: true, name: true } },
       trackNameSnapshot: true,
+      trackLayoutId: true,
+      trackLayout: { select: { id: true, name: true } },
+      trackDirection: true,
       eventId: true,
       event: {
         select: {
           id: true,
           name: true,
           trackId: true,
+          trackLayoutId: true,
+          trackDirection: true,
           startDate: true,
           endDate: true,
           track: { select: { id: true, name: true, location: true } },
@@ -122,6 +128,17 @@ export default async function EditRunPage({
       },
       loggingComplete: true,
       shareWithTeam: true,
+      conditionsAirTempC: true,
+      conditionsTrackTempC: true,
+      conditionsCloudCoverPct: true,
+      conditionsWeatherCode: true,
+      conditionsHumidityPct: true,
+      conditionsWindKph: true,
+      conditionsWindDirDeg: true,
+      conditionsSource: true,
+      conditionsLatitude: true,
+      conditionsLongitude: true,
+      conditionsObservedAt: true,
     },
   });
 
@@ -192,6 +209,9 @@ export default async function EditRunPage({
             carNameSnapshot: run.carNameSnapshot ?? null,
             trackId: run.trackId,
             trackNameSnapshot: run.trackNameSnapshot ?? null,
+            trackLayoutId: run.trackLayoutId ?? null,
+            trackLayout: run.trackLayout ? { id: run.trackLayout.id, name: run.trackLayout.name } : null,
+            trackDirection: run.trackDirection ?? null,
             raceClass: run.raceClass ?? null,
             eventId: run.eventId,
             tireSetId: run.tireSetId,
@@ -205,6 +225,8 @@ export default async function EditRunPage({
                   id: run.event.id,
                   name: run.event.name,
                   trackId: run.event.trackId,
+                  trackLayoutId: run.event.trackLayoutId,
+                  trackDirection: run.event.trackDirection,
                   startDate: run.event.startDate.toISOString(),
                   endDate: run.event.endDate.toISOString(),
                   notes: run.event.participations[0]?.notes ?? null,
@@ -252,6 +274,7 @@ export default async function EditRunPage({
             })),
             loggingComplete: run.loggingComplete,
             shareWithTeam: run.shareWithTeam,
+            conditions: runConditionsFromRecord(run),
           }}
         />
         <CardPanel className="mt-8 max-w-2xl">
