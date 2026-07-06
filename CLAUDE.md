@@ -8,3 +8,4 @@ just guarantees they're always in context.
 @docs/HOW_WE_BUILD.md
 @docs/PRODUCT_NORTH_STAR.md
 @docs/VISUAL_NORTH_STAR.md
+@docs/ENGINEER_NORTH_STAR.md

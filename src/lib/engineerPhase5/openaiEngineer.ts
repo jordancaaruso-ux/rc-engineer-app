@@ -32,6 +32,10 @@ import {
   sleepMs,
 } from "@/lib/openAiRetry";
 import type { EngineerChatContextTier } from "@/lib/engineerPhase5/engineerChatContextTier";
+import {
+  engineerChatModePromptAddon,
+  type EngineerChatMode,
+} from "@/lib/engineerPhase5/engineerChatMode";
 import { reasoningSpineSystemPromptAddon } from "@/lib/engineerPhase5/reasoningSpine/narrationPrompt";
 import type { ReasoningSpineV1 } from "@/lib/engineerPhase5/reasoningSpine/types";
 /**
@@ -60,9 +64,15 @@ function buildChatCompletionBody(
 /**
  * Chat uses one model for all turns (conversational engineer).
  * Default gpt-4o for responsive chat; override with ENGINEER_MODEL (e.g. gpt-5) when needed.
+ * ENGINEER_NORTH_STAR.md hard rule: no cheap models on the advice path — quick mode gets the
+ * same full-strength model (brevity comes from the prompt contract, never the model).
+ * Deep mode may opt into a stronger/reasoning model via ENGINEER_DEEP_MODEL.
  * `temperature` is only sent when the model accepts it (see modelSupportsCustomTemperature).
  */
-function getEngineerChatModelAndTemperature(tier: EngineerChatContextTier = "full"): {
+function getEngineerChatModelAndTemperature(
+  tier: EngineerChatContextTier = "full",
+  mode: EngineerChatMode = "normal"
+): {
   model: string;
   temperature: number;
 } {
@@ -73,7 +83,10 @@ function getEngineerChatModelAndTemperature(tier: EngineerChatContextTier = "ful
       || "gpt-4o-mini";
     return { model, temperature: 0.2 };
   }
-  const model = process.env.ENGINEER_MODEL?.trim() || "gpt-4o";
+  const model =
+    (mode === "deep" ? process.env.ENGINEER_DEEP_MODEL?.trim() : undefined)
+    || process.env.ENGINEER_MODEL?.trim()
+    || "gpt-4o";
   return {
     model,
     temperature: 0.3,
@@ -96,6 +109,13 @@ function mustGetKey(): string {
 
 export type EngineerChatMessage = { role: "user" | "assistant"; content: string };
 
+/** Token usage summed across the tool-loop completions. Null when streaming (usage not captured on SSE). */
+export type EngineerChatUsage = {
+  promptTokens: number;
+  completionTokens: number;
+  completionCalls: number;
+};
+
 function spineFromContext(contextJson: unknown): ReasoningSpineV1 | null {
   if (!contextJson || typeof contextJson !== "object") return null;
   const spine = (contextJson as Record<string, unknown>).reasoningSpine;
@@ -105,9 +125,14 @@ function spineFromContext(contextJson: unknown): ReasoningSpineV1 | null {
   return spine as ReasoningSpineV1;
 }
 
-function chatSystemPromptForContext(tier: EngineerChatContextTier, contextJson: unknown): string {
+function chatSystemPromptForContext(
+  tier: EngineerChatContextTier,
+  contextJson: unknown,
+  mode: EngineerChatMode = "normal"
+): string {
   const base = tier === "light" ? CHAT_SYSTEM_LIGHT : CHAT_SYSTEM;
-  return base + reasoningSpineSystemPromptAddon(spineFromContext(contextJson));
+  const modeAddon = tier === "light" ? "" : engineerChatModePromptAddon(mode);
+  return base + modeAddon + reasoningSpineSystemPromptAddon(spineFromContext(contextJson));
 }
 
 const CHAT_SYSTEM = `You are an RC touring car race engineer assistant.
@@ -127,6 +152,8 @@ Setup is **physics plus art**: mechanics in vehicleDynamicsKb are the **curated 
 CONTEXT LIMITS (community vs tire / class / time): Community medians in **richEngineerContext.setupVsSpread** are pooled by **setup sheet template · track surface · grip** only—they are **not** segmented by **tire compound**, **race class** (e.g. stock vs modified), or upload **recency**. When you cite "typical" or the field, **name** **richEngineerContext.tires** and **sessionClass** when present and explain that an optimal setup for **their** tire and class may **diverge** from the pooled aggregate. Do **not** treat another tire's or another class's median as automatically correct for this run. Older and newer uploads **mix** in the pool—community can **lag** evolving meta; say so when pushing aggressive "chase the field" advice.
 
 MANUFACTURER BASELINE (richEngineerContext.manufacturerBaseline): When **status** is **listed**, treat **pdfUrl** as the **official** manufacturer reference; use **summary** when it carries facts—**do not** invent numeric setup from the PDF unless **summary** provides it. When **status** is **missing**, say **no** manufacturer baseline is **on file** in the app for this template—**do not** imply one exists; community medians are **not** a substitute for the kit PDF. When **manufacturerBaseline** is **null** (no template on the car), skip baseline talk.
+
+CONDITIONS (richEngineerContext.conditions): When present it carries this session's **air temp**, optional **track temp** (probe), **sky**, **humidity**, **wind**, and a coarse **temperatureBand** (cool / mild / warm / hot). Weigh conditions in the diagnosis: **temperature and track state shift grip** and can explain a change in feel or pace **without** a setup cause. Separate **conditions / rubber / track state** from **chassis** before recommending a knob—when a handling change likely traces to a hotter or colder track, say so and **hedge** the setup call accordingly. Never invent weather that is not in the JSON; when **conditions** is **null**, do not guess it.
 
 ROLL CENTRE — ABSOLUTE POSITION (LOCK): **Forbidden:** any **numeric** **absolute** roll-centre **height** (mm, distance from ground, coordinates) or "your RC **is** …" as if **measured**—the app does **not** expose a roll-centre **calculator** yet; **do not** guess position numbers from shims. **Required:** only **relative** RC language—**raise / lower** **tendency**, **vs compare**, **flatter / more angled**, **front vs rear balance**—from **vehicleDynamicsKb**, **rcEffectHints**, and **frontAxleNetNote** / **rearAxleNetNote** (those are **sign** summaries **vs compare**, not measured height).
 
@@ -600,10 +627,12 @@ export async function generateEngineerChatReplyWithTools(params: {
   mergeContextWithFocusedPair: (focused: EngineerFocusedRunPairContext) => Promise<unknown>;
   onToken?: (delta: string) => void;
   contextTier?: EngineerChatContextTier;
+  mode?: EngineerChatMode;
 }): Promise<{
   reply: string;
   contextJson: unknown;
   resolvedFocus: { runId: string; compareRunId: string | null } | null;
+  usage: EngineerChatUsage | null;
 }> {
   const apiKey = mustGetKey();
   const safeMsgs = params.messages
@@ -613,8 +642,22 @@ export async function generateEngineerChatReplyWithTools(params: {
   let workingContext = params.contextJson;
   let resolvedFocus: { runId: string; compareRunId: string | null } | null = null;
   const tier: EngineerChatContextTier = params.contextTier ?? "full";
+  const mode: EngineerChatMode = params.mode ?? "normal";
   let contextBudgetChars = contextBudgetCharsForTier(tier);
-  let systemPrompt = chatSystemPromptForContext(tier, workingContext);
+  let systemPrompt = chatSystemPromptForContext(tier, workingContext, mode);
+  // Usage accumulates across tool-loop completions on the non-stream path only
+  // (SSE deltas don't carry usage without stream_options; bench runs non-streamed).
+  let usage: EngineerChatUsage | null = null;
+  const addUsage = (data: Record<string, unknown> | undefined) => {
+    const u = data?.usage as
+      | { prompt_tokens?: number; completion_tokens?: number }
+      | undefined;
+    if (!u || typeof u.prompt_tokens !== "number") return;
+    if (!usage) usage = { promptTokens: 0, completionTokens: 0, completionCalls: 0 };
+    usage.promptTokens += u.prompt_tokens;
+    usage.completionTokens += typeof u.completion_tokens === "number" ? u.completion_tokens : 0;
+    usage.completionCalls += 1;
+  };
 
   const messagesApi: ChatCompletionMessage[] = [
     {
@@ -634,8 +677,8 @@ export async function generateEngineerChatReplyWithTools(params: {
 
   const MAX_ITERS = 10;
   for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const opts = getEngineerChatModelAndTemperature(tier);
-    systemPrompt = chatSystemPromptForContext(tier, workingContext);
+    const opts = getEngineerChatModelAndTemperature(tier, mode);
+    systemPrompt = chatSystemPromptForContext(tier, workingContext, mode);
     messagesApi[0] = {
       role: "system",
       content: systemPrompt + TOOL_INSTRUCTIONS,
@@ -672,6 +715,7 @@ export async function generateEngineerChatReplyWithTools(params: {
         (res.data?.error as { message?: string } | undefined)?.message || `OpenAI error (${res.status})`;
       throw new Error(engineerOpenAiUserMessage(rawMsg));
     }
+    addUsage(res.data);
     const msg =
       res.streamResult != null
         ? {
@@ -752,6 +796,7 @@ export async function generateEngineerChatReplyWithTools(params: {
       reply: text || "I couldn't generate a response from the model. Try rephrasing your question.",
       contextJson: workingContext,
       resolvedFocus,
+      usage,
     };
   }
 
@@ -759,5 +804,6 @@ export async function generateEngineerChatReplyWithTools(params: {
     reply: "Too many tool steps — try a simpler question or narrow dates.",
     contextJson: workingContext,
     resolvedFocus,
+    usage,
   };
 }

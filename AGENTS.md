@@ -4,6 +4,8 @@ Guidance for any AI agent working in this repository (Cursor, Claude Code, Codex
 
 For **product direction and prioritization** (core loop, pillar rank, horizons), read `docs/PRODUCT_NORTH_STAR.md`.
 
+For **Engineer behavior** (the two moments, confidence ladder, failure-mode ranking, modes, suggestion lifecycle, KB doctrine), read `docs/ENGINEER_NORTH_STAR.md` **before** any Engineer prompt, suggestion-surface, or chat UX change.
+
 For **Engineer quality iteration** (eval failures, prompt/context/retrieval fixes, gold-set hygiene), use `.cursor/skills/engineer-improver/SKILL.md` — invoke only when the founder says "improve engineer" or similar. Session logs: `docs/ENGINEER_CHANGELOG.md`.
 
 ## UI / visual design (Technical v2)

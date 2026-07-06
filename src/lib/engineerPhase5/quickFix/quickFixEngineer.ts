@@ -21,11 +21,13 @@ import {
 import { parseQuickFixLlmShape, trimQuickFixStr } from "@/lib/engineerPhase5/quickFix/parseQuickFixLlmShape";
 import type { QuickFixPayloadV1, QuickFixSuggestionV1 } from "@/lib/engineerPhase5/quickFix/quickFixTypes";
 
+// ENGINEER_NORTH_STAR.md hard rule: no cheap models on the advice path — quick fix is
+// setup advice, so it falls back to the full-strength chat model, not a mini tier.
 function getModel(): string {
   return (
     process.env.ENGINEER_QUICK_FIX_MODEL?.trim() ||
-    process.env.ENGINEER_DASHBOARD_SUGGESTIONS_MODEL?.trim() ||
-    "gpt-4o-mini"
+    process.env.ENGINEER_MODEL?.trim() ||
+    "gpt-4o"
   );
 }
 
@@ -64,7 +66,9 @@ function buildDigDeeperPrompt(params: {
 }
 
 function buildEngineerHref(runId: string, prompt: string): string {
-  const sp = new URLSearchParams({ runId, prompt });
+  // mode=quick: the trackside card continues into chat under the quick contract
+  // (ENGINEER_NORTH_STAR.md surfaces map).
+  const sp = new URLSearchParams({ runId, prompt, mode: "quick" });
   return `/engineer?${sp.toString()}`;
 }
 

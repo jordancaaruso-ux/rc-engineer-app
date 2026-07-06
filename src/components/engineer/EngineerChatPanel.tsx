@@ -10,6 +10,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
+import {
+  parseChoiceChipsFromReply,
+  parseEngineerChatMode,
+  type EngineerChatMode,
+} from "@/lib/engineerPhase5/engineerChatMode";
+
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
 
 import { Button } from "@/components/ui/Button";
@@ -83,6 +89,14 @@ const STATUS_LABEL: Record<string, string> = {
   thinking: "Thinking…",
 
 };
+
+const CHAT_MODE_STORAGE_KEY = "engineer-chat-mode";
+
+const CHAT_MODE_META: Array<{ value: EngineerChatMode; label: string; hint: string }> = [
+  { value: "quick", label: "Quick", hint: "Trackside — the read + one call, fast" },
+  { value: "normal", label: "Normal", hint: "Balanced setup conversation" },
+  { value: "deep", label: "Deep", hint: "Debrief, what-ifs, and the why" },
+];
 
 
 
@@ -304,6 +318,34 @@ export function EngineerChatPanel({
   const [loadingThread, setLoadingThread] = useState(false);
 
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
+
+  const [chatMode, setChatMode] = useState<EngineerChatMode>("normal");
+
+  const modeFromUrl = searchParams.get("mode")?.trim() || null;
+
+  useEffect(() => {
+    // URL mode (e.g. quick-fix card "Dig deeper" → mode=quick) wins over the stored
+    // preference for this visit, but is situational — don't persist it.
+    if (modeFromUrl) {
+      setChatMode(parseEngineerChatMode(modeFromUrl));
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(CHAT_MODE_STORAGE_KEY);
+      if (stored) setChatMode(parseEngineerChatMode(stored));
+    } catch {
+      // localStorage unavailable (private mode) — keep default
+    }
+  }, [modeFromUrl]);
+
+  const selectChatMode = useCallback((next: EngineerChatMode) => {
+    setChatMode(next);
+    try {
+      window.localStorage.setItem(CHAT_MODE_STORAGE_KEY, next);
+    } catch {
+      // non-fatal
+    }
+  }, []);
 
 
 
@@ -536,6 +578,8 @@ export function EngineerChatPanel({
           messages: apiMessages,
 
           stream: true,
+
+          mode: chatMode,
 
           ...(threadId ? { threadId } : {}),
 
@@ -813,13 +857,9 @@ export function EngineerChatPanel({
 
 
 
-  async function sendMessage() {
-
-    const text = input.trim();
+  async function sendText(text: string) {
 
     if (!text || chatBusy || loadingThread) return;
-
-    setInput("");
 
     const displayNext: ChatMessage[] = [...messagesRef.current, { role: "user", content: text }];
 
@@ -828,6 +868,20 @@ export function EngineerChatPanel({
     setMessages(displayNext);
 
     await submitConversation(displayNext.slice(-8));
+
+  }
+
+
+
+  async function sendMessage() {
+
+    const text = input.trim();
+
+    if (!text) return;
+
+    setInput("");
+
+    await sendText(text);
 
   }
 
@@ -885,7 +939,23 @@ export function EngineerChatPanel({
 
         <div className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 space-y-2">
 
-          {messages.map((m, idx) => (
+          {messages.map((m, idx) => {
+
+            const parsed = m.role === "assistant" ? parseChoiceChipsFromReply(m.content) : null;
+
+            const displayContent = parsed ? parsed.text : m.content;
+
+            const showChoices =
+
+              m.role === "assistant" &&
+
+              idx === messages.length - 1 &&
+
+              !panelBusy &&
+
+              (parsed?.choices?.length ?? 0) > 0;
+
+            return (
 
             <div
 
@@ -913,7 +983,7 @@ export function EngineerChatPanel({
 
               <div className="whitespace-pre-wrap break-words">
 
-                {m.content ||
+                {displayContent ||
 
                   (chatBusy && m.role === "assistant"
 
@@ -926,6 +996,34 @@ export function EngineerChatPanel({
                       : "")}
 
               </div>
+
+              {showChoices ? (
+
+                <div className="mt-2 flex flex-wrap gap-1.5">
+
+                  {parsed!.choices!.map((choice) => (
+
+                    <button
+
+                      key={choice}
+
+                      type="button"
+
+                      onClick={() => void sendText(choice)}
+
+                      className="tap-active rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-foreground transition hover:border-primary/60 hover:bg-muted/70"
+
+                    >
+
+                      {choice}
+
+                    </button>
+
+                  ))}
+
+                </div>
+
+              ) : null}
 
               {ratingsEnabled && m.role === "assistant" && m.messageId ? (
 
@@ -943,7 +1041,9 @@ export function EngineerChatPanel({
 
             </div>
 
-          ))}
+            );
+
+          })}
 
         </div>
 
@@ -982,6 +1082,60 @@ export function EngineerChatPanel({
           </p>
 
         ) : null}
+
+        <div className="flex items-center gap-1" role="group" aria-label="Answer mode">
+
+          {CHAT_MODE_META.map((m) => {
+
+            const active = m.value === chatMode;
+
+            return (
+
+              <button
+
+                key={m.value}
+
+                type="button"
+
+                onClick={() => selectChatMode(m.value)}
+
+                disabled={panelBusy}
+
+                aria-pressed={active}
+
+                title={m.hint}
+
+                className={cn(
+
+                  "tap-active rounded-md px-2.5 py-1 text-[11px] font-semibold transition",
+
+                  active
+
+                    ? "bg-primary text-primary-foreground"
+
+                    : "border border-border/70 text-muted-foreground hover:border-border hover:text-foreground",
+
+                  panelBusy && "opacity-60"
+
+                )}
+
+              >
+
+                {m.label}
+
+              </button>
+
+            );
+
+          })}
+
+          <span className="ml-1 hidden text-[10px] text-muted-foreground min-[440px]:inline">
+
+            {CHAT_MODE_META.find((m) => m.value === chatMode)?.hint}
+
+          </span>
+
+        </div>
 
         <div className="flex items-end gap-2">
 

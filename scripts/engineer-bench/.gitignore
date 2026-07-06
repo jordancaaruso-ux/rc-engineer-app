@@ -1,0 +1,3 @@
+# Regenerated from the DB (contains founder-rated Q&A exemplars) — rebuild with:
+#   npm run engineer:bench:build
+benchmark-set.json

@@ -17,8 +17,14 @@ import { buildGroupedPairwiseSetupChangeLines } from "@/lib/engineerPhase5/betwe
 
 type DriverContextForHints = BetweenRunHintPayloadV2["driverContextPack"];
 
+// ENGINEER_NORTH_STAR.md hard rule: no cheap models on the advice path — between-run
+// hints are setup advice, so they fall back to the full-strength chat model.
 function getHintsModel(): string {
-  return process.env.ENGINEER_BETWEEN_RUN_HINTS_MODEL?.trim() || "gpt-4o-mini";
+  return (
+    process.env.ENGINEER_BETWEEN_RUN_HINTS_MODEL?.trim() ||
+    process.env.ENGINEER_MODEL?.trim() ||
+    "gpt-4o"
+  );
 }
 
 function modelSupportsCustomTemperature(model: string): boolean {

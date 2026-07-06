@@ -8,6 +8,7 @@ import {
   buildMergeContextWithFocusedPair,
 } from "@/lib/engineerPhase5/engineerChatPipeline";
 import { generateEngineerChatReplyWithTools } from "@/lib/engineerPhase5/openaiEngineer";
+import { parseEngineerChatMode } from "@/lib/engineerPhase5/engineerChatMode";
 import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
 import {
   tryAnswerComparisonQuery,
@@ -53,6 +54,7 @@ type ChatRequestBody = {
   paceVsFieldRunDigestSubset?: unknown;
   stream?: unknown;
   threadId?: unknown;
+  mode?: unknown;
 };
 
 type EngineerChatFeedbackPayload = {
@@ -137,6 +139,7 @@ export async function POST(request: Request) {
 
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
+    const chatMode = parseEngineerChatMode(body?.mode);
     const useStream = body?.stream === true;
     const timeZone =
       typeof body?.timeZone === "string" && body.timeZone.trim() ? body.timeZone.trim() : "UTC";
@@ -305,6 +308,7 @@ export async function POST(request: Request) {
               messages,
               runId,
               compareRunId,
+              mode: chatMode,
             });
             if ("error" in built) {
               send("error", { message: built.error ?? "Run not found" });
@@ -323,6 +327,7 @@ export async function POST(request: Request) {
               userId: user.id,
               mergeContextWithFocusedPair,
               contextTier,
+              mode: chatMode,
               onToken: (t) => send("token", { t }),
             });
             const feedback = await maybePersistEngineerReply({
@@ -365,6 +370,7 @@ export async function POST(request: Request) {
       messages,
       runId,
       compareRunId,
+      mode: chatMode,
     });
     if ("error" in built) {
       return jsonError(404, built.error ?? "Run not found");
@@ -382,6 +388,7 @@ export async function POST(request: Request) {
       userId: user.id,
       mergeContextWithFocusedPair,
       contextTier,
+      mode: chatMode,
     });
 
     const feedback = await maybePersistEngineerReply({

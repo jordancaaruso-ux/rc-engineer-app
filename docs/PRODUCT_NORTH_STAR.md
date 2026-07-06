@@ -131,6 +131,8 @@ Protect this data. Make export/continuity trustworthy. The moat is **accumulated
 
 The Engineer is not a generic chatbot. It is a **trusted setup engineer** grounded in the driver's context.
 
+> **The full behavioral spec lives in `docs/ENGINEER_NORTH_STAR.md`** — the two moments (trackside vs at-home), confidence ladder, failure-mode ranking, modes, suggestion lifecycle, KB doctrine, and rollout status. This section is the summary; that doc governs.
+
 | Principle | Implementation |
 |-----------|----------------|
 | **KB-grounded** | Prefer vehicle-dynamics KB + parameter catalog; quote authoritative prose when relevant (`AGENTS.md` gates KB edits). |

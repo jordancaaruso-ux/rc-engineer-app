@@ -7,6 +7,7 @@ import {
   engineerChatContextTier,
   engineerChatNeedsDeepContext,
 } from "@/lib/engineerPhase5/engineerChatContextTier";
+import type { EngineerChatMode } from "@/lib/engineerPhase5/engineerChatMode";
 import { getOrComputeEngineerSummaryForLatestRun } from "@/lib/engineerPhase5/loadLatestEngineerSummary";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
@@ -73,19 +74,22 @@ export async function buildEngineerChatContext(params: {
   messages: EngineerChatMessage[];
   runId: string;
   compareRunId: string;
+  mode?: EngineerChatMode;
 }): Promise<BuiltEngineerChatContext> {
   return perfSpan("buildEngineerChatContext", async () => {
-    const { userId, body, messages, runId, compareRunId } = params;
+    const { userId, body, messages, runId, compareRunId, mode } = params;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const needsDeep = engineerChatNeedsDeepContext({
       lastUserMessage: lastUser?.content,
       runId,
       compareRunId,
+      mode,
     });
     const contextTier = engineerChatContextTier({
       lastUserMessage: lastUser?.content,
       runId,
       compareRunId,
+      mode,
     });
 
     const [basePacket, focusedRunPair] = await Promise.all([
@@ -310,10 +314,12 @@ export async function runEngineerChatTurn(params: {
   question: string;
   runId?: string;
   compareRunId?: string;
+  mode?: EngineerChatMode;
 }): Promise<{
   reply: string;
   contextJson: unknown;
   resolvedFocus: { runId: string; compareRunId: string | null } | null;
+  usage: import("@/lib/engineerPhase5/openaiEngineer").EngineerChatUsage | null;
 }> {
   const runId = params.runId?.trim() ?? "";
   const compareRunId = params.compareRunId?.trim() ?? "";
@@ -325,6 +331,7 @@ export async function runEngineerChatTurn(params: {
     messages,
     runId,
     compareRunId,
+    mode: params.mode,
   });
   if ("error" in built) {
     throw new Error(built.error);
@@ -342,11 +349,13 @@ export async function runEngineerChatTurn(params: {
     userId: params.userId,
     mergeContextWithFocusedPair,
     contextTier: built.contextTier,
+    mode: params.mode,
   });
 
   return {
     reply: out.reply,
     contextJson: out.contextJson,
     resolvedFocus: out.resolvedFocus,
+    usage: out.usage,
   };
 }

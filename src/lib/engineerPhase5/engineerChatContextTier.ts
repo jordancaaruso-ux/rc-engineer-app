@@ -1,6 +1,8 @@
+import type { EngineerChatMode } from "@/lib/engineerPhase5/engineerChatMode";
+
 /** When false, chat skips community spread, brain, tire priors, and the full KB system prompt. */
 const SETUP_DEEP_RE =
-  /\b(setup|shim|spring|droop|caster|camber|toe|diff|wing|balance|handling|understeer|oversteer|grip|compare|change|field|median|spread|damping|roll|steer|anti-?dive|anti-?squat|ride height|bulkhead|gearbox|motor|pinion|mistake|sector)\b/i;
+  /\b(setup|shim|spring|droop|caster|camber|toe|diff|wing|balance|handling|understeer|oversteer|grip|compare|change|field|median|spread|damping|roll|steer|anti-?dive|anti-?squat|ride height|bulkhead|gearbox|motor|pinion|mistake|sector|push(?:es|ing|y)?|loose|corner|turn-?in|entry|exit|rotation|bite|edgy|nervous|hook(?:s|ed|ing)?|slid(?:e|es|ing)|snap(?:s|py|ping)?)\b/i;
 
 /** Lap pace / history at a track — answered deterministically or via light tier (not full setup context). */
 const LAP_HISTORY_SIGNAL_RE =
@@ -26,11 +28,15 @@ export function engineerChatNeedsDeepContext(input: {
   lastUserMessage: string | undefined;
   runId: string;
   compareRunId: string;
+  mode?: EngineerChatMode;
 }): boolean {
   if (input.runId.trim() || input.compareRunId.trim()) return true;
   const msg = input.lastUserMessage?.trim() ?? "";
   if (msg.length < 5) return false;
   if (engineerChatIsLapHistoryQuestion(msg)) return false;
+  // ENGINEER_NORTH_STAR.md: quick and deep are explicit advice modes — never the light
+  // tier (no cheap models / thin context on the advice path). Lap history above stays light.
+  if (input.mode === "quick" || input.mode === "deep") return true;
   if (SETUP_DEEP_RE.test(msg)) return true;
   if (SESSION_SCOPE_RE.test(msg) && /\b(setup|change|compare|outline|happened)\b/i.test(msg)) return true;
   return false;
@@ -42,6 +48,7 @@ export function engineerChatContextTier(input: {
   lastUserMessage: string | undefined;
   runId: string;
   compareRunId: string;
+  mode?: EngineerChatMode;
 }): EngineerChatContextTier {
   return engineerChatNeedsDeepContext(input) ? "full" : "light";
 }

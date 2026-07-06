@@ -4,8 +4,14 @@ import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import type { VehicleDynamicsKbSnippet } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
 
+// ENGINEER_NORTH_STAR.md hard rule: no cheap models on the advice path — the dashboard
+// suggestion is setup advice, so it falls back to the full-strength chat model.
 function getModel(): string {
-  return process.env.ENGINEER_DASHBOARD_SUGGESTIONS_MODEL?.trim() || "gpt-4o-mini";
+  return (
+    process.env.ENGINEER_DASHBOARD_SUGGESTIONS_MODEL?.trim() ||
+    process.env.ENGINEER_MODEL?.trim() ||
+    "gpt-4o"
+  );
 }
 
 function modelSupportsCustomTemperature(model: string): boolean {
