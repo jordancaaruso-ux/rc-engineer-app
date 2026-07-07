@@ -38,6 +38,8 @@ import {
   primaryLapRowsFromRun,
 } from "@/lib/lapAnalysis";
 import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
+import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
+import { RunRaceFieldSwitcher } from "@/components/runs/RunRaceFieldSwitcher";
 import Link from "next/link";
 import { SquarePen, Timer, Trash2, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -898,6 +900,27 @@ function RunDetail({
     );
   }, [ownRows, lapDash.bestLap]);
 
+  // Lap rows for the All laps grid + graph — prefer full rows (carry excluded
+  // flags); fall back to bare times when the lap session predates them.
+  const lapDisplayRows = useMemo(
+    () =>
+      ownRows.length === laps.length
+        ? ownRows
+        : laps.map((t, i) => ({
+            lapNumber: i + 1,
+            lapTimeSeconds: t,
+            isIncluded: true,
+          })),
+    [ownRows, laps]
+  );
+  const mistakeDetailByLapNumber = useMemo(
+    () =>
+      new Map(
+        mistakeAnalysis.mistakes.map((m) => [m.lapNumber, formatMistakeLapDetail(m)])
+      ),
+    [mistakeAnalysis.mistakes]
+  );
+
   function toggleLapStat(key: ExpandedLapStat) {
     setExpandedLapStat((cur) => (cur === key ? null : key));
   }
@@ -986,6 +1009,12 @@ function RunDetail({
         ) : null}
       </div>
 
+      <RunRaceFieldSwitcher
+        runId={run.id}
+        enabled={(run.importedLapSets?.length ?? 0) > 0}
+        userLapRows={lapDisplayRows}
+        userView={
+      <>
       <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-4 min-w-0">
         <div className="shrink-0 space-y-2 min-w-0">
           <div className="space-y-1">
@@ -1057,15 +1086,8 @@ function RunDetail({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="ui-label-caps">All laps ({laps.length})</div>
           {laps.length > 0 ? (
-            <div className={cn("flex flex-wrap gap-x-2 gap-y-1 max-h-24 overflow-y-auto rounded border border-border bg-muted/60 px-2 py-1.5", RUN_HISTORY_DATA_CLASS)}>
-              {(ownRows.length === laps.length
-                ? ownRows
-                : laps.map((t, i) => ({
-                    lapNumber: i + 1,
-                    lapTimeSeconds: t,
-                    isIncluded: true,
-                  }))
-              ).map((r, i) => {
+            <div className={cn("flex flex-wrap gap-x-2 gap-y-1 rounded border border-border bg-muted/60 px-2 py-1.5", RUN_HISTORY_DATA_CLASS)}>
+              {lapDisplayRows.map((r, i) => {
                 const isMistake = mistakeLapNumbers.has(r.lapNumber);
                 const isBest = bestLapNumbers.has(r.lapNumber);
                 const isHighlighted = isMistake || isBest;
@@ -1110,6 +1132,22 @@ function RunDetail({
           )}
         </div>
       </div>
+
+      {lapDisplayRows.length >= 3 ? (
+        <div className="space-y-1">
+          <div className="ui-label-caps">Lap graph</div>
+          <LapTimeGraph
+            rows={lapDisplayRows}
+            bestLapNumbers={bestLapNumbers}
+            mistakeLapNumbers={mistakeLapNumbers}
+            mistakeDetailByLapNumber={mistakeDetailByLapNumber}
+            medianSeconds={lapDash.median ?? null}
+          />
+        </div>
+      ) : null}
+      </>
+        }
+      />
 
       <div className="pt-1 border-t border-border/60 border-dashed">
         <details className="group">

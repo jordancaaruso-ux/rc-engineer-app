@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export type RunLayoutOption = { id: string; name: string; notes: string | null };
 
@@ -90,20 +91,17 @@ export function RunLayoutPicker({
             : "No layouts saved for this track. Add them on the track page to select one here."}
         </p>
       ) : (
-        <select
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none disabled:opacity-60"
-          value={layoutId}
-          disabled={disabled}
-          onChange={(e) => onLayoutChange(e.target.value)}
+        <SearchableSelect
           aria-label="Track layout"
-        >
-          <option value="">No layout</option>
-          {layouts.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
+          placeholder="No layout"
+          clearable
+          clearLabel="No layout"
+          searchable={layouts.length > 6}
+          disabled={disabled}
+          value={layoutId}
+          onChange={onLayoutChange}
+          options={layouts.map((l) => ({ value: l.id, label: l.name }))}
+        />
       )}
 
       <div className="flex items-center gap-2">

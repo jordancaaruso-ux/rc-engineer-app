@@ -30,6 +30,38 @@ test("loadFullVehicleDynamicsKb concatenates every KB file except README, sorted
   assert.equal(again.markdown, kb.markdown);
 });
 
+test("AI-drafted tier is included, divided, and provenance-marked", async () => {
+  const kb = await loadFullVehicleDynamicsKb();
+  assert.ok(kb.draftFiles.length >= 1, "expected draft files under drafts/");
+  assert.deepEqual(kb.draftFiles, [...kb.draftFiles].sort());
+  assert.ok(kb.markdown.includes("AI-DRAFTED BASELINE FILES"), "missing drafts divider");
+  for (const f of kb.draftFiles) {
+    assert.ok(
+      kb.markdown.includes(`=== vehicle-dynamics/drafts/${f} (AI DRAFT — unverified) ===`),
+      `missing marked separator for draft ${f}`
+    );
+  }
+  // Approved prose must come before the divider; drafts after it.
+  const dividerAt = kb.markdown.indexOf("AI-DRAFTED BASELINE FILES");
+  const firstDraftAt = kb.markdown.indexOf("=== vehicle-dynamics/drafts/");
+  const lastApprovedAt = kb.markdown.lastIndexOf("=== vehicle-dynamics/", firstDraftAt - 1);
+  assert.ok(lastApprovedAt < dividerAt && dividerAt < firstDraftAt);
+  // Every draft file carries the AGENTS.md provenance banner.
+  assert.ok(
+    !kb.draftFiles.length ||
+      kb.markdown.split("AI-DRAFTED BASELINE FILES")[1].includes("**AI-drafted baseline (unverified).**"),
+    "draft files must carry the provenance banner"
+  );
+});
+
+test("retrieval index marks draft chunks with [draft] titles and drafts/ paths", async () => {
+  const { searchVehicleDynamicsKb } = await import("@/lib/engineerPhase5/vehicleDynamicsKb");
+  const hits = await searchVehicleDynamicsKb("track width wheel spacer scrub radius", 8);
+  const draftHit = hits.find((h) => h.sourcePath.startsWith("vehicle-dynamics/drafts/"));
+  assert.ok(draftHit, "expected a draft chunk to be retrievable");
+  assert.match(draftHit!.title, /^\[draft\] /);
+});
+
 test("buildFullKbSystemBlock ships full prose under the ceiling", async () => {
   assert.equal(fullKbInContextEnabled(), true, "default must be enabled");
   const block = await buildFullKbSystemBlock();

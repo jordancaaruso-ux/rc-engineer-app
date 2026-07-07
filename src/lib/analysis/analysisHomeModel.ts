@@ -1,4 +1,12 @@
-import { getAverageTopN, getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
+import {
+  computeConsistencyFromCV,
+  computeMistakeLaps,
+  getAverageTopN,
+  getIncludedLaps,
+  primaryLapRowsFromRun,
+  roundConsistencyScore,
+  analyzeLapRows,
+} from "@/lib/lapAnalysis";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import type { RunTireIndicator } from "@/lib/runs/tireSetChange";
@@ -17,6 +25,10 @@ export type AnalysisRunMetrics = {
   avgTop10: number | null;
   median: number | null;
   cleanLapCount: number;
+  /** RC-style consistency (100 − CV), higher = steadier; null when too few laps. */
+  consistencyScore: number | null;
+  /** Count of mistake laps (IQR outliers); null when the run isn't mistake-eligible. */
+  mistakeCount: number | null;
 };
 
 export type AnalysisTrendRun = {
@@ -102,12 +114,24 @@ export function computeAnalysisRunMetrics(run: {
   const included = getIncludedLaps(rows);
   const times = included.map((l) => l.lapTimeSeconds);
   const computedBest = times.length > 0 ? Math.min(...times) : null;
+
+  const analysis = analyzeLapRows(rows);
+  const cvPercent =
+    analysis.averageLap != null && analysis.averageLap > 0 && analysis.consistencyStdDev != null
+      ? (analysis.consistencyStdDev / analysis.averageLap) * 100
+      : null;
+  const consistencyScore =
+    cvPercent != null ? roundConsistencyScore(computeConsistencyFromCV(cvPercent)) : null;
+  const mistakes = computeMistakeLaps(rows);
+
   return {
     best: run.bestLapSeconds ?? computedBest,
     avgTop5: run.avgTop5LapSeconds ?? getAverageTopN(rows, 5),
     avgTop10: getAverageTopN(rows, 10),
     median: medianOf(times),
     cleanLapCount: included.length,
+    consistencyScore,
+    mistakeCount: mistakes.eligible ? mistakes.mistakeCount : null,
   };
 }
 

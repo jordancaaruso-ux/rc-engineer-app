@@ -23,6 +23,7 @@ import { prisma } from "@/lib/prisma";
 import { runEngineerChatTurn } from "@/lib/engineerPhase5/engineerChatPipeline";
 import {
   judgeEngineerAnswer,
+  judgeEngineerAnswerSampled,
   type CalibratedJudgeResult,
   type JudgeExemplar,
 } from "@/lib/engineerFeedback/calibratedJudge";
@@ -89,6 +90,10 @@ function parseArgs(argv: string[]) {
     caseDelayMs: Math.floor(num("case-delay", 45) * 1000),
     comparePath: get("compare"),
     skipJudge: argv.includes("--skip-judge"),
+    // >1 repeat-samples the judge per case and takes the median (cuts the observed
+    // ±1-3 absolute-score noise at N× judge cost). Default 1 keeps results files
+    // comparable with earlier runs.
+    judgeSamples: Math.floor(num("judge-samples", 1)),
   };
 }
 
@@ -202,12 +207,23 @@ async function main() {
 
       let judge: CalibratedJudgeResult | null = null;
       if (!args.skipJudge) {
-        judge = await judgeEngineerAnswer({
-          question: c.question,
-          answer: turn.reply,
-          exemplars,
-          kbSections: meta.kbSections,
-        });
+        judge =
+          args.judgeSamples > 1
+            ? await judgeEngineerAnswerSampled(
+                {
+                  question: c.question,
+                  answer: turn.reply,
+                  exemplars,
+                  kbSections: meta.kbSections,
+                },
+                args.judgeSamples
+              )
+            : await judgeEngineerAnswer({
+                question: c.question,
+                answer: turn.reply,
+                exemplars,
+                kbSections: meta.kbSections,
+              });
       }
 
       const price = priceFor(answerModel);

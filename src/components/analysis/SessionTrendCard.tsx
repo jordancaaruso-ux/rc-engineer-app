@@ -6,26 +6,23 @@ import { ChevronRight, Disc } from "lucide-react";
 import type { AnalysisTrendModel, AnalysisTrendRun } from "@/lib/analysis/analysisHomeModel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
+import { PagedCard } from "@/components/ui/PagedCard";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
 import { formatTireIndicatorTitle } from "@/lib/runs/tireSetChange";
 import { cn } from "@/lib/utils";
 
 /**
- * Session trend chart — best / avg top 5 / avg top 10 / median per run across
- * the current event or day. The four series are ordered (best ≤ top5 ≤ top10 ≤
- * median) so they render as a non-crossing band; the gap between the outer
- * lines reads as consistency spread. Standard lap-time orientation: lower =
- * faster.
+ * Session trend — an Apple-widget paged chart: three lenses on the same
+ * event/day, swiped as faces. Pace (best / avg top 5 / avg top 10 / median
+ * band, lower = faster), Consistency (100 − CV, higher = steadier), and
+ * Mistakes (IQR-outlier count, lower = cleaner). The car tabs are shared across
+ * faces; each face owns its own orientation and units. Chart-series hues only —
+ * yellow stays reserved for actions per VISUAL_NORTH_STAR.
  */
 
 type SeriesKey = "best" | "avgTop5" | "avgTop10" | "median";
 
-/**
- * Data-series hues (cool = faster metric, warm = slower). CVD-validated on the
- * charcoal surface (worst adjacent pair ΔE 23.4 deutan). Chart-series colors,
- * not semantic tokens — yellow stays reserved for actions per VISUAL_NORTH_STAR.
- */
 const SERIES: Array<{ key: SeriesKey; name: string; color: string; width: number }> = [
   { key: "best", name: "Best lap", color: "#45C8E8", width: 2.5 },
   { key: "avgTop5", name: "Avg top 5", color: "#A78BFA", width: 2 },
@@ -63,15 +60,10 @@ function buildPolylineSegments(points: Array<{ x: number; y: number } | null>): 
   return segments;
 }
 
-export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }) {
-  const router = useRouter();
-  const [selectedCarId, setSelectedCarId] = useState<string | null>(trend?.defaultCarId ?? null);
-  const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+/** Measured chart width via ResizeObserver; each face measures independently. */
+function useChartWidth(dep: unknown): [React.RefObject<HTMLDivElement | null>, number] {
   const [chartWidth, setChartWidth] = useState(340);
   const chartRef = useRef<HTMLDivElement | null>(null);
-  const pointerDownRef = useRef<{ x: number; y: number; sameIndex: boolean } | null>(null);
-
   useEffect(() => {
     const el = chartRef.current;
     if (!el) return;
@@ -81,48 +73,17 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [trend]);
+  }, [dep]);
+  return [chartRef, chartWidth];
+}
+
+export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }) {
+  const [selectedCarId, setSelectedCarId] = useState<string | null>(trend?.defaultCarId ?? null);
 
   const carRuns = useMemo<AnalysisTrendRun[]>(
     () => (trend ? trend.runs.filter((run) => run.carId === selectedCarId) : []),
     [trend, selectedCarId]
   );
-
-  const geometry = useMemo(() => {
-    if (carRuns.length < 2) return null;
-    const values: number[] = [];
-    for (const run of carRuns) {
-      for (const { key } of SERIES) {
-        const v = run.metrics[key];
-        if (v != null) values.push(v);
-      }
-    }
-    if (values.length === 0) return null;
-    let min = Math.min(...values);
-    let max = Math.max(...values);
-    if (max - min < 0.15) {
-      // Flat session — pad so the band doesn't collapse into one line.
-      const mid = (min + max) / 2;
-      min = mid - 0.15;
-      max = mid + 0.15;
-    }
-    const padding = (max - min) * 0.07;
-    const lo = min - padding;
-    const hi = max + padding;
-    const innerWidth = chartWidth - PAD_LEFT - PAD_RIGHT;
-    const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
-    const xAt = (index: number) =>
-      PAD_LEFT + (carRuns.length === 1 ? innerWidth / 2 : (index / (carRuns.length - 1)) * innerWidth);
-    // Standard lap-time orientation: faster (smaller seconds) plots lower.
-    const yAt = (value: number) => PAD_TOP + ((hi - value) / (hi - lo)) * innerHeight;
-    const pointsFor = (key: SeriesKey) =>
-      carRuns.map((run, index) => {
-        const v = run.metrics[key];
-        return v == null ? null : { x: xAt(index), y: yAt(v) };
-      });
-    const ticks = [lo + (hi - lo) * 0.12, (lo + hi) / 2, hi - (hi - lo) * 0.12];
-    return { xAt, yAt, pointsFor, ticks };
-  }, [carRuns, chartWidth]);
 
   if (!trend) {
     return (
@@ -138,6 +99,132 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
       </SurfaceCard>
     );
   }
+
+  return (
+    <SurfaceCard variant="hero" contentClassName="flex flex-col gap-3.5 p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <Eyebrow dot="accent">Session trend</Eyebrow>
+        <div className="max-w-[180px] truncate text-right font-mono text-[10px] uppercase leading-relaxed tracking-[0.08em] text-faint">
+          {trend.scopeLabel}
+        </div>
+      </div>
+
+      {trend.carOptions.length > 1 ? (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Car">
+          {trend.carOptions.map((option) => {
+            const active = option.carId === selectedCarId;
+            return (
+              <button
+                key={option.carId ?? "none"}
+                type="button"
+                onClick={() => setSelectedCarId(option.carId)}
+                className={cn(
+                  "tap-active rounded-lg border px-2.5 py-1 text-[11.5px] font-semibold transition-colors",
+                  active
+                    ? "border-ring/45 bg-muted text-foreground"
+                    : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {option.carName}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <PagedCard
+        storageKey="analysis-session-trend"
+        faces={[
+          {
+            id: "pace",
+            label: "Pace",
+            content: <PaceTrendFace carRuns={carRuns} scopeLabel={trend.scopeLabel} />,
+          },
+          {
+            id: "consistency",
+            label: "Consistency",
+            content: (
+              <SingleMetricTrendFace
+                carRuns={carRuns}
+                metric="consistencyScore"
+                title="Consistency"
+                orientationHint="Higher = steadier"
+                higherIsBetter
+                color="#4FD089"
+                formatValue={(v) => `${v.toFixed(1)}%`}
+                emptyLabel="No consistency data for this car yet in this window."
+              />
+            ),
+          },
+          {
+            id: "mistakes",
+            label: "Mistakes",
+            content: (
+              <SingleMetricTrendFace
+                carRuns={carRuns}
+                metric="mistakeCount"
+                title="Mistakes"
+                orientationHint="Lower = cleaner"
+                higherIsBetter={false}
+                color="#E5644E"
+                formatValue={(v) => String(Math.round(v))}
+                emptyLabel="No mistake-eligible runs for this car yet in this window."
+              />
+            ),
+          },
+        ]}
+      />
+    </SurfaceCard>
+  );
+}
+
+/** Face 1 — the four-series pace band with hover tooltip, tire row, tap-to-open. */
+function PaceTrendFace({
+  carRuns,
+  scopeLabel,
+}: {
+  carRuns: AnalysisTrendRun[];
+  scopeLabel: string;
+}) {
+  const router = useRouter();
+  const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [chartRef, chartWidth] = useChartWidth(carRuns);
+  const pointerDownRef = useRef<{ x: number; y: number; sameIndex: boolean } | null>(null);
+
+  const geometry = useMemo(() => {
+    if (carRuns.length < 2) return null;
+    const values: number[] = [];
+    for (const run of carRuns) {
+      for (const { key } of SERIES) {
+        const v = run.metrics[key];
+        if (v != null) values.push(v);
+      }
+    }
+    if (values.length === 0) return null;
+    let min = Math.min(...values);
+    let max = Math.max(...values);
+    if (max - min < 0.15) {
+      const mid = (min + max) / 2;
+      min = mid - 0.15;
+      max = mid + 0.15;
+    }
+    const padding = (max - min) * 0.07;
+    const lo = min - padding;
+    const hi = max + padding;
+    const innerWidth = chartWidth - PAD_LEFT - PAD_RIGHT;
+    const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+    const xAt = (index: number) =>
+      PAD_LEFT + (carRuns.length === 1 ? innerWidth / 2 : (index / (carRuns.length - 1)) * innerWidth);
+    const yAt = (value: number) => PAD_TOP + ((hi - value) / (hi - lo)) * innerHeight;
+    const pointsFor = (key: SeriesKey) =>
+      carRuns.map((run, index) => {
+        const v = run.metrics[key];
+        return v == null ? null : { x: xAt(index), y: yAt(v) };
+      });
+    const ticks = [lo + (hi - lo) * 0.12, (lo + hi) / 2, hi - (hi - lo) * 0.12];
+    return { xAt, yAt, pointsFor, ticks };
+  }, [carRuns, chartWidth]);
 
   const toggleSeries = (key: SeriesKey) => {
     setHidden((previous) => {
@@ -169,9 +256,6 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
     if (index != null) setHoverIndex(index);
   };
 
-  // Desktop: hover previews, so a click opens the run straight away. Touch:
-  // the first tap places the crosshair/tooltip; a second tap on the same run
-  // opens it (otherwise the tooltip could never be inspected on a phone).
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     const index = nearestRunIndex(event);
     if (index == null) return;
@@ -187,11 +271,9 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
     const down = pointerDownRef.current;
     pointerDownRef.current = null;
     if (!down || hoverIndex == null) return;
-    // A drag/scroll gesture is not a tap.
     if (Math.abs(event.clientX - down.x) > 8 || Math.abs(event.clientY - down.y) > 8) return;
     const run = carRuns[hoverIndex];
     if (down.sameIndex && run) {
-      // Sessions page with this run focused — full summary in context, not the edit form.
       router.push(`/runs/history?focusRun=${encodeURIComponent(run.id)}`);
     }
   };
@@ -199,41 +281,10 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
   const hoverRun = hoverIndex != null ? carRuns[hoverIndex] : null;
 
   return (
-    <SurfaceCard variant="hero" contentClassName="flex flex-col gap-3.5 p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <Eyebrow dot="accent">Session trend</Eyebrow>
-        <div className="text-right font-mono text-[10px] uppercase leading-relaxed tracking-[0.08em] text-faint">
-          <div className="max-w-[180px] truncate">{trend.scopeLabel}</div>
-          <div>Lower = faster</div>
-        </div>
+    <div className="flex flex-col gap-3">
+      <div className="text-right font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
+        Lower = faster
       </div>
-
-      {trend.carOptions.length > 1 ? (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Car">
-          {trend.carOptions.map((option) => {
-            const active = option.carId === selectedCarId;
-            return (
-              <button
-                key={option.carId ?? "none"}
-                type="button"
-                onClick={() => {
-                  setSelectedCarId(option.carId);
-                  setHoverIndex(null);
-                }}
-                className={cn(
-                  "tap-active rounded-lg border px-2.5 py-1 text-[11.5px] font-semibold transition-colors",
-                  active
-                    ? "border-ring/45 bg-muted text-foreground"
-                    : "border-border bg-secondary text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {option.carName}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-
       {geometry ? (
         <div ref={chartRef} className="relative">
           <svg
@@ -242,15 +293,13 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
             viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
             className="block cursor-pointer touch-pan-y"
             role="img"
-            aria-label={`Lap metric trend across ${carRuns.length} runs — ${trend.scopeLabel}. Tap a run to open it.`}
+            aria-label={`Lap metric trend across ${carRuns.length} runs — ${scopeLabel}. Tap a run to open it.`}
             onPointerMove={handlePointerMove}
             onPointerDown={handlePointerDown}
             onPointerCancel={() => {
               pointerDownRef.current = null;
             }}
             onPointerLeave={(event) => {
-              // Touch pointers "leave" the moment the finger lifts — keep the
-              // tooltip up so it can be read and a second tap can open the run.
               if (event.pointerType === "mouse") setHoverIndex(null);
             }}
             onClick={handleClick}
@@ -277,8 +326,6 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
             ))}
 
             {carRuns.map((run, index) => {
-              // Thin labels on dense sessions: at most ~8 plus the final run,
-              // and drop a stepped label that would crowd the final one.
               const step = Math.max(1, Math.ceil(carRuns.length / 8));
               const isLast = index === carRuns.length - 1;
               const stepped = index % step === 0 && carRuns.length - 1 - index >= step;
@@ -297,9 +344,6 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
             })}
 
             {(() => {
-              // Tire row: same icon language as run rows — Disc + corner run
-              // count, bright when the set changed, faint when unchanged. On
-              // dense sessions it thins to changed-set runs only.
               const withTires = carRuns
                 .map((run, index) => ({ run, index }))
                 .filter(({ run }) => run.tireIndicator != null);
@@ -397,10 +441,7 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
             <div
               className="pointer-events-none absolute top-0 z-10 min-w-[132px] rounded-lg border border-border bg-muted px-2.5 py-2 shadow-lg"
               style={{
-                left: Math.max(
-                  2,
-                  Math.min(geometry.xAt(hoverIndex ?? 0) - 66, chartWidth - 136)
-                ),
+                left: Math.max(2, Math.min(geometry.xAt(hoverIndex ?? 0) - 66, chartWidth - 136)),
               }}
             >
               <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
@@ -482,6 +523,249 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
           );
         })}
       </div>
-    </SurfaceCard>
+    </div>
+  );
+}
+
+/** Faces 2 & 3 — one metric per run as a single line; tap a run to open it. */
+function SingleMetricTrendFace({
+  carRuns,
+  metric,
+  title,
+  orientationHint,
+  higherIsBetter,
+  color,
+  formatValue,
+  emptyLabel,
+}: {
+  carRuns: AnalysisTrendRun[];
+  metric: "consistencyScore" | "mistakeCount";
+  title: string;
+  orientationHint: string;
+  higherIsBetter: boolean;
+  color: string;
+  formatValue: (value: number) => string;
+  emptyLabel: string;
+}) {
+  const router = useRouter();
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [chartRef, chartWidth] = useChartWidth(carRuns);
+  const pointerDownRef = useRef<{ x: number; y: number; sameIndex: boolean } | null>(null);
+
+  const values = useMemo(() => carRuns.map((run) => run.metrics[metric]), [carRuns, metric]);
+  const present = values.filter((v): v is number => v != null);
+
+  const geometry = useMemo(() => {
+    if (present.length < 2) return null;
+    let min = Math.min(...present);
+    let max = Math.max(...present);
+    if (max - min < 1e-6) {
+      // Flat metric (e.g. every run 0 mistakes) — pad so the line sits mid-height.
+      min -= 1;
+      max += 1;
+    }
+    const padding = (max - min) * 0.12;
+    const lo = min - padding;
+    const hi = max + padding;
+    const innerWidth = chartWidth - PAD_LEFT - PAD_RIGHT;
+    const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+    const xAt = (index: number) =>
+      PAD_LEFT + (carRuns.length === 1 ? innerWidth / 2 : (index / (carRuns.length - 1)) * innerWidth);
+    // "Better" always plots higher: consistency up = higher score; mistakes up = fewer.
+    const yAt = (value: number) =>
+      higherIsBetter
+        ? PAD_TOP + ((hi - value) / (hi - lo)) * innerHeight
+        : PAD_TOP + ((value - lo) / (hi - lo)) * innerHeight;
+    const points = carRuns.map((run, index) => {
+      const v = run.metrics[metric];
+      return v == null ? null : { x: xAt(index), y: yAt(v) };
+    });
+    const ticks = [hi - (hi - lo) * 0.12, (lo + hi) / 2, lo + (hi - lo) * 0.12];
+    return { xAt, yAt, points, ticks };
+  }, [present, carRuns, chartWidth, higherIsBetter, metric]);
+
+  const nearestRunIndex = (event: React.PointerEvent<SVGSVGElement>): number | null => {
+    if (!geometry || carRuns.length === 0) return null;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    let nearest = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < carRuns.length; i++) {
+      const distance = Math.abs(geometry.xAt(i) - x);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = i;
+      }
+    }
+    return nearest;
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    const index = nearestRunIndex(event);
+    if (index == null) return;
+    pointerDownRef.current = { x: event.clientX, y: event.clientY, sameIndex: hoverIndex === index };
+    setHoverIndex(index);
+  };
+
+  const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
+    const down = pointerDownRef.current;
+    pointerDownRef.current = null;
+    if (!down || hoverIndex == null) return;
+    if (Math.abs(event.clientX - down.x) > 8 || Math.abs(event.clientY - down.y) > 8) return;
+    const run = carRuns[hoverIndex];
+    if (down.sameIndex && run) {
+      router.push(`/runs/history?focusRun=${encodeURIComponent(run.id)}`);
+    }
+  };
+
+  const hoverRun = hoverIndex != null ? carRuns[hoverIndex] : null;
+  const hoverValue = hoverIndex != null ? values[hoverIndex] : null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="type-data-label">{title}</div>
+        <div className="font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
+          {orientationHint}
+        </div>
+      </div>
+      {geometry ? (
+        <div ref={chartRef} className="relative">
+          <svg
+            width="100%"
+            height={CHART_HEIGHT}
+            viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
+            className="block cursor-pointer touch-pan-y"
+            role="img"
+            aria-label={`${title} trend across ${carRuns.length} runs. Tap a run to open it.`}
+            onPointerMove={(event) => {
+              const index = nearestRunIndex(event);
+              if (index != null) setHoverIndex(index);
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerCancel={() => {
+              pointerDownRef.current = null;
+            }}
+            onPointerLeave={(event) => {
+              if (event.pointerType === "mouse") setHoverIndex(null);
+            }}
+            onClick={handleClick}
+          >
+            {geometry.ticks.map((tick) => (
+              <g key={tick}>
+                <line
+                  x1={PAD_LEFT}
+                  x2={chartWidth - PAD_RIGHT}
+                  y1={geometry.yAt(tick)}
+                  y2={geometry.yAt(tick)}
+                  className="stroke-border"
+                  strokeWidth={1}
+                />
+                <text
+                  x={PAD_LEFT - 6}
+                  y={geometry.yAt(tick) + 3}
+                  textAnchor="end"
+                  className="fill-faint font-mono text-[9px] tabular-nums"
+                >
+                  {formatValue(tick)}
+                </text>
+              </g>
+            ))}
+
+            {carRuns.map((run, index) => {
+              const step = Math.max(1, Math.ceil(carRuns.length / 8));
+              const isLast = index === carRuns.length - 1;
+              const stepped = index % step === 0 && carRuns.length - 1 - index >= step;
+              if (!isLast && !stepped) return null;
+              return (
+                <text
+                  key={run.id}
+                  x={geometry.xAt(index)}
+                  y={CHART_HEIGHT - 8}
+                  textAnchor={index === 0 ? "start" : isLast ? "end" : "middle"}
+                  className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
+                >
+                  {run.shortLabel}
+                </text>
+              );
+            })}
+
+            {hoverIndex != null ? (
+              <line
+                x1={geometry.xAt(hoverIndex)}
+                x2={geometry.xAt(hoverIndex)}
+                y1={PAD_TOP - 2}
+                y2={CHART_HEIGHT - PAD_BOTTOM + 4}
+                className="stroke-border"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+              />
+            ) : null}
+
+            {buildPolylineSegments(geometry.points).map((segment) => (
+              <polyline
+                key={segment}
+                points={segment}
+                fill="none"
+                stroke={color}
+                strokeWidth={2.25}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+            {geometry.points.map((point, index) =>
+              point ? (
+                <circle
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={index}
+                  cx={point.x}
+                  cy={point.y}
+                  r={hoverIndex === index ? 4 : 2.75}
+                  fill={color}
+                  className="stroke-card"
+                  strokeWidth={hoverIndex === index ? 1.5 : 1}
+                />
+              ) : null
+            )}
+          </svg>
+
+          {hoverRun && hoverValue != null ? (
+            <div
+              className="pointer-events-none absolute top-0 z-10 min-w-[104px] rounded-lg border border-border bg-muted px-2.5 py-2 shadow-lg"
+              style={{
+                left: Math.max(2, Math.min(geometry.xAt(hoverIndex ?? 0) - 52, chartWidth - 108)),
+              }}
+            >
+              <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
+                {hoverRun.shortLabel}
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span
+                    className="h-2 w-2 rounded-[2px]"
+                    style={{ backgroundColor: color }}
+                    aria-hidden
+                  />
+                  {title}
+                </span>
+                <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
+                  {formatValue(hoverValue)}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-1 border-t border-border pt-1 text-[10.5px] font-semibold text-muted-foreground">
+                Open run
+                <ChevronRight className="h-3 w-3 text-primary" aria-hidden />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          {carRuns.length <= 1
+            ? "Log another run and this trend line appears."
+            : emptyLabel}
+        </p>
+      )}
+    </div>
   );
 }

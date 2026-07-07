@@ -94,6 +94,44 @@ test("most-active track+class wins the pace slot", () => {
   assert.equal(s.pace?.runsCount, 3);
 });
 
+test("paceByTrack ranks every 2+-run track+class, headline first", () => {
+  const rows = [
+    // trackA: 3 runs (most active — should rank first and be `pace`)
+    run({ effectiveAt: daysAgo(9), trackId: "trackA", trackName: "Track A", bestLapSeconds: 21 }),
+    run({ effectiveAt: daysAgo(8), trackId: "trackA", trackName: "Track A", bestLapSeconds: 20 }),
+    run({ effectiveAt: daysAgo(7), trackId: "trackA", trackName: "Track A", bestLapSeconds: 19 }),
+    // trackB: 2 runs, getting slower
+    run({ effectiveAt: daysAgo(6), trackId: "trackB", trackName: "Track B", bestLapSeconds: 15 }),
+    run({ effectiveAt: daysAgo(5), trackId: "trackB", trackName: "Track B", bestLapSeconds: 15.4 }),
+    // trackC: 1 run — no trend
+    run({ effectiveAt: daysAgo(4), trackId: "trackC", trackName: "Track C", bestLapSeconds: 12 }),
+  ];
+  const s = computeDashboardSummary(rows, NOW, "UTC");
+  assert.equal(s.paceByTrack.length, 2);
+  assert.equal(s.paceByTrack[0].trackName, "Track A");
+  assert.equal(s.paceByTrack[1].trackName, "Track B");
+  assert.equal(s.paceByTrack[1].deltaSeconds.toFixed(1), "0.4"); // slower
+  // Headline pace is always the first ranked entry.
+  assert.equal(s.pace?.trackName, s.paceByTrack[0].trackName);
+});
+
+test("activityByDay bins runs per local day, oldest → newest", () => {
+  const rows = [
+    run({ effectiveAt: daysAgo(0) }), // today → last slot
+    run({ effectiveAt: daysAgo(0) }), // same day
+    run({ effectiveAt: daysAgo(29) }), // window start → first slot
+    run({ effectiveAt: daysAgo(40) }), // prior window — excluded
+  ];
+  const s = computeDashboardSummary(rows, NOW, "UTC");
+  assert.equal(s.activityByDay.length, 30);
+  assert.equal(s.activityByDay[29], 2);
+  assert.equal(s.activityByDay[0], 1);
+  assert.equal(
+    s.activityByDay.reduce((a, b) => a + b, 0),
+    3
+  );
+});
+
 test("empty window reports no data", () => {
   const s = computeDashboardSummary([run({ effectiveAt: daysAgo(90) })], NOW, "UTC");
   assert.equal(s.hasData, false);

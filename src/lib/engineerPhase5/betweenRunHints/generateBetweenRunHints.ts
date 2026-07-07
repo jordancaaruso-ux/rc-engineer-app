@@ -1,5 +1,7 @@
 import "server-only";
 
+import { ENGINEER_DEFAULT_MODEL } from "@/lib/engineerPhase5/openaiEngineer";
+
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
 import type {
@@ -23,7 +25,7 @@ function getHintsModel(): string {
   return (
     process.env.ENGINEER_BETWEEN_RUN_HINTS_MODEL?.trim() ||
     process.env.ENGINEER_MODEL?.trim() ||
-    "gpt-4o"
+    ENGINEER_DEFAULT_MODEL
   );
 }
 

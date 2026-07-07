@@ -4,6 +4,22 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const KB_DIR = path.join(process.cwd(), "content", "vehicle-dynamics");
+/**
+ * AI-drafted baseline tier (AGENTS.md, 2026-07-07): agent-written reference theory,
+ * clearly marked everywhere it surfaces, never founder-tier authority. Promotion =
+ * founder edits + moves the file up into KB_DIR.
+ */
+const KB_DRAFTS_DIR = path.join(KB_DIR, "drafts");
+
+async function listKbMarkdownFiles(dir: string): Promise<string[]> {
+  try {
+    return (await fs.readdir(dir))
+      .filter((f) => f.endsWith(".md") && f.toLowerCase() !== "readme.md")
+      .sort();
+  } catch {
+    return [];
+  }
+}
 
 export type VehicleDynamicsKbSnippet = {
   /** File path relative to content/vehicle-dynamics */
@@ -103,10 +119,15 @@ type ScoredChunk = {
 export type FullVehicleDynamicsKb = {
   /** All KB files concatenated with `=== vehicle-dynamics/<file> ===` separators. */
   markdown: string;
-  /** Filenames included, sorted (stable order keeps the prompt-cache prefix stable). */
+  /** Founder-approved filenames included, sorted (stable order keeps the prompt-cache prefix stable). */
   files: string[];
+  /** AI-drafted baseline filenames included (drafts/ tier), sorted. */
+  draftFiles: string[];
   totalChars: number;
 };
+
+const FULL_KB_DRAFTS_DIVIDER = `──────── AI-DRAFTED BASELINE FILES (below this line) ────────
+Everything below is AI-researched baseline theory, NOT founder-approved ground truth. Cite as "draft \`file.md\`" with hedged wording ("general vehicle-dynamics theory — not yet verified for this KB"); when a draft and an approved file above disagree, the approved file wins.`;
 
 let fullKbCache: FullVehicleDynamicsKb | null = null;
 let fullKbLoadPromise: Promise<FullVehicleDynamicsKb> | null = null;
@@ -121,32 +142,46 @@ export async function loadFullVehicleDynamicsKb(): Promise<FullVehicleDynamicsKb
   if (fullKbCache) return fullKbCache;
   if (!fullKbLoadPromise) {
     fullKbLoadPromise = (async () => {
-      let files: string[] = [];
-      try {
-        files = (await fs.readdir(KB_DIR))
-          .filter((f) => f.endsWith(".md") && f.toLowerCase() !== "readme.md")
-          .sort();
-      } catch {
-        const empty = { markdown: "", files: [], totalChars: 0 };
-        fullKbCache = empty;
-        return empty;
-      }
-      const parts: string[] = [];
-      const included: string[] = [];
-      for (const file of files) {
-        let raw = "";
-        try {
-          raw = await fs.readFile(path.join(KB_DIR, file), "utf8");
-        } catch {
-          continue;
+      const approvedFiles = await listKbMarkdownFiles(KB_DIR);
+      const draftFiles = await listKbMarkdownFiles(KB_DRAFTS_DIR);
+
+      const readParts = async (dir: string, files: string[], pathPrefix: string, suffix: string) => {
+        const parts: string[] = [];
+        const included: string[] = [];
+        for (const file of files) {
+          let raw = "";
+          try {
+            raw = await fs.readFile(path.join(dir, file), "utf8");
+          } catch {
+            continue;
+          }
+          const body = raw.trim();
+          if (!body) continue;
+          parts.push(`=== ${pathPrefix}${file}${suffix} ===\n\n${body}`);
+          included.push(file);
         }
-        const body = raw.trim();
-        if (!body) continue;
-        parts.push(`=== vehicle-dynamics/${file} ===\n\n${body}`);
-        included.push(file);
+        return { parts, included };
+      };
+
+      const approved = await readParts(KB_DIR, approvedFiles, "vehicle-dynamics/", "");
+      const drafts = await readParts(
+        KB_DRAFTS_DIR,
+        draftFiles,
+        "vehicle-dynamics/drafts/",
+        " (AI DRAFT — unverified)"
+      );
+
+      const sections = [...approved.parts];
+      if (drafts.parts.length > 0) {
+        sections.push(FULL_KB_DRAFTS_DIVIDER, ...drafts.parts);
       }
-      const markdown = parts.join("\n\n");
-      const out = { markdown, files: included, totalChars: markdown.length };
+      const markdown = sections.join("\n\n");
+      const out = {
+        markdown,
+        files: approved.included,
+        draftFiles: drafts.included,
+        totalChars: markdown.length,
+      };
       fullKbCache = out;
       return out;
     })();
@@ -168,37 +203,41 @@ async function loadKbIndex(): Promise<KbIndexEntry[]> {
   if (kbIndexCache) return kbIndexCache;
   if (!kbIndexLoadPromise) {
     kbIndexLoadPromise = (async () => {
-      let files: string[] = [];
-      try {
-        files = (await fs.readdir(KB_DIR)).filter((f) => f.endsWith(".md") && f.toLowerCase() !== "readme.md");
-      } catch {
-        return [];
-      }
       const entries: KbIndexEntry[] = [];
-      for (const file of files) {
-        const full = path.join(KB_DIR, file);
-        let raw = "";
-        try {
-          raw = await fs.readFile(full, "utf8");
-        } catch {
-          continue;
-        }
-        const chunks: Array<{ title: string; body: string }> = [];
-        if (/\n##\s/.test(raw)) {
-          const parts = raw.split(/\n(?=##\s)/);
-          for (const part of parts) {
-            const lines = part.trim().split("\n");
-            const titleLine = lines[0]?.replace(/^#+\s*/, "").trim() || file;
-            const body = lines.slice(1).join("\n").trim();
-            chunks.push({ title: titleLine, body });
+      const indexDir = async (dir: string, filePrefix: string, titlePrefix: string) => {
+        for (const file of await listKbMarkdownFiles(dir)) {
+          let raw = "";
+          try {
+            raw = await fs.readFile(path.join(dir, file), "utf8");
+          } catch {
+            continue;
           }
-        } else {
-          chunks.push({ title: file.replace(/\.md$/i, ""), body: raw.trim() });
+          const chunks: Array<{ title: string; body: string }> = [];
+          if (/\n##\s/.test(raw)) {
+            const parts = raw.split(/\n(?=##\s)/);
+            for (const part of parts) {
+              const lines = part.trim().split("\n");
+              const titleLine = lines[0]?.replace(/^#+\s*/, "").trim() || file;
+              const body = lines.slice(1).join("\n").trim();
+              chunks.push({ title: titleLine, body });
+            }
+          } else {
+            chunks.push({ title: file.replace(/\.md$/i, ""), body: raw.trim() });
+          }
+          for (const { title, body } of chunks) {
+            entries.push({
+              title: `${titlePrefix}${title}`,
+              body,
+              file: `${filePrefix}${file}`,
+              keyTokens: extractKeyTokens(body),
+            });
+          }
         }
-        for (const { title, body } of chunks) {
-          entries.push({ title, body, file, keyTokens: extractKeyTokens(body) });
-        }
-      }
+      };
+      await indexDir(KB_DIR, "", "");
+      // AI-drafted tier: retrievable, but marked so consumers and the model can tell
+      // the provenance apart from founder-approved prose (AGENTS.md drafts rules).
+      await indexDir(KB_DRAFTS_DIR, "drafts/", "[draft] ");
       kbIndexCache = entries;
       return entries;
     })();

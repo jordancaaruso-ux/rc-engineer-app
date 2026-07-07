@@ -23,20 +23,40 @@ For **Engineer quality iteration** (eval failures, prompt/context/retrieval fixe
 
 Match the nearest **Tier A** screen that is already done (login, dashboard) or the shared components listed in the doc. Update the rollout status table in `docs/VISUAL_NORTH_STAR.md` when a screen tier is completed.
 
-## Engineer KB is hand-curated ground truth
+## Engineer KB — two tiers: founder ground truth + AI drafts
 
-The "Engineer" feature retrieves prose verbatim from `content/vehicle-dynamics/*.md` (see `src/lib/engineerPhase5/vehicleDynamicsKb.ts`) and quotes it back to end users as authoritative RC car setup advice. **Any language written in those files is presented to drivers as if it were expert knowledge**, regardless of who wrote it.
+The "Engineer" feature carries prose from `content/vehicle-dynamics/` (see `src/lib/engineerPhase5/vehicleDynamicsKb.ts` / `fullKbInContext.ts`) and quotes it back to end users as authoritative RC car setup advice. **Any language in those files is presented to drivers as expert knowledge**, regardless of who wrote it. Since 2026-07-07 the KB has two tiers with different rules:
 
-The structured parameter-effect catalog at `src/lib/engineerPhase5/parameterEffects/catalog.ts` is treated as an extension of this KB — every entry declares a direction + hedge flag + strength that the Engineer quotes back to drivers as ground truth. The same approval gate applies.
+| Tier | Location | Who writes | Authority |
+|---|---|---|---|
+| **Founder-approved** | `content/vehicle-dynamics/*.md` (top level) | Jordan (agents only with explicit approval) | Ground truth — cited without provenance hedging |
+| **AI-drafted baseline** | `content/vehicle-dynamics/drafts/*.md` | Agents, freely | Reference theory — always marked, cited hedged, never overrides top-level files |
 
-### Hard rule
+The structured parameter-effect catalog at `src/lib/engineerPhase5/parameterEffects/catalog.ts` is an extension of the **founder-approved** tier — every entry declares a direction + hedge flag + strength that the Engineer quotes back as ground truth. The approval gate applies in full.
 
-Do NOT modify, rewrite, expand, or "clean up" any file under `content/vehicle-dynamics/` **or any entry in `src/lib/engineerPhase5/parameterEffects/catalog.ts`** unless the user's most recent message either:
+### Hard rule — founder-approved tier (top-level files + catalog)
+
+Do NOT modify, rewrite, expand, or "clean up" any **top-level** file under `content/vehicle-dynamics/` **or any entry in `src/lib/engineerPhase5/parameterEffects/catalog.ts`** unless the user's most recent message either:
 
 - explicitly names the file, or
 - explicitly asks for KB content edits.
 
 "Improving clarity", "tightening grammar", or "adding a missing concept" are NOT sufficient justification. Propose the change in chat with a diff and wait for the user to type explicit approval before writing.
+
+### Drafts tier — agents may write (rules)
+
+Agents MAY create and edit files under `content/vehicle-dynamics/drafts/` without per-file approval (founder-granted 2026-07-07), to build baseline physics coverage for setup parameters the approved KB doesn't cover yet. Non-negotiable rules:
+
+1. **Provenance banner first.** Every draft file starts with this blockquote (update the date):
+
+   > **AI-drafted baseline (unverified).** Researched and written by the coding agent from general vehicle-dynamics knowledge on YYYY-MM-DD. Not yet edited or approved by Jordan — reference theory, not founder ground truth.
+
+2. **Never contradict or duplicate the approved tier.** If a draft topic touches an approved file's territory, align with it and cross-reference; if general knowledge genuinely disagrees with an approved file, flag the conflict to the founder in chat — never "correct" the approved file and never write the disagreement into the draft.
+3. **Same style rules as the KB:** terse, bold technical terms, physics-first (mechanism → documented tendency), hedges preserved where physics is genuinely situational, `##` sections (the chunker splits on them), `**Keys:**` lines with canonical parameter keys, ≤ ~90 lines per file.
+4. **No coaching, no invented numbers.** Mechanisms and directional tendencies only — no "always run X", no fabricated setup values or fake community norms.
+5. **Promotion ritual:** Jordan edits a draft (or is interviewed through it), then it moves up to `content/vehicle-dynamics/` with the banner removed — from that moment the hard rule above covers it. Only Jordan (or an agent on his explicit instruction naming the file) performs promotion.
+
+Runtime handling: loaders label draft content distinctly and the Engineer is instructed to cite drafts as hedged general theory ("per draft `x.md`"), never with founder-tier authority.
 
 The surrounding files (`types.ts`, `intentFromMessage.ts`, `query.ts`) are normal code — modify them freely when iterating on intent detection or join logic. Only `catalog.ts` entries are locked.
 

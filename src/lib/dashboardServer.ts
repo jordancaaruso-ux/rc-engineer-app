@@ -5,6 +5,11 @@ import { computeIncludedLapMetricsFromRun, getIncludedLaps, primaryLapRowsFromRu
 import { computeDashboardSummary, type DashboardSummary, type SummaryRunInput } from "@/lib/dashboardSummary";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import {
+  formatHandlingAssessmentDetailLines,
+  formatPrimaryFocusLine,
+  parseHandlingAssessmentJson,
+} from "@/lib/runHandlingAssessment";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { pickFeaturedEvent } from "@/lib/eventActive";
 import { formatFeaturedEventDateLabel } from "@/lib/formatDate";
@@ -302,8 +307,22 @@ export type DashboardHomeModel = {
     sessionLabel: string;
     bestLap: number | null;
     avgTop5: number | null;
+    /** Included (valid) lap count for the run. */
+    lapCount: number;
     /** 1–10 car handling rating from the feedback section; null when not rated. */
     carRating: number | null;
+    /** Human-readable structured handling read (feel vs last run, phase balance, trait axes, focus). */
+    handlingLines: string[];
+    /** Free-text handling notes, trimmed; null when empty. */
+    handlingProblems: string | null;
+    /** Setup changes vs the previous run's snapshot; null when this is the first run. */
+    setupChanges: null | Array<{
+      key: string;
+      label: string;
+      unit: string;
+      previous: string | null;
+      current: string;
+    }>;
   };
   /** Rolling 30-day reflective summary (runs / laps / wheel time / cadence / per-track pace). */
   summary: DashboardSummary;
@@ -327,6 +346,9 @@ const recentRunSelect = {
   meetingSessionCode: true,
   sessionLabel: true,
   carRating: true,
+  handlingAssessmentJson: true,
+  handlingProblems: true,
+  setupSnapshot: { select: { id: true, data: true } },
   car: { select: { id: true, name: true } },
   track: { select: { id: true, name: true } },
   event: { select: { id: true, name: true } },
@@ -678,6 +700,40 @@ export async function loadDashboardHomeModel(
   let recent: DashboardHomeModel["recentRun"] = null;
   if (recentRun) {
     const m = computeIncludedLapMetricsFromRun(recentRun);
+
+    // Structured handling read for the previous-run card's handling face.
+    const handlingLines = formatHandlingAssessmentDetailLines(recentRun.handlingAssessmentJson);
+    const parsedHandling = parseHandlingAssessmentJson(recentRun.handlingAssessmentJson);
+    if (parsedHandling?.primaryFocus) {
+      const focusLine = formatPrimaryFocusLine(parsedHandling.primaryFocus);
+      if (focusLine) handlingLines.push(focusLine);
+    }
+
+    // Setup changes vs the run immediately before this one (setup-changes face).
+    // Every run persists a snapshot, so null only means "no earlier run to diff".
+    let setupChanges: NonNullable<DashboardHomeModel["recentRun"]>["setupChanges"] = null;
+    const currentSnapshot = (recentRun.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
+    if (currentSnapshot) {
+      const runBefore = await prisma.run.findFirst({
+        where: { userId, sortAt: { lt: recentRun.sortAt } },
+        orderBy: { sortAt: "desc" },
+        select: { setupSnapshot: { select: { data: true } } },
+      });
+      const previousSnapshot =
+        (runBefore?.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
+      if (previousSnapshot) {
+        setupChanges = buildSetupDiffRows(currentSnapshot, previousSnapshot)
+          .filter((row) => row.changed)
+          .map((row) => ({
+            key: row.key,
+            label: row.label,
+            unit: row.unit,
+            previous: row.previous,
+            current: row.current,
+          }));
+      }
+    }
+
     recent = {
       id: recentRun.id,
       carId: recentRun.car?.id ?? null,
@@ -695,7 +751,11 @@ export async function loadDashboardHomeModel(
       sessionLabel: formatRunSessionDisplay(recentRun),
       bestLap: m.bestLap,
       avgTop5: m.averageTop5,
+      lapCount: m.lapCount,
       carRating: recentRun.carRating ?? null,
+      handlingLines,
+      handlingProblems: recentRun.handlingProblems?.trim() || null,
+      setupChanges,
     };
   }
 

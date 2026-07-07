@@ -21,6 +21,7 @@ import { RunLayoutPicker } from "@/components/runs/RunLayoutPicker";
 import { tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { RunTireSelectionPanel, type NewTireSetIntent } from "@/components/runs/RunTireSelectionPanel";
 import { RunAdditiveTimingPanel } from "@/components/runs/RunAdditiveTimingPanel";
 import { QuickAddBatteryPanel } from "@/components/assets/QuickAddBatteryPanel";
@@ -84,6 +85,16 @@ import {
   type HandlingAssessmentUiState,
 } from "@/lib/runHandlingAssessment";
 import { mergeUniqueById } from "@/lib/assets/mergeAssetLists";
+
+/**
+ * Floating save-action pills — same DNA as the global `LogRunFab` pill
+ * (h-12 rounded-full, Sora bold, yellow glow + charcoal shadow + specular rim)
+ * so the persistent actions read as one system across the app.
+ */
+const fabPillPrimaryClass =
+  "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full bg-primary px-4 font-sans text-sm font-bold text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-150 hover:bg-[#E6BE00] active:scale-95 touch-manipulation";
+const fabPillOutlineClass =
+  "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full border border-white/10 bg-card px-4 font-sans text-sm font-bold text-foreground shadow-[0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.12)] transition-transform duration-150 hover:bg-muted active:scale-95 touch-manipulation";
 
 type CarOption = {
   id: string;
@@ -2611,7 +2622,7 @@ export function NewRunForm(props: {
       }}
     />
     <form
-      className="max-w-3xl space-y-3"
+      className="max-w-3xl space-y-3 pb-16 md:pb-20"
       onSubmit={(e) => e.preventDefault()}
       noValidate
     >
@@ -2789,35 +2800,41 @@ export function NewRunForm(props: {
             </button>
           </div>
 
-          <select
-            className="form-control w-full px-3 py-2 text-sm"
+          <SearchableSelect
+            aria-label="Event"
+            placeholder="— Select event"
+            clearable
+            clearLabel="— Select event"
             value={eventId}
-            onChange={(e) => {
-              setEventId(e.target.value);
+            onChange={(next) => {
+              setEventId(next);
               setEventError(null);
             }}
-            aria-label="Event"
-          >
-            <option value="">— Select event</option>
-            {eventSelectGroups.upcoming.length > 0 ? (
-              <optgroup label="Upcoming">
-                {eventSelectGroups.upcoming.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.name} · {formatEventDate(ev.startDate)} · {formatEventRelativeLabel(ev)}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-            {eventSelectGroups.past.length > 0 ? (
-              <optgroup label="Past">
-                {eventSelectGroups.past.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.name} · {formatEventDate(ev.startDate)} · {formatEventRelativeLabel(ev)}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-          </select>
+            groups={[
+              ...(eventSelectGroups.upcoming.length > 0
+                ? [
+                    {
+                      label: "Upcoming",
+                      options: eventSelectGroups.upcoming.map((ev) => ({
+                        value: ev.id,
+                        label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
+                      })),
+                    },
+                  ]
+                : []),
+              ...(eventSelectGroups.past.length > 0
+                ? [
+                    {
+                      label: "Past",
+                      options: eventSelectGroups.past.map((ev) => ({
+                        value: ev.id,
+                        label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
+                      })),
+                    },
+                  ]
+                : []),
+            ]}
+          />
 
           {eventsLoading ? (
             <p className="text-[11px] text-muted-foreground">Loading events…</p>
@@ -2948,26 +2965,24 @@ export function NewRunForm(props: {
             <div className="inset-panel p-3 space-y-2">
               <div className="inset-panel-deep p-2">
                 <Eyebrow dot="muted" className="mb-1">Track (required)</Eyebrow>
-                <select
-                  className="form-control w-full px-3 py-2 text-sm"
+                <SearchableSelect
+                  aria-label="Event track"
+                  placeholder="— Select track"
+                  clearable
+                  clearLabel="— Select track"
                   value={newEventTrackId}
-                  onChange={(e) => {
-                    setNewEventTrackId(e.target.value);
+                  onChange={(next) => {
+                    setNewEventTrackId(next);
                     // Layout belongs to a track; reset when the track changes.
                     setNewEventLayoutId("");
                     setNewEventDirection("");
                     setEventError(null);
                   }}
-                  aria-label="Event track"
-                >
-                  <option value="">— Select track</option>
-                  {tracksList.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                      {t.location ? ` (${t.location})` : ""}
-                    </option>
-                  ))}
-                </select>
+                  options={tracksList.map((t) => ({
+                    value: t.id,
+                    label: `${t.name}${t.location ? ` (${t.location})` : ""}`,
+                  }))}
+                />
                 {newEventTrackId ? (
                   <div className="mt-2">
                     <RunLayoutPicker
@@ -3093,21 +3108,22 @@ export function NewRunForm(props: {
             <div className="flex flex-wrap gap-3 items-end">
               <div className="space-y-1">
                 <label className="block ui-label-meta">Type</label>
-                <select
-                  className="form-control px-3 py-2 text-sm"
-                  value={meetingSessionType}
-                  onChange={(e) => {
-                    setMeetingSessionType(e.target.value as MeetingSessionType);
-                    if (e.target.value !== "OTHER") setMeetingSessionCustom("");
-                  }}
+                <SearchableSelect
                   aria-label="Meeting session type"
-                >
-                  <option value="PRACTICE">Practice</option>
-                  <option value="SEEDING">Seeding</option>
-                  <option value="QUALIFYING">Qualifying</option>
-                  <option value="RACE">Race</option>
-                  <option value="OTHER">Other</option>
-                </select>
+                  className="min-w-[160px]"
+                  value={meetingSessionType}
+                  onChange={(next) => {
+                    setMeetingSessionType(next as MeetingSessionType);
+                    if (next !== "OTHER") setMeetingSessionCustom("");
+                  }}
+                  options={[
+                    { value: "PRACTICE", label: "Practice" },
+                    { value: "SEEDING", label: "Seeding" },
+                    { value: "QUALIFYING", label: "Qualifying" },
+                    { value: "RACE", label: "Race" },
+                    { value: "OTHER", label: "Other" },
+                  ]}
+                />
               </div>
               {meetingSessionType === "OTHER" && (
                 <div className="space-y-1">
@@ -3299,14 +3315,12 @@ export function NewRunForm(props: {
                   Car Manager
                 </Link>
               </div>
-              <select
-                className={cn(
-                  "form-control w-full px-3 py-2 text-sm",
-                  prefillFieldClass(Boolean(prefillHighlights?.car || copyCarWarning))
-                )}
+              <SearchableSelect
+                aria-label="Car"
+                className={prefillFieldClass(Boolean(prefillHighlights?.car || copyCarWarning))}
+                placeholder="Select car"
                 value={carId}
-                onChange={(e) => {
-                  const next = e.target.value;
+                onChange={(next) => {
                   const prev = carId;
                   setCarId(next);
                   setCopyCarWarning(null);
@@ -3320,14 +3334,8 @@ export function NewRunForm(props: {
                     setActiveSetupData({}, next);
                   }
                 }}
-                aria-label="Car"
-              >
-                {carsList.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                options={carsList.map((c) => ({ value: c.id, label: c.name }))}
+              />
               {copyCarWarning && (
                 <div className="text-[11px] text-destructive mt-1">{copyCarWarning}</div>
               )}
@@ -3541,26 +3549,23 @@ export function NewRunForm(props: {
                   {showNewBatteryPanel ? "Cancel" : "New battery"}
                 </button>
               </div>
-              <select
-                className={cn("form-control w-full px-3 py-2 text-sm", prefillFieldClass(Boolean(prefillHighlights?.battery)))}
+              <SearchableSelect
+                aria-label="Battery pack"
+                className={prefillFieldClass(Boolean(prefillHighlights?.battery))}
+                placeholder="—"
+                clearable
                 value={batteryId}
-                onChange={(e) => {
-                  const nextId = e.target.value;
+                onChange={(nextId) => {
                   setBatteryId(nextId);
                   applyTireBatteryToSetupSnapshot(tireSetIdRef.current, nextId);
                   setCopyBatteryWarning(null);
                   setPrefillHighlights((h) => (h ? { ...h, battery: false } : h));
                 }}
-                aria-label="Battery pack"
-              >
-                <option value="">—</option>
-                {batteries.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.label}
-                    {b.packNumber != null ? ` #${b.packNumber}` : ""}
-                  </option>
-                ))}
-              </select>
+                options={batteries.map((b) => ({
+                  value: b.id,
+                  label: `${b.label}${b.packNumber != null ? ` #${b.packNumber}` : ""}`,
+                }))}
+              />
               {copyBatteryWarning && (
                 <div className="text-[11px] text-muted-foreground mt-1">{copyBatteryWarning}</div>
               )}
@@ -3740,9 +3745,8 @@ export function NewRunForm(props: {
               ) : (
                 <>
                   <div className="space-y-1 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-medium text-muted-foreground">Setup source</div>
-                      {isEditing ? (
+                    {isEditing ? (
+                      <div className="flex items-center justify-end">
                         <button
                           type="button"
                           onClick={() => setShowSetupSourceControls(false)}
@@ -3751,25 +3755,25 @@ export function NewRunForm(props: {
                         >
                           Keep current
                         </button>
-                      ) : null}
-                    </div>
-                    <select
-                      className="form-control w-full max-w-2xl px-3 py-2 text-xs"
+                      </div>
+                    ) : null}
+                    <SearchableSelect
+                      aria-label="Setup source"
+                      className="max-w-2xl"
+                      searchable={false}
                       value={setupSource}
-                      onChange={(e) =>
-                        handleSetupSourceChange(
-                          e.target.value as "previous_runs" | "other" | "new"
-                        )
+                      onChange={(next) =>
+                        handleSetupSourceChange(next as "previous_runs" | "other" | "new")
                       }
-                    >
-                      <option value="previous_runs">Setups from previous runs</option>
-                      <option value="other">Other</option>
-                      <option value="new">New</option>
-                    </select>
+                      options={[
+                        { value: "previous_runs", label: "Setups from previous runs" },
+                        { value: "other", label: "Other" },
+                        { value: "new", label: "New" },
+                      ]}
+                    />
                   </div>
                   {setupSource === "previous_runs" ? (
                     <RunPickerSelect
-                      label={loadSetupControlLabel}
                       runs={pickerRuns}
                       value={loadSetupSelection}
                       onChange={applyPastSetupOnly}
@@ -3781,31 +3785,34 @@ export function NewRunForm(props: {
                     <div className="space-y-2">
                       <div className="space-y-1 text-sm">
                         <div className="text-sm font-medium text-muted-foreground">Other source</div>
-                        <select
-                          className="form-control w-full max-w-2xl px-3 py-2 text-xs"
+                        <SearchableSelect
+                          aria-label="Other setup source"
+                          className="max-w-2xl"
+                          searchable={false}
                           value={otherSetupSource}
-                          onChange={(e) => setOtherSetupSource(e.target.value as "downloaded_setups")}
-                        >
-                          <option value="downloaded_setups">Downloaded setups</option>
-                        </select>
+                          onChange={(next) => setOtherSetupSource(next as "downloaded_setups")}
+                          options={[{ value: "downloaded_setups", label: "Downloaded setups" }]}
+                        />
                       </div>
                       <div className="space-y-1 text-sm">
                         <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
                           {loadOtherSetupLabel}
                         </div>
-                        <select
-                          className="form-control w-full max-w-2xl px-3 py-2 text-xs font-mono"
-                          value={loadOtherSetupSelection}
-                          onChange={(e) => applyDownloadedSetupOnly(e.target.value)}
+                        <SearchableSelect
+                          aria-label="Downloaded setup"
+                          className="max-w-2xl"
+                          placeholder="Choose a downloaded setup…"
+                          clearable
+                          clearLabel="Choose a downloaded setup…"
+                          triggerMono
                           disabled={downloadedSetups.length === 0}
-                        >
-                          <option value="">Choose a downloaded setup…</option>
-                          {downloadedSetups.map((d) => (
-                            <option key={d.id} value={d.id}>
-                              {`${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`}
-                            </option>
-                          ))}
-                        </select>
+                          value={loadOtherSetupSelection}
+                          onChange={(next) => applyDownloadedSetupOnly(next)}
+                          options={downloadedSetups.map((d) => ({
+                            value: d.id,
+                            label: `${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`,
+                          }))}
+                        />
                       </div>
                       {carId ? (
                         <RunLogQuickSetupUpload
@@ -3871,20 +3878,6 @@ export function NewRunForm(props: {
           )
         ) : (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] text-muted-foreground">
-                One snapshot per run. Synced with Setup page and Current setup in compare.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setSetupSectionExpanded(false);
-                }}
-                className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground transition"
-              >
-                Collapse
-              </button>
-            </div>
             {setupSnapshotSaveStatus ? (
               <div
                 className={`text-[11px] ${
@@ -3900,22 +3893,22 @@ export function NewRunForm(props: {
                 by restoring the JSX block from git history. */}
             <div className="max-w-2xl space-y-2">
               <div className="space-y-1 text-sm">
-                <div className="text-sm font-medium text-muted-foreground">Setup source</div>
-                <select
-                  className="form-control w-full px-3 py-2 text-xs"
+                <SearchableSelect
+                  aria-label="Setup source"
+                  searchable={false}
                   value={setupSource}
-                  onChange={(e) =>
-                    handleSetupSourceChange(e.target.value as "previous_runs" | "other" | "new")
+                  onChange={(next) =>
+                    handleSetupSourceChange(next as "previous_runs" | "other" | "new")
                   }
-                >
-                  <option value="previous_runs">Setups from previous runs</option>
-                  <option value="other">Other</option>
-                  <option value="new">New</option>
-                </select>
+                  options={[
+                    { value: "previous_runs", label: "Setups from previous runs" },
+                    { value: "other", label: "Other" },
+                    { value: "new", label: "New" },
+                  ]}
+                />
               </div>
               {setupSource === "previous_runs" ? (
                 <RunPickerSelect
-                  label={loadSetupControlLabel}
                   runs={pickerRuns}
                   value={loadSetupSelection}
                   onChange={applyPastSetupOnly}
@@ -3927,31 +3920,32 @@ export function NewRunForm(props: {
                 <div className="space-y-2">
                   <div className="space-y-1 text-sm">
                     <div className="text-sm font-medium text-muted-foreground">Other source</div>
-                    <select
-                      className="form-control w-full px-3 py-2 text-xs"
+                    <SearchableSelect
+                      aria-label="Other setup source"
+                      searchable={false}
                       value={otherSetupSource}
-                      onChange={(e) => setOtherSetupSource(e.target.value as "downloaded_setups")}
-                    >
-                      <option value="downloaded_setups">Downloaded setups</option>
-                    </select>
+                      onChange={(next) => setOtherSetupSource(next as "downloaded_setups")}
+                      options={[{ value: "downloaded_setups", label: "Downloaded setups" }]}
+                    />
                   </div>
                   <div className="space-y-1 text-sm">
                     <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
                       {loadOtherSetupLabel}
                     </div>
-                    <select
-                      className="form-control w-full px-3 py-2 text-xs font-mono"
-                      value={loadOtherSetupSelection}
-                      onChange={(e) => applyDownloadedSetupOnly(e.target.value)}
+                    <SearchableSelect
+                      aria-label="Downloaded setup"
+                      placeholder="Choose a downloaded setup…"
+                      clearable
+                      clearLabel="Choose a downloaded setup…"
+                      triggerMono
                       disabled={downloadedSetups.length === 0}
-                    >
-                      <option value="">Choose a downloaded setup…</option>
-                      {downloadedSetups.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {`${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`}
-                        </option>
-                      ))}
-                    </select>
+                      value={loadOtherSetupSelection}
+                      onChange={(next) => applyDownloadedSetupOnly(next)}
+                      options={downloadedSetups.map((d) => ({
+                        value: d.id,
+                        label: `${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`,
+                      }))}
+                    />
                   </div>
                   {carId ? (
                     <RunLogQuickSetupUpload
@@ -3967,6 +3961,24 @@ export function NewRunForm(props: {
                   Blank setup for this car — edit the sheet below, or lock in when you are ready.
                 </p>
               )}
+              <button
+                type="button"
+                onClick={() => setSetupSectionExpanded(false)}
+                aria-label="Collapse setup"
+                title="Collapse setup"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <svg
+                  aria-hidden
+                  viewBox="0 0 20 20"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                >
+                  <path d="M5 7l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
             </div>
             <SetupSheetView
               value={setupData}
@@ -4139,7 +4151,7 @@ export function NewRunForm(props: {
           placeholder={
             isDraft && notes.trim().length === 0
               ? "How did the run feel? Grip, balance, any issues, what you'd change…"
-              : "Session notes, handling, track conditions…"
+              : "Notes…"
           }
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -4242,38 +4254,45 @@ export function NewRunForm(props: {
         Share this run with my teams
       </label>
 
-      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-        {editingCompletedRun ? (
-          <>
-            <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-md">
-              Saves your changes to this run only. It stays marked complete; tire and battery run numbers are not
-              updated (they were set when you first clicked Run complete).
-            </p>
-            <div className="flex flex-wrap justify-end gap-2">
+      {editingCompletedRun ? (
+        <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-md">
+          Saves your changes to this run only. It stays marked complete; tire and battery run numbers are not
+          updated (they were set when you first clicked Run complete).
+        </p>
+      ) : null}
+
+      {/* Persistent save actions — pinned bottom-right so they stay reachable
+          anywhere in this long form. Mobile offset mirrors LogRunFab (which is
+          suppressed on run create/edit routes, so no collision): dock pad +
+          dock height + gap. Desktop floats at the viewport corner. */}
+      <div
+        className={cn(
+          "pointer-events-none fixed inset-x-0 z-40 px-4",
+          "bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.25rem)]",
+          "md:inset-x-auto md:right-8 md:bottom-8 md:px-0"
+        )}
+      >
+        <div className="mx-auto flex max-w-md flex-wrap justify-end gap-2 md:mx-0 md:max-w-none">
+          {editingCompletedRun ? (
+            <button
+              type="button"
+              className={cn(
+                fabPillPrimaryClass,
+                (!canSave || saving) && "opacity-70 pointer-events-none"
+              )}
+              onClick={(e) => saveRun(e, "completed")}
+              disabled={!canSave || saving}
+              aria-busy={saving}
+              title="Save changes without affecting completion or tire/battery run counts."
+            >
+              {saving ? "Saving…" : saveSuccess ? "Saved" : "Save edits"}
+            </button>
+          ) : (
+            <>
               <button
                 type="button"
                 className={cn(
-                  buttonLinkClassName("primary"),
-                  "gap-1.5",
-                  (!canSave || saving) && "opacity-70 pointer-events-none"
-                )}
-                onClick={(e) => saveRun(e, "completed")}
-                disabled={!canSave || saving}
-                aria-busy={saving}
-                title="Save changes without affecting completion or tire/battery run counts."
-              >
-                {saving ? "Saving…" : saveSuccess ? "Saved" : "Save edits"}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                className={cn(
-                  buttonLinkClassName("outline"),
-                  "gap-1.5 shadow-sm",
+                  fabPillOutlineClass,
                   (!canSave || saving) && "opacity-70 pointer-events-none"
                 )}
                 onClick={(e) => saveRun(e, "draft")}
@@ -4286,8 +4305,7 @@ export function NewRunForm(props: {
               <button
                 type="button"
                 className={cn(
-                  buttonLinkClassName("primary"),
-                  "gap-1.5",
+                  fabPillPrimaryClass,
                   (!canSave || saving) && "opacity-70 pointer-events-none"
                 )}
                 onClick={(e) => saveRun(e, "completed")}
@@ -4300,9 +4318,9 @@ export function NewRunForm(props: {
                   🏁
                 </span>
               </button>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </form>
     </>

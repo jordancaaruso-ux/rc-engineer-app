@@ -26,6 +26,8 @@ export type FullKbSystemBlock = {
 const FULL_KB_HEADER = `VEHICLE DYNAMICS KB — FULL TEXT (canonical, hand-curated ground truth).
 This is the COMPLETE vehicle-dynamics knowledge base: every file, full prose. It is the corpus the instructions and context JSON call "vehicleDynamicsKb". Per-turn retrieved excerpts are retired — richEngineerContext.vehicleDynamicsKb and focusedRunPair.setupCompareKbSnippets carry only a pointer to this block, so wherever the instructions mention retrieved snippets or excerpts, read the relevant file below instead. Never claim a KB excerpt "didn't make retrieval" or that KB coverage is missing for a parameter documented below — everything is here. All KB rules apply to these files: cite filenames (e.g. \`damper-oil.md\`), never contradict them, preserve their hedges.
 
+PROVENANCE TIERS: files above the "AI-DRAFTED BASELINE FILES" divider are founder-approved ground truth — cite them plainly. Files below it (marked "AI DRAFT — unverified") are AI-researched baseline theory: use them, but cite as "draft \`file.md\`" with hedged wording ("general vehicle-dynamics theory — not yet verified for this KB"), never with the same authority as approved files, and if a draft and an approved file disagree, the approved file wins without exception.
+
 `;
 
 /**

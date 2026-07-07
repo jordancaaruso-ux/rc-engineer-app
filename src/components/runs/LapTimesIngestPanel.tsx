@@ -45,7 +45,7 @@ export type LapIngestFormValue = {
   urlImportBlocks: UrlImportBlock[];
 };
 
-type IngestTab = "url-auto" | "url-manual" | "manual" | "photo" | "csv";
+type IngestTab = "url-auto" | "url-manual" | "manual" | "photo";
 
 const URL_TABS: IngestTab[] = ["url-auto", "url-manual"];
 
@@ -961,7 +961,6 @@ export function LapTimesIngestPanel({
             ["url-manual", "URL Manual"],
             ["manual", "Manual"],
             ["photo", "Photo"],
-            ["csv", "CSV"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -969,18 +968,15 @@ export function LapTimesIngestPanel({
             type="button"
             role="tab"
             aria-selected={tab === id}
-            disabled={id === "csv"}
             className={cn(
               "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
               tab === id
                 ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-              id === "csv" && "opacity-50 cursor-not-allowed"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
             onClick={() => selectTab(id)}
           >
             {label}
-            {id === "csv" ? " (soon)" : ""}
           </button>
         ))}
       </div>
@@ -1139,8 +1135,7 @@ export function LapTimesIngestPanel({
             </div>
           ) : (
             <p className="ui-label-meta">
-              Select a track with a LiveRC or Speedhive URL on the Tracks page, or use{" "}
-              <span className="text-foreground/90">URL Manual</span> to paste a timing URL.
+              Automatic lap-time ingestion based on the selected track.
             </p>
           )}
         </div>
@@ -1331,10 +1326,6 @@ export function LapTimesIngestPanel({
             </p>
           ) : null}
         </div>
-      ) : null}
-
-      {tab === "csv" ? (
-        <p className="ui-label-meta">CSV import will use the same confirmation step as manual entry.</p>
       ) : null}
 
       {!isUrlTab(tab) ? (

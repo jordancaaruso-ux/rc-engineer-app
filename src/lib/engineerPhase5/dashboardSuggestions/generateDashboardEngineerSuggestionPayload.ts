@@ -1,5 +1,7 @@
 import "server-only";
 
+import { ENGINEER_DEFAULT_MODEL } from "@/lib/engineerPhase5/openaiEngineer";
+
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import type { VehicleDynamicsKbSnippet } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
@@ -10,7 +12,7 @@ function getModel(): string {
   return (
     process.env.ENGINEER_DASHBOARD_SUGGESTIONS_MODEL?.trim() ||
     process.env.ENGINEER_MODEL?.trim() ||
-    "gpt-4o"
+    ENGINEER_DEFAULT_MODEL
   );
 }
 

@@ -8,7 +8,24 @@ Keep **stamped KB** prose **mechanics- and physics-forward**: what changes do to
 
 ## Governance
 
-Per [`AGENTS.md`](../AGENTS.md): **do not** add or edit files under `content/vehicle-dynamics/` without explicit user approval naming the file or requesting KB edits. When a topic below is ready, propose a short `##` section or a new small file with citations-ready prose, get approval, then land the change.
+Per [`AGENTS.md`](../AGENTS.md) (two-tier since 2026-07-07): **top-level** `content/vehicle-dynamics/` files remain founder-approved ground truth — do not add or edit without explicit approval naming the file. Agents MAY write AI-drafted baseline files under `content/vehicle-dynamics/drafts/` freely (provenance banner required; loaders label them; the Engineer cites them hedged). Promotion = Jordan edits/interviews through a draft, then it moves up with the banner removed.
+
+## Batch 1 outcome (2026-07-07 — drafted, claim-checked, corrected, and PROMOTED same day)
+
+Review surface: KB workbench artifact https://claude.ai/code/artifact/a9fb7cfd-8a44-44e5-995c-20d514119595 (claim checks → export JSON → agent applies). Founder verdict: rewrites confirmed (`r2-ok` all six); five promoted, one kept as draft.
+
+| File | Status | Claim-check outcome |
+|---|---|---|
+| `anti-dive-anti-squat.md` | ✅ **Promoted** | Signs + bump trade confirmed; founder point added (anti speeds up load transfer); steady-state framing softened |
+| `ride-height-and-rake.md` | ✅ **Promoted** | Rake + 0.2 mm step confirmed; "lower=grip" hedged; corrected: lower always helps traction rolling |
+| `diff-and-driveline.md` | ✅ **Promoted** | Two inversions corrected: thicker oil normally = on-throttle oversteer; low grip → thinner / more grip → thicker |
+| `steering-geometry-ackermann.md` | ✅ **Promoted** | Rewritten: more ackermann = less steering/easier; founder reduces ackermann for tight layouts; param = link position on rack |
+| `weight-distribution-and-ballast.md` | ✅ **Promoted** (polar/lateral sections carry inline "not yet founder-verified" labels) | Inversion corrected: more front weight = less steering (pendulum effect) |
+| `drafts/track-width-wheel-spacers.md` | 🟡 Draft (founder untested) | Experimental theory — Engineer advises it only as a test to run |
+
+Approved corpus after batch 1: **16 files, ~54K chars** (was 11 / ~38.5K). Batch-2 queue: `spring_gap_*`, `damper_percent_*`, `upstop_*`, `rear_hrb_setting`, `servo_horn_height` (need founder interview on platform semantics first), plus gap-driven topics as they surface.
+
+Known platform-specific keys deliberately NOT drafted (semantics need founder interview first): `spring_gap_*` (preload), `damper_percent_*`, `upstop_*`, `rear_hrb_setting`, `servo_horn_height`.
 
 ## Suggested physics-first topics (fill over time)
 

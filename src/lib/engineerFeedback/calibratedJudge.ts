@@ -165,32 +165,9 @@ function parseJudgeJson(content: string): CalibratedJudgeResult | null {
   return { score0to10: score, tags, rationale };
 }
 
-export async function judgeEngineerAnswer(params: {
-  question: string;
-  answer: string;
-  exemplars: JudgeExemplar[];
-  kbSections?: string[];
-}): Promise<CalibratedJudgeResult> {
+async function postJudgeCompletion(body: string): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-
-  const system = `${JUDGE_SYSTEM_BASE}\n\n${formatExemplars(params.exemplars)}`;
-  const userPayload = {
-    question: params.question,
-    answer: params.answer,
-    kbSectionsRetrieved: params.kbSections ?? [],
-  };
-
-  const body = JSON.stringify({
-    model: judgeModel(),
-    temperature: 0.1,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: JSON.stringify(userPayload) },
-    ],
-  });
-
   const maxAttempts = maxOpenAiRateLimitAttempts();
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -214,9 +191,167 @@ export async function judgeEngineerAnswer(params: {
       }
       throw new Error(data.error?.message ?? `Judge OpenAI error (${res.status})`);
     }
-    const parsed = parseJudgeJson(data.choices?.[0]?.message?.content ?? "");
-    if (!parsed) throw new Error("Judge returned unparseable JSON");
-    return parsed;
+    return data.choices?.[0]?.message?.content ?? "";
   }
   throw new Error("Judge rate-limited after retries");
+}
+
+export async function judgeEngineerAnswer(params: {
+  question: string;
+  answer: string;
+  exemplars: JudgeExemplar[];
+  kbSections?: string[];
+}): Promise<CalibratedJudgeResult> {
+  const system = `${JUDGE_SYSTEM_BASE}\n\n${formatExemplars(params.exemplars)}`;
+  const userPayload = {
+    question: params.question,
+    answer: params.answer,
+    kbSectionsRetrieved: params.kbSections ?? [],
+  };
+
+  const body = JSON.stringify({
+    model: judgeModel(),
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify(userPayload) },
+    ],
+  });
+
+  const parsed = parseJudgeJson(await postJudgeCompletion(body));
+  if (!parsed) throw new Error("Judge returned unparseable JSON");
+  return parsed;
+}
+
+/**
+ * Repeat-sampled absolute judging: N independent samples, median score, tags kept when
+ * a majority of samples agree. Absolute 0–10 LLM scores swing ±1–3 on equivalent
+ * answers (observed 2026-07-06); the median cuts that noise at N× judge cost.
+ */
+export async function judgeEngineerAnswerSampled(
+  params: {
+    question: string;
+    answer: string;
+    exemplars: JudgeExemplar[];
+    kbSections?: string[];
+  },
+  samples: number
+): Promise<CalibratedJudgeResult & { sampleScores: number[] }> {
+  const n = Math.max(1, Math.min(samples, 7));
+  const results: CalibratedJudgeResult[] = [];
+  for (let i = 0; i < n; i++) {
+    results.push(await judgeEngineerAnswer(params));
+  }
+  const scores = results.map((r) => r.score0to10).sort((a, b) => a - b);
+  const median = scores[Math.floor((scores.length - 1) / 2)];
+  const tagCounts = new Map<JudgeTag, number>();
+  for (const r of results) for (const t of r.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+  const majorityTags = [...tagCounts.entries()]
+    .filter(([, c]) => c * 2 > n)
+    .map(([t]) => t);
+  // Rationale from the sample that landed on the median score.
+  const medianResult = results.find((r) => r.score0to10 === median) ?? results[0];
+  return {
+    score0to10: median,
+    tags: majorityTags,
+    rationale: medianResult.rationale,
+    sampleScores: scores,
+  };
+}
+
+export type PairwiseVerdict = {
+  /** "A" | "B" | "tie" after position-bias reconciliation. */
+  winner: "A" | "B" | "tie";
+  /** Set when both orderings agreed on the winner. */
+  agreedBothOrders: boolean;
+  rationaleFirstOrder: string;
+  rationaleSecondOrder: string;
+};
+
+const PAIRWISE_SYSTEM_SUFFIX = `
+
+PAIRWISE MODE: You are given ONE question and TWO candidate answers (ANSWER_1 and ANSWER_2) from different versions of the engineer AI. Decide which answer the founder would rate higher on his scale, applying the ranked failure modes and exemplars above. A tie is a legitimate verdict when the answers are substantively equivalent — do not force a winner over cosmetic differences.
+
+Return ONLY valid JSON:
+{
+  "winner": "1" | "2" | "tie",
+  "rationale": "2-3 sentences naming the deciding rubric points"
+}`;
+
+function parsePairwiseJson(content: string): { winner: "1" | "2" | "tie"; rationale: string } | null {
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(content) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const w = obj.winner;
+  if (w !== "1" && w !== "2" && w !== "tie") return null;
+  return { winner: w, rationale: typeof obj.rationale === "string" ? obj.rationale.trim() : "" };
+}
+
+async function judgePairOnce(
+  question: string,
+  first: string,
+  second: string,
+  exemplars: JudgeExemplar[]
+): Promise<{ winner: "1" | "2" | "tie"; rationale: string }> {
+  const system = `${JUDGE_SYSTEM_BASE}${PAIRWISE_SYSTEM_SUFFIX}\n\n${formatExemplars(exemplars)}`;
+  const body = JSON.stringify({
+    model: judgeModel(),
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: JSON.stringify({ question, ANSWER_1: first, ANSWER_2: second }),
+      },
+    ],
+  });
+  const parsed = parsePairwiseJson(await postJudgeCompletion(body));
+  if (!parsed) throw new Error("Pairwise judge returned unparseable JSON");
+  return parsed;
+}
+
+/**
+ * Pairwise comparison — the reliable instrument for A/B experiment decisions. LLM judges
+ * are far more consistent at "which is better?" than at absolute scores. Judged twice
+ * with the answers swapped; a disagreement between orderings (position bias) resolves
+ * to a tie.
+ */
+export async function judgeEngineerAnswerPairwise(params: {
+  question: string;
+  answerA: string;
+  answerB: string;
+  exemplars: JudgeExemplar[];
+}): Promise<PairwiseVerdict> {
+  const firstOrder = await judgePairOnce(params.question, params.answerA, params.answerB, params.exemplars);
+  const secondOrder = await judgePairOnce(params.question, params.answerB, params.answerA, params.exemplars);
+
+  // Map each ordering's verdict back to A/B labels.
+  const v1: "A" | "B" | "tie" =
+    firstOrder.winner === "tie" ? "tie" : firstOrder.winner === "1" ? "A" : "B";
+  const v2: "A" | "B" | "tie" =
+    secondOrder.winner === "tie" ? "tie" : secondOrder.winner === "1" ? "B" : "A";
+
+  let winner: "A" | "B" | "tie";
+  let agreedBothOrders = false;
+  if (v1 === v2) {
+    winner = v1;
+    agreedBothOrders = true;
+  } else if (v1 === "tie") {
+    winner = v2;
+  } else if (v2 === "tie") {
+    winner = v1;
+  } else {
+    winner = "tie"; // Opposite winners across orderings = position bias, not signal.
+  }
+  return {
+    winner,
+    agreedBothOrders,
+    rationaleFirstOrder: firstOrder.rationale,
+    rationaleSecondOrder: secondOrder.rationale,
+  };
 }

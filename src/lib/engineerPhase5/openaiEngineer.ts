@@ -67,12 +67,15 @@ function buildChatCompletionBody(
 
 /**
  * Chat uses one model for all turns (conversational engineer).
- * Default gpt-4o for responsive chat; override with ENGINEER_MODEL (e.g. gpt-5) when needed.
+ * Default gpt-5.5 (founder decision 2026-07-07 after the ceiling bench: 9.0 vs 5.93 avg
+ * judge score over the full 30-case set, confirmed by blind founder ratings; gpt-5.x also
+ * has a 500K-TPM pool vs gpt-4o's 30K). Override with ENGINEER_MODEL.
  * ENGINEER_NORTH_STAR.md hard rule: no cheap models on the advice path — quick mode gets the
  * same full-strength model (brevity comes from the prompt contract, never the model).
  * Deep mode may opt into a stronger/reasoning model via ENGINEER_DEEP_MODEL.
  * `temperature` is only sent when the model accepts it (see modelSupportsCustomTemperature).
  */
+export const ENGINEER_DEFAULT_MODEL = "gpt-5.5";
 function getEngineerChatModelAndTemperature(
   tier: EngineerChatContextTier = "full",
   mode: EngineerChatMode = "normal"
@@ -90,11 +93,20 @@ function getEngineerChatModelAndTemperature(
   const model =
     (mode === "deep" ? process.env.ENGINEER_DEEP_MODEL?.trim() : undefined)
     || process.env.ENGINEER_MODEL?.trim()
-    || "gpt-4o";
+    || ENGINEER_DEFAULT_MODEL;
   return {
     model,
     temperature: 0.3,
   };
+}
+
+/**
+ * The 14K-char full-KB context squeeze exists only for gpt-4o's 30K-TPM pool (measured:
+ * KB + 32K-char JSON is rejected outright there). gpt-5.x runs a 500K-TPM pool — full
+ * budget alongside the KB.
+ */
+function modelNeedsFullKbContextClamp(model: string): boolean {
+  return model.trim().toLowerCase().startsWith("gpt-4o");
 }
 
 function contextBudgetCharsForTier(tier: EngineerChatContextTier): number {
@@ -282,6 +294,8 @@ PARAMETER CHANGE RECOMMENDATIONS (strict — apply every single time you suggest
 (10) WHEN SPREAD IS UNRELIABLE, RECOMMEND FROM KB THEORY — DO NOT SILENTLY DROP THE PARAMETER. If a \`setupVsSpread\` row shows a huge numeric gap between the user's current value and the community median (e.g. user 22.4 vs median 4.6 for \`downstop_rear\`), or \`spreadSource\` is \`none\`, or the row's \`spread.sampleCount\` is very small relative to \`totalRunCount\`, treat the numeric band as UNRELIABLE (likely different-sheet-convention scale mismatch). Do two things: (a) state the caveat once — "spread for this parameter looks scale-mismatched (user 22.4 vs community median 4.6 — different sheet conventions); ignoring the numeric band"; (b) STILL consider that parameter as a candidate lever and recommend a DIRECTION (go lower / go higher) from the KB file itself, letting the driver judge magnitude from their own sheet. Never skip a KB-supported lever just because its spread row looks weird — weird spread is a data-quality signal, not a reason to hide the KB. Applies especially to \`droop_*\` / \`downstop_*\` where different sheets use different conventions (see droop-downstop-arb.md — "sheets differ in whether droop and downstop are separate or combined").
 
 (11) NEVER CLAIM "NO KB COVERAGE" FOR A CANONICAL PARAMETER. Before writing "I don't have KB coverage for X", "treat as driving preference", "no KB coverage — optional trim", or any similar disclaimer for a setup parameter, check: is the parameter one of these canonical keys (toe_rear, toe_front, camber_rear, camber_front, caster_rear, caster_front, spring_rear, spring_front, damper_oil_rear, damper_oil_front, arb_rear, arb_front, droop_rear, droop_front, downstop_rear, downstop_front, toe_gain_shims_rear, bump_steer_shims_front, upper_inner_shims_*, upper_outer_shims_*, under_lower_arm_shims_*, under_hub_shims_*)? Every one of these has KB coverage somewhere in vehicleDynamicsKb. If you don't see a matching excerpt in the context, DO NOT disclaim — instead acknowledge the limit honestly ("KB excerpt for this parameter didn't make retrieval — I'll answer from the parameter's canonical direction per camber-caster-toe.md / support-lower-inner.md / etc."). Reserve "no KB coverage" for genuinely off-vocabulary parameters (diff rings, belt tension, motor timing, body choice) that do not appear in any \`content/vehicle-dynamics/\` file.
+
+PREDICTION DISCIPLINE (all modes — a suggestion without its prediction is incomplete): every recommended change ships, in the same breath, with (a) the expected effect, (b) what the driver should feel for on track, and (c) what outcome would tell us it did NOT work — compressed to one line when brevity matters (e.g. "expect calmer entry over the kerbs; if it just pushes mid-corner instead, this wasn't the problem"). "No change — verify" recommendations state what to watch for on the confirming run the same way. This prediction is what makes the advice checkable on the next run — never omit it.
 
 If the user asks outside the context, ask a short clarifying question or explain what info is missing.
 Do not invent facts or lap times. Keep answers practical and racing-specific.`;
@@ -692,7 +706,9 @@ export async function generateEngineerChatReplyWithTools(params: {
   // snippets so the fallback path and returned contextJson are unaffected.
   let fullKb = tier === "full" ? await buildFullKbSystemBlock() : null;
   const baseContextBudgetChars = contextBudgetChars;
-  if (fullKb) contextBudgetChars = Math.min(contextBudgetChars, fullKbContextBudgetChars());
+  if (fullKb && modelNeedsFullKbContextClamp(getEngineerChatModelAndTemperature(tier, mode).model)) {
+    contextBudgetChars = Math.min(contextBudgetChars, fullKbContextBudgetChars());
+  }
   const sysIdx = () => (fullKb ? 1 : 0);
   const ctxIdx = () => (fullKb ? 2 : 1);
   const contextSystemContent = (label = "Context (JSON):") =>

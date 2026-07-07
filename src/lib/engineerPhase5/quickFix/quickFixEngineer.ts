@@ -1,5 +1,7 @@
 import "server-only";
 
+import { ENGINEER_DEFAULT_MODEL } from "@/lib/engineerPhase5/openaiEngineer";
+
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import {
   computeOpenAiRetryDelayMs,
@@ -27,7 +29,7 @@ function getModel(): string {
   return (
     process.env.ENGINEER_QUICK_FIX_MODEL?.trim() ||
     process.env.ENGINEER_MODEL?.trim() ||
-    "gpt-4o"
+    ENGINEER_DEFAULT_MODEL
   );
 }
 

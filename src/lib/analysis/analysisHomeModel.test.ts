@@ -54,6 +54,18 @@ test("computeAnalysisRunMetrics: empty laps → nulls, zero count", () => {
   assert.equal(metrics.best, null);
   assert.equal(metrics.median, null);
   assert.equal(metrics.cleanLapCount, 0);
+  assert.equal(metrics.consistencyScore, null);
+  assert.equal(metrics.mistakeCount, null);
+});
+
+test("computeAnalysisRunMetrics: consistency + mistakes on a real run", () => {
+  // 8 steady laps + one blow-up: consistency is a score, the spike is a mistake.
+  const metrics = computeAnalysisRunMetrics({
+    lapTimes: [25.0, 25.1, 25.0, 25.2, 25.1, 25.0, 25.1, 25.0, 31.5],
+  });
+  assert.ok(metrics.consistencyScore != null && metrics.consistencyScore > 0);
+  assert.ok(metrics.consistencyScore! <= 100);
+  assert.equal(metrics.mistakeCount, 1);
 });
 
 test("shortRunLabel: code wins, short label used, else R{n}", () => {

@@ -53,6 +53,7 @@ Single place to track product notes from app usage (2026-04-27). Edit **Priority
 | FB-20 | Sync to MyLaps | Integration to pull or link MyLaps timing data. | Integrations | L | 21 | Not started |
 | FB-21 | Day debrief | End-of-day or post-event debrief flow (summary, notes, Engineer hook — scope TBD). | Product | L | 22 | Not started |
 | FB-22 | Balance image top down | Setup or help UI: balance diagram viewed from **top** (orientation / asset update). | Content / UI | M | 3 | Not started |
+| FB-23 | Per-car swiping on widget cards | Designed, not built. Extend the `PagedCard` widget-face axis to swipe **between cars/categories**: dashboard summary (all-cars → per-car overview), dashboard last-run (latest run of each car), analysis session-trend (form per category). Deferred until multi-category users are real (interview 2026-07-07). Faces per card already ship; this adds a car dimension. | Dashboard / Analysis | M | 23 | Designed — deferred |
 
 **Priority column:** Draft stack rank for discussion (1 = ship first). Reorder anytime; keep numbers unique per row.
 
@@ -88,6 +89,7 @@ Work through in **Priority** order from the table (after you fill it in). Check 
 - [ ] FB-20 MyLaps sync  
 - [ ] FB-21 Day debrief  
 - [ ] FB-22 Balance image top-down  
+- [ ] FB-23 Per-car swiping on widget cards (designed 2026-07-07, deferred until multi-category users)  
 
 ## Related code (hints for implementers)
 
@@ -97,5 +99,6 @@ Work through in **Priority** order from the table (after you fill it in). Check 
 | FB-16 | `src/components/dashboard/DashboardHome.tsx`, `src/app/runs/history/page.tsx` (`focusRun` query), `src/components/runs/RunHistoryTable.tsx` |
 | FB-14 | `src/components/setup-documents/SetupCalibrationEditorClient.tsx` |
 | FB-11 | `src/lib/setupAggregations/`, rebuild via `POST /api/setup-aggregations/rebuild` per `AGENTS.md` |
+| FB-23 | `src/components/ui/PagedCard.tsx` (add a car axis), `DashboardSummaryCard.tsx`, `DashboardPreviousRunCard.tsx`, `SessionTrendCard.tsx`; per-car data already grouped in `dashboardSummary.ts` / `analysisHomeModel.ts` (`carOptions`) |
 
 Do not treat `content/vehicle-dynamics/` or `src/lib/engineerPhase5/parameterEffects/catalog.ts` as part of this backlog unless an item explicitly targets KB text.

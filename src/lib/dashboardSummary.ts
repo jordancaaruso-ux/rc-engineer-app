@@ -54,6 +54,17 @@ export type DashboardSummary = {
   tracks: number;
   /** Best-lap trend at the most-active track+class, or null when not enough data. */
   pace: DashboardPaceTrend | null;
+  /**
+   * Best-lap trends for every track+class with ≥2 timed runs in the window,
+   * most-active first (`pace` is always the first entry). Feeds the summary
+   * card's per-track pace face.
+   */
+  paceByTrack: DashboardPaceTrend[];
+  /**
+   * Runs per local calendar day across the current window, oldest → newest
+   * (length = windowDays; today is the last entry). Feeds the activity face.
+   */
+  activityByDay: number[];
 };
 
 /** Local-day key (YYYY-MM-DD) in the given IANA zone; falls back to UTC on a bad zone. */
@@ -92,6 +103,15 @@ export function computeDashboardSummary(
   const activeDayKeys = new Set<string>();
   const trackIds = new Set<string>();
 
+  // Map each of the window's local calendar days to its slot, oldest → newest.
+  // (DST can make two offsets share a key; last write wins, which is harmless.)
+  const dayIndexByKey = new Map<string, number>();
+  for (let i = 0; i < windowDays; i++) {
+    const day = new Date(now.getTime() - (windowDays - 1 - i) * DAY_MS);
+    dayIndexByKey.set(localDayKey(day, timeZone), i);
+  }
+  const activityByDay: number[] = new Array(windowDays).fill(0);
+
   // Group current-window runs by track+class for the pace trend.
   const paceGroups = new Map<string, { trackName: string; className: string | null; runs: SummaryRunInput[] }>();
 
@@ -107,7 +127,10 @@ export function computeDashboardSummary(
     drivingSeconds[bucket] += r.drivingSeconds;
 
     if (inCurrent) {
-      activeDayKeys.add(localDayKey(r.effectiveAt, timeZone));
+      const dayKey = localDayKey(r.effectiveAt, timeZone);
+      activeDayKeys.add(dayKey);
+      const dayIndex = dayIndexByKey.get(dayKey);
+      if (dayIndex != null) activityByDay[dayIndex] += 1;
       if (r.trackId) trackIds.add(r.trackId);
       if (r.trackId && r.bestLapSeconds != null && Number.isFinite(r.bestLapSeconds)) {
         const key = `${r.trackId}::${r.className ?? ""}`;
@@ -125,7 +148,7 @@ export function computeDashboardSummary(
     }
   }
 
-  const pace = pickPaceTrend(paceGroups);
+  const paceByTrack = rankPaceTrends(paceGroups);
 
   return {
     windowDays,
@@ -135,49 +158,42 @@ export function computeDashboardSummary(
     drivingSeconds,
     activeDays: activeDayKeys.size,
     tracks: trackIds.size,
-    pace,
+    pace: paceByTrack[0] ?? null,
+    paceByTrack,
+    activityByDay,
   };
 }
 
 /**
- * Pick the track+class with the most timed runs in the window (tie-break: the one
- * whose latest run is most recent) and trend its best lap. Needs ≥2 runs to be a
- * trend at all.
+ * Trend the best lap of every track+class with ≥2 timed runs in the window,
+ * ranked by run count (tie-break: the group whose latest run is most recent).
+ * The first entry is the headline `pace` trend.
  */
-function pickPaceTrend(
+function rankPaceTrends(
   groups: Map<string, { trackName: string; className: string | null; runs: SummaryRunInput[] }>
-): DashboardPaceTrend | null {
-  let best: { trackName: string; className: string | null; runs: SummaryRunInput[] } | null = null;
-  for (const g of groups.values()) {
-    if (g.runs.length < 2) continue;
-    if (!best) {
-      best = g;
-      continue;
-    }
-    if (g.runs.length !== best.runs.length) {
-      if (g.runs.length > best.runs.length) best = g;
-      continue;
-    }
-    // Tie on count → prefer the group with the more recent latest run.
-    const gLatest = Math.max(...g.runs.map((r) => r.effectiveAt.getTime()));
-    const bLatest = Math.max(...best.runs.map((r) => r.effectiveAt.getTime()));
-    if (gLatest > bLatest) best = g;
-  }
-  if (!best) return null;
+): DashboardPaceTrend[] {
+  const ranked = [...groups.values()]
+    .filter((g) => g.runs.length >= 2)
+    .map((g) => {
+      const ordered = [...g.runs].sort((a, b) => a.effectiveAt.getTime() - b.effectiveAt.getTime());
+      return { group: g, ordered, latest: ordered[ordered.length - 1].effectiveAt.getTime() };
+    })
+    .sort((a, b) => b.ordered.length - a.ordered.length || b.latest - a.latest);
 
-  const ordered = [...best.runs].sort((a, b) => a.effectiveAt.getTime() - b.effectiveAt.getTime());
-  const spark = ordered.map((r) => r.bestLapSeconds as number);
-  const firstBestLap = spark[0];
-  const lastBestLap = spark[spark.length - 1];
-  return {
-    trackName: best.trackName,
-    className: best.className,
-    runsCount: ordered.length,
-    firstBestLap,
-    lastBestLap,
-    deltaSeconds: lastBestLap - firstBestLap,
-    spark,
-  };
+  return ranked.map(({ group, ordered }) => {
+    const spark = ordered.map((r) => r.bestLapSeconds as number);
+    const firstBestLap = spark[0];
+    const lastBestLap = spark[spark.length - 1];
+    return {
+      trackName: group.trackName,
+      className: group.className,
+      runsCount: ordered.length,
+      firstBestLap,
+      lastBestLap,
+      deltaSeconds: lastBestLap - firstBestLap,
+      spark,
+    };
+  });
 }
 
 /** Human wheel-time: "2h 14m", "47m", or "3m" (rounds to whole minutes; "0m" when none). */

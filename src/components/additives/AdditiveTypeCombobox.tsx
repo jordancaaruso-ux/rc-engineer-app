@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { useAnchoredMenuPosition } from "@/components/ui/SearchableSelect";
 
 export type AdditiveTypeOption = {
   id: string;
@@ -42,6 +44,8 @@ export function AdditiveTypeCombobox({
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuPos = useAnchoredMenuPosition(isOpen, containerRef);
 
   const loadOptions = useCallback(async (q: string) => {
     setLoading(true);
@@ -102,10 +106,10 @@ export function AdditiveTypeCombobox({
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        setIsOpen(false);
-        setShowCreate(false);
-      }
+      const t = e.target as Node;
+      if (containerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setIsOpen(false);
+      setShowCreate(false);
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
@@ -196,11 +200,22 @@ export function AdditiveTypeCombobox({
         }}
       />
 
-      {isOpen ? (
+      {isOpen && menuPos
+        ? createPortal(
+            <div
+              ref={menuRef}
+              style={{
+                position: "fixed",
+                top: menuPos.top,
+                left: menuPos.left,
+                width: menuPos.width,
+                zIndex: 60,
+              }}
+            >
         <ul
           ref={listRef}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-background shadow-lg text-sm"
+          className="max-h-56 w-full overflow-auto rounded-md border border-border bg-background shadow-lg text-sm"
         >
           <li>
             {allowClear ? (
@@ -283,7 +298,10 @@ export function AdditiveTypeCombobox({
             </li>
           ) : null}
         </ul>
-      ) : null}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

@@ -2,9 +2,10 @@
 
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLine } from "@/lib/runPickerFormat";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function RunPickerSelect({
-  label,
+  label = "",
   runs,
   value,
   onChange,
@@ -12,7 +13,7 @@ export function RunPickerSelect({
   disabled,
   formatLine = formatRunPickerLine,
 }: {
-  label: string;
+  label?: string;
   runs: RunPickerRun[];
   value: string;
   onChange: (runId: string) => void;
@@ -26,19 +27,18 @@ export function RunPickerSelect({
       {label ? (
         <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">{label}</div>
       ) : null}
-      <select
-        className="w-full max-w-2xl rounded-md border border-border bg-card px-3 py-2 text-xs outline-none font-mono"
-        value={value}
+      <SearchableSelect
+        aria-label={label || placeholder}
+        className="max-w-2xl"
+        placeholder={placeholder}
+        clearable
+        clearLabel={placeholder}
+        triggerMono
         disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">{placeholder}</option>
-        {runs.map((r) => (
-          <option key={r.id} value={r.id} title={formatLine(r)}>
-            {formatLine(r)}
-          </option>
-        ))}
-      </select>
+        value={value}
+        onChange={onChange}
+        options={runs.map((r) => ({ value: r.id, label: formatLine(r) }))}
+      />
     </div>
   );
 }
