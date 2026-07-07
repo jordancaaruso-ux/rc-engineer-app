@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
@@ -26,6 +26,7 @@ import {
 } from "@/lib/setupCalibrations/autoPickImageCalibration";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
 import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
+import { ensureSheetModelForUpload } from "@/lib/setupExtractAi/ensureSheetModelForUpload";
 import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 
@@ -274,6 +275,45 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   }
 
+  // AI front door (SETUP_UPLOAD_NORTH_STAR.md Stage 1.4/1.5, flag-gated): an image no
+  // calibration recognized → read the printed brand/model from the sheet, match the global
+  // model catalog, or — genuinely new car — draft its schema and create a provisional
+  // model (isAuthorized:false) + car so the upload proceeds instead of dead-ending.
+  let aiFrontDoorNote: string | null = null;
+  if (
+    process.env.SETUP_AI_EXTRACT === "1"
+    && !detectedModelId
+    && !outcome.pickedCalibrationId
+    && mimeType.startsWith("image/")
+  ) {
+    try {
+      const ensured = await ensureSheetModelForUpload({
+        userId: user.id,
+        imageBytes: Buffer.from(bytes),
+        mimeType,
+      });
+      if (ensured.outcome === "matched" || ensured.outcome === "created") {
+        detectedModelId = ensured.modelId;
+        detectedModelName = ensured.modelName;
+        setupSheetModelId = ensured.modelId;
+        const modelRow = await prisma.setupSheetModel.findUnique({
+          where: { id: ensured.modelId },
+          select: { slug: true },
+        });
+        if (modelRow) setupSheetTemplate = templateKeyFromModelSlug(modelRow.slug);
+        if (ensured.outcome === "created") {
+          carId = ensured.carId;
+          aiFrontDoorNote = `Identified as ${ensured.identifiedName} — new to the app, so a car and its setup sheet (${ensured.fieldCount} fields) were created for you.`;
+        } else {
+          aiFrontDoorNote = `Identified from the sheet as ${ensured.identifiedName}.`;
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[setup-documents/quick-create] ai front door error=${msg.slice(0, 300)}`);
+    }
+  }
+
   if (!carId && detectedModelId) {
     const cars = await prisma.car.findMany({
       where: { userId: user.id, setupSheetModelId: detectedModelId },
@@ -323,6 +363,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     (mimeType === PDF_MIME || mimeType.startsWith("image/"));
 
   // Persist a plain-language note (shown on the review screen via calibrationResolvedDebug).
+  if (!pickUserNote && aiFrontDoorNote) {
+    pickUserNote = aiFrontDoorNote;
+  }
   if (!pickUserNote) {
     if (carCandidates.length > 1) {
       pickUserNote = `Recognized as ${detectedModelName ?? "a known chassis"} — choose which car to attach it to.`;
@@ -400,15 +443,31 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // Run the parse/map pipeline inline so the response can report final status without the client
   // needing to poll. Failure here is non-fatal — the document still exists for manual review.
+  // EXCEPT the AI front-door path: its vision read takes minutes (longer than any sane request
+  // timeout), so it runs after the response and the document page live-refreshes until done.
   let needsReview = false;
   let needsReviewReason: string | null = null;
-  try {
-    await processSetupDocumentImport({ docId: created.id, userId: user.id });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+  const aiAsyncExtraction = aiFrontDoorNote !== null;
+  if (aiAsyncExtraction) {
     needsReview = true;
-    needsReviewReason = `Parse failed: ${msg.slice(0, 200)}`;
-    console.warn(`[setup-documents/quick-create] doc=${created.id} processImport error=${msg}`);
+    needsReviewReason = `${aiFrontDoorNote} The setup is being read now — values appear on the document page in a minute or two.`;
+    after(async () => {
+      try {
+        await processSetupDocumentImport({ docId: created.id, userId: user.id });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`[setup-documents/quick-create] doc=${created.id} async processImport error=${msg}`);
+      }
+    });
+  } else {
+    try {
+      await processSetupDocumentImport({ docId: created.id, userId: user.id });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      needsReview = true;
+      needsReviewReason = `Parse failed: ${msg.slice(0, 200)}`;
+      console.warn(`[setup-documents/quick-create] doc=${created.id} processImport error=${msg}`);
+    }
   }
 
   const latest = await prisma.setupDocument.findUnique({
@@ -420,8 +479,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       carId: true,
       createdSetupId: true,
       calibrationProfileId: true,
+      importDiagnosticJson: true,
     },
   });
+  // When the AI reader ran (image, no calibration), surface its result as the review reason.
+  const aiDiag =
+    latest?.importDiagnosticJson && typeof latest.importDiagnosticJson === "object"
+      ? (latest.importDiagnosticJson as { kind?: string; importedCount?: number; flaggedKeys?: unknown[] })
+      : null;
+  const aiExtractionRan = aiDiag?.kind === "ai_extraction_diagnostic_v1";
   const parseStatus = (latest?.parseStatus ?? "PENDING") as QuickCreateResponse["parseStatus"];
   const calibrationAmbiguous = outcome.pickSource === "ambiguous_suggestion";
 
@@ -431,10 +497,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     needsReview = true;
     needsReviewReason =
       needsReviewReason
-      ?? (mimeType.startsWith("image/")
-        ? "No image calibration matched — draw regions once to teach the app this sheet."
-        : pickUserNote
-          ?? "This chassis isn’t recognized from the sheet layout. Pick a chassis type and calibrate it once to teach the app.");
+      ?? (aiExtractionRan
+        ? `AI read ${aiDiag?.importedCount ?? 0} values from the sheet — glance over the ${Array.isArray(aiDiag?.flaggedKeys) ? aiDiag.flaggedKeys.length : 0} flagged fields (mostly checkboxes) before creating the setup.`
+        : mimeType.startsWith("image/")
+          ? "No image calibration matched — draw regions once to teach the app this sheet."
+          : pickUserNote
+            ?? "This chassis isn’t recognized from the sheet layout. Pick a chassis type and calibrate it once to teach the app.");
   }
   if (calibrationModelMismatch && pickUserNote) {
     needsReview = true;

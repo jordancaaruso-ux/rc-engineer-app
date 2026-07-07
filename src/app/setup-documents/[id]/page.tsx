@@ -6,6 +6,8 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDocumentReviewClient";
+import { AutoRefreshWhileProcessing } from "@/components/setup-documents/AutoRefreshWhileProcessing";
+import { AiExtractionReviewPanel, type AiReviewField } from "@/components/setup-documents/AiExtractionReviewPanel";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { loadSetupSheetModelById } from "@/lib/setupSheetModels/resolveModelForCar";
@@ -135,6 +137,80 @@ export default async function SetupDocumentDetailPage({
   });
 
   const isImage = doc.sourceType === "IMAGE" || (doc.mimeType ?? "").startsWith("image/");
+
+  // AI-read documents get the side-by-side review panel: model schema supplies labels,
+  // sections, and choice options; the AI diagnostic supplies confidence + flagged keys.
+  let aiReviewFields: AiReviewField[] | null = null;
+  const aiDiag =
+    doc.importDiagnosticJson && typeof doc.importDiagnosticJson === "object"
+      ? (doc.importDiagnosticJson as {
+          kind?: string;
+          confidence?: Record<string, number>;
+          flaggedKeys?: string[];
+          disagreedKeys?: string[];
+        })
+      : null;
+  let aiReviewSheetAspect: number | undefined;
+  if (aiDiag?.kind === "ai_extraction_diagnostic_v1" && modelIdForTemplate && isImage) {
+    const model = await loadSetupSheetModelById(user.id, modelIdForTemplate);
+    if (model) {
+      const parsed =
+        doc.parsedDataJson && typeof doc.parsedDataJson === "object"
+          ? (doc.parsedDataJson as Record<string, unknown>)
+          : {};
+      const flaggedSet = new Set(Array.isArray(aiDiag.flaggedKeys) ? aiDiag.flaggedKeys : []);
+      const disagreedSet = new Set(Array.isArray(aiDiag.disagreedKeys) ? aiDiag.disagreedKeys : []);
+      const confidence = aiDiag.confidence ?? {};
+      // Evidence-crop regions: the model's blank-sheet calibration knows where each field's
+      // box sits on the sheet (SETUP_UPLOAD_NORTH_STAR.md Stage 2A). Groups use the union
+      // bounding box of their option checkboxes.
+      const regionByKey = new Map<string, { xPct: number; yPct: number; wPct: number; hPct: number }>();
+      if (defaultCalibrationIdForDocModel) {
+        const calRow = await prisma.setupSheetCalibration.findUnique({
+          where: { id: defaultCalibrationIdForDocModel },
+          select: { calibrationDataJson: true },
+        });
+        const imageCal = calRow
+          ? normalizeCalibrationData(calRow.calibrationDataJson).imageCalibration
+          : undefined;
+        if (imageCal) {
+          aiReviewSheetAspect = imageCal.reference.widthPx / Math.max(1, imageCal.reference.heightPx);
+          for (const cf of imageCal.fields) {
+            if (cf.kind === "text" || cf.kind === "checkbox") {
+              regionByKey.set(cf.key, cf.region);
+            } else {
+              let x0 = 1;
+              let y0 = 1;
+              let x1 = 0;
+              let y1 = 0;
+              for (const o of cf.options) {
+                x0 = Math.min(x0, o.region.xPct);
+                y0 = Math.min(y0, o.region.yPct);
+                x1 = Math.max(x1, o.region.xPct + o.region.wPct);
+                y1 = Math.max(y1, o.region.yPct + o.region.hPct);
+              }
+              if (x1 > x0 && y1 > y0) {
+                regionByKey.set(cf.key, { xPct: x0, yPct: y0, wPct: x1 - x0, hPct: y1 - y0 });
+              }
+            }
+          }
+        }
+      }
+      aiReviewFields = model.schema.fields
+        .filter((f) => f.showInSetupSheet !== false)
+        .map((f) => ({
+          key: f.key,
+          label: f.displayLabel,
+          section: f.sectionTitle,
+          value: typeof parsed[f.key] === "string" ? (parsed[f.key] as string) : parsed[f.key] != null ? String(parsed[f.key]) : "",
+          confidence: typeof confidence[f.key] === "number" ? confidence[f.key] : 1,
+          flagged: flaggedSet.has(f.key),
+          disagreed: disagreedSet.has(f.key),
+          ...(f.groupedOptionLabels?.length ? { options: f.groupedOptionLabels } : {}),
+          ...(regionByKey.has(f.key) ? { region: regionByKey.get(f.key)! } : {}),
+        }));
+    }
+  }
   const linkedCalibrationFields = doc.calibrationProfileId
     ? (() => {
         const cal = calibrations.find((c) => c.id === doc.calibrationProfileId);
@@ -152,7 +228,7 @@ export default async function SetupDocumentDetailPage({
           <p className="page-subtitle">Check the imported values look right, then return to Setup.</p>
         </div>
       </header>
-      {showImageCalibrateCta ? (
+      {showImageCalibrateCta && !aiReviewFields ? (
         <div className="page-body pb-0">
           <CardPanel contentClassName="p-3 flex items-center justify-between gap-3">
             <div className="text-xs">
@@ -170,6 +246,18 @@ export default async function SetupDocumentDetailPage({
             </Link>
           </CardPanel>
         </div>
+      ) : null}
+      <AutoRefreshWhileProcessing
+        active={doc.importStatus === "PENDING" || doc.importStatus === "PROCESSING"}
+      />
+      {aiReviewFields ? (
+        <AiExtractionReviewPanel
+          docId={doc.id}
+          previewUrl={`/api/setup-documents/${doc.id}/file`}
+          fields={aiReviewFields}
+          createdSetupId={doc.createdSetupId}
+          sheetAspect={aiReviewSheetAspect}
+        />
       ) : null}
       <SetupDocumentReviewClient
         doc={{

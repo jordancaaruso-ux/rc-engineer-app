@@ -52,6 +52,9 @@ function isTransientDbDisconnect(err: unknown): boolean {
     || msg.includes("Connection terminated unexpectedly")
     || msg.includes("ECONNRESET")
     || msg.includes("ETIMEDOUT")
+    // Neon serverless auto-suspends when idle; the wake-up drops the first connection
+    // (Prisma P1001). This is what silently ate an AI-extraction diagnostic on 2026-07-06.
+    || msg.includes("Can't reach database server")
   );
 }
 
@@ -642,30 +645,40 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
           if (ai.ran) {
             aiRan = true;
             normalizedParsedData = normalizeParsedSetupData(ai.parsedData);
-            await prisma.setupDocument.update({
-              where: { id: doc.id },
-              data: {
-                parseStatus: ai.importedCount >= 10 ? "PARSED" : ai.importedCount > 0 ? "PARTIAL" : "FAILED",
-                importOutcome: "COMPLETED_WITH_WARNINGS",
-                importDiagnosticJson: {
-                  kind: "ai_extraction_diagnostic_v1",
-                  filename: doc.originalFilename,
-                  model: ai.modelName,
-                  schemaLabel: ai.schemaLabel,
-                  fieldCount: ai.fieldCount,
-                  importedCount: ai.importedCount,
-                  flaggedKeys: ai.flaggedKeys,
-                  disagreedKeys: ai.disagreedKeys,
-                  confidence: ai.confidence,
-                } as object,
-              },
-            });
+            // The diagnostic carries the confidence/flagged data the review panel needs —
+            // a transient DB failure here must not silently discard it (retry like every
+            // other pipeline write; a real failure surfaces with the full message below).
+            await withDbRetry(
+              () =>
+                prisma.setupDocument.update({
+                  where: { id: doc.id },
+                  data: {
+                    parseStatus: ai.importedCount >= 10 ? "PARSED" : ai.importedCount > 0 ? "PARTIAL" : "FAILED",
+                    importOutcome: "COMPLETED_WITH_WARNINGS",
+                    importDiagnosticJson: {
+                      kind: "ai_extraction_diagnostic_v1",
+                      filename: doc.originalFilename,
+                      model: ai.modelName,
+                      schemaLabel: ai.schemaLabel,
+                      fieldCount: ai.fieldCount,
+                      importedCount: ai.importedCount,
+                      flaggedKeys: ai.flaggedKeys,
+                      disagreedKeys: ai.disagreedKeys,
+                      confidence: ai.confidence,
+                      regionKeys: ai.regionKeys ?? [],
+                      calibrationGreenLit: ai.calibrationGreenLit ?? false,
+                      suppressedFlaggedKeys: ai.suppressedFlaggedKeys ?? [],
+                    } as object,
+                  },
+                }),
+              "aiExtract:persistDiagnostic"
+            );
           } else {
             await appendDebugLog(doc.id, { at: nowIso(), stage: "ai_extract", event: "info", data: { skipped: ai.skippedReason } });
           }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          await appendDebugLog(doc.id, { at: nowIso(), stage: "ai_extract", event: "error", data: { error: msg.slice(0, 500) } });
+          await appendDebugLog(doc.id, { at: nowIso(), stage: "ai_extract", event: "error", data: { error: msg.slice(0, 2500) } });
         }
       }
 

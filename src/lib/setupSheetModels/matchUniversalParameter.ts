@@ -44,12 +44,16 @@ export function suggestUniversalParameterId(key: string, label?: string): string
   const direct = universalParameterIdForSnapshotKey(key);
   if (direct) return direct;
 
-  // 2) Concept + axle heuristics over the key and label together. Separators are
-  // normalized to spaces first — `toe_out_front` must match \btoe\b just like "Toe out".
-  const haystack = `${key} ${label ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, " ");
-  const axle = detectAxle(haystack);
+  // 2) Concept + axle heuristics. Separators normalize to spaces (`toe_out_front` must match
+  // \btoe\b like "Toe out"). Concept detection ignores parenthetical label text — parens hold
+  // units and location hints ("FF shim (mm, front ride height block)") that would otherwise
+  // map a shim into ride-height stats. Axle detection keeps the full text ("Camber (Front)").
+  const labelSansParens = (label ?? "").replace(/\([^)]*\)/g, " ");
+  const conceptHaystack = `${key} ${labelSansParens}`.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  const axleHaystack = `${key} ${label ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  const axle = detectAxle(axleHaystack);
   for (const c of CONCEPTS) {
-    if (!c.test.test(haystack)) continue;
+    if (!c.test.test(conceptHaystack)) continue;
     if (axle === "front" && c.front) return c.front;
     if (axle === "rear" && c.rear) return c.rear;
     // Concept matched but axle ambiguous → don't guess a side.

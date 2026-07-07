@@ -13,6 +13,7 @@ import {
   hammingDistanceHex,
 } from "@/lib/setupCalibrations/imageFingerprint";
 import {
+  diffImageCalibrationFieldKeys,
   normalizeCalibrationData,
   normalizeImageCalibrationField,
   type ImageCalibration,
@@ -365,6 +366,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
     const merged = normalizeCalibrationData(existing.calibrationDataJson);
+    // Post-green-light geometry edits invalidate just the affected fields (informational —
+    // the calibration stays verified/live). Labels live in the model schema, not here.
+    if (merged.verification?.greenLitAt) {
+      const changedKeys = diffImageCalibrationFieldKeys(merged.imageCalibration, imageCalibration);
+      if (changedKeys.length) {
+        merged.verification.fieldsNeedingRecheck = [
+          ...new Set([...(merged.verification.fieldsNeedingRecheck ?? []), ...changedKeys]),
+        ];
+      }
+    }
     merged.imageCalibration = imageCalibration;
     if (!deriveFromCalibrationId) merged.templateType = "image_region_v1";
     const nextName = body.name?.trim() || existing.name;

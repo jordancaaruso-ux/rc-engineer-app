@@ -212,6 +212,12 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <Link
+                      href={`/setup-sheet-models/${m.id}`}
+                      className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+                    >
+                      Workbench
+                    </Link>
+                    <Link
                       href={`/setup-sheet-models/${m.id}/schema`}
                       className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
                     >

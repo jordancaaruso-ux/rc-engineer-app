@@ -44,7 +44,7 @@ function modelUsesDefaultSampler(model: string): boolean {
  * eval's dominant failure was misread checkbox groups. Alongside the full-sheet
  * overview we send 2×2 zoomed tiles (with overlap) so every mark arrives legible.
  */
-async function buildImageTiles(imageBytes: Buffer): Promise<Buffer[]> {
+export async function buildImageTiles(imageBytes: Buffer): Promise<Buffer[]> {
   const meta = await sharp(imageBytes).metadata();
   const w = meta.width ?? 0;
   const h = meta.height ?? 0;
@@ -230,11 +230,11 @@ export async function extractSetupFromImage(input: {
     { fields: [...input.schema.fields].reverse(), passModel: modelB },
   ].slice(0, passes);
 
-  // Sequential passes: the tiled payload is heavy and parallel passes blow through TPM limits.
-  const results: PassResult[] = [];
-  for (const pass of passInputs) {
-    results.push(
-      await runExtractionPass({
+  // Parallel passes halve wall time; TPM bursts are absorbed by the 429 retry-with-backoff
+  // inside runExtractionPass (the reason this was once sequential).
+  const results: PassResult[] = await Promise.all(
+    passInputs.map((pass) =>
+      runExtractionPass({
         apiKey: input.apiKey,
         model: pass.passModel,
         imageDataUrls,
@@ -242,8 +242,8 @@ export async function extractSetupFromImage(input: {
         sheetLabel: input.schema.label,
         choiceKeys,
       })
-    );
-  }
+    )
+  );
 
   const primary = results[0];
   const secondary = results.length > 1 ? results[1] : null;

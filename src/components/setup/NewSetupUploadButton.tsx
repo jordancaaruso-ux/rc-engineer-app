@@ -52,9 +52,12 @@ export function NewSetupUploadButton({
       setStage("uploading");
       scheduleStageHints();
       // Auto-detect the chassis from the fingerprint; pass a model only when the entry point set one.
+      // 3-minute timeout: the AI front door (identify + schema draft for a brand-new car) runs
+      // inline before the response; the slow vision read itself happens after the response.
       const result = await postQuickCreateSetup(
         file,
-        defaultSetupSheetModelId ? { setupSheetModelId: defaultSetupSheetModelId } : {}
+        defaultSetupSheetModelId ? { setupSheetModelId: defaultSetupSheetModelId } : {},
+        { timeoutMs: 180_000 }
       );
       clearStageTimers();
       if (!result.ok) {

@@ -494,14 +494,17 @@ export async function mapExtractedImageWithCalibration(input: {
         scores.sort((a, b) => b.darkness - a.darkness);
         const winner = scores[0]!;
         const runnerUp = scores[1]?.darkness ?? 0;
-        if (winner.darkness >= 0.45 && winner.darkness - runnerUp >= 0.08) {
+        const minWinner = field.minWinnerDarkness ?? 0.45;
+        const minMargin = field.minMargin ?? 0.08;
+        if (winner.darkness >= minWinner && winner.darkness - runnerUp >= minMargin) {
           parsedData[field.key] = winner.value;
           importedKeys.push(field.key);
         } else {
           warnings.push(`group_low_confidence:${field.key}`);
         }
       } else {
-        const picked = scores.filter((s) => s.darkness >= 0.5).map((s) => s.value);
+        const minMarked = field.minWinnerDarkness ?? 0.5;
+        const picked = scores.filter((s) => s.darkness >= minMarked).map((s) => s.value);
         if (picked.length > 0) {
           parsedData[field.key] = picked.join(",");
           importedKeys.push(field.key);

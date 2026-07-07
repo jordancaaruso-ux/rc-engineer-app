@@ -8,6 +8,10 @@ import {
   canManageCalibration,
   setupDocumentLinkableAsCalibrationExampleWhere,
 } from "@/lib/setupCalibrations/calibrationAccess";
+import {
+  diffImageCalibrationFieldKeys,
+  normalizeCalibrationData,
+} from "@/lib/setupCalibrations/types";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -56,7 +60,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
   const existing = await prisma.setupSheetCalibration.findFirst({
     where: { id },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, calibrationDataJson: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!canManageCalibration(user, existing)) {
@@ -83,7 +87,20 @@ export async function PATCH(request: Request, ctx: Ctx) {
     if (t) data.sourceType = t;
   }
   if (body.calibrationDataJson !== undefined) {
-    data.calibrationDataJson = (body.calibrationDataJson ?? {}) as object;
+    // Verification is server-authoritative: preserve it across editor saves (clients don't
+    // send it) and mark fields whose read geometry changed after a green-light for re-check.
+    const prior = normalizeCalibrationData(existing.calibrationDataJson);
+    const incoming = normalizeCalibrationData(body.calibrationDataJson ?? {});
+    incoming.verification = prior.verification;
+    if (incoming.verification?.greenLitAt) {
+      const changedKeys = diffImageCalibrationFieldKeys(prior.imageCalibration, incoming.imageCalibration);
+      if (changedKeys.length) {
+        incoming.verification.fieldsNeedingRecheck = [
+          ...new Set([...(incoming.verification.fieldsNeedingRecheck ?? []), ...changedKeys]),
+        ];
+      }
+    }
+    data.calibrationDataJson = incoming as unknown as object;
   }
   if ("setupSheetModelId" in body) {
     const raw = body.setupSheetModelId;

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CalibrationDeleteButton } from "@/components/setup-documents/CalibrationDeleteButton";
 import { CalibrationChassisDefaultPanel } from "@/components/setup-sheet-models/CalibrationChassisDefaultPanel";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -51,7 +51,34 @@ export default async function SetupCalibrationDetailPage({
   });
   if (!calibration) notFound();
   const canManage = canManageCalibration(user, calibration);
-  const mappingCounts = calibrationMappingCounts(normalizeCalibrationData(calibration.calibrationDataJson));
+  const normalizedData = normalizeCalibrationData(calibration.calibrationDataJson);
+  const mappingCounts = calibrationMappingCounts(normalizedData);
+  // Image-based calibrations (e.g. blank-sheet auto calibrations) are edited in the image
+  // box editor — this page's editor reads PDF form fields and breaks on image example docs.
+  if (normalizedData.imageCalibration && calibration.exampleDocumentId && canManage) {
+    redirect(`/setup-documents/${calibration.exampleDocumentId}/calibrate-image`);
+  }
+  if (normalizedData.imageCalibration && canManage) {
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <h1 className="page-title">Image calibration</h1>
+            <p className="page-subtitle">
+              {calibration.name} — this is an image-region calibration with no example document
+              linked, so the box editor can&apos;t open it. Attach it to a reference image
+              document to edit its regions.
+            </p>
+          </div>
+        </header>
+        <section className="page-body">
+          <Link href="/setup-calibrations" className="text-sm text-accent hover:underline">
+            Back to calibrations
+          </Link>
+        </section>
+      </>
+    );
+  }
   return (
     <>
       <header className="page-header">

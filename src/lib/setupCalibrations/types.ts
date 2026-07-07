@@ -324,11 +324,20 @@ export type ImageCalibrationField =
       kind: "singleChoiceGroup";
       key: string;
       options: Array<{ value: string; region: ImageRegion }>;
+      /**
+       * Mark-detection gates. Defaults preserve legacy behavior (0.45 / 0.08); blank-sheet
+       * calibrations set lower values measured on real sheets — a red X in a white box reads
+       * ~0.33–0.41 mean darkness, well under the legacy 0.45 gate.
+       */
+      minWinnerDarkness?: number;
+      minMargin?: number;
     }
   | {
       kind: "multiSelectGroup";
       key: string;
       options: Array<{ value: string; region: ImageRegion }>;
+      /** Per-option darkness above which an option counts as marked (legacy default 0.5). */
+      minWinnerDarkness?: number;
     };
 
 /** Small fixed-position landmark used to verify alignment between the reference and a new upload. */
@@ -437,7 +446,22 @@ export function normalizeImageCalibrationField(value: unknown): ImageCalibration
       options.push({ value: optionValue, region: normalizeImageRegion(oo.region) });
     }
     if (options.length === 0) return null;
-    return { kind, key, options };
+    const minWinnerDarkness =
+      typeof v.minWinnerDarkness === "number" && Number.isFinite(v.minWinnerDarkness)
+        ? clampPct(v.minWinnerDarkness)
+        : undefined;
+    if (kind === "multiSelectGroup") {
+      return { kind, key, options, ...(minWinnerDarkness != null ? { minWinnerDarkness } : {}) };
+    }
+    const minMargin =
+      typeof v.minMargin === "number" && Number.isFinite(v.minMargin) ? clampPct(v.minMargin) : undefined;
+    return {
+      kind,
+      key,
+      options,
+      ...(minWinnerDarkness != null ? { minWinnerDarkness } : {}),
+      ...(minMargin != null ? { minMargin } : {}),
+    };
   }
   return null;
 }
@@ -545,7 +569,65 @@ export type SetupSheetCalibrationData = {
    * PDF maps so a single calibration can in principle support both formats.
    */
   imageCalibration?: ImageCalibration;
+  /**
+   * Admin whole-sheet green-light (SETUP_UPLOAD_NORTH_STAR round 3/4): a verified calibration
+   * imports silently — no review flags on valued fields. Server-authoritative: the calibration
+   * PATCH route preserves this block across editor saves and appends keys whose geometry
+   * changed post-verification to `fieldsNeedingRecheck` (informational; the model stays live).
+   */
+  verification?: CalibrationVerification;
 };
+
+export type CalibrationVerification = {
+  /** ISO timestamp of the admin green-light; absent/undefined = not verified. */
+  greenLitAt?: string;
+  greenLitByUserId?: string;
+  /** Field keys whose read-affecting definition changed after the green-light. */
+  fieldsNeedingRecheck?: string[];
+};
+
+export function normalizeCalibrationVerification(value: unknown): CalibrationVerification | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  const out: CalibrationVerification = {};
+  if (typeof v.greenLitAt === "string" && v.greenLitAt.trim()) out.greenLitAt = v.greenLitAt;
+  if (typeof v.greenLitByUserId === "string" && v.greenLitByUserId.trim()) {
+    out.greenLitByUserId = v.greenLitByUserId;
+  }
+  if (Array.isArray(v.fieldsNeedingRecheck)) {
+    const keys = v.fieldsNeedingRecheck.filter((k): k is string => typeof k === "string" && k.trim().length > 0);
+    if (keys.length) out.fieldsNeedingRecheck = [...new Set(keys)];
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+export function isCalibrationGreenLit(data: SetupSheetCalibrationData): boolean {
+  return Boolean(data.verification?.greenLitAt);
+}
+
+/**
+ * Field keys whose read behavior differs between two versions of a calibration's
+ * image mapping — used to invalidate per-field verification after post-green-light edits.
+ * Compares the full field rule (kind, region, options, thresholds); labels live in the
+ * model schema and never pass through here.
+ */
+export function diffImageCalibrationFieldKeys(
+  before: ImageCalibration | undefined,
+  after: ImageCalibration | undefined
+): string[] {
+  const byKey = (cal: ImageCalibration | undefined) => {
+    const m = new Map<string, string>();
+    for (const f of cal?.fields ?? []) m.set(f.key, JSON.stringify(f));
+    return m;
+  };
+  const a = byKey(before);
+  const b = byKey(after);
+  const changed: string[] = [];
+  for (const [key, serialized] of b) {
+    if (a.get(key) !== serialized) changed.push(key);
+  }
+  return changed;
+}
 
 export function isCalibrationFieldRegion(value: unknown): value is CalibrationFieldRegion {
   if (!value || typeof value !== "object") return false;
@@ -871,6 +953,9 @@ export function normalizeCalibrationData(input: unknown): SetupSheetCalibrationD
 
   const imageCal = normalizeImageCalibration(obj.imageCalibration);
   if (imageCal) out.imageCalibration = imageCal;
+
+  const verification = normalizeCalibrationVerification(obj.verification);
+  if (verification) out.verification = verification;
 
   if (typeof obj.templateType !== "string") {
     inferTemplateType(out);
