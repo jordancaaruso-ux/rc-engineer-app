@@ -47,20 +47,20 @@ test("temperatureBandLabel includes the range", () => {
 // --- sky labels + summary ---
 
 test("describeSky prefers weather code and flags wet", () => {
-  assert.deepEqual(describeSky(0, 0), { label: "Sunny", wet: false });
+  assert.deepEqual(describeSky(0, 0), { label: "Clear", wet: false });
   assert.deepEqual(describeSky(3, 5), { label: "Overcast", wet: false });
   assert.equal(describeSky(63, null)?.wet, true); // rain
   assert.equal(describeSky(95, null)?.label, "Thunderstorm");
 });
 
 test("describeSky falls back to cloud cover when no code", () => {
-  assert.equal(describeSky(null, 0)?.label, "Sunny");
+  assert.equal(describeSky(null, 0)?.label, "Clear");
   assert.equal(describeSky(null, 100)?.label, "Overcast");
   assert.equal(describeSky(null, null), null);
 });
 
 test("skyLabelFromCloudCover buckets", () => {
-  assert.equal(skyLabelFromCloudCover(0), "Sunny");
+  assert.equal(skyLabelFromCloudCover(0), "Clear");
   assert.equal(skyLabelFromCloudCover(50), "Partly cloudy");
   assert.equal(skyLabelFromCloudCover(95), "Overcast");
 });
@@ -69,7 +69,7 @@ test("formatConditionsSummary joins temp and sky, null when empty", () => {
   assert.equal(formatConditionsSummary(EMPTY_RUN_CONDITIONS), null);
   assert.equal(
     formatConditionsSummary({ ...EMPTY_RUN_CONDITIONS, airTempC: 18.4, weatherCode: 0 }),
-    "18°C · Sunny"
+    "18°C · Clear"
   );
   assert.equal(
     formatConditionsSummary({ ...EMPTY_RUN_CONDITIONS, airTempC: 26.6 }),

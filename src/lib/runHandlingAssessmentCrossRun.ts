@@ -11,7 +11,15 @@ import {
 } from "@/lib/runHandlingAssessment";
 
 const PHASES: CornerPhase[] = ["entry", "mid", "exit"];
-const TRAIT_AXES: HandlingTraitAxisKey[] = ["feelSteering", "feelGeneral", "driveEase", "tractionRoll"];
+const TRAIT_AXES: HandlingTraitAxisKey[] = [
+  "feelSteering",
+  "onPower",
+  "braking",
+  "tractionRoll",
+  "driveEase",
+  // Legacy — retired from capture 2026-07-08 but still compared on old runs.
+  "feelGeneral",
+];
 
 const MAX_BLOCK_CHARS = 1400;
 

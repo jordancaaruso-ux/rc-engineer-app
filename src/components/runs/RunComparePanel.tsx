@@ -275,7 +275,6 @@ export function RunComparePanel({
                   tireRunNumber: baseRun.tireRunNumber,
                   additiveType: baseRun.additiveType,
                   warmerTimingMinutes: baseRun.warmerTimingMinutes,
-                  setupSnapshotData: baseRun.setupSnapshot?.data,
                 })}
               </p>
             </div>

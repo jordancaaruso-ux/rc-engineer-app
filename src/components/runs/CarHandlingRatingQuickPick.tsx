@@ -25,7 +25,7 @@ export function CarHandlingRatingQuickPick({
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="text-xs font-medium text-foreground">Car handling rating</div>
+        <div className="text-xs font-medium text-muted-foreground">Car handling rating</div>
         <div
           className={cn(
             "text-[11px]",

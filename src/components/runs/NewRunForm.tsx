@@ -300,6 +300,77 @@ function setupSnapshotWithDerived(raw: unknown): SetupSnapshotData {
   return applyDerivedFieldsToSnapshot(normalizeSetupData(raw));
 }
 
+/**
+ * localStorage key for the silent autosave of an in-progress (never-saved) new-run
+ * form. Only used on the plain `/runs/new` flow — edit / draft runs live in the DB.
+ * Bump the version suffix if the persisted shape changes incompatibly.
+ */
+const NEW_RUN_DRAFT_STORAGE_KEY = "rc-engineer-new-run-draft-v1";
+
+/** Fields we silently persist so leaving and returning to `/runs/new` doesn't lose work. */
+type NewRunDraftSnapshot = {
+  sessionType: "TESTING" | "RACE_MEETING";
+  meetingSessionType: MeetingSessionType;
+  meetingSessionCustom: string;
+  carId: string;
+  trackId: string;
+  trackLayoutId: string;
+  trackDirection: "" | "CW" | "CCW";
+  eventId: string;
+  tireSetId: string;
+  newTireSetIntent: NewTireSetIntent | null;
+  additiveTypeId: string;
+  warmerTimingMinutes: string;
+  batteryId: string;
+  setupData: SetupSnapshotData;
+  setupBaselineSnapshotId: string | null;
+  setupBaselineData: SetupSnapshotData | null;
+  lapIngest: LapIngestFormValue;
+  notes: string;
+  raceClass: string;
+  setupChangesText: string;
+  handlingUi: HandlingAssessmentUiState;
+  carRating: number | null;
+  shareWithTeam: boolean;
+  conditions: RunConditions;
+};
+
+/**
+ * True when a draft snapshot holds anything worth restoring. `carId` /
+ * `shareWithTeam` carry defaults, so they don't count as "the driver logged
+ * something" on their own.
+ */
+function newRunDraftHasContent(s: NewRunDraftSnapshot): boolean {
+  return Boolean(
+    s.trackId ||
+      s.eventId ||
+      s.tireSetId ||
+      s.newTireSetIntent ||
+      s.batteryId ||
+      s.additiveTypeId ||
+      s.warmerTimingMinutes.trim() ||
+      s.notes.trim() ||
+      s.raceClass.trim() ||
+      s.setupChangesText.trim() ||
+      s.carRating != null ||
+      s.sessionType !== "TESTING" ||
+      (s.setupData && Object.keys(s.setupData).length > 0) ||
+      (s.lapIngest && newRunLapIngestHasContent(s.lapIngest)) ||
+      (s.handlingUi && isHandlingAssessmentMeaningful(persistedFromUiState(s.handlingUi))) ||
+      (s.conditions && !isConditionsEmpty(s.conditions))
+  );
+}
+
+/** Any driver-entered laps (manual paste, edited rows, or a URL import block). */
+function newRunLapIngestHasContent(v: LapIngestFormValue): boolean {
+  return Boolean(
+    v.manualText.trim() ||
+      (v.manualLapRows && v.manualLapRows.length > 0) ||
+      (v.urlLapRows && v.urlLapRows.length > 0) ||
+      (v.urlImportBlocks && v.urlImportBlocks.length > 0)
+  );
+}
+
 /** Deep copy a setup snapshot so mutating `setupData` later doesn't drag the baseline along. */
 function cloneSetupSnapshot(d: SetupSnapshotData): SetupSnapshotData {
   try {
@@ -882,6 +953,137 @@ export function NewRunForm(props: {
     setReplicateLast(false);
   }, [dashboardPrefill, carsList, clearNewTireSetIntent]);
 
+  /**
+   * Silent draft autosave (issue: leaving `/runs/new` mid-log lost everything).
+   * Only the plain new-run flow — edit/draft runs and deep-linked prefills own
+   * their own state and must not be clobbered by a stale local snapshot.
+   */
+  const draftAutosaveEnabled = !isEditing && !dashboardPrefill && !initialEventId;
+  const draftHydratedRef = useRef(false);
+
+  // Restore once on mount. Runs after the default/prefill effects above so the
+  // saved snapshot wins over the empty starting form.
+  useEffect(() => {
+    if (draftHydratedRef.current) return;
+    if (!draftAutosaveEnabled) {
+      draftHydratedRef.current = true;
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(NEW_RUN_DRAFT_STORAGE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw) as Partial<NewRunDraftSnapshot>;
+        if (s.sessionType === "TESTING" || s.sessionType === "RACE_MEETING")
+          setSessionType(s.sessionType);
+        if (s.meetingSessionType) setMeetingSessionType(s.meetingSessionType);
+        if (typeof s.meetingSessionCustom === "string")
+          setMeetingSessionCustom(s.meetingSessionCustom);
+        if (s.carId) setCarId(s.carId);
+        if (typeof s.trackId === "string") setTrackId(s.trackId);
+        if (typeof s.trackLayoutId === "string") setTrackLayoutId(s.trackLayoutId);
+        if (s.trackDirection === "" || s.trackDirection === "CW" || s.trackDirection === "CCW")
+          setTrackDirection(s.trackDirection);
+        if (typeof s.eventId === "string") setEventId(s.eventId);
+        if (typeof s.tireSetId === "string") setTireSetId(s.tireSetId);
+        if (s.newTireSetIntent !== undefined) setNewTireSetIntent(s.newTireSetIntent);
+        if (typeof s.additiveTypeId === "string") setAdditiveTypeId(s.additiveTypeId);
+        if (typeof s.warmerTimingMinutes === "string")
+          setWarmerTimingMinutes(s.warmerTimingMinutes);
+        if (typeof s.batteryId === "string") setBatteryId(s.batteryId);
+        if (s.setupData) setSetupData(s.setupData);
+        if (s.setupBaselineSnapshotId !== undefined)
+          setSetupBaselineSnapshotId(s.setupBaselineSnapshotId);
+        if (s.setupBaselineData !== undefined) setSetupBaselineData(s.setupBaselineData);
+        if (s.lapIngest) setLapIngest(s.lapIngest);
+        if (typeof s.notes === "string") setNotes(s.notes);
+        if (typeof s.raceClass === "string") setRaceClass(s.raceClass);
+        if (typeof s.setupChangesText === "string") setSetupChangesText(s.setupChangesText);
+        if (s.handlingUi) setHandlingUi(s.handlingUi);
+        if (s.carRating === null || typeof s.carRating === "number") setCarRating(s.carRating);
+        if (typeof s.shareWithTeam === "boolean") setShareWithTeam(s.shareWithTeam);
+        if (s.conditions) setConditions(s.conditions);
+      }
+    } catch {
+      // Corrupt/unavailable storage — start fresh, never block the form.
+    }
+    draftHydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftAutosaveEnabled]);
+
+  // Debounced persist. Guarded on hydration so the initial empty render can't
+  // overwrite a saved snapshot before restore runs.
+  useEffect(() => {
+    if (!draftAutosaveEnabled || !draftHydratedRef.current) return;
+    const snapshot: NewRunDraftSnapshot = {
+      sessionType,
+      meetingSessionType,
+      meetingSessionCustom,
+      carId,
+      trackId,
+      trackLayoutId,
+      trackDirection,
+      eventId,
+      tireSetId,
+      newTireSetIntent,
+      additiveTypeId,
+      warmerTimingMinutes,
+      batteryId,
+      setupData,
+      setupBaselineSnapshotId,
+      setupBaselineData,
+      lapIngest,
+      notes,
+      raceClass,
+      setupChangesText,
+      handlingUi,
+      carRating,
+      shareWithTeam,
+      conditions,
+    };
+    if (!newRunDraftHasContent(snapshot)) {
+      try {
+        window.localStorage.removeItem(NEW_RUN_DRAFT_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    const t = setTimeout(() => {
+      try {
+        window.localStorage.setItem(NEW_RUN_DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+      } catch {
+        /* quota / unavailable — best effort only */
+      }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [
+    draftAutosaveEnabled,
+    sessionType,
+    meetingSessionType,
+    meetingSessionCustom,
+    carId,
+    trackId,
+    trackLayoutId,
+    trackDirection,
+    eventId,
+    tireSetId,
+    newTireSetIntent,
+    additiveTypeId,
+    warmerTimingMinutes,
+    batteryId,
+    setupData,
+    setupBaselineSnapshotId,
+    setupBaselineData,
+    lapIngest,
+    notes,
+    raceClass,
+    setupChangesText,
+    handlingUi,
+    carRating,
+    shareWithTeam,
+    conditions,
+  ]);
+
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
 
@@ -1059,6 +1261,23 @@ export function NewRunForm(props: {
   const selectedEventForRun = useMemo(
     () => (needsEvent && eventId ? events.find((e) => e.id === eventId) ?? null : null),
     [needsEvent, eventId, events]
+  );
+  /**
+   * LiveRC root URL of the selected/new event's track, if any. When present, the
+   * timing pages are discoverable from the track root, so the manual practice /
+   * race timing URL inputs are redundant and hidden.
+   */
+  const selectedEventTrackLiveRc = useMemo(() => {
+    const ev = eventId ? events.find((e) => e.id === eventId) : null;
+    const tid = ev?.trackId ?? null;
+    return tid ? tracksList.find((t) => t.id === tid)?.liveRcUrl?.trim() || null : null;
+  }, [eventId, events, tracksList]);
+  const newEventTrackLiveRc = useMemo(
+    () =>
+      newEventTrackId
+        ? tracksList.find((t) => t.id === newEventTrackId)?.liveRcUrl?.trim() || null
+        : null,
+    [newEventTrackId, tracksList]
   );
   /** Race meeting + event with a track: run track follows the event (picker disabled). */
   const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
@@ -2520,6 +2739,14 @@ export function NewRunForm(props: {
           .catch(() => {});
       }
 
+      // The run is persisted (draft or complete) — drop the local autosave so
+      // returning to /runs/new starts clean instead of restoring this run.
+      try {
+        window.localStorage.removeItem(NEW_RUN_DRAFT_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+
       // Completing a run sends the driver to the dashboard with a one-time
       // prompt to generate Engineer suggestions for the session they just saved.
       if (intent === "completed") {
@@ -2854,38 +3081,46 @@ export function NewRunForm(props: {
 
           {eventId ? (
             <div className="mt-2 space-y-2 text-sm">
-              <div className="space-y-1">
-                <label
-                  htmlFor="event-practice-timing-url"
-                  className="block text-xs font-medium text-muted-foreground"
-                >
-                  Practice timing URL (optional)
-                </label>
-                <input
-                  id="event-practice-timing-url"
-                  type="url"
-                  value={eventPracticeTimingUrl}
-                  onChange={(e) => setEventPracticeTimingUrl(e.target.value)}
-                  placeholder="LiveRC practice session list URL"
-                  className="form-control w-full px-3 py-2 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="event-race-timing-url"
-                  className="block text-xs font-medium text-muted-foreground"
-                >
-                  Race timing URL (optional)
-                </label>
-                <input
-                  id="event-race-timing-url"
-                  type="url"
-                  value={eventRaceTimingUrl}
-                  onChange={(e) => setEventRaceTimingUrl(e.target.value)}
-                  placeholder="LiveRC results / race timing page URL"
-                  className="form-control w-full px-3 py-2 text-xs"
-                />
-              </div>
+              {selectedEventTrackLiveRc ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Lap times are pulled from this track&apos;s LiveRC link automatically.
+                </p>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="event-practice-timing-url"
+                      className="block text-xs font-medium text-muted-foreground"
+                    >
+                      Practice timing URL (optional)
+                    </label>
+                    <input
+                      id="event-practice-timing-url"
+                      type="url"
+                      value={eventPracticeTimingUrl}
+                      onChange={(e) => setEventPracticeTimingUrl(e.target.value)}
+                      placeholder="LiveRC practice session list URL"
+                      className="form-control w-full px-3 py-2 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="event-race-timing-url"
+                      className="block text-xs font-medium text-muted-foreground"
+                    >
+                      Race timing URL (optional)
+                    </label>
+                    <input
+                      id="event-race-timing-url"
+                      type="url"
+                      value={eventRaceTimingUrl}
+                      onChange={(e) => setEventRaceTimingUrl(e.target.value)}
+                      placeholder="LiveRC results / race timing page URL"
+                      className="form-control w-full px-3 py-2 text-xs"
+                    />
+                  </div>
+                </>
+              )}
               <div className="space-y-1">
                 <label
                   htmlFor="event-controlled-tire-type"
@@ -2946,12 +3181,6 @@ export function NewRunForm(props: {
                   />
                 ) : null}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                Saved on the event when you save this run. Lap times → URL uses the practice link when your
-                meeting session is Practice; otherwise it prefers the race/results link (either link can be
-                scanned). Spec tire pre-selects that compound when you log tires for this event. Control additive
-                requires an additive selection when you complete a run.
-              </p>
             </div>
           ) : null}
 
@@ -3023,26 +3252,34 @@ export function NewRunForm(props: {
                   placeholder="End date"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="block ui-label-meta">Practice timing URL (optional)</label>
-                <input
-                  type="url"
-                  className="form-control w-full px-3 py-2 text-xs"
-                  value={newEventPracticeUrl}
-                  onChange={(e) => setNewEventPracticeUrl(e.target.value)}
-                  placeholder="LiveRC practice session list URL"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="block ui-label-meta">Race timing URL (optional)</label>
-                <input
-                  type="url"
-                  className="form-control w-full px-3 py-2 text-xs"
-                  value={newEventResultsUrl}
-                  onChange={(e) => setNewEventResultsUrl(e.target.value)}
-                  placeholder="LiveRC results / race timing page URL"
-                />
-              </div>
+              {newEventTrackLiveRc ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Lap times are pulled from this track&apos;s LiveRC link automatically.
+                </p>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <label className="block ui-label-meta">Practice timing URL (optional)</label>
+                    <input
+                      type="url"
+                      className="form-control w-full px-3 py-2 text-xs"
+                      value={newEventPracticeUrl}
+                      onChange={(e) => setNewEventPracticeUrl(e.target.value)}
+                      placeholder="LiveRC practice session list URL"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block ui-label-meta">Race timing URL (optional)</label>
+                    <input
+                      type="url"
+                      className="form-control w-full px-3 py-2 text-xs"
+                      value={newEventResultsUrl}
+                      onChange={(e) => setNewEventResultsUrl(e.target.value)}
+                      placeholder="LiveRC results / race timing page URL"
+                    />
+                  </div>
+                </>
+              )}
               <div className="space-y-1">
                 <label className="block ui-label-meta">Controlled / spec tire (optional)</label>
                 <TireTypeCombobox

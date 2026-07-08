@@ -8,6 +8,8 @@ For **Engineer behavior** (the two moments, confidence ladder, failure-mode rank
 
 For **Engineer quality iteration** (eval failures, prompt/context/retrieval fixes, gold-set hygiene), use `.cursor/skills/engineer-improver/SKILL.md` — invoke only when the founder says "improve engineer" or similar. Session logs: `docs/ENGINEER_CHANGELOG.md`.
 
+For **features that are spec'd but NOT implemented**, check `docs/NOT_YET_BUILT.md` before claiming a feature exists or "fixing" it — a north-star doc or prototype is intent, not shipped code.
+
 ## UI / visual design (Technical v2)
 
 **Before any UI, styling, layout, or visual rework** — read `docs/VISUAL_NORTH_STAR.md` and follow it. That doc is the locked north star: palette, typography, component vocabulary, journey-map rollout order, and per-screen checklist.
@@ -52,7 +54,7 @@ Agents MAY create and edit files under `content/vehicle-dynamics/drafts/` withou
    > **AI-drafted baseline (unverified).** Researched and written by the coding agent from general vehicle-dynamics knowledge on YYYY-MM-DD. Not yet edited or approved by Jordan — reference theory, not founder ground truth.
 
 2. **Never contradict or duplicate the approved tier.** If a draft topic touches an approved file's territory, align with it and cross-reference; if general knowledge genuinely disagrees with an approved file, flag the conflict to the founder in chat — never "correct" the approved file and never write the disagreement into the draft.
-3. **Same style rules as the KB:** terse, bold technical terms, physics-first (mechanism → documented tendency), hedges preserved where physics is genuinely situational, `##` sections (the chunker splits on them), `**Keys:**` lines with canonical parameter keys, ≤ ~90 lines per file.
+3. **Same style rules as the KB:** terse, bold technical terms, physics-first (mechanism → documented tendency), hedges preserved where physics is genuinely situational, `##` sections (the chunker splits on them), `**Keys:**` lines with canonical parameter keys, ≤ ~90 lines per file. **Physics/Handling split (adopted 2026-07-08):** each knob gets a `**Physics.**` block (mechanism — geometry/loads/kinematics, stated flat, no hedging) then a `**Handling.**` block (situational effects — openly hedged, framed as a test). See `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md` and `drafts/shock-geometry.md`.
 4. **No coaching, no invented numbers.** Mechanisms and directional tendencies only — no "always run X", no fabricated setup values or fake community norms.
 5. **Promotion ritual:** Jordan edits a draft (or is interviewed through it), then it moves up to `content/vehicle-dynamics/` with the banner removed — from that moment the hard rule above covers it. Only Jordan (or an agent on his explicit instruction naming the file) performs promotion.
 

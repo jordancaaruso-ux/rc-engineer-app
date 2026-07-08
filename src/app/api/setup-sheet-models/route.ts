@@ -9,6 +9,8 @@ import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerMo
 import { slugifySetupSheetModelName, uniqueSlugCandidate } from "@/lib/setupSheetModels/slug";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
+import { draftedSchemaToModelSchema } from "@/lib/setupExtractAi/draftedSchemaToModelSchema";
+import type { DraftedField } from "@/lib/setupExtractAi/draftSetupSheetModelSchema";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -68,6 +70,8 @@ export async function POST(request: Request) {
     name?: string;
     seedFromGenericPreset?: boolean;
     schema?: unknown;
+    /** AcroForm-anchored AI draft (from /draft-from-pdf), converted to a schema server-side. */
+    draftedFields?: DraftedField[];
   };
   const name = body.name?.trim();
   if (!name) {
@@ -96,6 +100,14 @@ export async function POST(request: Request) {
     const parsed = parseSetupSheetModelSchema(body.schema);
     if (!parsed) {
       return NextResponse.json({ error: "Invalid schema" }, { status: 400 });
+    }
+    schemaJson = parsed as object;
+  } else if (Array.isArray(body.draftedFields) && body.draftedFields.length > 0) {
+    const parsed = parseSetupSheetModelSchema(
+      draftedSchemaToModelSchema({ carName: name, fields: body.draftedFields })
+    );
+    if (!parsed) {
+      return NextResponse.json({ error: "Invalid drafted fields" }, { status: 400 });
     }
     schemaJson = parsed as object;
   } else {

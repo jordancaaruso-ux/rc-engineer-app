@@ -37,6 +37,15 @@ hand-drawn region calibration first. New brand = dead end until an admin calibra
 | **Cost** | Accuracy first. LLM-per-upload in Stage 1 is acceptable (pennies at current volume); Stage 2 makes repeat styles cheap. |
 | **Legacy path** | Existing manual calibration system (editor, fingerprint auto-pick, bulk import) stays untouched alongside. AI path is additive: runs when no calibration matches. |
 
+### Refinement — template creation is AcroForm-anchored (2026-07-08)
+
+The "AI drafts the schema from an unknown sheet" decision above splits into **two distinct techniques** — do not conflate them:
+
+- **Template creation (the reusable sheet model + calibration) — AcroForm-anchored, required.** The editable AcroForm PDF supplies exact box count, position, and structural type; AI vision only reads labels / purpose / option text *at those known locations*. This is the only way a template is built. A PDF with no form fields is **rejected** — pure-image template creation is not reliable enough ("the AI does its own thing" — miscounts and misplaces boxes) and is out of scope.
+- **One-off value extraction — pure-vision fallback only.** The unconstrained image→schema AI (`draftSetupSheetModelSchema`) stays a best-effort fallback for reading a single *uncalibrated* upload; it never builds the reusable template.
+
+Full design (upload-first wizard, manual mapping with auto type/group detect, car decoupling, draw-fields removal): interview 2026-07-08 + memory `setup-template-creation-rework`.
+
 ---
 
 ## Stages

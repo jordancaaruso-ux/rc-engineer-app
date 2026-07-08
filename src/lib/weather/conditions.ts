@@ -70,8 +70,8 @@ export type SkyDescription = {
  * collapse the long tail.
  */
 export function skyLabelFromWeatherCode(code: number): SkyDescription {
-  if (code === 0) return { label: "Sunny", wet: false };
-  if (code === 1) return { label: "Mostly sunny", wet: false };
+  if (code === 0) return { label: "Clear", wet: false };
+  if (code === 1) return { label: "Mostly clear", wet: false };
   if (code === 2) return { label: "Partly cloudy", wet: false };
   if (code === 3) return { label: "Overcast", wet: false };
   if (code === 45 || code === 48) return { label: "Fog", wet: true };
@@ -86,8 +86,8 @@ export function skyLabelFromWeatherCode(code: number): SkyDescription {
 
 /** Fallback sky label from cloud-cover % when no weather code is present. */
 export function skyLabelFromCloudCover(cloudCoverPct: number): string {
-  if (cloudCoverPct < 12) return "Sunny";
-  if (cloudCoverPct < 40) return "Mostly sunny";
+  if (cloudCoverPct < 12) return "Clear";
+  if (cloudCoverPct < 40) return "Mostly clear";
   if (cloudCoverPct < 70) return "Partly cloudy";
   if (cloudCoverPct < 90) return "Mostly cloudy";
   return "Overcast";

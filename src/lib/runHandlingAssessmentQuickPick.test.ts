@@ -25,7 +25,7 @@ test("coerceFeelVsLastRunForCompleteRun requires selection when prior run exists
 test("coerceFeelVsLastRunForCompleteRun defaults to Similar on first run", () => {
   const result = coerceFeelVsLastRunForCompleteRun(null, false);
   assert.equal(result.error, undefined);
-  assert.deepEqual(result.parsed, { version: 5, feelVsLastRun: 0 });
+  assert.deepEqual(result.parsed, { version: 6, feelVsLastRun: 0 });
 });
 
 test("coerceFeelVsLastRunForCompleteRun preserves other handling fields when coercing", () => {

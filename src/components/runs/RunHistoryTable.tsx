@@ -11,7 +11,6 @@ import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
 import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
 import { formatHandlingAssessmentDetailLines, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
-import { formatLapSourceSummary, tryReadLapSourceUrl } from "@/lib/lapSession/display";
 import { formatConditionsChip } from "@/lib/weather/conditions";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
@@ -39,13 +38,13 @@ import {
 } from "@/lib/lapAnalysis";
 import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
 import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
-import { RunRaceFieldSwitcher } from "@/components/runs/RunRaceFieldSwitcher";
+import { RunRaceFieldSwitcher, RACE_IDENTITY } from "@/components/runs/RunRaceFieldSwitcher";
 import Link from "next/link";
 import { SquarePen, Timer, Trash2, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { Eyebrow } from "@/components/ui/panel";
+import { SectionTitle } from "@/components/ui/SectionTitle";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
 import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import {
@@ -126,17 +125,6 @@ type Run = {
     }>;
   }>;
 };
-
-function formatLapSourceLinkText(url: string): string {
-  try {
-    const u = new URL(url);
-    const path = u.pathname + u.search;
-    const pathShort = path.length > 26 ? `${path.slice(0, 24)}…` : path;
-    return `${u.hostname}${pathShort || "/"}`;
-  } catch {
-    return url.length > 42 ? `${url.slice(0, 39)}…` : url;
-  }
-}
 
 function CompactField({
   label,
@@ -951,8 +939,6 @@ function RunDetail({
     lapDash.avgTop10,
     mistakeSummary,
   ]);
-  const sourceUrl = tryReadLapSourceUrl(run.lapSession);
-  const sourceSummary = formatLapSourceSummary(run.lapSession);
   const conditionsChip = formatConditionsChip(runConditionsFromRecord(run));
   const carRatingDisplay = useMemo(() => {
     const rating = run.carRating;
@@ -986,8 +972,137 @@ function RunDetail({
   const additiveLine = formatAdditiveTimingLine(run.additiveType, run.warmerTimingMinutes);
   const tirePrepDisplay = additiveLine ?? "—";
 
+  // Lap stats / grid / graph split into three nodes so the driver-compare
+  // switcher can slot its notebook tabs between the stats and the lap card.
+  // Solo runs reassemble them into the original side-by-side `userView`.
+  const lapStatsBlock = (
+    <div className="space-y-1">
+      <div className="flex flex-wrap gap-1 md:gap-1.5">
+        <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
+        <LapStatChip
+          label="Stint"
+          title="Sum of included lap times"
+          value={lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"}
+        />
+        <LapStatChip
+          label="Best lap"
+          value={formatLap(lapDash.bestLap)}
+          expandable={bestLapRows.length > 0}
+          expanded={expandedLapStat === "best"}
+          onToggle={() => toggleLapStat("best")}
+        />
+        <LapStatChip
+          label="Avg top 5"
+          value={formatLap(lapDash.avgTop5)}
+          expandable={top5LapRows.length > 0}
+          expanded={expandedLapStat === "avg5"}
+          onToggle={() => toggleLapStat("avg5")}
+        />
+        <LapStatChip
+          label="Avg top 10"
+          value={formatLap(lapDash.avgTop10)}
+          expandable={top10LapRows.length > 0}
+          expanded={expandedLapStat === "avg10"}
+          onToggle={() => toggleLapStat("avg10")}
+        />
+        <LapStatChip label="Median" value={formatLap(lapDash.median)} />
+        {conditionsChip ? (
+          <LapStatChip
+            label="Conditions"
+            value={conditionsChip.value}
+            title={conditionsChip.title}
+          />
+        ) : null}
+        <LapStatChip
+          label="Consistency"
+          title="100 − CV; higher = more consistent laps"
+          value={
+            lapDash.consistencyScore != null
+              ? formatConsistencyScorePercent(lapDash.consistencyScore)
+              : "—"
+          }
+        />
+        <LapStatChip
+          label="Mistakes"
+          title={mistakeSummary}
+          value={mistakeAnalysis.eligible ? String(mistakeAnalysis.mistakeCount) : "—"}
+          expandable={mistakeAnalysis.eligible}
+          expanded={expandedLapStat === "mistakes"}
+          onToggle={() => toggleLapStat("mistakes")}
+        />
+      </div>
+      {expandedLapStat && expandedLapStatDetail ? (
+        <p className={cn(RUN_HISTORY_DATA_CLASS, "text-muted-foreground leading-snug break-words")}>
+          {expandedLapStatDetail}
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const lapCardBlock =
+    laps.length > 0 ? (
+      <div className={cn("flex flex-wrap gap-x-2 gap-y-1 rounded border border-border bg-muted/60 px-2 py-1.5", RUN_HISTORY_DATA_CLASS)}>
+        {lapDisplayRows.map((r, i) => {
+          const isMistake = mistakeLapNumbers.has(r.lapNumber);
+          const isBest = bestLapNumbers.has(r.lapNumber);
+          const isHighlighted = isMistake || isBest;
+          const mistake = mistakeAnalysis.mistakes.find((m) => m.lapNumber === r.lapNumber);
+          return (
+            <span
+              key={i}
+              className={cn(
+                "inline-grid grid-cols-[2rem_auto] gap-x-0.5 items-baseline tabular-nums rounded px-0.5",
+                !r.isIncluded && "opacity-50 line-through",
+                isMistake && "bg-red-600/55 text-white ring-1 ring-red-500/45",
+                isBest && !isMistake && "bg-purple-600/55 text-white ring-1 ring-purple-500/45"
+              )}
+              title={
+                !r.isIncluded
+                  ? "Excluded"
+                  : isMistake && mistake
+                    ? `${formatMistakeLapDetail(mistake)} vs median`
+                    : isBest
+                      ? "Best lap"
+                      : undefined
+              }
+            >
+              <span
+                className={cn(
+                  "text-right",
+                  isHighlighted ? "text-white/80" : "text-muted-foreground"
+                )}
+              >
+                {r.lapNumber}.
+              </span>
+              <span>{r.lapTimeSeconds.toFixed(3)}s</span>
+            </span>
+          );
+        })}
+      </div>
+    ) : (
+      <div className={cn(RUN_HISTORY_DATA_CLASS, "text-muted-foreground")}>—</div>
+    );
+
+  const buildLapGraph = (lineColor?: string) =>
+    lapDisplayRows.length >= 3 ? (
+      <div className="space-y-1">
+        <LapTimeGraph
+          rows={lapDisplayRows}
+          bestLapNumbers={bestLapNumbers}
+          mistakeLapNumbers={mistakeLapNumbers}
+          mistakeDetailByLapNumber={mistakeDetailByLapNumber}
+          medianSeconds={null}
+          lineColor={lineColor}
+        />
+      </div>
+    ) : null;
+
   return (
     <CardPanel contentClassName="space-y-3 text-sm min-w-0 w-full">
+      <div className="space-y-2">
+      <SectionTitle as="div" style={{ color: "var(--primary)" }}>
+        Session details
+      </SectionTitle>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
         <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3 min-w-0 flex-1">
           <CompactField label="Date / time" value={dateTimeLabel} />
@@ -1008,183 +1123,34 @@ function RunDetail({
           </Link>
         ) : null}
       </div>
-
-      <RunRaceFieldSwitcher
-        runId={run.id}
-        enabled={(run.importedLapSets?.length ?? 0) > 0}
-        userLapRows={lapDisplayRows}
-        userView={
-      <>
-      <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-4 min-w-0">
-        <div className="shrink-0 space-y-2 min-w-0">
-          <div className="space-y-1">
-            <div className="flex flex-wrap gap-1 md:gap-1.5">
-              <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
-              <LapStatChip
-                label="Stint"
-                title="Sum of included lap times"
-                value={lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"}
-              />
-              <LapStatChip
-                label="Best lap"
-                value={formatLap(lapDash.bestLap)}
-                expandable={bestLapRows.length > 0}
-                expanded={expandedLapStat === "best"}
-                onToggle={() => toggleLapStat("best")}
-              />
-              <LapStatChip
-                label="Avg top 5"
-                value={formatLap(lapDash.avgTop5)}
-                expandable={top5LapRows.length > 0}
-                expanded={expandedLapStat === "avg5"}
-                onToggle={() => toggleLapStat("avg5")}
-              />
-              <LapStatChip
-                label="Avg top 10"
-                value={formatLap(lapDash.avgTop10)}
-                expandable={top10LapRows.length > 0}
-                expanded={expandedLapStat === "avg10"}
-                onToggle={() => toggleLapStat("avg10")}
-              />
-              <LapStatChip label="Median" value={formatLap(lapDash.median)} />
-              {conditionsChip ? (
-                <LapStatChip
-                  label="Conditions"
-                  value={conditionsChip.value}
-                  title={conditionsChip.title}
-                />
-              ) : null}
-              <LapStatChip
-                label="Consistency"
-                title="100 − CV; higher = more consistent laps"
-                value={
-                  lapDash.consistencyScore != null
-                    ? formatConsistencyScorePercent(lapDash.consistencyScore)
-                    : "—"
-                }
-              />
-              <LapStatChip
-                label="Mistakes"
-                title={mistakeSummary}
-                value={
-                  mistakeAnalysis.eligible ? String(mistakeAnalysis.mistakeCount) : "—"
-                }
-                expandable={mistakeAnalysis.eligible}
-                expanded={expandedLapStat === "mistakes"}
-                onToggle={() => toggleLapStat("mistakes")}
-              />
-            </div>
-            {expandedLapStat && expandedLapStatDetail ? (
-              <p className={cn(RUN_HISTORY_DATA_CLASS, "text-muted-foreground leading-snug break-words")}>
-                {expandedLapStatDetail}
-              </p>
-            ) : null}
-          </div>
-
-        </div>
-
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="ui-label-caps">All laps ({laps.length})</div>
-          {laps.length > 0 ? (
-            <div className={cn("flex flex-wrap gap-x-2 gap-y-1 rounded border border-border bg-muted/60 px-2 py-1.5", RUN_HISTORY_DATA_CLASS)}>
-              {lapDisplayRows.map((r, i) => {
-                const isMistake = mistakeLapNumbers.has(r.lapNumber);
-                const isBest = bestLapNumbers.has(r.lapNumber);
-                const isHighlighted = isMistake || isBest;
-                const mistake = mistakeAnalysis.mistakes.find((m) => m.lapNumber === r.lapNumber);
-                return (
-                <span
-                  key={i}
-                  className={cn(
-                    "inline-grid grid-cols-[2rem_auto] gap-x-0.5 items-baseline tabular-nums rounded px-0.5",
-                    !r.isIncluded && "opacity-50 line-through",
-                    isMistake &&
-                      "bg-red-600/55 text-white ring-1 ring-red-500/45",
-                    isBest &&
-                      !isMistake &&
-                      "bg-purple-600/55 text-white ring-1 ring-purple-500/45"
-                  )}
-                  title={
-                    !r.isIncluded
-                      ? "Excluded"
-                      : isMistake && mistake
-                        ? `${formatMistakeLapDetail(mistake)} vs median`
-                        : isBest
-                          ? "Best lap"
-                          : undefined
-                  }
-                >
-                  <span
-                    className={cn(
-                      "text-right",
-                      isHighlighted ? "text-white/80" : "text-muted-foreground"
-                    )}
-                  >
-                    {r.lapNumber}.
-                  </span>
-                  <span>{r.lapTimeSeconds.toFixed(3)}s</span>
-                </span>
-              );
-              })}
-            </div>
-          ) : (
-            <div className={cn(RUN_HISTORY_DATA_CLASS, "text-muted-foreground")}>—</div>
-          )}
-        </div>
       </div>
 
-      {lapDisplayRows.length >= 3 ? (
-        <div className="space-y-1">
-          <div className="ui-label-caps">Lap graph</div>
-          <LapTimeGraph
-            rows={lapDisplayRows}
-            bestLapNumbers={bestLapNumbers}
-            mistakeLapNumbers={mistakeLapNumbers}
-            mistakeDetailByLapNumber={mistakeDetailByLapNumber}
-            medianSeconds={lapDash.median ?? null}
-          />
-        </div>
-      ) : null}
-      </>
-        }
-      />
+      <div className="space-y-2">
+        <SectionTitle as="div" style={{ color: "var(--primary)" }}>Laptimes</SectionTitle>
+        <RunRaceFieldSwitcher
+          runId={run.id}
+          enabled={(run.importedLapSets?.length ?? 0) > 0}
+          userLapRows={lapDisplayRows}
+          userStats={lapStatsBlock}
+          userLapCard={lapCardBlock}
+          userGraph={buildLapGraph(RACE_IDENTITY.you)}
+          userView={
+            <>
+              <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-4 min-w-0">
+                <div className="shrink-0 space-y-2 min-w-0">{lapStatsBlock}</div>
+                <div className="min-w-0 flex-1 space-y-1">{lapCardBlock}</div>
+              </div>
+              {buildLapGraph()}
+            </>
+          }
+        />
+      </div>
 
-      <div className="pt-1 border-t border-border/60 border-dashed">
-        <details className="group">
-          <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] [&::-webkit-details-marker]:hidden">
-            <span className="ui-label-caps text-[9px] text-muted-foreground/80 shrink-0">Lap source</span>
-            <span
-              className={cn(
-                RUN_HISTORY_DATA_CLASS,
-                "text-muted-foreground/90 truncate min-w-0 max-w-[min(100%,320px)]"
-              )}
-            >
-              {sourceSummary ?? "—"}
-            </span>
-            {sourceUrl ? (
-              <span className="shrink-0 text-[10px] font-medium text-accent underline underline-offset-2">
-                Link
-              </span>
-            ) : null}
-          </summary>
-          {sourceUrl ? (
-            <div className="mt-1 pl-0.5">
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  RUN_HISTORY_DATA_CLASS,
-                  "inline-block break-all text-accent/90 underline underline-offset-2"
-                )}
-                title={sourceUrl}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {formatLapSourceLinkText(sourceUrl)}
-              </a>
-            </div>
-          ) : null}
-        </details>
+      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+        <SectionTitle as="div" style={{ color: "var(--primary)" }}>Setup vs previous run</SectionTitle>
+        <SetupChangedSincePreviousList
+          rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
+        />
       </div>
 
       <div className="space-y-2">
@@ -1213,27 +1179,25 @@ function RunDetail({
         ) : null}
       </div>
 
-      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-        <div className="ui-label-caps">Setup vs previous run</div>
-        <SetupChangedSincePreviousList
-          rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
-        />
-        {allowRunMutations ? (
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleDeleteRun}
-              disabled={deleting}
-              aria-label={deleting ? "Deleting run" : "Delete run"}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
-              title="Permanently delete this run"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden />
-            </button>
-          </div>
-        ) : null}
-        {deleteError ? <p className="text-[11px] text-destructive">{deleteError}</p> : null}
-      </div>
+      {allowRunMutations || deleteError ? (
+        <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+          {allowRunMutations ? (
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleDeleteRun}
+                disabled={deleting}
+                aria-label={deleting ? "Deleting run" : "Delete run"}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-60 transition"
+                title="Permanently delete this run"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          ) : null}
+          {deleteError ? <p className="text-[11px] text-destructive">{deleteError}</p> : null}
+        </div>
+      ) : null}
     </CardPanel>
   );
 }
@@ -1291,7 +1255,7 @@ function DetailRow({
   const show = emptyAsDash && !value.trim() ? "—" : value;
   return (
     <div>
-      <Eyebrow>{label}</Eyebrow>
+      <SectionTitle as="div" style={{ color: "var(--primary)" }}>{label}</SectionTitle>
       <div
         className={cn(
           prose ? "text-[13px] leading-relaxed" : RUN_HISTORY_DATA_CLASS,

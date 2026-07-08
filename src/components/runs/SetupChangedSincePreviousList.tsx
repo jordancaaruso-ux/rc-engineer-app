@@ -1,8 +1,11 @@
 "use client";
 
-import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
+import { Fragment } from "react";
 import type { SetupChangedRow } from "@/lib/setupCompare/changedSincePrevious";
 import { cn } from "@/lib/utils";
+
+const HEAD_CELL =
+  "sticky top-0 z-10 border-b border-border bg-secondary/95 py-2 font-mono text-[9px] uppercase tracking-[0.2em] text-faint backdrop-blur-sm";
 
 /**
  * "Setup vs previous run" changed-field list — shared by the Sessions expanded
@@ -33,26 +36,33 @@ export function SetupChangedSincePreviousList({
   return (
     <div
       className={cn(
-        "rounded-md border border-border bg-muted/70 divide-y divide-border max-h-48 overflow-y-auto",
+        "max-h-48 overflow-y-auto rounded-md border border-border bg-muted/70",
         className
       )}
     >
-      {rows.map((row) => (
-        <div
-          key={`${row.label}:${row.value}:${row.previousValue}`}
-          className="px-3 py-2 flex flex-col gap-0.5 text-xs sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"
-        >
-          <span className="text-muted-foreground shrink-0">{row.label}</span>
-          <div className="min-w-0 text-right sm:text-left">
-            <span className={cn(RUN_HISTORY_DATA_CLASS, "text-foreground")}>{row.value}</span>
-            <span
-              className={cn(RUN_HISTORY_DATA_CLASS, "block text-muted-foreground sm:inline sm:ml-2")}
-            >
-              was {row.previousValue}
-            </span>
-          </div>
-        </div>
-      ))}
+      {/* Single grid so NOW / WAS align in fixed columns across every row —
+          the widest value in each column sets its width (instrument table). */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline">
+        <div className={cn(HEAD_CELL, "pl-3.5 pr-2 text-left")}>Parameter</div>
+        <div className={cn(HEAD_CELL, "px-2 text-right")}>Now</div>
+        <div className={cn(HEAD_CELL, "pl-2 pr-3.5 text-right")}>Was</div>
+        {rows.map((row, i) => {
+          const divider = i > 0 ? "border-t border-border/50" : undefined;
+          return (
+            <Fragment key={`${row.label}:${row.value}:${row.previousValue}`}>
+              <div className={cn("min-w-0 truncate pl-3.5 pr-2 py-[7px] text-[13px] leading-tight text-muted-foreground", divider)}>
+                {row.label}
+              </div>
+              <div className={cn("px-2 py-[7px] text-right font-mono text-[13px] tabular-nums leading-tight text-foreground", divider)}>
+                {row.value}
+              </div>
+              <div className={cn("pl-2 pr-3.5 py-[7px] text-right font-mono text-[12px] tabular-nums leading-tight text-faint line-through", divider)}>
+                {row.previousValue}
+              </div>
+            </Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }

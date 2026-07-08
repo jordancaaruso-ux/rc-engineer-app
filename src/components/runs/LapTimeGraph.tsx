@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 
 /**
  * Lap-by-lap time graph for a single run (Sessions expanded view). Follows the
@@ -10,7 +9,9 @@ import { cn } from "@/lib/utils";
  *
  * The y-axis is clamped to clean pace (best included lap → best + 15%) so a
  * crash lap doesn't flatten the real variation; clamped laps pin to the top
- * edge as hollow triangles carrying the true time in their tooltip.
+ * edge as triangles carrying the true time in their tooltip. Excluded laps
+ * (timing artifacts / invalid fast laps) are skipped entirely — the line
+ * bridges across their slot.
  */
 
 export type LapGraphRow = {
@@ -33,30 +34,22 @@ const PAD_BOTTOM = 22;
 const CLAMP_FACTOR = 1.15;
 
 /**
- * Index-aligned dashed baseline as polyline segments: each included lap becomes
- * a point (clamped into [lo, hi]); excluded laps break the line so an outlier
- * doesn't drag a segment across the plot.
+ * Index-aligned dashed baseline: each included lap becomes a point (clamped
+ * into [lo, hi]); excluded laps are skipped entirely, the line bridging their
+ * neighbours, so timing artifacts never appear on the trace.
  */
-function buildBaselineSegments(
+function buildBaselinePoints(
   baseline: LapGraphRow[],
   xAt: (i: number) => number,
   yAt: (v: number) => number,
   lo: number,
   hi: number
-): string[] {
-  const segments: string[] = [];
-  let current: string[] = [];
-  baseline.forEach((r, i) => {
-    if (!r.isIncluded) {
-      if (current.length > 1) segments.push(current.join(" "));
-      current = [];
-      return;
-    }
-    const clamped = Math.min(Math.max(r.lapTimeSeconds, lo), hi);
-    current.push(`${xAt(i)},${yAt(clamped)}`);
-  });
-  if (current.length > 1) segments.push(current.join(" "));
-  return segments;
+): string {
+  return baseline
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.isIncluded)
+    .map(({ r, i }) => `${xAt(i)},${yAt(Math.min(Math.max(r.lapTimeSeconds, lo), hi))}`)
+    .join(" ");
 }
 
 export function LapTimeGraph({
@@ -67,6 +60,8 @@ export function LapTimeGraph({
   medianSeconds,
   baseline,
   baselineLabel,
+  lineColor = LINE_COLOR,
+  baselineColor,
 }: {
   rows: LapGraphRow[];
   bestLapNumbers: Set<number>;
@@ -76,6 +71,10 @@ export function LapTimeGraph({
   /** Reference trace under the main series (driver compare: your laps, faint). */
   baseline?: LapGraphRow[] | null;
   baselineLabel?: string | null;
+  /** Identity hue for the main pace series (driver compare). Defaults to neutral ink. */
+  lineColor?: string;
+  /** Identity hue for the dashed baseline; when set it renders bolder than the neutral default. */
+  baselineColor?: string;
 }) {
   const [chartWidth, setChartWidth] = useState(340);
   const chartRef = useRef<HTMLDivElement | null>(null);
@@ -97,12 +96,15 @@ export function LapTimeGraph({
     const anchor = included.length > 0 ? included : rows.map((r) => r.lapTimeSeconds);
     const best = Math.min(...anchor);
     const cap = best * CLAMP_FACTOR;
+    // Excluded laps never render, so the window and clamp markers only care
+    // about included pace.
     const inWindow = rows
+      .filter((r) => r.isIncluded)
       .map((r) => r.lapTimeSeconds)
       .filter((t) => t <= cap);
     let min = best;
     let max = inWindow.length > 0 ? Math.max(...inWindow) : cap;
-    const anyClamped = rows.some((r) => r.lapTimeSeconds > cap);
+    const anyClamped = rows.some((r) => r.isIncluded && r.lapTimeSeconds > cap);
     if (anyClamped) max = Math.max(max, cap);
     if (max - min < 0.4) {
       // Metronomic run — pad so the line doesn't collapse flat.
@@ -130,8 +132,13 @@ export function LapTimeGraph({
 
   const { xAt, yAt, ticks, lo, hi, cap } = geometry;
   const labelStep = Math.max(1, Math.ceil(rows.length / 8));
+  // Excluded laps (timing artifacts, invalid fast laps) are skipped — the line
+  // bridges straight across their slot. X stays index-aligned so lap N of the
+  // baseline still sits under lap N of the main series.
   const linePoints = rows
-    .map((r, i) => `${xAt(i)},${yAt(r.lapTimeSeconds)}`)
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.isIncluded)
+    .map(({ r, i }) => `${xAt(i)},${yAt(r.lapTimeSeconds)}`)
     .join(" ");
 
   return (
@@ -207,46 +214,42 @@ export function LapTimeGraph({
         {baseline && baseline.length >= 2 ? (
           <g>
             <title>{baselineLabel ?? "Baseline"}</title>
-            {/* Faint dashed reference of the comparison run. Excluded laps break
-                the line (index-aligned to the main series) so an outlier in the
-                reference doesn't spike it; points are clamped into the window. */}
-            {buildBaselineSegments(baseline, xAt, yAt, lo, hi).map((segment) => (
-              <polyline
-                key={segment}
-                points={segment}
-                fill="none"
-                stroke={LINE_COLOR}
-                strokeWidth={1.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeOpacity={0.35}
-                strokeDasharray="4 3"
-              />
-            ))}
+            {/* Dashed reference of the comparison run — excluded laps skipped,
+                line bridged, points clamped into the window. */}
+            <polyline
+              points={buildBaselinePoints(baseline, xAt, yAt, lo, hi)}
+              fill="none"
+              stroke={baselineColor ?? LINE_COLOR}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeOpacity={baselineColor ? 0.8 : 0.35}
+              strokeDasharray="4 3"
+            />
           </g>
         ) : null}
 
         <polyline
           points={linePoints}
           fill="none"
-          stroke={LINE_COLOR}
+          stroke={lineColor}
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeOpacity={0.75}
+          strokeOpacity={0.9}
         />
 
         {rows.map((r, i) => {
+          if (!r.isIncluded) return null; // excluded laps never plot
           const clamped = cap != null && r.lapTimeSeconds > cap;
           const isMistake = mistakeLapNumbers.has(r.lapNumber);
           const isBest = bestLapNumbers.has(r.lapNumber);
-          const color = isMistake ? MISTAKE_COLOR : isBest ? BEST_COLOR : LINE_COLOR;
+          const color = isMistake ? MISTAKE_COLOR : isBest ? BEST_COLOR : lineColor;
           const mistakeDetail = mistakeDetailByLapNumber.get(r.lapNumber);
           const title = [
             `Lap ${r.lapNumber} — ${r.lapTimeSeconds.toFixed(3)}s`,
             isBest ? "Best lap" : null,
             mistakeDetail ? `${mistakeDetail} vs median` : null,
-            !r.isIncluded ? "Excluded from stats" : null,
             clamped ? "Off the clean-pace scale" : null,
           ]
             .filter(Boolean)
@@ -254,12 +257,12 @@ export function LapTimeGraph({
           const x = xAt(i);
           const y = yAt(r.lapTimeSeconds);
           return (
-            <g key={r.lapNumber} opacity={r.isIncluded ? 1 : 0.45}>
+            <g key={r.lapNumber}>
               <title>{title}</title>
               {clamped ? (
                 <path
                   d={`M ${x} ${y - 3.5} L ${x + 3.5} ${y + 3} L ${x - 3.5} ${y + 3} Z`}
-                  fill={r.isIncluded ? color : "none"}
+                  fill={color}
                   stroke={color}
                   strokeWidth={1.25}
                 />
@@ -268,10 +271,8 @@ export function LapTimeGraph({
                   cx={x}
                   cy={y}
                   r={isBest || isMistake ? 3 : 2.5}
-                  fill={r.isIncluded ? color : "none"}
-                  stroke={r.isIncluded ? undefined : color}
-                  strokeWidth={r.isIncluded ? undefined : 1.25}
-                  className={cn(r.isIncluded && "stroke-card")}
+                  fill={color}
+                  className="stroke-card"
                 />
               )}
             </g>

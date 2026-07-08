@@ -12,6 +12,7 @@ import {
 } from "@/lib/setupCalibrations/calibrationAccess";
 import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { SetupCalibrationEditorClient } from "@/components/setup-documents/SetupCalibrationEditorLazy";
+import { DeriveImageMapButton } from "@/components/setup-documents/DeriveImageMapButton";
 import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function SetupCalibrationDetailPage({
@@ -45,7 +46,7 @@ export default async function SetupCalibrationDetailPage({
       userId: true,
       setupSheetModel: { select: { id: true, name: true } },
       exampleDocument: {
-        select: { id: true, originalFilename: true },
+        select: { id: true, originalFilename: true, mimeType: true },
       },
     },
   });
@@ -53,12 +54,16 @@ export default async function SetupCalibrationDetailPage({
   const canManage = canManageCalibration(user, calibration);
   const normalizedData = normalizeCalibrationData(calibration.calibrationDataJson);
   const mappingCounts = calibrationMappingCounts(normalizedData);
-  // Image-based calibrations (e.g. blank-sheet auto calibrations) are edited in the image
-  // box editor — this page's editor reads PDF form fields and breaks on image example docs.
-  if (normalizedData.imageCalibration && calibration.exampleDocumentId && canManage) {
+  const exampleIsPdf = (calibration.exampleDocument?.mimeType ?? "") === "application/pdf";
+  // Genuine image-region calibrations (image example doc, e.g. blank-sheet auto calibrations) are
+  // edited in the image box editor. An AcroForm calibration that merely *derived* an image map
+  // keeps a PDF example doc and stays on this editor (two-lane: AcroForm mappings + image map).
+  if (normalizedData.imageCalibration && calibration.exampleDocumentId && canManage && !exampleIsPdf) {
     redirect(`/setup-documents/${calibration.exampleDocumentId}/calibrate-image`);
   }
-  if (normalizedData.imageCalibration && canManage) {
+  // Image-only calibration with no editable PDF example — the box editor can't open it. (A PDF
+  // AcroForm calibration that derived an image map has a PDF example and falls through to its editor.)
+  if (normalizedData.imageCalibration && canManage && !exampleIsPdf) {
     return (
       <>
         <header className="page-header">
@@ -126,6 +131,13 @@ export default async function SetupCalibrationDetailPage({
               currentModelId={calibration.setupSheetModelId}
               currentModelName={calibration.setupSheetModel?.name ?? null}
             />
+            {exampleIsPdf && calibration.exampleDocumentId && mappingCounts.formFields > 0 ? (
+              <DeriveImageMapButton
+                calibrationId={calibration.id}
+                previewUrl={`/api/setup-documents/${calibration.exampleDocumentId}/file`}
+                hasImageMap={mappingCounts.imageFields > 0}
+              />
+            ) : null}
             <SetupCalibrationEditorClient
               calibrationId={calibration.id}
               documentId={calibration.exampleDocumentId ?? ""}

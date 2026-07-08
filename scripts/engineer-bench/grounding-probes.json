@@ -1,0 +1,36 @@
+{
+  "_comment": "Differential-grounding sweep config (ENGINEER_SUGGESTION_QUALITY_PLAN step 1, context-diversity). Each probe is answered against EVERY fixture; groundingDivergence.ts measures whether context-sensitive answers adapt and context-invariant ones stay stable. Populate `fixtures` with varied runIds via `npm run engineer:bench:grounding -- --list-runs`. runId: null or \"none\" = cold/no-history; \"latest\" = most recent run.",
+  "fixtures": [
+    { "label": "cold-no-history", "runId": null, "descriptor": "brand-new user, zero runs (control)" },
+    { "label": "loose-still-quick", "runId": "cmqwz47h70003l504hmjwt092", "descriptor": "Bayside r6 — pretty loose, still quick" },
+    { "label": "lowspeed-understeer", "runId": "cmqvmdzqc0003l2046va8myno", "descriptor": "Bayside r8 — low-speed understeer, 4.4 front" },
+    { "label": "lowgrip-drying", "runId": "cmqn6qwyf0003kv04ppj67lgi", "descriptor": "TFTR r7 — grip super low, track drying" },
+    { "label": "dialed-keep-it", "runId": "cmqvqbcr70003js04qpnedkv1", "descriptor": "Bayside r8 — feels very good, probably keep it" }
+  ],
+  "probes": [
+    {
+      "id": "mid-corner-push",
+      "sensitivity": "sensitive",
+      "mode": "quick",
+      "question": "The car pushes through the middle of the corner. What one change should I try?"
+    },
+    {
+      "id": "loose-on-power",
+      "sensitivity": "sensitive",
+      "mode": "quick",
+      "question": "It's getting loose on power out of slow corners. What should I do?"
+    },
+    {
+      "id": "what-next",
+      "sensitivity": "sensitive",
+      "mode": "normal",
+      "question": "Based on my recent runs, what should I work on next?"
+    },
+    {
+      "id": "damper-oil-teach",
+      "sensitivity": "invariant",
+      "mode": "normal",
+      "question": "What does running thicker damper oil actually do to the car?"
+    }
+  ]
+}

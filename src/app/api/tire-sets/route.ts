@@ -22,7 +22,7 @@ export async function GET() {
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const tireSets = await prisma.tireSet.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, archivedAt: null },
     orderBy: [{ label: "asc" }, { setNumber: "asc" }, { createdAt: "desc" }],
     select: TIRE_SET_SELECT,
   });

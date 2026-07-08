@@ -1,4 +1,4 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
@@ -20,15 +20,45 @@ import {
   applyPostFingerprintPickLinks,
   pickCalibrationByFingerprint,
 } from "@/lib/setupCalibrations/fingerprintPick";
-import {
-  buildImageCalibrationCandidates,
-  repickImageCalibrationForBytes,
-} from "@/lib/setupCalibrations/autoPickImageCalibration";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
 import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
-import { ensureSheetModelForUpload } from "@/lib/setupExtractAi/ensureSheetModelForUpload";
 import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
+import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
+import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+
+/**
+ * The image-map calibration for a car's setup-sheet model, if one exists — the model's default
+ * calibration when it carries an image map, else any visible calibration for the model that does.
+ * Returns null when the model has no derived image map yet, so the caller can block and prompt the
+ * driver to derive one (image uploads read values ONLY through a real derived calibration).
+ */
+async function resolveModelImageCalibration(
+  userId: string,
+  setupSheetModelId: string
+): Promise<{ id: string; name: string } | null> {
+  const model = await prisma.setupSheetModel.findUnique({
+    where: { id: setupSheetModelId },
+    select: { defaultCalibration: { select: { id: true, name: true, calibrationDataJson: true } } },
+  });
+  if (
+    model?.defaultCalibration &&
+    normalizeCalibrationData(model.defaultCalibration.calibrationDataJson).imageCalibration
+  ) {
+    return { id: model.defaultCalibration.id, name: model.defaultCalibration.name };
+  }
+  const cals = await prisma.setupSheetCalibration.findMany({
+    where: { ...calibrationsVisibleToUserWhere(userId), setupSheetModelId },
+    select: { id: true, name: true, calibrationDataJson: true },
+    orderBy: { createdAt: "desc" },
+  });
+  for (const c of cals) {
+    if (normalizeCalibrationData(c.calibrationDataJson).imageCalibration) {
+      return { id: c.id, name: c.name };
+    }
+  }
+  return null;
+}
 
 const PDF_MIME = "application/pdf";
 
@@ -208,6 +238,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   };
   let pickUserNote: string | null = null;
   let calibrationModelMismatch = false;
+  // Image uploads are car-driven: block (don't process, don't AI-guess) when the car's sheet has
+  // no derived image map, or when there's no car context to read the image against.
+  let imageBlockReason: string | null = null;
+  let imageNeedsCar = false;
   if (mimeType === PDF_MIME) {
     try {
       const pick = await pickCalibrationByFingerprint({
@@ -238,19 +272,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       pickUserNote = "Fingerprint matching failed — pick a calibration manually.";
     }
   } else if (mimeType.startsWith("image/")) {
-    try {
-      const candidates = await buildImageCalibrationCandidates({ userId: user.id });
-      outcome = await repickImageCalibrationForBytes(bytes, candidates, {
-        debugPrefix: "quickCreate:imageAuto",
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      outcome = {
-        pickedCalibrationId: null,
-        pickedCalibrationName: null,
-        pickSource: "none",
-        pickDebug: `quickCreate:imageAuto fingerprint_error=${msg.slice(0, 200)}`,
-      };
+    // Car-driven (design 2026-07-08): read VALUES only through the resolved car's model's derived
+    // image calibration. Never fingerprint-match across other calibrations, never invent a model.
+    if (setupSheetModelId) {
+      const modelCal = await resolveModelImageCalibration(user.id, setupSheetModelId);
+      if (modelCal) {
+        outcome = {
+          pickedCalibrationId: modelCal.id,
+          pickedCalibrationName: modelCal.name,
+          pickSource: "exact_fingerprint",
+          pickDebug: `quickCreate:imageModelCal=${modelCal.name}`,
+        };
+      } else {
+        imageBlockReason =
+          "This car's setup sheet has no image map yet. Open its calibration, click “Derive image map” once, then re-upload the screenshot.";
+      }
+    } else if (carId) {
+      imageBlockReason =
+        "This car has no setup sheet model yet. Build its sheet from the AcroForm PDF before importing screenshots.";
+    } else {
+      imageNeedsCar = true;
     }
   }
 
@@ -275,44 +316,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   }
 
-  // AI front door (SETUP_UPLOAD_NORTH_STAR.md Stage 1.4/1.5, flag-gated): an image no
-  // calibration recognized → read the printed brand/model from the sheet, match the global
-  // model catalog, or — genuinely new car — draft its schema and create a provisional
-  // model (isAuthorized:false) + car so the upload proceeds instead of dead-ending.
-  let aiFrontDoorNote: string | null = null;
-  if (
-    process.env.SETUP_AI_EXTRACT === "1"
-    && !detectedModelId
-    && !outcome.pickedCalibrationId
-    && mimeType.startsWith("image/")
-  ) {
-    try {
-      const ensured = await ensureSheetModelForUpload({
-        userId: user.id,
-        imageBytes: Buffer.from(bytes),
-        mimeType,
-      });
-      if (ensured.outcome === "matched" || ensured.outcome === "created") {
-        detectedModelId = ensured.modelId;
-        detectedModelName = ensured.modelName;
-        setupSheetModelId = ensured.modelId;
-        const modelRow = await prisma.setupSheetModel.findUnique({
-          where: { id: ensured.modelId },
-          select: { slug: true },
-        });
-        if (modelRow) setupSheetTemplate = templateKeyFromModelSlug(modelRow.slug);
-        if (ensured.outcome === "created") {
-          carId = ensured.carId;
-          aiFrontDoorNote = `Identified as ${ensured.identifiedName} — new to the app, so a car and its setup sheet (${ensured.fieldCount} fields) were created for you.`;
-        } else {
-          aiFrontDoorNote = `Identified from the sheet as ${ensured.identifiedName}.`;
-        }
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[setup-documents/quick-create] ai front door error=${msg.slice(0, 300)}`);
-    }
-  }
+  // AI front door removed (2026-07-08): image uploads never invent a model or draft parameters.
+  // The car determines the sheet; an unrecognized image is routed to car selection / calibration.
 
   if (!carId && detectedModelId) {
     const cars = await prisma.car.findMany({
@@ -326,6 +331,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     } else if (cars.length > 1) {
       carCandidates = cars;
     }
+  }
+
+  // Image with no car context: offer the driver's own cars so they can say which it's for.
+  if (imageNeedsCar && carCandidates.length === 0) {
+    carCandidates = await prisma.car.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true },
+      take: 25,
+    });
   }
 
   // Legacy fallback: calibration matched but carries no model link — reuse the old template heuristic.
@@ -363,8 +378,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     (mimeType === PDF_MIME || mimeType.startsWith("image/"));
 
   // Persist a plain-language note (shown on the review screen via calibrationResolvedDebug).
-  if (!pickUserNote && aiFrontDoorNote) {
-    pickUserNote = aiFrontDoorNote;
+  if (!pickUserNote && imageBlockReason) {
+    pickUserNote = imageBlockReason;
   }
   if (!pickUserNote) {
     if (carCandidates.length > 1) {
@@ -447,18 +462,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   // timeout), so it runs after the response and the document page live-refreshes until done.
   let needsReview = false;
   let needsReviewReason: string | null = null;
-  const aiAsyncExtraction = aiFrontDoorNote !== null;
-  if (aiAsyncExtraction) {
+  const imageBlocked = Boolean(imageBlockReason) || imageNeedsCar;
+  if (imageBlocked) {
+    // Do NOT run the import pipeline: no derived calibration means no values to read, and we never
+    // fall back to AI-guessing the sheet. Surface the actionable reason for the review screen.
     needsReview = true;
-    needsReviewReason = `${aiFrontDoorNote} The setup is being read now — values appear on the document page in a minute or two.`;
-    after(async () => {
-      try {
-        await processSetupDocumentImport({ docId: created.id, userId: user.id });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.warn(`[setup-documents/quick-create] doc=${created.id} async processImport error=${msg}`);
-      }
-    });
+    needsReviewReason = imageBlockReason ?? "Pick which of your cars this screenshot is for.";
   } else {
     try {
       await processSetupDocumentImport({ docId: created.id, userId: user.id });

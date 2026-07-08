@@ -27,19 +27,20 @@ export async function DELETE(
   const runCount = await prisma.run.count({
     where: { userId: user.id, batteryId },
   });
+
+  // Packs linked to runs are archived (soft-deleted) so the run history keeps its
+  // battery attribution; unused packs are removed outright.
   if (runCount > 0) {
-    return NextResponse.json(
-      {
-        error: `Cannot delete — ${runCount} run${runCount === 1 ? "" : "s"} still linked to this pack.`,
-        runCount,
-      },
-      { status: 409 }
-    );
+    await prisma.battery.updateMany({
+      where: { id: batteryId, userId: user.id },
+      data: { archivedAt: new Date() },
+    });
+    return NextResponse.json({ ok: true, archived: true, runCount });
   }
 
   await prisma.battery.deleteMany({
     where: { id: batteryId, userId: user.id },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, archived: false });
 }

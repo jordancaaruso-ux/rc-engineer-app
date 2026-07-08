@@ -73,9 +73,11 @@ export function inferPrimaryHandlingIssue(
   const traits: Array<{ label: string; value: PhaseBalance; abs: number }> = [];
   const traitDefs: Array<{ key: keyof typeof handling; label: string }> = [
     { key: "feelSteering", label: "steering feel" },
-    { key: "feelGeneral", label: "general feel" },
-    { key: "driveEase", label: "drive difficulty" },
+    { key: "onPower", label: "on-power grip" },
+    { key: "braking", label: "braking stability" },
+    { key: "driveEase", label: "drivability" },
     { key: "tractionRoll", label: "traction rolling" },
+    { key: "feelGeneral", label: "general feel" },
   ];
   for (const t of traitDefs) {
     const v = handling[t.key];

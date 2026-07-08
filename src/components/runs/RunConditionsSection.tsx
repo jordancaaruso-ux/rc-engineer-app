@@ -31,8 +31,8 @@ type RunConditionsSectionProps = {
 
 /** Sky override chips → representative WMO weather codes. */
 const SKY_CHOICES: Array<{ label: string; code: number }> = [
-  { label: "Sunny", code: 0 },
-  { label: "Mostly sunny", code: 1 },
+  { label: "Clear", code: 0 },
+  { label: "Mostly clear", code: 1 },
   { label: "Partly cloudy", code: 2 },
   { label: "Overcast", code: 3 },
   { label: "Rain", code: 63 },

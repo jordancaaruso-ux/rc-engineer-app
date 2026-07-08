@@ -22,7 +22,7 @@ export async function GET() {
 
   const [tireSets, runs] = await Promise.all([
     prisma.tireSet.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, archivedAt: null },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

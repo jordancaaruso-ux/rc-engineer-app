@@ -144,7 +144,7 @@ async function loadBatteryRunStats(userId: string, batteryIds: string[]): Promis
 
 export async function loadUserTireSetsForList(userId: string): Promise<UserTireSetListItem[]> {
   const tireSets = await prisma.tireSet.findMany({
-    where: { userId },
+    where: { userId, archivedAt: null },
     orderBy: [{ label: "asc" }, { setNumber: "asc" }, { createdAt: "desc" }],
     select: TIRE_SET_SELECT,
   });
@@ -172,7 +172,7 @@ export async function loadUserTireSetsForList(userId: string): Promise<UserTireS
 
 export async function loadUserBatteriesForList(userId: string): Promise<UserBatteryListItem[]> {
   const batteries = await prisma.battery.findMany({
-    where: { userId },
+    where: { userId, archivedAt: null },
     orderBy: [{ label: "asc" }, { packNumber: "asc" }, { createdAt: "desc" }],
     select: BATTERY_SELECT,
   });

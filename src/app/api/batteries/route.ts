@@ -10,7 +10,7 @@ export async function GET() {
   const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const batteries = await prisma.battery.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, archivedAt: null },
     orderBy: [{ label: "asc" }, { packNumber: "asc" }, { createdAt: "desc" }],
     select: { id: true, label: true, packNumber: true, initialRunCount: true },
   });

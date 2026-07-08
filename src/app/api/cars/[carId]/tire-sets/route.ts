@@ -26,7 +26,7 @@ export async function GET(
   }
 
   const tireSets = await prisma.tireSet.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, archivedAt: null },
     orderBy: [{ label: "asc" }, { setNumber: "asc" }, { createdAt: "desc" }],
     select: { id: true, label: true, setNumber: true,initialRunCount: true }
   });

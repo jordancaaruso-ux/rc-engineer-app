@@ -189,22 +189,6 @@ export function SetupSheetModelSchemaEditor(props: {
 
   return (
     <div className="space-y-4">
-      <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Define parameters for this sheet model (types and options are stored here — the source of truth for PDF
-        calibration). Optionally link a field to a universal parameter for cross-car stats. Calibrate your PDF in the
-        next step. Use <span className="font-medium text-foreground">Show on sheet</span> for the full setup page and
-        PDF review; use <span className="font-medium text-foreground">Show in log run</span> for logging a run;
-        use <span className="font-medium text-foreground">Show in analysis</span> for compare / analysis views.
-        Parameters marked <span className="font-medium text-foreground">Not in layout</span> need{" "}
-        <span className="font-medium text-foreground">Add to sheet</span> or the{" "}
-        <span className="font-medium text-foreground">Layout</span> tab. Corner fields (
-        <span className="font-mono">*_ff</span>, <span className="font-mono">*_fr</span>, …) and front/rear pairs are
-        grouped automatically when keys end in <span className="font-mono">_front</span> /{" "}
-        <span className="font-mono">_rear</span> or corner suffixes. Select parameters below to{" "}
-        <span className="font-medium text-foreground">group manually</span> when auto-group misses a
-        pair or corner row (e.g. clip / o-ring — front &amp; rear).
-      </p>
-
       {!readOnly ? (
         <button
           type="button"

@@ -67,7 +67,7 @@ export function FeelVsLastRunQuickPick({
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="text-xs font-medium text-foreground">
+        <div className="text-xs font-medium text-muted-foreground">
           Compared to last run with this car
         </div>
         <div

@@ -448,6 +448,8 @@ model TireSet {
   specificModel String?
   notes      String?
   createdAt  DateTime @default(now())
+  /** Soft delete: hidden from pickers/lists but kept so linked run history stays intact. */
+  archivedAt DateTime?
 
   tireType   TireType? @relation(fields: [tireTypeId], references: [id], onDelete: SetNull)
   tireTypeId String?
@@ -468,6 +470,8 @@ model Battery {
   initialRunCount Int      @default(0)
   notes           String?
   createdAt       DateTime @default(now())
+  /** Soft delete: hidden from pickers/lists but kept so linked run history stays intact. */
+  archivedAt      DateTime?
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
-import { CarSetupWizardClient } from "@/components/cars/CarSetupWizardClient";
+import { SetupSheetModelWizardClient } from "@/components/cars/CarSetupWizardClient";
 
 export default async function SetupSheetModelNewSetupPage() {
   const user = await getAuthenticatedApiUser();
@@ -13,13 +13,14 @@ export default async function SetupSheetModelNewSetupPage() {
         <Link href="/setup-sheet-models" className="text-xs text-muted-foreground hover:text-foreground">
           ← Chassis types
         </Link>
-        <h1 className="ui-title mt-2 text-lg">New car & setup sheet</h1>
+        <h1 className="ui-title mt-2 text-lg">New setup sheet model</h1>
         <p className="mt-1 text-sm text-muted-foreground max-w-xl">
-          Define the parameter list for this car model, upload your setup PDF, then map fields in the calibration
-          editor.
+          Add a car <span className="font-medium text-foreground">type</span> to the app: upload its editable AcroForm
+          PDF and the AI drafts the parameter list from the sheet&rsquo;s field boxes for you to review. Add your own
+          car in Assets › Cars.
         </p>
       </div>
-      <CarSetupWizardClient />
+      <SetupSheetModelWizardClient />
     </section>
   );
 }

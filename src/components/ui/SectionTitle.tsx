@@ -1,16 +1,18 @@
-import type { ElementType, ReactNode } from "react";
+import type { CSSProperties, ElementType, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export function SectionTitle({
   as: Tag = "h2",
   className,
+  style,
   children,
 }: {
   as?: ElementType;
   className?: string;
+  style?: CSSProperties;
   children: ReactNode;
 }) {
-  return <Tag className={cn("section-title", className)}>{children}</Tag>;
+  return <Tag className={cn("section-title", className)} style={style}>{children}</Tag>;
 }
 
 export function SectionMeta({

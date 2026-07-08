@@ -46,16 +46,51 @@ type RaceFieldDriver = {
 const CLAIM_DISTANCE = 8;
 /** Drag distance (px) that commits a driver change on release. */
 const COMMIT_DISTANCE = 56;
+/** Horizontal overlap (rem) that makes the tabs cascade like browser tabs. */
+const TAB_OVERLAP_REM = 0.55;
+
+/**
+ * Identity hues for the driver-compare view: your run vs the selected competitor.
+ * Applied to both the notebook tab and the matching lap-graph trace so the eye
+ * ties tab → laps → line together. (Yellow is normally action-only; here it reads
+ * as "you" against the competitor teal in an explicit comparison surface.)
+ */
+export const RACE_IDENTITY = {
+  you: "#FFD60A",
+  competitor: "#2DD4BF",
+} as const;
+
+/**
+ * Compact tab code for a driver: your own tab reads `YOU`; everyone else is the
+ * first three letters of their last name, uppercased (e.g. Jordan Caruso → CAR).
+ * Collisions across the field are acceptable — the tooltip carries the full
+ * `P{position} {name}` label.
+ */
+function driverTabCode(driver: RaceFieldDriver): string {
+  if (driver.isUser) return "YOU";
+  const words = driver.name.trim().split(/\s+/).filter(Boolean);
+  const last = words.length > 0 ? words[words.length - 1] : "";
+  return last.slice(0, 3).toUpperCase() || "—";
+}
 
 export function RunRaceFieldSwitcher({
   runId,
   userView,
+  userStats,
+  userLapCard,
+  userGraph,
   userLapRows,
   enabled = true,
 }: {
   runId: string;
-  /** The existing single-run stats + laps + graph block, rendered untouched for your tab. */
+  /** Single-run layout (stats beside laps), rendered untouched when there's no field. */
   userView: ReactNode;
+  /** Your stats chips — rendered above the notebook tabs in compare mode. */
+  userStats: ReactNode;
+  /** Your lap-time grid card — the notebook page the tabs attach to. */
+  userLapCard: ReactNode;
+  /** Your lap graph (yellow trace) — rendered below the notebook in compare mode. */
+  userGraph: ReactNode;
   /** Your run's laps — the dashed baseline under other drivers' traces. */
   userLapRows: LapGraphRow[];
   /** Skip the field fetch entirely (e.g. manually-typed runs with no import). */
@@ -170,57 +205,98 @@ export function RunRaceFieldSwitcher({
 
   const selected = drivers[selectedIndex] ?? drivers[0];
 
-  return (
-    <div className="space-y-2">
-      <div
-        ref={tabsRef}
-        className="flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        role="tablist"
-        aria-label="Race field"
-      >
-        {drivers.map((driver) => {
-          const active = driver.id === selectedId;
-          return (
-            <button
-              key={driver.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              data-driver-id={driver.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedId(driver.id);
-              }}
-              className={cn(
-                "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] transition-colors",
-                active
-                  ? "border-ring/45 bg-muted text-foreground"
-                  : "border-border bg-secondary text-muted-foreground hover:text-foreground"
-              )}
-            >
-              P{driver.position} {driver.name}
-              {driver.isUser ? " · you" : ""}
-            </button>
-          );
-        })}
-      </div>
+  // The cascading notebook-tab strip. Rendered once and dropped in above whichever
+  // driver's lap card is showing (yours or a competitor's). It stops pointer events
+  // from reaching the swipe handler so the strip can scroll horizontally on its own.
+  const tabsNode = (
+    <div
+      ref={tabsRef}
+      className="-mb-px flex overflow-x-auto px-px pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      role="tablist"
+      aria-label="Race field"
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {drivers.map((driver, index) => {
+        const active = driver.id === selectedId;
+        const hue = driver.isUser ? RACE_IDENTITY.you : RACE_IDENTITY.competitor;
+        const fullLabel = `P${driver.position} ${driver.name}${driver.isUser ? " · you" : ""}`;
+        return (
+          <button
+            key={driver.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-label={fullLabel}
+            title={fullLabel}
+            data-driver-id={driver.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedId(driver.id);
+            }}
+            style={{
+              // Cascade: overlap the left neighbour; better-placed tabs stack on
+              // top, the active tab rises flush against the card below (a folder tab).
+              marginLeft: index === 0 ? undefined : `-${TAB_OVERLAP_REM}rem`,
+              zIndex: active ? drivers.length + 1 : drivers.length - index,
+              // Your tab stays yellow even when unselected — your yellow trace is
+              // still on every graph, so the tab keeps reading as "you".
+              color: active ? hue : driver.isUser ? RACE_IDENTITY.you : undefined,
+            }}
+            className={cn(
+              "relative shrink-0 overflow-hidden whitespace-nowrap rounded-t-md border border-b-0 py-1 pr-2.5 font-sans text-[11px] font-semibold tracking-tight transition-transform",
+              // Tucked tabs pad left so their text clears the overlapping
+              // neighbour; the active tab sits on top of the stack, so it goes
+              // back to symmetric padding.
+              index === 0 || active ? "pl-2.5" : "pl-4",
+              active
+                ? "translate-y-0 border-ring/40 bg-muted"
+                : "translate-y-[3px] border-border bg-secondary text-muted-foreground hover:translate-y-[1px] hover:text-foreground"
+            )}
+          >
+            {active ? (
+              // Identity-coloured top edge — ties the tab to its graph line.
+              <span
+                aria-hidden
+                className="absolute inset-x-0 top-0 h-[2px]"
+                style={{ backgroundColor: hue }}
+              />
+            ) : null}
+            {driverTabCode(driver)}
+          </button>
+        );
+      })}
+    </div>
+  );
 
-      <div
-        style={{ touchAction: "pan-y" }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={() => {
-          gestureRef.current = null;
-        }}
-        onClickCapture={onClickCapture}
-      >
-        {selected.isUser ? (
-          userView
-        ) : (
-          <RaceFieldDriverPanel key={selected.id} driver={selected} userLapRows={userLapRows} />
-        )}
-      </div>
+  return (
+    <div
+      className="space-y-3"
+      style={{ touchAction: "pan-y" }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        gestureRef.current = null;
+      }}
+      onClickCapture={onClickCapture}
+    >
+      {selected.isUser ? (
+        <>
+          {userStats}
+          <div className="min-w-0">
+            {tabsNode}
+            {userLapCard}
+          </div>
+          {userGraph}
+        </>
+      ) : (
+        <RaceFieldDriverPanel
+          key={selected.id}
+          driver={selected}
+          userLapRows={userLapRows}
+          tabs={tabsNode}
+        />
+      )}
     </div>
   );
 }
@@ -229,9 +305,12 @@ export function RunRaceFieldSwitcher({
 function RaceFieldDriverPanel({
   driver,
   userLapRows,
+  tabs,
 }: {
   driver: RaceFieldDriver;
   userLapRows: LapGraphRow[];
+  /** The shared notebook-tab strip, dropped in above this driver's lap card. */
+  tabs: ReactNode;
 }) {
   // Clean the raw timing-provider laps with the SAME median-band rule the app
   // applies to the user's own imported runs, so a competitor's grid/stats/graph
@@ -290,8 +369,8 @@ function RaceFieldDriverPanel({
         ))}
       </div>
 
-      <div className="min-w-0 space-y-1">
-        <div className="ui-label-caps">All laps ({rows.length})</div>
+      <div className="min-w-0">
+        {tabs}
         {rows.length > 0 ? (
           <div
             className={cn(
@@ -341,19 +420,35 @@ function RaceFieldDriverPanel({
 
       {rows.length >= 3 ? (
         <div className="space-y-1">
-          <div className="ui-label-caps">Lap graph</div>
           <LapTimeGraph
             rows={rows}
             bestLapNumbers={bestLapNumbers}
             mistakeLapNumbers={mistakeLapNumbers}
             mistakeDetailByLapNumber={mistakeDetailByLapNumber}
-            medianSeconds={dash.median ?? null}
+            medianSeconds={null}
+            lineColor={RACE_IDENTITY.competitor}
             baseline={userLapRows.length >= 2 ? userLapRows : null}
+            baselineColor={RACE_IDENTITY.you}
             baselineLabel="Your run"
           />
           {userLapRows.length >= 2 ? (
-            <p className="text-[10px] leading-snug text-muted-foreground">
-              Solid = {driver.name} · dashed = your run
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span
+                  className="inline-block h-0.5 w-3 rounded"
+                  style={{ backgroundColor: RACE_IDENTITY.competitor }}
+                />
+                {driver.name}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span
+                  className="inline-block h-0.5 w-3 rounded"
+                  style={{
+                    backgroundImage: `repeating-linear-gradient(to right, ${RACE_IDENTITY.you} 0 3px, transparent 3px 5px)`,
+                  }}
+                />
+                your run
+              </span>
             </p>
           ) : null}
         </div>

@@ -4,28 +4,26 @@ import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   buildPrimaryFocusOptions,
-  HANDLING_TRAIT_AXIS_UI,
+  CAPTURE_TRAIT_AXIS_KEYS,
+  HANDLING_SEVERITY_CHIP_LABELS,
+  HANDLING_TRAIT_CHIP_META,
+  sanitizeHandlingUiState,
+  type CaptureTraitAxisKey,
+  type CornerSpeed,
   type HandlingAssessmentUiState,
-  type HandlingTraitAxisKey,
+  type HandlingIssueKey,
   type PhaseBalance,
   type PrimaryFocus,
-  sanitizeHandlingUiState,
 } from "@/lib/runHandlingAssessment";
 
 const PHASE_ROWS: {
   stateKey: "balanceEntry" | "balanceMid" | "balanceExit";
+  phase: "entry" | "mid" | "exit";
   label: string;
 }[] = [
-  { stateKey: "balanceEntry", label: "Entry" },
-  { stateKey: "balanceMid", label: "Mid" },
-  { stateKey: "balanceExit", label: "Exit" },
-];
-
-const TRAIT_AXIS_KEYS: HandlingTraitAxisKey[] = [
-  "feelSteering",
-  "feelGeneral",
-  "driveEase",
-  "tractionRoll",
+  { stateKey: "balanceEntry", phase: "entry", label: "Entry" },
+  { stateKey: "balanceMid", phase: "mid", label: "Mid" },
+  { stateKey: "balanceExit", phase: "exit", label: "Exit" },
 ];
 
 const PHASE_BALANCE_LEVELS: PhaseBalance[] = [-3, -2, -1, 0, 1, 2, 3];
@@ -33,16 +31,15 @@ const PHASE_BALANCE_LEVELS: PhaseBalance[] = [-3, -2, -1, 0, 1, 2, 3];
 const PHASE_BALANCE_INFO =
   "US (understeer) = the front washes out and the car won't turn in. OS (oversteer) = the rear steps out and the car rotates too much. Mark how it felt through this part of the corner; the centre is neutral.";
 
-const TRAIT_AXIS_INFO: Record<HandlingTraitAxisKey, string> = {
-  feelSteering:
-    "How sharp the steering response feels — dull and muted at one end, sharp and aggressive at the other.",
-  feelGeneral:
-    "The car's overall demeanour — smooth and calm at one end, reactive and twitchy at the other.",
-  driveEase:
-    "How demanding the car is to drive at pace — hard and punishing at one end, easy and forgiving at the other.",
-  tractionRoll:
-    "How often the car trips over its tyres and traction-rolls — never at one end, often at the other.",
-};
+const CORNER_SPEEDS: CornerSpeed[] = ["slow", "fast", "both"];
+const SPEED_SHORT: Record<CornerSpeed, string> = { slow: "Slow", fast: "Fast", both: "Both" };
+const SEVERITIES: Array<1 | 2 | 3> = [1, 2, 3];
+
+/** Flat list of problem chips: bipolar traits (steering feel) contribute two. */
+const CHIP_DEFS: Array<{ axis: CaptureTraitAxisKey; sign: -1 | 1; label: string }> =
+  CAPTURE_TRAIT_AXIS_KEYS.flatMap((axis) =>
+    HANDLING_TRAIT_CHIP_META[axis].problemPoles.map((p) => ({ axis, sign: p.sign, label: p.label }))
+  );
 
 function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
   return sanitizeHandlingUiState(next);
@@ -151,11 +148,40 @@ function BalanceCircleScale({
   );
 }
 
-function primaryFocusSelectValue(ui: HandlingAssessmentUiState): string {
-  if (!ui.primaryFocus) return "";
-  const id = JSON.stringify(ui.primaryFocus);
-  const opts = buildPrimaryFocusOptions(ui);
-  return opts.some((o) => o.id === id) ? id : "";
+/** Slow / Fast / Both selector for a flagged issue. Tap the active one to clear. */
+function SpeedTagPicker({
+  value,
+  onChange,
+}: {
+  value: CornerSpeed | undefined;
+  onChange: (next: CornerSpeed | null) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] text-muted-foreground">Where?</span>
+      <div className="flex gap-1" role="group" aria-label="Where does it happen">
+        {CORNER_SPEEDS.map((s) => {
+          const selected = value === s;
+          return (
+            <button
+              key={s}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(selected ? null : s)}
+              className={cn(
+                "rounded-md border px-2 py-0.5 text-[10px] font-medium transition",
+                selected
+                  ? "border-accent bg-accent text-accent-foreground"
+                  : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {SPEED_SHORT[s]}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 type Props = {
@@ -176,19 +202,39 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
     n: PhaseBalance
   ) {
     const cur = value[stateKey];
-    emit({
-      ...value,
-      [stateKey]: cur === n ? null : n,
-    });
+    emit({ ...value, [stateKey]: cur === n ? null : n });
   }
 
-  function setTraitAxis(axis: HandlingTraitAxisKey, n: PhaseBalance) {
-    const cur = value[axis];
-    emit({
-      ...value,
-      [axis]: cur === n ? null : n,
-    });
+  function setSpeed(issueKey: HandlingIssueKey, speed: CornerSpeed | null) {
+    const nextTags = { ...value.speedTags };
+    if (speed == null) delete nextTags[issueKey];
+    else nextTags[issueKey] = speed;
+    emit({ ...value, speedTags: nextTags });
   }
+
+  /** Toggle / set a trait chip. sign fixes the problem pole; default severity = moderate. */
+  function toggleTraitChip(axis: CaptureTraitAxisKey, sign: -1 | 1) {
+    const cur = value[axis];
+    const active = cur != null && cur !== 0 && Math.sign(cur) === sign;
+    if (active) {
+      emit({ ...value, [axis]: null });
+      return;
+    }
+    const severity = cur != null && cur !== 0 ? (Math.abs(cur) as 1 | 2 | 3) : 2;
+    emit({ ...value, [axis]: (sign * severity) as PhaseBalance });
+  }
+
+  function setTraitSeverity(axis: CaptureTraitAxisKey, severity: 1 | 2 | 3) {
+    const cur = value[axis];
+    if (cur == null || cur === 0) return;
+    const sign = Math.sign(cur);
+    emit({ ...value, [axis]: (sign * severity) as PhaseBalance });
+  }
+
+  const activeTraitAxes = CAPTURE_TRAIT_AXIS_KEYS.filter((axis) => {
+    const v = value[axis];
+    return v != null && v !== 0;
+  });
 
   return (
     <div className="space-y-4 inset-panel p-3">
@@ -196,8 +242,10 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
         <div className="text-xs font-medium text-muted-foreground">
           Corner balance (understeer → oversteer, per phase)
         </div>
-        {PHASE_ROWS.map(({ stateKey, label }) => {
+        {PHASE_ROWS.map(({ stateKey, phase, label }) => {
           const rowVal = value[stateKey];
+          const flagged = rowVal != null && rowVal !== 0;
+          const issueKey = `balance:${phase}` as HandlingIssueKey;
           return (
             <div
               key={stateKey}
@@ -211,34 +259,92 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
                 current={rowVal}
                 onSelect={(n) => setPhaseBalance(stateKey, n)}
               />
+              {flagged ? (
+                <div className="mt-2 pl-14">
+                  <SpeedTagPicker
+                    value={value.speedTags[issueKey]}
+                    onChange={(s) => setSpeed(issueKey, s)}
+                  />
+                </div>
+              ) : null}
             </div>
           );
         })}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="text-xs font-medium text-muted-foreground">
-          Handling traits (rate toward either end)
+          Anything notable? (tap only if it was a problem)
         </div>
-        {TRAIT_AXIS_KEYS.map((axisKey) => {
-          const meta = HANDLING_TRAIT_AXIS_UI[axisKey];
-          const rowVal = value[axisKey];
-          return (
-            <div
-              key={axisKey}
-              className="border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
-            >
-              <BalanceCircleScale
-                title={meta.title}
-                info={TRAIT_AXIS_INFO[axisKey]}
-                negLabel={meta.neg}
-                posLabel={meta.pos}
-                current={rowVal}
-                onSelect={(n) => setTraitAxis(axisKey, n)}
-              />
-            </div>
-          );
-        })}
+        <div className="flex flex-wrap gap-1.5">
+          {CHIP_DEFS.map(({ axis, sign, label }) => {
+            const cur = value[axis];
+            const active = cur != null && cur !== 0 && Math.sign(cur) === sign;
+            return (
+              <button
+                key={`${axis}:${sign}`}
+                type="button"
+                aria-pressed={active}
+                onClick={() => toggleTraitChip(axis, sign)}
+                className={cn(
+                  "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
+                  active
+                    ? "border-destructive/70 bg-destructive/15 text-foreground"
+                    : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground hover:border-destructive/40"
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {activeTraitAxes.length > 0 ? (
+          <div className="space-y-2 pt-1">
+            {activeTraitAxes.map((axis) => {
+              const cur = value[axis] as PhaseBalance;
+              const sign = Math.sign(cur) as -1 | 1;
+              const severity = Math.abs(cur) as 1 | 2 | 3;
+              const pole = HANDLING_TRAIT_CHIP_META[axis].problemPoles.find((p) => p.sign === sign);
+              const issueKey = `trait:${axis}` as HandlingIssueKey;
+              return (
+                <div
+                  key={axis}
+                  className="rounded-md border border-border/60 bg-surface-runna-inset/40 p-2 space-y-2"
+                >
+                  <div className="text-[11px] font-medium text-foreground">{pole?.label ?? axis}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex gap-1" role="group" aria-label={`${axis} severity`}>
+                      {SEVERITIES.map((s) => {
+                        const selected = severity === s;
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            aria-pressed={selected}
+                            onClick={() => setTraitSeverity(axis, s)}
+                            className={cn(
+                              "rounded-md border px-2 py-0.5 text-[10px] font-medium capitalize transition",
+                              selected
+                                ? "border-foreground/50 bg-muted text-foreground"
+                                : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {HANDLING_SEVERITY_CHIP_LABELS[s]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <SpeedTagPicker
+                      value={value.speedTags[issueKey]}
+                      onChange={(sp) => setSpeed(issueKey, sp)}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-1">
@@ -265,9 +371,7 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
           }}
         >
           <option value="">
-            {primaryFocusOptions.length === 0
-              ? "Select other options first"
-              : "None selected"}
+            {primaryFocusOptions.length === 0 ? "Select other options first" : "None selected"}
           </option>
           {primaryFocusOptions.map((o) => (
             <option key={o.id} value={o.id}>
@@ -278,4 +382,11 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
       </div>
     </div>
   );
+}
+
+function primaryFocusSelectValue(ui: HandlingAssessmentUiState): string {
+  if (!ui.primaryFocus) return "";
+  const id = JSON.stringify(ui.primaryFocus);
+  const opts = buildPrimaryFocusOptions(ui);
+  return opts.some((o) => o.id === id) ? id : "";
 }

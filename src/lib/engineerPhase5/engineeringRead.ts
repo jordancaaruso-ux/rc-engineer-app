@@ -77,9 +77,12 @@ export type FeelReadV1 = {
   phaseBalance: Record<CornerPhase, FeelReadPhase>;
   traits: {
     feelSteering: PhaseBalance | null;
-    feelGeneral: PhaseBalance | null;
+    onPower: PhaseBalance | null;
+    braking: PhaseBalance | null;
     driveEase: PhaseBalance | null;
     tractionRoll: PhaseBalance | null;
+    /** @deprecated legacy runs only; retired from capture 2026-07-08. */
+    feelGeneral: PhaseBalance | null;
   };
   /** Free notes are quoted verbatim only; they never score chip-style agreement. */
   notesContext: string[];
@@ -382,9 +385,11 @@ function buildFeelRead(
 
   const traits = {
     feelSteering: parsedCurrent?.feelSteering ?? null,
-    feelGeneral: parsedCurrent?.feelGeneral ?? null,
+    onPower: parsedCurrent?.onPower ?? null,
+    braking: parsedCurrent?.braking ?? null,
     driveEase: parsedCurrent?.driveEase ?? null,
     tractionRoll: parsedCurrent?.tractionRoll ?? null,
+    feelGeneral: parsedCurrent?.feelGeneral ?? null,
   };
   const phases = (["entry", "mid", "exit"] as CornerPhase[]).reduce(
     (acc, phase) => {

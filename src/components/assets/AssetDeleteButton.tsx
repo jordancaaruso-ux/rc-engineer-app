@@ -16,7 +16,10 @@ export function AssetDeleteButton({ label, onDelete, runCount = 0, className, si
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const blocked = runCount > 0;
+  // Linked to runs → archive (soft delete) so run history stays intact; otherwise
+  // a true delete. Same handler either way — the server decides which happens.
+  const archiving = runCount > 0;
+  const actionWord = archiving ? "Archive" : "Delete";
   const pad = size === "sm" ? "px-3 py-1.5 text-xs" : "px-2.5 py-1 text-[11px]";
 
   async function handleConfirm() {
@@ -26,28 +29,19 @@ export function AssetDeleteButton({ label, onDelete, runCount = 0, className, si
       await onDelete();
       setConfirming(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      setError(err instanceof Error ? err.message : `${actionWord} failed`);
     } finally {
       setBusy(false);
     }
-  }
-
-  if (blocked) {
-    return (
-      <span
-        className={cn("text-muted-foreground", size === "sm" ? "text-xs" : "text-[11px]", className)}
-        title={`${runCount} run${runCount === 1 ? "" : "s"} linked`}
-      >
-        In use
-      </span>
-    );
   }
 
   if (confirming) {
     return (
       <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
         <span className={cn("text-muted-foreground", size === "sm" ? "text-xs" : "text-[11px]")}>
-          Delete {label}?
+          {archiving
+            ? `Archive ${label}? ${runCount} run${runCount === 1 ? "" : "s"} keep their history.`
+            : `Delete ${label}?`}
         </span>
         <button
           type="button"
@@ -58,7 +52,7 @@ export function AssetDeleteButton({ label, onDelete, runCount = 0, className, si
             pad
           )}
         >
-          {busy ? "Deleting…" : "Confirm"}
+          {busy ? `${actionWord}…` : "Confirm"}
         </button>
         <button
           type="button"
@@ -79,6 +73,7 @@ export function AssetDeleteButton({ label, onDelete, runCount = 0, className, si
   return (
     <button
       type="button"
+      title={archiving ? `${runCount} run${runCount === 1 ? "" : "s"} linked — archives instead of deleting` : undefined}
       onClick={() => {
         setConfirming(true);
         setError(null);
@@ -89,7 +84,7 @@ export function AssetDeleteButton({ label, onDelete, runCount = 0, className, si
         className
       )}
     >
-      Delete
+      {actionWord}
     </button>
   );
 }
