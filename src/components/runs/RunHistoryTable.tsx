@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { Collapse } from "@/components/ui/Collapse";
 import { formatRunSessionDisplay } from "@/lib/runSession";
-import { formatRunCreatedAtDateTime, formatRunDateCompact } from "@/lib/formatDate";
+import { formatRunDateShort, formatRunDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
@@ -44,7 +45,8 @@ import { SquarePen, Timer, Trash2, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { SectionTitle } from "@/components/ui/SectionTitle";
+import { Eyebrow } from "@/components/ui/panel";
+import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
 import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import {
@@ -55,6 +57,9 @@ import {
   RunHistoryMobileColumns,
   RunHistoryMobileRowShell,
 } from "@/components/runs/runHistoryTableColumns";
+
+/** Keep in sync with the <Collapse> duration used for the run-detail row. */
+const RUN_DETAIL_COLLAPSE_MS = 300;
 
 type Run = {
   id: string;
@@ -125,75 +130,6 @@ type Run = {
     }>;
   }>;
 };
-
-function CompactField({
-  label,
-  value,
-  children,
-  valueClassName,
-}: {
-  label: string;
-  value?: string;
-  children?: React.ReactNode;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="min-w-0 max-w-full sm:max-w-[220px] sm:min-w-[5.5rem]">
-      <div className="ui-label-caps">{label}</div>
-      <div className={cn(valueClassName ?? RUN_HISTORY_DATA_CLASS, "break-words")}>
-        {children ?? value ?? "—"}
-      </div>
-    </div>
-  );
-}
-
-function LapStatChip({
-  label,
-  value,
-  title,
-  expanded,
-  expandable,
-  onToggle,
-}: {
-  label: string;
-  value: string;
-  title?: string;
-  expanded?: boolean;
-  expandable?: boolean;
-  onToggle?: () => void;
-}) {
-  const className = cn(
-    "rounded border border-border bg-muted/80 px-1.5 py-0.5 md:px-2 md:py-1 min-w-0 md:min-w-[4.5rem] text-left",
-    expandable && "cursor-pointer hover:bg-muted active:bg-muted/90 transition-colors",
-    expanded && "ring-1 ring-primary border-primary/50 bg-primary/5"
-  );
-  const inner = (
-    <>
-      <div className={cn("ui-label-caps", "text-[9px] leading-none mb-0.5")}>{label}</div>
-      <div className={RUN_HISTORY_DATA_CLASS}>{value}</div>
-    </>
-  );
-  if (expandable && onToggle) {
-    return (
-      <button
-        type="button"
-        className={className}
-        title={title ?? "Tap for lap breakdown"}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-      >
-        {inner}
-      </button>
-    );
-  }
-  return (
-    <div className={className} title={title}>
-      {inner}
-    </div>
-  );
-}
 
 type ExpandedLapStat = "best" | "avg5" | "avg10" | "mistakes" | null;
 
@@ -348,6 +284,37 @@ export function RunHistoryTable({
   useEffect(() => {
     setModalsPortalReady(true);
   }, []);
+
+  // The expanded row's detail is expensive (setup compare, laps, modals), so we
+  // only ever mount ONE of them. `mountedDetailId` tracks the row whose detail
+  // is in the DOM; it follows `expandedId` on open and lingers for the collapse
+  // animation (Collapse duration) on close before unmounting.
+  const [mountedDetailId, setMountedDetailId] = useState<string | null>(expandedId);
+  const detailUnmountTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (detailUnmountTimerRef.current !== null) {
+      window.clearTimeout(detailUnmountTimerRef.current);
+      detailUnmountTimerRef.current = null;
+    }
+    if (expandedId) {
+      setMountedDetailId(expandedId);
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setMountedDetailId(null);
+      return;
+    }
+    detailUnmountTimerRef.current = window.setTimeout(() => {
+      setMountedDetailId(null);
+      detailUnmountTimerRef.current = null;
+    }, RUN_DETAIL_COLLAPSE_MS);
+    return () => {
+      if (detailUnmountTimerRef.current !== null) {
+        window.clearTimeout(detailUnmountTimerRef.current);
+        detailUnmountTimerRef.current = null;
+      }
+    };
+  }, [expandedId]);
 
   function toggleRow(runId: string) {
     setExpandedId((prev) => (prev === runId ? null : runId));
@@ -552,9 +519,9 @@ export function RunHistoryTable({
                       <>
                         <span
                           className={cn(RUN_HISTORY_DATA_CLASS, "block leading-snug text-foreground")}
-                          title={formatRunCreatedAtDateTime(runInstant, displayTimeZone)}
+                          title={formatRunDateTime(runInstant, displayTimeZone)}
                         >
-                          {formatRunDateCompact(runInstant, displayTimeZone)}
+                          {formatRunDateShort(runInstant, displayTimeZone)}
                         </span>
                         {showMemberColumn && memberLabel ? (
                           <span
@@ -630,8 +597,8 @@ export function RunHistoryTable({
                 </td>
               ) : null}
               <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground leading-snug md:whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
-                <span title={formatRunCreatedAtDateTime(runInstant, displayTimeZone)}>
-                  {formatRunDateCompact(runInstant, displayTimeZone)}
+                <span title={formatRunDateTime(runInstant, displayTimeZone)}>
+                  {formatRunDateShort(runInstant, displayTimeZone)}
                 </span>
               </td>
               {showSessionColumn ? (
@@ -687,18 +654,20 @@ export function RunHistoryTable({
                 </td>
               </tr>
             ) : null}
-            {isExpanded && (
-              <tr className="border-b border-border/80">
+            {run.id === mountedDetailId && (
+              <tr className={cn(isExpanded && "border-b border-border/80")}>
                 <td colSpan={totalCols} className="w-0 p-0 align-top">
-                  <div className="min-w-0 max-w-full overflow-x-hidden px-2 py-3 md:px-4 md:py-4">
-                    <RunDetail
-                      run={run}
-                      pickerRuns={allRunsDescending}
-                      runListSource={runListSource}
-                      displayTimeZone={displayTimeZone}
-                      allowRunMutations={allowRunMutations}
-                    />
-                  </div>
+                  <Collapse open={isExpanded} durationMs={RUN_DETAIL_COLLAPSE_MS}>
+                    <div className="min-w-0 max-w-full overflow-x-hidden px-2 py-3 md:px-4 md:py-4">
+                      <RunDetail
+                        run={run}
+                        pickerRuns={allRunsDescending}
+                        runListSource={runListSource}
+                        displayTimeZone={displayTimeZone}
+                        allowRunMutations={allowRunMutations}
+                      />
+                    </div>
+                  </Collapse>
                 </td>
               </tr>
             )}
@@ -756,6 +725,9 @@ function RunDetail({
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [setupDataByRunId, setSetupDataByRunId] = useState<Record<string, unknown>>({});
   const [expandedLapStat, setExpandedLapStat] = useState<ExpandedLapStat>(null);
+  // Holds the detail text through its collapse animation (the live value goes
+  // null the instant a chip closes, which would otherwise pop the height to 0).
+  const [lastLapStatDetail, setLastLapStatDetail] = useState<string | null>(null);
 
   useEffect(() => {
     setExpandedLapStat(null);
@@ -767,7 +739,7 @@ function RunDetail({
 
   async function handleDeleteRun() {
     if (deleting) return;
-    const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run), displayTimeZone);
+    const when = formatRunDateTime(resolveRunDisplayInstant(run), displayTimeZone);
     const carLabel = run.car?.name ?? run.carNameSnapshot ?? "this run";
     const ok = window.confirm(
       `Delete ${carLabel} run from ${when}?\n\nThis removes the run and its lap data. Setup snapshots are kept.`
@@ -939,6 +911,9 @@ function RunDetail({
     lapDash.avgTop10,
     mistakeSummary,
   ]);
+  useEffect(() => {
+    if (expandedLapStatDetail !== null) setLastLapStatDetail(expandedLapStatDetail);
+  }, [expandedLapStatDetail]);
   const conditionsChip = formatConditionsChip(runConditionsFromRecord(run));
   const carRatingDisplay = useMemo(() => {
     const rating = run.carRating;
@@ -962,7 +937,7 @@ function RunDetail({
   }, [run]);
 
   const runInstant = resolveRunDisplayInstant(run);
-  const dateTimeLabel = formatRunCreatedAtDateTime(runInstant, displayTimeZone);
+  const dateTimeLabel = formatRunDateTime(runInstant, displayTimeZone);
   const tireSetDisplay = run.tireSet
     ? `${run.tireSet.label} · run ${run.tireRunNumber}`
     : "—";
@@ -977,71 +952,83 @@ function RunDetail({
   // Solo runs reassemble them into the original side-by-side `userView`.
   const lapStatsBlock = (
     <div className="space-y-1">
-      <div className="flex flex-wrap gap-1 md:gap-1.5">
-        <LapStatChip label="Laps" value={String(lapDash.lapCount)} />
-        <LapStatChip
+      <StatWellGrid>
+        <StatWellCell label="Laps" value={String(lapDash.lapCount)} alignValue />
+        <StatWellCell
           label="Stint"
           title="Sum of included lap times"
           value={lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"}
+          alignValue
         />
-        <LapStatChip
+        <StatWellCell
           label="Best lap"
           value={formatLap(lapDash.bestLap)}
           expandable={bestLapRows.length > 0}
           expanded={expandedLapStat === "best"}
           onToggle={() => toggleLapStat("best")}
+          alignValue
         />
-        <LapStatChip
+        <StatWellCell
           label="Avg top 5"
           value={formatLap(lapDash.avgTop5)}
           expandable={top5LapRows.length > 0}
           expanded={expandedLapStat === "avg5"}
           onToggle={() => toggleLapStat("avg5")}
+          alignValue
         />
-        <LapStatChip
+        <StatWellCell
           label="Avg top 10"
           value={formatLap(lapDash.avgTop10)}
           expandable={top10LapRows.length > 0}
           expanded={expandedLapStat === "avg10"}
           onToggle={() => toggleLapStat("avg10")}
+          alignValue
         />
-        <LapStatChip label="Median" value={formatLap(lapDash.median)} />
+        <StatWellCell label="Median" value={formatLap(lapDash.median)} alignValue />
         {conditionsChip ? (
-          <LapStatChip
-            label="Conditions"
+          <StatWellCell
+            label="Cond."
             value={conditionsChip.value}
             title={conditionsChip.title}
+            alignValue
           />
         ) : null}
-        <LapStatChip
-          label="Consistency"
-          title="100 − CV; higher = more consistent laps"
+        <StatWellCell
+          label="Consist."
+          title="Consistency: 100 − CV; higher = more consistent laps"
           value={
             lapDash.consistencyScore != null
               ? formatConsistencyScorePercent(lapDash.consistencyScore)
               : "—"
           }
+          alignValue
         />
-        <LapStatChip
+        <StatWellCell
           label="Mistakes"
           title={mistakeSummary}
           value={mistakeAnalysis.eligible ? String(mistakeAnalysis.mistakeCount) : "—"}
           expandable={mistakeAnalysis.eligible}
           expanded={expandedLapStat === "mistakes"}
           onToggle={() => toggleLapStat("mistakes")}
+          alignValue
         />
-      </div>
-      {expandedLapStat && expandedLapStatDetail ? (
-        <p className={cn(RUN_HISTORY_DATA_CLASS, "text-muted-foreground leading-snug break-words")}>
-          {expandedLapStatDetail}
+      </StatWellGrid>
+      <Collapse open={Boolean(expandedLapStat && expandedLapStatDetail)}>
+        <p
+          className={cn(
+            RUN_HISTORY_DATA_CLASS,
+            "pt-1 text-muted-foreground leading-snug break-words",
+          )}
+        >
+          {expandedLapStatDetail ?? lastLapStatDetail}
         </p>
-      ) : null}
+      </Collapse>
     </div>
   );
 
   const lapCardBlock =
     laps.length > 0 ? (
-      <div className={cn("flex flex-wrap gap-x-2 gap-y-1 rounded border border-border bg-muted/60 px-2 py-1.5", RUN_HISTORY_DATA_CLASS)}>
+      <div className={cn("flex flex-wrap gap-x-3 gap-y-1.5 rounded-lg border border-border bg-background/40 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]", RUN_HISTORY_DATA_CLASS)}>
         {lapDisplayRows.map((r, i) => {
           const isMistake = mistakeLapNumbers.has(r.lapNumber);
           const isBest = bestLapNumbers.has(r.lapNumber);
@@ -1100,33 +1087,31 @@ function RunDetail({
   return (
     <CardPanel contentClassName="space-y-3 text-sm min-w-0 w-full">
       <div className="space-y-2">
-      <SectionTitle as="div" style={{ color: "var(--primary)" }}>
-        Session details
-      </SectionTitle>
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
-        <div className="flex flex-wrap gap-x-4 gap-y-2.5 max-md:gap-x-3 min-w-0 flex-1">
-          <CompactField label="Date / time" value={dateTimeLabel} />
-          {hasMeetingType ? <CompactField label="Session" value={meetingType} /> : null}
-          <CompactField label="Car" value={carDisplay} />
-          <CompactField label="Tire set" value={tireSetDisplay} />
-          <CompactField label="Tire prep" value={tirePrepDisplay} />
+        <div className="flex items-center justify-between gap-2">
+          <Eyebrow>Session details</Eyebrow>
+          {allowRunMutations ? (
+            <Link
+              href={`/runs/${encodeURIComponent(run.id)}/edit`}
+              aria-label="Edit run"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground no-underline hover:bg-muted/80 transition"
+              title="Edit run"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <SquarePen className="h-4 w-4" aria-hidden />
+            </Link>
+          ) : null}
         </div>
-        {allowRunMutations ? (
-          <Link
-            href={`/runs/${encodeURIComponent(run.id)}/edit`}
-            aria-label="Edit run"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground no-underline hover:bg-muted/80 transition"
-            title="Edit run"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <SquarePen className="h-4 w-4" aria-hidden />
-          </Link>
-        ) : null}
-      </div>
+        <StatWellGrid gridClassName="grid-cols-2 sm:grid-cols-3">
+          <StatWellCell label="Date / time" value={dateTimeLabel} />
+          {hasMeetingType ? <StatWellCell label="Session" value={meetingType} /> : null}
+          <StatWellCell label="Car" value={carDisplay} valueClassName="whitespace-normal break-words" />
+          <StatWellCell label="Tire set" value={tireSetDisplay} valueClassName="whitespace-normal break-words" />
+          <StatWellCell label="Tire prep" value={tirePrepDisplay} valueClassName="whitespace-normal break-words" />
+        </StatWellGrid>
       </div>
 
       <div className="space-y-2">
-        <SectionTitle as="div" style={{ color: "var(--primary)" }}>Laptimes</SectionTitle>
+        <Eyebrow>Laptimes</Eyebrow>
         <RunRaceFieldSwitcher
           runId={run.id}
           enabled={(run.importedLapSets?.length ?? 0) > 0}
@@ -1135,19 +1120,17 @@ function RunDetail({
           userLapCard={lapCardBlock}
           userGraph={buildLapGraph(RACE_IDENTITY.you)}
           userView={
-            <>
-              <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:gap-4 min-w-0">
-                <div className="shrink-0 space-y-2 min-w-0">{lapStatsBlock}</div>
-                <div className="min-w-0 flex-1 space-y-1">{lapCardBlock}</div>
-              </div>
+            <div className="space-y-2 min-w-0">
+              {lapStatsBlock}
+              {lapCardBlock}
               {buildLapGraph()}
-            </>
+            </div>
           }
         />
       </div>
 
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-        <SectionTitle as="div" style={{ color: "var(--primary)" }}>Setup vs previous run</SectionTitle>
+        <Eyebrow>Setup vs previous run</Eyebrow>
         <SetupChangedSincePreviousList
           rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
         />
@@ -1254,12 +1237,12 @@ function DetailRow({
 }) {
   const show = emptyAsDash && !value.trim() ? "—" : value;
   return (
-    <div>
-      <SectionTitle as="div" style={{ color: "var(--primary)" }}>{label}</SectionTitle>
+    <div className="space-y-1">
+      <Eyebrow>{label}</Eyebrow>
       <div
         className={cn(
           prose ? "text-[13px] leading-relaxed" : RUN_HISTORY_DATA_CLASS,
-          "mt-0.5 text-foreground",
+          "text-foreground",
           multiline && "whitespace-pre-wrap break-words"
         )}
       >

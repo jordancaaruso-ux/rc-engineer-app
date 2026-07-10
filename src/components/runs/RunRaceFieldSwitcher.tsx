@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
+import { chipToggleClass } from "@/components/ui/chipToggle";
 import { formatLap, formatStintTime } from "@/lib/runLaps";
 import {
   computeMistakeLaps,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/lapAnalysis";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { LapTimeGraph, type LapGraphRow } from "@/components/runs/LapTimeGraph";
+import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
 import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
 
 /**
@@ -46,18 +48,17 @@ type RaceFieldDriver = {
 const CLAIM_DISTANCE = 8;
 /** Drag distance (px) that commits a driver change on release. */
 const COMMIT_DISTANCE = 56;
-/** Horizontal overlap (rem) that makes the tabs cascade like browser tabs. */
-const TAB_OVERLAP_REM = 0.55;
 
 /**
  * Identity hues for the driver-compare view: your run vs the selected competitor.
  * Applied to both the notebook tab and the matching lap-graph trace so the eye
- * ties tab → laps → line together. (Yellow is normally action-only; here it reads
- * as "you" against the competitor teal in an explicit comparison surface.)
+ * ties tab → laps → line together. Yellow = you (the hero line); white = the
+ * field, echoing the monochrome ink ramp on the analysis trend graph. (Yellow is
+ * normally action-only; here it reads as "you" in an explicit comparison.)
  */
 export const RACE_IDENTITY = {
   you: "#FFD60A",
-  competitor: "#2DD4BF",
+  competitor: "#ECE9E4",
 } as const;
 
 /**
@@ -65,11 +66,16 @@ export const RACE_IDENTITY = {
  * first three letters of their last name, uppercased (e.g. Jordan Caruso → CAR).
  * Collisions across the field are acceptable — the tooltip carries the full
  * `P{position} {name}` label.
+ *
+ * A trailing single-letter token is not a surname — some tracks append `M`
+ * (member) to LiveRC names (e.g. "Jordan Caruso M"), so the last name is only
+ * valid when it has more than one letter; otherwise fall back to the previous
+ * word (→ CAR, not M).
  */
 function driverTabCode(driver: RaceFieldDriver): string {
   if (driver.isUser) return "YOU";
   const words = driver.name.trim().split(/\s+/).filter(Boolean);
-  const last = words.length > 0 ? words[words.length - 1] : "";
+  const last = [...words].reverse().find((w) => w.length > 1) ?? words[words.length - 1] ?? "";
   return last.slice(0, 3).toUpperCase() || "—";
 }
 
@@ -205,18 +211,19 @@ export function RunRaceFieldSwitcher({
 
   const selected = drivers[selectedIndex] ?? drivers[0];
 
-  // The cascading notebook-tab strip. Rendered once and dropped in above whichever
+  // The race-field tab strip — flat chips matching every other toggle group
+  // (shared chipToggleClass). Rendered once and dropped in above whichever
   // driver's lap card is showing (yours or a competitor's). It stops pointer events
   // from reaching the swipe handler so the strip can scroll horizontally on its own.
   const tabsNode = (
     <div
       ref={tabsRef}
-      className="-mb-px flex overflow-x-auto px-px pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex gap-1 overflow-x-auto px-px pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       role="tablist"
       aria-label="Race field"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {drivers.map((driver, index) => {
+      {drivers.map((driver) => {
         const active = driver.id === selectedId;
         const hue = driver.isUser ? RACE_IDENTITY.you : RACE_IDENTITY.competitor;
         const fullLabel = `P${driver.position} ${driver.name}${driver.isUser ? " · you" : ""}`;
@@ -234,23 +241,14 @@ export function RunRaceFieldSwitcher({
               setSelectedId(driver.id);
             }}
             style={{
-              // Cascade: overlap the left neighbour; better-placed tabs stack on
-              // top, the active tab rises flush against the card below (a folder tab).
-              marginLeft: index === 0 ? undefined : `-${TAB_OVERLAP_REM}rem`,
-              zIndex: active ? drivers.length + 1 : drivers.length - index,
               // Your tab stays yellow even when unselected — your yellow trace is
-              // still on every graph, so the tab keeps reading as "you".
+              // still on every graph, so the tab keeps reading as "you". Identity
+              // colour overrides the chip's default text colour.
               color: active ? hue : driver.isUser ? RACE_IDENTITY.you : undefined,
             }}
             className={cn(
-              "relative shrink-0 overflow-hidden whitespace-nowrap rounded-t-md border border-b-0 py-1 pr-2.5 font-sans text-[11px] font-semibold tracking-tight transition-transform",
-              // Tucked tabs pad left so their text clears the overlapping
-              // neighbour; the active tab sits on top of the stack, so it goes
-              // back to symmetric padding.
-              index === 0 || active ? "pl-2.5" : "pl-4",
-              active
-                ? "translate-y-0 border-ring/40 bg-muted"
-                : "translate-y-[3px] border-border bg-secondary text-muted-foreground hover:translate-y-[1px] hover:text-foreground"
+              chipToggleClass(active),
+              "relative shrink-0 overflow-hidden whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold"
             )}
           >
             {active ? (
@@ -348,7 +346,7 @@ function RaceFieldDriverPanel({
     { label: "Avg top 10", value: formatLap(dash.avgTop10) },
     { label: "Median", value: formatLap(dash.median) },
     {
-      label: "Consistency",
+      label: "Consist.",
       value:
         dash.consistencyScore != null ? formatConsistencyScorePercent(dash.consistencyScore) : "—",
     },
@@ -357,24 +355,18 @@ function RaceFieldDriverPanel({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-1 md:gap-1.5">
+      <StatWellGrid>
         {chips.map((chip) => (
-          <div
-            key={chip.label}
-            className="min-w-0 rounded border border-border bg-muted/80 px-1.5 py-0.5 text-left md:min-w-[4.5rem] md:px-2 md:py-1"
-          >
-            <div className="ui-label-caps mb-0.5 text-[9px] leading-none">{chip.label}</div>
-            <div className={RUN_HISTORY_DATA_CLASS}>{chip.value}</div>
-          </div>
+          <StatWellCell key={chip.label} label={chip.label} value={chip.value} alignValue />
         ))}
-      </div>
+      </StatWellGrid>
 
       <div className="min-w-0">
         {tabs}
         {rows.length > 0 ? (
           <div
             className={cn(
-              "flex flex-wrap gap-x-2 gap-y-1 rounded border border-border bg-muted/60 px-2 py-1.5",
+              "flex flex-wrap gap-x-3 gap-y-1.5 rounded-lg border border-border bg-background/40 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
               RUN_HISTORY_DATA_CLASS
             )}
           >
@@ -443,9 +435,7 @@ function RaceFieldDriverPanel({
               <span className="inline-flex items-center gap-1">
                 <span
                   className="inline-block h-0.5 w-3 rounded"
-                  style={{
-                    backgroundImage: `repeating-linear-gradient(to right, ${RACE_IDENTITY.you} 0 3px, transparent 3px 5px)`,
-                  }}
+                  style={{ backgroundColor: RACE_IDENTITY.you }}
                 />
                 your run
               </span>

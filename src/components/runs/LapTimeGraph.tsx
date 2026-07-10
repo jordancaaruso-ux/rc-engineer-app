@@ -220,11 +220,11 @@ export function LapTimeGraph({
               points={buildBaselinePoints(baseline, xAt, yAt, lo, hi)}
               fill="none"
               stroke={baselineColor ?? LINE_COLOR}
-              strokeWidth={1.5}
+              strokeWidth={baselineColor ? 2 : 1.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeOpacity={baselineColor ? 0.8 : 0.35}
-              strokeDasharray="4 3"
+              strokeOpacity={baselineColor ? 0.95 : 0.35}
+              strokeDasharray={baselineColor ? undefined : "4 3"}
             />
           </g>
         ) : null}
