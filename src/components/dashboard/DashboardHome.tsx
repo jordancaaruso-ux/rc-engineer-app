@@ -13,7 +13,7 @@ import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { HeroPanel } from "@/components/ui/HeroPanel";
 import { Reveal } from "@/components/ui/Reveal";
-import { Eyebrow, PanelSubtitle, PanelTitle, StatStrip, StatTile } from "@/components/ui/panel";
+import { Eyebrow, HubRowTitle, PanelSubtitle, StatStrip, StatTile } from "@/components/ui/panel";
 
 /** Time-of-day greeting + date chip in the user's zone; falls back gracefully on a bad zone. */
 function headerContext(displayTimeZone: string): { daypart: string; dateChip: string } {
@@ -185,10 +185,14 @@ function FeaturedMeetingCard({
       ) : null}
       <div className={isActive ? "mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between" : "relative z-10 mt-1.5 pointer-events-none"}>
         <div className="min-w-0">
-          <PanelTitle>{featuredEvent.name}</PanelTitle>
-          <PanelSubtitle className="mt-1">{featuredEvent.dateLabel}</PanelSubtitle>
-          <PanelSubtitle className="mt-0.5">
-            {featuredEvent.trackLabel ?? "Track not set — link one on the event"}
+          {/* Event names are proper prose ("2026 QLD State Titles"), so they keep
+              the Sora voice — but quiet (HubRowTitle, not the big hero PanelTitle)
+              so the pace strip below leads. */}
+          <HubRowTitle as="h3">{featuredEvent.name}</HubRowTitle>
+          <PanelSubtitle className="mt-1">
+            {[featuredEvent.dateLabel, featuredEvent.trackLabel ?? "Track not set — link one on the event"]
+              .filter(Boolean)
+              .join(" · ")}
           </PanelSubtitle>
         </div>
         {isActive ? (

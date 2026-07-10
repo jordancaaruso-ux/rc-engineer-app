@@ -12,7 +12,7 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PagedCard } from "@/components/ui/PagedCard";
 import { RollingNumber } from "@/components/ui/motion";
-import { Eyebrow, PanelSubtitle, PanelTitle, StatStrip, StatTile } from "@/components/ui/panel";
+import { Eyebrow, PanelSubtitle, StatStrip, StatTile } from "@/components/ui/panel";
 
 type RecentRun = NonNullable<DashboardHomeModel["recentRun"]>;
 
@@ -64,19 +64,25 @@ export function DashboardPreviousRunCard({
     );
   }
 
+  // Car model codes (A800RR, "Volante 28R V9X") read as machine identifiers, so
+  // the car name is the mono/instrument voice — quiet, not a big Sora headline —
+  // letting the yellow best-lap number below lead. Track / session / event / date
+  // fold into one muted meta line.
   const header = (
-    <div className="space-y-2">
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <PanelTitle as="h3" className="shrink-0">
-          {recentRun.carName}
-        </PanelTitle>
-        <span className="min-w-0 truncate text-[13px] leading-relaxed text-muted-foreground">
-          {recentRun.trackName ?? "No track"} · {recentRun.sessionLabel} · {formattedRunDate}
-        </span>
-      </div>
-      {recentRun.eventName ? (
-        <PanelSubtitle className="mt-0">{recentRun.eventName}</PanelSubtitle>
-      ) : null}
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <h3 className="shrink-0 font-mono text-[15px] font-medium tracking-wide text-foreground">
+        {recentRun.carName}
+      </h3>
+      <span className="min-w-0 truncate text-[12px] leading-relaxed text-muted-foreground">
+        {[
+          recentRun.trackName ?? "No track",
+          recentRun.sessionLabel,
+          recentRun.eventName,
+          formattedRunDate,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </span>
     </div>
   );
 
