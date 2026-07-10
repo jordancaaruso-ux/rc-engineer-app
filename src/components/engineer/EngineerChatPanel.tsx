@@ -20,6 +20,8 @@ import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageR
 
 import { Button } from "@/components/ui/Button";
 
+import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
+
 import { Eyebrow } from "@/components/ui/panel";
 
 import { RelativeTime } from "@/components/ui/RelativeTime";
@@ -981,21 +983,29 @@ export function EngineerChatPanel({
 
               </div>
 
-              <div className="whitespace-pre-wrap break-words">
+              {m.role === "assistant" && displayContent ? (
 
-                {displayContent ||
+                <EngineerMarkdown>{displayContent}</EngineerMarkdown>
 
-                  (chatBusy && m.role === "assistant"
+              ) : (
 
-                    ? statusLabel ?? "…"
+                <div className="whitespace-pre-wrap break-words">
 
-                    : m.role === "assistant"
+                  {displayContent ||
 
-                      ? "—"
+                    (chatBusy && m.role === "assistant"
 
-                      : "")}
+                      ? statusLabel ?? "…"
 
-              </div>
+                      : m.role === "assistant"
+
+                        ? "—"
+
+                        : "")}
+
+                </div>
+
+              )}
 
               {showChoices ? (
 

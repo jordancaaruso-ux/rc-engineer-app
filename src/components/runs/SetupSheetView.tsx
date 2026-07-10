@@ -169,7 +169,7 @@ function SheetCell({
             aria-label={field.label}
           />
         ) : (
-          <span className="px-2 py-1 text-sm font-mono text-muted-foreground">{value || "—"}</span>
+          <span className="px-2 py-1 text-sm font-mono tabular-nums text-muted-foreground">{value || "—"}</span>
         )}
         {baseline !== "" && baseline !== value ? (
           <span className="px-2 text-[9px] font-mono text-muted-foreground/80 truncate" title={baseline}>

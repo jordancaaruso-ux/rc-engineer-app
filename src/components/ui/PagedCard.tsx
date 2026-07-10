@@ -10,15 +10,15 @@ import {
   type WheelEvent as ReactWheelEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
  * Apple-widget-style paged card region: one card slot, several designed "faces"
- * of the same subject, swiped horizontally. iOS-convention chrome — pagination
- * dots (ink active / faint inactive; yellow stays action-only), rubber-band edge
- * resistance, hover chevrons on desktop. The card's height is fixed by its
- * tallest face so the page never jumps while swiping.
+ * of the same subject, swiped horizontally. A labeled segmented control below
+ * the content names every face and switches to it on tap (the discovery
+ * affordance — replaced the old pagination dots 2026-07-10); swipe, trackpad
+ * scroll, and rubber-band edge resistance still work. The card's height is fixed
+ * by its tallest face so the page never jumps while swiping.
  *
  * Place this INSIDE the card surface (`SurfaceCard` / `CardPanel`); it pages the
  * content region, not the card frame. The last-viewed face is remembered per
@@ -28,8 +28,12 @@ import { cn } from "@/lib/utils";
 export type PagedCardFace = {
   /** Stable id — persisted as the remembered face; don't rename casually. */
   id: string;
-  /** Short human label for dot / chevron aria-labels ("Per-track pace"). */
+  /** Full human label for aria ("Per-track pace"). */
   label: string;
+  /** Terse label for the segmented control; falls back to `label`. Keep ≤ ~10 chars. */
+  shortLabel?: string;
+  /** Extra classes on this face's segment button (e.g. an attention ring). */
+  controlClassName?: string;
   content: ReactNode;
 };
 
@@ -52,15 +56,35 @@ export function PagedCard({
   storageKey,
   faces,
   className,
+  controlPosition = "below",
+  heightMode = "tallest",
+  activeId,
+  onActiveIdChange,
 }: {
   /** Unique per card placement — namespaces the remembered face. */
   storageKey: string;
   faces: PagedCardFace[];
   className?: string;
+  /** "below" is the dashboard widget style; "above" reads as a mode picker for form sections. */
+  controlPosition?: "above" | "below";
+  /**
+   * "tallest" locks the card to its tallest face (dashboard — the page never
+   * jumps while swiping); "adaptive" animates to each face's own height so
+   * short form faces don't leave dead space.
+   */
+  heightMode?: "tallest" | "adaptive";
+  /**
+   * Controlled mode: the active face id. Pair with `onActiveIdChange` when the
+   * face IS a piece of form state (e.g. setup source). Disables face memory.
+   */
+  activeId?: string;
+  onActiveIdChange?: (id: string) => void;
 }) {
   const count = faces.length;
+  const controlled = activeId !== undefined;
   const [rawIndex, setRawIndex] = useState(0);
-  const index = Math.max(0, Math.min(count - 1, rawIndex));
+  const controlledIndex = controlled ? faces.findIndex((f) => f.id === activeId) : -1;
+  const index = Math.max(0, Math.min(count - 1, controlled ? Math.max(0, controlledIndex) : rawIndex));
   const [dragPx, setDragPx] = useState(0);
   const [dragging, setDragging] = useState(false);
   /** Off until the remembered face is restored, so the first paint doesn't animate. */
@@ -83,14 +107,16 @@ export function PagedCard({
   const wheelLockUntilRef = useRef(0);
 
   useEffect(() => {
-    try {
-      const savedId = window.localStorage.getItem(storageKeyFor(storageKey));
-      if (savedId) {
-        const i = faces.findIndex((f) => f.id === savedId);
-        if (i > 0) setRawIndex(i);
+    if (!controlled) {
+      try {
+        const savedId = window.localStorage.getItem(storageKeyFor(storageKey));
+        if (savedId) {
+          const i = faces.findIndex((f) => f.id === savedId);
+          if (i > 0) setRawIndex(i);
+        }
+      } catch {
+        /* storage unavailable (private mode) — always fall back to face 1 */
       }
-    } catch {
-      /* storage unavailable (private mode) — always fall back to face 1 */
     }
     const raf = requestAnimationFrame(() => setAnimate(true));
     return () => cancelAnimationFrame(raf);
@@ -101,8 +127,13 @@ export function PagedCard({
   const goTo = useCallback(
     (i: number) => {
       const next = Math.max(0, Math.min(count - 1, i));
-      setRawIndex(next);
       const face = faces[next];
+      if (controlled) {
+        // Controlled faces are form state — the owner decides; nothing is remembered.
+        if (face) onActiveIdChange?.(face.id);
+        return;
+      }
+      setRawIndex(next);
       if (face) {
         try {
           window.localStorage.setItem(storageKeyFor(storageKey), face.id);
@@ -111,8 +142,22 @@ export function PagedCard({
         }
       }
     },
-    [count, faces, storageKey]
+    [count, faces, storageKey, controlled, onActiveIdChange]
   );
+
+  /** Adaptive height: track the active face's own height (incl. its content resizing). */
+  const faceRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [adaptiveHeight, setAdaptiveHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (heightMode !== "adaptive") return;
+    const el = faceRefs.current[index];
+    if (!el) return;
+    const measure = () => setAdaptiveHeight(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [heightMode, index, count]);
 
   const endGesture = useCallback(
     (commit: boolean) => {
@@ -126,20 +171,17 @@ export function PagedCard({
       suppressClickRef.current = true;
       if (commit) {
         const width = viewportRef.current?.clientWidth ?? 1;
-        setDragPx((drag) => {
-          const passedDistance = Math.abs(drag) > width * COMMIT_FRACTION;
-          const flicked = Math.abs(g.vx) > COMMIT_VELOCITY && Math.sign(g.vx) === Math.sign(drag);
-          if (passedDistance || flicked) {
-            // drag < 0 means content moved left → next face.
-            goTo(index + (drag < 0 ? 1 : -1));
-          }
-          return 0;
-        });
-      } else {
-        setDragPx(0);
+        const passedDistance = Math.abs(dragPx) > width * COMMIT_FRACTION;
+        const flicked = Math.abs(g.vx) > COMMIT_VELOCITY && Math.sign(g.vx) === Math.sign(dragPx);
+        if (passedDistance || flicked) {
+          // drag < 0 means content moved left → next face. Outside the setDragPx
+          // updater: goTo may call a controlled owner's callback (a side effect).
+          goTo(index + (dragPx < 0 ? 1 : -1));
+        }
       }
+      setDragPx(0);
     },
-    [goTo, index]
+    [goTo, index, dragPx]
   );
 
   const onPointerDown = useCallback(
@@ -147,6 +189,14 @@ export function PagedCard({
       if (count < 2) return;
       // Primary button / single touch only.
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      // Drags starting inside a text control belong to the control (cursor
+      // placement / text selection), never to paging.
+      if (
+        e.target instanceof Element &&
+        e.target.closest("input, textarea, select, [contenteditable='true']")
+      ) {
+        return;
+      }
       gestureRef.current = {
         pointerId: e.pointerId,
         startX: e.clientX,
@@ -242,12 +292,59 @@ export function PagedCard({
   if (count === 0) return null;
   if (count === 1) return <div className={className}>{faces[0].content}</div>;
 
+  const adaptive = heightMode === "adaptive";
+
+  /* Segmented control — names each face and switches to it; the discovery
+     affordance that replaced pagination dots. Yellow stays action-only, so
+     the active segment reads as a raised neutral chip, not the accent. */
+  const control = (
+    <div
+      role="tablist"
+      aria-label="Card views"
+      className={cn(
+        "flex items-center gap-0.5 rounded-full border border-border bg-background/45 p-0.5",
+        controlPosition === "above" ? "mb-3" : "mt-3"
+      )}
+    >
+      {faces.map((face, i) => {
+        const active = i === index;
+        return (
+          <button
+            key={face.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-label={`Show ${face.label}`}
+            onClick={() => goTo(i)}
+            className={cn(
+              "min-w-0 flex-1 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              active
+                ? "bg-muted text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                : "text-muted-foreground hover:text-foreground",
+              face.controlClassName
+            )}
+          >
+            {face.shortLabel ?? face.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div className={cn("group/paged relative", className)}>
+    <div className={cn("relative", className)}>
+      {controlPosition === "above" ? control : null}
       <div
         ref={viewportRef}
-        className={cn("overflow-hidden", dragging && "select-none")}
-        style={{ touchAction: "pan-y" }}
+        className={cn(
+          "overflow-hidden",
+          dragging && "select-none",
+          adaptive && animate && !dragging && "transition-[height] duration-300 ease-out"
+        )}
+        style={{
+          touchAction: "pan-y",
+          height: adaptive && adaptiveHeight != null ? adaptiveHeight : undefined,
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -258,7 +355,10 @@ export function PagedCard({
       >
         <div
           className={cn(
-            "flex items-stretch",
+            "flex",
+            // Adaptive: each face keeps its natural height so the viewport can
+            // hug the active one; tallest: stretch so the card never jumps.
+            adaptive ? "items-start" : "items-stretch",
             animate && !dragging && "transition-transform duration-300 ease-out"
           )}
           style={{ transform: `translate3d(calc(${-index * 100}% + ${dragPx}px), 0, 0)` }}
@@ -266,6 +366,9 @@ export function PagedCard({
           {faces.map((face, i) => (
             <div
               key={face.id}
+              ref={(el) => {
+                faceRefs.current[i] = el;
+              }}
               className="relative w-full min-w-0 shrink-0"
               aria-hidden={i !== index}
               inert={i !== index ? true : undefined}
@@ -275,51 +378,7 @@ export function PagedCard({
           ))}
         </div>
       </div>
-
-      {/* Desktop chevrons — revealed on hover / keyboard focus; edges hide their side. */}
-      {index > 0 ? (
-        <button
-          type="button"
-          aria-label={`Show ${faces[index - 1].label}`}
-          onClick={() => goTo(index - 1)}
-          className="absolute left-0 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-lg border border-border bg-card/85 p-1 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 group-hover/paged:opacity-100 sm:flex"
-        >
-          <ChevronLeft className="h-4 w-4" aria-hidden />
-        </button>
-      ) : null}
-      {index < count - 1 ? (
-        <button
-          type="button"
-          aria-label={`Show ${faces[index + 1].label}`}
-          onClick={() => goTo(index + 1)}
-          className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-lg border border-border bg-card/85 p-1 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 group-hover/paged:opacity-100 sm:flex"
-        >
-          <ChevronRight className="h-4 w-4" aria-hidden />
-        </button>
-      ) : null}
-
-      {/* Pagination dots — ink active / faint inactive; the discovery affordance. */}
-      <div className="mt-2 flex items-center justify-center">
-        {faces.map((face, i) => (
-          <button
-            key={face.id}
-            type="button"
-            aria-label={`Show ${face.label}`}
-            aria-current={i === index ? "true" : undefined}
-            onClick={() => goTo(i)}
-            className="group/dot p-1 focus-visible:outline-none"
-          >
-            <span
-              className={cn(
-                "block h-1.5 w-1.5 rounded-full transition-colors",
-                i === index
-                  ? "bg-foreground"
-                  : "bg-foreground/25 group-hover/dot:bg-foreground/50 group-focus-visible/dot:bg-foreground/50"
-              )}
-            />
-          </button>
-        ))}
-      </div>
+      {controlPosition === "below" ? control : null}
     </div>
   );
 }

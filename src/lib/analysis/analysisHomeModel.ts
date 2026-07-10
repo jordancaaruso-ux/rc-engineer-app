@@ -10,6 +10,9 @@ import {
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import type { RunTireIndicator } from "@/lib/runs/tireSetChange";
+import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
+import { isTireFieldKey } from "@/lib/tires/tireSelectionValue";
+import { allTirePrepBooleanKeys } from "@/lib/tires/tirePrepFields";
 
 /**
  * Analysis debrief home model — pure types + shaping helpers shared by the
@@ -31,6 +34,17 @@ export type AnalysisRunMetrics = {
   mistakeCount: number | null;
 };
 
+/**
+ * Chassis-setup change vs the previous run on the same car — the wrench-row
+ * marker on the trend chart. Present (non-null) only when at least one setup
+ * field differed; tires / battery / additive are not setup-sheet fields and are
+ * excluded (they live on the run itself and have their own tire row).
+ */
+export type RunSetupChangeIndicator = {
+  /** Human labels of the fields that changed, e.g. ["Camber (Front)", "Toe (Rear)"]. */
+  changedFieldLabels: string[];
+};
+
 export type AnalysisTrendRun = {
   id: string;
   carId: string | null;
@@ -41,6 +55,8 @@ export type AnalysisTrendRun = {
   metrics: AnalysisRunMetrics;
   /** Tire set + wear for this run; null when no set was logged. */
   tireIndicator: RunTireIndicator | null;
+  /** Setup fields changed vs the previous run on this car; null when none / no baseline. */
+  setupChange: RunSetupChangeIndicator | null;
 };
 
 export type AnalysisCarOption = { carId: string | null; carName: string };
@@ -225,6 +241,45 @@ export function isTrackCarPersonalBest(
 ): boolean {
   if (best == null || minBestAtTrackCar == null) return false;
   return best <= minBestAtTrackCar + epsilon;
+}
+
+const EXCLUDED_TIRE_PREP_KEYS = new Set(allTirePrepBooleanKeys());
+
+/**
+ * Setup keys the trend wrench row ignores: tire selection + legacy tire-prep
+ * booleans. (Battery / additive / tire set are Run columns, not setup-sheet
+ * data, so they never appear in the setup diff at all.)
+ */
+function isExcludedSetupChangeKey(key: string): boolean {
+  return isTireFieldKey(key) || EXCLUDED_TIRE_PREP_KEYS.has(key);
+}
+
+/**
+ * Per-run setup-change markers keyed by run id, computed over a newest-first
+ * window. Each run diffs against the next older run **on the same car**; the
+ * first run on a car (no baseline) and runs with no setup change get no entry.
+ * Tire / battery / additive changes are excluded (see `isExcludedSetupChangeKey`).
+ */
+export function computeSetupChangesByRunId(
+  runsDesc: Array<{ id: string; carId: string | null; setupData: unknown }>
+): Map<string, RunSetupChangeIndicator> {
+  const byRunId = new Map<string, RunSetupChangeIndicator>();
+  for (let i = 0; i < runsDesc.length; i++) {
+    const run = runsDesc[i];
+    let previous: (typeof runsDesc)[number] | null = null;
+    for (let j = i + 1; j < runsDesc.length; j++) {
+      if (runsDesc[j].carId === run.carId) {
+        previous = runsDesc[j];
+        break;
+      }
+    }
+    if (!previous) continue; // first run on this car — no baseline to diff.
+    const changedFieldLabels = setupChangedRowsSincePrevious(run.setupData, previous.setupData)
+      .filter((row) => !isExcludedSetupChangeKey(row.key))
+      .map((row) => row.label);
+    if (changedFieldLabels.length > 0) byRunId.set(run.id, { changedFieldLabels });
+  }
+  return byRunId;
 }
 
 /** Distinct car options in first-seen order (chronological input preserved). */

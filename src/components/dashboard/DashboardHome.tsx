@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
+import { DashboardLaunchpadDoors } from "@/components/dashboard/DashboardLaunchpadDoors";
 import { DashboardPreviousRunCard } from "@/components/dashboard/DashboardPreviousRunCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
 import { IdeasSheetFab } from "@/components/dashboard/IdeasSheetFab";
@@ -11,6 +12,7 @@ import { SHOW_DASHBOARD_ENGINEER_SUGGESTIONS } from "@/lib/featureFlags";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { HeroPanel } from "@/components/ui/HeroPanel";
+import { Reveal } from "@/components/ui/Reveal";
 import { Eyebrow, PanelSubtitle, PanelTitle, StatStrip, StatTile } from "@/components/ui/panel";
 
 /** Time-of-day greeting + date chip in the user's zone; falls back gracefully on a bad zone. */
@@ -54,6 +56,8 @@ export function DashboardHome({
     thingsToTry,
     thingsToDo,
     summary,
+    records,
+    newPb,
     todayRunCount,
     todayDraftRunId,
     todayDraftSavedAt,
@@ -74,40 +78,59 @@ export function DashboardHome({
       </header>
 
       <section className="page-body max-w-3xl">
-        <DashboardSummaryCard
-          summary={summary}
-          todayRunCount={todayRunCount}
-          serverDraftRunId={todayDraftRunId}
-          serverDraftSavedAt={todayDraftSavedAt}
-        />
+        <Reveal index={0}>
+          <DashboardSummaryCard
+            summary={summary}
+            records={records}
+            newPb={newPb}
+            todayRunCount={todayRunCount}
+            serverDraftRunId={todayDraftRunId}
+            serverDraftSavedAt={todayDraftSavedAt}
+          />
+        </Reveal>
+
+        <Reveal index={1}>
+          <DashboardLaunchpadDoors />
+        </Reveal>
 
         {SHOW_DASHBOARD_ENGINEER_SUGGESTIONS ? (
-          <Suspense
-            fallback={
-              <HeroPanel>
-                <Eyebrow dot="muted">Engineer suggestions</Eyebrow>
-                <p className="ui-caption mt-1.5">Loading…</p>
-              </HeroPanel>
-            }
-          >
-            <DashboardEngineerSuggestionsSection
-              primaryRunId={engineerSuggestionsPrimaryRunId}
-              carName={recentRun?.carName ?? "Car"}
-              trackName={recentRun?.trackName ?? null}
-              eventName={recentRun?.eventName ?? null}
-            />
-          </Suspense>
+          <Reveal index={2}>
+            <Suspense
+              fallback={
+                <HeroPanel>
+                  <Eyebrow dot="muted">Engineer suggestions</Eyebrow>
+                  <p className="ui-caption mt-1.5">Loading…</p>
+                </HeroPanel>
+              }
+            >
+              <DashboardEngineerSuggestionsSection
+                primaryRunId={engineerSuggestionsPrimaryRunId}
+                carName={recentRun?.carName ?? "Car"}
+                trackName={recentRun?.trackName ?? null}
+                eventName={recentRun?.eventName ?? null}
+              />
+            </Suspense>
+          </Reveal>
         ) : null}
 
-        <DashboardPreviousRunCard recentRun={recentRun} displayTimeZone={displayTimeZone} />
+        <Reveal index={3}>
+          <DashboardPreviousRunCard
+            recentRun={recentRun}
+            newPb={newPb}
+            displayTimeZone={displayTimeZone}
+          />
+        </Reveal>
 
         {featuredEvent ? (
-          <FeaturedMeetingCard featuredEvent={featuredEvent} />
+          <Reveal index={4}>
+            <FeaturedMeetingCard featuredEvent={featuredEvent} />
+          </Reveal>
         ) : null}
 
         {/* Desktop keeps the inline Try/Do card (there's room + no FAB); mobile
             gets the same lists via the bottom-left Ideas sheet below. */}
-        <CardPanel className="hidden md:block" contentClassName="space-y-3">
+        <Reveal index={5} className="hidden md:block">
+        <CardPanel contentClassName="space-y-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <ActionItemListPanel
               list="try"
@@ -125,6 +148,7 @@ export function DashboardHome({
             />
           </div>
         </CardPanel>
+        </Reveal>
       </section>
 
       <IdeasSheetFab thingsToTry={thingsToTry} thingsToDo={thingsToDo} />

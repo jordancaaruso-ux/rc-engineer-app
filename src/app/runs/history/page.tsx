@@ -9,6 +9,7 @@ import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
+import { SessionsScopeSwitcher } from "@/components/runs/SessionsScopeSwitcher";
 import { buildRunHistoryGroups, type RunHistoryGroup } from "@/lib/runs/buildRunHistoryGroups";
 import {
   applyRunHistoryPostFiltersWithReasons,
@@ -354,7 +355,6 @@ export default async function RunHistoryPage({
     focusGroupIndex >= 0 ? Math.max(8, focusGroupIndex + 1) : 8;
 
   const teamMode = Boolean(teamId && !teamAccessDenied);
-  const showViewTabs = teamsForUser.length > 0 && !teamAccessDenied;
   const pageTitle = teamAccessDenied ? "Sessions" : teamMode ? `Team — ${teamTitle}` : "Sessions";
   const mySessionsViewDescription =
     "Your runs grouped by session. Filter, compare, and drag to reorder within a group.";
@@ -565,20 +565,6 @@ export default async function RunHistoryPage({
     ...(viewAll ? { viewAll: "1" } : {}),
   }).toString();
 
-  const runCountLabel = (() => {
-    if (filtersActive) {
-      return `${matchedRunCount} run${matchedRunCount === 1 ? "" : "s"} match (of ${totalRunCount} total)`;
-    }
-    if (filters.layout === "flat") {
-      return `${matchedRunCount} run${matchedRunCount === 1 ? "" : "s"}`;
-    }
-    if (groups.length === 0) return "No runs yet.";
-    if (hasMoreRuns) {
-      return `${matchedRunCount} of ${totalRunCount} runs across ${groups.length} session${groups.length === 1 ? "" : "s"}`;
-    }
-    return `${matchedRunCount} run${matchedRunCount === 1 ? "" : "s"} across ${groups.length} session${groups.length === 1 ? "" : "s"}`;
-  })();
-
   if (teamAccessDenied) {
     return (
       <>
@@ -614,33 +600,10 @@ export default async function RunHistoryPage({
         </div>
       </header>
       <section className="page-body min-w-0 max-w-full">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {showViewTabs ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground/80">View:</span>
-              <Link
-                href="/runs/history"
-                className={!teamMode ? "font-semibold text-foreground underline" : "hover:text-foreground underline-offset-2 hover:underline"}
-              >
-                My sessions
-              </Link>
-              {teamsForUser.map((t) => (
-                <Link
-                  key={t.id}
-                  href={`/runs/history?teamId=${encodeURIComponent(t.id)}`}
-                  className={
-                    teamId === t.id
-                      ? "font-semibold text-foreground underline"
-                      : "hover:text-foreground underline-offset-2 hover:underline"
-                  }
-                >
-                  {t.name}
-                </Link>
-              ))}
-            </div>
-          ) : null}
-          <span className="ml-auto text-[11px] text-muted-foreground">{runCountLabel}</span>
-        </div>
+        <SessionsScopeSwitcher
+          teams={teamsForUser.map((t) => ({ id: t.id, name: t.name }))}
+          activeTeamId={teamId}
+        />
         <Suspense fallback={<div className="h-20 rounded-lg border border-border bg-card animate-pulse" />}>
           <SessionsFilterBar
             cars={filterCars}

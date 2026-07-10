@@ -25,7 +25,13 @@ import { coerceFeelVsLastRunForCompleteRun, parseHandlingAssessmentJson } from "
 import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
 import { ensureEventParticipation } from "@/lib/events/eventParticipation";
-import { normalizeRunConditionsInput, NULL_RUN_CONDITIONS_COLUMNS } from "@/lib/weather/runConditionsRecord";
+import {
+  normalizeRunConditionsInput,
+  NULL_RUN_CONDITIONS_COLUMNS,
+  type RunConditionsRecord,
+} from "@/lib/weather/runConditionsRecord";
+import { fetchRunConditionsFromOpenMeteo } from "@/lib/weather/openMeteo";
+import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 
 type RunUpsertBody = {
   runId?: string;
@@ -126,6 +132,32 @@ type RunUpsertBody = {
    */
   conditions?: unknown;
 };
+
+/**
+ * Effortless-capture backfill: fetch run conditions server-side for a pinned
+ * track when the client attached none (fast save, a transient weather-fetch
+ * failure, or the client fetch simply not landing before submit). Reuses the
+ * client's normalize/clamp path so stored columns match a client-side capture,
+ * and preserves the Open-Meteo source stamp. Best-effort — any failure
+ * (network, no reading for that time/place) resolves to null and the run saves
+ * without conditions, exactly as before.
+ */
+async function backfillRunConditionsFromTrack(params: {
+  latitude: number;
+  longitude: number;
+  atIso: string | null;
+}): Promise<RunConditionsRecord | null> {
+  try {
+    const conditions = await fetchRunConditionsFromOpenMeteo({
+      latitude: params.latitude,
+      longitude: params.longitude,
+      atIso: params.atIso,
+    });
+    return normalizeRunConditionsInput(conditions);
+  } catch {
+    return null;
+  }
+}
 
 function normalizeCarRating(raw: unknown): number | null {
   if (raw == null) return null;
@@ -237,11 +269,13 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
 
   // Weather conditions: normalize + clamp untrusted input. `null` when the key
   // is absent (leave unchanged on update); an all-null record when sent empty
-  // (clears the stored reading on update).
-  const conditionsColumns =
-    "conditions" in body
-      ? (normalizeRunConditionsInput(body.conditions) ?? NULL_RUN_CONDITIONS_COLUMNS)
-      : null;
+  // (clears the stored reading on update). `normalizedConditions` is non-null
+  // only when the client actually attached a reading — the signal for whether
+  // server-side backfill should kick in (below, after the track is resolved).
+  const normalizedConditions =
+    "conditions" in body ? normalizeRunConditionsInput(body.conditions) : null;
+  let conditionsColumns: RunConditionsRecord | null =
+    "conditions" in body ? (normalizedConditions ?? NULL_RUN_CONDITIONS_COLUMNS) : null;
 
   const tireRunNumberFromBody =
     typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
@@ -485,11 +519,30 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   const track = body.trackId
     ? await prisma.track.findFirst({
         where: communityTrackByIdWhere(body.trackId),
-        select: { name: true },
+        select: { name: true, latitude: true, longitude: true },
       })
     : null;
   if (body.trackId && !track) {
     return NextResponse.json({ error: "Track not found" }, { status: 400 });
+  }
+
+  // Effortless capture: when the client attached no reading (fast save, a
+  // transient weather-fetch failure, or the async client fetch not landing
+  // before submit) but the run's track has a saved pin, fetch conditions
+  // server-side so auto-capture is reliable every time. Create-only: never
+  // override an explicit clear on edit; the session instant drives the reading.
+  if (
+    params.mode === "create" &&
+    normalizedConditions == null &&
+    track &&
+    trackHasMarkedLocation(track)
+  ) {
+    const backfilled = await backfillRunConditionsFromTrack({
+      latitude: track.latitude!,
+      longitude: track.longitude!,
+      atIso: sessionCompletedAtResolved ? sessionCompletedAtResolved.toISOString() : null,
+    });
+    if (backfilled) conditionsColumns = backfilled;
   }
 
   // Layout must belong to the run's track. Snapshot the name so it survives layout deletion.

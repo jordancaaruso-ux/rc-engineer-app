@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 import { computeIncludedLapMetricsFromRun, getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { computeDashboardSummary, type DashboardSummary, type SummaryRunInput } from "@/lib/dashboardSummary";
+import {
+  computeDashboardRecords,
+  type DashboardNewPb,
+  type DashboardRecord,
+  type RecordRunInput,
+} from "@/lib/dashboardRecords";
 import { displayRunNotes } from "@/lib/runNotes";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import {
@@ -326,6 +332,10 @@ export type DashboardHomeModel = {
   };
   /** Rolling 30-day reflective summary (runs / laps / wheel time / cadence / per-track pace). */
   summary: DashboardSummary;
+  /** All-time per-track+class records (best lap / avg-top-5 / race pace), most-recent track first. */
+  records: DashboardRecord[];
+  /** Set when the most recent completed run beat an existing record — drives the celebration surfaces. */
+  newPb: DashboardNewPb | null;
   /** Cached dashboard Engineer suggestions for the latest run (peek on SSR). Client sync-fetches when null. */
   engineerSuggestionsInitial: DashboardEngineerSuggestionPayloadV1 | null;
   /** Latest run id eligible for dashboard Engineer suggestions (requires car + completed logging). */
@@ -434,17 +444,17 @@ export async function loadDashboardHomeModel(
 ): Promise<DashboardHomeModel> {
   return perfSpan("loadDashboardHomeModel", async () => {
   const { start: todayStart, end: todayEnd } = localTodayBounds();
-  // Rolling summary covers a 30-day current window + 30-day prior for deltas. Fetch
-  // a little wider (62d) on sortAt so runs whose effective instant is near the edge
-  // aren't dropped before JS buckets them precisely by display instant.
-  const summaryFetchStart = new Date(Date.now() - 62 * 24 * 60 * 60 * 1000);
+  // One completed-runs fetch feeds BOTH the rolling 30-day summary (it ignores
+  // rows outside its window) AND the all-time records board (which genuinely
+  // needs every run — a PB is forever). At current scale this is fine; if it
+  // gets heavy, materialize a per-run race-pace column + a records rollup.
 
   // Fire-and-forget: LiveRC fetches + Prisma writes; can take 1–2s. Dashboard no
   // longer shows detected-session prompts, but background sync keeps event lap
   // sources fresh for next features / pages.
   void syncRecentEventLapSources(userId).catch(() => {});
 
-  const [scopedEvents, recentRun, todaysRuns, priorRun, incompleteRunsRows, summaryRunRows] = await Promise.all([
+  const [scopedEvents, recentRun, todaysRuns, priorRun, incompleteRunsRows, completedRunRows] = await Promise.all([
     loadUserScopedEvents({ userId, take: 40 }),
     prisma.run.findFirst({
       where: {
@@ -495,14 +505,13 @@ export async function loadDashboardHomeModel(
       take: 5,
       select: incompleteRunSelect,
     }),
-    // Completed runs in the last ~62 days for the rolling summary. Kept lean:
-    // lap arrays (for lap count + wheel time), stored best lap, and the track+class
-    // pace-comparability key.
+    // All completed runs. Kept lean: lap arrays (lap count + wheel time + race
+    // pace), stored best lap + avg-top-5, and the track+class comparability key.
+    // Feeds the rolling summary and the all-time records board.
     prisma.run.findMany({
       where: {
         userId,
         OR: [{ loggingCompletedAt: { not: null } }, { loggingComplete: true }],
-        sortAt: { gte: summaryFetchStart },
       },
       orderBy: { sortAt: "asc" },
       select: {
@@ -514,6 +523,7 @@ export async function loadDashboardHomeModel(
         lapTimes: true,
         lapSession: true,
         bestLapSeconds: true,
+        avgTop5LapSeconds: true,
         raceClass: true,
         trackId: true,
         track: { select: { name: true } },
@@ -522,7 +532,7 @@ export async function loadDashboardHomeModel(
   ]);
   const hasRunToday = todaysRuns.length > 0;
 
-  const summaryInputs: SummaryRunInput[] = summaryRunRows.map((r) => {
+  const summaryInputs: SummaryRunInput[] = completedRunRows.map((r) => {
     const included = getIncludedLaps(primaryLapRowsFromRun(r));
     const drivingSeconds = included.reduce((sum, l) => sum + l.lapTimeSeconds, 0);
     const storedBest = typeof r.bestLapSeconds === "number" ? r.bestLapSeconds : null;
@@ -544,6 +554,26 @@ export async function loadDashboardHomeModel(
     };
   });
   const summary = computeDashboardSummary(summaryInputs, new Date(), timeZone);
+
+  // All-time records board (best lap / avg-top-5 / race pace per track+class) +
+  // the fresh-PB flag when the most recent completed run just broke a record.
+  const recordInputs: RecordRunInput[] = completedRunRows.map((r) => ({
+    runId: r.id,
+    effectiveAt: resolveRunDisplayInstant({
+      createdAt: r.createdAt,
+      sessionCompletedAt: r.sessionCompletedAt,
+      loggingCompletedAt: r.loggingCompletedAt,
+      sortAt: r.sortAt,
+    }),
+    trackId: r.trackId,
+    trackName: r.track?.name ?? null,
+    className: r.raceClass,
+    bestLapSeconds: typeof r.bestLapSeconds === "number" ? r.bestLapSeconds : null,
+    avgTop5Seconds: typeof r.avgTop5LapSeconds === "number" ? r.avgTop5LapSeconds : null,
+    lapTimes: r.lapTimes,
+    lapSession: r.lapSession,
+  }));
+  const { records, newPb } = computeDashboardRecords(recordInputs, recentRun?.id ?? null);
 
   const actionItemSelect = {
     id: true,
@@ -799,6 +829,8 @@ export async function loadDashboardHomeModel(
     todaysChanges,
     recentRun: recent,
     summary,
+    records,
+    newPb,
     engineerSuggestionsInitial: null,
     engineerSuggestionsPrimaryRunId,
   };

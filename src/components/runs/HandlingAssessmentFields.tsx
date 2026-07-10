@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { chipToggleClass } from "@/components/ui/chipToggle";
 import {
   buildPrimaryFocusOptions,
   CAPTURE_TRAIT_AXIS_KEYS,
@@ -168,12 +169,7 @@ function SpeedTagPicker({
               type="button"
               aria-pressed={selected}
               onClick={() => onChange(selected ? null : s)}
-              className={cn(
-                "rounded-md border px-2 py-0.5 text-[10px] font-medium transition",
-                selected
-                  ? "border-accent bg-accent text-accent-foreground"
-                  : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground"
-              )}
+              className={cn(chipToggleClass(selected), "px-2 py-0.5 text-[10px]")}
             >
               {SPEED_SHORT[s]}
             </button>
@@ -287,10 +283,9 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
                 aria-pressed={active}
                 onClick={() => toggleTraitChip(axis, sign)}
                 className={cn(
-                  "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
-                  active
-                    ? "border-destructive/70 bg-destructive/15 text-foreground"
-                    : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground hover:border-destructive/40"
+                  chipToggleClass(active, { tone: "problem" }),
+                  "px-2.5 py-1 text-[11px]",
+                  !active && "hover:border-destructive/40"
                 )}
               >
                 {label}
@@ -324,10 +319,8 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
                             aria-pressed={selected}
                             onClick={() => setTraitSeverity(axis, s)}
                             className={cn(
-                              "rounded-md border px-2 py-0.5 text-[10px] font-medium capitalize transition",
-                              selected
-                                ? "border-foreground/50 bg-muted text-foreground"
-                                : "border-border bg-surface-runna-inset text-muted-foreground hover:text-foreground"
+                              chipToggleClass(selected),
+                              "px-2 py-0.5 text-[10px] capitalize"
                             )}
                           >
                             {HANDLING_SEVERITY_CHIP_LABELS[s]}

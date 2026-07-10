@@ -5,6 +5,7 @@ import {
   filterAvoidRepeatingForBetweenRunHints,
   pseudoSetupChangesFromSessionLines,
 } from "@/lib/engineerPhase5/betweenRunHints/avoidRepeatingFilterForHints";
+import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
 import { SectionMetaInline, SectionTitle } from "@/components/ui/SectionTitle";
 import { cn } from "@/lib/utils";
 
@@ -48,14 +49,16 @@ export function BetweenRunHintSummary({
       </div>
 
       {headline ? (
-        <p className="text-[13px] font-medium leading-snug text-foreground">{headline}</p>
+        <p className="text-[13px] font-medium leading-snug text-foreground">
+          <EngineerMarkdown inline>{headline}</EngineerMarkdown>
+        </p>
       ) : null}
 
       {bullets.length > 0 ? (
         <ul className="list-disc space-y-1 pl-4 text-[12px] leading-snug text-foreground/95">
           {bullets.map((b, i) => (
             <li key={i} className="break-words">
-              {b.trim()}
+              <EngineerMarkdown inline>{b.trim()}</EngineerMarkdown>
             </li>
           ))}
         </ul>

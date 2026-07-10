@@ -338,8 +338,8 @@ export function RunComparePanel({
                             <span className="text-muted-foreground text-xs ml-1">({r.unit})</span>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2 font-mono text-xs">{r.current}</td>
-                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                        <td className="px-3 py-2 font-mono text-xs tabular-nums">{r.current}</td>
+                        <td className="px-3 py-2 font-mono text-xs tabular-nums text-muted-foreground">
                           {r.previous ?? "—"}
                         </td>
                       </tr>

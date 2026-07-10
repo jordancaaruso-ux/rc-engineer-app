@@ -5,6 +5,8 @@ import { Lightbulb, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
+import { useScrolled } from "@/components/layout/useScrolled";
+import { useEnterExit } from "@/components/ui/Collapse";
 
 /**
  * Mobile-only "Ideas & reminders" access — a subdued glass pill pinned
@@ -25,6 +27,9 @@ export function IdeasSheetFab({
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"try" | "do">("try");
+  const collapsed = useScrolled();
+  // Keeps the sheet mounted through its slide-down close so the exit animates.
+  const sheet = useEnterExit(open, 300);
 
   useEffect(() => {
     if (!open) return;
@@ -53,30 +58,58 @@ export function IdeasSheetFab({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            aria-label="Ideas and reminders"
-            className="pointer-events-auto tap-active relative inline-flex h-12 items-center gap-1.5 rounded-full border border-white/10 bg-card/70 pl-3.5 pr-4 font-sans text-sm font-semibold text-foreground shadow-[0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-xl transition-transform duration-150 active:scale-95 touch-manipulation"
+            aria-label={openCount > 0 ? `Ideas and reminders, ${openCount} open` : "Ideas and reminders"}
+            className={cn(
+              "pointer-events-auto tap-active relative inline-flex h-12 items-center rounded-full border border-white/10 bg-card/70 font-sans text-sm font-semibold text-foreground shadow-[0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-xl transition-[padding] duration-200 ease-out active:scale-95 touch-manipulation",
+              collapsed ? "px-3" : "pl-3.5 pr-4"
+            )}
           >
             <Lightbulb size={18} strokeWidth={2} aria-hidden />
-            <span>Ideas</span>
+            <span
+              className={cn(
+                "overflow-hidden whitespace-nowrap transition-all duration-200 ease-out",
+                collapsed ? "ml-0 max-w-0 opacity-0" : "ml-1.5 max-w-[5rem] opacity-100"
+              )}
+            >
+              Ideas
+            </span>
             {openCount > 0 ? (
-              <span className="ml-0.5 min-w-5 rounded-full bg-muted px-1.5 text-center font-mono text-[11px] leading-5 text-muted-foreground">
+              <span
+                className={cn(
+                  "overflow-hidden rounded-full bg-muted text-center font-mono text-[11px] leading-5 text-muted-foreground transition-all duration-200 ease-out",
+                  collapsed ? "ml-0 max-w-0 px-0 opacity-0" : "ml-1 min-w-5 max-w-[2.5rem] px-1.5 opacity-100"
+                )}
+              >
                 {openCount}
               </span>
+            ) : null}
+            {/* Collapsed: the count folds into a small dot so the pill stays a clean circle. */}
+            {collapsed && openCount > 0 ? (
+              <span
+                className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-muted-foreground ring-2 ring-background"
+                aria-hidden
+              />
             ) : null}
           </button>
         </div>
       </div>
 
-      {open ? (
+      {sheet.mounted ? (
         <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden"
+          className={cn(
+            "fixed inset-0 z-[60] flex items-end justify-center bg-black/50 transition-opacity duration-300 ease-out motion-reduce:transition-none md:hidden",
+            sheet.entered ? "opacity-100" : "opacity-0"
+          )}
           role="dialog"
           aria-modal="true"
           aria-label="Ideas and reminders"
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-t-2xl border border-white/10 bg-card/95 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-16px_40px_-12px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+            className={cn(
+              "w-full max-w-md rounded-t-2xl border border-white/10 bg-card/95 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-16px_40px_-12px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-transform duration-300 ease-out motion-reduce:transition-none",
+              sheet.entered ? "translate-y-0" : "translate-y-full"
+            )}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 pt-3">

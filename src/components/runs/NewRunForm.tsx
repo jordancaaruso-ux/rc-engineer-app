@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -41,7 +42,10 @@ import { useCopyLastRunFormOptional } from "@/components/runs/CopyLastRunFormCon
 import { useTodayDraftRunOptional } from "@/components/layout/TodayDraftRunProvider";
 import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
+import { LogRunProgressRail, type RunProgressSection } from "@/components/runs/LogRunProgressRail";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
+import { PagedCard, type PagedCardFace } from "@/components/ui/PagedCard";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
 import { normalizeLapTimes } from "@/lib/runLaps";
@@ -503,13 +507,22 @@ export function NewRunForm(props: {
   const [setupData, setSetupData] = useState<SetupSnapshotData>({});
   /** Baseline SetupSnapshot id for server merge + audit (null = scratch / no prior snapshot). */
   const [setupBaselineSnapshotId, setSetupBaselineSnapshotId] = useState<string | null>(null);
-  /** Deep-frozen copy of the setup that was loaded (past run / downloaded / replicate / edit-run hydrate /
-   *  local "Save setup snapshot"). Drives the "X changes from loaded setup" badge in the collapsed view. */
+  /** Deep-frozen copy of the setup that was loaded (past run / downloaded / replicate / edit-run hydrate).
+   *  Drives the "X changes from loaded setup" badge in the collapsed view. */
   const [setupBaselineData, setSetupBaselineData] = useState<SetupSnapshotData | null>(null);
-  const [setupSnapshotSaveStatus, setSetupSnapshotSaveStatus] = useState<
-    { kind: "ok" | "error"; text: string } | null
-  >(null);
-  const [setupSnapshotSaving, setSetupSnapshotSaving] = useState(false);
+  /** Per-source sheet stash so swiping between source faces is lossless (see handleSetupSourceChange). */
+  const setupSourceStashRef = useRef<
+    Partial<
+      Record<
+        "previous_runs" | "other" | "new",
+        {
+          setupData: SetupSnapshotData;
+          baselineSnapshotId: string | null;
+          baselineData: SetupSnapshotData | null;
+        }
+      >
+    >
+  >({});
   const [lapIngest, setLapIngest] = useState<LapIngestFormValue>(() => defaultLapIngestValue());
   const [notes, setNotes] = useState("");
   const [raceClass, setRaceClass] = useState("");
@@ -520,7 +533,7 @@ export function NewRunForm(props: {
     Array<{ fieldKey: string; fieldLabel: string; fromValue: string; toValue: string; confidence: "low" | "medium" | "high"; note?: string | null }>
   >([]);
   const [handlingUi, setHandlingUi] = useState<HandlingAssessmentUiState>(() => emptyHandlingAssessmentUiState());
-  const [handlingDetailExpanded, setHandlingDetailExpanded] = useState(false);
+  const [feedbackFace, setFeedbackFace] = useState<"feedback" | "handling">("feedback");
   /** Required 1-10 overall car rating; null until the driver sets one. Server enforces presence at "Run complete". */
   const [carRating, setCarRating] = useState<number | null>(null);
   type RunDetailsTab = "car" | "tires" | "battery" | "conditions" | "track";
@@ -540,7 +553,8 @@ export function NewRunForm(props: {
     carRating: boolean;
     feelVsLastRun: boolean;
     additive: boolean;
-  }>({ show: false, carRating: false, feelVsLastRun: false, additive: false });
+    setup: boolean;
+  }>({ show: false, carRating: false, feelVsLastRun: false, additive: false, setup: false });
 
   const [copyCarWarning, setCopyCarWarning] = useState<string | null>(null);
   const [copyTrackWarning, setCopyTrackWarning] = useState<string | null>(null);
@@ -646,17 +660,6 @@ export function NewRunForm(props: {
   const isDraft = isEditing && editRun?.loggingComplete === false;
   /** Run was already marked complete — edits must not flip back to draft or bump tire/battery run # (server enforces too). */
   const editingCompletedRun = isEditing && editRun?.loggingComplete === true;
-  /**
-   * Two-step save confirmation when the user has edited the setup sheet but
-   * never hit "Save setup snapshot". Null = no confirmation pending, otherwise
-   * the intent that's waiting on the user to acknowledge the unsaved setup
-   * edits before we hit the backend. The actual run payload always includes
-   * `setupData`, so the backend stores the edits either way — this just gives
-   * the driver a last look at what they changed before the run is written.
-   */
-  const [pendingSaveIntent, setPendingSaveIntent] = useState<
-    "draft" | "completed" | null
-  >(null);
   const focusSection = props.focusSection ?? null;
   const setupSectionRef = useRef<HTMLDivElement>(null);
   const feedbackRequiredRef = useRef<HTMLDivElement>(null);
@@ -664,6 +667,19 @@ export function NewRunForm(props: {
 
   const dashboardPrefillAppliedRef = useRef(false);
   const editPrefillAppliedRef = useRef(false);
+
+  /**
+   * Gate the portaled save bar until after mount so `createPortal(document.body)`
+   * never runs during SSR. The bar is portaled out of the form (and thus out of
+   * `.page-body`) because the app-wide reveal animation puts a transform on every
+   * `.page-body` child, and a transformed ancestor traps `position: fixed` — which
+   * pinned the bar to the form's bottom instead of the viewport. Same reason
+   * AppShell renders BottomNav / LogRunFab outside `.app-shell`.
+   */
+  const [saveBarMounted, setSaveBarMounted] = useState(false);
+  useEffect(() => {
+    setSaveBarMounted(true);
+  }, []);
 
   useEffect(() => {
     setCarsList(props.cars);
@@ -772,7 +788,9 @@ export function NewRunForm(props: {
     setNotes((r.notes ?? "").trim());
     const parsedHandling = parseHandlingAssessmentJson(r.handlingAssessmentJson);
     setHandlingUi(uiStateFromParsed(parsedHandling));
-    setHandlingDetailExpanded(isHandlingAssessmentMeaningful(r.handlingAssessmentJson));
+    // Feedback face stays the landing view even when the run has handling
+    // detail — required rating fields live there; detail is one swipe away.
+    setFeedbackFace("feedback");
     setCarRating(
       typeof r.carRating === "number" && Number.isFinite(r.carRating) && r.carRating >= 1 && r.carRating <= 10
         ? Math.round(r.carRating)
@@ -1223,21 +1241,29 @@ export function NewRunForm(props: {
       if (!prev.show) return prev;
       const carOk = carRating != null && carRating >= 1 && carRating <= 10;
       const feelOk = !feelVsLastRunEligible || handlingUi.feelVsLastRun != null;
-      if (carOk && feelOk) {
-        return { show: false, carRating: false, feelVsLastRun: false, additive: false };
+      const setupOk = Object.keys(setupData).length > 0;
+      if (carOk && feelOk && setupOk) {
+        return { show: false, carRating: false, feelVsLastRun: false, additive: false, setup: false };
       }
       return {
         show: true,
         carRating: prev.carRating && !carOk,
         feelVsLastRun: prev.feelVsLastRun && !feelOk,
         additive: prev.additive,
+        setup: prev.setup && !setupOk,
       };
     });
-  }, [carRating, handlingUi.feelVsLastRun, feelVsLastRunEligible]);
+  }, [carRating, handlingUi.feelVsLastRun, feelVsLastRunEligible, setupData]);
 
   useEffect(() => {
     if (completeValidation.show) return;
     setInlineError((err) => (err?.startsWith("Before Run complete:") ? null : err));
+  }, [completeValidation.show]);
+
+  useEffect(() => {
+    // Required rating fields live on the "feedback" face — flip back to it when
+    // Run complete validation fires while the user is on Handling detail.
+    if (completeValidation.show) setFeedbackFace("feedback");
   }, [completeValidation.show]);
 
   const loadSetupControlLabel = loadedSetupRun
@@ -1281,6 +1307,62 @@ export function NewRunForm(props: {
   );
   /** Race meeting + event with a track: run track follows the event (picker disabled). */
   const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
+
+  /**
+   * Per-card completion for the floating progress rail. Required = the exact
+   * "Run complete" bar the save gate enforces (car · track · rating · feel-when-
+   * eligible · controlled additive when the event enforces one · a setup
+   * snapshot). Tires are the one recommended-but-optional nudge. Session + Event
+   * carry no gate, so they always read complete — they stay in the rail as scroll
+   * anchors / a full map of the form.
+   */
+  const railSections = useMemo<RunProgressSection[]>(() => {
+    const hasTrack = Boolean(
+      trackId.trim() || (trackLockedToEvent && selectedEventForRun?.trackId)
+    );
+    const requiresControlledAdditive = Boolean(
+      needsEvent && eventId && eventControlAdditiveEnabled && eventControlledAdditiveTypeId.trim()
+    );
+    const missingAdditive = requiresControlledAdditive && !additiveTypeId.trim();
+    const detailsRequired = (carId ? 0 : 1) + (hasTrack ? 0 : 1) + (missingAdditive ? 1 : 0);
+    const hasTires = Boolean(tireSetId || newTireSetIntent);
+    const hasSetup = Object.keys(setupData).length > 0;
+    const ratingMissing = carRating == null || carRating < 1 || carRating > 10;
+    const feelMissing = feelVsLastRunEligible && handlingUi.feelVsLastRun == null;
+    return [
+      { id: "session", label: "Session", requiredMissing: 0, recommendedMissing: 0 },
+      { id: "event", label: "Event", requiredMissing: 0, recommendedMissing: 0 },
+      {
+        id: "details",
+        label: "Details",
+        requiredMissing: detailsRequired,
+        recommendedMissing: hasTires ? 0 : 1,
+      },
+      { id: "setup", label: "Setup", requiredMissing: hasSetup ? 0 : 1, recommendedMissing: 0 },
+      {
+        id: "feedback",
+        label: "Feel",
+        requiredMissing: (ratingMissing ? 1 : 0) + (feelMissing ? 1 : 0),
+        recommendedMissing: 0,
+      },
+    ];
+  }, [
+    carId,
+    trackId,
+    trackLockedToEvent,
+    selectedEventForRun,
+    needsEvent,
+    eventId,
+    eventControlAdditiveEnabled,
+    eventControlledAdditiveTypeId,
+    additiveTypeId,
+    tireSetId,
+    newTireSetIntent,
+    setupData,
+    carRating,
+    handlingUi.feelVsLastRun,
+    feelVsLastRunEligible,
+  ]);
 
   const tracksGpsFingerprint = useMemo(
     () =>
@@ -1687,10 +1769,25 @@ export function NewRunForm(props: {
   }, [carId]);
 
   function handleSetupSourceChange(next: "previous_runs" | "other" | "new") {
+    if (next === setupSource) return;
+    // Lossless source switching: the source control is a swipeable face now, so
+    // passing through a face (including "New") must not destroy anything. Leaving
+    // a source stashes its sheet + baseline; returning restores it exactly.
+    setupSourceStashRef.current[setupSource] = {
+      setupData,
+      baselineSnapshotId: setupBaselineSnapshotId,
+      baselineData: setupBaselineData,
+    };
     setSetupSource(next);
+    const stash = setupSourceStashRef.current[next];
+    if (stash) {
+      setSetupData(stash.setupData);
+      setActiveSetupData(stash.setupData, carId || null);
+      setSetupBaselineSnapshotId(stash.baselineSnapshotId);
+      setSetupBaselineData(stash.baselineData);
+      return;
+    }
     if (next === "new") {
-      setLoadSetupSelection("");
-      setLoadOtherSetupSelection("");
       const empty = setupSnapshotWithDerived({});
       setSetupData(empty);
       setActiveSetupData(empty, carId || null);
@@ -1725,57 +1822,6 @@ export function NewRunForm(props: {
     setSetupBaselineData(cloneSetupSnapshot(next));
   }
 
-  /**
-   * "Save setup snapshot to this run" handler.
-   *
-   *  - In edit mode (`isEditing`): PATCH `/api/runs/<id>/setup-snapshot` with the
-   *    current `setupData`; server creates a new `SetupSnapshot` (delta vs existing)
-   *    and re-points `Run.setupSnapshotId` at it. On success we re-baseline locally
-   *    so the "X changes since loaded" badge resets, and collapse the expanded sheet.
-   *  - In new-run mode: no run exists yet, so we just re-baseline the in-memory
-   *    setup (locks the current values in as the new "loaded" state) and collapse.
-   */
-  async function handleSaveSetupSnapshot() {
-    setSetupSnapshotSaveStatus(null);
-    if (isEditing && editRun?.id) {
-      setSetupSnapshotSaving(true);
-      try {
-        const res = await fetch(`/api/runs/${editRun.id}/setup-snapshot`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ setupData }),
-        });
-        const json = (await res.json().catch(() => ({}))) as {
-          ok?: boolean;
-          error?: string;
-          snapshot?: { id: string; data: SetupSnapshotData };
-        };
-        if (!res.ok || !json.ok || !json.snapshot) {
-          throw new Error(json.error ?? `HTTP ${res.status}`);
-        }
-        const merged = setupSnapshotWithDerived(json.snapshot.data);
-        setSetupData(merged);
-        setActiveSetupData(merged, carId || null);
-        setSetupBaselineSnapshotId(json.snapshot.id);
-        setSetupBaselineData(cloneSetupSnapshot(merged));
-        setSetupSectionExpanded(false);
-        setSetupSnapshotSaveStatus({ kind: "ok", text: "Setup snapshot saved to this run." });
-      } catch (err) {
-        setSetupSnapshotSaveStatus({
-          kind: "error",
-          text: err instanceof Error ? err.message : "Failed to save setup snapshot.",
-        });
-      } finally {
-        setSetupSnapshotSaving(false);
-      }
-      return;
-    }
-    // New-run mode: just re-baseline locally.
-    setSetupBaselineData(cloneSetupSnapshot(setupData));
-    setSetupSectionExpanded(false);
-    setSetupSnapshotSaveStatus({ kind: "ok", text: "Setup locked in; will save with the run." });
-  }
-
   function applyDownloadedSetupOnly(docId: string) {
     setSetupSource("other");
     if (!docId) {
@@ -1792,6 +1838,94 @@ export function NewRunForm(props: {
     setActiveSetupData(next, picked.carId ?? carId ?? null);
     setSetupBaselineSnapshotId(picked.baselineSetupSnapshotId ?? null);
     setSetupBaselineData(cloneSetupSnapshot(next));
+  }
+
+  /** Faces for the setup-source PagedCard — the segment IS the source choice;
+   *  swiping to a face selects it (losslessly, via setupSourceStashRef). */
+  function setupSourceFaces(): PagedCardFace[] {
+    return [
+      {
+        id: "previous_runs",
+        label: "Setups from previous runs",
+        shortLabel: "Previous runs",
+        content: (
+          <div className="space-y-2 pt-0.5">
+            <RunPickerSelect
+              runs={pickerRuns}
+              value={loadSetupSelection}
+              onChange={applyPastSetupOnly}
+              placeholder="Choose a run…"
+              disabled={pickerRuns.length === 0}
+              formatLine={formatRunPickerLineRelativeWhen}
+            />
+            {pickerRuns.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                No past runs yet, or list failed to load. Switch to{" "}
+                <span className="font-medium">New</span> to start from a blank sheet.
+              </p>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        id: "other",
+        label: "Other setup sources",
+        shortLabel: "Other",
+        content: (
+          <div className="space-y-2 pt-0.5">
+            <div className="space-y-1 text-sm">
+              <div className="text-sm font-medium text-muted-foreground">Other source</div>
+              <SearchableSelect
+                aria-label="Other setup source"
+                className="max-w-2xl"
+                searchable={false}
+                value={otherSetupSource}
+                onChange={(next) => setOtherSetupSource(next as "downloaded_setups")}
+                options={[{ value: "downloaded_setups", label: "Downloaded setups" }]}
+              />
+            </div>
+            <div className="space-y-1 text-sm">
+              <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
+                {loadOtherSetupLabel}
+              </div>
+              <SearchableSelect
+                aria-label="Downloaded setup"
+                className="max-w-2xl"
+                placeholder="Choose a downloaded setup…"
+                clearable
+                clearLabel="Choose a downloaded setup…"
+                triggerMono
+                disabled={downloadedSetups.length === 0}
+                value={loadOtherSetupSelection}
+                onChange={(next) => applyDownloadedSetupOnly(next)}
+                options={downloadedSetups.map((d) => ({
+                  value: d.id,
+                  label: `${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`,
+                }))}
+              />
+            </div>
+            {carId ? (
+              <RunLogQuickSetupUpload
+                carId={carId}
+                onImported={handleQuickSetupImported}
+                onRefetchList={() => void refreshDownloadedSetups()}
+                variant={downloadedSetups.length === 0 ? "banner" : "inline"}
+              />
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        id: "new",
+        label: "New blank setup",
+        shortLabel: "New",
+        content: (
+          <p className="pt-0.5 text-[11px] text-muted-foreground">
+            Blank setup for this car — edit the sheet below, or lock in when you are ready.
+          </p>
+        ),
+      },
+    ];
   }
 
   const refreshDownloadedSetups = useCallback(async () => {
@@ -2461,8 +2595,7 @@ export function NewRunForm(props: {
 
   async function saveRun(
     e?: React.MouseEvent,
-    intent: "draft" | "completed" = "completed",
-    opts: { bypassUnsavedSetupCheck?: boolean } = {}
+    intent: "draft" | "completed" = "completed"
   ) {
     e?.preventDefault();
     if (pendingCompleteNavigationRef.current || pendingDraftNavigationRef.current) return;
@@ -2493,40 +2626,43 @@ export function NewRunForm(props: {
           eventControlledAdditiveTypeId.trim()
       );
       const missingAdditive = requiresControlledAdditive && !additiveTypeId.trim();
-      if (missingCarRating || missingFeelVsLastRun || missingAdditive) {
+      const missingSetup = Object.keys(setupData).length === 0;
+      if (missingCarRating || missingFeelVsLastRun || missingAdditive || missingSetup) {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
         if (missingFeelVsLastRun) {
           parts.push("pick how this run felt vs your last run on this car");
         }
         if (missingAdditive) parts.push("select the required additive on the Tires tab");
+        if (missingSetup) {
+          parts.push("attach a setup — copy last run, load a past setup, or upload a sheet");
+        }
         setCompleteValidation({
           show: true,
           carRating: missingCarRating,
           feelVsLastRun: missingFeelVsLastRun,
           additive: missingAdditive,
+          setup: missingSetup,
         });
-        setInlineError(`Before Run complete: ${parts.join(" and ")}.`);
+        setInlineError(`Before Run complete: ${parts.join("; ")}.`);
         if (missingAdditive) setRunDetailsTab("tires");
+        // Only the setup field lives outside the feedback card — scroll there when
+        // that's the sole blocker so the amber-highlighted Setup card is in view.
+        const scrollTarget: Element | null =
+          missingSetup && !missingCarRating && !missingFeelVsLastRun && !missingAdditive
+            ? document.querySelector(".run-section--setup")
+            : feedbackRequiredRef.current;
         window.requestAnimationFrame(() => {
-          feedbackRequiredRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          scrollTarget?.scrollIntoView({ behavior: "smooth", block: "center" });
         });
         return;
       }
-      setCompleteValidation({ show: false, carRating: false, feelVsLastRun: false, additive: false });
+      setCompleteValidation({ show: false, carRating: false, feelVsLastRun: false, additive: false, setup: false });
     }
-    // Surface unsaved setup edits before we write — the driver gets to review
-    // exactly what they changed vs. the loaded baseline. Continuing from the
-    // confirmation passes `bypassUnsavedSetupCheck: true` so we don't loop.
-    if (
-      !opts.bypassUnsavedSetupCheck &&
-      setupChangedRowsSinceBaseline.length > 0 &&
-      setupBaselineData
-    ) {
-      setPendingSaveIntent(intent);
-      return;
-    }
-    setPendingSaveIntent(null);
+    // Setup edits ride along with the run automatically — the payload always
+    // includes `setupData`, so unsaved sheet changes are stored either way. No
+    // pre-save confirmation gate (removed 2026-07-10; the fixed save buttons
+    // made the inline review easy to miss and it read as a dead button).
     setSaving(true);
     setSaveSuccess(false);
     try {
@@ -2853,6 +2989,7 @@ export function NewRunForm(props: {
       onSubmit={(e) => e.preventDefault()}
       noValidate
     >
+      <LogRunProgressRail sections={railSections} />
       {carsList.length === 0 ? (
         <CardPanel contentClassName="text-sm text-muted-foreground">
           <div className="text-sm text-muted-foreground">
@@ -2891,7 +3028,7 @@ export function NewRunForm(props: {
       <SurfaceCard
         variant="panel"
         overflowHidden={false}
-        className={cn(isDraft && "border-emerald-500/40", prefillFieldClass(Boolean(prefillHighlights?.session)))}
+        className={cn("run-section--session", isDraft && "border-emerald-500/40", prefillFieldClass(Boolean(prefillHighlights?.session)))}
         contentClassName="space-y-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2964,32 +3101,17 @@ export function NewRunForm(props: {
             )}
           </div>
         ) : (
-          <>
-            <div className="mt-2 flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="sessionType"
-                  value="TESTING"
-                  checked={sessionType === "TESTING"}
-                  onChange={() => setSessionType("TESTING")}
-                  className="h-3 w-3 shrink-0 accent-primary"
-                />
-                <span>Testing</span>
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="sessionType"
-                  value="RACE_MEETING"
-                  checked={sessionType === "RACE_MEETING"}
-                  onChange={() => setSessionType("RACE_MEETING")}
-                  className="h-3 w-3 shrink-0 accent-primary"
-                />
-                <span>Race Meeting</span>
-              </label>
-            </div>
-          </>
+          <div className="mt-2">
+            <SegmentedControl<"TESTING" | "RACE_MEETING">
+              ariaLabel="Session type"
+              value={sessionType}
+              onChange={(next) => setSessionType(next)}
+              options={[
+                { value: "TESTING", label: "Testing" },
+                { value: "RACE_MEETING", label: "Race meeting" },
+              ]}
+            />
+          </div>
         )}
       </SurfaceCard>
 
@@ -3008,7 +3130,7 @@ export function NewRunForm(props: {
       ) : null}
 
       {needsEvent && (sessionExpanded || !isDraft) ? (
-        <SurfaceCard variant="panel" overflowHidden={false} className={prefillFieldClass(Boolean(prefillHighlights?.event))} contentClassName="space-y-3">
+        <SurfaceCard variant="panel" overflowHidden={false} className={cn("run-section--event", prefillFieldClass(Boolean(prefillHighlights?.event)))} contentClassName="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <Eyebrow>Event / Race meeting</Eyebrow>
@@ -3383,7 +3505,7 @@ export function NewRunForm(props: {
       <SurfaceCard
         variant="panel"
         overflowHidden={false}
-        className={cn(isDraft && "border-emerald-500/40")}
+        className={cn("run-section--details", isDraft && "border-emerald-500/40")}
         contentClassName="space-y-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3462,85 +3584,17 @@ export function NewRunForm(props: {
           </div>
         ) : (
           <>
-        <div
-          className="flex flex-wrap border-b border-border gap-x-0.5"
-          role="tablist"
-          aria-label="Run details sections"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={runDetailsTab === "car"}
-            className={cn(
-              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px",
-              runDetailsTab === "car"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setRunDetailsTab("car")}
-          >
-            Car
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={runDetailsTab === "tires"}
-            className={cn(
-              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px",
-              runDetailsTab === "tires"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setRunDetailsTab("tires")}
-          >
-            Tires
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={runDetailsTab === "battery"}
-            className={cn(
-              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px",
-              runDetailsTab === "battery"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setRunDetailsTab("battery")}
-          >
-            Battery
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={runDetailsTab === "conditions"}
-            className={cn(
-              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px",
-              runDetailsTab === "conditions"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setRunDetailsTab("conditions")}
-          >
-            Conditions
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={runDetailsTab === "track"}
-            className={cn(
-              "run-details-tab px-3 sm:px-4 py-2 text-xs transition border-b-2 -mb-px rounded-t-md",
-              runDetailsTab === "track"
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-              trackSaveWarning && runDetailsTab !== "track" && "ring-2 ring-amber-500/55 ring-offset-2 ring-offset-background"
-            )}
-            onClick={() => setRunDetailsTab("track")}
-          >
-            Track
-          </button>
-        </div>
-
-        {runDetailsTab === "car" ? (
+        <PagedCard
+          storageKey="run-form:run-details"
+          controlPosition="above"
+          heightMode="adaptive"
+          activeId={runDetailsTab}
+          onActiveIdChange={(id) => setRunDetailsTab(id as RunDetailsTab)}
+          faces={[
+            {
+              id: "car",
+              label: "Car",
+              content: (
           <div className="space-y-3 pt-1">
             <div className="space-y-1 text-sm">
               <div className="flex items-center justify-between gap-2">
@@ -3580,9 +3634,195 @@ export function NewRunForm(props: {
             {/* Race class (optional) field intentionally hidden from Log Your Run.
                 `raceClass` state + save payload are kept so the feature can be re-enabled later. */}
           </div>
-        ) : null}
+              ),
+            },
+            {
+              id: "tires",
+              label: "Tires",
+              content: (
+          <div className="space-y-3 pt-1">
+            <RunTireSelectionPanel
+              tireSets={tireSets}
+              tireSetId={tireSetId}
+              onSelectExistingSet={(nextId, ts) => {
+                setTireSetId(nextId);
+                clearNewTireSetIntent();
+                // Sets known only to the picker must land in the catalog so snapshot
+                // lookups (tires line on the sheet) resolve them.
+                if (ts) {
+                  setTireSets((prev) =>
+                    prev.some((t) => t.id === ts.id) ? prev : [ts, ...prev]
+                  );
+                }
+                applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
+                setCopyTireWarning(null);
+              }}
+              newSetIntent={newTireSetIntent}
+              onNewSetIntentChange={(intent) => {
+                setNewTireSetIntent(intent);
+                newTireSetIntentRef.current = intent;
+                if (intent) {
+                  setTireSetId("");
+                  tireRunUserTouchedRef.current = false;
+                  setRunsCompleted(0);
+                  setCopyTireWarning(null);
+                }
+                applyTireBatteryToSetupSnapshot(intent ? "" : tireSetIdRef.current, batteryIdRef.current);
+              }}
+              preferredTireType={preferredTireType}
+              runsCompleted={runsCompleted}
+              onRunsCompletedChange={setRunsCompleted}
+              onRunsCompletedUserTouched={() => {
+                tireRunUserTouchedRef.current = true;
+              }}
+              onPrefillClear={() => setPrefillHighlights((h) => (h ? { ...h, tires: false } : h))}
+              copyTireWarning={copyTireWarning}
+              prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
+            />
+            <RunAdditiveTimingPanel
+              additiveTypeId={additiveTypeId}
+              onAdditiveTypeIdChange={(id) => {
+                setAdditiveTypeId(id);
+                if (id && !additiveTypesById[id]) {
+                  void fetch("/api/additive-types?limit=200", { cache: "no-store" })
+                    .then((r) => r.json())
+                    .then((data: { additiveTypes?: Array<{ id: string; displayName: string }> }) => {
+                      const hit = (data.additiveTypes ?? []).find((t) => t.id === id);
+                      if (hit) {
+                        setAdditiveTypesById((prev) => ({ ...prev, [id]: hit }));
+                      }
+                    })
+                    .catch(() => {});
+                }
+                applyAdditiveTimingToSetupSnapshot(id, warmerTimingMinutesRef.current);
+              }}
+              warmerTimingMinutes={warmerTimingMinutes}
+              onWarmerTimingMinutesChange={(value) => {
+                setWarmerTimingMinutes(value);
+                applyAdditiveTimingToSetupSnapshot(additiveTypeIdRef.current, value);
+              }}
+              requireAdditive={
+                needsEvent &&
+                Boolean(eventId) &&
+                eventControlAdditiveEnabled &&
+                Boolean(eventControlledAdditiveTypeId.trim())
+              }
+              highlightMissing={completeValidation.additive}
+            />
+          </div>
+              ),
+            },
+            {
+              id: "battery",
+              label: "Battery",
+              content: (
+          <div className="space-y-3 pt-1 text-sm">
+            <div className="space-y-2">
+              <div className="flex items-end justify-between gap-3">
+                <Eyebrow dot="muted">Battery pack</Eyebrow>
+                <button
+                  type="button"
+                  className="btn-surface px-3 py-1.5 text-xs"
+                  onClick={() => {
+                    setShowNewBatteryPanel((v) => !v);
+                    setInlineError(null);
+                  }}
+                >
+                  {showNewBatteryPanel ? "Cancel" : "New battery"}
+                </button>
+              </div>
+              <SearchableSelect
+                aria-label="Battery pack"
+                className={prefillFieldClass(Boolean(prefillHighlights?.battery))}
+                placeholder="—"
+                clearable
+                value={batteryId}
+                onChange={(nextId) => {
+                  setBatteryId(nextId);
+                  applyTireBatteryToSetupSnapshot(tireSetIdRef.current, nextId);
+                  setCopyBatteryWarning(null);
+                  setPrefillHighlights((h) => (h ? { ...h, battery: false } : h));
+                }}
+                options={batteries.map((b) => ({
+                  value: b.id,
+                  label: `${b.label}${b.packNumber != null ? ` #${b.packNumber}` : ""}`,
+                }))}
+              />
+              {copyBatteryWarning && (
+                <div className="text-[11px] text-muted-foreground mt-1">{copyBatteryWarning}</div>
+              )}
+            </div>
 
-        {runDetailsTab === "track" ? (
+            {showNewBatteryPanel && (
+              <QuickAddBatteryPanel
+                onCreated={(battery) => {
+                  setBatteries((prev) => [battery, ...prev]);
+                  setBatteryId(battery.id);
+                  batteryRunUserTouchedRef.current = true;
+                  setBatteryRunsCompleted(battery.initialRunCount ?? 0);
+                  applyTireBatteryToSetupSnapshot(tireSetIdRef.current, battery.id);
+                  setShowNewBatteryPanel(false);
+                  setCopyBatteryWarning(null);
+                  setStatus("Battery pack created — selected.");
+                }}
+                onCancel={() => {
+                  setShowNewBatteryPanel(false);
+                  setInlineError(null);
+                }}
+              />
+            )}
+
+            {!showNewBatteryPanel && batteryId ? (
+              <div className="space-y-1 text-sm">
+                <Eyebrow dot="muted">Prior runs on this pack (before this log)</Eyebrow>
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full max-w-md form-control px-3 py-2 text-sm"
+                  inputMode="numeric"
+                  value={batteryRunsCompleted}
+                  onChange={(e) => {
+                    batteryRunUserTouchedRef.current = true;
+                    setBatteryRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)));
+                  }}
+                  aria-label="Prior runs on this battery pack before this log"
+                />
+                <div className="text-[11px] text-muted-foreground">
+                  This log saves as{" "}
+                  <span className="font-medium text-foreground">battery run #{batteryRunsCompleted + 1}</span>
+                  {batteryRunsCompleted === 0
+                    ? " (first run on this pack)."
+                    : batteryRunsCompleted === 1
+                      ? " (after 1 prior run on this pack)."
+                      : ` (after ${batteryRunsCompleted} prior runs on this pack).`}
+                </div>
+              </div>
+            ) : null}
+          </div>
+              ),
+            },
+            {
+              id: "conditions",
+              label: "Conditions",
+              shortLabel: "Cond.",
+              content: (
+          <RunConditionsSection
+            value={conditions}
+            onChange={setConditions}
+            track={conditionsTrack}
+            sessionAtIso={conditionsSessionAtIso}
+            onSaveTrackPin={handleSaveTrackPin}
+          />
+              ),
+            },
+            {
+              id: "track",
+              label: "Track",
+              controlClassName:
+                trackSaveWarning && runDetailsTab !== "track"
+                  ? "ring-2 ring-inset ring-amber-500/55"
+                  : undefined,
+              content: (
           <div className="space-y-3 pt-1">
             <div className="space-y-1 text-sm">
               <div className="flex items-center justify-between gap-2">
@@ -3695,176 +3935,10 @@ export function NewRunForm(props: {
               />
             ) : null}
           </div>
-        ) : null}
-
-        {runDetailsTab === "tires" ? (
-          <div className="space-y-3 pt-1">
-            <RunTireSelectionPanel
-              tireSets={tireSets}
-              tireSetId={tireSetId}
-              onSelectExistingSet={(nextId, ts) => {
-                setTireSetId(nextId);
-                clearNewTireSetIntent();
-                // Sets known only to the picker must land in the catalog so snapshot
-                // lookups (tires line on the sheet) resolve them.
-                if (ts) {
-                  setTireSets((prev) =>
-                    prev.some((t) => t.id === ts.id) ? prev : [ts, ...prev]
-                  );
-                }
-                applyTireBatteryToSetupSnapshot(nextId, batteryIdRef.current);
-                setCopyTireWarning(null);
-              }}
-              newSetIntent={newTireSetIntent}
-              onNewSetIntentChange={(intent) => {
-                setNewTireSetIntent(intent);
-                newTireSetIntentRef.current = intent;
-                if (intent) {
-                  setTireSetId("");
-                  tireRunUserTouchedRef.current = false;
-                  setRunsCompleted(0);
-                  setCopyTireWarning(null);
-                }
-                applyTireBatteryToSetupSnapshot(intent ? "" : tireSetIdRef.current, batteryIdRef.current);
-              }}
-              preferredTireType={preferredTireType}
-              runsCompleted={runsCompleted}
-              onRunsCompletedChange={setRunsCompleted}
-              onRunsCompletedUserTouched={() => {
-                tireRunUserTouchedRef.current = true;
-              }}
-              onPrefillClear={() => setPrefillHighlights((h) => (h ? { ...h, tires: false } : h))}
-              copyTireWarning={copyTireWarning}
-              prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
-            />
-            <RunAdditiveTimingPanel
-              additiveTypeId={additiveTypeId}
-              onAdditiveTypeIdChange={(id) => {
-                setAdditiveTypeId(id);
-                if (id && !additiveTypesById[id]) {
-                  void fetch("/api/additive-types?limit=200", { cache: "no-store" })
-                    .then((r) => r.json())
-                    .then((data: { additiveTypes?: Array<{ id: string; displayName: string }> }) => {
-                      const hit = (data.additiveTypes ?? []).find((t) => t.id === id);
-                      if (hit) {
-                        setAdditiveTypesById((prev) => ({ ...prev, [id]: hit }));
-                      }
-                    })
-                    .catch(() => {});
-                }
-                applyAdditiveTimingToSetupSnapshot(id, warmerTimingMinutesRef.current);
-              }}
-              warmerTimingMinutes={warmerTimingMinutes}
-              onWarmerTimingMinutesChange={(value) => {
-                setWarmerTimingMinutes(value);
-                applyAdditiveTimingToSetupSnapshot(additiveTypeIdRef.current, value);
-              }}
-              requireAdditive={
-                needsEvent &&
-                Boolean(eventId) &&
-                eventControlAdditiveEnabled &&
-                Boolean(eventControlledAdditiveTypeId.trim())
-              }
-              highlightMissing={completeValidation.additive}
-            />
-          </div>
-        ) : null}
-
-        {runDetailsTab === "battery" ? (
-          <div className="space-y-3 pt-1 text-sm">
-            <div className="space-y-2">
-              <div className="flex items-end justify-between gap-3">
-                <Eyebrow dot="muted">Battery pack</Eyebrow>
-                <button
-                  type="button"
-                  className="btn-surface px-3 py-1.5 text-xs"
-                  onClick={() => {
-                    setShowNewBatteryPanel((v) => !v);
-                    setInlineError(null);
-                  }}
-                >
-                  {showNewBatteryPanel ? "Cancel" : "New battery"}
-                </button>
-              </div>
-              <SearchableSelect
-                aria-label="Battery pack"
-                className={prefillFieldClass(Boolean(prefillHighlights?.battery))}
-                placeholder="—"
-                clearable
-                value={batteryId}
-                onChange={(nextId) => {
-                  setBatteryId(nextId);
-                  applyTireBatteryToSetupSnapshot(tireSetIdRef.current, nextId);
-                  setCopyBatteryWarning(null);
-                  setPrefillHighlights((h) => (h ? { ...h, battery: false } : h));
-                }}
-                options={batteries.map((b) => ({
-                  value: b.id,
-                  label: `${b.label}${b.packNumber != null ? ` #${b.packNumber}` : ""}`,
-                }))}
-              />
-              {copyBatteryWarning && (
-                <div className="text-[11px] text-muted-foreground mt-1">{copyBatteryWarning}</div>
-              )}
-            </div>
-
-            {showNewBatteryPanel && (
-              <QuickAddBatteryPanel
-                onCreated={(battery) => {
-                  setBatteries((prev) => [battery, ...prev]);
-                  setBatteryId(battery.id);
-                  batteryRunUserTouchedRef.current = true;
-                  setBatteryRunsCompleted(battery.initialRunCount ?? 0);
-                  applyTireBatteryToSetupSnapshot(tireSetIdRef.current, battery.id);
-                  setShowNewBatteryPanel(false);
-                  setCopyBatteryWarning(null);
-                  setStatus("Battery pack created — selected.");
-                }}
-                onCancel={() => {
-                  setShowNewBatteryPanel(false);
-                  setInlineError(null);
-                }}
-              />
-            )}
-
-            {!showNewBatteryPanel && batteryId ? (
-              <div className="space-y-1 text-sm">
-                <Eyebrow dot="muted">Prior runs on this pack (before this log)</Eyebrow>
-                <input
-                  type="number"
-                  min={0}
-                  className="w-full max-w-md form-control px-3 py-2 text-sm"
-                  inputMode="numeric"
-                  value={batteryRunsCompleted}
-                  onChange={(e) => {
-                    batteryRunUserTouchedRef.current = true;
-                    setBatteryRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)));
-                  }}
-                  aria-label="Prior runs on this battery pack before this log"
-                />
-                <div className="text-[11px] text-muted-foreground">
-                  This log saves as{" "}
-                  <span className="font-medium text-foreground">battery run #{batteryRunsCompleted + 1}</span>
-                  {batteryRunsCompleted === 0
-                    ? " (first run on this pack)."
-                    : batteryRunsCompleted === 1
-                      ? " (after 1 prior run on this pack)."
-                      : ` (after ${batteryRunsCompleted} prior runs on this pack).`}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {runDetailsTab === "conditions" ? (
-          <RunConditionsSection
-            value={conditions}
-            onChange={setConditions}
-            track={conditionsTrack}
-            sessionAtIso={conditionsSessionAtIso}
-            onSaveTrackPin={handleSaveTrackPin}
-          />
-        ) : null}
+              ),
+            },
+          ]}
+        />
           </>
         )}
       </SurfaceCard>
@@ -3874,7 +3948,8 @@ export function NewRunForm(props: {
         variant="panel"
         overflowHidden={false}
         className={cn(
-          "transition-colors",
+          "run-section--setup transition-colors",
+          completeValidation.setup && "border-amber-500/60 ring-1 ring-amber-500/30",
           isDraft && !setupSectionExpanded && setupBaselineData && "border-emerald-500/40",
           prefillFieldClass(Boolean(prefillHighlights?.setup))
         )}
@@ -3981,90 +4056,29 @@ export function NewRunForm(props: {
                 </div>
               ) : (
                 <>
-                  <div className="space-y-1 text-sm">
-                    {isEditing ? (
-                      <div className="flex items-center justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setShowSetupSourceControls(false)}
-                          className="text-[10px] text-muted-foreground underline decoration-border underline-offset-2 hover:text-foreground"
-                          title="Hide the source controls and keep the current setup as-is."
-                        >
-                          Keep current
-                        </button>
-                      </div>
-                    ) : null}
-                    <SearchableSelect
-                      aria-label="Setup source"
-                      className="max-w-2xl"
-                      searchable={false}
-                      value={setupSource}
-                      onChange={(next) =>
-                        handleSetupSourceChange(next as "previous_runs" | "other" | "new")
-                      }
-                      options={[
-                        { value: "previous_runs", label: "Setups from previous runs" },
-                        { value: "other", label: "Other" },
-                        { value: "new", label: "New" },
-                      ]}
-                    />
-                  </div>
-                  {setupSource === "previous_runs" ? (
-                    <RunPickerSelect
-                      runs={pickerRuns}
-                      value={loadSetupSelection}
-                      onChange={applyPastSetupOnly}
-                      placeholder="Choose a run…"
-                      disabled={pickerRuns.length === 0}
-                      formatLine={formatRunPickerLineRelativeWhen}
-                    />
-                  ) : setupSource === "other" ? (
-                    <div className="space-y-2">
-                      <div className="space-y-1 text-sm">
-                        <div className="text-sm font-medium text-muted-foreground">Other source</div>
-                        <SearchableSelect
-                          aria-label="Other setup source"
-                          className="max-w-2xl"
-                          searchable={false}
-                          value={otherSetupSource}
-                          onChange={(next) => setOtherSetupSource(next as "downloaded_setups")}
-                          options={[{ value: "downloaded_setups", label: "Downloaded setups" }]}
-                        />
-                      </div>
-                      <div className="space-y-1 text-sm">
-                        <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
-                          {loadOtherSetupLabel}
-                        </div>
-                        <SearchableSelect
-                          aria-label="Downloaded setup"
-                          className="max-w-2xl"
-                          placeholder="Choose a downloaded setup…"
-                          clearable
-                          clearLabel="Choose a downloaded setup…"
-                          triggerMono
-                          disabled={downloadedSetups.length === 0}
-                          value={loadOtherSetupSelection}
-                          onChange={(next) => applyDownloadedSetupOnly(next)}
-                          options={downloadedSetups.map((d) => ({
-                            value: d.id,
-                            label: `${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`,
-                          }))}
-                        />
-                      </div>
-                      {carId ? (
-                        <RunLogQuickSetupUpload
-                          carId={carId}
-                          onImported={handleQuickSetupImported}
-                          onRefetchList={() => void refreshDownloadedSetups()}
-                          variant={downloadedSetups.length === 0 ? "banner" : "inline"}
-                        />
-                      ) : null}
+                  {isEditing ? (
+                    <div className="flex items-center justify-end text-sm">
+                      <button
+                        type="button"
+                        onClick={() => setShowSetupSourceControls(false)}
+                        className="text-[10px] text-muted-foreground underline decoration-border underline-offset-2 hover:text-foreground"
+                        title="Hide the source controls and keep the current setup as-is."
+                      >
+                        Keep current
+                      </button>
                     </div>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground">
-                      Blank setup for this car — edit the sheet below, or lock in when you are ready.
-                    </p>
-                  )}
+                  ) : null}
+                  <PagedCard
+                    storageKey="run-form:setup-source"
+                    className="max-w-2xl"
+                    controlPosition="above"
+                    heightMode="adaptive"
+                    activeId={setupSource}
+                    onActiveIdChange={(id) =>
+                      handleSetupSourceChange(id as "previous_runs" | "other" | "new")
+                    }
+                    faces={setupSourceFaces()}
+                  />
                 </>
               )}
               <button
@@ -4105,99 +4119,25 @@ export function NewRunForm(props: {
                 </ul>
               </div>
             ) : null}
-            {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">
-                No past runs yet, or list failed to load. You can choose <span className="font-medium">New</span> above
-                to start from a blank sheet.
-              </p>
-            ) : null}
           </div>
           )
         ) : (
           <>
-            {setupSnapshotSaveStatus ? (
-              <div
-                className={`text-[11px] ${
-                  setupSnapshotSaveStatus.kind === "error" ? "text-destructive" : "text-emerald-700 dark:text-emerald-300"
-                }`}
-              >
-                {setupSnapshotSaveStatus.text}
-              </div>
-            ) : null}
             {/* Setup-changes free-text "Interpret changes" panel intentionally hidden from Log Your Run.
                 State (setupChangesText/Busy/Error/Proposal) and handlers (interpretSetupChanges,
                 applySetupChangesProposal) are kept in this file so the feature can be re-enabled
                 by restoring the JSX block from git history. */}
             <div className="max-w-2xl space-y-2">
-              <div className="space-y-1 text-sm">
-                <SearchableSelect
-                  aria-label="Setup source"
-                  searchable={false}
-                  value={setupSource}
-                  onChange={(next) =>
-                    handleSetupSourceChange(next as "previous_runs" | "other" | "new")
-                  }
-                  options={[
-                    { value: "previous_runs", label: "Setups from previous runs" },
-                    { value: "other", label: "Other" },
-                    { value: "new", label: "New" },
-                  ]}
-                />
-              </div>
-              {setupSource === "previous_runs" ? (
-                <RunPickerSelect
-                  runs={pickerRuns}
-                  value={loadSetupSelection}
-                  onChange={applyPastSetupOnly}
-                  placeholder="Choose a run…"
-                  disabled={pickerRuns.length === 0}
-                  formatLine={formatRunPickerLineRelativeWhen}
-                />
-              ) : setupSource === "other" ? (
-                <div className="space-y-2">
-                  <div className="space-y-1 text-sm">
-                    <div className="text-sm font-medium text-muted-foreground">Other source</div>
-                    <SearchableSelect
-                      aria-label="Other setup source"
-                      searchable={false}
-                      value={otherSetupSource}
-                      onChange={(next) => setOtherSetupSource(next as "downloaded_setups")}
-                      options={[{ value: "downloaded_setups", label: "Downloaded setups" }]}
-                    />
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
-                      {loadOtherSetupLabel}
-                    </div>
-                    <SearchableSelect
-                      aria-label="Downloaded setup"
-                      placeholder="Choose a downloaded setup…"
-                      clearable
-                      clearLabel="Choose a downloaded setup…"
-                      triggerMono
-                      disabled={downloadedSetups.length === 0}
-                      value={loadOtherSetupSelection}
-                      onChange={(next) => applyDownloadedSetupOnly(next)}
-                      options={downloadedSetups.map((d) => ({
-                        value: d.id,
-                        label: `${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`,
-                      }))}
-                    />
-                  </div>
-                  {carId ? (
-                    <RunLogQuickSetupUpload
-                      carId={carId}
-                      onImported={handleQuickSetupImported}
-                      onRefetchList={() => void refreshDownloadedSetups()}
-                      variant={downloadedSetups.length === 0 ? "banner" : "inline"}
-                    />
-                  ) : null}
-                </div>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  Blank setup for this car — edit the sheet below, or lock in when you are ready.
-                </p>
-              )}
+              <PagedCard
+                storageKey="run-form:setup-source-expanded"
+                controlPosition="above"
+                heightMode="adaptive"
+                activeId={setupSource}
+                onActiveIdChange={(id) =>
+                  handleSetupSourceChange(id as "previous_runs" | "other" | "new")
+                }
+                faces={setupSourceFaces()}
+              />
               <button
                 type="button"
                 onClick={() => setSetupSectionExpanded(false)}
@@ -4223,12 +4163,6 @@ export function NewRunForm(props: {
               template={setupTemplate}
               enableFieldSearch
             />
-            {setupSource === "previous_runs" && pickerRuns.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">
-                No past runs yet, or list failed to load. You can choose <span className="font-medium">New</span> above
-                to start from a blank sheet.
-              </p>
-            ) : null}
             {carId &&
             downloadedSetups.length === 0 &&
             setupSource !== "other" &&
@@ -4240,73 +4174,6 @@ export function NewRunForm(props: {
                 variant="banner"
               />
             ) : null}
-            <div className="flex flex-col gap-2 max-w-2xl border-t border-border/70 pt-3">
-              {(isEditing && editRun?.id) || setupBaselineSnapshotId ? (
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-                  {isEditing && editRun?.id ? (
-                    <>
-                      <a
-                        className="text-accent underline decoration-border underline-offset-2 hover:opacity-90"
-                        href={`/api/runs/${editRun.id}/setup-pdf`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        View filled setup PDF
-                      </a>
-                      <a
-                        className="text-accent underline decoration-border underline-offset-2 hover:opacity-90"
-                        href={`/api/runs/${editRun.id}/setup-pdf?download=1`}
-                        rel="noopener noreferrer"
-                      >
-                        Download PDF
-                      </a>
-                    </>
-                  ) : setupBaselineSnapshotId ? (
-                    <>
-                      <a
-                        className="text-accent underline decoration-border underline-offset-2 hover:opacity-90"
-                        href={`/api/setup-snapshots/${setupBaselineSnapshotId}/setup-pdf`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        View filled setup PDF
-                      </a>
-                      <a
-                        className="text-accent underline decoration-border underline-offset-2 hover:opacity-90"
-                        href={`/api/setup-snapshots/${setupBaselineSnapshotId}/setup-pdf?download=1`}
-                        rel="noopener noreferrer"
-                      >
-                        Download PDF
-                      </a>
-                    </>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] text-muted-foreground">
-                Lock in the sheet as the new baseline so later changes show as deltas against it.
-              </p>
-              <button
-                type="button"
-                onClick={handleSaveSetupSnapshot}
-                disabled={setupSnapshotSaving || setupChangeCountSinceBaseline === 0}
-                className="rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-emerald-300 transition"
-                title={
-                  setupChangeCountSinceBaseline === 0
-                    ? "No changes to save — the setup is still identical to the loaded snapshot."
-                    : isEditing
-                      ? "Save the current sheet as a new snapshot attached to this run."
-                      : "Lock in the current sheet so it counts as the loaded baseline."
-                }
-              >
-                {setupSnapshotSaving
-                  ? "Saving…"
-                  : isEditing
-                    ? "Save setup snapshot to this run"
-                    : "Lock in setup changes"}
-              </button>
-            </div>
-            </div>
           </>
         )}
       </SurfaceCard>
@@ -4353,63 +4220,72 @@ export function NewRunForm(props: {
         isDraftResume={isDraft}
       />
 
-      <SurfaceCard variant="panel" overflowHidden={false} contentClassName="space-y-3 text-sm">
+      <SurfaceCard variant="panel" overflowHidden={false} className="run-section--feedback" contentClassName="space-y-3 text-sm">
         <Eyebrow>Feedback</Eyebrow>
-        <div ref={feedbackRequiredRef} className="space-y-3">
-          {completeValidation.show ? (
-            <div
-              role="alert"
-              className="rounded-md border border-amber-500/50 bg-amber-500/15 px-2.5 py-2 text-[11px] leading-snug text-amber-950 dark:text-amber-100"
-            >
-              {inlineError ?? "Complete the highlighted fields below before Run complete."}
-            </div>
-          ) : null}
-          <CarHandlingRatingQuickPick
-            value={carRating}
-            onChange={(n) => setCarRating((cur) => (cur === n ? null : n))}
-            highlightMissing={completeValidation.carRating}
-          />
-          <FeelVsLastRunQuickPick
-            value={handlingUi.feelVsLastRun}
-            onChange={(feelVsLastRun) =>
-              setHandlingUi((cur) => ({ ...cur, feelVsLastRun }))
-            }
-            eligible={feelVsLastRunEligible}
-            highlightMissing={completeValidation.feelVsLastRun}
-          />
-        </div>
-        <textarea
-          className={cn(
-            "form-control h-32 w-full resize-none px-3 py-2 text-sm",
-            isDraft && notes.trim().length === 0
-              ? "border-amber-500/50 ring-1 ring-amber-500/30"
-              : "border-border"
-          )}
-          placeholder={
-            isDraft && notes.trim().length === 0
-              ? "How did the run feel? Grip, balance, any issues, what you'd change…"
-              : "Notes…"
-          }
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          aria-label="Session notes"
+        <PagedCard
+          storageKey="run-form:feedback"
+          controlPosition="above"
+          heightMode="adaptive"
+          activeId={feedbackFace}
+          onActiveIdChange={(id) => setFeedbackFace(id as "feedback" | "handling")}
+          faces={[
+            {
+              id: "feedback",
+              label: "Feedback",
+              content: (
+                <div className="space-y-3">
+                  <div ref={feedbackRequiredRef} className="space-y-3">
+                    {completeValidation.show ? (
+                      <div
+                        role="alert"
+                        className="rounded-md border border-amber-500/50 bg-amber-500/15 px-2.5 py-2 text-[11px] leading-snug text-amber-950 dark:text-amber-100"
+                      >
+                        {inlineError ?? "Complete the highlighted fields below before Run complete."}
+                      </div>
+                    ) : null}
+                    <CarHandlingRatingQuickPick
+                      value={carRating}
+                      onChange={(n) => setCarRating((cur) => (cur === n ? null : n))}
+                      highlightMissing={completeValidation.carRating}
+                    />
+                    <FeelVsLastRunQuickPick
+                      value={handlingUi.feelVsLastRun}
+                      onChange={(feelVsLastRun) =>
+                        setHandlingUi((cur) => ({ ...cur, feelVsLastRun }))
+                      }
+                      eligible={feelVsLastRunEligible}
+                      highlightMissing={completeValidation.feelVsLastRun}
+                    />
+                  </div>
+                  <textarea
+                    className={cn(
+                      "form-control h-32 w-full resize-none px-3 py-2 text-sm",
+                      isDraft && notes.trim().length === 0
+                        ? "border-amber-500/50 ring-1 ring-amber-500/30"
+                        : "border-border"
+                    )}
+                    placeholder={
+                      isDraft && notes.trim().length === 0
+                        ? "How did the run feel? Grip, balance, any issues, what you'd change…"
+                        : "Notes…"
+                    }
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    aria-label="Session notes"
+                  />
+                </div>
+              ),
+            },
+            {
+              id: "handling",
+              label: "Handling detail",
+              shortLabel: "Handling",
+              content: (
+                <HandlingAssessmentFields value={handlingUi} onChange={setHandlingUi} />
+              ),
+            },
+          ]}
         />
-        <div className="pt-1">
-          <button
-            type="button"
-            className="btn-surface flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium"
-            aria-expanded={handlingDetailExpanded}
-            onClick={() => setHandlingDetailExpanded((v) => !v)}
-          >
-            <span>Handling detail (optional)</span>
-            <span className="text-[10px] opacity-70">{handlingDetailExpanded ? "Hide" : "Show"}</span>
-          </button>
-          {handlingDetailExpanded ? (
-            <div className="mt-2">
-              <HandlingAssessmentFields value={handlingUi} onChange={setHandlingUi} />
-            </div>
-          ) : null}
-        </div>
       </SurfaceCard>
 
 
@@ -4426,58 +4302,6 @@ export function NewRunForm(props: {
           )}
         >
           {status}
-        </div>
-      ) : null}
-
-      {pendingSaveIntent ? (
-        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs">
-          <Eyebrow dot="muted">Unsaved changes to setup</Eyebrow>
-          <p className="mt-1 text-[11px] leading-snug text-foreground/90">
-            You&apos;ve edited{" "}
-            <span className="font-medium">
-              {setupChangedRowsSinceBaseline.length} parameter
-              {setupChangedRowsSinceBaseline.length === 1 ? "" : "s"}
-            </span>{" "}
-            but haven&apos;t locked them into a new snapshot. Saving will include these
-            changes with the run — review them first:
-          </p>
-          <ul className="mt-2 grid max-h-40 grid-cols-1 gap-x-4 gap-y-0.5 overflow-auto sm:grid-cols-2">
-            {setupChangedRowsSinceBaseline.map((r) => (
-              <li key={r.key} className="flex flex-wrap items-baseline gap-1">
-                <span className="truncate font-medium text-foreground">{r.label}</span>
-                {r.unit ? (
-                  <span className="text-[10px] text-muted-foreground">({r.unit})</span>
-                ) : null}
-                <span className="ml-auto font-mono tabular-nums text-muted-foreground">
-                  <span className="line-through opacity-70">{r.previous ?? "—"}</span>
-                  <span className="mx-1 text-foreground/60">→</span>
-                  <span className="font-semibold text-foreground">{r.current || "—"}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-2 flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              className="btn-surface px-3 py-1.5 text-[11px] font-medium"
-              onClick={() => setPendingSaveIntent(null)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="rounded-md border border-amber-500/60 bg-amber-500/20 px-3 py-1.5 text-[11px] font-medium text-amber-800 hover:bg-amber-500/30 dark:text-amber-200 transition"
-              onClick={(e) =>
-                saveRun(e, pendingSaveIntent, { bypassUnsavedSetupCheck: true })
-              }
-            >
-              {pendingSaveIntent === "draft"
-                ? "Save changes + save draft"
-                : editingCompletedRun
-                  ? "Save edits"
-                  : "Save changes + run complete"}
-            </button>
-          </div>
         </div>
       ) : null}
 
@@ -4499,17 +4323,21 @@ export function NewRunForm(props: {
       ) : null}
 
       {/* Persistent save actions — pinned bottom-right so they stay reachable
-          anywhere in this long form. Mobile offset mirrors LogRunFab (which is
+          anywhere in this long form. Portaled to <body> so the app-wide reveal
+          transform on `.page-body` children can't trap `fixed` (which stranded
+          the bar at the form's bottom). Mobile offset mirrors LogRunFab (which is
           suppressed on run create/edit routes, so no collision): dock pad +
           dock height + gap. Desktop floats at the viewport corner. */}
-      <div
-        className={cn(
-          "pointer-events-none fixed inset-x-0 z-40 px-4",
-          "bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.25rem)]",
-          "md:inset-x-auto md:right-8 md:bottom-8 md:px-0"
-        )}
-      >
-        <div className="mx-auto flex max-w-md flex-wrap justify-end gap-2 md:mx-0 md:max-w-none">
+      {saveBarMounted &&
+        createPortal(
+          <div
+            className={cn(
+              "pointer-events-none fixed inset-x-0 z-40 px-4",
+              "bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.25rem)]",
+              "md:inset-x-auto md:right-8 md:bottom-8 md:px-0"
+            )}
+          >
+            <div className="mx-auto flex max-w-md flex-wrap justify-end gap-2 md:mx-0 md:max-w-none">
           {editingCompletedRun ? (
             <button
               type="button"
@@ -4557,8 +4385,10 @@ export function NewRunForm(props: {
               </button>
             </>
           )}
-        </div>
-      </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </form>
     </>
   );

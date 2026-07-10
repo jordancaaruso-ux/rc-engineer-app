@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
+import { getMyNameSetting } from "@/lib/appSettings";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getCachedDashboardHomeModel } from "@/lib/cachedReads";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
@@ -30,9 +31,14 @@ export default async function DashboardPage(): Promise<ReactNode> {
     requireCurrentUser(),
     getExplicitTimeZoneForRunFormatting(),
   ]);
-  const model = await getCachedDashboardHomeModel(user.id, displayTimeZone);
-  /* First name only — the greeting should read like a race engineer saying hi, not a mail merge. */
-  const greetingName = user.name?.trim().split(/\s+/)[0] ?? null;
+  const [model, myName] = await Promise.all([
+    getCachedDashboardHomeModel(user.id, displayTimeZone),
+    getMyNameSetting(user.id),
+  ]);
+  /* First name only — the greeting should read like a race engineer saying hi, not a mail merge.
+     Display name from settings wins; auth session name is the fallback. */
+  const fullName = myName?.trim() || user.name?.trim() || "";
+  const greetingName = fullName ? fullName.split(/\s+/)[0] : null;
 
   return (
     <DashboardHome model={model} displayTimeZone={displayTimeZone} greetingName={greetingName} />

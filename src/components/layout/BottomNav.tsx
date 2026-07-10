@@ -29,10 +29,10 @@ export const BottomNav = memo(function BottomNav() {
 
   return (
     <nav
-      className="bottom-nav pointer-events-none fixed inset-x-0 bottom-0 z-50 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+      className="bottom-nav pointer-events-none fixed inset-x-0 bottom-0 z-50 px-7 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
       aria-label="Primary"
     >
-      <div className="pointer-events-auto relative mx-auto max-w-md overflow-hidden rounded-2xl border border-white/[0.14] bg-card/[0.42] bg-gradient-to-b from-white/[0.06] to-transparent shadow-[0_20px_45px_-18px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-[30px] backdrop-saturate-[1.7]">
+      <div className="pointer-events-auto relative mx-auto max-w-[302px] overflow-hidden rounded-full border border-white/[0.06] bg-card/[0.32] bg-[linear-gradient(180deg,rgba(255,255,255,0.07),transparent_42%)] shadow-[0_22px_48px_-18px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_0_0.5px_rgba(255,255,255,0.06)] backdrop-blur-[40px] backdrop-saturate-[1.9]">
         {/* Sliding active-tab indicator — equal grid cells, so left is index-based. */}
         <span
           aria-hidden
@@ -44,7 +44,7 @@ export const BottomNav = memo(function BottomNav() {
         >
           <span className="h-0.5 w-7 rounded-full bg-primary shadow-[0_0_10px_1px_rgba(255,214,10,0.4)]" />
         </span>
-        <ul className="grid h-14 max-w-full grid-cols-5">
+        <ul className="grid h-[49px] max-w-full grid-cols-5">
           {MOBILE_NAV.map((item) => {
             const active = activeId === item.id;
             const isEngineer = item.id === "engineer";

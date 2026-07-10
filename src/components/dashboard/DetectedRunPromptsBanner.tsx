@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { formatRunDateTime } from "@/lib/formatDate";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
@@ -68,7 +68,7 @@ export function DetectedRunPromptsBanner({
             p.promptKind === "finish" ? "Finish logging this run" : "Log this run";
           const timeLabel = formatLap(p.bestLapSeconds);
           const lapsLabel = p.lapCount != null ? `${p.lapCount} lap${p.lapCount === 1 ? "" : "s"}` : "—";
-          const whenFallback = formatRunCreatedAtDateTime(p.sessionCompletedAtIso, displayTimeZone);
+          const whenFallback = formatRunDateTime(p.sessionCompletedAtIso, displayTimeZone);
           const kindLabel = p.sourceType === "practice" ? "Practice" : "Race / qualifying";
           const sessionTitle =
             p.sessionListLabel?.trim() ||

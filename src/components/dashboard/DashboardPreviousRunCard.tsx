@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Trophy } from "lucide-react";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
+import { recordMetricLabel, type DashboardNewPb } from "@/lib/dashboardRecords";
 import { cn } from "@/lib/utils";
 import { formatLap } from "@/lib/runLaps";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { formatRunDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PagedCard } from "@/components/ui/PagedCard";
+import { RollingNumber } from "@/components/ui/motion";
 import { Eyebrow, PanelSubtitle, PanelTitle, StatStrip, StatTile } from "@/components/ui/panel";
 
 type RecentRun = NonNullable<DashboardHomeModel["recentRun"]>;
@@ -27,9 +30,12 @@ function formatCarRating(rating: number | null | undefined): string {
  */
 export function DashboardPreviousRunCard({
   recentRun,
+  newPb,
   displayTimeZone,
 }: {
   recentRun: DashboardHomeModel["recentRun"];
+  /** Set when this run broke a record — surfaces the post-run PB celebration. */
+  newPb: DashboardNewPb | null;
   displayTimeZone: string;
 }) {
   const viewRunHref = recentRun
@@ -39,7 +45,7 @@ export function DashboardPreviousRunCard({
     Boolean(recentRun?.loggingCompletedAt) || recentRun?.loggingComplete === true;
   const formattedRunDate =
     recentRun
-      ? formatRunCreatedAtDateTime(
+      ? formatRunDateTime(
           resolveRunDisplayInstant({
             createdAt: recentRun.createdAt,
             sessionCompletedAt: recentRun.sessionCompletedAt,
@@ -101,7 +107,10 @@ export function DashboardPreviousRunCard({
         aria-label="View last run"
         className="tap-active absolute inset-0 z-0 cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
       />
-      <div className="pointer-events-none relative z-10 mt-1.5">{header}</div>
+      <div className="pointer-events-none relative z-10 mt-1.5">
+        {header}
+        {newPb ? <PbFlag newPb={newPb} /> : null}
+      </div>
       <div className="relative z-10">
         <PagedCard
           storageKey="dashboard-previous-run"
@@ -109,6 +118,7 @@ export function DashboardPreviousRunCard({
             {
               id: "laps",
               label: "Lap stats",
+              shortLabel: "Laps",
               content: (
                 <RunFace href={viewRunHref}>
                   <LapsFace run={recentRun} />
@@ -118,6 +128,7 @@ export function DashboardPreviousRunCard({
             {
               id: "handling",
               label: "Handling read",
+              shortLabel: "Handling",
               content: (
                 <RunFace href={viewRunHref}>
                   <HandlingFace run={recentRun} />
@@ -127,6 +138,7 @@ export function DashboardPreviousRunCard({
             {
               id: "setup-changes",
               label: "Setup changes",
+              shortLabel: "Setup",
               content: (
                 <RunFace href={viewRunHref}>
                   <SetupChangesFace run={recentRun} />
@@ -137,6 +149,16 @@ export function DashboardPreviousRunCard({
         />
       </div>
     </CardPanel>
+  );
+}
+
+/** Post-run celebration pill — a record this run just broke. Green = pace win. */
+function PbFlag({ newPb }: { newPb: DashboardNewPb }) {
+  return (
+    <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#4FD089]/12 px-2 py-1 text-[11px] font-medium text-[#4FD089]">
+      <Trophy className="size-3.5 shrink-0" aria-hidden />
+      New {recordMetricLabel(newPb.metric)} · {formatLap(newPb.value)}
+    </div>
   );
 }
 
@@ -160,15 +182,21 @@ function RunFace({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-/** Face 1 — the numbers. */
+/** Face 1 — the numbers. Lap times roll in on mount; the lap count stays put. */
 function LapsFace({ run }: { run: RecentRun }) {
   return (
     <StatStrip className="mt-2" gridClassName="grid-cols-3">
-      <StatTile label="Best lap" value={formatLap(run.bestLap)} accent className="py-2" />
-      <StatTile label="Avg top 5" value={formatLap(run.avgTop5)} className="py-2" />
+      <StatTile label="Best lap" value={<RollingLap seconds={run.bestLap} />} accent className="py-2" />
+      <StatTile label="Avg top 5" value={<RollingLap seconds={run.avgTop5} />} className="py-2" />
       <StatTile label="Laps" value={String(run.lapCount)} className="py-2" />
     </StatStrip>
   );
+}
+
+/** A lap time that rolls to its value, or a static em-dash when there's no lap. */
+function RollingLap({ seconds }: { seconds: number | null | undefined }) {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds)) return <>{formatLap(seconds ?? null)}</>;
+  return <RollingNumber value={seconds} format={(n) => formatLap(n)} />;
 }
 
 /** How many handling read lines the face shows before truncating. */

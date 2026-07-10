@@ -556,6 +556,142 @@ html[data-nav-pending] .page {
   @apply text-[11px] leading-snug text-muted-foreground;
 }
 
+/* --------------------------------------------------------------------------
+   Motion primitives (dashboard vertical slice, 2026-07-10)
+   Pure-CSS entrance + chart draw-in so they need no JS and can't flash on
+   hydration. The rolling number is the only JS-driven motion (motion.tsx).
+   Reduced motion collapses every one of these to its end state instantly.
+--------------------------------------------------------------------------- */
+@keyframes rc-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    /* No `transform` here on purpose: it rests at the element's base value
+       (none), so a finished reveal never leaves a lingering identity transform
+       that would establish a containing block for fixed/sticky descendants —
+       important now that the entrance is applied app-wide (below). */
+  }
+}
+
+/* Staggered card entrance; `--rc-delay` is set per sibling by <Reveal>. */
+.rc-reveal {
+  animation: rc-reveal 460ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation-delay: var(--rc-delay, 0ms);
+}
+
+/*
+ * App-wide card entrance. Every page routes its content through `.page-body`,
+ * so its direct children get the same staggered fade the dashboard hand-wires
+ * with <Reveal> — no per-page changes, and it re-runs on each client navigation
+ * (elements remount). `:not(.rc-reveal)` yields to pages that already opt in
+ * (dashboard, analysis) so those never double-animate. Gated on no-preference so
+ * reduced motion shows everything at its end state instantly (opacity comes only
+ * from the keyframe, so with no animation the content is simply visible).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .page-body > *:not(.rc-reveal) {
+    animation: rc-reveal 460ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+  .page-body > *:not(.rc-reveal):nth-child(1) { animation-delay: 0ms; }
+  .page-body > *:not(.rc-reveal):nth-child(2) { animation-delay: 60ms; }
+  .page-body > *:not(.rc-reveal):nth-child(3) { animation-delay: 120ms; }
+  .page-body > *:not(.rc-reveal):nth-child(4) { animation-delay: 180ms; }
+  .page-body > *:not(.rc-reveal):nth-child(5) { animation-delay: 240ms; }
+  .page-body > *:not(.rc-reveal):nth-child(6) { animation-delay: 300ms; }
+  .page-body > *:not(.rc-reveal):nth-child(n + 7) { animation-delay: 340ms; }
+}
+
+@keyframes rc-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Left-to-right line draw for a normalized (`pathLength="1"`) SVG stroke. */
+.rc-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: rc-draw 900ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation-delay: var(--rc-delay, 140ms);
+}
+
+@keyframes rc-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Gentle fade-in for elements that should trail a drawing line (sparkline wash,
+   endpoint dot). Opacity is set on the element; the keyframe only ramps it up. */
+.rc-fade {
+  animation: rc-fade 500ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation-delay: var(--rc-delay, 320ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-reveal,
+  .rc-draw,
+  .rc-fade {
+    animation: none;
+  }
+  .rc-draw {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Log-run floating progress rail (2026-07-10)
+   Chips pop in as cards dock; a jumped-to card flashes a yellow ring. The rail
+   scrolls horizontally without a visible scrollbar when the chips overflow.
+--------------------------------------------------------------------------- */
+.run-rail-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.run-rail-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes rc-rail-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.run-rail-pop {
+  animation: rc-rail-pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes rc-section-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 214, 10, 0);
+  }
+  12% {
+    box-shadow:
+      0 0 0 1px rgba(255, 214, 10, 0.9),
+      0 0 24px -6px rgba(255, 214, 10, 0.45);
+  }
+}
+.run-section-flash {
+  border-radius: 0.75rem;
+  animation: rc-section-flash 1.3s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-rail-pop,
+  .run-section-flash {
+    animation: none;
+  }
+}
+
 /* Instant tap feedback on mobile nav, hub rows, and buttons */
 .tap-active {
   @apply transition-transform duration-75 active:scale-[0.97] active:opacity-90;

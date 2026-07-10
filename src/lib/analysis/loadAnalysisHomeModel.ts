@@ -6,6 +6,7 @@ import {
   bestDeltaVsPreviousSameCarTrack,
   collectCarOptions,
   computeAnalysisRunMetrics,
+  computeSetupChangesByRunId,
   isTrackCarPersonalBest,
   resolveTrendScope,
   runMatchesScope,
@@ -46,6 +47,7 @@ const analysisRunSelect = {
   lapSession: true,
   bestLapSeconds: true,
   avgTop5LapSeconds: true,
+  setupSnapshot: { select: { data: true } },
 } satisfies Prisma.RunSelect;
 
 type AnalysisRunRow = Prisma.RunGetPayload<{ select: typeof analysisRunSelect }>;
@@ -91,6 +93,13 @@ async function loadTrendModel(
   // Computed on the full (unfiltered) newest-first window so the first scoped
   // run still compares against the run before it where possible.
   const tireIndicatorsByRunId = computeTireIndicatorsByRunId(rows);
+  const setupChangesByRunId = computeSetupChangesByRunId(
+    rows.map((run) => ({
+      id: run.id,
+      carId: run.carId,
+      setupData: run.setupSnapshot?.data ?? null,
+    }))
+  );
 
   const scoped = rows
     .filter((run) => runMatchesScope(run, scope, timeZone))
@@ -114,6 +123,7 @@ async function loadTrendModel(
       createdAtIso: run.createdAt.toISOString(),
       metrics,
       tireIndicator: tireIndicatorsByRunId.get(run.id) ?? null,
+      setupChange: setupChangesByRunId.get(run.id) ?? null,
     });
   }
 

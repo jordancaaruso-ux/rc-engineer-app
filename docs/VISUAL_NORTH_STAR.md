@@ -72,7 +72,7 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 ### Color semantics
 
 - **Yellow = action only** (CTAs, focus rings, active nav). Never use yellow to mean “fast lap” or “good data.”
-- **Green / red = data deltas** (`gain` / `loss`).
+- **Green / red = pace/quality deltas only** (`gain` / `loss` — faster/slower, cleaner/messier). **Volume deltas are neutral:** fewer runs, laps, or wheel time is *less*, not a failure, so those changes render in muted ink with a plain ↑/↓, never green/red (2026-07-10; `DashboardSummaryCard` `DeltaChip`).
 - **Dark text on yellow** — always `primary-foreground` (`#121110`), never white on yellow.
 
 ---
@@ -282,6 +282,7 @@ Track these when prioritizing rework:
 
 | Date | Change |
 |------|--------|
+| 2026-07-10 | **Stat-tile baseline lock + tabular-nums sweep** — `StatTile` label now reserves a fixed 2-line box (`line-clamp-2 min-h-[2.6em] leading-[1.3]`) so a wrapping label ("Time driving") no longer shoves its value off the baseline shared by its neighbours in a `grid-cols-3` strip — fixes the dashboard 30-day trio app-wide via the primitive. Audit found the app already sans-tabular-clean (no `font-sans tabular-nums`, no inline `fontFamily`); added `tabular-nums` to the remaining user-facing numeric leaks (`LapComparisonColumnGrid` value line, `RunComparePanel` current/previous cells, `SetupSheetView` value). Tier-C admin/debug/PDF-calibration mono left as-is (identifiers/code, not tabular data). |
 | 2026-07-06 | **Dock → 5 destinations + floating action + account avatar** — Founder-interviewed nav restructure. **Add run** left the dock for a floating yellow `Log run` pill (bottom-right, 48px, draft-aware green dot, `LogRunFab`; suppressed on run + setup create/edit routes via `shouldShowLogRunFab`). **Settings** left the dock for a top-right account avatar menu (`AccountMenu` — Settings · Privacy · Sign out, `useSession` face). **Teams** took the freed slot. Mobile dock is now `Dashboard · Analysis · Assets · Engineer · Teams` (grid-cols-6 → 5). Desktop sidebar unchanged apart from gaining Teams. |
 | 2026-07-03 | **Mobile bottom nav → floating dock** — icon-only rounded pill floating above the screen edge (blurred `bg-card/90` + top sheen + charcoal shadow), Phosphor icons regular→**fill** when active (Gauge / ChartBar / PlusCircle / Car / GearSix; `EngineerNavIcon` gained a `filled` variant), sliding yellow top-edge indicator (2px, soft glow, 200ms). Labels retired on the mobile dock (sidebar labels unchanged); `--mobile-tab-bar-height` 3.25 → 4.75rem (dock + float gap clearance). Desktop sidebar untouched (still Lucide + labels). |
 | 2026-07-03 | **Photo wash + liquid glass** — TITC sunset (`track-hero.jpg`, 52KB) as the global fixed background (blur 8 · yellow .3 · dark .4, user-tuned via artifact sliders); `SurfaceCard` → `.glass-card` (0.7 alpha, 35px backdrop blur); dock pill → liquid glass (0.42, 30px). Replaces flat-charcoal shell; "calm flat / no photography" rule retired. `suppressHydrationWarning` added to SurfaceCard for the external `--focus` writes. |

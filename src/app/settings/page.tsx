@@ -11,7 +11,6 @@ import {
   formatSpeedhiveTransponderNumbersForSetting,
   parseSpeedhiveTransponderNumbersSetting,
 } from "@/lib/speedhive/speedhiveTransponder";
-import { BackgroundPreviewSection } from "@/components/settings/BackgroundPreviewSection";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
@@ -50,9 +49,6 @@ export default async function SettingsPage() {
       <header className="page-header">
         <div className="min-w-0">
           <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">
-            Per-user preferences. These persist across Log Your Run forms and lap imports.
-          </p>
         </div>
       </header>
       <section className="page-body max-w-2xl">
@@ -65,7 +61,6 @@ export default async function SettingsPage() {
             speedhiveTransponderNumbers: speedhiveTransponderNumbersText,
           }}
         />
-        <BackgroundPreviewSection />
         <SettingsNavSection />
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (

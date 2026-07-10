@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
 import { ButtonLink, buttonLinkClassName, primaryButtonClassName } from "@/components/ui/ButtonLink";
+import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
 import { HeroPanel } from "@/components/ui/HeroPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { SectionMetaInline, SectionTitle } from "@/components/ui/SectionTitle";
@@ -42,11 +43,13 @@ function SuggestionsReady({
 }) {
   return (
     <div className="space-y-2 text-[11px] leading-snug">
-      <p className="font-medium text-foreground">{suggestions.headline}</p>
+      <p className="font-medium text-foreground">
+        <EngineerMarkdown inline>{suggestions.headline}</EngineerMarkdown>
+      </p>
       <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
         {suggestions.bullets.map((b, i) => (
           <li key={i} className="break-words">
-            {b}
+            <EngineerMarkdown inline>{b}</EngineerMarkdown>
           </li>
         ))}
       </ul>
@@ -55,7 +58,9 @@ function SuggestionsReady({
           <Eyebrow className="mb-1">Next session</Eyebrow>
           <ul className="list-decimal space-y-0.5 pl-4 text-muted-foreground">
             {suggestions.tryNextSession.map((t, i) => (
-              <li key={i}>{t}</li>
+              <li key={i}>
+                <EngineerMarkdown inline>{t}</EngineerMarkdown>
+              </li>
             ))}
           </ul>
         </div>

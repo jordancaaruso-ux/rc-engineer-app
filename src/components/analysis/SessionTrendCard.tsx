@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Disc } from "lucide-react";
+import { Disc, Wrench } from "lucide-react";
 import type { AnalysisTrendModel, AnalysisTrendRun } from "@/lib/analysis/analysisHomeModel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
@@ -23,26 +23,58 @@ import { cn } from "@/lib/utils";
 
 type SeriesKey = "best" | "avgTop5" | "avgTop10" | "median";
 
+// Single warm-ink luminance ramp, not a rainbow: the series you came to read
+// (best lap) is the brightest + thickest line and everything else recedes with
+// falling luminance. Yellow stays action-only (VISUAL_NORTH_STAR), so the hero
+// line is bright ink, never the accent.
 const SERIES: Array<{ key: SeriesKey; name: string; color: string; width: number }> = [
-  { key: "best", name: "Best lap", color: "#45C8E8", width: 2.5 },
-  { key: "avgTop5", name: "Avg top 5", color: "#A78BFA", width: 2 },
-  { key: "avgTop10", name: "Avg top 10", color: "#4FD089", width: 2 },
-  { key: "median", name: "Median", color: "#E5644E", width: 2 },
+  { key: "best", name: "Best lap", color: "#ECE9E4", width: 2.5 },
+  { key: "avgTop5", name: "Avg top 5", color: "#B7B3AC", width: 1.75 },
+  { key: "avgTop10", name: "Avg top 10", color: "#87847D", width: 1.75 },
+  { key: "median", name: "Median", color: "#5C5A55", width: 1.75 },
 ];
 
-const CHART_HEIGHT = 216;
+const CHART_HEIGHT = 234;
 const PAD_LEFT = 38;
 const PAD_RIGHT = 14;
 const PAD_TOP = 14;
-/** Bottom band: tire indicator row + x-axis run labels. */
-const PAD_BOTTOM = 42;
-/** Top of the 12px tire icons, between the plot and the run labels. */
-const TIRE_ROW_TOP = CHART_HEIGHT - PAD_BOTTOM + 4;
+/** Bottom band: setup-change wrench row + tire indicator row + x-axis run labels. */
+const PAD_BOTTOM = 60;
+/** Bottom of the plotted area (top of the marker band). */
+const PLOT_BOTTOM = CHART_HEIGHT - PAD_BOTTOM;
+/** Top of the 11px setup-change wrench icons, directly below the plot (all faces). */
+const SETUP_ROW_TOP = PLOT_BOTTOM + 4;
+/** Top of the 12px tire icons, below the setup row (pace face only). */
+const TIRE_ROW_TOP = PLOT_BOTTOM + 22;
 /** Minimum px between runs before the tire row thins to changed-set runs only. */
 const TIRE_ROW_MIN_SPACING = 18;
 
 function seconds(value: number | null | undefined, digits = 3): string {
   return value == null ? "—" : value.toFixed(digits);
+}
+
+/**
+ * Gridline values snapped to round increments (…, 0.1, 0.2, 0.5, 1, 2, 5, …)
+ * inside [lo, hi] — never arbitrary fractions of the range. `minStep` floors the
+ * increment for integer metrics (mistake counts) so labels can't duplicate.
+ */
+function niceTicks(lo: number, hi: number, minStep = 0): number[] {
+  const span = hi - lo;
+  if (span <= 0) return [];
+  const rawStep = span / 3.5;
+  const pow = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  let step = pow * 10;
+  for (const multiple of [1, 2, 5]) {
+    if (pow * multiple >= rawStep) {
+      step = pow * multiple;
+      break;
+    }
+  }
+  step = Math.max(step, minStep);
+  const first = Math.ceil(lo / step);
+  const ticks: number[] = [];
+  for (let i = first; i * step <= hi + step * 1e-6; i++) ticks.push(i * step);
+  return ticks;
 }
 
 function buildPolylineSegments(points: Array<{ x: number; y: number } | null>): string[] {
@@ -58,6 +90,35 @@ function buildPolylineSegments(points: Array<{ x: number; y: number } | null>): 
   }
   if (current.length > 1) segments.push(current.join(" "));
   return segments;
+}
+
+/**
+ * The setup-change wrench row: a small wrench under every run whose chassis
+ * setup differed from the previous run on that car (tires / battery / additive
+ * excluded — see `computeSetupChangesByRunId`). Native `<title>` names the
+ * changed fields on hover / long-press. Shared by all three faces.
+ */
+function SetupChangeRow({
+  carRuns,
+  xAt,
+}: {
+  carRuns: AnalysisTrendRun[];
+  xAt: (index: number) => number;
+}) {
+  const marks = carRuns
+    .map((run, index) => ({ run, index }))
+    .filter(({ run }) => run.setupChange != null);
+  if (marks.length === 0) return null;
+  return (
+    <>
+      {marks.map(({ run, index }) => (
+        <g key={`setup-${run.id}`} className="text-muted-foreground">
+          <title>{`Setup changed: ${run.setupChange!.changedFieldLabels.join(", ")}`}</title>
+          <Wrench x={xAt(index) - 5.5} y={SETUP_ROW_TOP} width={11} height={11} aria-hidden />
+        </g>
+      ))}
+    </>
+  );
 }
 
 /** Measured chart width via ResizeObserver; each face measures independently. */
@@ -102,12 +163,7 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
 
   return (
     <SurfaceCard variant="hero" contentClassName="flex flex-col gap-3.5 p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <Eyebrow dot="accent">Session trend</Eyebrow>
-        <div className="max-w-[180px] truncate text-right font-mono text-[10px] uppercase leading-relaxed tracking-[0.08em] text-faint">
-          {trend.scopeLabel}
-        </div>
-      </div>
+      <Eyebrow dot="accent">Session trend</Eyebrow>
 
       {trend.carOptions.length > 1 ? (
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Car">
@@ -148,7 +204,6 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                 carRuns={carRuns}
                 metric="consistencyScore"
                 title="Consistency"
-                orientationHint="Higher = steadier"
                 higherIsBetter
                 color="#4FD089"
                 formatValue={(v) => `${v.toFixed(1)}%`}
@@ -164,10 +219,10 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                 carRuns={carRuns}
                 metric="mistakeCount"
                 title="Mistakes"
-                orientationHint="Lower = cleaner"
                 higherIsBetter={false}
                 color="#E5644E"
                 formatValue={(v) => String(Math.round(v))}
+                tickMinStep={1}
                 emptyLabel="No mistake-eligible runs for this car yet in this window."
               />
             ),
@@ -178,7 +233,7 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
   );
 }
 
-/** Face 1 — the four-series pace band with hover tooltip, tire row, tap-to-open. */
+/** Face 1 — the four-series pace band with a fixed readout strip, tire row, tap-to-open. */
 function PaceTrendFace({
   carRuns,
   scopeLabel,
@@ -222,7 +277,7 @@ function PaceTrendFace({
         const v = run.metrics[key];
         return v == null ? null : { x: xAt(index), y: yAt(v) };
       });
-    const ticks = [lo + (hi - lo) * 0.12, (lo + hi) / 2, hi - (hi - lo) * 0.12];
+    const ticks = niceTicks(lo, hi);
     return { xAt, yAt, pointsFor, ticks };
   }, [carRuns, chartWidth]);
 
@@ -279,12 +334,52 @@ function PaceTrendFace({
   };
 
   const hoverRun = hoverIndex != null ? carRuns[hoverIndex] : null;
+  // The readout strip always shows a run — the hovered one, else the latest —
+  // so it has a stable height and the plot itself is never covered by a tooltip.
+  const displayRun = hoverRun ?? carRuns[carRuns.length - 1] ?? null;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-right font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
-        Lower = faster
-      </div>
+      {geometry && displayRun ? (
+        <div className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                {displayRun.shortLabel}
+              </span>
+              {displayRun.tireIndicator ? (
+                <span className="flex min-w-0 items-center gap-1">
+                  <TireIndicatorIcon
+                    indicator={displayRun.tireIndicator}
+                    size="sm"
+                    className="-my-1 shrink-0"
+                  />
+                  <span className="max-w-[110px] truncate text-[10.5px] text-muted-foreground">
+                    {displayRun.tireIndicator.setLabel}
+                    {displayRun.tireIndicator.runNumber != null
+                      ? ` · run ${displayRun.tireIndicator.runNumber}`
+                      : ""}
+                  </span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+            {SERIES.filter((series) => !hidden.has(series.key)).map((series) => (
+              <span key={series.key} className="flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 rounded-[2px]"
+                  style={{ backgroundColor: series.color }}
+                  aria-hidden
+                />
+                <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
+                  {seconds(displayRun.metrics[series.key])}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {geometry ? (
         <div ref={chartRef} className="relative">
           <svg
@@ -335,7 +430,7 @@ function PaceTrendFace({
                   key={run.id}
                   x={geometry.xAt(index)}
                   y={CHART_HEIGHT - 8}
-                  textAnchor={index === 0 ? "start" : isLast ? "end" : "middle"}
+                  textAnchor="middle"
                   className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
                 >
                   {run.shortLabel}
@@ -368,8 +463,9 @@ function PaceTrendFace({
                     <Disc x={x - 6} y={TIRE_ROW_TOP} width={12} height={12} aria-hidden />
                     {indicator.runNumber != null ? (
                       <text
-                        x={x + 5}
+                        x={x}
                         y={TIRE_ROW_TOP + 13}
+                        textAnchor="middle"
                         className="fill-current font-mono text-[7px] tabular-nums"
                       >
                         {indicator.runNumber}
@@ -379,6 +475,8 @@ function PaceTrendFace({
                 );
               });
             })()}
+
+            <SetupChangeRow carRuns={carRuns} xAt={geometry.xAt} />
 
             {hoverIndex != null ? (
               <line
@@ -436,53 +534,6 @@ function PaceTrendFace({
               );
             })}
           </svg>
-
-          {hoverRun ? (
-            <div
-              className="pointer-events-none absolute top-0 z-10 min-w-[132px] rounded-lg border border-border bg-muted px-2.5 py-2 shadow-lg"
-              style={{
-                left: Math.max(2, Math.min(geometry.xAt(hoverIndex ?? 0) - 66, chartWidth - 136)),
-              }}
-            >
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
-                {hoverRun.shortLabel}
-              </div>
-              {SERIES.filter((series) => !hidden.has(series.key)).map((series) => (
-                <div key={series.key} className="flex items-center justify-between gap-3 py-px">
-                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span
-                      className="h-2 w-2 rounded-[2px]"
-                      style={{ backgroundColor: series.color }}
-                      aria-hidden
-                    />
-                    {series.name}
-                  </span>
-                  <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
-                    {seconds(hoverRun.metrics[series.key])}
-                  </span>
-                </div>
-              ))}
-              {hoverRun.tireIndicator ? (
-                <div className="mt-1 flex items-center gap-1 border-t border-border pt-1">
-                  <TireIndicatorIcon
-                    indicator={hoverRun.tireIndicator}
-                    size="sm"
-                    className="-my-1 -ml-1.5"
-                  />
-                  <span className="min-w-0 truncate text-[10.5px] text-muted-foreground">
-                    {hoverRun.tireIndicator.setLabel}
-                    {hoverRun.tireIndicator.runNumber != null
-                      ? ` · run ${hoverRun.tireIndicator.runNumber}`
-                      : ""}
-                  </span>
-                </div>
-              ) : null}
-              <div className="mt-1 flex items-center gap-1 border-t border-border pt-1 text-[10.5px] font-semibold text-muted-foreground">
-                Open run
-                <ChevronRight className="h-3 w-3 text-primary" aria-hidden />
-              </div>
-            </div>
-          ) : null}
         </div>
       ) : (
         <p className="text-[13px] leading-relaxed text-muted-foreground">
@@ -532,20 +583,21 @@ function SingleMetricTrendFace({
   carRuns,
   metric,
   title,
-  orientationHint,
   higherIsBetter,
   color,
   formatValue,
   emptyLabel,
+  tickMinStep = 0,
 }: {
   carRuns: AnalysisTrendRun[];
   metric: "consistencyScore" | "mistakeCount";
   title: string;
-  orientationHint: string;
   higherIsBetter: boolean;
   color: string;
   formatValue: (value: number) => string;
   emptyLabel: string;
+  /** Floor for the y-tick increment — 1 for integer metrics so labels can't repeat. */
+  tickMinStep?: number;
 }) {
   const router = useRouter();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -580,9 +632,9 @@ function SingleMetricTrendFace({
       const v = run.metrics[metric];
       return v == null ? null : { x: xAt(index), y: yAt(v) };
     });
-    const ticks = [hi - (hi - lo) * 0.12, (lo + hi) / 2, lo + (hi - lo) * 0.12];
+    const ticks = niceTicks(lo, hi, tickMinStep);
     return { xAt, yAt, points, ticks };
-  }, [present, carRuns, chartWidth, higherIsBetter, metric]);
+  }, [present, carRuns, chartWidth, higherIsBetter, metric, tickMinStep]);
 
   const nearestRunIndex = (event: React.PointerEvent<SVGSVGElement>): number | null => {
     if (!geometry || carRuns.length === 0) return null;
@@ -619,16 +671,32 @@ function SingleMetricTrendFace({
   };
 
   const hoverRun = hoverIndex != null ? carRuns[hoverIndex] : null;
-  const hoverValue = hoverIndex != null ? values[hoverIndex] : null;
+  // Stable readout strip (see pace face) — hovered run, else the latest with data.
+  const lastWithValue = [...carRuns].reverse().find((run) => run.metrics[metric] != null) ?? null;
+  const displayRun = hoverRun ?? lastWithValue;
+  const displayValue = displayRun ? displayRun.metrics[metric] : null;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="type-data-label">{title}</div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
-          {orientationHint}
+      {geometry && displayRun ? (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+              {displayRun.shortLabel}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-2 w-2 rounded-[2px]"
+                style={{ backgroundColor: color }}
+                aria-hidden
+              />
+              <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
+                {displayValue == null ? "—" : formatValue(displayValue)}
+              </span>
+            </span>
+          </div>
         </div>
-      </div>
+      ) : null}
       {geometry ? (
         <div ref={chartRef} className="relative">
           <svg
@@ -682,13 +750,15 @@ function SingleMetricTrendFace({
                   key={run.id}
                   x={geometry.xAt(index)}
                   y={CHART_HEIGHT - 8}
-                  textAnchor={index === 0 ? "start" : isLast ? "end" : "middle"}
+                  textAnchor="middle"
                   className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
                 >
                   {run.shortLabel}
                 </text>
               );
             })}
+
+            <SetupChangeRow carRuns={carRuns} xAt={geometry.xAt} />
 
             {hoverIndex != null ? (
               <line
@@ -728,36 +798,6 @@ function SingleMetricTrendFace({
               ) : null
             )}
           </svg>
-
-          {hoverRun && hoverValue != null ? (
-            <div
-              className="pointer-events-none absolute top-0 z-10 min-w-[104px] rounded-lg border border-border bg-muted px-2.5 py-2 shadow-lg"
-              style={{
-                left: Math.max(2, Math.min(geometry.xAt(hoverIndex ?? 0) - 52, chartWidth - 108)),
-              }}
-            >
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
-                {hoverRun.shortLabel}
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span
-                    className="h-2 w-2 rounded-[2px]"
-                    style={{ backgroundColor: color }}
-                    aria-hidden
-                  />
-                  {title}
-                </span>
-                <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
-                  {formatValue(hoverValue)}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center gap-1 border-t border-border pt-1 text-[10.5px] font-semibold text-muted-foreground">
-                Open run
-                <ChevronRight className="h-3 w-3 text-primary" aria-hidden />
-              </div>
-            </div>
-          ) : null}
         </div>
       ) : (
         <p className="text-[13px] leading-relaxed text-muted-foreground">

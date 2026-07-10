@@ -7,6 +7,7 @@ import {
   bestDeltaVsPreviousSameCarTrack,
   collectCarOptions,
   computeAnalysisRunMetrics,
+  computeSetupChangesByRunId,
   isTrackCarPersonalBest,
   medianOf,
   resolveTrendScope,
@@ -140,6 +141,35 @@ test("isTrackCarPersonalBest: float tolerance, null guards", () => {
   assert.equal(isTrackCarPersonalBest(24.83, 24.81), false);
   assert.equal(isTrackCarPersonalBest(null, 24.81), false);
   assert.equal(isTrackCarPersonalBest(24.81, null), false);
+});
+
+test("computeSetupChangesByRunId: diffs vs previous run on same car, skips first + tires", () => {
+  // Newest-first, one car. r3 changed camber; r2 only swapped tires (excluded);
+  // r1 is the first run (no baseline).
+  const changes = computeSetupChangesByRunId([
+    { id: "r3", carId: "c1", setupData: { camber_front: -3.0, tires: "set B" } },
+    { id: "r2", carId: "c1", setupData: { camber_front: -2.5, tires: "set B" } },
+    { id: "r1", carId: "c1", setupData: { camber_front: -2.5, tires: "set A" } },
+  ]);
+  // r3 vs r2: camber changed → marked (label carries the field unit).
+  assert.deepEqual(changes.get("r3"), { changedFieldLabels: ["Camber (Front) (°)"] });
+  // r2 vs r1: only tires differ (excluded) → no marker.
+  assert.equal(changes.has("r2"), false);
+  // r1: no previous run on this car → no marker.
+  assert.equal(changes.has("r1"), false);
+});
+
+test("computeSetupChangesByRunId: compares within a car, not across cars", () => {
+  const changes = computeSetupChangesByRunId([
+    { id: "b2", carId: "c2", setupData: { spring_front: 2.5 } },
+    { id: "a2", carId: "c1", setupData: { spring_front: 3.0 } },
+    { id: "b1", carId: "c2", setupData: { spring_front: 2.4 } },
+    { id: "a1", carId: "c1", setupData: { spring_front: 3.0 } },
+  ]);
+  // b2 diffs against b1 (its own car), not the interleaved a2.
+  assert.deepEqual(changes.get("b2"), { changedFieldLabels: ["Spring (Front)"] });
+  // a2 vs a1: identical → no marker.
+  assert.equal(changes.has("a2"), false);
 });
 
 test("collectCarOptions: distinct, first-seen order, null car bucket", () => {

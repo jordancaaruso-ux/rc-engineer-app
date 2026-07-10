@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PrimaryNavItem } from "@/components/layout/navConfig";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
+import { haptic } from "@/lib/haptics";
 
 type PrimaryNavLinkProps = {
   item: PrimaryNavItem;
@@ -38,7 +39,10 @@ export function PrimaryNavLink({
       onPointerEnter={warmRoute}
       onTouchStart={warmRoute}
       onClick={() => {
-        if (activeId !== item.id) beginNav(item.id);
+        if (activeId !== item.id) {
+          haptic("light");
+          beginNav(item.id);
+        }
       }}
       className={className}
       {...a11y}

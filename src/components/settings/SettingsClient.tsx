@@ -63,7 +63,6 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
     <div className="space-y-5">
       <SettingField
         label="Your display name"
-        hint="Shown on your runs. Purely cosmetic."
         value={myName}
         onChange={setMyName}
         onSave={() => postSetting("/api/settings/my-name", { myName: myName.trim() || null }, setSavingMyName)}
@@ -72,7 +71,6 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
 
       <SettingField
         label="LiveRC driver name"
-        hint="Must match how timing pages spell your name. Used together with your LiveRC driver ID so A/B/C mains don’t get mixed up with someone who shares your name."
         value={liveRcDriverName}
         onChange={setLiveRcDriverName}
         onSave={() =>
@@ -88,7 +86,6 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
 
       <SettingField
         label="MYLAPS transponder number(s)"
-        hint="Used with each track’s Speedhive organization URL to find your sessions (no MYLAPS login). Separate multiple chips with commas."
         value={speedhiveTransponderNumbers}
         onChange={setSpeedhiveTransponderNumbers}
         onSave={() =>
@@ -106,7 +103,6 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
 
       <SettingField
         label="Speedhive driver name"
-        hint="Fallback when public results do not list transponder numbers. Leave blank to use your LiveRC driver name above."
         value={speedhiveDriverName}
         onChange={setSpeedhiveDriverName}
         onSave={() =>
@@ -122,10 +118,6 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
 
       <div className="space-y-1 text-sm">
         <label className="block text-sm font-medium text-foreground">LiveRC driver ID</label>
-        <p className="ui-caption">
-          From LiveRC result tables (<code className="text-[10px]">data-driver-id</code>). Usually filled automatically
-          when you import a race or open “Your sessions at this event.” Clear it if results pick the wrong person.
-        </p>
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="text"
@@ -161,7 +153,6 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
 
 function SettingField({
   label,
-  hint,
   value,
   onChange,
   onSave,
@@ -169,7 +160,6 @@ function SettingField({
   placeholder,
 }: {
   label: string;
-  hint?: string;
   value: string;
   onChange: (next: string) => void;
   onSave: () => void;
@@ -179,7 +169,6 @@ function SettingField({
   return (
     <div className="space-y-1 text-sm">
       <label className="block text-sm font-medium text-foreground">{label}</label>
-      {hint ? <p className="ui-caption">{hint}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"

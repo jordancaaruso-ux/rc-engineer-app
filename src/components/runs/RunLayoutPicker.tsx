@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { chipToggleClass } from "@/components/ui/chipToggle";
 
 export type RunLayoutOption = { id: string; name: string; notes: string | null };
 
@@ -106,7 +107,7 @@ export function RunLayoutPicker({
 
       <div className="flex items-center gap-2">
         <span className="text-[11px] font-medium text-muted-foreground">Direction</span>
-        <div className="inline-flex overflow-hidden rounded-md border border-border">
+        <div className="inline-flex gap-1">
           {directions.map((d) => {
             const active = direction === d.value;
             return (
@@ -115,12 +116,7 @@ export function RunLayoutPicker({
                 type="button"
                 disabled={disabled}
                 onClick={() => onDirectionChange(active ? "" : d.value)}
-                className={cn(
-                  "px-3 py-1.5 text-[11px] font-medium transition disabled:opacity-60",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-muted-foreground hover:text-foreground"
-                )}
+                className={cn(chipToggleClass(active), "px-3 py-1.5 text-[11px]")}
                 aria-pressed={active}
               >
                 {d.label}

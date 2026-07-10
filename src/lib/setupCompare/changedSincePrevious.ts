@@ -2,6 +2,8 @@ import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { compareSetupField } from "@/lib/setupCompare/compare";
 
 export type SetupChangedRow = {
+  /** Canonical setup-field key (e.g. `camber_front`) — lets callers filter by key. */
+  key: string;
   label: string;
   value: string;
   previousValue: string;
@@ -30,6 +32,7 @@ export function setupChangedRowsSincePrevious(
     });
     if (cmp.areEqual) continue;
     rows.push({
+      key,
       label: setupFieldLabel(key),
       value: cmp.normalizedA,
       previousValue: cmp.normalizedB,

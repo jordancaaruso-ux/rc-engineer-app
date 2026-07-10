@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { formatLap } from "@/lib/runLaps";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { formatRunDateTime } from "@/lib/formatDate";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { Eyebrow, PanelSubtitle, StatStrip, StatTile } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -180,7 +180,7 @@ function TodayChangesPanel({
                 {block.runLabel}
               </Link>
               <div className="text-[10px] type-timestamp">
-                {formatRunCreatedAtDateTime(block.when, displayTimeZone)}
+                {formatRunDateTime(block.when, displayTimeZone)}
               </div>
             </div>
             <div className="text-[10px] text-muted-foreground">

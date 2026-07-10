@@ -14,6 +14,7 @@ import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLa
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
+import { PagedCard } from "@/components/ui/PagedCard";
 
 export type UrlImportBlock = {
   blockId: string;
@@ -950,70 +951,17 @@ export function LapTimesIngestPanel({
           </button>
         ) : null}
       </div>
-      <div
-        className="flex flex-wrap border-b border-border gap-x-0.5"
-        role="tablist"
-        aria-label="Lap time entry method"
-      >
-        {(
-          [
-            ["url-auto", "URL Auto"],
-            ["url-manual", "URL Manual"],
-            ["manual", "Manual"],
-            ["photo", "Photo"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            className={cn(
-              "px-3 sm:px-4 py-2 text-xs font-medium transition border-b-2 -mb-px",
-              tab === id
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => selectTab(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "manual" ? (
-        <p className="ui-label-meta">
-          Paste or type laps — separated by <span className="text-foreground/80">new lines</span>,{" "}
-          <span className="text-foreground/80">commas</span>, or <span className="text-foreground/80">spaces</span>.
-        </p>
-      ) : null}
-
-      {tab === "photo" ? (
-        <div className="space-y-2 text-sm">
-          <p className="ui-label-meta">
-            Upload a screenshot or photo of a lap list / timing app. The server uses{" "}
-            <span className="text-foreground/90">OpenAI vision</span> (JSON output) to fill laps below — always review
-            and edit before saving. Requires <code className="text-foreground/80">OPENAI_API_KEY</code> in{" "}
-            <code className="text-foreground/80">.env</code>.
-          </p>
-          <input
-            type="file"
-            accept="image/*"
-            disabled={photoBusy}
-            className="block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-surface-runna file:px-2 file:py-1"
-            onChange={(e) => onPhotoSelected(e.target.files?.[0] ?? null)}
-          />
-          {photoBusy ? <p className="ui-label-meta">Processing…</p> : null}
-          {photoConfidence ? (
-            <p className="ui-label-meta">
-              Model confidence: <span className="font-mono text-foreground/90">{photoConfidence}</span>
-            </p>
-          ) : null}
-          {photoNote ? <p className="text-[11px] text-muted-foreground">{photoNote}</p> : null}
-        </div>
-      ) : null}
-
-      {tab === "url-auto" ? (
+      <PagedCard
+        storageKey="run-form:lap-ingest"
+        controlPosition="above"
+        heightMode="adaptive"
+        activeId={tab}
+        onActiveIdChange={(id) => selectTab(id as IngestTab)}
+        faces={[
+          {
+            id: "url-auto",
+            label: "URL Auto",
+            content: (
         <div className="space-y-2 text-sm">
           {hasTrackDiscovery || lapImportEventId?.trim() ? (
             <div
@@ -1139,9 +1087,12 @@ export function LapTimesIngestPanel({
             </p>
           )}
         </div>
-      ) : null}
-
-      {tab === "url-manual" ? (
+            ),
+          },
+          {
+            id: "url-manual",
+            label: "URL Manual",
+            content: (
         <div className="space-y-2 text-sm">
           <p className="ui-label-meta">
             Paste a LiveRC, Speedhive, or other timing/results page URL to import laps.
@@ -1326,7 +1277,48 @@ export function LapTimesIngestPanel({
             </p>
           ) : null}
         </div>
-      ) : null}
+            ),
+          },
+          {
+            id: "manual",
+            label: "Manual",
+            content: (
+        <p className="ui-label-meta">
+          Paste or type laps — separated by <span className="text-foreground/80">new lines</span>,{" "}
+          <span className="text-foreground/80">commas</span>, or <span className="text-foreground/80">spaces</span>.
+        </p>
+            ),
+          },
+          {
+            id: "photo",
+            label: "Photo",
+            content: (
+        <div className="space-y-2 text-sm">
+          <p className="ui-label-meta">
+            Upload a screenshot or photo of a lap list / timing app. The server uses{" "}
+            <span className="text-foreground/90">OpenAI vision</span> (JSON output) to fill laps below — always review
+            and edit before saving. Requires <code className="text-foreground/80">OPENAI_API_KEY</code> in{" "}
+            <code className="text-foreground/80">.env</code>.
+          </p>
+          <input
+            type="file"
+            accept="image/*"
+            disabled={photoBusy}
+            className="block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-surface-runna file:px-2 file:py-1"
+            onChange={(e) => onPhotoSelected(e.target.files?.[0] ?? null)}
+          />
+          {photoBusy ? <p className="ui-label-meta">Processing…</p> : null}
+          {photoConfidence ? (
+            <p className="ui-label-meta">
+              Model confidence: <span className="font-mono text-foreground/90">{photoConfidence}</span>
+            </p>
+          ) : null}
+          {photoNote ? <p className="text-[11px] text-muted-foreground">{photoNote}</p> : null}
+        </div>
+            ),
+          },
+        ]}
+      />
 
       {!isUrlTab(tab) ? (
         <div className="space-y-1">

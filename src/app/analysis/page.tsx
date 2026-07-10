@@ -9,6 +9,7 @@ import { AnalysisVideoCard } from "@/components/analysis/AnalysisVideoCard";
 import { HubNavLink } from "@/components/layout/HubNavLink";
 import { ANALYSIS_HUB_LINKS } from "@/components/layout/navConfig";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Reveal } from "@/components/ui/Reveal";
 
 /**
  * Analysis debrief — the "review the day" surface: session trend chart,
@@ -53,13 +54,21 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body flex max-w-2xl flex-col gap-3">
-        <RecentRunsCard runs={model.recentRuns} />
-        <SessionTrendCard trend={model.trend} />
-        <AnalysisVideoCard video={model.video} />
+        <Reveal index={0}>
+          <RecentRunsCard runs={model.recentRuns} />
+        </Reveal>
+        <Reveal index={1}>
+          <SessionTrendCard trend={model.trend} />
+        </Reveal>
+        <Reveal index={2}>
+          <AnalysisVideoCard video={model.video} />
+        </Reveal>
         {setupComparisonLink ? (
-          <ul className="flex flex-col gap-2.5">
-            <HubNavLink link={setupComparisonLink} />
-          </ul>
+          <Reveal index={3}>
+            <ul className="flex flex-col gap-2.5">
+              <HubNavLink link={setupComparisonLink} />
+            </ul>
+          </Reveal>
         ) : null}
       </section>
     </>

@@ -6,6 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
 import { shouldShowLogRunFab } from "@/components/layout/navConfig";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
+import { useScrolled } from "@/components/layout/useScrolled";
+import { haptic } from "@/lib/haptics";
+import { cn } from "@/lib/utils";
 
 /**
  * Floating "Log run" action — the app's #1 action, lifted out of the mobile
@@ -27,6 +30,7 @@ export const LogRunFab = memo(function LogRunFab() {
   const pathname = usePathname();
   const router = useRouter();
   const { addRunHref, draftRunId } = useTodayDraftRun();
+  const collapsed = useScrolled();
 
   if (!shouldShowLogRunFab(pathname)) return null;
 
@@ -49,11 +53,22 @@ export const LogRunFab = memo(function LogRunFab() {
           prefetch={false}
           onPointerEnter={warm}
           onTouchStart={warm}
+          onClick={() => haptic("light")}
           aria-label={label}
-          className="pointer-events-auto tap-active relative inline-flex h-12 items-center gap-1.5 rounded-full bg-primary pl-3.5 pr-4 font-sans text-sm font-bold text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-150 hover:bg-[#E6BE00] active:scale-95 touch-manipulation"
+          className={cn(
+            "pointer-events-auto tap-active relative inline-flex h-12 items-center rounded-full bg-primary font-sans text-sm font-bold text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.4)] transition-[padding] duration-200 ease-out hover:bg-[#E6BE00] active:scale-95 touch-manipulation",
+            collapsed ? "px-3" : "pl-3.5 pr-4"
+          )}
         >
           <Plus size={22} weight="bold" aria-hidden />
-          <span>{label}</span>
+          <span
+            className={cn(
+              "overflow-hidden whitespace-nowrap transition-all duration-200 ease-out",
+              collapsed ? "ml-0 max-w-0 opacity-0" : "ml-1.5 max-w-[6rem] opacity-100"
+            )}
+          >
+            {label}
+          </span>
           {draftRunId ? (
             <span
               className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-background"

@@ -1,31 +1,40 @@
+import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatLap } from "@/lib/runLaps";
+import { type DashboardSummary } from "@/lib/dashboardSummary";
 import {
-  formatDrivingDuration,
-  summaryChangeChip,
-  type DashboardPaceTrend,
-  type DashboardSummary,
-  type SummaryDelta,
-} from "@/lib/dashboardSummary";
+  recordMetricLabel,
+  type DashboardNewPb,
+  type DashboardRecord,
+} from "@/lib/dashboardRecords";
 import { Eyebrow, StatStrip, StatTile } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { PagedCard } from "@/components/ui/PagedCard";
+import { DashboardMetricTile } from "@/components/dashboard/DashboardMetricTile";
 import { DashboardTodayStrip } from "@/components/dashboard/DashboardTodayStrip";
 
 /**
- * Reflective "last 30 days" summary — the dashboard centerpiece (Apple-Health
- * style). Now an Apple-widget-style paged card: swipe between the momentum
- * overview, per-track pace trends, and the activity cadence — all faces of the
- * same 30-day window. Green = faster/more, red = slower/fewer; yellow stays
- * reserved for the one action (the Today strip's log-run button).
+ * Reflective dashboard centerpiece — an Apple-widget-style paged card. Swipe
+ * between the momentum overview, the all-time RECORDS board, and the activity
+ * cadence. Records replaced the old per-track pace trend (2026-07-10): a record
+ * only moves when the driver genuinely beats it, so a single slow run can never
+ * read as "slower" — the exact flaw the trend had.
+ *
+ * Colour semantics: green is reserved for a genuine PACE win (a fresh record /
+ * the celebration); volume (runs, laps, wheel time) stays neutral ink; yellow
+ * stays reserved for the one action (the Today strip's log-run button).
  */
 export function DashboardSummaryCard({
   summary,
+  records,
+  newPb,
   todayRunCount,
   serverDraftRunId,
   serverDraftSavedAt,
 }: {
   summary: DashboardSummary;
+  records: DashboardRecord[];
+  newPb: DashboardNewPb | null;
   todayRunCount: number;
   serverDraftRunId: string | null;
   serverDraftSavedAt: string | null;
@@ -35,6 +44,9 @@ export function DashboardSummaryCard({
   return (
     <SurfaceCard variant="hero">
       <Eyebrow>Last 30 days</Eyebrow>
+
+      {/* The earned "little judgement": a real record just fell. */}
+      {newPb ? <NewPbBanner newPb={newPb} /> : null}
 
       {/* Renders only when today has an unfinished run (owns its own top margin). */}
       <DashboardTodayStrip
@@ -46,147 +58,176 @@ export function DashboardSummaryCard({
       {hasData ? (
         <PagedCard
           storageKey="dashboard-summary"
+          // Adaptive so each face hugs its own height — the momentum overview and
+          // the records board differ a lot in length and "tallest" left a big gap
+          // under the shorter one.
+          heightMode="adaptive"
           faces={[
             { id: "overview", label: "Overview", content: <OverviewFace summary={summary} /> },
-            {
-              id: "pace-by-track",
-              label: "Per-track pace",
-              content: <PaceByTrackFace paceByTrack={summary.paceByTrack} />,
-            },
-            { id: "activity", label: "Activity & volume", content: <ActivityFace summary={summary} /> },
+            { id: "records", label: "Records", content: <RecordsFace records={records} /> },
           ]}
         />
       ) : (
         <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
-          Log your first run to start building your 30-day summary — runs, laps, wheel
-          time, and per-track pace all land here.
+          Log your first run to start building your summary — runs, laps, wheel time,
+          and your per-track records all land here.
         </p>
       )}
     </SurfaceCard>
   );
 }
 
-/** Face 1 — the momentum overview (previous card content, unchanged). */
-function OverviewFace({ summary }: { summary: DashboardSummary }) {
-  const { runs, laps, drivingSeconds, activeDays, tracks, pace } = summary;
+/** Celebration strip — a record the most recent run just broke. Green = pace win. */
+function NewPbBanner({ newPb }: { newPb: DashboardNewPb }) {
+  const improvement = Math.max(0, newPb.previousValue - newPb.value);
   return (
-    <div>
-      <StatStrip className="mt-3" gridClassName="grid-cols-3">
-        <MetricTile label="Runs" value={String(runs.current)} delta={runs} />
-        <MetricTile label="Laps" value={String(laps.current)} delta={laps} />
-        <MetricTile
-          label="Time driving"
-          value={formatDrivingDuration(drivingSeconds.current)}
-          delta={drivingSeconds}
-          formatDelta={formatDrivingDuration}
-        />
-      </StatStrip>
-
-      <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-        <span className="type-data-label">Δ</span> vs the previous 30 days ·{" "}
-        <span className="text-foreground">{activeDays}</span> day{activeDays === 1 ? "" : "s"} active
-        {" · "}
-        <span className="text-foreground">{tracks}</span> track{tracks === 1 ? "" : "s"}
-      </p>
-
-      {pace ? <PacePanel pace={pace} /> : null}
+    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-[#4FD089]/30 bg-[#4FD089]/10 px-3 py-2.5">
+      <Trophy className="size-4 shrink-0 text-[#4FD089]" aria-hidden />
+      <div className="min-w-0 text-[12.5px] leading-snug">
+        <span className="font-semibold text-foreground">New {recordMetricLabel(newPb.metric)}</span>
+        <span className="text-muted-foreground">
+          {" · "}
+          {newPb.trackName}
+          {newPb.className ? ` · ${newPb.className}` : ""}
+        </span>{" "}
+        <span className="font-mono tabular-nums text-[#4FD089]">{formatLap(newPb.value)}</span>{" "}
+        <span className="font-mono tabular-nums text-muted-foreground">(−{improvement.toFixed(2)}s)</span>
+      </div>
     </div>
   );
 }
 
-/** How many per-track pace rows the face shows before the "+N more" line. */
-const PACE_FACE_MAX_ROWS = 4;
+/**
+ * Face 1 — momentum + cadence in one: the 30-day totals, the active-days /
+ * tracks / streak trio, and the runs-per-day strip. (Absorbed the old separate
+ * Activity face so Overview carries its own height instead of leaving a gap.)
+ */
+function OverviewFace({ summary }: { summary: DashboardSummary }) {
+  const { runs, laps, drivingSeconds, activeDays, tracks, activityByDay } = summary;
+  const streak = longestStreak(activityByDay);
+  return (
+    <div className="mt-3 space-y-3">
+      <div>
+        <StatStrip gridClassName="grid-cols-3">
+          <DashboardMetricTile label="Runs" value={runs.current} delta={runs} />
+          <DashboardMetricTile label="Laps" value={laps.current} delta={laps} />
+          <DashboardMetricTile
+            label="Time driving"
+            value={drivingSeconds.current}
+            delta={drivingSeconds}
+            kind="duration"
+          />
+        </StatStrip>
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          <span className="type-data-label">Δ</span> vs the previous 30 days
+        </p>
+      </div>
 
-/** Face 2 — best-lap trend for every track+class with enough runs in the window. */
-function PaceByTrackFace({ paceByTrack }: { paceByTrack: DashboardPaceTrend[] }) {
-  if (paceByTrack.length === 0) {
+      <StatStrip gridClassName="grid-cols-3">
+        <StatTile label="Active days" value={String(activeDays)} className="py-2.5" />
+        <StatTile label="Tracks" value={String(tracks)} className="py-2.5" />
+        <StatTile label="Best streak" value={`${streak}d`} className="py-2.5" />
+      </StatStrip>
+
+      <div className="rounded-xl border border-border bg-background/45 px-3.5 py-3">
+        <div className="type-data-label">Runs per day</div>
+        <ActivityBars values={activityByDay} className="mt-2" />
+        <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
+          {runs.current} run{runs.current === 1 ? "" : "s"} across the last {summary.windowDays} days ·
+          today at the right
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** How many record rows the face shows before the "+N more" line. */
+const RECORDS_FACE_MAX_ROWS = 3;
+
+/** Face 2 — all-time records per track+class: best lap, avg top-5, race pace. */
+function RecordsFace({ records }: { records: DashboardRecord[] }) {
+  if (records.length === 0) {
     return (
       <div className="mt-3">
-        <div className="type-data-label">Pace by track</div>
+        <div className="type-data-label">Your records</div>
         <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-          Two or more timed runs at the same track and class build a pace trend here.
+          Log timed runs at a track and your records land here — best lap, avg top-5,
+          and race pace, per track and class. A record only moves when you beat it.
         </p>
       </div>
     );
   }
-  const rows = paceByTrack.slice(0, PACE_FACE_MAX_ROWS);
-  const moreCount = paceByTrack.length - rows.length;
+  const rows = records.slice(0, RECORDS_FACE_MAX_ROWS);
+  const moreCount = records.length - rows.length;
   return (
     <div className="mt-3">
-      <div className="type-data-label">Pace by track</div>
+      <div className="type-data-label">Your records</div>
       <div className="mt-2 overflow-hidden rounded-xl border border-border bg-background/45">
-        {rows.map((pace, i) => (
-          <PaceRow
-            key={`${pace.trackName}::${pace.className ?? ""}`}
-            pace={pace}
+        {rows.map((rec, i) => (
+          <RecordRow
+            key={`${rec.trackName}::${rec.className ?? ""}`}
+            record={rec}
             className={i > 0 ? "border-t border-border" : undefined}
           />
         ))}
       </div>
       {moreCount > 0 ? (
         <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
-          +{moreCount} more track{moreCount === 1 ? "" : "s"} with a trend this window
+          +{moreCount} more track{moreCount === 1 ? "" : "s"} with records
         </p>
       ) : null}
     </div>
   );
 }
 
-/** One compact track+class pace trend row (first→last best lap + signed delta). */
-function PaceRow({ pace, className }: { pace: DashboardPaceTrend; className?: string }) {
-  const improved = pace.deltaSeconds < 0;
-  const flat = Math.abs(pace.deltaSeconds) < 0.005;
-  const deltaCls = flat ? "text-muted-foreground" : improved ? "text-[#4FD089]" : "text-destructive";
-  const sign = pace.deltaSeconds <= 0 ? "" : "+";
+/** One track+class record row: label + a fresh-PB flag, then the three bests. */
+function RecordRow({ record, className }: { record: DashboardRecord; className?: string }) {
   return (
-    <div className={cn("flex items-center justify-between gap-3 px-3.5 py-2.5", className)}>
-      <div className="min-w-0">
-        <div className="type-data-label truncate">
-          {pace.trackName}
-          {pace.className ? ` · ${pace.className}` : ""}
+    <div className={cn("px-3.5 py-2.5", className)}>
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="type-data-label min-w-0 truncate">
+          {record.trackName}
+          {record.className ? ` · ${record.className}` : ""}
         </div>
-        <div className="mt-0.5 font-mono text-[13px] tabular-nums text-foreground">
-          {formatLap(pace.firstBestLap)}
-          <span className="mx-1.5 text-muted-foreground">→</span>
-          {formatLap(pace.lastBestLap)}
-        </div>
+        {record.freshPbMetric ? (
+          <span className="shrink-0 rounded-md bg-[#4FD089]/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#4FD089]">
+            New PB
+          </span>
+        ) : (
+          <span className="type-data-label shrink-0">
+            {record.runsCount} run{record.runsCount === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
-      <div className="shrink-0 text-right">
-        <div className={cn("font-mono text-[13px] font-medium tabular-nums", deltaCls)}>
-          {sign}
-          {pace.deltaSeconds.toFixed(2)}s
-        </div>
-        <div className="type-data-label mt-0.5">
-          {pace.runsCount} run{pace.runsCount === 1 ? "" : "s"}
-        </div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <RecordCell label="Best" value={record.bestLap} fresh={record.freshPbMetric === "best"} />
+        <RecordCell label="Avg 5" value={record.avgTop5} fresh={record.freshPbMetric === "avgTop5"} />
+        <RecordCell label="Race" value={record.racePace} fresh={record.freshPbMetric === "racePace"} />
       </div>
     </div>
   );
 }
 
-/** Face 3 — cadence: active days, streak, and a runs-per-day bar strip. */
-function ActivityFace({ summary }: { summary: DashboardSummary }) {
-  const { activeDays, tracks, activityByDay, runs } = summary;
-  const streak = longestStreak(activityByDay);
+/** A single record metric cell; the freshly-broken metric renders green. */
+function RecordCell({
+  label,
+  value,
+  fresh,
+}: {
+  label: string;
+  value: number | null;
+  fresh: boolean;
+}) {
   return (
     <div>
-      <StatStrip className="mt-3" gridClassName="grid-cols-3">
-        <StatTile label="Active days" value={String(activeDays)} className="py-2.5" />
-        <StatTile label="Tracks" value={String(tracks)} className="py-2.5" />
-        <StatTile
-          label="Best streak"
-          value={`${streak}d`}
-          className="py-2.5"
-        />
-      </StatStrip>
-
-      <div className="mt-3 rounded-xl border border-border bg-background/45 px-3.5 py-3">
-        <div className="type-data-label">Runs per day</div>
-        <ActivityBars values={activityByDay} className="mt-2" />
-        <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
-          {runs.current} run{runs.current === 1 ? "" : "s"} across the last{" "}
-          {summary.windowDays} days · today at the right
-        </p>
+      <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-faint">{label}</div>
+      <div
+        className={cn(
+          "mt-0.5 font-mono text-[13px] tabular-nums",
+          fresh ? "text-[#4FD089]" : "text-foreground"
+        )}
+      >
+        {formatLap(value)}
       </div>
     </div>
   );
@@ -223,150 +264,5 @@ function ActivityBars({ values, className }: { values: number[]; className?: str
         />
       ))}
     </div>
-  );
-}
-
-/** A StatTile whose value carries a small colored delta chip beneath it. */
-function MetricTile({
-  label,
-  value,
-  delta,
-  formatDelta,
-}: {
-  label: string;
-  value: string;
-  delta: SummaryDelta;
-  /** Render the delta magnitude (e.g. wheel time as a duration); defaults to a plain count. */
-  formatDelta?: (n: number) => string;
-}) {
-  return (
-    <StatTile
-      label={label}
-      className="py-2.5"
-      value={
-        <span className="flex flex-col gap-0.5">
-          <span>{value}</span>
-          <DeltaChip delta={delta} formatDelta={formatDelta} />
-        </span>
-      }
-    />
-  );
-}
-
-/** Signed change vs the prior window. More = green (gain), fewer = red (loss). */
-function DeltaChip({
-  delta,
-  formatDelta = (n) => String(n),
-}: {
-  delta: SummaryDelta;
-  formatDelta?: (n: number) => string;
-}) {
-  const { diff, direction } = summaryChangeChip(delta);
-  if (direction === "flat") {
-    return <span className="text-[10px] font-normal text-muted-foreground">±0</span>;
-  }
-  return (
-    <span
-      className={cn(
-        "text-[10px] font-medium tabular-nums",
-        direction === "up" ? "text-[#4FD089]" : "text-destructive"
-      )}
-    >
-      {direction === "up" ? "▲" : "▼"} {formatDelta(Math.abs(diff))}
-    </span>
-  );
-}
-
-function PacePanel({ pace }: { pace: DashboardPaceTrend }) {
-  const improved = pace.deltaSeconds < 0;
-  const flat = Math.abs(pace.deltaSeconds) < 0.005;
-  const deltaCls = flat ? "text-muted-foreground" : improved ? "text-[#4FD089]" : "text-destructive";
-  const deltaLabel = flat ? "no change" : improved ? "faster" : "slower";
-  const sign = pace.deltaSeconds <= 0 ? "" : "+";
-
-  return (
-    <div className="mt-3 rounded-xl border border-border bg-background/45 px-3.5 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="type-data-label truncate">
-            Pace · {pace.trackName}
-            {pace.className ? ` · ${pace.className}` : ""}
-          </div>
-          <div className="mt-1 font-mono text-[15px] tabular-nums text-foreground">
-            {formatLap(pace.firstBestLap)}
-            <span className="mx-1.5 text-muted-foreground">→</span>
-            {formatLap(pace.lastBestLap)}
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className={cn("font-mono text-[13px] font-medium tabular-nums", deltaCls)}>
-            {sign}
-            {pace.deltaSeconds.toFixed(2)}s
-          </div>
-          <div className="type-data-label mt-0.5">{deltaLabel}</div>
-        </div>
-      </div>
-
-      <PaceSparkline values={pace.spark} improved={improved} className="mt-2.5" />
-
-      <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
-        Best lap across {pace.runsCount} runs at your most-driven track
-      </p>
-    </div>
-  );
-}
-
-/**
- * Single-series best-lap sparkline. Y is inverted so a faster lap sits HIGHER —
- * improvement reads as an upward trend, matching the green delta. The line stays
- * a recessive neutral ink; only the latest-point dot carries gain/loss color.
- */
-function PaceSparkline({
-  values,
-  improved,
-  className,
-}: {
-  values: number[];
-  improved: boolean;
-  className?: string;
-}) {
-  const W = 100;
-  const H = 26;
-  const pad = 3;
-  if (values.length < 2) return null;
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min;
-  const x = (i: number) => pad + (i * (W - 2 * pad)) / (values.length - 1);
-  const y = (v: number) =>
-    span === 0 ? H / 2 : pad + ((v - min) / span) * (H - 2 * pad); // faster (min) → top
-  const points = values.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ");
-  const lastX = x(values.length - 1);
-  const lastY = y(values[values.length - 1]);
-
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      className={cn("h-6 w-full text-muted-foreground/70", className)}
-      aria-hidden
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-      <circle
-        cx={lastX}
-        cy={lastY}
-        r={2.5}
-        className={improved ? "fill-[#4FD089]" : "fill-destructive"}
-      />
-    </svg>
   );
 }

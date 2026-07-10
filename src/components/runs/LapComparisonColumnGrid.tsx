@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Wrench } from "lucide-react";
 import type { ComparisonSeries, LapRow } from "@/lib/lapAnalysis";
 import {
   alignLapsByNumber,
@@ -103,15 +104,23 @@ function MetricBlock({
   delta: number | null;
   showDelta: boolean;
 }) {
+  const hasDelta = showDelta && delta != null && Number.isFinite(delta);
   return (
     <div className="space-y-0.5">
       <div className="text-[10px] text-muted-foreground">{label}</div>
-      <div className="font-mono text-[11px] text-foreground">{value}</div>
-      {showDelta && delta != null && Number.isFinite(delta) ? (
-        <div className={cn("text-[10px] font-mono tabular-nums", deltaTextClass(delta))}>
-          {formatLapDelta(delta)}
-        </div>
-      ) : null}
+      <div className="font-mono text-[11px] tabular-nums text-foreground">{value}</div>
+      {/* Delta slot always reserves its line height (even on the target column and
+          when no delta exists) so Best / Avg top 5 / Avg top 10 stay aligned across
+          every column. */}
+      <div
+        className={cn(
+          "text-[10px] font-mono tabular-nums leading-tight",
+          hasDelta ? deltaTextClass(delta!) : "opacity-0"
+        )}
+        aria-hidden={hasDelta ? undefined : true}
+      >
+        {hasDelta ? formatLapDelta(delta!) : "0.000"}
+      </div>
     </div>
   );
 }
@@ -178,10 +187,12 @@ function SetupHint({
   return (
     <button
       type="button"
-      className="text-[10px] text-accent underline underline-offset-2 mt-0.5 hover:brightness-110"
+      aria-label="View setup"
+      title="View setup sheet for this run"
+      className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background text-foreground transition hover:bg-muted/80"
       onClick={() => onView(run)}
     >
-      View setup
+      <Wrench className="h-3.5 w-3.5" aria-hidden />
     </button>
   );
 }

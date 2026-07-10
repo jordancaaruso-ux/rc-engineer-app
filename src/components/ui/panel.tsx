@@ -126,7 +126,10 @@ export function StatTile({
 }) {
   return (
     <div className={cn("border-l border-t border-border px-3 py-2.5", className)}>
-      <div className="type-data-label">{label}</div>
+      {/* Fixed 2-line label box: a wrapping label (e.g. "Time driving") no longer
+          pushes its value down, so every tile's value sits on the same baseline
+          across the strip — even in a grid-cols-3 cell. */}
+      <div className="type-data-label line-clamp-2 min-h-[2.6em] leading-[1.3]">{label}</div>
       <div
         className={cn(
           "mt-1 font-mono text-[18px] font-medium tabular-nums",

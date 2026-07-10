@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { chipToggleClass } from "@/components/ui/chipToggle";
 import { Eyebrow } from "@/components/ui/panel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatSessionChain } from "@/lib/tires/tireSetSessionChain";
@@ -71,10 +72,8 @@ function toPickerRow(ts: RunTireSetOption): PickerRow {
 
 function chipClass(selected: boolean) {
   return cn(
-    "rounded-md border px-2.5 py-1.5 text-xs font-medium transition text-left max-w-full truncate",
-    selected
-      ? "border-accent bg-accent/15 text-foreground"
-      : "border-border bg-secondary text-foreground hover:bg-muted"
+    chipToggleClass(selected),
+    "px-2.5 py-1.5 text-xs text-left max-w-full truncate"
   );
 }
 

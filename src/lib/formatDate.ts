@@ -83,6 +83,74 @@ export function formatRunCreatedAtDateTime(d: string | Date, timeZone?: string |
   return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, opts).format(dt);
 }
 
+/** Calendar year of an instant in an IANA zone (defaults to the runtime zone). */
+function yearInZone(d: Date, timeZone?: string | null): number {
+  const tz = timeZone?.trim();
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      ...(tz ? { timeZone: tz } : {}),
+    }).format(d)
+  );
+}
+
+/**
+ * Canonical user-facing run timestamp: **"8 Jul, 10:12 PM"** — day-month order,
+ * short month, uppercase AM/PM. The year is appended **only** when the run isn't
+ * in the current calendar year ("8 Jul 2025, 10:12 PM"), so recent runs stay
+ * terse without ever being ambiguous. Prefer passing `timeZone` (IANA) so SSR
+ * matches the signed-in device once `rc_tz` is set.
+ *
+ * This is the one format for run times the driver reads (dashboard, history,
+ * detail). It deliberately does NOT feed the Engineer's LLM context or audit
+ * logs — those keep their own formatters.
+ */
+export function formatRunDateTime(
+  d: string | Date,
+  timeZone?: string | null,
+  now: Date = new Date()
+): string {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  const tz = timeZone?.trim();
+  const withYear = yearInZone(dt, tz) !== yearInZone(now, tz);
+  const opts: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    ...(tz ? { timeZone: tz } : {}),
+  };
+  // en-GB renders "8 Jul, 10:12 pm" (comma, day-month, true short months —
+  // en-AU expands "July"/"Sept"); uppercase the period → "PM".
+  return new Intl.DateTimeFormat(LOCALE, opts)
+    .format(dt)
+    .replace(/\b([ap])m\b/i, (_, p) => `${p.toUpperCase()}M`);
+}
+
+/**
+ * Date-only sibling of {@link formatRunDateTime}: **"8 Jul"** ("8 Jul 2025" for
+ * a past year). For run rows where the time would be noise.
+ */
+export function formatRunDateShort(
+  d: string | Date,
+  timeZone?: string | null,
+  now: Date = new Date()
+): string {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  const tz = timeZone?.trim();
+  const withYear = yearInZone(dt, tz) !== yearInZone(now, tz);
+  return new Intl.DateTimeFormat(LOCALE, {
+    day: "numeric",
+    month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
+    ...(tz ? { timeZone: tz } : {}),
+  }).format(dt);
+}
+
 /**
  * Date with weekday for printable/setup sheet headers.
  */
