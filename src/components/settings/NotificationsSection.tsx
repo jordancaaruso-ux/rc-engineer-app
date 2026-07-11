@@ -23,6 +23,9 @@ export function NotificationsSection() {
   const [iosNeedsInstall, setIosNeedsInstall] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [testUrl, setTestUrl] = useState("");
+  const [testBusy, setTestBusy] = useState(false);
+  const [testReport, setTestReport] = useState<string | null>(null);
 
   useEffect(() => {
     const ok = pushSupported();
@@ -97,6 +100,27 @@ export function NotificationsSection() {
       setBusy(false);
     }
   }, []);
+
+  const runWatchTest = useCallback(
+    async (force: boolean) => {
+      setTestBusy(true);
+      setTestReport(null);
+      try {
+        const res = await fetch("/api/push/watch-test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ speedhiveUrl: testUrl.trim() || undefined, force }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { note?: string; error?: string };
+        setTestReport(res.ok ? body.note ?? "Done." : body.error ?? `HTTP ${res.status}`);
+      } catch (e) {
+        setTestReport(e instanceof Error ? e.message : "Test failed.");
+      } finally {
+        setTestBusy(false);
+      }
+    },
+    [testUrl],
+  );
 
   const sendTest = useCallback(async () => {
     setBusy(true);
@@ -181,6 +205,46 @@ export function NotificationsSection() {
         </p>
       ) : null}
       {status ? <p className="mt-2 text-xs text-muted-foreground">{status}</p> : null}
+
+      {subscribed ? (
+        <div className="mt-5 border-t border-border pt-4">
+          <h3 className="text-xs font-semibold text-foreground">Test result detection</h3>
+          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            Runs the Speedhive watcher against a URL now (ignores the active-event-day gate).
+            Leave blank to use a Speedhive URL from one of your tracks. <strong>Check now</strong>{" "}
+            pushes only genuinely new+recent sessions; <strong>Force</strong> pushes your latest
+            matched session regardless, so you can see the tap flow.
+          </p>
+          <input
+            type="url"
+            value={testUrl}
+            onChange={(e) => setTestUrl(e.target.value)}
+            placeholder="Speedhive org/practice URL (optional)"
+            className="ui-control mt-3 w-full rounded-lg border border-border bg-input px-3 py-2 text-xs text-foreground outline-none placeholder:text-faint focus:border-primary"
+          />
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={testBusy}
+              onClick={() => void runWatchTest(false)}
+              className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+            >
+              {testBusy ? "Checking…" : "Check now"}
+            </button>
+            <button
+              type="button"
+              disabled={testBusy}
+              onClick={() => void runWatchTest(true)}
+              className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+            >
+              Force push latest
+            </button>
+          </div>
+          {testReport ? (
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{testReport}</p>
+          ) : null}
+        </div>
+      ) : null}
     </CardPanel>
   );
 }

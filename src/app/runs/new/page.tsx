@@ -50,6 +50,7 @@ export default async function NewRunPage({
       : null;
   const importedLapTimeSessionIdRaw =
     typeof sp.importedLapTimeSessionId === "string" ? sp.importedLapTimeSessionId.trim() : "";
+  const importFailed = typeof sp.importError === "string" && sp.importError.trim() === "1";
 
   const [dashboardPrefill, incompleteRunsForImport, cars, allTracks, favouriteTrackIds, copyPreviewRun] =
     await Promise.all([
@@ -92,6 +93,12 @@ export default async function NewRunPage({
         </div>
       </header>
       <section className="page-body max-w-3xl">
+        {importFailed ? (
+          <CardPanel className="mb-4" contentClassName="text-[11px] leading-snug text-muted-foreground">
+            We couldn&apos;t fetch that result yet — it may still be posting. Log this run manually
+            now, or tap the notification again shortly and the laps should attach.
+          </CardPanel>
+        ) : null}
         <CopyLastRunFormProvider previewRun={copyPreviewRun}>
           <NewRunImportLinkChooser
             incompleteRuns={incompleteRunsForImport}

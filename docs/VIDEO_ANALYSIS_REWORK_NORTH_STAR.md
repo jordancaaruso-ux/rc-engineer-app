@@ -1,6 +1,6 @@
 # Video Analysis Rework North Star
 
-**Status:** Interview-locked rulings (2026-07-10) + audited current state. Prototype refinement in progress — details may shift in the artifact round, structure is settled. **Owner:** Jordan.
+**Status:** **Locked** (founder, 2026-07-12). **Owner:** Jordan.
 
 The UX/IA spec for reworking the video analysis system into the Technical v2 app. Complements `docs/VIDEO_TRACE_NORTH_STAR.md` (which owns channels/accuracy doctrine — what the data means); this doc owns **where video lives, how the flows work, and what gets retired**. Founder verdict driving it: the old surfaces "feel very out of date relative to the rest of the app."
 
@@ -22,7 +22,7 @@ The UX/IA spec for reworking the video analysis system into the Technical v2 app
 | **Device contract** | **Truly mobile-first for the analyze flow** — marking at the track between runs is the point. Touch scrubbing, big targets, thumb reach are first-class, not adaptations. |
 | **Camera profiles** | **Move to the track entity** (Assets → Tracks → detail gets a Video/camera section). Analyze flows deep-link there when a profile is missing. |
 | **Library home** | **Inside the Video tools page** (not Assets) — videos are analysis material. |
-| **Storage doctrine** | **Decide from real usage** — open question (see below), not a blocker for Phase A. |
+| **Storage doctrine** | **Local-first (locked 2026-07-12).** Heat videos assumed ~1GB — too heavy to upload by default. Videos stay on the phone; "save to library" is opt-in for keepers. Clips in the compare surface work only for saved videos, labeled as such. |
 | **Process** | **Spec → artifact prototype → founder refines in artifact → build phase by phase.** |
 | **Build order** | **Reachability → flow → tools.** |
 
@@ -77,7 +77,7 @@ Full-screen analyze flow (mobile-first, launched from session or tools page)
 | **B — Mobile-first analyze flow** | The 5-step full-screen flow rebuilt for touch: step rail, touch scrubber with coarse→fine gearing, big-target frame nudge, guided anchor/marking, Technical v2 skin throughout | 🟡 **Built 2026-07-11** (`AnalyzeFlowClient` replaces the legacy manual UX via `VideoAnalysisJobRouter`; same manualJson v2 schema + sync math underneath). Includes: library-asset pick with durable `videoAssetId` link (PATCH route extended, ownership-checked), run-laps timing default (`session-drivers`), fine wheel 1px=4ms + ±1-frame, guided mark queue with sibling-lap/fraction predictions, done-step compare preview, save-to-library. Verified headless end-to-end on stubbed endpoints (`/debug/analyze-flow-preview`). Not yet: crop UI in the new flow (stored crops preserved, not rendered), real-footage pass, founder feel-check on the touch transport. |
 | **C — Tools + relocations + retirements** | Camera profiles move to track entity (touch-friendly line editor: bigger handles, hit-slop, zoom); worker import lane restyled; dead code deleted; `/videos/*` route consolidation | ⬜ |
 
-Storage doctrine (open): measure a real heat video's size + upload time on real connections before choosing upload-first vs local-first-with-save. Client-direct blob upload removes the 4MB cap if upload-first wins. Until decided, Phase A ships local-first with optional "save to library".
+Storage doctrine: **local-first, locked 2026-07-12** (see rulings table). If a big-file save path is ever needed, client-direct blob upload removes the current 4MB route cap.
 
 ---
 

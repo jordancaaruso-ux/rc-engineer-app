@@ -1,6 +1,8 @@
 # Video Data Trace North Star
 
-**Status:** Draft for founder review — becomes **locked** once Jordan edits and approves. **Owner:** Jordan.
+**Status:** **Locked** (founder, 2026-07-12). **Owner:** Jordan.
+
+> **Founder ruling 2026-07-12:** corner-by-corner sector deltas deliver the majority of a speed trace's value. Phases 2–3 (metric survey → speed channels) stay queued *after* the rework's Phase C cleanup, and their bar is "worth the extra precision," not "core to the product."
 
 The behavioral spec for turning **fixed-camera video into race data**. `PRODUCT_NORTH_STAR.md` ranks video analysis (pillar 6); this doc says what the video pipeline is becoming, which outputs are trustworthy at what level, and in what order to build. When a video feature feels off-scope or an accuracy claim feels optimistic, check here.
 

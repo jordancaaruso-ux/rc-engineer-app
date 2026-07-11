@@ -14,12 +14,22 @@ Sources: founder interviews 2026-07-10 + 2026-07-11 (four structured rounds) + w
 
 ---
 
+## Who it serves (founder, 2026-07-11)
+
+Three doors, one engine — all equal: **the number** (RC becomes a real, trackable setup value like camber), **the history** (every run records how geometry moved and what it felt like), **the Engineer** (advice in real millimeters, not vague directions). Used trackside between runs, at home planning, and reviewing after events.
+
+**Two kinds of drivers, by design:** the geometry-curious open the Lab and read the numbers; drivers who *just want the car better* never open any of it — for them the geometry works invisibly through the Engineer ("add 0.5mm under the front hubs" with the reasoning available but never required). **Geometry must never be required reading.**
+
+**Ambition:** team weapon (one shared pack per car model; compare geometry across teammates at events), product differentiator (no other RC app computes real geometry from a logged sheet), and a headline feature for **every user soon** — more platform packs are a priority, not a maybe.
+
+---
+
 ## The engine (built + validated — do not re-derive)
 
 A 2D front-elevation kinematics engine already exists and is **cross-validated against VSUSP to 0.01mm** on the founder's measured Awesomatix A800R:
 
 - **Model:** VSUSP-compatible hardpoint parameterization — frame mounts (from centerline + chassis bottom), ball-to-ball arm lengths, rigid knuckle (hub→ball offsets), wheel plane at hub + wheel offset, loaded tire radius (OD/2 − compression). Per side: 1-DOF four-bar solved by bisection (contact point on ground); ICs from arm-line intersection; RC from force-line intersection; camber = true wheel-plane lean (no KPI folding).
-- **Computes:** static RC height F/R, roll-axis rake, static camber, camber gain (°/mm bump), RC migration under chassis roll (0–3° sweep), track width, per-shim RC sensitivities.
+- **Computes:** static RC height F/R, roll-axis rake, static camber, camber gain (°/mm bump), RC migration under chassis roll (0–3° sweep), track width, per-shim RC sensitivities, and **true arm angles** — actual lower-arm and upper-link inclination in degrees, per axle.
 - **Validation:** VSUSP displays −9.1 F / −8.5 R for "A800R No Shims - STEEL"; engine computes **−9.09 / −8.50**. Overall width reproduces at 188.7mm; static camber at −1.78°. 128/128 extreme-input combinations solve.
 - **A800R shim sensitivities (mm RC per mm of stack, Awesomatix position names — founder 2026-07-11):** under lower arm **+2.2** · under hub **+2.1** · upper inner **−1.0** · upper outer **+1.0** · ride height +1mm → RC +1.2 vs ground. (Under-hub shims raise the hub off the lower ball → lower ball moves *down* in the knuckle frame → RC rises; the engine wires this sign flip.)
 - **VSUSP URL parser:** share-link fragments decode at mm×1000 for *every* value — including `tires.compression` (125 → 0.125mm squash, **not** a percent; this was the one decode bug found and fixed during validation).
@@ -114,7 +124,11 @@ Blank shim = 0, tire = nominal, etc.; the geometry block shows a small "assumed:
 
 ### Store computed results per setup document
 
-RC F/R, rake, camber gain persist on (or derive cheaply from) each setup document — this is what makes compare surfaces, Engineer context, and future aggregation queries cheap.
+RC F/R, rake, camber gain, and arm angles persist on (or derive cheaply from) each setup document — this is what makes compare surfaces, Engineer context, and aggregation queries cheap.
+
+### Real arm angles retire the index proxies (founder, 2026-07-11)
+
+`src/lib/setupAggregations/setupGeometryDerivedMetrics.ts` currently ships `derived_upper_link_index_*_mm` and `derived_lower_link_index_*_mm` — shim-difference proxies that *guess* at arm angle. The engine computes the **actual angles**. Phase 1 adds `derived_lower_arm_angle_{front,rear}_deg` and `derived_upper_link_angle_{front,rear}_deg` computed from the solved geometry; they join the sheet geometry block, tuning comparison keys, and aggregations. The mm indices retire once the angle keys cover their uses (update `tuningComparisonKeys.ts` + `parameterClassificationOverrides.ts` in the same pass) — the angle is what the index was always trying to say, made clear.
 
 ---
 
@@ -141,7 +155,7 @@ RC F/R, rake, camber gain persist on (or derive cheaply from) each setup documen
 | **What** | Front/rear RC, roll-axis rake, camber gain, **deltas vs the previous run's setup**, pack verification grade. Summary scalars only — no raw sweep curves. |
 | **Quantified predictions** | **Yes** — suggestions ship with the computed effect: "add 0.5mm lower-inner shim → front RC rises ~1.1mm (geometric calc)." The geometry number is deterministic and stated flat; the *handling* outcome stays hedged per the confidence ladder. This is the prediction-discipline ideal: a checkable, physics-derived prediction on every geometry suggestion. |
 | **Wording by grade** | `cross-checked`/`measured` packs: "geometric calc from your measured geometry"; `cad-verified`: stated flat. Never source names (VSUSP) in driver-facing answers — provenance stays in authoring records, per the KB provenance doctrine. |
-| **Diagnostic use** | RC state is context for balance diagnosis ("your front RC is ~2mm lower than your usual") — same cross-axle-check pattern as community position policy. |
+| **Diagnostic use — conditions-aware (founder, 2026-07-11)** | Deeper than knowing the numbers: knowing **what the numbers should look like for the conditions.** The Engineer compares the driver's computed RC/rake against setups that tend to work in similar conditions — own history first, then team, then community aggregations of stored RC (bucketed by surface/grip, density-gated per the Engineer north star) — and flags meaningful outliers as candidate causes with a concrete move ("your front RC is well below what works in high grip here — worth trying +0.5mm under the front hubs"). Same soft-prior rules as the community position policy: named and reasoned, never silently normalized toward the field. |
 
 KB note: `content/vehicle-dynamics/` roll-centre prose exists for *mechanism*; the computed numbers are *this driver's geometry* — a new evidence tier the Engineer cites as "your own setup's geometry." A drafts-tier physics file on roll axis / camber gain may accompany the build (drafts tier is pre-authorized; top-level KB stays gated).
 
@@ -163,7 +177,7 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 | **1** | **Engine + pack into the app** — port engine to `src/lib/rollCenter/` with the node tests, pack JSON schema on `SetupSheetModel`, VSUSP import, Awesomatix pack + field mapping (needs founder's shim step sizes + field keys) | Unit tests reproduce the VSUSP cross-check exactly | ⬜ |
 | **2** | **Passive surfaces** — setup sheet geometry block (grade tag, assumption notes, roll-axis strip), run detail line, compare delta chips | Founder reads a real sheet's geometry block and trusts it | ⬜ |
 | **3** | **Roll Center Lab** — port the artifact to an Analysis tool page; "Open in Lab" deep links seed it from a sheet | Lab loads any Awesomatix sheet's state correctly | ⬜ |
-| **4** | **Engineer wiring** — compact geometry block in rich context; quantified geometric predictions in suggestions; grade-aware wording | Bench: geometry-question cases cite computed values correctly; no regression on the 30-case set | ⬜ |
+| **4** | **Engineer wiring** — compact geometry block in rich context; quantified geometric predictions in suggestions; grade-aware wording; **conditions-aware RC position evidence** (vs own history/team/community per the diagnostic-use row — community leg activates as Phase 5 density allows) | Bench: geometry-question cases cite computed values correctly; a low-RC-for-conditions bait case gets caught; no regression on the 30-case set | ⬜ |
 | **5** | **Community layer** — aggregation over stored RC values once a second platform pack exists | Second pack authored + density gate | ⬜ |
 
 **Legend:** ✅ done · 🟡 partial · ⬜ not started
@@ -184,11 +198,13 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 
 ---
 
-## Success signals
+## Success signals (founder-confirmed 2026-07-11 — all four)
 
-- Founder makes a shim decision at a race meeting using the sheet geometry block or Lab (not VSUSP).
-- Engineer geometry-cited answers rate well in the existing quality loop; zero wrong-direction shim claims (they're deterministic now).
-- A second platform pack gets authored via VSUSP import without code changes.
+- **VSUSP retired:** geometry lives where the runs live; the founder stops opening the external tool.
+- **A real decision changed:** at least once at a real race, the RC number or the Engineer's geometry-grounded advice picks a different change than gut would have.
+- **Understanding grows:** shim choices stop being folklore — the founder (and geometry-curious users) know what their stacks actually do.
+- **Teammates want in:** other Awesomatix drivers see it and ask for it; a second platform pack gets authored via VSUSP import without code changes.
+- Guardrail: Engineer geometry-cited answers rate well in the quality loop; zero wrong-direction shim claims (they're deterministic now).
 
 ---
 
@@ -202,4 +218,4 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 | CAD/drawing source for `cad-verified` upgrade | Jordan / Awesomatix contact |
 | Doc lock | Jordan |
 
-**Changelog:** 2026-07-11 initial draft from founder interviews (four rounds) + validated prototype · 2026-07-11 shim stacks ruled free-typed mm (no step enumeration); slider keeps 0.25 detents · 2026-07-11 Awesomatix field map recovered from calibration DB (per-leg inner shim keys; lower-arm extensions + wheel spacers added as inputs); chassis thickness table (steel 1.2 base / alu 2.0 / carbon 2.2).
+**Changelog:** 2026-07-11 initial draft from founder interviews (four rounds) + validated prototype · 2026-07-11 shim stacks ruled free-typed mm (no step enumeration); slider keeps 0.25 detents · 2026-07-11 Awesomatix field map recovered from calibration DB (per-leg inner shim keys; lower-arm extensions + wheel spacers added as inputs); chassis thickness table (steel 1.2 base / alu 2.0 / carbon 2.2) · 2026-07-11 goal section + all-four success signals (founder-confirmed); "geometry never required reading" principle · 2026-07-11 true arm angles retire the link-index proxies; Phase 4 upgraded to conditions-aware RC position evidence (founder).
