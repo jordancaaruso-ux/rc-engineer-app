@@ -9,6 +9,7 @@ import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerMo
 import { slugifySetupSheetModelName, uniqueSlugCandidate } from "@/lib/setupSheetModels/slug";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { draftedSchemaToModelSchema } from "@/lib/setupExtractAi/draftedSchemaToModelSchema";
 import type { DraftedField } from "@/lib/setupExtractAi/draftSetupSheetModelSchema";
 
@@ -90,6 +91,15 @@ export async function POST(request: Request) {
     revalidatePath("/cars");
     revalidatePath("/setup-sheet-models");
     return NextResponse.json({ model: existingByName, reused: true });
+  }
+
+  // Creating a brand-new chassis type (a global, shared setup sheet) is admin-only — the catalog is
+  // curated founder ground truth. Non-admins pick from existing types or mark a car "pending".
+  if (!isAuthAdminEmail(user.email)) {
+    return NextResponse.json(
+      { error: "Only an admin can create a new chassis type. Pick an existing one, or leave it unset for now." },
+      { status: 403 }
+    );
   }
 
   const existingSlugs = new Set(existingRows.map((r) => r.slug));

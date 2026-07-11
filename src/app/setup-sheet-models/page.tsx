@@ -117,16 +117,18 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
       </header>
 
       <section className="page-body">
-        <CardPanel className="max-w-2xl">
-          <Eyebrow>New car with custom setup sheet</Eyebrow>
-          <p className="ui-caption mt-1">
-            Define parameters for a car model (e.g. Mugen MTC3), upload a PDF, and calibrate — without inheriting the
-            Awesomatix A800 sheet.
-          </p>
-          <ButtonLink href="/setup-sheet-models/new/setup" className="mt-3 inline-flex text-sm">
-            Start setup wizard
-          </ButtonLink>
-        </CardPanel>
+        {isAdmin ? (
+          <CardPanel className="max-w-2xl">
+            <Eyebrow>New car with custom setup sheet</Eyebrow>
+            <p className="ui-caption mt-1">
+              Define parameters for a car model (e.g. Mugen MTC3), upload a PDF, and calibrate — without inheriting the
+              Awesomatix A800 sheet.
+            </p>
+            <ButtonLink href="/setup-sheet-models/new/setup" className="mt-3 inline-flex text-sm">
+              Start setup wizard
+            </ButtonLink>
+          </CardPanel>
+        ) : null}
 
         {isAdmin && duplicateGroupCount > 0 ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">

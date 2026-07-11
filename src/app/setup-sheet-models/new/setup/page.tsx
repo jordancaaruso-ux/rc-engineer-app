@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { SetupSheetModelWizardClient } from "@/components/cars/CarSetupWizardClient";
 
 export default async function SetupSheetModelNewSetupPage() {
   const user = await getAuthenticatedApiUser();
   if (!user) redirect("/login");
+  // Chassis types are curated global setup sheets — only an admin adds new ones.
+  if (!isAuthAdminEmail(user.email)) redirect("/setup-sheet-models");
 
   return (
     <section className="page-body">

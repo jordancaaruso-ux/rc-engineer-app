@@ -7,6 +7,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 
 /** User-specific list — revalidated on car mutations. */
 export const revalidate = 30;
@@ -34,6 +35,7 @@ export default async function CarManagerPage(): Promise<ReactNode> {
   }
 
   const user = await requireCurrentUser();
+  const isAdmin = isAuthAdminEmail(user.email);
   await ensureAuthorizedSetupSheetCatalog();
   const [allModels, cars] = await Promise.all([
     prisma.setupSheetModel.findMany({
@@ -91,7 +93,7 @@ export default async function CarManagerPage(): Promise<ReactNode> {
       </header>
       <section className="page-body">
         <div className="max-w-2xl">
-          <CarList initialCars={cars} setupSheetModels={setupSheetModels} />
+          <CarList initialCars={cars} setupSheetModels={setupSheetModels} isAdmin={isAdmin} />
         </div>
       </section>
     </>

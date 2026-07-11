@@ -33,9 +33,11 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 export function CarList({
   initialCars,
   setupSheetModels: initialSetupSheetModels = [],
+  isAdmin = false,
 }: {
   initialCars: Car[];
   setupSheetModels?: SetupSheetModelOption[];
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [cars, setCars] = useState<Car[]>(initialCars);
@@ -57,15 +59,19 @@ export function CarList({
       })
       .catch(() => {});
   }, [initialSetupSheetModels.length]);
+
   const [name, setName] = useState("");
-  const [chassis, setChassis] = useState("");
+  const [nameDirty, setNameDirty] = useState(false);
   const [notes, setNotes] = useState("");
   const [setupSheetModelId, setSetupSheetModelId] = useState("");
   const [modelQuery, setModelQuery] = useState("");
   const [modelOpen, setModelOpen] = useState(false);
+  const [pending, setPending] = useState(false); // "my chassis isn't listed yet"
+  const [creatingType, setCreatingType] = useState(false);
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  const selectedModel = setupSheetModels.find((m) => m.id === setupSheetModelId) ?? null;
   const normalizedQuery = modelQuery.trim().toLowerCase();
   const filteredModels = normalizedQuery
     ? setupSheetModels.filter((m) => m.name.toLowerCase().includes(normalizedQuery))
@@ -74,64 +80,87 @@ export function CarList({
     (m) => m.name.trim().toLowerCase() === normalizedQuery
   );
 
+  /** Keep the auto-filled name in sync until the user hand-edits it. */
+  function onNameChange(value: string) {
+    setName(value);
+    setNameDirty(value.trim().length > 0);
+  }
+
   function selectModel(m: SetupSheetModelOption) {
     setSetupSheetModelId(m.id);
     setModelQuery(m.name);
+    setPending(false);
+    setModelOpen(false);
+    if (!nameDirty) setName(m.name); // auto-fill name from chassis (still editable)
+  }
+
+  function chooseNotListed() {
+    setSetupSheetModelId("");
+    setPending(true);
     setModelOpen(false);
   }
 
-  /** Resolve the chosen chassis to a model id, creating (or reusing) one for free-typed names. */
-  async function resolveModelId(): Promise<string | null> {
-    if (setupSheetModelId) return setupSheetModelId;
+  async function createTypeFromQuery() {
     const typed = modelQuery.trim();
-    if (!typed) return null;
-    if (exactModelMatch) return exactModelMatch.id;
-    const { model } = await jsonFetch<{ model: { id: string; name: string; slug: string } }>(
-      "/api/setup-sheet-models",
-      {
+    if (!typed || creatingType) return;
+    setCreatingType(true);
+    setMessage(null);
+    try {
+      const { model } = await jsonFetch<{ model: SetupSheetModelOption }>("/api/setup-sheet-models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: typed }),
-      }
-    );
-    return model.id;
+      });
+      setSetupSheetModels((prev) =>
+        prev.some((m) => m.id === model.id) ? prev : [{ ...model, isAuthorized: false }, ...prev]
+      );
+      selectModel(model);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to create chassis type");
+    } finally {
+      setCreatingType(false);
+    }
+  }
+
+  function resetForm() {
+    setName("");
+    setNameDirty(false);
+    setNotes("");
+    setSetupSheetModelId("");
+    setModelQuery("");
+    setPending(false);
   }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) {
+    const chosenName = name.trim() || selectedModel?.name || modelQuery.trim();
+    if (!chosenName) {
       setMessage("Name is required.");
       return;
     }
-    const wantsModel = Boolean(setupSheetModelId || modelQuery.trim());
-    if (!wantsModel) {
-      const ok = window.confirm(
-        "Add this car without a chassis type? Community stats, setup compare, and structured setup tools work best when you link one (e.g. Mugen MTC3)."
-      );
-      if (!ok) return;
+    if (!setupSheetModelId && !pending) {
+      setMessage("Choose a chassis type — or ‘My chassis isn’t listed yet’.");
+      return;
     }
     setMessage(null);
     setAdding(true);
     try {
-      const modelId = await resolveModelId();
       const { car } = await jsonFetch<{ car: Car }>("/api/cars", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: trimmed,
-          chassis: chassis.trim() || null,
+          name: chosenName,
           notes: notes.trim() || null,
-          setupSheetModelId: modelId,
+          setupSheetModelId: setupSheetModelId || null,
         }),
       });
       setCars((prev) => [car, ...prev]);
-      setName("");
-      setChassis("");
-      setNotes("");
-      setSetupSheetModelId("");
-      setModelQuery("");
-      setMessage("Car added. You can use it when logging a run.");
+      resetForm();
+      setMessage(
+        setupSheetModelId
+          ? "Car added. You can use it when logging a run."
+          : "Car added — no setup sheet yet. We’ll flag it to add your chassis type."
+      );
       router.refresh();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to add car");
@@ -142,41 +171,15 @@ export function CarList({
 
   return (
     <div className="space-y-4">
-      <CardPanel contentClassName="p-4">
-      <form onSubmit={handleAdd} className="space-y-3">
-        <Eyebrow>Add car (quick)</Eyebrow>
-        <div className="grid gap-3 md:grid-cols-3">
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
-            <input
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. TC6.2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Chassis / model (optional)</label>
-            <input
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={chassis}
-              onChange={(e) => setChassis(e.target.value)}
-              placeholder="e.g. Xray T4"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
-            <input
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional"
-            />
-          </div>
+      {/* overflowHidden={false} + raised z so the chassis-type menu isn't clipped by the card. */}
+      <CardPanel contentClassName="p-4" overflowHidden={false} className="relative z-30">
+        <form onSubmit={handleAdd} className="space-y-3">
+          <Eyebrow>Add car</Eyebrow>
+
+          {/* Chassis type — the required, schema-driving field, first. */}
           <div className="relative">
             <label className="block text-[11px] text-muted-foreground mb-1">
-              Chassis type <span className="text-amber-600 dark:text-amber-500">(recommended)</span>
+              Chassis type <span className="text-amber-600 dark:text-amber-500">*</span>
             </label>
             <input
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
@@ -185,6 +188,7 @@ export function CarList({
               onChange={(e) => {
                 setModelQuery(e.target.value);
                 setSetupSheetModelId("");
+                setPending(false);
                 setModelOpen(true);
               }}
               onFocus={() => setModelOpen(true)}
@@ -193,11 +197,11 @@ export function CarList({
               <>
                 <button
                   type="button"
-                  className="fixed inset-0 z-10 cursor-default"
+                  className="fixed inset-0 z-30 cursor-default"
                   aria-label="Close chassis menu"
                   onClick={() => setModelOpen(false)}
                 />
-                <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
+                <div className="absolute left-0 top-full z-40 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
                   {filteredModels.map((m) => (
                     <button
                       key={m.id}
@@ -213,50 +217,91 @@ export function CarList({
                       ) : null}
                     </button>
                   ))}
-                  {modelQuery.trim() && !exactModelMatch ? (
+                  {filteredModels.length === 0 ? (
+                    <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
+                      No matching chassis type.
+                    </p>
+                  ) : null}
+                  {/* Admin-only: mint a new global chassis type from the typed name. */}
+                  {isAdmin && modelQuery.trim() && !exactModelMatch ? (
                     <button
                       type="button"
-                      onClick={() => setModelOpen(false)}
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-accent hover:bg-muted/60"
+                      onClick={createTypeFromQuery}
+                      disabled={creatingType}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-accent hover:bg-muted/60 disabled:opacity-60"
                     >
-                      + Create chassis type “{modelQuery.trim()}”
+                      {creatingType ? "Creating…" : `+ Create chassis type “${modelQuery.trim()}”`}
                     </button>
                   ) : null}
-                  {filteredModels.length === 0 && !modelQuery.trim() ? (
-                    <p className="px-2 py-1.5 text-[11px] text-muted-foreground">No chassis types yet.</p>
-                  ) : null}
+                  {/* Non-admins can't add types — let them proceed without one (flagged pending). */}
+                  <button
+                    type="button"
+                    onClick={chooseNotListed}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-muted/60"
+                  >
+                    My chassis isn’t listed yet — add without a setup sheet
+                  </button>
                 </div>
               </>
             ) : null}
-            {!setupSheetModelId && modelQuery.trim() && !exactModelMatch ? (
-              <p className="mt-1 text-[11px] text-accent">
-                New chassis type — it’ll be created and shared when you add the car.
+            {selectedModel ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Uses the shared <span className="text-foreground">{selectedModel.name}</span> setup sheet.
               </p>
-            ) : !setupSheetModelId && !modelQuery.trim() ? (
+            ) : pending ? (
               <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-                Without a chassis type, community stats and Engineer spread won’t apply.
+                No setup sheet yet — community stats and structured setup tools won’t apply until your
+                chassis type is added.
               </p>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="submit"
-            disabled={adding}
-            className={cn(
-              buttonLinkClassName("primary"),
-              adding && "opacity-70 pointer-events-none"
+            ) : (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Required — pick the chassis so the car gets the right setup sheet.
+              </p>
             )}
-          >
-            {adding ? "Adding…" : "Add car"}
-          </button>
-          {message && (
-            <span className={cn("text-xs", message.startsWith("Car added") ? "text-accent" : "text-muted-foreground")}>
-              {message}
-            </span>
-          )}
-        </div>
-      </form>
+          </div>
+
+          {/* Name — auto-filled from the chassis type, editable (your nickname for the car). */}
+          <div>
+            <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
+            <input
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              placeholder={selectedModel?.name ?? "e.g. My MTC3"}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
+            <input
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={adding}
+              className={cn(buttonLinkClassName("primary"), adding && "opacity-70 pointer-events-none")}
+            >
+              {adding ? "Adding…" : "Add car"}
+            </button>
+            {message && (
+              <span
+                className={cn(
+                  "text-xs",
+                  message.startsWith("Car added") ? "text-accent" : "text-muted-foreground"
+                )}
+              >
+                {message}
+              </span>
+            )}
+          </div>
+        </form>
       </CardPanel>
 
       <div>
@@ -276,7 +321,11 @@ export function CarList({
                       {c.chassis && <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>}
                       <span className="ui-caption block mt-0.5">
                         Setup sheet:{" "}
-                        {c.setupSheetModel?.name ?? labelForSetupSheetTemplate(c.setupSheetTemplate ?? null)}
+                        {c.setupSheetModel?.name ?? (
+                          <span className="text-amber-700 dark:text-amber-400">
+                            not linked yet — setup sheet coming
+                          </span>
+                        )}
                       </span>
                     </div>
                     <span className="text-[11px] text-muted-foreground font-mono">{c.id.slice(0, 8)}</span>
@@ -287,7 +336,7 @@ export function CarList({
                     href={`/setup-sheet-models/${c.setupSheetModelId}/schema`}
                     className="tap-active mt-1 block text-[10px] text-accent hover:underline"
                   >
-                    Edit parameters
+                    {isAdmin ? "Edit parameters" : "View parameters"}
                   </Link>
                 ) : null}
               </li>

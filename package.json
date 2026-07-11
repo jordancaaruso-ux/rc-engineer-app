@@ -36,6 +36,7 @@
     "test:video-analysis": "npx tsx src/lib/videoAnalysis/sectorStats.test.ts && npx tsx src/lib/videoAnalysis/lapCompare.test.ts && npx tsx src/lib/videoAnalysis/manualCompareAdapter.test.ts",
     "test:manual-video-analysis": "npx tsx src/lib/manualVideoAnalysis/sync.test.ts",
     "test:setup-model-dedupe": "npx tsx src/lib/setupSheetModels/dedupeElection.test.ts",
+    "test:setup-model-match": "npx tsx src/lib/setupSheetModels/matchAuthorizedModel.test.ts",
     "test:picker-models": "npx tsx src/lib/setupSheetModels/pickerModels.test.ts",
     "test:fingerprint-scope": "npx tsx src/lib/setupCalibrations/scopeCandidates.test.ts",
     "test:engineer-ratings": "npx tsx src/lib/engineerFeedback/ratingValidation.test.ts && npx tsx src/lib/engineerFeedback/adminFeedbackAccess.test.ts",
