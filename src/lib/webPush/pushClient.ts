@@ -42,6 +42,16 @@ export async function getExistingSubscription(): Promise<PushSubscription | null
   return reg.pushManager.getSubscription();
 }
 
+/** Flatten a browser PushSubscription into the shape our /api/push/subscribe expects. */
+export function serializeSubscription(
+  sub: PushSubscription,
+): { endpoint: string; p256dh: string; auth: string } | null {
+  const json = sub.toJSON();
+  const keys = json.keys;
+  if (!json.endpoint || !keys?.p256dh || !keys.auth) return null;
+  return { endpoint: json.endpoint, p256dh: keys.p256dh, auth: keys.auth };
+}
+
 /**
  * Subscribe this device to push (idempotent — returns the existing subscription
  * if already subscribed). Caller is responsible for having permission granted.

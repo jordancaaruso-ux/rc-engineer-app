@@ -21,7 +21,7 @@ A 2D front-elevation kinematics engine already exists and is **cross-validated a
 - **Model:** VSUSP-compatible hardpoint parameterization — frame mounts (from centerline + chassis bottom), ball-to-ball arm lengths, rigid knuckle (hub→ball offsets), wheel plane at hub + wheel offset, loaded tire radius (OD/2 − compression). Per side: 1-DOF four-bar solved by bisection (contact point on ground); ICs from arm-line intersection; RC from force-line intersection; camber = true wheel-plane lean (no KPI folding).
 - **Computes:** static RC height F/R, roll-axis rake, static camber, camber gain (°/mm bump), RC migration under chassis roll (0–3° sweep), track width, per-shim RC sensitivities.
 - **Validation:** VSUSP displays −9.1 F / −8.5 R for "A800R No Shims - STEEL"; engine computes **−9.09 / −8.50**. Overall width reproduces at 188.7mm; static camber at −1.78°. 128/128 extreme-input combinations solve.
-- **A800R shim sensitivities (mm RC per mm shim):** lower-inner **+2.2** · lower-outer **−2.3** · upper-inner **−1.0** · upper-outer **+1.0** · ride height +1mm → RC +1.2 vs ground.
+- **A800R shim sensitivities (mm RC per mm of stack, Awesomatix position names — founder 2026-07-11):** under lower arm **+2.2** · under hub **+2.1** · upper inner **−1.0** · upper outer **+1.0** · ride height +1mm → RC +1.2 vs ground. (Under-hub shims raise the hub off the lower ball → lower ball moves *down* in the knuckle frame → RC rises; the engine wires this sign flip.)
 - **VSUSP URL parser:** share-link fragments decode at mm×1000 for *every* value — including `tires.compression` (125 → 0.125mm squash, **not** a percent; this was the one decode bug found and fixed during validation).
 
 Prototype (interactive, app-styled): https://claude.ai/code/artifact/acd0774d-d38d-4ae0-b8e6-eafefbdbd100 · engine + node test harness in the 2026-07-11 session scratchpad (`roll-center-prototype.html`, `engine-test.js`).
@@ -74,7 +74,7 @@ pack = {
 
 | Input | Source | Effect |
 |---|---|---|
-| **Four shim stacks per axle** (lower-inner, lower-outer, upper-inner, upper-outer) | Dedicated per-position sheet fields (already exist on the Awesomatix sheet) | Continuous hardpoint offsets |
+| **Four shim stacks per axle** — Awesomatix names: **upper inner shims · under lower arm shims · upper outer shims · under hub shims** | Dedicated per-position sheet fields (already exist on the Awesomatix sheet; exact field keys still owed). **Free-typed total stack thickness in mm** — any increment (0.1, 0.25, whatever the driver runs); no step enumeration in the schema. UI: typed number input + 0.25-detent slider (founder rulings 2026-07-11) | Continuous hardpoint offsets. Under-hub is sign-inverted (raises hub → lower ball down in knuckle frame → RC up) |
 | **Build choices** — chassis thickness, bulkhead upper-inner position parts | Sheet fields | Datum shift / discrete hardpoint moves |
 | **Ride height** (per axle) | Sheet | Chassis heave (~1.2mm RC per mm) |
 | **Camber** (per axle) | Sheet | Engine back-solves camber-link length from the recorded angle |
@@ -169,9 +169,9 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 
 | Item | Owner |
 |---|---|
-| Shim step sizes at the four positions + exact sheet field keys (F/R) | Jordan — last input for the Phase 1 mapping |
+| Exact sheet field keys for the four shim positions (F/R) | Jordan — last input for the Phase 1 mapping. ~~Step sizes~~ resolved 2026-07-11: stacks are free-typed mm, no steps |
 | Chassis-thickness + bulkhead-position option tables (which parts → which offsets) | Jordan (has data; capture at Phase 1) |
 | CAD/drawing source for `cad-verified` upgrade | Jordan / Awesomatix contact |
 | Doc lock | Jordan |
 
-**Changelog:** 2026-07-11 initial draft from founder interviews (four rounds) + validated prototype.
+**Changelog:** 2026-07-11 initial draft from founder interviews (four rounds) + validated prototype · 2026-07-11 shim stacks ruled free-typed mm (no step enumeration).

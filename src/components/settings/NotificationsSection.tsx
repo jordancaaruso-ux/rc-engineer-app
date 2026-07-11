@@ -6,6 +6,7 @@ import {
   getExistingSubscription,
   pushSupported,
   registerServiceWorker,
+  serializeSubscription,
   subscribeToPush,
 } from "@/lib/webPush/pushClient";
 
@@ -51,10 +52,47 @@ export function NotificationsSection() {
       }
       await registerServiceWorker();
       const sub = await subscribeToPush(VAPID);
-      setSubscribed(Boolean(sub));
-      setStatus(sub ? "Notifications enabled on this device." : "Could not subscribe on this device.");
+      const serialized = sub ? serializeSubscription(sub) : null;
+      if (!serialized) {
+        setStatus("Could not subscribe on this device.");
+        return;
+      }
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: serialized, userAgent: navigator.userAgent }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      setSubscribed(true);
+      setStatus("Notifications enabled on this device.");
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Failed to enable notifications.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const disable = useCallback(async () => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const sub = await getExistingSubscription();
+      const endpoint = sub?.endpoint;
+      if (sub) await sub.unsubscribe().catch(() => {});
+      if (endpoint) {
+        await fetch("/api/push/unsubscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint }),
+        }).catch(() => {});
+      }
+      setSubscribed(false);
+      setStatus("Notifications turned off on this device.");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Failed to turn off notifications.");
     } finally {
       setBusy(false);
     }
@@ -105,22 +143,35 @@ export function NotificationsSection() {
         </p>
       ) : (
         <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            disabled={busy || !VAPID}
-            onClick={() => void enable()}
-            className="rounded-md border border-primary bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
-          >
-            {subscribed ? "Enabled ✓" : busy ? "Enabling…" : "Enable notifications"}
-          </button>
-          <button
-            type="button"
-            disabled={busy || !subscribed}
-            onClick={() => void sendTest()}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
-          >
-            Send test
-          </button>
+          {!subscribed ? (
+            <button
+              type="button"
+              disabled={busy || !VAPID}
+              onClick={() => void enable()}
+              className="rounded-md border border-primary bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
+            >
+              {busy ? "Enabling…" : "Enable notifications"}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void sendTest()}
+                className="rounded-md border border-primary bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
+              >
+                Send test
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void disable()}
+                className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+              >
+                Turn off
+              </button>
+            </>
+          )}
         </div>
       )}
 

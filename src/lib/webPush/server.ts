@@ -2,6 +2,8 @@ import "server-only";
 
 import webpush, { type PushSubscription as WebPushSubscription } from "web-push";
 
+import { prisma } from "@/lib/prisma";
+
 /**
  * Server-side web-push send path. VAPID keys come from env (see .env.local /
  * Vercel: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT). Persistence of
@@ -43,4 +45,45 @@ export async function sendPush(
 ): Promise<void> {
   ensureConfigured();
   await webpush.sendNotification(subscription, JSON.stringify(payload));
+}
+
+/**
+ * Send a push to every device a user has registered (the real send path used by
+ * the cron + triggers). Prunes endpoints that return 404/410 (expired/unsubscribed).
+ */
+export async function sendPushToUser(
+  userId: string,
+  payload: PushPayload,
+): Promise<{ sent: number; pruned: number; devices: number }> {
+  ensureConfigured();
+  const subs = await prisma.pushSubscription.findMany({ where: { userId } });
+
+  let sent = 0;
+  let pruned = 0;
+
+  await Promise.all(
+    subs.map(async (s) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+          JSON.stringify(payload),
+        );
+        sent += 1;
+      } catch (err) {
+        const status = (err as { statusCode?: number }).statusCode;
+        if (status === 404 || status === 410) {
+          await prisma.pushSubscription.delete({ where: { id: s.id } }).catch(() => {});
+          pruned += 1;
+        }
+      }
+    }),
+  );
+
+  if (sent > 0) {
+    await prisma.pushSubscription
+      .updateMany({ where: { userId }, data: { lastNotifiedAt: new Date() } })
+      .catch(() => {});
+  }
+
+  return { sent, pruned, devices: subs.length };
 }

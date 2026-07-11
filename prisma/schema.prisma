@@ -44,6 +44,7 @@ model User {
   setupImportBatches SetupImportBatch[]
   importedLapTimeSessions ImportedLapTimeSession[]
   watchedLapSources WatchedLapSource[]
+  pushSubscriptions PushSubscription[]
   videoAssets     VideoAsset[]
   trackCameraProfiles TrackCameraProfile[]
   videoAnalysisJobs   VideoAnalysisJob[]
@@ -1372,3 +1373,26 @@ model VideoAnalysisJob {
   @@index([runId])
 }
 
+
+/// Web Push device subscription (one row per browser/device). Sent to by the
+/// server (cron + triggers). Pruned when the endpoint returns 404/410.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// Web Push endpoint URL — unique per device/browser.
+  endpoint String @unique
+  /// Encryption keys from the browser PushSubscription.
+  p256dh String
+  auth   String
+  /// Best-effort device label for the user's own reference.
+  userAgent String?
+  /// Housekeeping: last time a push was delivered to this endpoint.
+  lastNotifiedAt DateTime?
+
+  @@index([userId])
+}

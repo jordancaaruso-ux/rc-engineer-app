@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { VideoAnalysisJobClient } from "./VideoAnalysisJobClient";
-import { ManualVideoAnalysisClient } from "./ManualVideoAnalysisClient";
+import { AnalyzeFlowClient } from "./AnalyzeFlowClient";
 
 export function VideoAnalysisJobRouter({ jobId }: { jobId: string }) {
   const [mode, setMode] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export function VideoAnalysisJobRouter({ jobId }: { jobId: string }) {
   }
 
   if (mode === "manual") {
-    return <ManualVideoAnalysisClient jobId={jobId} />;
+    return <AnalyzeFlowClient jobId={jobId} />;
   }
 
   return <VideoAnalysisJobClient jobId={jobId} />;

@@ -130,6 +130,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const body = (await request.json().catch(() => null)) as {
     runId?: string | null;
+    videoAssetId?: string | null;
     alignmentJson?: unknown;
     idCorrectionsJson?: MotIdCorrection[];
     status?: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
@@ -141,6 +142,14 @@ export async function PATCH(request: Request, { params }: Params) {
     select: { id: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (typeof body?.videoAssetId === "string") {
+    const asset = await prisma.videoAsset.findFirst({
+      where: { id: body.videoAssetId, userId: user.id },
+      select: { id: true },
+    });
+    if (!asset) return NextResponse.json({ error: "Video not found" }, { status: 404 });
+  }
 
   let manualJsonUpdate: object | undefined;
   if (body?.manualJson !== undefined) {
@@ -155,6 +164,7 @@ export async function PATCH(request: Request, { params }: Params) {
     where: { id: jobId },
     data: {
       ...(body?.runId !== undefined ? { runId: body.runId } : {}),
+      ...(body?.videoAssetId !== undefined ? { videoAssetId: body.videoAssetId } : {}),
       ...(body?.alignmentJson !== undefined
         ? { alignmentJson: body.alignmentJson as object }
         : {}),

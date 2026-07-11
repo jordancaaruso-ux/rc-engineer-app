@@ -101,7 +101,19 @@ Service worker (public/sw.js)         ← receives 'push' + 'notificationclick'
 **Goal:** the driver's transponder posts a result on a timing site → they get a push → one tap
 starts an Add-Run pre-filled with that result. Removes the "remember to log it" step entirely.
 
-**Feasibility finding (2026-07-11): much of the integration already exists.** Settings already stores per-user **LiveRC driver ID + name** and **Speedhive transponder numbers + name** (`getLiveRcDriverIdSetting`, `getSpeedhiveTransponderNumbersSetting`, `src/lib/speedhive/`), and the app already imports laps/results from both platforms. So the identity-link (design Q2) and result-fetch plumbing are largely built — the spike narrows to: *is there a cheap "did this driver get a NEW result since T" poll, and how fast does it appear.* (The dedicated research agent was cut off by a session limit; resume it, but start from the existing `src/lib/speedhive/` + LiveRC import code, not from scratch.)
+**FEASIBILITY: HIGH — the detection engine already exists (code audit 2026-07-11).** This is far more built than "design only":
+
+- **`WatchedLapSource` Prisma model + `checkWatchedLapSources()` (`src/lib/lapWatch/detect.ts`) + `POST /api/lap-watch/check`** already: iterate a user's watched sources → fetch the timing index → **diff discovered sessions against a `lastSeenSessionCompletedAt` watermark** (= "new since T") → match by driver name / class → **auto-import** new sessions → advance the watermark. That IS the detection + dedup + new-since primitive the flagship needs.
+- **Identity handles stored per-user in Settings:** LiveRC driver name/ID, Speedhive transponder #s + name (`speedhiveDriverSettings.ts`, `appSettings.ts`).
+- **Two fetch paths already written:** LiveRC = **HTML scrape** (`fetchUrlText` + `livercSessionIndexParsers` + driver-ID resolve) — brittle-ish but working and name/ID-matched. Speedhive = **clean public JSON API** at `https://api2.mylaps.com` (no auth; `/organizations/{org}/events`, `/events/{id}/sessions`, `/sessions/{id}/classification|alllaptimes`), transponder-keyed, events carry `updatedAt` → **cheaper + more reliable to poll than LiveRC.**
+
+**What's actually missing to ship "new result → notify" (small):**
+1. **A scheduler.** `checkWatchedLapSources` is user-POST-triggered only; there's **no `vercel.json` cron yet**. Add a cron → call it per user with active watched sources.
+2. **Push hookup.** When it yields `status:"new_imported"` (or a notify-only variant), send a web push (the plumbing shipped 2026-07-11) deep-linking to the imported session / run.
+3. **Speedhive in the watch engine.** `detect.ts` is **LiveRC-only** today; Speedhive discovery (`discoverSpeedhiveSessionsForUser`) exists but isn't wired into the watcher. Add a Speedhive branch (or parallel watcher) — its JSON API + `updatedAt` makes this the *easier* platform to poll well.
+4. **Notify-vs-auto-import decision.** The watcher auto-imports today; decide whether the notification says "new result imported — review it" (current behavior) or "new result up — tap to add a run" (defer import until tapped).
+
+**Recommendation:** start with **Speedhive** (clean API, transponder-keyed, `updatedAt`), cadence ~2–5 min only during a user's likely-active windows (event linked today / recent manual check), dedup on `(source, sessionId)` via the existing watermark + `ImportedLapTimeSession.sourceUrl`. **Risk/diligence:** formally check each platform's ToS/rate limits for *automated* polling (the app polls user-triggered today; a cron is heavier) — Speedhive's public JSON API is lower-risk than LiveRC HTML scraping; keep cadence modest and windowed. Name-based LiveRC matching is fuzzy (see the extensive `no_driver_match` logging) — transponder (Speedhive) is more precise.
 
 **Open design questions (resolve before building):**
 1. **Detection source.** LiveRC and Speedhive (MyLaps) are the two big ones. Is there a public
