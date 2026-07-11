@@ -18,6 +18,8 @@ import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
 
 import { PwaSplashDismiss } from "@/components/pwa/PwaSplashDismiss";
 
+import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
+
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 
 import { bgPreviewBootstrapScript } from "@/lib/appThemePreview";
@@ -204,6 +206,8 @@ export default function RootLayout({ children }: { children: ReactNode }): React
             <PwaInstallPrompt />
 
             <PwaSplashDismiss />
+
+            <ServiceWorkerRegistrar />
 
           </AuthSessionProvider>
 

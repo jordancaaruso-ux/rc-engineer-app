@@ -24,6 +24,8 @@ import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
 
 import { Eyebrow } from "@/components/ui/panel";
 
+import { PillToggle } from "@/components/ui/PillToggle";
+
 import { RelativeTime } from "@/components/ui/RelativeTime";
 
 
@@ -1093,57 +1095,35 @@ export function EngineerChatPanel({
 
         ) : null}
 
-        <div className="flex items-center gap-1" role="group" aria-label="Answer mode">
+        <div className="space-y-1.5">
 
-          {CHAT_MODE_META.map((m) => {
+          <PillToggle
 
-            const active = m.value === chatMode;
+            ariaLabel="Answer mode"
 
-            return (
+            disabled={panelBusy}
 
-              <button
+            options={CHAT_MODE_META.map((m) => ({
 
-                key={m.value}
+              value: m.value,
 
-                type="button"
+              label: m.label,
 
-                onClick={() => selectChatMode(m.value)}
+              ariaLabel: m.hint,
 
-                disabled={panelBusy}
+            }))}
 
-                aria-pressed={active}
+            value={chatMode}
 
-                title={m.hint}
+            onChange={selectChatMode}
 
-                className={cn(
+          />
 
-                  "tap-active rounded-md px-2.5 py-1 text-[11px] font-semibold transition",
-
-                  active
-
-                    ? "bg-primary text-primary-foreground"
-
-                    : "border border-border/70 text-muted-foreground hover:border-border hover:text-foreground",
-
-                  panelBusy && "opacity-60"
-
-                )}
-
-              >
-
-                {m.label}
-
-              </button>
-
-            );
-
-          })}
-
-          <span className="ml-1 hidden text-[10px] text-muted-foreground min-[440px]:inline">
+          <p className="text-center text-[10px] text-muted-foreground">
 
             {CHAT_MODE_META.find((m) => m.value === chatMode)?.hint}
 
-          </span>
+          </p>
 
         </div>
 

@@ -7,6 +7,7 @@ import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/e
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow, PanelSubtitle } from "@/components/ui/panel";
+import { PillToggle } from "@/components/ui/PillToggle";
 import { cn } from "@/lib/utils";
 
 type EngineerMainTab = "chat" | "compare";
@@ -45,28 +46,16 @@ export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-3">
-      <SurfaceCard variant="panel" contentClassName="flex gap-1 p-1">
-        <button
-          type="button"
-          className={cn(
-            "tap-active flex-1 rounded-lg px-3 py-2 text-sm font-medium transition",
-            mainTab === "chat" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => selectTab("chat")}
-        >
-          Chat
-        </button>
-        <button
-          type="button"
-          className={cn(
-            "tap-active flex-1 rounded-lg px-3 py-2 text-sm font-medium transition",
-            mainTab === "compare" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => selectTab("compare")}
-        >
-          Compare &amp; trend
-        </button>
-      </SurfaceCard>
+      <PillToggle
+        role="tablist"
+        ariaLabel="Engineer view"
+        options={[
+          { value: "chat", label: "Chat" },
+          { value: "compare", label: "Compare & trend" },
+        ]}
+        value={mainTab}
+        onChange={(next) => selectTab(next)}
+      />
 
       {mainTab === "chat" ? (
         <SurfaceCard variant="panel" overflowHidden={false} contentClassName={cn("p-0", isPending && "opacity-90")}>

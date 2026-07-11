@@ -5,6 +5,11 @@ import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIn
 import { primaryNormsFromImportedLapSets } from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 import { normalizeLapTimes } from "@/lib/runLaps";
+import {
+  canViewPeerRuns,
+  isRunSharedWithTeam,
+  peerAccessIsTeamOnly,
+} from "@/lib/teammateRunAccess";
 
 /**
  * The full field of a run's imported timing session (e.g. a LiveRC race
@@ -49,11 +54,13 @@ function lapsEqual(a: number[], b: number[]): boolean {
  * Returns an empty field when the run has no linked session or the session
  * has fewer than two drivers with laps.
  */
-export async function loadRaceFieldForRun(userId: string, runId: string): Promise<RaceFieldForRun> {
-  const run = await prisma.run.findFirst({
-    where: { id: runId, userId },
+export async function loadRaceFieldForRun(viewerId: string, runId: string): Promise<RaceFieldForRun> {
+  const run = await prisma.run.findUnique({
+    where: { id: runId },
     select: {
       id: true,
+      userId: true,
+      shareWithTeam: true,
       lapTimes: true,
       importedLapTimeSessionId: true,
       importedLapSets: { select: { driverName: true, isPrimaryUser: true } },
@@ -66,12 +73,23 @@ export async function loadRaceFieldForRun(userId: string, runId: string): Promis
   });
   if (!run) return { drivers: [] };
 
+  // Authorize the viewer against the run's OWNER, not themselves: the field is
+  // scoped to whoever logged the run. Teammates see it via link / mutual team;
+  // team-only access additionally requires the run be shared with the team.
+  const ownerId = run.userId;
+  if (ownerId !== viewerId) {
+    if (!(await canViewPeerRuns(viewerId, ownerId))) return { drivers: [] };
+    if ((await peerAccessIsTeamOnly(viewerId, ownerId)) && !isRunSharedWithTeam(run)) {
+      return { drivers: [] };
+    }
+  }
+
   // Prefer the detection-primary session; fall back to the newest linked one
   // whose payload actually carries a multi-driver field.
   const candidates: Array<{ id: string; parsedPayload: unknown }> = [];
   if (run.importedLapTimeSessionId) {
     const detected = await prisma.importedLapTimeSession.findFirst({
-      where: { id: run.importedLapTimeSessionId, userId },
+      where: { id: run.importedLapTimeSessionId, userId: ownerId },
       select: { id: true, parsedPayload: true },
     });
     if (detected) candidates.push(detected);

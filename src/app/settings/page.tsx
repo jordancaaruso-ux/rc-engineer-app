@@ -13,6 +13,7 @@ import {
 } from "@/lib/speedhive/speedhiveTransponder";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { AccountSection } from "@/components/settings/AccountSection";
+import { NotificationsSection } from "@/components/settings/NotificationsSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
 import { EngineerFeedbackAdminSection } from "@/components/settings/EngineerFeedbackAdminSection";
 import { EngineerGoldSetAdminSection } from "@/components/settings/EngineerGoldSetAdminSection";
@@ -62,6 +63,7 @@ export default async function SettingsPage() {
           }}
         />
         <SettingsNavSection />
+        <NotificationsSection />
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (
           <>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { NavHubSection } from "@/components/layout/navConfig";
 import { HubNavLink } from "@/components/layout/HubNavLink";
-import { cn } from "@/lib/utils";
+import { PillToggle } from "@/components/ui/PillToggle";
 
 /**
  * Assets hub with a Mine / Global scope toggle instead of two stacked sections.
@@ -51,32 +51,16 @@ export function AssetsHubClient({ sections }: { sections: NavHubSection[] }) {
 
   return (
     <>
-      <div
+      <PillToggle
         role="tablist"
-        aria-label="Asset scope"
-        className="flex items-center gap-0.5 rounded-full border border-border bg-background/45 p-0.5"
-      >
-        {sections.map((section, i) => {
-          const on = i === active;
-          return (
-            <button
-              key={section.eyebrow}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              onClick={() => select(i)}
-              className={cn(
-                "flex-1 rounded-full px-3 py-1.5 text-[12px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-                on
-                  ? "bg-muted text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {scopeLabel(section.eyebrow)}
-            </button>
-          );
-        })}
-      </div>
+        ariaLabel="Asset scope"
+        options={sections.map((section, i) => ({
+          value: String(i),
+          label: scopeLabel(section.eyebrow),
+        }))}
+        value={String(active)}
+        onChange={(next) => select(Number(next))}
+      />
 
       <ul className="flex flex-col gap-2.5">
         {current.links.map((link) => (

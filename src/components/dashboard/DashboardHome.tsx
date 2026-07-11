@@ -73,8 +73,8 @@ export function DashboardHome({
           <p className="page-greeting">
             {greetingName ? `${daypart}, ${greetingName}` : daypart}
           </p>
+          {dateChip ? <span className="page-header-chip">{dateChip}</span> : null}
         </div>
-        {dateChip ? <span className="page-header-chip">{dateChip}</span> : null}
       </header>
 
       <section className="page-body max-w-3xl">

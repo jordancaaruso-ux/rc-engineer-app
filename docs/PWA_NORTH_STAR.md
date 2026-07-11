@@ -26,9 +26,17 @@ store path later. Both reuse the same Next.js app.
 
 Already present before this pass: `viewportFit: "cover"`, `themeColor: "#121110"`, `env(safe-area-inset-*)` handling.
 
+### Shipped 2026-07-11 (batch 2) — brand + push plumbing
+- [x] **Icon + brand art** — on-brand yellow/white JRC marks; generated app icons/favicon/apple-touch; `JrcMark` on login/sidebar/mobile/splash (closes Visual North Star Known Gap #2).
+- [x] **Service worker** (`public/sw.js`) — web push + `notificationclick` + minimal offline shell (static assets + `offline.html`; no page/API caching → no stale-data bugs). Registered **prod-only** (`ServiceWorkerRegistrar`).
+- [x] **Web push plumbing (milestone: prove the stack)** — `web-push` + VAPID; client helpers (`lib/webPush/pushClient.ts`), server send (`lib/webPush/server.ts`), auth-gated `POST /api/push/test`, and a **Settings → Notifications** card (enable + send test). Sends to the caller's own live subscription — **no persistence yet**.
+
+**⚠️ Vercel env required for prod push:** set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (same as public), `VAPID_SUBJECT` (mailto:) — mirrored in local `.env.local`. Without these the enable/test buttons no-op.
+
 ### Still to do on the PWA track
-- [ ] **Icon + splash art** (§2) — the manifest/apple-touch links point at `public/icons/*`; drop the PNGs in.
-- [ ] **Service worker** — offline app shell + the transport for web push (§3). Deferred: it can subtly break caching, so it gets its own pass + `/verify`.
+- [ ] **`PushSubscription` Prisma model** + `/api/push/subscribe|unsubscribe` (persist devices) — required before any *real* trigger. Migration via committed SQL + `migrate deploy` (never `db push` on prod).
+- [ ] **Contextual permission ask** after first run log (Q: chosen UX) — reuse the Settings enable flow.
+- [ ] True per-device iOS `startupImage` splash PNGs (current splash is the CSS/JS overlay).
 - [ ] Optional: passive "Get the app" entry in `AccountMenu` for users who dismissed the popup.
 
 ---
@@ -92,6 +100,8 @@ Service worker (public/sw.js)         ← receives 'push' + 'notificationclick'
 
 **Goal:** the driver's transponder posts a result on a timing site → they get a push → one tap
 starts an Add-Run pre-filled with that result. Removes the "remember to log it" step entirely.
+
+**Feasibility finding (2026-07-11): much of the integration already exists.** Settings already stores per-user **LiveRC driver ID + name** and **Speedhive transponder numbers + name** (`getLiveRcDriverIdSetting`, `getSpeedhiveTransponderNumbersSetting`, `src/lib/speedhive/`), and the app already imports laps/results from both platforms. So the identity-link (design Q2) and result-fetch plumbing are largely built — the spike narrows to: *is there a cheap "did this driver get a NEW result since T" poll, and how fast does it appear.* (The dedicated research agent was cut off by a session limit; resume it, but start from the existing `src/lib/speedhive/` + LiveRC import code, not from scratch.)
 
 **Open design questions (resolve before building):**
 1. **Detection source.** LiveRC and Speedhive (MyLaps) are the two big ones. Is there a public
