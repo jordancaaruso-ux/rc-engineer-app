@@ -81,6 +81,33 @@ pack = {
 | **Tire diameter** (measured/worn) | Sheet / linked tire | Hub height — worn rubber (64→~60mm) moves RC |
 | **Track width** | Sheet | Contact patch placement |
 
+### Awesomatix field map (recovered from the calibration DB, 2026-07-11)
+
+The A800R/RR calibrations (`SetupSheetCalibration.calibrationDataJson.formFieldMappings`) already carry every key the mapping needs — identical keys across all three calibrations (A800RR-Old_V1.0, A800RR_New_V1.0, A800R Old_V1.1):
+
+| Engine input | Sheet field key(s) | Note |
+|---|---|---|
+| Under lower arm shims | `under_lower_arm_shims_ff` / `_fr` (front) · `_rf` / `_rr` (rear) | **Per-leg** (front/rear pin of each arm). Front-view RC uses the **mean of the two legs**; differential legging is side-view geometry (kick-up/anti) — out of scope here, but the data is already captured for the future side-view model. |
+| Upper inner shims | `upper_inner_shims_ff` / `_fr` · `_rf` / `_rr` | Same per-leg structure, same mean rule. |
+| Under hub shims | `under_hub_shims_front` / `_rear` | Per axle. Sign-inverted (see above). |
+| Upper outer shims | `upper_outer_shims_front` / `_rear` | Per axle. |
+| Chassis (datum shift) | `chassis` — single choice: `C01RS` / `C01B-RC` / `C01B-RAF` (+ `chassis_other` free text) | Thickness table below. |
+| Lower arm length | `lower_arm_extension_front` / `_rear` | Arm-length option parts → `lowerLen` adjustment. |
+| Track / wheel plane | `wheel_spacer_front` / `_rear` | Adds to wheel offset. |
+| Not RC inputs | `bump_steer_shims_front`, `toe_gain_shims_rear`, `diff_shims` | Steering/toe link heights (bump-steer model someday), diff internals — excluded. |
+
+### Chassis thickness table (founder, 2026-07-11)
+
+Mount heights are measured from the chassis **bottom**; parts bolt to its **top** — so a thickness change shifts every frame-relative z by Δthickness while ride height (ground → bottom) is set independently.
+
+| Chassis | Thickness | Datum shift vs pack base |
+|---|---|---|
+| Steel | 1.2 mm | **0 (pack base — the VSUSP project was measured on steel)** |
+| Alu | 2.0 mm | +0.8 mm on all frame mounts |
+| Carbon | 2.2 mm | +1.0 mm on all frame mounts |
+
+Sheet codes `C01RS` / `C01B-RC` / `C01B-RAF` map to steel / carbon / alu **(probable — founder to confirm the code↔material pairing at Phase 1)**.
+
 ### Missing data: compute with defaults, flag assumptions
 
 Blank shim = 0, tire = nominal, etc.; the geometry block shows a small "assumed: …" note listing exactly what was defaulted. RC always exists; deltas between two sheets with the same gaps stay valid. Never block, never silently guess.
@@ -169,9 +196,10 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 
 | Item | Owner |
 |---|---|
-| Exact sheet field keys for the four shim positions (F/R) | Jordan — last input for the Phase 1 mapping. ~~Step sizes~~ resolved 2026-07-11: stacks are free-typed mm, no steps |
-| Chassis-thickness + bulkhead-position option tables (which parts → which offsets) | Jordan (has data; capture at Phase 1) |
+| ~~Exact sheet field keys~~ | **Resolved 2026-07-11** — recovered from the calibration DB (table above). ~~Step sizes~~ resolved: free-typed mm, no steps |
+| Confirm chassis code↔material pairing (`C01RS`/`C01B-RC`/`C01B-RAF` → steel/carbon/alu) | Jordan — one glance at a sheet |
+| Bulkhead upper-inner position option table (which parts → which x/z offsets) | Jordan — "not sure for now" (2026-07-11); Phase 1 ships without it, flagged as an assumption when relevant |
 | CAD/drawing source for `cad-verified` upgrade | Jordan / Awesomatix contact |
 | Doc lock | Jordan |
 
-**Changelog:** 2026-07-11 initial draft from founder interviews (four rounds) + validated prototype · 2026-07-11 shim stacks ruled free-typed mm (no step enumeration).
+**Changelog:** 2026-07-11 initial draft from founder interviews (four rounds) + validated prototype · 2026-07-11 shim stacks ruled free-typed mm (no step enumeration); slider keeps 0.25 detents · 2026-07-11 Awesomatix field map recovered from calibration DB (per-leg inner shim keys; lower-arm extensions + wheel spacers added as inputs); chassis thickness table (steel 1.2 base / alu 2.0 / carbon 2.2).
