@@ -57,6 +57,19 @@
   --mobile-tab-bar-height: 4.75rem;
 
   /*
+   * Vertical anchor for the fixed mobile corner chrome (JRC pill + account
+   * avatar, both 34px tall) so their centres line up with the page title.
+   * Title centre = header padding-top (1.5rem) + half its line-box; the title is
+   * `clamp(22px,4vw,30px)` at line-height 1.15, so half-line = 0.575 × that.
+   * Pill top = title-centre − 17px (half the pill). Tracks the title across the
+   * whole < md range where the pills are visible. If `.page-title`'s font-size
+   * or line-height changes, update this. Shared by MobileBrandMark + AccountMenu.
+   */
+  --top-chrome-y: calc(
+    env(safe-area-inset-top, 0px) + 7px + 0.575 * clamp(22px, 4vw, 30px)
+  );
+
+  /*
    * Appearance knobs — referenced by the photo wash + glass surfaces below.
    * These are the shipped values.
    */

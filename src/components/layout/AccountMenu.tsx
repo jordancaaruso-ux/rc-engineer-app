@@ -62,7 +62,7 @@ export function AccountMenu() {
     <div
       ref={wrapRef}
       className="fixed right-4 z-40 md:hidden"
-      style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.6rem)" }}
+      style={{ top: "var(--top-chrome-y)" }}
     >
       <button
         type="button"
