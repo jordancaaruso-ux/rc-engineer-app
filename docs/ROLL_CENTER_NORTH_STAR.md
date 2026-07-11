@@ -106,7 +106,7 @@ Mount heights are measured from the chassis **bottom**; parts bolt to its **top*
 | Alu | 2.0 mm | +0.8 mm on all frame mounts |
 | Carbon | 2.2 mm | +1.0 mm on all frame mounts |
 
-Sheet codes `C01RS` / `C01B-RC` / `C01B-RAF` map to steel / carbon / alu **(probable — founder to confirm the code↔material pairing at Phase 1)**.
+Sheet codes confirmed (founder, 2026-07-11): `C01RS` = steel · `C01B-RC` = carbon · `C01B-RAF` = alu.
 
 ### Missing data: compute with defaults, flag assumptions
 
@@ -197,7 +197,7 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 | Item | Owner |
 |---|---|
 | ~~Exact sheet field keys~~ | **Resolved 2026-07-11** — recovered from the calibration DB (table above). ~~Step sizes~~ resolved: free-typed mm, no steps |
-| Confirm chassis code↔material pairing (`C01RS`/`C01B-RC`/`C01B-RAF` → steel/carbon/alu) | Jordan — one glance at a sheet |
+| ~~Confirm chassis code↔material pairing~~ | **Resolved 2026-07-11**: RS = steel, RC = carbon, RAF = alu |
 | Bulkhead upper-inner position option table (which parts → which x/z offsets) | Jordan — "not sure for now" (2026-07-11); Phase 1 ships without it, flagged as an assumption when relevant |
 | CAD/drawing source for `cad-verified` upgrade | Jordan / Awesomatix contact |
 | Doc lock | Jordan |

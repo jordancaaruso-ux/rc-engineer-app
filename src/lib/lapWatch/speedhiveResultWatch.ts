@@ -127,7 +127,8 @@ export async function checkSpeedhiveResultsForUser(
     fresh.length > 1
       ? `${fresh.length} new sessions with your transponder — tap to log them.`
       : `${newest.label || "Session"} — tap to log this run.`;
-  const url = `/runs/new?importSession=${encodeURIComponent(newest.sessionUrl)}`;
+  // Tap → import this session (on demand, never auto) → Add Run link-or-new flow.
+  const url = `/api/laps/import-and-log?session=${encodeURIComponent(newest.sessionUrl)}`;
 
   const res = await sendPushToUser(target.userId, {
     title,
