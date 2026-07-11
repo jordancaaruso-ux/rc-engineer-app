@@ -178,9 +178,9 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
     icon: "history",
   },
   {
-    href: "/videos/analysis/manual/new",
-    label: "Video analysis",
-    description: "Review onboard footage and lap timing.",
+    href: "/videos",
+    label: "Video",
+    description: "Analysis sessions, saved videos, and tools.",
     icon: "video",
   },
   {

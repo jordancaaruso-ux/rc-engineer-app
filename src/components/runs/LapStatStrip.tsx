@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Children, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,17 +11,48 @@ import { cn } from "@/lib/utils";
  * cell borders (see `StatWellCell`) with the inner grid offset −1px so the outer
  * cells' borders tuck under the frame — single interior hairlines that stay
  * correct even when the grid wraps.
+ *
+ * A partial last row would otherwise leave the interior hairlines half-drawn
+ * (the empty trailing slot has no cell, so the divider beside the last real cell
+ * and the line above the gap never render). We pad the last row with empty
+ * bordered filler cells so every row closes into a full rectangle. Because the
+ * column count changes at `sm`, the number of fillers differs per breakpoint —
+ * we emit both sets and toggle them with `sm:hidden` / `hidden sm:block` so
+ * exactly the right count shows at each width.
  */
+const COLS_CLASS: Record<number, string> = {
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+};
+const SM_COLS_CLASS: Record<number, string> = {
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-3",
+  4: "sm:grid-cols-4",
+};
+
+/** Fillers needed to complete the last row for a given column count. */
+function fillerCount(itemCount: number, cols: number): number {
+  return (cols - (itemCount % cols)) % cols;
+}
+
 export function StatWellGrid({
   children,
   className,
-  gridClassName = "grid-cols-3 sm:grid-cols-4",
+  cols = 3,
+  smCols = 4,
 }: {
   children: ReactNode;
   className?: string;
-  /** grid-template classes for the cells (`grid-cols-3`, …). */
-  gridClassName?: string;
+  /** Base-width column count (`grid-cols-{cols}`). */
+  cols?: number;
+  /** ≥`sm` column count (`sm:grid-cols-{smCols}`). */
+  smCols?: number;
 }) {
+  // toArray drops null / false children, so this is the true visible cell count.
+  const itemCount = Children.toArray(children).length;
+  const baseFill = fillerCount(itemCount, cols);
+  const smFill = fillerCount(itemCount, smCols);
   return (
     <div
       className={cn(
@@ -29,7 +60,23 @@ export function StatWellGrid({
         className
       )}
     >
-      <div className={cn("grid -ml-px -mt-px", gridClassName)}>{children}</div>
+      <div className={cn("grid -ml-px -mt-px", COLS_CLASS[cols], SM_COLS_CLASS[smCols])}>
+        {children}
+        {Array.from({ length: baseFill }).map((_, i) => (
+          <div
+            key={`bf-${i}`}
+            aria-hidden
+            className="border-l border-t border-border sm:hidden"
+          />
+        ))}
+        {Array.from({ length: smFill }).map((_, i) => (
+          <div
+            key={`sf-${i}`}
+            aria-hidden
+            className="hidden border-l border-t border-border sm:block"
+          />
+        ))}
+      </div>
     </div>
   );
 }

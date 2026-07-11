@@ -36,6 +36,12 @@ export function AnalysisVideoCard({ video }: { video: AnalysisVideoModel }) {
           aria-hidden
         />
       </Link>
+      <Link
+        href="/videos"
+        className="type-timestamp self-start text-muted-foreground no-underline hover:text-foreground"
+      >
+        All sessions &amp; saved videos →
+      </Link>
     </CardPanel>
   );
 }

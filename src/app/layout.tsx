@@ -14,6 +14,10 @@ import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider"
 
 import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLinkBridge";
 
+import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
+
+import { PwaSplashDismiss } from "@/components/pwa/PwaSplashDismiss";
+
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 
 import { bgPreviewBootstrapScript } from "@/lib/appThemePreview";
@@ -63,7 +67,27 @@ export const metadata: Metadata = {
 
   description:
 
-    "Track runs, setups, and engineering-style guidance for competitive RC touring car drivers."
+    "Track runs, setups, and engineering-style guidance for competitive RC touring car drivers.",
+
+  applicationName: "JRC Race Engineer",
+
+  /*
+   * iOS home-screen behaviour. `capable` renders full-screen (no Safari chrome);
+   * `black-translucent` lets the charcoal background flow under the status bar so
+   * an installed launch reads as a native app, not a web view.
+   */
+  appleWebApp: {
+
+    capable: true,
+
+    title: "JRC",
+
+    statusBarStyle: "black-translucent",
+
+  },
+
+  // Favicon + apple-touch-icon come from the `app/icon.png` + `app/apple-icon.png`
+  // file conventions (Next injects the tags). Manifest icons live in `manifest.ts`.
 
 };
 
@@ -131,11 +155,33 @@ export default function RootLayout({ children }: { children: ReactNode }): React
 
         </div>
 
+        {/*
+         * PWA launch splash — CSS-gated to installed (standalone) launches via
+         * `html[data-standalone]` (set pre-paint by the bootstrap script below), so it
+         * covers the cold-launch gap; `PwaSplashDismiss` fades it once the app is ready.
+         * Plain <img> (not next/image) so it paints without a client loader.
+         */}
+        <div id="pwa-splash" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/jrc-mark-yellow.svg" alt="" />
+        </div>
+
         <div className="app-root">
 
           <Script id="rc-bg-preview-bootstrap" strategy="beforeInteractive">
 
             {bgPreviewBootstrapScript()}
+
+          </Script>
+
+          {/*
+           * Mark the document when launched from the home screen (installed PWA) so
+           * native-feel CSS (no rubber-band, no tap-callout) applies only there and the
+           * in-browser experience is untouched. Runs pre-hydration to avoid a flash.
+           */}
+          <Script id="rc-pwa-standalone-bootstrap" strategy="beforeInteractive">
+
+            {`(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;if(s){document.documentElement.setAttribute('data-standalone','true');}}catch(e){}})();`}
 
           </Script>
 
@@ -154,6 +200,10 @@ export default function RootLayout({ children }: { children: ReactNode }): React
             <CapacitorDeepLinkBridge />
 
             <AppShell>{children}</AppShell>
+
+            <PwaInstallPrompt />
+
+            <PwaSplashDismiss />
 
           </AuthSessionProvider>
 

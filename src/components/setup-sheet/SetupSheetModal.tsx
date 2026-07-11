@@ -14,6 +14,8 @@ import {
 } from "@/lib/runPickerFormat";
 import { filterRunsForTeamSetupComparePicker } from "@/lib/setupCompare/teamSetupComparePicker";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SegmentedControl, type SegmentedOption } from "@/components/ui/SegmentedControl";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { Eyebrow } from "@/components/ui/panel";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
@@ -53,6 +55,39 @@ export type SetupSheetModalRun = {
   lapTimes?: unknown;
 };
 
+/** A standalone library setup sheet (upload or PetitRC download) pickable as a compare baseline. */
+export type SetupCompareDoc = {
+  id: string;
+  originalFilename: string;
+  sourceType?: string | null;
+  sourceSite?: string | null;
+  sourceUrl?: string | null;
+  createdAt: string | Date;
+  setupSheetTemplate?: string | null;
+  parsedDataJson: unknown;
+};
+
+/** Which pool the compare baseline is drawn from. */
+type CompareSource = "mine" | "teammates" | "setups";
+
+const COMPARE_SOURCE_META: Record<CompareSource, SegmentedOption<CompareSource>> = {
+  mine: { value: "mine", label: "Mine" },
+  teammates: { value: "teammates", label: "Teammates" },
+  setups: { value: "setups", label: "Setups" },
+};
+
+function formatSetupDocLine(doc: SetupCompareDoc): string {
+  const source = doc.sourceSite?.toLowerCase() === "petitrc" ? "PetitRC" : "Upload";
+  const name = doc.originalFilename?.replace(/\.(pdf|jpe?g|png|webp)$/i, "").trim() || "Setup sheet";
+  let when = "";
+  try {
+    when = new Date(doc.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    when = "";
+  }
+  return when ? `${source} · ${name} · ${when}` : `${source} · ${name}`;
+}
+
 export function SetupSheetModal({
   open,
   onClose,
@@ -72,9 +107,15 @@ export function SetupSheetModal({
   memberDisplayByUserId?: Record<string, string>;
 }) {
   const [compareOpen, setCompareOpen] = useState(false);
+  const [compareSource, setCompareSource] = useState<CompareSource>("mine");
   const [otherRunId, setOtherRunId] = useState("");
+  const [selectedDocId, setSelectedDocId] = useState("");
   const [comparePickerRuns, setComparePickerRuns] = useState<SetupSheetModalRun[]>([]);
   const [comparePickerLoading, setComparePickerLoading] = useState(false);
+  const [setupDocs, setSetupDocs] = useState<SetupCompareDoc[]>([]);
+  const [teammateRuns, setTeammateRuns] = useState<SetupSheetModalRun[]>([]);
+  const [teammateDisplay, setTeammateDisplay] = useState<Record<string, string>>({});
+  const [hasTeammates, setHasTeammates] = useState(false);
   const [numericAggregationByKey, setNumericAggregationByKey] = useState<Map<
     string,
     NumericAggregationCompareSlice
@@ -101,7 +142,13 @@ export function SetupSheetModal({
   useEffect(() => {
     if (!open) return;
     setCompareOpen(false);
+    setCompareSource("mine");
     setOtherRunId("");
+    setSelectedDocId("");
+    setSetupDocs([]);
+    setTeammateRuns([]);
+    setTeammateDisplay({});
+    setHasTeammates(false);
     setBaselineSetupData(null);
     setBaselineSetupLoading(false);
   }, [open, run?.id]);
@@ -239,6 +286,68 @@ export function SetupSheetModal({
     setComparePickerLoading(false);
   }, [open, run?.id, runListSource, viewerUserId, pickerRuns]);
 
+  // Standalone library setups (uploads + PetitRC downloads) on this car's setup
+  // sheet — a third compare source alongside my runs / teammate runs. Fetched
+  // once the compare panel opens so the picker doesn't pay for it on every view.
+  useEffect(() => {
+    if (!open || !compareOpen || !run?.id) return;
+    let alive = true;
+    void fetch(`/api/setup-documents/for-compare?runId=${encodeURIComponent(run.id)}`, {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as { documents?: SetupCompareDoc[] };
+        return Array.isArray(data.documents) ? data.documents : [];
+      })
+      .then((docs) => {
+        if (alive) setSetupDocs(docs);
+      })
+      .catch(() => {
+        if (alive) setSetupDocs([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, compareOpen, run?.id]);
+
+  // Teammate-visible runs on this setup sheet — a compare source in EITHER
+  // context (open my own setup, compare to a teammate). `hasTeammates` keeps the
+  // segment discoverable even before a teammate has logged this car.
+  useEffect(() => {
+    if (!open || !compareOpen || !run?.id) return;
+    let alive = true;
+    void fetch(`/api/runs/teammate-for-setup-compare?runId=${encodeURIComponent(run.id)}`, {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as {
+          runs?: SetupSheetModalRun[];
+          memberDisplayByUserId?: Record<string, string>;
+          hasTeammates?: boolean;
+        };
+        return {
+          runs: Array.isArray(data.runs) ? data.runs : [],
+          display: data.memberDisplayByUserId ?? {},
+          hasTeammates: Boolean(data.hasTeammates),
+        };
+      })
+      .then(({ runs, display, hasTeammates: ht }) => {
+        if (!alive) return;
+        setTeammateRuns(runs);
+        setTeammateDisplay(display);
+        setHasTeammates(ht);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setTeammateRuns([]);
+        setTeammateDisplay({});
+        setHasTeammates(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, compareOpen, run?.id]);
+
   const formatPickerLine = useMemo((): ((run: SetupSheetModalRun) => string) => {
     if (runListSource !== "team_runs" || !memberDisplayByUserId) {
       return (r) => formatRunPickerLine(r);
@@ -251,12 +360,67 @@ export function SetupSheetModal({
     () => runs.filter((r) => r.id !== run?.id),
     [runs, run?.id]
   );
+
+  // My runs come from the local pool (in team context the merged list also
+  // holds teammate rows, so filter to the viewer when we know who they are).
+  // Teammate runs are fetched separately so they're available in EITHER context.
+  const myRuns = useMemo(
+    () => (viewerUserId ? otherRuns.filter((r) => r.userId === viewerUserId) : otherRuns),
+    [otherRuns, viewerUserId]
+  );
+
+  // Only offer a source with something to pick — except Teammates, which stays
+  // visible whenever the viewer has any teammate (empty state explains the gap).
+  const availableSources = useMemo<CompareSource[]>(() => {
+    const out: CompareSource[] = [];
+    if (myRuns.length > 0) out.push("mine");
+    if (hasTeammates) out.push("teammates");
+    if (setupDocs.length > 0) out.push("setups");
+    return out;
+  }, [myRuns.length, hasTeammates, setupDocs.length]);
+
+  // Driver names for teammate rows (fetched map wins; falls back to any passed in).
+  const teammateFormatLine = useMemo(
+    () =>
+      (r: SetupSheetModalRun) =>
+        formatRunPickerLineWithDriver(r, { ...(memberDisplayByUserId ?? {}), ...teammateDisplay }),
+    [memberDisplayByUserId, teammateDisplay]
+  );
+
+  // Keep the active source valid as pools load in / change.
+  useEffect(() => {
+    if (availableSources.length === 0) return;
+    if (!availableSources.includes(compareSource)) {
+      setCompareSource(availableSources[0]!);
+      setOtherRunId("");
+      setSelectedDocId("");
+    }
+  }, [availableSources, compareSource]);
+
+  const sourceRuns = compareSource === "teammates" ? teammateRuns : myRuns;
+
   const baselineRun = useMemo(() => {
-    if (!compareOpen || !otherRunId) return null;
-    return runs.find((r) => r.id === otherRunId) ?? null;
-  }, [compareOpen, otherRunId, runs]);
+    if (!compareOpen || compareSource === "setups" || !otherRunId) return null;
+    // Teammate rows live in their own fetched pool, not the local run list.
+    return sourceRuns.find((r) => r.id === otherRunId) ?? null;
+  }, [compareOpen, compareSource, otherRunId, sourceRuns]);
+
+  const selectedDoc = useMemo(() => {
+    if (!compareOpen || compareSource !== "setups" || !selectedDocId) return null;
+    return setupDocs.find((d) => d.id === selectedDocId) ?? null;
+  }, [compareOpen, compareSource, selectedDocId, setupDocs]);
 
   useEffect(() => {
+    // Library setups carry parsed values inline — no snapshot fetch needed.
+    if (compareSource === "setups") {
+      if (!open || !compareOpen || !selectedDoc) {
+        setBaselineSetupData(null);
+      } else {
+        setBaselineSetupData(selectedDoc.parsedDataJson ?? {});
+      }
+      setBaselineSetupLoading(false);
+      return;
+    }
     if (!open || !compareOpen || !otherRunId || !baselineRun) {
       setBaselineSetupData(null);
       setBaselineSetupLoading(false);
@@ -285,21 +449,29 @@ export function SetupSheetModal({
     return () => {
       alive = false;
     };
-  }, [open, compareOpen, otherRunId, baselineRun]);
+  }, [open, compareOpen, compareSource, otherRunId, baselineRun, selectedDoc]);
 
   const runSetup = useMemo<SetupSnapshotData>(
     () => normalizeSetupData(loadedSetupData ?? run?.setupSnapshot?.data ?? {}),
     [loadedSetupData, run?.setupSnapshot?.data]
   );
 
+  const hasBaselineSelection = compareSource === "setups" ? Boolean(selectedDocId) : Boolean(otherRunId);
+
   const baselineValue = useMemo<SetupSnapshotData | null>(() => {
-    if (!compareOpen || !otherRunId || baselineSetupLoading || baselineSetupData === null) {
+    if (!compareOpen || !hasBaselineSelection || baselineSetupLoading || baselineSetupData === null) {
       return null;
     }
     return normalizeSetupData(baselineSetupData);
-  }, [compareOpen, otherRunId, baselineSetupLoading, baselineSetupData]);
+  }, [compareOpen, hasBaselineSelection, baselineSetupLoading, baselineSetupData]);
 
   const compareActive = baselineValue != null;
+
+  // Label for the "showing vs …" line, whichever source is active.
+  const baselineLabel = useMemo(() => {
+    if (compareSource === "setups") return selectedDoc ? formatSetupDocLine(selectedDoc) : null;
+    return baselineRun ? formatPickerLine(baselineRun) : null;
+  }, [compareSource, selectedDoc, baselineRun, formatPickerLine]);
 
   // "What changed this session" — diff vs the previous run on the same car,
   // mirroring the Sessions expanded-row preview. Same-car neighbours come from
@@ -387,7 +559,10 @@ export function SetupSheetModal({
                     type="button"
                     onClick={() => {
                       setCompareOpen((wasOpen) => {
-                        if (wasOpen) setOtherRunId("");
+                        if (wasOpen) {
+                          setOtherRunId("");
+                          setSelectedDocId("");
+                        }
                         return !wasOpen;
                       });
                     }}
@@ -415,29 +590,70 @@ export function SetupSheetModal({
                   <div className="space-y-2 pt-1">
                     {comparePickerLoading ? (
                       <span className="text-[11px] text-muted-foreground">Loading runs…</span>
-                    ) : otherRuns.length > 0 ? (
-                      <div className="min-w-0 w-full max-w-md">
-                        <RunPickerSelect
-                          label=""
-                          runs={otherRuns as RunPickerRun[]}
-                          value={otherRunId}
-                          onChange={setOtherRunId}
-                          placeholder="Select run…"
-                          formatLine={formatPickerLine as (run: RunPickerRun) => string}
-                        />
-                      </div>
-                    ) : (
+                    ) : availableSources.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        No other runs on this setup sheet yet. Log a run on your car with the same sheet model, or
-                        ask your teammate to share more sessions.
+                        No runs or saved setups on this setup sheet yet. Log a run on your car with the same
+                        sheet model, upload a setup sheet, or ask a teammate to share more sessions.
                       </p>
+                    ) : (
+                      <>
+                        {availableSources.length > 1 ? (
+                          <SegmentedControl<CompareSource>
+                            size="sm"
+                            ariaLabel="Compare against"
+                            className="max-w-md"
+                            value={compareSource}
+                            onChange={(next) => {
+                              setCompareSource(next);
+                              setOtherRunId("");
+                              setSelectedDocId("");
+                            }}
+                            options={availableSources.map((s) => COMPARE_SOURCE_META[s])}
+                          />
+                        ) : null}
+                        <div className="min-w-0 w-full max-w-md">
+                          {compareSource === "setups" ? (
+                            <SearchableSelect
+                              aria-label="Select a saved setup"
+                              placeholder="Select saved setup…"
+                              triggerMono
+                              clearable
+                              clearLabel="Select saved setup…"
+                              value={selectedDocId}
+                              onChange={setSelectedDocId}
+                              options={setupDocs.map((d) => ({
+                                value: d.id,
+                                label: formatSetupDocLine(d),
+                              }))}
+                            />
+                          ) : compareSource === "teammates" && sourceRuns.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              No teammate runs on this setup sheet yet. Ask a teammate to log or share a run
+                              on this car.
+                            </p>
+                          ) : (
+                            <RunPickerSelect
+                              label=""
+                              runs={sourceRuns as RunPickerRun[]}
+                              value={otherRunId}
+                              onChange={setOtherRunId}
+                              placeholder={compareSource === "teammates" ? "Select teammate run…" : "Select run…"}
+                              formatLine={
+                                (compareSource === "teammates"
+                                  ? teammateFormatLine
+                                  : formatPickerLine) as (run: RunPickerRun) => string
+                              }
+                            />
+                          )}
+                        </div>
+                      </>
                     )}
-                    {otherRunId && baselineSetupLoading ? (
+                    {hasBaselineSelection && baselineSetupLoading ? (
                       <p className="text-xs text-muted-foreground">Loading comparison setup…</p>
                     ) : null}
-                    {compareActive && baselineRun ? (
+                    {compareActive && baselineLabel ? (
                       <p className="text-[11px] text-muted-foreground">
-                        Showing this run&apos;s setup vs {formatPickerLine(baselineRun)}. Changed fields show{" "}
+                        Showing this run&apos;s setup vs {baselineLabel}. Changed fields show{" "}
                         <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
                         <span className="text-destructive/90">Darker red</span> = larger difference vs
                         community spread for that parameter; parameters without enough community samples use a

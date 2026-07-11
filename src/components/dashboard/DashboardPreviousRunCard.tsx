@@ -12,7 +12,7 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PagedCard } from "@/components/ui/PagedCard";
 import { RollingNumber } from "@/components/ui/motion";
-import { Eyebrow, PanelSubtitle, StatStrip, StatTile } from "@/components/ui/panel";
+import { Eyebrow, HubRowTitle, PanelSubtitle, StatStrip, StatTile } from "@/components/ui/panel";
 
 type RecentRun = NonNullable<DashboardHomeModel["recentRun"]>;
 
@@ -64,15 +64,16 @@ export function DashboardPreviousRunCard({
     );
   }
 
-  // Car model codes (A800RR, "Volante 28R V9X") read as machine identifiers, so
-  // the car name is the mono/instrument voice — quiet, not a big Sora headline —
-  // letting the yellow best-lap number below lead. Track / session / event / date
-  // fold into one muted meta line.
+  // The car name headlines in Sora (quiet HubRowTitle), matching the sibling
+  // last-meeting card's event title so the two dashboard cards read as a pair —
+  // the earlier mono treatment clashed against the Sora event name. The yellow
+  // best-lap number below still leads; track / session / event / date fold into
+  // one muted meta line.
   const header = (
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-      <h3 className="shrink-0 font-mono text-[15px] font-medium tracking-wide text-foreground">
+      <HubRowTitle as="h3" className="shrink-0">
         {recentRun.carName}
-      </h3>
+      </HubRowTitle>
       <span className="min-w-0 truncate text-[12px] leading-relaxed text-muted-foreground">
         {[
           recentRun.trackName ?? "No track",

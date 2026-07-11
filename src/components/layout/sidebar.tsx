@@ -1,6 +1,8 @@
 "use client";
 
 import { memo } from "react";
+import Link from "next/link";
+import { JrcMark } from "@/components/brand/JrcMark";
 import { DESKTOP_NAV } from "@/components/layout/navConfig";
 import { EngineerNavIcon } from "@/components/layout/EngineerNavIcon";
 import { PrimaryNavLink } from "@/components/layout/PrimaryNavLink";
@@ -14,6 +16,9 @@ export const Sidebar = memo(function Sidebar() {
 
   return (
     <aside className="sidebar hidden md:flex">
+      <Link href="/" aria-label="JRC Race Engineer — dashboard" className="sidebar-brand">
+        <JrcMark variant="white" className="h-5 opacity-90" />
+      </Link>
       <nav className="sidebar-nav">
         {DESKTOP_NAV.map((item) => {
           const active = activeId === item.id;

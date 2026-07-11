@@ -9,7 +9,6 @@ import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
-import { SessionsScopeSwitcher } from "@/components/runs/SessionsScopeSwitcher";
 import { buildRunHistoryGroups, type RunHistoryGroup } from "@/lib/runs/buildRunHistoryGroups";
 import {
   applyRunHistoryPostFiltersWithReasons,
@@ -600,10 +599,6 @@ export default async function RunHistoryPage({
         </div>
       </header>
       <section className="page-body min-w-0 max-w-full">
-        <SessionsScopeSwitcher
-          teams={teamsForUser.map((t) => ({ id: t.id, name: t.name }))}
-          activeTeamId={teamId}
-        />
         <Suspense fallback={<div className="h-20 rounded-lg border border-border bg-card animate-pulse" />}>
           <SessionsFilterBar
             cars={filterCars}
@@ -611,6 +606,7 @@ export default async function RunHistoryPage({
             events={filterEvents}
             tireTypes={filterTireTypes}
             setupFields={filterSetupFields}
+            teams={teamsForUser.map((t) => ({ id: t.id, name: t.name }))}
             teamId={teamId}
             focusRun={focusRunId}
             viewAll={viewAll}

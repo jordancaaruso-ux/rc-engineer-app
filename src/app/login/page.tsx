@@ -14,6 +14,8 @@ import { Suspense, useEffect, useState } from "react";
 
 import { Eyebrow } from "@/components/ui/panel";
 
+import { JrcMark } from "@/components/brand/JrcMark";
+
 import { primaryButtonClassName } from "@/components/ui/ButtonLink";
 
 
@@ -270,17 +272,13 @@ function LoginForm() {
 
       <div className="relative z-10 w-full max-w-[400px]">
 
-        {/* Brand lockup (type-based for now; logo asset rework is a separate step). */}
+        {/* Brand lockup — JRC mark (yellow, brand hero) + Race Engineer wordline. */}
 
         <div className="flex flex-col items-center text-center">
 
-          <span className="text-[44px] font-extrabold leading-none tracking-tight text-foreground">
+          <JrcMark variant="yellow" priority className="h-11" />
 
-            JRC
-
-          </span>
-
-          <span className="type-data-label mt-2.5 text-primary">Race Engineer</span>
+          <span className="type-data-label mt-3 text-primary">Race Engineer</span>
 
         </div>
 

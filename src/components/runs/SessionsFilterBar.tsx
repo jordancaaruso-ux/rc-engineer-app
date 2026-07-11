@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, Search, SlidersHorizontal, User, Users, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   DEFAULT_RUN_HISTORY_FILTERS,
@@ -11,7 +11,6 @@ import {
   type RunHistoryFilters,
 } from "@/lib/runs/runHistoryFilters";
 import { Button } from "@/components/ui/Button";
-import { primarySegmentLeadingClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 
 const FILTER_PANEL_SESSION_KEY = "runs-history-filters-open";
@@ -35,6 +34,8 @@ function writeFilterPanelSessionOpen(open: boolean) {
 
 type Option = { id: string; label: string };
 
+type TeamOption = { id: string; name: string };
+
 type SessionsFilterBarProps = {
   cars: Option[];
   tracks: Option[];
@@ -43,6 +44,8 @@ type SessionsFilterBarProps = {
   tireTypes: Option[];
   /** Setup parameter keys present across the loaded runs (id = setup key). */
   setupFields: Option[];
+  /** Teams the driver belongs to — drives the scope segment fused into the search bar. */
+  teams: TeamOption[];
   teamId: string | null;
   focusRun: string | null;
   viewAll: boolean;
@@ -126,12 +129,123 @@ function MultiSelect({
   );
 }
 
+/**
+ * Session scope — fused as the leading segment of the search bar (My sessions vs
+ * a team). Replaces the old free-floating pill row above search. A hairline
+ * divides it from the query field; the trigger opens a dropdown listing
+ * `My sessions` + each team, or a muted "set up a team" hint when the driver has
+ * none. Switching scope navigates to the bare route (dropping filters), matching
+ * the previous behavior — no filter/query is threaded across scopes.
+ */
+function ScopeSegment({
+  teams,
+  activeTeamId,
+}: {
+  teams: TeamOption[];
+  activeTeamId: string | null;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const hasTeams = teams.length > 0;
+  const scopeIsTeam = Boolean(activeTeamId);
+  const activeTeam = teams.find((t) => t.id === activeTeamId) ?? null;
+  const label = scopeIsTeam ? activeTeam?.name ?? "Team" : "My sessions";
+  const TriggerIcon = scopeIsTeam ? Users : User;
+
+  const go = (target: string) => {
+    setOpen(false);
+    router.push(target);
+  };
+
+  const itemClass = (active: boolean) =>
+    `flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition hover:bg-muted/50 ${
+      active ? "text-foreground" : "text-muted-foreground"
+    }`;
+
+  return (
+    <div className="relative flex">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Session scope: ${label}`}
+        className="tap-active flex shrink-0 items-center gap-1.5 self-stretch rounded-l-lg border-r border-border py-1.5 pl-3 pr-2.5 text-xs font-semibold text-foreground transition hover:bg-muted/50"
+      >
+        <TriggerIcon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden />
+        <span className="max-w-[7.5rem] truncate">{label}</span>
+        <ChevronDown
+          className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          strokeWidth={2.2}
+          aria-hidden
+        />
+      </button>
+      {open ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-10 cursor-default"
+            aria-label="Close scope menu"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="menu"
+            className="absolute left-0 top-full z-20 mt-1 min-w-[13rem] rounded-md border border-border bg-card p-1.5 shadow-lg"
+          >
+            <p className="px-2 pb-1 pt-0.5 ui-label-meta">View</p>
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={!scopeIsTeam}
+              className={itemClass(!scopeIsTeam)}
+              onClick={() => go("/runs/history")}
+            >
+              <User className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden />
+              <span className="min-w-0 truncate">My sessions</span>
+              {!scopeIsTeam ? <Check className="ml-auto size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden /> : null}
+            </button>
+            {hasTeams ? (
+              teams.map((t) => {
+                const active = t.id === activeTeamId;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={active}
+                    className={itemClass(active)}
+                    onClick={() => go(`/runs/history?teamId=${encodeURIComponent(t.id)}`)}
+                  >
+                    <Users className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.9} aria-hidden />
+                    <span className="min-w-0 truncate">{t.name}</span>
+                    {active ? <Check className="ml-auto size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden /> : null}
+                  </button>
+                );
+              })
+            ) : (
+              <>
+                <div className="my-1 h-px bg-border" />
+                <p className="px-2 py-1 ui-caption">See teammates’ runs once you’re on a team.</p>
+                <button type="button" className={itemClass(false)} onClick={() => go("/teams")}>
+                  <Users className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.9} aria-hidden />
+                  <span className="min-w-0 truncate">Set up a team</span>
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function SessionsFilterBar({
   cars,
   tracks,
   events,
   tireTypes,
   setupFields,
+  teams,
   teamId,
   focusRun,
   viewAll,
@@ -378,16 +492,20 @@ export function SessionsFilterBar({
   }
 
   return (
-    <div className="w-full min-w-0 space-y-2">
+    // `relative z-30` lifts the whole bar's stacking context above the session
+    // list below it, so the scope/filter dropdowns (opaque menus) aren't
+    // occluded by the later-sibling glass session cards painting over them.
+    <div className="relative z-30 w-full min-w-0 space-y-2">
       <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
         <div className="action-item-add-composite flex min-w-0 flex-1 items-stretch rounded-lg border border-border bg-card">
-          <div className={primarySegmentLeadingClassName()} aria-hidden>
+          <ScopeSegment teams={teams} activeTeamId={teamId} />
+          <span className="flex shrink-0 items-center justify-center pl-2.5 pr-1 text-muted-foreground" aria-hidden>
             {isPending ? (
               <Loader2 className="size-4 animate-spin" strokeWidth={2.5} />
             ) : (
               <Search className="size-4" strokeWidth={2.5} />
             )}
-          </div>
+          </span>
           <label htmlFor="sessions-search" className="sr-only">
             Search sessions
           </label>

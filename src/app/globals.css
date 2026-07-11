@@ -230,6 +230,66 @@ body {
 }
 
 /*
+ * PWA native-feel — applies ONLY when launched from the iOS/Android home screen
+ * (installed standalone; attribute set by the bootstrap script in layout.tsx).
+ * The in-browser experience is deliberately left untouched. These strip the
+ * remaining "it's a webpage" tells: whole-document rubber-band overscroll, the
+ * grey tap flash, and the long-press callout/selection on chrome. Real content
+ * (inputs, prose, tables, chat) keeps selection so lap times / setup values stay
+ * copyable.
+ */
+html[data-standalone="true"],
+html[data-standalone="true"] body {
+  overscroll-behavior-y: none;
+}
+
+html[data-standalone="true"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-standalone="true"] button,
+html[data-standalone="true"] a,
+html[data-standalone="true"] nav,
+html[data-standalone="true"] label,
+html[data-standalone="true"] [role="button"],
+html[data-standalone="true"] .no-select {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/*
+ * PWA launch splash — hidden by default; shown only on installed (standalone)
+ * launches. Because `data-standalone` is set pre-paint, this covers the cold-launch
+ * gap with the yellow mark on charcoal. `PwaSplashDismiss` fades then removes it.
+ */
+#pwa-splash {
+  display: none;
+}
+html[data-standalone="true"] #pwa-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #121110;
+  transition: opacity 500ms ease;
+}
+html[data-standalone="true"] #pwa-splash img {
+  width: 40vw;
+  max-width: 220px;
+  height: auto;
+}
+html.pwa-ready[data-standalone="true"] #pwa-splash {
+  opacity: 0;
+  pointer-events: none;
+}
+html.pwa-splash-done[data-standalone="true"] #pwa-splash {
+  display: none;
+}
+
+/*
  * Elevated panel surface — the shared "lift" that makes cards siblings of the
  * dashboard hero instead of flat near-black rectangles. Warm top sheen + a
  * gradient that lifts the top edge + a soft drop shadow so panels read off the
@@ -286,7 +346,19 @@ body {
    * so the first nav row lines up with the header band / horizontal rule to the right.
    */
   @apply w-64 flex-col gap-3 border-r border-border bg-secondary/80 px-4 pb-5 backdrop-blur-md;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 4rem);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+}
+
+/* Brand mark atop the desktop sidebar — white mark (chrome), reclaims the space
+   the old top padding held so the first nav row stays near the header hairline. */
+.sidebar-brand {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 1.5rem 0.25rem;
+  transition: opacity 150ms ease;
+}
+.sidebar-brand:hover {
+  opacity: 0.85;
 }
 
 .sidebar-nav {

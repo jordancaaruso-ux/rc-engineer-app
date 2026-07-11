@@ -47,6 +47,7 @@ import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
+import { LapComparePanel } from "@/components/videoAnalysis/LapComparePanel";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
 import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import {
@@ -1101,7 +1102,7 @@ function RunDetail({
             </Link>
           ) : null}
         </div>
-        <StatWellGrid gridClassName="grid-cols-2 sm:grid-cols-3">
+        <StatWellGrid cols={2} smCols={3}>
           <StatWellCell label="Date / time" value={dateTimeLabel} />
           {hasMeetingType ? <StatWellCell label="Session" value={meetingType} /> : null}
           <StatWellCell label="Car" value={carDisplay} valueClassName="whitespace-normal break-words" />
@@ -1128,6 +1129,12 @@ function RunDetail({
           }
         />
       </div>
+
+      <LapComparePanel
+        runId={run.id}
+        trackId={run.track?.id ?? null}
+        allowMutations={allowRunMutations}
+      />
 
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
         <Eyebrow>Setup vs previous run</Eyebrow>

@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Disc, Wrench } from "lucide-react";
+import { Wrench } from "lucide-react";
 import type { AnalysisTrendModel, AnalysisTrendRun } from "@/lib/analysis/analysisHomeModel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { PagedCard } from "@/components/ui/PagedCard";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
-import { formatTireIndicatorTitle } from "@/lib/runs/tireSetChange";
+import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import { cn } from "@/lib/utils";
 
 /**
@@ -34,20 +34,24 @@ const SERIES: Array<{ key: SeriesKey; name: string; color: string; width: number
   { key: "median", name: "Median", color: "#5C5A55", width: 1.75 },
 ];
 
-const CHART_HEIGHT = 234;
+const CHART_HEIGHT = 252;
 const PAD_LEFT = 38;
 const PAD_RIGHT = 14;
 const PAD_TOP = 14;
 /** Bottom band: setup-change wrench row + tire indicator row + x-axis run labels. */
-const PAD_BOTTOM = 60;
+const PAD_BOTTOM = 78;
 /** Bottom of the plotted area (top of the marker band). */
 const PLOT_BOTTOM = CHART_HEIGHT - PAD_BOTTOM;
-/** Top of the 11px setup-change wrench icons, directly below the plot (all faces). */
-const SETUP_ROW_TOP = PLOT_BOTTOM + 4;
-/** Top of the 12px tire icons, below the setup row (pace face only). */
+/** Edge length of the setup-change wrench — sized for a comfortable mobile tap. */
+const SETUP_ICON = 17;
+/** Square slot for the tire wheel marker (matches TireIndicatorIcon size="lg"). */
+const TIRE_SLOT = 28;
+/** Top of the setup-change wrench icons, directly below the plot (all faces). Tappable → opens the setup sheet. */
+const SETUP_ROW_TOP = PLOT_BOTTOM + 6;
+/** Top of the tire wheel slot, below the setup row (pace face only). */
 const TIRE_ROW_TOP = PLOT_BOTTOM + 22;
-/** Minimum px between runs before the tire row thins to changed-set runs only. */
-const TIRE_ROW_MIN_SPACING = 18;
+/** Minimum px between runs before the tire row thins to changed-set runs only (wheels would otherwise touch). */
+const TIRE_ROW_MIN_SPACING = 26;
 
 function seconds(value: number | null | undefined, digits = 3): string {
   return value == null ? "—" : value.toFixed(digits);
@@ -93,17 +97,23 @@ function buildPolylineSegments(points: Array<{ x: number; y: number } | null>): 
 }
 
 /**
- * The setup-change wrench row: a small wrench under every run whose chassis
- * setup differed from the previous run on that car (tires / battery / additive
- * excluded — see `computeSetupChangesByRunId`). Native `<title>` names the
- * changed fields on hover / long-press. Shared by all three faces.
+ * The setup-change wrench row: a wrench under every run whose chassis setup
+ * differed from the previous run on that car (tires / battery / additive
+ * excluded — see `computeSetupChangesByRunId`). Each wrench is its own tap
+ * target (transparent hit rect) — tapping opens that run's setup sheet, the
+ * same modal as the "View setup" button in Sessions. Native `<title>` names
+ * the changed fields on hover / long-press. Shared by all three faces.
  */
 function SetupChangeRow({
   carRuns,
   xAt,
+  onOpenSetup,
+  loadingRunId,
 }: {
   carRuns: AnalysisTrendRun[];
   xAt: (index: number) => number;
+  onOpenSetup: (runId: string) => void;
+  loadingRunId: string | null;
 }) {
   const marks = carRuns
     .map((run, index) => ({ run, index }))
@@ -111,12 +121,51 @@ function SetupChangeRow({
   if (marks.length === 0) return null;
   return (
     <>
-      {marks.map(({ run, index }) => (
-        <g key={`setup-${run.id}`} className="text-muted-foreground">
-          <title>{`Setup changed: ${run.setupChange!.changedFieldLabels.join(", ")}`}</title>
-          <Wrench x={xAt(index) - 5.5} y={SETUP_ROW_TOP} width={11} height={11} aria-hidden />
-        </g>
-      ))}
+      {marks.map(({ run, index }) => {
+        const x = xAt(index);
+        const changedLabels = run.setupChange!.changedFieldLabels.join(", ");
+        const loading = loadingRunId === run.id;
+        return (
+          <g
+            key={`setup-${run.id}`}
+            role="button"
+            tabIndex={0}
+            aria-label={`View setup for ${run.shortLabel} — changed: ${changedLabels}`}
+            className={cn(
+              "cursor-pointer transition-colors hover:text-foreground focus-visible:text-foreground",
+              loading ? "animate-pulse text-primary" : "text-muted-foreground"
+            )}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenSetup(run.id);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpenSetup(run.id);
+              }
+            }}
+          >
+            <title>{`View setup — changed: ${changedLabels}`}</title>
+            <rect
+              x={x - 14}
+              y={SETUP_ROW_TOP - 4}
+              width={28}
+              height={26}
+              rx={6}
+              fill="transparent"
+            />
+            <Wrench
+              x={x - SETUP_ICON / 2}
+              y={SETUP_ROW_TOP}
+              width={SETUP_ICON}
+              height={SETUP_ICON}
+              aria-hidden
+            />
+          </g>
+        );
+      })}
     </>
   );
 }
@@ -140,6 +189,34 @@ function useChartWidth(dep: unknown): [React.RefObject<HTMLDivElement | null>, n
 
 export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }) {
   const [selectedCarId, setSelectedCarId] = useState<string | null>(trend?.defaultCarId ?? null);
+  // Tapping a wrench opens the same setup sheet the "View setup" button opens in
+  // Sessions — but in-place here, no navigation. We fetch the run + compare
+  // picker on demand (same endpoint RecentRunsCard uses) and mount the modal.
+  const [setupModal, setSetupModal] = useState<{
+    run: SetupSheetModalRun;
+    pickerRuns: SetupSheetModalRun[];
+  } | null>(null);
+  const [setupLoadingRunId, setSetupLoadingRunId] = useState<string | null>(null);
+  const [setupError, setSetupError] = useState<string | null>(null);
+
+  const openSetupForRun = async (runId: string) => {
+    setSetupLoadingRunId(runId);
+    setSetupError(null);
+    try {
+      const res = await fetch(`/api/runs/for-setup-compare?runId=${encodeURIComponent(runId)}`, {
+        cache: "no-store",
+      });
+      const data = (await res.json().catch(() => ({}))) as { runs?: SetupSheetModalRun[] };
+      const pickerRuns = Array.isArray(data.runs) ? data.runs : [];
+      const anchor = pickerRuns.find((r) => r.id === runId);
+      if (!res.ok || !anchor) throw new Error("load failed");
+      setSetupModal({ run: anchor, pickerRuns });
+    } catch {
+      setSetupError("Couldn't load the setup for this run.");
+    } finally {
+      setSetupLoadingRunId(null);
+    }
+  };
 
   const carRuns = useMemo<AnalysisTrendRun[]>(
     () => (trend ? trend.runs.filter((run) => run.carId === selectedCarId) : []),
@@ -194,7 +271,14 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
           {
             id: "pace",
             label: "Pace",
-            content: <PaceTrendFace carRuns={carRuns} scopeLabel={trend.scopeLabel} />,
+            content: (
+              <PaceTrendFace
+                carRuns={carRuns}
+                scopeLabel={trend.scopeLabel}
+                onOpenSetup={openSetupForRun}
+                setupLoadingRunId={setupLoadingRunId}
+              />
+            ),
           },
           {
             id: "consistency",
@@ -208,6 +292,8 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                 color="#4FD089"
                 formatValue={(v) => `${v.toFixed(1)}%`}
                 emptyLabel="No consistency data for this car yet in this window."
+                onOpenSetup={openSetupForRun}
+                setupLoadingRunId={setupLoadingRunId}
               />
             ),
           },
@@ -224,11 +310,24 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                 formatValue={(v) => String(Math.round(v))}
                 tickMinStep={1}
                 emptyLabel="No mistake-eligible runs for this car yet in this window."
+                onOpenSetup={openSetupForRun}
+                setupLoadingRunId={setupLoadingRunId}
               />
             ),
           },
         ]}
       />
+
+      {setupError ? <p className="text-[11px] text-destructive">{setupError}</p> : null}
+
+      {setupModal ? (
+        <SetupSheetModal
+          open
+          onClose={() => setSetupModal(null)}
+          run={setupModal.run}
+          pickerRuns={setupModal.pickerRuns}
+        />
+      ) : null}
     </SurfaceCard>
   );
 }
@@ -237,9 +336,13 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
 function PaceTrendFace({
   carRuns,
   scopeLabel,
+  onOpenSetup,
+  setupLoadingRunId,
 }: {
   carRuns: AnalysisTrendRun[];
   scopeLabel: string;
+  onOpenSetup: (runId: string) => void;
+  setupLoadingRunId: string | null;
 }) {
   const router = useRouter();
   const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
@@ -454,29 +557,32 @@ function PaceTrendFace({
               return shown.map(({ run, index }) => {
                 const indicator = run.tireIndicator!;
                 const x = geometry.xAt(index);
+                // Render the real TireIndicatorIcon (disc + corner run-number
+                // badge) so the marker is identical to Sessions. It sits in a
+                // foreignObject; pointer-events off so a tap still opens the run.
                 return (
-                  <g
+                  <foreignObject
                     key={`tire-${run.id}`}
-                    className={indicator.changed ? "text-foreground" : "text-faint"}
+                    x={x - TIRE_SLOT / 2}
+                    y={TIRE_ROW_TOP}
+                    width={TIRE_SLOT}
+                    height={TIRE_SLOT}
+                    style={{ overflow: "visible", pointerEvents: "none" }}
                   >
-                    <title>{formatTireIndicatorTitle(indicator)}</title>
-                    <Disc x={x - 6} y={TIRE_ROW_TOP} width={12} height={12} aria-hidden />
-                    {indicator.runNumber != null ? (
-                      <text
-                        x={x}
-                        y={TIRE_ROW_TOP + 13}
-                        textAnchor="middle"
-                        className="fill-current font-mono text-[7px] tabular-nums"
-                      >
-                        {indicator.runNumber}
-                      </text>
-                    ) : null}
-                  </g>
+                    <div className="flex items-center justify-center">
+                      <TireIndicatorIcon indicator={indicator} size="lg" />
+                    </div>
+                  </foreignObject>
                 );
               });
             })()}
 
-            <SetupChangeRow carRuns={carRuns} xAt={geometry.xAt} />
+            <SetupChangeRow
+              carRuns={carRuns}
+              xAt={geometry.xAt}
+              onOpenSetup={onOpenSetup}
+              loadingRunId={setupLoadingRunId}
+            />
 
             {hoverIndex != null ? (
               <line
@@ -588,6 +694,8 @@ function SingleMetricTrendFace({
   formatValue,
   emptyLabel,
   tickMinStep = 0,
+  onOpenSetup,
+  setupLoadingRunId,
 }: {
   carRuns: AnalysisTrendRun[];
   metric: "consistencyScore" | "mistakeCount";
@@ -598,6 +706,8 @@ function SingleMetricTrendFace({
   emptyLabel: string;
   /** Floor for the y-tick increment — 1 for integer metrics so labels can't repeat. */
   tickMinStep?: number;
+  onOpenSetup: (runId: string) => void;
+  setupLoadingRunId: string | null;
 }) {
   const router = useRouter();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -758,7 +868,12 @@ function SingleMetricTrendFace({
               );
             })}
 
-            <SetupChangeRow carRuns={carRuns} xAt={geometry.xAt} />
+            <SetupChangeRow
+              carRuns={carRuns}
+              xAt={geometry.xAt}
+              onOpenSetup={onOpenSetup}
+              loadingRunId={setupLoadingRunId}
+            />
 
             {hoverIndex != null ? (
               <line

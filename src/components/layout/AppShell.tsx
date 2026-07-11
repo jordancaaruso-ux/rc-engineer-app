@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/layout/AccountMenu";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { LogRunFab } from "@/components/layout/LogRunFab";
+import { MobileBrandMark } from "@/components/layout/MobileBrandMark";
 import { isHiddenNavRoute } from "@/components/layout/navConfig";
 import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -46,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
          */}
         <BottomNav />
         <LogRunFab />
+        <MobileBrandMark />
         <AccountMenu />
       </PrimaryNavProvider>
     </TodayDraftRunProvider>
