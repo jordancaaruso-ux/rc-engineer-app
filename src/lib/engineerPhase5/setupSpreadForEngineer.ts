@@ -30,6 +30,7 @@ import {
   SETUP_GEOMETRY_DERIVED_KEYS_ORDERED,
   computeSetupGeometryDerivedMetrics,
   isSetupGeometryDerivedKey,
+  setupGeometryDerivedUnit,
 } from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
 import {
   computeGripSpreadContrast,
@@ -628,7 +629,7 @@ export async function buildSetupSpreadForEngineer(params: {
       : normalized[key];
     const currentDisplay =
       isSetupGeometryDerivedKey(key) && typeof cur === "number" && Number.isFinite(cur)
-        ? `${cur.toFixed(2)} mm`
+        ? `${cur.toFixed(2)} ${setupGeometryDerivedUnit(key)}`
         : formatSetupVal(cur);
 
     const comm = communityByKey.get(key);

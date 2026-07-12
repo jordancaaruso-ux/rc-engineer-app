@@ -101,12 +101,13 @@ export const PARAMETER_CLASSIFICATION_OVERRIDES: Record<string, ParameterClassif
   upper_outer_shims_front: "numeric",
   upper_outer_shims_rear: "numeric",
 
-  derived_upper_link_index_front_mm: "numeric",
-  derived_upper_link_index_rear_mm: "numeric",
-  derived_upper_link_stagger_mm: "numeric",
-  derived_lower_link_index_front_mm: "numeric",
-  derived_lower_link_index_rear_mm: "numeric",
-  derived_lower_link_stagger_mm: "numeric",
+  derived_roll_center_front_mm: "numeric",
+  derived_roll_center_rear_mm: "numeric",
+  derived_roll_axis_rake_mm: "numeric",
+  derived_lower_arm_angle_front_deg: "numeric",
+  derived_lower_arm_angle_rear_deg: "numeric",
+  derived_upper_link_angle_front_deg: "numeric",
+  derived_upper_link_angle_rear_deg: "numeric",
 
   // --- Presence/indicator fields that parse as "1" but are really categorical ---
   abh_front: "categorical",

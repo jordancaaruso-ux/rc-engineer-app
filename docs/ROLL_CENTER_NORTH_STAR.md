@@ -1,6 +1,6 @@
 # Roll Center North Star
 
-**Status:** Draft for founder review — becomes **locked** once Jordan edits and approves. **Owner:** Jordan.
+**Status:** **Locked** (founder approved via outline review, 2026-07-11 — "build what you've said"). **Owner:** Jordan.
 
 The behavioral spec for **computed suspension geometry as a first-class setup signal** — geometric roll center, roll axis, and camber gain calculated automatically from every setup sheet, expressed honestly to the driver, and fed to the Engineer as deterministic evidence. When a geometry feature feels off-scope or an accuracy claim feels optimistic, check here.
 
@@ -174,8 +174,8 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 | Phase | Scope | Gate | Status |
 |:--:|---|---|---|
 | **0** | Prototype engine + A800R pack + VSUSP cross-validation + this doc | Founder locks doc | 🟡 Engine validated 2026-07-11; doc awaiting founder lock |
-| **1** | **Engine + pack into the app** — port engine to `src/lib/rollCenter/` with the node tests, pack JSON schema on `SetupSheetModel`, VSUSP import, Awesomatix pack + field mapping (needs founder's shim step sizes + field keys) | Unit tests reproduce the VSUSP cross-check exactly | ⬜ |
-| **2** | **Passive surfaces** — setup sheet geometry block (grade tag, assumption notes, roll-axis strip), run detail line, compare delta chips | Founder reads a real sheet's geometry block and trusts it | ⬜ |
+| **1** | **Engine + pack into the app** — port engine to `src/lib/rollCenter/` with the node tests, pack JSON schema, VSUSP import, Awesomatix pack + field mapping | Unit tests reproduce the VSUSP cross-check exactly | ✅ 2026-07-11 — `src/lib/rollCenter/` (engine, vsusp, packs, computeFromSnapshot), 11 tests green (`npm run test:roll-center`), incl. VSUSP cross-check to ±0.02mm and a datum-robustness proof of the delta doctrine. **Deviation:** pack ships as a typed code registry (same JSON shape), not a DB column — avoids a prod-risk migration; the `SetupSheetModel` column + admin VSUSP import land with the second platform. Derived keys (`derived_roll_center_*_mm`, `derived_roll_axis_rake_mm`, `derived_*_angle_*_deg`) replaced the index proxies in `setupGeometryDerivedMetrics.ts` / `tuningComparisonKeys.ts` / `parameterClassificationOverrides.ts`; Engineer prompt paragraph rewritten (`openaiEngineer.ts` DERIVED COMPUTED GEOMETRY). **Post-ship:** run `POST /api/setup-aggregations/rebuild` so aggregations pick up the new keys. |
+| **2** | **Passive surfaces** — setup sheet geometry block (grade tag, assumption notes, roll-axis strip), run detail line, compare delta chips | Founder reads a real sheet's geometry block and trusts it | 🟡 2026-07-11 — `RollCenterGeometryBlock` renders at the top of every `SetupSheetView` (RC F/R, roll-axis strip + rake, arm angles, camber gain, grade tag, assumptions note); `RollCenterCompareStrip` in `RunComparePanel` (RC F/R + rake, this-run vs other, "deltas exact" tag). Compiled + typechecked, **not yet driven in-browser** — founder gate open. A dedicated compact line in the history table is deferred (the sheet modal already carries the block). |
 | **3** | **Roll Center Lab** — port the artifact to an Analysis tool page; "Open in Lab" deep links seed it from a sheet | Lab loads any Awesomatix sheet's state correctly | ⬜ |
 | **4** | **Engineer wiring** — compact geometry block in rich context; quantified geometric predictions in suggestions; grade-aware wording; **conditions-aware RC position evidence** (vs own history/team/community per the diagnostic-use row — community leg activates as Phase 5 density allows) | Bench: geometry-question cases cite computed values correctly; a low-RC-for-conditions bait case gets caught; no regression on the 30-case set | ⬜ |
 | **5** | **Community layer** — aggregation over stored RC values once a second platform pack exists | Second pack authored + density gate | ⬜ |
@@ -186,13 +186,20 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 
 ---
 
+## Future directions (saved for later — founder, 2026-07-11)
+
+Explicitly **not v1**, explicitly **wanted eventually**. Don't build these now; don't design v1 in a way that blocks them.
+
+| Direction | Founder ruling |
+|---|---|
+| **Full-car geometry model** — steering, bump steer, toe gain, everything | **"The true north star."** The per-leg shim keys, bump-steer / toe-gain fields, and steering fields are already captured on sheets — the data pipeline for this exists today. |
+| **Side-view geometry** (anti-dive / anti-squat, caster) | "Could be great." Same pack concept, side elevation; also the #1-ranked KB gap. The per-leg (ff/fr) shim data v1 averages away is exactly what this model needs. |
+| **Force-based / dynamic roll center** | "Isn't something currently used, but could be amazing." Needs tire models + CG data; a differentiator beyond what any RC pit tool does. |
+
 ## Non-goals
 
 | Not the goal | Why |
 |---|---|
-| Side-view geometry (anti-dive / anti-squat, caster) | Separate model; natural later extension of the same pack — and the #1 ranked KB gap, so it's a *future* candidate, not v1 scope. |
-| Force-based / dynamic roll center | Load-dependent migration needs tire models and CG data; geometric RC + kinematic roll sweep is the honest deliverable. |
-| CG height / roll-moment displays | Requires a CG estimate we don't have; rejected in interview. |
 | Suspensions beyond double wishbone | TC first, per the KB layering rule (nail touring car, design for later disciplines). |
 | Guided caliper measurement of assembled cars | Hybrid sourcing means packs come from stripped-car measurement / VSUSP / drawings; measuring a built car to 0.1mm isn't real. |
 
@@ -218,4 +225,4 @@ RC height is **car-independent physics** — −9mm front RC means the same thin
 | CAD/drawing source for `cad-verified` upgrade | Jordan / Awesomatix contact |
 | Doc lock | Jordan |
 
-**Changelog:** 2026-07-11 initial draft from founder interviews (four rounds) + validated prototype · 2026-07-11 shim stacks ruled free-typed mm (no step enumeration); slider keeps 0.25 detents · 2026-07-11 Awesomatix field map recovered from calibration DB (per-leg inner shim keys; lower-arm extensions + wheel spacers added as inputs); chassis thickness table (steel 1.2 base / alu 2.0 / carbon 2.2) · 2026-07-11 goal section + all-four success signals (founder-confirmed); "geometry never required reading" principle · 2026-07-11 true arm angles retire the link-index proxies; Phase 4 upgraded to conditions-aware RC position evidence (founder).
+**Changelog:** 2026-07-11 initial draft from founder interviews (four rounds) + validated prototype · 2026-07-11 shim stacks ruled free-typed mm (no step enumeration); slider keeps 0.25 detents · 2026-07-11 Awesomatix field map recovered from calibration DB (per-leg inner shim keys; lower-arm extensions + wheel spacers added as inputs); chassis thickness table (steel 1.2 base / alu 2.0 / carbon 2.2) · 2026-07-11 goal section + all-four success signals (founder-confirmed); "geometry never required reading" principle · 2026-07-11 true arm angles retire the link-index proxies; Phase 4 upgraded to conditions-aware RC position evidence (founder) · 2026-07-11 doc locked ("build what you've said"); future-directions section added (full-car geometry = true north star) · 2026-07-11 Phases 1–2 built: engine + tests + derived-key swap + sheet geometry block + compare strip (see rollout table).

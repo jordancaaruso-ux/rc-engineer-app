@@ -14,6 +14,7 @@ import {
 import { displayRunNotes } from "@/lib/runNotes";
 import { Eyebrow } from "@/components/ui/panel";
 import { formatRunTiresDetailLine } from "@/lib/runs/runTireContextDisplay";
+import { RollCenterCompareStrip } from "@/components/rollCenter/RollCenterGeometryBlock";
 
 export type CompareRunShape = {
   id: string;
@@ -257,6 +258,14 @@ export function RunComparePanel({
               rightLabel={rightLabel}
             />
           </div>
+
+          {baselineForDiff && (
+            <RollCenterCompareStrip
+              a={historicalSetup}
+              b={baselineForDiff}
+              rightLabel={rightLabel.toLowerCase()}
+            />
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <NoteBlock title="Notes · this run" text={displayRunNotes(baseRun)} />

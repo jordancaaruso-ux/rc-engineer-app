@@ -1,20 +1,30 @@
 /**
- * Shim-derived mm scalars for cross-setup comparison (not literal link ° in the data).
- * Upper index (per axle, two inners + one outer per end): upper outer shims − average(upper inner L/R on that axle).
- * Greater value ⇒ more angled upper link; smaller ⇒ flatter.
- * Lower index (per axle, two under-lowers + one hub per end): average(under-lower inner L/R) + under hub on that end.
- * Use lower indices for relativity between setups, not as absolute “height.”
- * Balance rows: front index − rear index (upper and lower) for front-vs-rear comparison.
+ * Geometry scalars derived from a setup snapshot for cross-setup comparison,
+ * Engineer spread rows, and aggregation buckets.
+ *
+ * Since 2026-07-11 these are REAL computed geometry (roll center heights, roll-axis
+ * rake, true arm angles) from the validated kinematics engine in `src/lib/rollCenter/`
+ * — replacing the old shim-difference "link index" proxies that only guessed at arm
+ * angle (see docs/ROLL_CENTER_NORTH_STAR.md, "Real arm angles retire the index proxies").
+ *
+ * Values exist only when a platform pack matches the snapshot (Awesomatix A800-family
+ * today, resolved by key fingerprint). Absolute values inherit the pack's verification
+ * grade; deltas between setups are datum-robust (tested).
+ *
+ * NOTE: aggregation rows are materialized — after this key change ships, rebuild via
+ * POST /api/setup-aggregations/rebuild so the new keys appear in community/car stats.
  */
 import type { SetupSnapshotValue } from "@/lib/runSetup";
+import { computeRollCenterFromSnapshot } from "@/lib/rollCenter/computeFromSnapshot";
 
 export const SETUP_GEOMETRY_DERIVED_KEYS_ORDERED = [
-  "derived_upper_link_index_front_mm",
-  "derived_upper_link_index_rear_mm",
-  "derived_upper_link_stagger_mm",
-  "derived_lower_link_index_front_mm",
-  "derived_lower_link_index_rear_mm",
-  "derived_lower_link_stagger_mm",
+  "derived_roll_center_front_mm",
+  "derived_roll_center_rear_mm",
+  "derived_roll_axis_rake_mm",
+  "derived_lower_arm_angle_front_deg",
+  "derived_lower_arm_angle_rear_deg",
+  "derived_upper_link_angle_front_deg",
+  "derived_upper_link_angle_rear_deg",
 ] as const;
 
 export type SetupGeometryDerivedKey = (typeof SETUP_GEOMETRY_DERIVED_KEYS_ORDERED)[number];
@@ -27,86 +37,57 @@ export function isSetupGeometryDerivedKey(key: string): key is SetupGeometryDeri
 
 /** Human labels for Engineer / prompts (keys stay machine ids). */
 export const SETUP_GEOMETRY_DERIVED_LABELS: Record<SetupGeometryDerivedKey, string> = {
-  derived_upper_link_index_front_mm: "Upper link index front (upper outer − avg upper inner; larger = more angled)",
-  derived_upper_link_index_rear_mm: "Upper link index rear (upper outer − avg upper inner; larger = more angled)",
-  derived_upper_link_stagger_mm: "Upper link balance (front index − rear index; + = front more angled vs rear)",
-  derived_lower_link_index_front_mm: "Lower link index front (avg under-lower inner + under hub F)",
-  derived_lower_link_index_rear_mm: "Lower link index rear (avg under-lower inner + under hub R)",
-  derived_lower_link_stagger_mm: "Lower arm balance (front index − rear index; front vs rear lower-line proxy)",
+  derived_roll_center_front_mm:
+    "Front roll center height (geometric, computed from measured platform geometry; + = above ground)",
+  derived_roll_center_rear_mm:
+    "Rear roll center height (geometric, computed from measured platform geometry; + = above ground)",
+  derived_roll_axis_rake_mm:
+    "Roll axis rake (rear RC − front RC; + = axis rakes down toward the front)",
+  derived_lower_arm_angle_front_deg:
+    "Front lower arm angle (true computed angle; + = outer end higher than inner)",
+  derived_lower_arm_angle_rear_deg:
+    "Rear lower arm angle (true computed angle; + = outer end higher than inner)",
+  derived_upper_link_angle_front_deg:
+    "Front upper link angle (true computed angle; + = outer end higher than inner)",
+  derived_upper_link_angle_rear_deg:
+    "Rear upper link angle (true computed angle; + = outer end higher than inner)",
 };
 
-function parseShimMm(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "boolean") return v ? 1 : 0;
-  const s = String(v ?? "").trim();
-  if (!s || s === "—" || s === "-") return null;
-  const cleaned = s.replace(/mm/gi, "").replace(",", ".").trim();
-  const n = Number.parseFloat(cleaned);
-  return Number.isFinite(n) ? n : null;
+/** Display unit for a derived key (mm vs °). */
+export function setupGeometryDerivedUnit(key: SetupGeometryDerivedKey): "mm" | "°" {
+  return key.endsWith("_deg") ? "°" : "mm";
 }
 
-function avg2(a: number | null, b: number | null): number | null {
-  if (a == null || b == null) return null;
-  return (a + b) / 2;
-}
+export type SetupGeometryDerivedMetrics = Record<SetupGeometryDerivedKey, number | null>;
 
-export type SetupGeometryDerivedMetrics = {
-  derived_upper_link_index_front_mm: number | null;
-  derived_upper_link_index_rear_mm: number | null;
-  derived_upper_link_stagger_mm: number | null;
-  derived_lower_link_index_front_mm: number | null;
-  derived_lower_link_index_rear_mm: number | null;
-  derived_lower_link_stagger_mm: number | null;
-};
+const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /**
- * Computes derived link indices from a normalized setup snapshot (plain object).
+ * Computes derived geometry from a normalized setup snapshot (plain object).
+ * All-null when no platform pack matches the snapshot.
  */
-export function computeSetupGeometryDerivedMetrics(data: Record<string, SetupSnapshotValue>): SetupGeometryDerivedMetrics {
-  const uiff = parseShimMm(data.upper_inner_shims_ff);
-  const uifr = parseShimMm(data.upper_inner_shims_fr);
-  const uirf = parseShimMm(data.upper_inner_shims_rf);
-  const uirr = parseShimMm(data.upper_inner_shims_rr);
-  const uof = parseShimMm(data.upper_outer_shims_front);
-  const uor = parseShimMm(data.upper_outer_shims_rear);
-
-  const ulff = parseShimMm(data.under_lower_arm_shims_ff);
-  const ulfr = parseShimMm(data.under_lower_arm_shims_fr);
-  const ulrf = parseShimMm(data.under_lower_arm_shims_rf);
-  const ulrr = parseShimMm(data.under_lower_arm_shims_rr);
-  const hubf = parseShimMm(data.under_hub_shims_front);
-  const hubr = parseShimMm(data.under_hub_shims_rear);
-
-  const upperFront = avg2(uiff, uifr);
-  const upperRear = avg2(uirf, uirr);
-  const lowerFront = avg2(ulff, ulfr);
-  const lowerRear = avg2(ulrf, ulrr);
-
-  const derived_upper_link_index_front_mm =
-    upperFront != null && uof != null ? uof - upperFront : null;
-  const derived_upper_link_index_rear_mm =
-    upperRear != null && uor != null ? uor - upperRear : null;
-  const derived_upper_link_stagger_mm =
-    derived_upper_link_index_front_mm != null && derived_upper_link_index_rear_mm != null
-      ? derived_upper_link_index_front_mm - derived_upper_link_index_rear_mm
-      : null;
-
-  const derived_lower_link_index_front_mm =
-    lowerFront != null && hubf != null ? lowerFront + hubf : null;
-  const derived_lower_link_index_rear_mm =
-    lowerRear != null && hubr != null ? lowerRear + hubr : null;
-  const derived_lower_link_stagger_mm =
-    derived_lower_link_index_front_mm != null && derived_lower_link_index_rear_mm != null
-      ? derived_lower_link_index_front_mm - derived_lower_link_index_rear_mm
-      : null;
-
+export function computeSetupGeometryDerivedMetrics(
+  data: Record<string, SetupSnapshotValue>
+): SetupGeometryDerivedMetrics {
+  const empty: SetupGeometryDerivedMetrics = {
+    derived_roll_center_front_mm: null,
+    derived_roll_center_rear_mm: null,
+    derived_roll_axis_rake_mm: null,
+    derived_lower_arm_angle_front_deg: null,
+    derived_lower_arm_angle_rear_deg: null,
+    derived_upper_link_angle_front_deg: null,
+    derived_upper_link_angle_rear_deg: null,
+  };
+  const computed = computeRollCenterFromSnapshot(data);
+  if (!computed) return empty;
   return {
-    derived_upper_link_index_front_mm,
-    derived_upper_link_index_rear_mm,
-    derived_upper_link_stagger_mm,
-    derived_lower_link_index_front_mm,
-    derived_lower_link_index_rear_mm,
-    derived_lower_link_stagger_mm,
+    derived_roll_center_front_mm: round2(computed.front.rcHeightMm),
+    derived_roll_center_rear_mm: round2(computed.rear.rcHeightMm),
+    derived_roll_axis_rake_mm: round2(computed.rakeMm),
+    derived_lower_arm_angle_front_deg: round2(computed.front.lowerArmAngleDeg),
+    derived_lower_arm_angle_rear_deg: round2(computed.rear.lowerArmAngleDeg),
+    derived_upper_link_angle_front_deg: round2(computed.front.upperLinkAngleDeg),
+    derived_upper_link_angle_rear_deg: round2(computed.rear.upperLinkAngleDeg),
   };
 }
 

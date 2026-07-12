@@ -21,6 +21,7 @@
     "db:migrate:resolve:action-item-prerun": "npx dotenv-cli -e .env.local -- prisma migrate resolve --applied 20260427120000_action_item_list_kind_and_suggested_prerun",
     "db:migrate:resolve:teams-pilot": "npx dotenv-cli -e .env.local -- prisma migrate resolve --applied 20260427183000_teams_pilot",
     "db:migrate:resolve:run-share-with-team": "npx dotenv-cli -e .env.local -- prisma migrate resolve --applied 20260428120000_run_share_with_team",
+    "test:roll-center": "npx tsx --test src/lib/rollCenter/rollCenter.test.ts",
     "test:weather": "npx tsx src/lib/weather/weather.test.ts",
     "test:condition-signature": "npx tsx src/lib/trackConditionSignature.test.ts",
     "test:grip-spread": "npx tsx src/lib/engineerPhase5/gripSpreadContrast.test.ts",

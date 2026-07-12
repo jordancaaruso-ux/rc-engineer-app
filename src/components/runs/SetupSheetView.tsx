@@ -14,6 +14,7 @@ import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericA
 import type { CompareColumnRole } from "@/lib/setupCompare/compareHighlight";
 import { getDifferenceColor } from "@/lib/setupCompare/differenceColor";
 import { Eyebrow } from "@/components/ui/panel";
+import { RollCenterGeometryBlock } from "@/components/rollCenter/RollCenterGeometryBlock";
 
 const SetupSheetStructured = dynamic(
   () => import("@/components/runs/SetupSheetStructured").then((m) => ({ default: m.SetupSheetStructured })),
@@ -274,6 +275,8 @@ export function SetupSheetView({
         <div className="text-[10px] font-medium text-muted-foreground tracking-widest">SETUP SHEET</div>
         <div className="text-xs font-medium mt-0.5">{template.label}</div>
       </div>
+
+      <RollCenterGeometryBlock value={value} baselineValue={baseline} className="mb-3" />
 
       {template.structuredSections?.length ? (
         <SetupSheetStructured
