@@ -51,7 +51,15 @@ type SectorLineApi = {
   lineKey: string;
   label: string;
   sortOrder: number;
+  /** Normalized frame coords (0..1) — drawn guides; absent on legacy lines. */
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
 };
+
+/** Editable copy of a sector line while the in-flow editor is open. */
+type DraftLine = { lineKey: string; label: string; x1: number; y1: number; x2: number; y2: number };
 
 type JobData = {
   job: {
@@ -117,6 +125,13 @@ export function AnalyzeFlowClient({
   const [markCursor, setMarkCursor] = useState(0);
   const [uploadState, setUploadState] = useState<"idle" | "busy" | "done" | "error">("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // In-flow sector line editor — null when closed. Lines are drawn as overlays
+  // on the (fixed-camera) video frame in normalized 0..1 coords.
+  const [draftLines, setDraftLines] = useState<DraftLine[] | null>(null);
+  const [savingLines, setSavingLines] = useState(false);
+  const [videoDims, setVideoDims] = useState<{ w: number; h: number } | null>(null);
+  const lineDragRef = useRef<{ idx: number; end: 1 | 2 } | null>(null);
+  const overlayElRef = useRef<HTMLDivElement | null>(null);
 
   /* ---------- load ---------- */
 
@@ -474,11 +489,13 @@ export function AnalyzeFlowClient({
       const laps = session.selectedLaps[role === "me" ? "me" : "competitor"];
       const driver = role === "me" ? meDriver : compDriver;
       if (!driver) continue;
+      // No SF targets: Mark is only reachable once anchored, and anchored
+      // sessions already know every SF crossing from transponder lap times
+      // (the compare adapter derives lap end as start + lapTime).
       for (const lapNumber of laps) {
         for (const line of nonSfLines) {
           targets.push({ role, lapNumber, lineKey: line.lineKey, label: line.label });
         }
-        targets.push({ role, lapNumber, lineKey: "sf", label: "SF end" });
       }
     }
     return targets;
@@ -532,14 +549,15 @@ export function AnalyzeFlowClient({
   );
 
   useEffect(() => {
-    if (step !== 4 || !markQueue.length) return;
-    // Start at the first unmarked target.
+    if (step !== 4 || !markQueue.length || draftLines) return;
+    // Start at the first unmarked target — also fires when lines are first
+    // saved from the in-flow editor and the queue materializes.
     const firstOpen = markQueue.findIndex((t) => markFor(t) == null);
     const idx = firstOpen === -1 ? 0 : firstOpen;
     setMarkCursor(idx);
     jumpToTarget(idx);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, [step, markQueue.length, draftLines == null]);
 
   function advanceCursor(from: number) {
     const nextIdx = from + 1;
@@ -577,6 +595,118 @@ export function AnalyzeFlowClient({
     });
     schedulePersist({ ...session, marks });
     advanceCursor(markCursor);
+  }
+
+  /* ---------- sector line editor ---------- */
+
+  function clamp01(n: number): number {
+    return Math.max(0, Math.min(1, n));
+  }
+
+  function openLineEditor() {
+    const existing = (data?.sectorLines ?? [])
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((l) => ({
+        lineKey: l.lineKey,
+        label: l.label,
+        x1: l.x1 ?? 0.3,
+        y1: l.y1 ?? 0.35,
+        x2: l.x2 ?? 0.7,
+        y2: l.y2 ?? 0.35,
+      }));
+    // sf always exists and stays first; ensure it if a profile somehow lacks it.
+    if (!existing.some((l) => l.lineKey === "sf")) {
+      existing.unshift({ lineKey: "sf", label: "Start / Finish", x1: 0.3, y1: 0.8, x2: 0.7, y2: 0.8 });
+    }
+    setDraftLines(existing);
+  }
+
+  function addDraftLine() {
+    setDraftLines((prev) => {
+      if (!prev) return prev;
+      const used = new Set(prev.map((l) => l.lineKey));
+      let n = 1;
+      while (used.has(`s${n}`)) n += 1;
+      const y = 0.2 + ((prev.length - 1) % 4) * 0.18;
+      return [...prev, { lineKey: `s${n}`, label: `S${n}`, x1: 0.35, y1: y, x2: 0.65, y2: y }];
+    });
+  }
+
+  function beginLineDrag(idx: number, end: 1 | 2) {
+    lineDragRef.current = { idx, end };
+  }
+
+  function endLineDrag() {
+    lineDragRef.current = null;
+  }
+
+  function dragLinePoint(clientX: number, clientY: number, idx: number, end: 1 | 2) {
+    const d = lineDragRef.current;
+    const rect = overlayElRef.current?.getBoundingClientRect();
+    if (!d || !rect || !rect.width || !rect.height || d.idx !== idx || d.end !== end) return;
+    const x = clamp01((clientX - rect.left) / rect.width);
+    const y = clamp01((clientY - rect.top) / rect.height);
+    setDraftLines(
+      (prev) =>
+        prev?.map((pl, i) =>
+          i === d.idx ? (d.end === 1 ? { ...pl, x1: x, y1: y } : { ...pl, x2: x, y2: y }) : pl
+        ) ?? prev
+    );
+  }
+
+  function moveDraftLine(idx: number, dir: -1 | 1) {
+    setDraftLines((prev) => {
+      if (!prev) return prev;
+      const to = idx + dir;
+      // sf is pinned at 0 — corner lines reorder among themselves.
+      if (prev[idx]?.lineKey === "sf" || to < 1 || to >= prev.length) return prev;
+      const next = prev.slice();
+      [next[idx], next[to]] = [next[to]!, next[idx]!];
+      return next;
+    });
+  }
+
+  async function saveSectorLines() {
+    if (!draftLines || !data) return;
+    setSavingLines(true);
+    try {
+      const res = await fetch(
+        `/api/video-analysis/profiles/${encodeURIComponent(data.job.profile.id)}/sectors`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lines: draftLines.map((l, i) => ({ ...l, label: l.label.trim() || l.lineKey.toUpperCase(), sortOrder: i })),
+          }),
+        }
+      );
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        sectorLines?: Array<SectorLineApi>;
+      };
+      if (!res.ok || !payload.sectorLines) throw new Error(payload.error || `Save failed (${res.status})`);
+      const lines = payload.sectorLines.map((l) => ({
+        lineKey: l.lineKey,
+        label: l.label,
+        sortOrder: l.sortOrder,
+        x1: l.x1,
+        y1: l.y1,
+        x2: l.x2,
+        y2: l.y2,
+      }));
+      setData((d) => (d ? { ...d, sectorLines: lines } : d));
+      setDraftLines(null);
+      setMsg(
+        lines.length > 1
+          ? "Sector lines saved to this track's camera — mark each crossing now."
+          : "Saved. Add at least one corner line to unlock sector deltas."
+      );
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Saving sector lines failed.");
+    } finally {
+      setSavingLines(false);
+    }
   }
 
   /* ---------- done ---------- */
@@ -647,6 +777,106 @@ export function AnalyzeFlowClient({
 
   const backHref = data.job.runId ? "/runs/history" : "/videos";
 
+  // The video sits object-contain in a 16:9 box — the overlay must cover the
+  // painted frame (line coords are normalized to it), not the letterbox.
+  const contentRect = (() => {
+    if (!videoDims || !videoDims.w || !videoDims.h) {
+      return { left: "0%", top: "0%", width: "100%", height: "100%" };
+    }
+    const va = videoDims.w / videoDims.h;
+    const ca = 16 / 9;
+    if (va >= ca) {
+      const h = (ca / va) * 100;
+      return { left: "0%", top: `${(100 - h) / 2}%`, width: "100%", height: `${h}%` };
+    }
+    const w = (va / ca) * 100;
+    return { left: `${(100 - w) / 2}%`, top: "0%", width: `${w}%`, height: "100%" };
+  })();
+
+  // Static guide lines: SF while syncing, the current target while marking.
+  const staticGuides: DraftLine[] = (() => {
+    if (draftLines) return [];
+    const withGeom = (l?: SectorLineApi): DraftLine | null =>
+      l && l.x1 != null && l.y1 != null && l.x2 != null && l.y2 != null
+        ? { lineKey: l.lineKey, label: l.label, x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 }
+        : null;
+    if (step === 3) {
+      const sf = withGeom(data.sectorLines.find((l) => l.lineKey === "sf"));
+      return sf ? [sf] : [];
+    }
+    if (step === 4) {
+      const target = markQueue[markCursor];
+      const line = withGeom(data.sectorLines.find((l) => l.lineKey === target?.lineKey));
+      return line ? [line] : [];
+    }
+    return [];
+  })();
+
+  const overlayLines = draftLines ?? staticGuides;
+
+  const lineOverlay = overlayLines.length ? (
+    <div
+      ref={overlayElRef}
+      className={cn("absolute", draftLines ? "touch-none" : "pointer-events-none")}
+      style={contentRect}
+    >
+      <svg
+        viewBox="0 0 1000 1000"
+        preserveAspectRatio="none"
+        className="absolute inset-0 h-full w-full"
+      >
+        {overlayLines.map((l) => (
+          <line
+            key={l.lineKey}
+            x1={l.x1 * 1000}
+            y1={l.y1 * 1000}
+            x2={l.x2 * 1000}
+            y2={l.y2 * 1000}
+            stroke={l.lineKey === "sf" ? "#ECE9E4" : "#FFD60A"}
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+            strokeDasharray={l.lineKey === "sf" ? "6 4" : undefined}
+          />
+        ))}
+      </svg>
+      {overlayLines.map((l) => (
+        <span
+          key={`lbl-${l.lineKey}`}
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-[150%] rounded bg-background/70 px-1 py-px font-mono text-[9px] text-foreground backdrop-blur-sm"
+          style={{ left: `${((l.x1 + l.x2) / 2) * 100}%`, top: `${((l.y1 + l.y2) / 2) * 100}%` }}
+        >
+          {l.label}
+        </span>
+      ))}
+      {/* eslint-disable-next-line react-hooks/refs -- drag refs are read only inside pointer handlers, never during render */}
+      {draftLines?.map((l, idx) =>
+        ([1, 2] as const).map((end) => (
+          <button
+            key={`${l.lineKey}-${end}`}
+            type="button"
+            aria-label={`Move ${l.label} endpoint ${end}`}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              beginLineDrag(idx, end);
+            }}
+            onPointerMove={(e) => dragLinePoint(e.clientX, e.clientY, idx, end)}
+            onPointerUp={() => endLineDrag()}
+            onPointerCancel={() => endLineDrag()}
+            className={cn(
+              "absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-background/70",
+              l.lineKey === "sf" ? "border-foreground/60" : "border-primary"
+            )}
+            style={{
+              left: `${(end === 1 ? l.x1 : l.x2) * 100}%`,
+              top: `${(end === 1 ? l.y1 : l.y2) * 100}%`,
+            }}
+          />
+        ))
+      )}
+    </div>
+  ) : null;
+
   const transport = (
     <div className="space-y-2.5">
       <div className="relative overflow-hidden rounded-xl border border-border bg-black">
@@ -659,6 +889,7 @@ export function AnalyzeFlowClient({
           className="aspect-video w-full object-contain"
           onLoadedMetadata={(e) => {
             setDuration(e.currentTarget.duration || 0);
+            setVideoDims({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight });
             if (coarseElRef.current) {
               coarseElRef.current.max = String(Math.max(e.currentTarget.duration || 0, 0.01));
             }
@@ -686,6 +917,7 @@ export function AnalyzeFlowClient({
         >
           {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
         </button>
+        {lineOverlay}
       </div>
       <input
         ref={coarseElRef}
@@ -988,14 +1220,145 @@ export function AnalyzeFlowClient({
       ) : null}
 
       {/* ---------- STEP 4: mark ---------- */}
-      {step === 4 && session ? (
+      {step === 4 && session && draftLines ? (
         <div className="space-y-3">
           <div>
-            <h2 className="text-[16px] font-bold tracking-tight">Mark sector crossings</h2>
+            <h2 className="text-[16px] font-bold tracking-tight">Draw sector lines</h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              This unlocks corner-by-corner deltas. The video jumps near each crossing — fine-tune
-              and confirm.
+              Scrub to a clear frame, then drag each line&apos;s ends onto the track where you want
+              a split. Add corners in the order the car meets them after start/finish. Saved to{" "}
+              {data.job.track.name}&apos;s camera — every future video reuses them.
             </p>
+          </div>
+          {transport}
+          <div className="space-y-1.5">
+            {draftLines.map((l, idx) => (
+              <div key={l.lineKey} className="flex items-center gap-1.5">
+                <span className="w-7 shrink-0 text-center font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
+                  {l.lineKey === "sf" ? "SF" : idx}
+                </span>
+                <input
+                  value={l.label}
+                  disabled={l.lineKey === "sf"}
+                  onChange={(e) =>
+                    setDraftLines(
+                      (prev) =>
+                        prev?.map((pl, i) => (i === idx ? { ...pl, label: e.target.value } : pl)) ??
+                        prev
+                    )
+                  }
+                  className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-secondary px-2.5 text-[12.5px] text-foreground disabled:opacity-60"
+                  aria-label={`Line ${idx} name`}
+                />
+                {l.lineKey === "sf" ? (
+                  <span className="shrink-0 pr-1 font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
+                    synced
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => moveDraftLine(idx, -1)}
+                      aria-label={`Move ${l.label} earlier`}
+                      className="h-9 w-9 shrink-0 rounded-lg border border-border bg-secondary text-[13px] text-muted-foreground"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveDraftLine(idx, 1)}
+                      aria-label={`Move ${l.label} later`}
+                      className="h-9 w-9 shrink-0 rounded-lg border border-border bg-secondary text-[13px] text-muted-foreground"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDraftLines((prev) => prev?.filter((_, i) => i !== idx) ?? prev)
+                      }
+                      aria-label={`Delete ${l.label}`}
+                      className="h-9 w-9 shrink-0 rounded-lg border border-border bg-secondary text-[13px] text-destructive"
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addDraftLine}
+            className="w-full rounded-xl border-[1.5px] border-dashed border-foreground/20 bg-secondary py-2.5 text-[12.5px] font-semibold text-foreground"
+          >
+            + Add sector line
+          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={savingLines}
+              onClick={() => setDraftLines(null)}
+              className="rounded-xl border border-border bg-secondary px-4 py-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingLines}
+              onClick={() => void saveSectorLines()}
+              className="flex-1 rounded-xl bg-primary py-3 text-[13px] font-bold text-primary-foreground disabled:opacity-60"
+            >
+              {savingLines ? "Saving…" : "Save lines"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {step === 4 && session && !draftLines && nonSfLines.length === 0 ? (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-[16px] font-bold tracking-tight">No sector lines here yet</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              Start/finish is already synced from timing — nothing to re-mark. To get
+              corner-by-corner deltas, draw the crossings once for {data.job.track.name}; they
+              stick to the track for every future video.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openLineEditor}
+            className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
+          >
+            Draw sector lines
+          </button>
+          <button
+            type="button"
+            onClick={() => setStep(5)}
+            className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
+          >
+            Skip — whole-lap compare only
+          </button>
+        </div>
+      ) : null}
+
+      {step === 4 && session && !draftLines && nonSfLines.length > 0 ? (
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-[16px] font-bold tracking-tight">Mark sector crossings</h2>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                Start/finish is already synced. The video jumps near each corner crossing —
+                fine-tune and confirm.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openLineEditor}
+              className="shrink-0 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground"
+            >
+              Edit lines
+            </button>
           </div>
           {markQueue[markCursor] ? (
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary">
@@ -1032,14 +1395,13 @@ export function AnalyzeFlowClient({
                       {l.label}
                     </th>
                   ))}
-                  <th className="table-col-header pb-1 text-center">SF</th>
                 </tr>
               </thead>
               <tbody>
                 {Array.from(new Set(markQueue.map((t) => `${t.role}:${t.lapNumber}`))).map((key) => {
                   const [role, lapStr] = key.split(":") as [DriverRole, string];
                   const lapNumber = Number(lapStr);
-                  const cells = [...nonSfLines.map((l) => l.lineKey), "sf"];
+                  const cells = nonSfLines.map((l) => l.lineKey);
                   return (
                     <tr key={key}>
                       <td className="py-1 pr-2 font-mono text-[10.5px] text-muted-foreground">

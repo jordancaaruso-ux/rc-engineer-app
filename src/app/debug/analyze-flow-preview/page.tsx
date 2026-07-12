@@ -12,10 +12,12 @@ import { AnalyzeFlowClient } from "@/components/videoAnalysis/AnalyzeFlowClient"
 
 const SAMPLE_VIDEO = "/dev-lap-compare-sample.mp4";
 
-const SECTOR_LINES = [
-  { lineKey: "sf", label: "SF", sortOrder: 0, x1: 0, y1: 0, x2: 1, y2: 0 },
-  { lineKey: "s1", label: "Esses", sortOrder: 1, x1: 0, y1: 0, x2: 1, y2: 0 },
-  { lineKey: "s2", label: "Sweeper", sortOrder: 2, x1: 0, y1: 0, x2: 1, y2: 0 },
+// Mutable so the stubbed sectors PUT (in-flow line editor) survives re-fetches.
+// `?empty=1` starts with only SF — the no-corner-lines setup state.
+let sectorLinesState = [
+  { lineKey: "sf", label: "SF", sortOrder: 0, x1: 0.25, y1: 0.75, x2: 0.55, y2: 0.85 },
+  { lineKey: "s1", label: "Esses", sortOrder: 1, x1: 0.15, y1: 0.3, x2: 0.35, y2: 0.2 },
+  { lineKey: "s2", label: "Sweeper", sortOrder: 2, x1: 0.65, y1: 0.25, x2: 0.85, y2: 0.4 },
 ];
 
 const TIMING = {
@@ -71,6 +73,9 @@ export default function AnalyzeFlowPreviewPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("empty") === "1") {
+      sectorLinesState = sectorLinesState.filter((l) => l.lineKey === "sf");
+    }
     const realFetch = window.fetch.bind(window);
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -99,8 +104,19 @@ export default function AnalyzeFlowPreviewPage() {
           },
           manual: { session: sessionState },
           result: null,
-          sectorLines: SECTOR_LINES,
+          sectorLines: sectorLinesState,
         });
+      }
+      if (url.includes("/api/video-analysis/profiles/prof_prev/sectors") && init?.method === "PUT") {
+        try {
+          const body = JSON.parse(String(init.body ?? "{}")) as {
+            lines?: typeof sectorLinesState;
+          };
+          if (Array.isArray(body.lines)) {
+            sectorLinesState = body.lines.map((l, i) => ({ ...l, sortOrder: i }));
+          }
+        } catch {}
+        return json({ sectorLines: sectorLinesState });
       }
       if (url.includes("/api/video-analysis/manual/session-drivers")) {
         return json(TIMING);
