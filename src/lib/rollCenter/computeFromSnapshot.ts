@@ -9,11 +9,13 @@
  */
 import {
   computeAxleMetrics,
+  solveAxle,
   solveCamberTrim,
   ZERO_ADJUSTMENTS,
   type AxleAdjustments,
   type AxleGeometry,
   type AxleMetrics,
+  type SolvedAxle,
 } from "./engine";
 import {
   chassisMountShiftMm,
@@ -189,13 +191,15 @@ function axleAdjustments(
   return adj;
 }
 
-/**
- * Compute geometry for a setup snapshot. Null when no platform pack matches the
- * snapshot (non-Awesomatix sheets today) or the linkage can't assemble.
- */
-export function computeRollCenterFromSnapshot(
-  data: Record<string, unknown>
-): RollCenterComputation | null {
+type SnapshotGeometryInputs = {
+  pack: RollCenterPack;
+  frontAdj: AxleAdjustments;
+  rearAdj: AxleAdjustments;
+  assumptions: string[];
+};
+
+/** Shared derivation: pack + per-axle adjustments + assumption notes from a snapshot. */
+function deriveSnapshotInputs(data: Record<string, unknown>): SnapshotGeometryInputs | null {
   const pack = resolvePackForSnapshot(data);
   if (!pack) return null;
 
@@ -214,6 +218,20 @@ export function computeRollCenterFromSnapshot(
   const frontAdj = axleAdjustments(data, pack.front, FRONT_KEYS, mountZShiftMm, assumptions);
   const rearAdj = axleAdjustments(data, pack.rear, REAR_KEYS, mountZShiftMm, assumptions);
 
+  return { pack, frontAdj, rearAdj, assumptions };
+}
+
+/**
+ * Compute geometry for a setup snapshot. Null when no platform pack matches the
+ * snapshot (non-Awesomatix sheets today) or the linkage can't assemble.
+ */
+export function computeRollCenterFromSnapshot(
+  data: Record<string, unknown>
+): RollCenterComputation | null {
+  const inputs = deriveSnapshotInputs(data);
+  if (!inputs) return null;
+  const { pack, frontAdj, rearAdj, assumptions } = inputs;
+
   const front = computeAxleMetrics(pack.front, frontAdj);
   const rear = computeAxleMetrics(pack.rear, rearAdj);
   if (!front || !rear) return null;
@@ -227,6 +245,27 @@ export function computeRollCenterFromSnapshot(
     rakeMm: rear.rcHeightMm - front.rcHeightMm,
     assumptions,
   };
+}
+
+/**
+ * Full solved linkage poses (static, 0° roll) for drawing the front-view schematic —
+ * the expanded sheet block and the future Lab. Null when no pack matches or a side
+ * can't assemble; callers hide the diagram and let the numeric block stand alone.
+ */
+export type RollCenterDiagramSolves = {
+  front: SolvedAxle;
+  rear: SolvedAxle;
+};
+
+export function solveRollCenterDiagram(
+  data: Record<string, unknown>
+): RollCenterDiagramSolves | null {
+  const inputs = deriveSnapshotInputs(data);
+  if (!inputs) return null;
+  const front = solveAxle(inputs.pack.front, inputs.frontAdj, 0);
+  const rear = solveAxle(inputs.pack.rear, inputs.rearAdj, 0);
+  if (!front?.rollCentre || !rear?.rollCentre) return null;
+  return { front, rear };
 }
 
 const AWESOMATIX_NOMINAL_TIRE_NOTE = "64mm nominal";

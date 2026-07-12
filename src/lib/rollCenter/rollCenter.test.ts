@@ -12,7 +12,7 @@ import { test } from "node:test";
 import { computeAxleMetrics, solveAxle, solveCamberTrim, ZERO_ADJUSTMENTS } from "./engine";
 import { parseVsuspUrl } from "./vsusp";
 import { AWESOMATIX_A800_PACK, chassisMountShiftMm, resolvePackForSnapshot } from "./packs";
-import { computeRollCenterFromSnapshot } from "./computeFromSnapshot";
+import { computeRollCenterFromSnapshot, solveRollCenterDiagram } from "./computeFromSnapshot";
 
 const FOUNDER_VSUSP_URL = `https://www.vsusp.com/#0.8%26project_name%3AA800R%20No%20Shims%20-%20STEEL%26trim%7Bbody_roll_angle%3A0%7Cfront.left_bump%3A0%7Crear.left_bump%3A0%7Cfront.right_bump%3A0%7Crear.right_bump%3A0%7D%26front%7Bframe.susp_type%3A0%7Cframe.bottom_y%3A5000%7Cframe.center_to_upper_mount_x%3A19500%7Cframe.bottom_to_upper_mount_y%3A34500%7Cframe.center_to_lower_mount_x%3A10500%7Cframe.bottom_to_lower_mount_y%3A4450%7Ccontrol_arms.upper_length%3A50691%7Ccontrol_arms.lower_length%3A60500%7Cknuckles.hub_to_upper_x%3A16200%7Cknuckles.hub_to_lower_x%3A16300%7Cknuckles.hub_to_lower_y%3A15000%7Cknuckles.hub_to_upper_y%3A14500%7Cknuckles.hub_to_strut_axis%3A14000%7Cknuckles.strut_incl%3A8000%7Csteering.active%3A0%7Csteering.hub_to_outer_tie_rod_x%3A7620%7Csteering.hub_to_outer_tie_rod_y%3A7620%7Cwheels.offset%3A5220%7Cwheels.diameter%3A1500%7Cwheels.diameter_expl%3A52000%7Ctires.size_convention%3A1%7Ctires.section_width%3A19500%7Ctires.aspect_ratio%3A4500%7Ctires.diameter_expl%3A64000%7Ctires.width_expl%3A24300%7Ctires.compression%3A125%7D%26rear%7Bframe.susp_type%3A0%7Cframe.bottom_y%3A5200%7Cframe.center_to_upper_mount_x%3A19500%7Cframe.bottom_to_upper_mount_y%3A34500%7Cframe.center_to_lower_mount_x%3A9000%7Cframe.bottom_to_lower_mount_y%3A4450%7Ccontrol_arms.upper_length%3A49197%7Ccontrol_arms.lower_length%3A60500%7Cknuckles.hub_to_upper_x%3A16200%7Cknuckles.hub_to_lower_x%3A16300%7Cknuckles.hub_to_lower_y%3A15000%7Cknuckles.hub_to_upper_y%3A14500%7Cknuckles.hub_to_strut_axis%3A14000%7Cknuckles.strut_incl%3A8000%7Csteering.active%3A0%7Csteering.hub_to_outer_tie_rod_x%3A7620%7Csteering.hub_to_outer_tie_rod_y%3A7620%7Cwheels.offset%3A5220%7Cwheels.diameter%3A1500%7Cwheels.diameter_expl%3A52000%7Ctires.size_convention%3A1%7Ctires.section_width%3A19500%7Ctires.aspect_ratio%3A4500%7Ctires.diameter_expl%3A64000%7Ctires.width_expl%3A24300%7Ctires.compression%3A125%7D`;
 
@@ -131,6 +131,24 @@ test("computeRollCenterFromSnapshot: sparse sheet computes with flagged assumpti
 
 test("non-Awesomatix snapshot returns null (no pack)", () => {
   assert.equal(computeRollCenterFromSnapshot({ camber_front: "2" }), null);
+});
+
+test("diagram solves draw the same geometry the metrics report", () => {
+  const snapshot: Record<string, unknown> = {
+    under_hub_shims_front: "1",
+    upper_inner_shims_ff: "0.5",
+    camber_front: "2.0",
+  };
+  const metrics = computeRollCenterFromSnapshot(snapshot);
+  const solves = solveRollCenterDiagram(snapshot);
+  assert.ok(metrics && solves, "compute or diagram solve returned null");
+  // Same solve → identical RC; the schematic can never disagree with the numbers.
+  assert.ok(Math.abs(solves.front.rollCentre!.z - metrics.front.rcHeightMm) < 1e-6);
+  assert.ok(Math.abs(solves.rear.rollCentre!.z - metrics.rear.rcHeightMm) < 1e-6);
+  assert.ok(Math.abs(solves.front.right.camberDeg - metrics.front.camberDeg) < 1e-6);
+  // Both sides assembled with sensible ordering for drawing.
+  assert.ok(solves.front.left.contact.x < 0 && solves.front.right.contact.x > 0);
+  assert.equal(solveRollCenterDiagram({ camber_front: "2" }), null);
 });
 
 test("deltas are datum-robust: shim delta survives a base-geometry error", () => {

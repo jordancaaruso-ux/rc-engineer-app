@@ -4,15 +4,23 @@
  * Computed-geometry block for setup sheets and compare surfaces.
  * Renders only when a platform pack matches the snapshot (Awesomatix today).
  *
- * Trust doctrine (docs/ROLL_CENTER_NORTH_STAR.md): deltas render untagged
- * (instrument-grade); absolutes carry the pack's verification-grade tag.
- * Geometry deltas are neutral ink — direction, not good/bad.
+ * Founder-picked viewing experience (2026-07-12, docs/ROLL_CENTER_NORTH_STAR.md
+ * Phase 2.5): collapsed by default to the RC + rake one-liner; expands to the
+ * clean-schematic axle diagram (front/rear toggle, arm angles on the arms) with
+ * camber gain for both axles.
+ *
+ * Trust doctrine: deltas render untagged (instrument-grade); absolutes carry the
+ * pack's verification-grade tag. Geometry deltas are neutral ink — direction,
+ * not good/bad.
  */
 
-import { useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
 import {
   computeRollCenterFromSnapshot,
+  solveRollCenterDiagram,
   type RollCenterComputation,
 } from "@/lib/rollCenter/computeFromSnapshot";
 
@@ -66,6 +74,10 @@ function RollAxisStrip({ frontMm, rearMm }: { frontMm: number; rearMm: number })
   );
 }
 
+function fmtGain(v: number | null): string {
+  return v == null ? "—" : v.toFixed(3);
+}
+
 export type RollCenterGeometryBlockProps = {
   value: Record<string, unknown>;
   /** Optional comparison snapshot: renders neutral ↑/↓ deltas vs it. */
@@ -79,6 +91,11 @@ export function RollCenterGeometryBlock({ value, baselineValue, className }: Rol
     () => (baselineValue ? computeRollCenterFromSnapshot(baselineValue) : null),
     [baselineValue]
   );
+  const [expanded, setExpanded] = useState(false);
+  const [axle, setAxle] = useState<"front" | "rear">("front");
+  // The diagram solve only runs once the block is opened.
+  const solves = useMemo(() => (expanded ? solveRollCenterDiagram(value) : null), [expanded, value]);
+  const bodyId = useId();
   if (!computed) return null;
 
   const rakeWord =
@@ -89,61 +106,94 @@ export function RollCenterGeometryBlock({ value, baselineValue, className }: Rol
         : "level";
 
   return (
-    <div className={cn("rounded-lg border border-border bg-secondary/60 p-3", className)}>
-      <div className="flex items-baseline justify-between gap-2 mb-2">
-        <span className="type-data-label">Computed geometry</span>
+    <div className={cn("rounded-lg border border-border bg-secondary/60", className)}>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-controls={bodyId}
+        className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2.5 text-left"
+      >
+        <svg
+          viewBox="0 0 12 12"
+          className={cn(
+            "h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-150",
+            expanded && "rotate-90"
+          )}
+          aria-hidden="true"
+        >
+          <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="type-data-label">Geometry</span>
+        <span className="font-mono text-[11px] tabular-nums">
+          RC {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)}mm · rake {fmtMm(computed.rakeMm)}
+        </span>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.18em] text-faint border border-border rounded px-1.5 py-0.5"
+          className="ml-auto font-mono text-[9px] uppercase tracking-[0.18em] text-faint border border-border rounded px-1.5 py-0.5"
           title="Trust grade for absolute values; deltas between setups are exact regardless"
         >
           {GRADE_LABELS[computed.verificationGrade]}
         </span>
-      </div>
+      </button>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 items-start">
-        <div className="space-y-0.5">
-          <div className="type-data-label">Roll center F / R</div>
-          <div className="font-mono text-sm tabular-nums">
-            {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)} mm
-          </div>
-          <div className="flex gap-2">
-            <NeutralDelta current={computed.front.rcHeightMm} baseline={baseline?.front.rcHeightMm} unit="F" />
-            <NeutralDelta current={computed.rear.rcHeightMm} baseline={baseline?.rear.rcHeightMm} unit="R" />
-          </div>
-        </div>
+      {expanded && (
+        <div id={bodyId} className="px-3 pb-3 space-y-3">
+          <SegmentedControl
+            size="sm"
+            className="mx-auto max-w-[200px]"
+            ariaLabel="Axle shown in the schematic"
+            options={[
+              { value: "front", label: "Front" },
+              { value: "rear", label: "Rear" },
+            ]}
+            value={axle}
+            onChange={setAxle}
+          />
 
-        <div className="space-y-0.5">
-          <div className="type-data-label">Roll axis</div>
-          <div className="text-current">
-            <RollAxisStrip frontMm={computed.front.rcHeightMm} rearMm={computed.rear.rcHeightMm} />
-          </div>
-          <div className="font-mono text-[10px] text-muted-foreground tabular-nums">
-            Δ {Math.abs(computed.rakeMm).toFixed(1)}mm · {rakeWord}
-          </div>
-        </div>
+          {solves && (
+            <AxleSchematic
+              solved={axle === "front" ? solves.front : solves.rear}
+              axleLabel={axle}
+              className="text-foreground"
+            />
+          )}
 
-        <div className="space-y-1 col-span-2 sm:col-span-1">
-          <div>
-            <div className="type-data-label">Arm angles F / R</div>
-            <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
-              lower {computed.front.lowerArmAngleDeg.toFixed(1)}° / {computed.rear.lowerArmAngleDeg.toFixed(1)}°
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 items-start">
+            <div className="space-y-0.5">
+              <div className="type-data-label">Roll center F/R</div>
+              <div className="font-mono text-sm tabular-nums">
+                {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)} mm
+              </div>
+              <div className="flex gap-2">
+                <NeutralDelta current={computed.front.rcHeightMm} baseline={baseline?.front.rcHeightMm} unit="F" />
+                <NeutralDelta current={computed.rear.rcHeightMm} baseline={baseline?.rear.rcHeightMm} unit="R" />
+              </div>
             </div>
-            <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
-              upper {computed.front.upperLinkAngleDeg.toFixed(1)}° / {computed.rear.upperLinkAngleDeg.toFixed(1)}°
+
+            <div className="space-y-0.5">
+              <div className="type-data-label">Roll axis</div>
+              <div className="text-current">
+                <RollAxisStrip frontMm={computed.front.rcHeightMm} rearMm={computed.rear.rcHeightMm} />
+              </div>
+              <div className="font-mono text-[10px] text-muted-foreground tabular-nums">
+                Δ {Math.abs(computed.rakeMm).toFixed(1)}mm · {rakeWord}
+              </div>
+            </div>
+
+            <div className="space-y-0.5 col-span-2 sm:col-span-1">
+              <div className="type-data-label">Camber gain F/R</div>
+              <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                {fmtGain(computed.front.camberGainDegPerMm)} / {fmtGain(computed.rear.camberGainDegPerMm)} °/mm
+              </div>
             </div>
           </div>
-          {computed.front.camberGainDegPerMm != null && (
-            <div className="font-mono text-[10px] text-faint tabular-nums">
-              camber gain {computed.front.camberGainDegPerMm.toFixed(3)}°/mm F
-            </div>
+
+          {computed.assumptions.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-faint">
+              Assumed: {computed.assumptions.join(" · ")}
+            </p>
           )}
         </div>
-      </div>
-
-      {computed.assumptions.length > 0 && (
-        <p className="mt-2 text-[10px] leading-relaxed text-faint">
-          Assumed: {computed.assumptions.join(" · ")}
-        </p>
       )}
     </div>
   );
