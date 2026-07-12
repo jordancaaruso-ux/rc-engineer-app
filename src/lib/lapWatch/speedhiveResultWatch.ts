@@ -125,6 +125,9 @@ export type ResultCheckReport = {
   notified: boolean;
   sent: number;
   hint: string | null;
+  /** Newest matched session (whether or not it's fresh) — for transparent test reporting. */
+  newestLabel: string | null;
+  newestIso: string | null;
 };
 
 /**
@@ -140,7 +143,15 @@ export async function checkSpeedhiveResultsForUser(
   now: Date,
 ): Promise<ResultCheckReport> {
   if (!(await hasSpeedhiveIdentityForUser(target.userId))) {
-    return { matched: 0, fresh: 0, notified: false, sent: 0, hint: "No Speedhive transponder / driver name set." };
+    return {
+      matched: 0,
+      fresh: 0,
+      notified: false,
+      sent: 0,
+      hint: "No Speedhive transponder / driver name set.",
+      newestLabel: null,
+      newestIso: null,
+    };
   }
 
   const discovery = await discoverSpeedhiveSessionsForUser({
@@ -148,6 +159,7 @@ export async function checkSpeedhiveResultsForUser(
     trackSpeedhiveUrl: target.speedhiveUrl,
   });
 
+  const newestMatch = discovery.candidates[0] ?? null;
   const notifiedSet = await getNotifiedSet(target.userId);
   const freshCutoff = now.getTime() - FRESHNESS_HOURS * 60 * 60 * 1000;
 
@@ -168,6 +180,8 @@ export async function checkSpeedhiveResultsForUser(
       notified: false,
       sent: 0,
       hint: discovery.hint,
+      newestLabel: newestMatch?.label ?? null,
+      newestIso: newestMatch?.sessionCompletedAtIso ?? null,
     };
   }
 
@@ -194,11 +208,13 @@ export async function checkSpeedhiveResultsForUser(
     notified: res.sent > 0,
     sent: res.sent,
     hint: null,
+    newestLabel: newestMatch?.label ?? null,
+    newestIso: newestMatch?.sessionCompletedAtIso ?? null,
   };
 }
 
 export type WatchTestReport = {
-  mode: "check" | "force";
+  mode: "check" | "test";
   speedhiveUrl: string;
   matched: number;
   fresh?: number;
@@ -208,11 +224,29 @@ export type WatchTestReport = {
   note: string;
 };
 
+/** Human date + age for the newest matched session, so "nothing fresh" is self-explanatory. */
+function describeNewest(label: string | null, iso: string | null, now: Date): string {
+  if (!label && !iso) return "none";
+  const parts: string[] = [];
+  if (label) parts.push(label);
+  if (iso) {
+    const t = new Date(iso).getTime();
+    if (!Number.isNaN(t)) {
+      const days = Math.floor((now.getTime() - t) / 86_400_000);
+      const date = iso.slice(0, 10);
+      parts.push(days >= 1 ? `${date} (${days} day${days === 1 ? "" : "s"} ago)` : date);
+    }
+  }
+  return parts.join(" — ");
+}
+
 /**
- * On-demand test of the detection pipeline for the current user against a specific
- * Speedhive URL — bypasses the active-event-day gate. `check` runs the real logic
- * (dedup + 4h freshness, persists). `force` pushes the newest matched session
- * regardless of dedup/freshness and does NOT persist, so it can be repeated.
+ * On-demand test tool (Settings → Notifications).
+ * - `force` (= "Send test push") sends a CANNED notification to prove the push → tap → Add Run
+ *   plumbing. It does NOT look up real sessions, so it can never surface a stale old run.
+ * - otherwise ("Check now") runs the real watcher logic (dedup + 4h freshness, persists) and
+ *   reports transparently — including the newest matched session's date and the URL used — so
+ *   a "nothing fresh" result explains itself.
  */
 export async function runWatchTest(
   input: { userId: string; speedhiveUrl: string; force: boolean },
@@ -221,38 +255,22 @@ export async function runWatchTest(
   const { userId, speedhiveUrl, force } = input;
 
   if (force) {
-    const discovery = await discoverSpeedhiveSessionsForUser({
-      userId,
-      trackSpeedhiveUrl: speedhiveUrl,
-    });
-    const newest = discovery.candidates[0] ?? null;
-    if (!newest) {
-      return {
-        mode: "force",
-        speedhiveUrl,
-        matched: discovery.candidates.length,
-        pushed: false,
-        sent: 0,
-        newestLabel: null,
-        note: discovery.hint ?? "No sessions matched your transponder / driver name at this URL.",
-      };
-    }
     const res = await sendPushToUser(userId, {
-      title: "New run (test)",
-      body: `${newest.label || "Session"} — tap to log this run.`,
+      title: "Test notification",
+      body: "This is a test — tap to open Add Run.",
       url: NEW_RUN_TAP_URL,
       tag: "jrc-new-result",
     });
     return {
-      mode: "force",
+      mode: "test",
       speedhiveUrl,
-      matched: discovery.candidates.length,
+      matched: 0,
       pushed: res.sent > 0,
       sent: res.sent,
-      newestLabel: newest.label ?? null,
+      newestLabel: null,
       note:
         res.sent > 0
-          ? `Forced a test push for your latest session to ${res.sent} device(s).`
+          ? `Sent a canned test notification to ${res.sent} device(s) — tap it to check the Add Run flow. It does not look up real sessions.`
           : "No devices to push to — enable notifications on this device first.",
     };
   }
@@ -265,11 +283,11 @@ export async function runWatchTest(
     fresh: r.fresh,
     pushed: r.notified,
     sent: r.sent,
-    newestLabel: null,
+    newestLabel: r.newestLabel,
     note: r.notified
       ? `Pushed ${r.fresh} new session(s) to ${r.sent} device(s).`
       : r.matched > 0
-        ? "Found your sessions, but none are new + fresh (already notified, already logged, or older than 4h). Use Force to push the latest anyway."
+        ? `Found ${r.matched} matching session(s) at ${speedhiveUrl}, but none are new + recent (<4h) — so the real watcher would NOT notify. Newest match: ${describeNewest(r.newestLabel, r.newestIso, now)}.`
         : r.hint ?? "No sessions matched your transponder / driver name at this URL.",
   };
 }

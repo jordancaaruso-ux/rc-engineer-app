@@ -213,11 +213,11 @@ export function NotificationsSection() {
           <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
             Leave blank to use a Speedhive URL from one of your tracks. <strong>Check now</strong>{" "}
             runs exactly what the cron does — skips only the active-day gate, then pushes just the
-            genuinely new, recent (&lt;4h) sessions and tells you why if it doesn&apos;t.{" "}
-            <strong>Send test push</strong> ignores every gate and pushes your latest matched
-            session regardless of age, so you can see the notification → tap → Add Run flow even
-            with old data (it does <em>not</em> reflect what the real watcher would send). Tapping
-            either opens the normal Add Run — no laps are imported; add them the usual way.
+            genuinely new, recent (&lt;4h) sessions; if there&apos;s nothing fresh it tells you the
+            newest match and how old it is. <strong>Send test push</strong> sends a canned test
+            notification to check the tap → Add Run flow — it does <em>not</em> look up real
+            sessions, so it never surfaces an old run. Tapping either opens the normal Add Run — no
+            laps are imported; add them the usual way.
           </p>
           <input
             type="url"
