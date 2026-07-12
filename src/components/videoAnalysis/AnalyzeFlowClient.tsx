@@ -98,8 +98,16 @@ export function AnalyzeFlowClient({
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [library, setLibrary] = useState<LibraryVideo[]>([]);
   const [duration, setDuration] = useState(0);
-  const [clock, setClock] = useState(0);
   const [playing, setPlaying] = useState(false);
+  // Scrub path is deliberately outside React state: on a ~1GB phone video every
+  // drag event issuing a seek (and a re-render) starves the decoder — the frame
+  // never updates and WebKit can kill the page under the churn. One in-flight
+  // seek at a time, always retargeted to the newest position; timecode + slider
+  // update imperatively.
+  const seekTargetRef = useRef<{ t: number; fast: boolean } | null>(null);
+  const issuedSeekRef = useRef<number | null>(null);
+  const timecodeElRef = useRef<HTMLSpanElement | null>(null);
+  const coarseElRef = useRef<HTMLInputElement | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [timingLoading, setTimingLoading] = useState(false);
@@ -170,20 +178,73 @@ export function AnalyzeFlowClient({
 
   /* ---------- video + transport ---------- */
 
-  function seekTo(sec: number) {
-    const v = videoRef.current;
-    const t = Math.max(0, Math.min(duration || Number.MAX_SAFE_INTEGER, sec));
-    lastSeekRef.current = t;
-    setClock(t);
-    if (v) {
-      v.currentTime = t;
-      v.pause();
-      setPlaying(false);
+  function syncTransportUi(t: number) {
+    if (timecodeElRef.current) timecodeElRef.current.textContent = fmtClock(t);
+    if (coarseElRef.current && document.activeElement !== coarseElRef.current) {
+      coarseElRef.current.value = String(t);
     }
   }
 
+  /** Issue the newest pending seek — but never while one is already in flight.
+   * `fast` uses fastSeek (nearest keyframe) where available: right for coarse
+   * dragging, wrong for precision moves. */
+  function pumpSeek() {
+    const v = videoRef.current;
+    const target = seekTargetRef.current;
+    if (!v || !target || v.seeking || v.readyState === 0) return;
+    if (Math.abs(v.currentTime - target.t) < 0.001) {
+      seekTargetRef.current = null;
+      return;
+    }
+    issuedSeekRef.current = target.t;
+    const vv = v as HTMLVideoElement & { fastSeek?: (t: number) => void };
+    if (target.fast && typeof vv.fastSeek === "function") vv.fastSeek(target.t);
+    else v.currentTime = target.t;
+  }
+
+  function onVideoSeeked() {
+    const target = seekTargetRef.current;
+    if (!target) return;
+    if (issuedSeekRef.current !== target.t) {
+      // A newer position arrived while the last seek decoded — chase it.
+      pumpSeek();
+      return;
+    }
+    if (target.fast) {
+      // Keyframe accuracy is the point while dragging; don't re-seek exactly.
+      seekTargetRef.current = null;
+      return;
+    }
+    pumpSeek();
+  }
+
+  function requestSeek(sec: number, opts?: { fast?: boolean }) {
+    const v = videoRef.current;
+    const max = v?.duration || duration || Number.MAX_SAFE_INTEGER;
+    const t = Math.max(0, Math.min(max, sec));
+    lastSeekRef.current = t;
+    seekTargetRef.current = { t, fast: opts?.fast ?? false };
+    syncTransportUi(t);
+    if (v && !v.paused) v.pause();
+    if (playing) setPlaying(false);
+    pumpSeek();
+  }
+
+  function seekTo(sec: number) {
+    requestSeek(sec, { fast: false });
+  }
+
+  /** Where the user *intends* the playhead to be: the pending seek target wins
+   * over the video's (possibly still-decoding) currentTime. Anchors, pins, and
+   * marks must read this, or a tap mid-seek records a stale frame. */
+  function playheadTime(): number {
+    return seekTargetRef.current?.t ?? videoRef.current?.currentTime ?? lastSeekRef.current;
+  }
+
   function nudge(deltaSec: number) {
-    seekTo((videoRef.current?.currentTime ?? clock) + deltaSec);
+    // Base on the pending target so rapid nudges accumulate even while a seek
+    // is still decoding.
+    requestSeek(playheadTime() + deltaSec, { fast: false });
   }
 
   function togglePlay() {
@@ -360,7 +421,7 @@ export function AnalyzeFlowClient({
 
   function setAnchorAtPlayhead() {
     if (!session || !primary || anchorLap == null) return;
-    const t = videoRef.current?.currentTime ?? clock;
+    const t = playheadTime();
     const next = updateTimingSession(session, primary.sessionId, {
       isOnVideo: true,
       sync: {
@@ -381,7 +442,7 @@ export function AnalyzeFlowClient({
 
   function pinSelectedLapHere() {
     if (!session || !primary || anchorLap == null) return;
-    const t = videoRef.current?.currentTime ?? clock;
+    const t = playheadTime();
     const next = updateTimingSession(session, primary.sessionId, {
       sync: {
         ...primary.sync,
@@ -497,7 +558,7 @@ export function AnalyzeFlowClient({
       setStep(5);
       return;
     }
-    const videoTimeSec = videoRef.current?.currentTime ?? clock;
+    const videoTimeSec = playheadTime();
     const marks = session.marks.filter(
       (m) =>
         !(
@@ -594,17 +655,28 @@ export function AnalyzeFlowClient({
           src={videoSrc ?? undefined}
           muted
           playsInline
-          preload="metadata"
+          preload="auto"
           className="aspect-video w-full object-contain"
           onLoadedMetadata={(e) => {
             setDuration(e.currentTarget.duration || 0);
-            if (lastSeekRef.current > 0) e.currentTarget.currentTime = lastSeekRef.current;
+            if (coarseElRef.current) {
+              coarseElRef.current.max = String(Math.max(e.currentTarget.duration || 0, 0.01));
+            }
+            if (lastSeekRef.current > 0) requestSeek(lastSeekRef.current);
+            else syncTransportUi(0);
           }}
-          onTimeUpdate={(e) => setClock(e.currentTarget.currentTime)}
+          onSeeked={onVideoSeeked}
+          onTimeUpdate={(e) => {
+            // Playback progress only — scrubbing paints through syncTransportUi.
+            if (!seekTargetRef.current) syncTransportUi(e.currentTarget.currentTime);
+          }}
           onClick={togglePlay}
         />
-        <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-background/70 px-2 py-0.5 font-mono text-[12px] tabular-nums text-foreground backdrop-blur-sm">
-          {fmtClock(clock)}
+        <span
+          ref={timecodeElRef}
+          className="pointer-events-none absolute bottom-2 left-2 rounded bg-background/70 px-2 py-0.5 font-mono text-[12px] tabular-nums text-foreground backdrop-blur-sm"
+        >
+          {fmtClock(lastSeekRef.current)}
         </span>
         <button
           type="button"
@@ -616,12 +688,15 @@ export function AnalyzeFlowClient({
         </button>
       </div>
       <input
+        ref={coarseElRef}
         type="range"
         min={0}
         max={Math.max(duration, 0.01)}
         step={0.05}
-        value={Math.min(clock, duration || clock)}
-        onChange={(e) => seekTo(Number(e.target.value))}
+        defaultValue={lastSeekRef.current}
+        onChange={(e) => requestSeek(Number(e.target.value), { fast: true })}
+        onPointerUp={(e) => requestSeek(Number(e.currentTarget.value))}
+        onKeyUp={(e) => requestSeek(Number(e.currentTarget.value))}
         aria-label="Coarse scrub"
         className="h-7 w-full accent-[#FFD60A]"
       />
