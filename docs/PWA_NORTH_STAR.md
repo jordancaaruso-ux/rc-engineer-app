@@ -96,9 +96,33 @@ Service worker (public/sw.js)         ← receives 'push' + 'notificationclick'
 **Recommended build order:** #2 (proves the push stack end-to-end, cheap) → #1 (the flagship) →
 #3 → #4 (blocked on suggestion lifecycle).
 
-### Flagship: "New result → add run" (design only — real backend feature)
+### Flagship: "New result → log a run"
 
-**Goal:** the driver's transponder posts a result on a timing site → they get a push → one tap
+> **Revised 2026-07-12 (founder) — trigger, not a pipeline.** The earlier model (auto-import
+> laps on tap, prefill/continue a draft, "notify only when laps are fetchable") is **retired**.
+> Speedhive activity is now purely a **trigger**: it tells the driver "you've got a new run —
+> tap to log it," and the tap opens the **normal Add Run flow**. **No laps are auto-imported;**
+> the driver adds laps the way they normally would. This drops the reliability bar hard — we
+> notify on a transponder/name *match*, not on cleanly parseable laps — and makes every path
+> (Speedhive detection, the no-coverage reminder, a plain manual log) end in the same place.
+>
+> - **Trigger** → broadened beyond formal events: a user is polled if they're in a Speedhive
+>   event active today **or** they've logged a run today at a Speedhive-enabled track (covers
+>   casual/eventless test days — catches runs after the first). `getResultWatchTargets`.
+> - **No race/practice distinction** — everything is "new run."
+> - **Tap** → `/runs/new?resume=1`. If an in-progress draft from *today* exists, offer to
+>   continue it (`ResumeDraftChooser`) so pre-run setup/notes aren't orphaned; else a blank
+>   Add Run. No `session` param, no import. (`import-and-log` route deleted.)
+> - **No-Speedhive coverage** → a time-based "log your runs?" reminder instead of silence
+>   (`logReminderNudge.ts`): event-gated (needs an Event to know you're racing), once/day,
+>   only if you haven't logged today, inside a daytime window. Same tap target.
+> - **Still out of reach:** eventless test days at non-Speedhive tracks (no presence signal) —
+>   future "at the track today" tap. LiveRC-for-races bridge still deferred.
+>
+> The rest of this section is retained for feasibility history; where it describes auto-import
+> or lap prefill on tap, read it against the revised model above.
+
+**Original goal:** the driver's transponder posts a result on a timing site → they get a push → one tap
 starts an Add-Run pre-filled with that result. Removes the "remember to log it" step entirely.
 
 **FEASIBILITY: HIGH — the detection engine already exists (code audit 2026-07-11).** This is far more built than "design only":

@@ -438,6 +438,30 @@ export async function loadIncompleteRunsForImportChooser(
   return rows.map(toDashboardIncompleteRunRow);
 }
 
+/**
+ * Today's in-progress drafts, most recent first — for the "new run — tap to log it"
+ * notification path (`/runs/new?resume=1`). Continuing one preserves any pre-run setup
+ * the driver logged before the run; today-scoped so a stale draft from last week doesn't
+ * get offered as the run they just completed.
+ */
+export async function loadTodaysIncompleteRuns(
+  userId: string
+): Promise<DashboardIncompleteRunRow[]> {
+  const { start, end } = localTodayBounds();
+  const rows = await prisma.run.findMany({
+    where: {
+      userId,
+      loggingComplete: false,
+      incompleteLoggingPromptDismissedAt: null,
+      sortAt: { gte: start, lte: end },
+    },
+    orderBy: { sortAt: "desc" },
+    take: 15,
+    select: incompleteRunSelect,
+  });
+  return rows.map(toDashboardIncompleteRunRow);
+}
+
 export async function loadDashboardHomeModel(
   userId: string,
   timeZone: string

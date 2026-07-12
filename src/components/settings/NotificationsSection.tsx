@@ -152,8 +152,9 @@ export function NotificationsSection() {
     <CardPanel className="mt-10">
       <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Get a push when a new result posts for your transponder and when your Engineer read is
-        ready. Beta — enable per device.
+        Get a nudge to log a run when your transponder posts a result on Speedhive — or a reminder
+        on race days at tracks without live timing. Tap opens Add Run; add laps the usual way. Beta
+        — enable per device.
       </p>
 
       {supported === false ? (
@@ -210,10 +211,13 @@ export function NotificationsSection() {
         <div className="mt-5 border-t border-border pt-4">
           <h3 className="text-xs font-semibold text-foreground">Test result detection</h3>
           <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-            Runs the Speedhive watcher against a URL now (ignores the active-event-day gate).
             Leave blank to use a Speedhive URL from one of your tracks. <strong>Check now</strong>{" "}
-            pushes only genuinely new+recent sessions; <strong>Force</strong> pushes your latest
-            matched session regardless, so you can see the tap flow.
+            runs exactly what the cron does — skips only the active-day gate, then pushes just the
+            genuinely new, recent (&lt;4h) sessions and tells you why if it doesn&apos;t.{" "}
+            <strong>Send test push</strong> ignores every gate and pushes your latest matched
+            session regardless of age, so you can see the notification → tap → Add Run flow even
+            with old data (it does <em>not</em> reflect what the real watcher would send). Tapping
+            either opens the normal Add Run — no laps are imported; add them the usual way.
           </p>
           <input
             type="url"
@@ -237,7 +241,7 @@ export function NotificationsSection() {
               onClick={() => void runWatchTest(true)}
               className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
             >
-              Force push latest
+              Send test push
             </button>
           </div>
           {testReport ? (

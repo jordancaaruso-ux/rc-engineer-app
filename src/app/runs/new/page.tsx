@@ -4,8 +4,13 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getDashboardNewRunPrefill, loadIncompleteRunsForImportChooser } from "@/lib/dashboardServer";
+import {
+  getDashboardNewRunPrefill,
+  loadIncompleteRunsForImportChooser,
+  loadTodaysIncompleteRuns,
+} from "@/lib/dashboardServer";
 import { NewRunImportLinkChooser } from "@/components/runs/NewRunImportLinkChooser";
+import { ResumeDraftChooser } from "@/components/runs/ResumeDraftChooser";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { getLastRunForCopyPreview } from "@/lib/runs/getLastRunForCopyPreview";
@@ -51,13 +56,24 @@ export default async function NewRunPage({
   const importedLapTimeSessionIdRaw =
     typeof sp.importedLapTimeSessionId === "string" ? sp.importedLapTimeSessionId.trim() : "";
   const importFailed = typeof sp.importError === "string" && sp.importError.trim() === "1";
+  // `?resume=1` is the "new run — tap to log it" notification landing: offer to continue
+  // today's in-progress draft (preserving pre-run setup) before falling through to a blank form.
+  const resumeDraft = typeof sp.resume === "string" && sp.resume.trim() === "1";
 
-  const [dashboardPrefill, incompleteRunsForImport, cars, allTracks, favouriteTrackIds, copyPreviewRun] =
-    await Promise.all([
+  const [
+    dashboardPrefill,
+    incompleteRunsForImport,
+    todaysDrafts,
+    cars,
+    allTracks,
+    favouriteTrackIds,
+    copyPreviewRun,
+  ] = await Promise.all([
     getDashboardNewRunPrefill(user.id, sp),
     importedLapTimeSessionIdRaw.length > 0
       ? loadIncompleteRunsForImportChooser(user.id, initialEventId)
       : Promise.resolve([]),
+    resumeDraft ? loadTodaysIncompleteRuns(user.id) : Promise.resolve([]),
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -99,30 +115,32 @@ export default async function NewRunPage({
             now, or tap the notification again shortly and the laps should attach.
           </CardPanel>
         ) : null}
-        <CopyLastRunFormProvider previewRun={copyPreviewRun}>
-          <NewRunImportLinkChooser
-            incompleteRuns={incompleteRunsForImport}
-            importedLapTimeSessionId={importedLapTimeSessionIdRaw || null}
-            eventId={initialEventId}
-            displayTimeZone={displayTimeZone}
-          >
-            {copyPreviewRun ? (
-              <div className="mb-4">
-                <NewRunCopyLastRunSlot displayTimeZone={displayTimeZone} />
-              </div>
-            ) : null}
-            <NewRunForm
-              cars={cars}
-              tracks={tracks}
-              favouriteTrackIds={favouriteTrackIds}
-              favouriteTracks={favouriteTracks}
-              dashboardPrefill={dashboardPrefill}
-              initialEventId={initialEventId}
-              focusSection={focusSection}
-              initialCopyPreviewRun={copyPreviewRun}
-            />
-          </NewRunImportLinkChooser>
-        </CopyLastRunFormProvider>
+        <ResumeDraftChooser drafts={todaysDrafts} displayTimeZone={displayTimeZone}>
+          <CopyLastRunFormProvider previewRun={copyPreviewRun}>
+            <NewRunImportLinkChooser
+              incompleteRuns={incompleteRunsForImport}
+              importedLapTimeSessionId={importedLapTimeSessionIdRaw || null}
+              eventId={initialEventId}
+              displayTimeZone={displayTimeZone}
+            >
+              {copyPreviewRun ? (
+                <div className="mb-4">
+                  <NewRunCopyLastRunSlot displayTimeZone={displayTimeZone} />
+                </div>
+              ) : null}
+              <NewRunForm
+                cars={cars}
+                tracks={tracks}
+                favouriteTrackIds={favouriteTrackIds}
+                favouriteTracks={favouriteTracks}
+                dashboardPrefill={dashboardPrefill}
+                initialEventId={initialEventId}
+                focusSection={focusSection}
+                initialCopyPreviewRun={copyPreviewRun}
+              />
+            </NewRunImportLinkChooser>
+          </CopyLastRunFormProvider>
+        </ResumeDraftChooser>
       </section>
     </>
   );

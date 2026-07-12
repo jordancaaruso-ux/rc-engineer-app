@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { hasDatabaseUrl } from "@/lib/env";
+import { runLogReminderNudge } from "@/lib/lapWatch/logReminderNudge";
 import { runResultWatch } from "@/lib/lapWatch/speedhiveResultWatch";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +23,12 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   try {
-    const result = await runResultWatch(new Date());
-    return NextResponse.json({ ok: true, ...result });
+    const now = new Date();
+    const [result, reminders] = await Promise.all([
+      runResultWatch(now),
+      runLogReminderNudge(now),
+    ]);
+    return NextResponse.json({ ok: true, ...result, reminders });
   } catch (error) {
     const message = error instanceof Error ? error.message : "watch failed";
     return NextResponse.json({ error: message }, { status: 500 });

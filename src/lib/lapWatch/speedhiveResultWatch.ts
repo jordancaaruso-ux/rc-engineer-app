@@ -38,30 +38,59 @@ function endOfDay(d: Date): Date {
   return x;
 }
 
-/** Users to poll now: participants in a Speedhive-enabled event active today. */
+/**
+ * Users to poll now, from two arming signals (a formal Event is no longer required —
+ * that missed casual test days):
+ *   A) participants in a Speedhive-enabled event active today, and
+ *   B) anyone who has logged a run today at a Speedhive-enabled track.
+ * (B) covers eventless practice/race days: once the driver logs their first run, the
+ * watcher picks up their remaining sessions for the rest of the day. Deduped per
+ * (user, Speedhive URL).
+ */
 export async function getResultWatchTargets(now: Date): Promise<ResultWatchTarget[]> {
-  const events = await prisma.event.findMany({
-    where: {
-      startDate: { lte: endOfDay(now) },
-      endDate: { gte: startOfDay(now) },
-      track: { speedhiveUrl: { not: null } },
-    },
-    select: {
-      track: { select: { name: true, speedhiveUrl: true } },
-      participations: { select: { userId: true } },
-    },
-  });
+  const dayStart = startOfDay(now);
+  const dayEnd = endOfDay(now);
+
+  const [events, runsToday] = await Promise.all([
+    prisma.event.findMany({
+      where: {
+        startDate: { lte: dayEnd },
+        endDate: { gte: dayStart },
+        track: { speedhiveUrl: { not: null } },
+      },
+      select: {
+        track: { select: { name: true, speedhiveUrl: true } },
+        participations: { select: { userId: true } },
+      },
+    }),
+    prisma.run.findMany({
+      where: {
+        sortAt: { gte: dayStart, lte: dayEnd },
+        track: { speedhiveUrl: { not: null } },
+      },
+      select: {
+        userId: true,
+        track: { select: { name: true, speedhiveUrl: true } },
+      },
+      distinct: ["userId", "trackId"],
+    }),
+  ]);
 
   const byKey = new Map<string, ResultWatchTarget>();
+  const add = (userId: string, url: string | null | undefined, trackName: string | null) => {
+    const u = url?.trim();
+    if (!u) return;
+    const key = `${userId}::${u}`;
+    if (!byKey.has(key)) byKey.set(key, { userId, speedhiveUrl: u, trackName });
+  };
+
   for (const ev of events) {
-    const url = ev.track?.speedhiveUrl?.trim();
-    if (!url) continue;
     for (const p of ev.participations) {
-      const key = `${p.userId}::${url}`;
-      if (!byKey.has(key)) {
-        byKey.set(key, { userId: p.userId, speedhiveUrl: url, trackName: ev.track?.name ?? null });
-      }
+      add(p.userId, ev.track?.speedhiveUrl, ev.track?.name ?? null);
     }
+  }
+  for (const r of runsToday) {
+    add(r.userId, r.track?.speedhiveUrl, r.track?.name ?? null);
   }
   return [...byKey.values()];
 }
@@ -98,10 +127,13 @@ export type ResultCheckReport = {
   hint: string | null;
 };
 
-/** Deep-link a session URL to the on-demand import + Add Run flow (never auto-imports). */
-function tapUrlForSession(sessionUrl: string): string {
-  return `/api/laps/import-and-log?session=${encodeURIComponent(sessionUrl)}`;
-}
+/**
+ * Deep-link for a "new run" notification. The notification is a pure trigger: it opens
+ * the normal Add Run flow and resumes today's in-progress draft if one exists (so pre-run
+ * setup/notes aren't orphaned). It NEVER auto-imports laps — the driver adds laps the
+ * normal way. Hence a constant, session-less link.
+ */
+const NEW_RUN_TAP_URL = "/runs/new?resume=1";
 
 export async function checkSpeedhiveResultsForUser(
   target: ResultWatchTarget,
@@ -152,7 +184,7 @@ export async function checkSpeedhiveResultsForUser(
   const res = await sendPushToUser(target.userId, {
     title,
     body,
-    url: tapUrlForSession(newest.sessionUrl),
+    url: NEW_RUN_TAP_URL,
     tag: "jrc-new-result",
   });
 
@@ -208,7 +240,7 @@ export async function runWatchTest(
     const res = await sendPushToUser(userId, {
       title: "New run (test)",
       body: `${newest.label || "Session"} — tap to log this run.`,
-      url: tapUrlForSession(newest.sessionUrl),
+      url: NEW_RUN_TAP_URL,
       tag: "jrc-new-result",
     });
     return {
