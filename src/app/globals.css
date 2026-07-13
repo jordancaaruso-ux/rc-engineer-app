@@ -110,6 +110,11 @@ html {
   min-height: 100dvh;
   /* Overscroll / gap fallback — tinted to match top mesh, not flat black. */
   background-color: var(--page-top-theme);
+  /* No-zoom (founder decision 2026-07-14): kill double-tap zoom app-wide. Pinch
+   * is blocked by the viewport meta (WKWebView/PWA) + the `gesturestart` guard in
+   * layout.tsx (Safari, which ignores user-scalable). Tap-to-focus zoom on inputs
+   * is stopped by `maximum-scale=1`. */
+  touch-action: manipulation;
 }
 
 body {

@@ -15,6 +15,7 @@ import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
 import { TrackLayoutsEditor } from "@/components/tracks/TrackLayoutsEditor";
+import { TrackTimingLinks } from "@/components/tracks/TrackTimingLinks";
 import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { UnverifiedBadge } from "@/components/assets/CatalogVerifyControl";
@@ -135,6 +136,8 @@ export default async function TrackDetailPage(props: {
             </p>
           ) : null}
 
+          <TrackTimingLinks liveRcUrl={track.liveRcUrl} speedhiveUrl={track.speedhiveUrl} />
+
           {canManage ? (
             <>
               <TrackLocationNotSetBanner
@@ -170,7 +173,7 @@ export default async function TrackDetailPage(props: {
             </>
           ) : (
             <CardPanel contentClassName="text-sm text-muted-foreground">
-              GPS, grip/layout tags, and timing URLs are managed by the user who added this track.
+              GPS and grip/layout tags are managed by the user who added this track.
             </CardPanel>
           )}
 

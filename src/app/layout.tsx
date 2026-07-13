@@ -113,6 +113,24 @@ export const viewport: Viewport = {
 
   initialScale: 1,
 
+  // Lock zoom entirely (founder decision 2026-07-14): tapping a dropdown / input
+
+  // must never trigger iOS focus-zoom, and no pinch gesture should zoom the app.
+
+  // `maximumScale: 1` stops Safari's input focus-zoom; `userScalable: false` locks
+
+  // the WKWebView / installed PWA fully. Safari ignores `userScalable`, so pinch is
+
+  // additionally blocked via `touch-action` + a `gesturestart` guard (see globals.css
+
+  // and the inline no-zoom script below).
+
+  minimumScale: 1,
+
+  maximumScale: 1,
+
+  userScalable: false,
+
   viewportFit: "cover",
 
   themeColor: "#121110",
@@ -187,6 +205,19 @@ export default function RootLayout({ children }: { children: ReactNode }): React
           <Script id="rc-pwa-standalone-bootstrap" strategy="beforeInteractive">
 
             {`(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;if(s){document.documentElement.setAttribute('data-standalone','true');}}catch(e){}})();`}
+
+          </Script>
+
+          {/*
+           * No-zoom guard for mobile Safari, which ignores `user-scalable=no`.
+           * `gesturestart`/`gesturechange` fire only on pinch; preventing them
+           * blocks pinch-zoom without touching normal scroll/tap. Double-tap zoom
+           * is handled by `touch-action: manipulation` (globals.css) and input
+           * focus-zoom by `maximum-scale=1` (viewport). Founder decision 2026-07-14.
+           */}
+          <Script id="rc-no-zoom-guard" strategy="beforeInteractive">
+
+            {`(function(){try{var p=function(e){e.preventDefault();};document.addEventListener('gesturestart',p,{passive:false});document.addEventListener('gesturechange',p,{passive:false});}catch(e){}})();`}
 
           </Script>
 

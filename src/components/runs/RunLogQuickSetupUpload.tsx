@@ -150,7 +150,9 @@ export function RunLogQuickSetupUpload(props: {
         tabIndex={0}
         onPaste={onPaste}
         className={cn(
-          "min-h-[2rem] rounded border border-dashed border-border bg-surface-runna-inset px-2 py-1.5 text-[11px] text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-accent/50",
+          // Clipboard paste is a desktop-only paradigm (no Ctrl+V on phones, and a
+          // touch keyboard can't paste an image into a div) — hide it below `sm`.
+          "hidden sm:block min-h-[2rem] rounded border border-dashed border-border bg-surface-runna-inset px-2 py-1.5 text-[11px] text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-accent/50",
           variant === "banner" ? "flex-1 min-w-[8rem] max-w-md" : "min-w-[6rem] flex-1 max-w-xs"
         )}
       >

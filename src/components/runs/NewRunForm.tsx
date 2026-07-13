@@ -474,7 +474,14 @@ export function NewRunForm(props: {
   >({});
   const [batteries, setBatteries] = useState<BatteryPackOption[]>([]);
   const [batteryId, setBatteryId] = useState<string>("");
-  const [batteryRunsCompleted, setBatteryRunsCompleted] = useState<number>(0);
+  // Raw input string so the field can be cleared/edited freely (empty while
+  // typing); the canonical count is derived from it.
+  const [batteryRunsInput, setBatteryRunsInput] = useState<string>("0");
+  const batteryRunsCompleted = Math.max(0, Math.floor(Number(batteryRunsInput) || 0));
+  // Programmatic setter used by copy-last / edit / auto-fill paths — keeps the
+  // string field in sync when the count is set from a number.
+  const setBatteryRunsCompleted = (n: number) =>
+    setBatteryRunsInput(String(Math.max(0, Math.floor(n))));
 
   const [events, setEvents] = useState<EventOption[]>([]);
   const [eventId, setEventId] = useState<string>("");
@@ -3377,26 +3384,32 @@ export function NewRunForm(props: {
                 onChange={(e) => setNewEventName(e.target.value)}
               />
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  className="form-control px-3 py-2 text-sm"
-                  value={newEventStartDate}
-                  onChange={(e) => {
-                    setNewEventStartDate(e.target.value);
-                    setEventError(null);
-                  }}
-                  placeholder="Start date"
-                />
-                <input
-                  type="date"
-                  className="form-control px-3 py-2 text-sm"
-                  value={newEventEndDate}
-                  onChange={(e) => {
-                    setNewEventEndDate(e.target.value);
-                    setEventError(null);
-                  }}
-                  placeholder="End date"
-                />
+                <div className="space-y-1">
+                  <label className="block ui-label-meta">Start date</label>
+                  <input
+                    type="date"
+                    aria-label="Event start date"
+                    className="form-control w-full px-3 py-2 text-sm"
+                    value={newEventStartDate}
+                    onChange={(e) => {
+                      setNewEventStartDate(e.target.value);
+                      setEventError(null);
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block ui-label-meta">End date</label>
+                  <input
+                    type="date"
+                    aria-label="Event end date"
+                    className="form-control w-full px-3 py-2 text-sm"
+                    value={newEventEndDate}
+                    onChange={(e) => {
+                      setNewEventEndDate(e.target.value);
+                      setEventError(null);
+                    }}
+                  />
+                </div>
               </div>
               {newEventTrackLiveRc ? (
                 <p className="text-[11px] text-muted-foreground">
@@ -3804,11 +3817,14 @@ export function NewRunForm(props: {
                   min={0}
                   className="w-full max-w-md form-control px-3 py-2 text-sm"
                   inputMode="numeric"
-                  value={batteryRunsCompleted}
+                  value={batteryRunsInput}
                   onChange={(e) => {
                     batteryRunUserTouchedRef.current = true;
-                    setBatteryRunsCompleted(Math.max(0, Math.floor(Number(e.target.value) || 0)));
+                    // Keep the raw string (allow empty/partial) so the field can
+                    // be cleared and retyped; the count is derived on read.
+                    setBatteryRunsInput(e.target.value);
                   }}
+                  onBlur={() => setBatteryRunsInput(String(batteryRunsCompleted))}
                   aria-label="Prior runs on this battery pack before this log"
                 />
                 <div className="text-[11px] text-muted-foreground">
