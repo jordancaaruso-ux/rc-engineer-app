@@ -6,6 +6,7 @@ import {
   calibrationReadableByIdWhere,
   calibrationsEditableByUserWhere,
   canManageCalibration,
+  isCalibrationAdmin,
   setupDocumentLinkableAsCalibrationExampleWhere,
 } from "@/lib/setupCalibrations/calibrationAccess";
 import {
@@ -56,6 +57,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     calibrationDataJson?: unknown;
     exampleDocumentId?: string | null;
     setupSheetModelId?: string | null;
+    verified?: boolean;
   };
 
   const existing = await prisma.setupSheetCalibration.findFirst({
@@ -76,7 +78,13 @@ export async function PATCH(request: Request, ctx: Ctx) {
     calibrationDataJson?: object;
     exampleDocumentId?: string | null;
     setupSheetModelId?: string | null;
+    verifiedAt?: Date | null;
   } = {};
+
+  // Verification (gates cross-user auto-pick) is admin-only, independent of ownership.
+  if (typeof body.verified === "boolean" && isCalibrationAdmin(user)) {
+    data.verifiedAt = body.verified ? new Date() : null;
+  }
 
   if (body.name !== undefined) {
     const t = body.name?.trim();

@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getMyNameSetting } from "@/lib/appSettings";
+import { getMyNameSetting, getMyNameSettingsForUsers } from "@/lib/appSettings";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
@@ -21,6 +21,8 @@ import {
   type MatchReason,
 } from "@/lib/runs/runHistoryFilters";
 import { normalizeSetupData } from "@/lib/runSetup";
+import { getBestLap, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
+import { formatLap } from "@/lib/runLaps";
 import { isDocumentMetadataField } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { setupFieldLabel } from "@/lib/setupCompare/changedSincePrevious";
 import { compareRunTimestamp } from "@/lib/runCompareCatalog";
@@ -28,6 +30,7 @@ import { toCompareRunShape } from "@/lib/runCompareShape";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import Link from "next/link";
+import { ChevronRight, Flag, Wrench } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -235,13 +238,19 @@ export default async function RunHistoryPage({
       totalRunCount = loaded.totalRunCount;
       viewAll = loaded.viewAll;
       hasMoreRuns = loaded.hasMoreRuns;
-      const members = await prisma.user.findMany({
-        where: { id: { in: memberIds } },
-        select: { id: true, name: true, email: true },
-      });
+      const [members, myNames] = await Promise.all([
+        prisma.user.findMany({
+          where: { id: { in: memberIds } },
+          select: { id: true, name: true, email: true },
+        }),
+        // Display names are stored per-user in AppSetting (Settings → "My name"),
+        // not User.name — prefer that so the roster matches what each member set.
+        getMyNameSettingsForUsers(memberIds),
+      ]);
       memberDisplayByUserId = Object.fromEntries(
         members.map((m) => {
-          const base = m.name?.trim() || m.email?.trim() || m.id.slice(0, 8);
+          const base =
+            myNames[m.id]?.trim() || m.name?.trim() || m.email?.trim() || m.id.slice(0, 8);
           return [m.id, m.id === user.id ? `You (${base})` : base] as const;
         })
       );
@@ -343,7 +352,7 @@ export default async function RunHistoryPage({
   const matchedRunCount = runs.length;
 
   const groups: Group[] =
-    filters.layout === "flat" ? [] : buildRunHistoryGroups(runs);
+    filters.layout === "flat" ? [] : buildRunHistoryGroups(runs, displayTimeZone);
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
   const compareRunsDescending = allRunsDescending.map(toCompareRunShape);
   const focusRunId =
@@ -365,23 +374,147 @@ export default async function RunHistoryPage({
     ? "That team was not found or you are not a member."
     : activeViewDescription;
 
-  function renderSessionGroup(group: Group, idx: number) {
-    const showSessionColumn = group.runs.some((r) => formatRunSessionDisplay(r) !== "—");
+  /**
+   * The Best/Top5/Median grid table for a set of runs. Reused for solo groups,
+   * single-driver team groups, and inside each per-driver accordion. Column
+   * layout follows `showMemberColumn` (dropped when a driver sub-heading already
+   * names the member) and reorder is team-disabled.
+   */
+  function renderRunsTable(
+    tableRuns: RunInGroup[],
+    opts: { showMemberColumn: boolean; initialExpandedRunId: string | null }
+  ) {
+    const showSessionColumn = tableRuns.some((r) => formatRunSessionDisplay(r) !== "—");
     const columnLayout = {
       showReorderColumn: !teamMode,
-      showMemberColumn: teamMode,
+      showMemberColumn: opts.showMemberColumn,
       showSessionColumn,
     };
     const colSpan = computeRunHistoryColSpan(columnLayout);
     return (
-      <SurfaceCard
-        key={group.id}
-        variant="panel"
-        contentClassName="p-0"
-        className="min-w-0 max-w-full"
-      >
+      <div className="min-w-0 max-w-full max-md:overflow-x-hidden md:overflow-x-auto">
+        <table className="w-full max-w-full text-sm table-fixed">
+          <RunHistoryColGroup layout={columnLayout} />
+          <thead>
+            <RunHistoryMobileHeaderRow colSpan={colSpan} />
+            <tr className="hidden md:table-row border-b border-border bg-muted/70 text-left">
+              {!teamMode ? (
+                <th
+                  className="hidden md:table-cell w-6 px-1 py-2"
+                  aria-label="Drag to reorder"
+                />
+              ) : null}
+              {columnLayout.showMemberColumn ? (
+                <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
+                  <span className="hidden sm:inline">Member</span>
+                  <span className="sm:hidden">Who</span>
+                </th>
+              ) : null}
+              <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                Date
+              </th>
+              {showSessionColumn ? (
+                <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 min-w-0">
+                  Session
+                </th>
+              ) : null}
+              <th className="table-col-header hidden md:table-cell px-4 py-2">Car</th>
+              <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                Best
+              </th>
+              <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                <span className="md:hidden">Top 5</span>
+                <span className="hidden md:inline">Avg top 5</span>
+              </th>
+              <th className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                Avg top 10
+              </th>
+              <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                Median
+              </th>
+              <th
+                className={cn(RUN_HISTORY_ACTION_CELL_CLASS, "text-[10px]")}
+                aria-label="Setup and laps"
+              />
+            </tr>
+          </thead>
+          <tbody>
+            <RunHistoryTable
+              runs={tableRuns}
+              allRunsDescending={compareRunsDescending}
+              runListSource={teamMode ? "team_runs" : "my_runs"}
+              userDisplayName={userDisplayName}
+              displayTimeZone={displayTimeZone}
+              enableReorder={!teamMode}
+              viewerUserId={teamMode ? user.id : null}
+              memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
+              showMemberColumn={columnLayout.showMemberColumn}
+              showSessionColumn={showSessionColumn}
+              matchReasonsById={matchReasonsById}
+              initialExpandedRunId={opts.initialExpandedRunId}
+            />
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  function renderSessionGroup(group: Group, idx: number) {
+    const isRaceMeeting = group.type === "Race Meeting";
+    // Test days: the date now lives on the meta line, so the generic
+    // "Test day – <date>" title collapses to just "Test day".
+    const displayTitle = isRaceMeeting ? group.title : "Test day";
+    const trackDisplay =
+      group.trackName && group.trackName !== "—" ? group.trackName : null;
+    const groupHasFocus =
+      focusRunId != null && group.runs.some((r) => r.id === focusRunId);
+
+    // Team view: cluster a group's runs by driver, ranked by pace (best included
+    // lap), and expose each driver as its own accordion — the collation surface
+    // ("what's everyone running here"). Solo / single-driver groups skip the
+    // driver level and show runs directly.
+    const driverClusters = teamMode
+      ? (() => {
+          const byUser = new Map<string, RunInGroup[]>();
+          for (const r of group.runs) {
+            const uid = r.userId ?? "unknown";
+            const list = byUser.get(uid);
+            if (list) list.push(r);
+            else byUser.set(uid, [r]);
+          }
+          const clusters = [...byUser.entries()].map(([userId, driverRuns]) => {
+            const bests = driverRuns
+              .map((r) => getBestLap(primaryLapRowsFromRun(r)))
+              .filter((n): n is number => n != null);
+            return {
+              userId,
+              name: memberDisplayByUserId?.[userId] ?? "Unknown driver",
+              runs: driverRuns,
+              best: bests.length ? Math.min(...bests) : null,
+            };
+          });
+          // Fastest driver first; drivers with no timed lap fall to the bottom.
+          clusters.sort((a, b) =>
+            a.best == null && b.best == null
+              ? 0
+              : a.best == null
+                ? 1
+                : b.best == null
+                  ? -1
+                  : a.best - b.best
+          );
+          return clusters;
+        })()
+      : null;
+    const multiDriver = driverClusters != null && driverClusters.length > 1;
+    return (
+      // Track-forward session row inside the single Sessions card: icon well
+      // carries the type (flag = race meeting, wrench = testing), date + run
+      // count sit under the full (never truncated) title, track holds the
+      // right column. Approved artifact: sessions-redesign (variant C).
       <details
-        className="min-w-0 max-w-full group/details"
+        key={group.id}
+        className="min-w-0 max-w-full group/details border-t border-border first:border-t-0"
         open={
           focusRunId
             ? group.runs.some((r) => r.id === focusRunId)
@@ -389,96 +522,90 @@ export default async function RunHistoryPage({
         }
       >
         <summary className="list-none cursor-pointer overflow-x-hidden">
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-muted/50 transition">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 leading-none">
-              <span className="session-group-title">{group.title}</span>
-              <span className="text-xs font-semibold leading-none text-muted-foreground">{group.type}</span>
-              {group.trackName ? (
-                <span className="text-xs font-semibold leading-none text-muted-foreground">
-                  · {group.trackName}
-                </span>
-              ) : null}
-              <span className="type-timestamp leading-none">
-                {group.dateLabel}
-              </span>
-            </div>
-            <span className="type-timestamp shrink-0 leading-none">
-              {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
+          <div className="flex min-w-0 items-center gap-3 px-3 py-3 hover:bg-muted/50 transition sm:px-4">
+            <span
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-secondary text-muted-foreground"
+              title={group.type}
+              aria-label={group.type}
+            >
+              {isRaceMeeting ? (
+                <Flag className="h-4 w-4" aria-hidden />
+              ) : (
+                <Wrench className="h-4 w-4" aria-hidden />
+              )}
             </span>
+            <span className="min-w-0 flex-1">
+              <span className="session-group-title block">{displayTitle}</span>
+              <span className="type-timestamp mt-0.5 block leading-none">
+                {group.dateLabel}
+                <span className="whitespace-nowrap">
+                  {" "}· {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
+                </span>
+              </span>
+            </span>
+            {trackDisplay ? (
+              <span className="min-w-0 max-w-[45%] shrink text-right text-xs font-semibold leading-tight text-muted-foreground">
+                {trackDisplay}
+              </span>
+            ) : null}
+            <ChevronRight
+              className="h-3.5 w-3.5 shrink-0 text-faint transition-transform group-open/details:rotate-90"
+              aria-hidden
+            />
           </div>
         </summary>
-        <div className="min-w-0 max-w-full border-t border-border bg-muted/40">
-          <div className="min-w-0 max-w-full max-md:overflow-x-hidden md:overflow-x-auto">
-            <table className="w-full max-w-full text-sm table-fixed">
-              <RunHistoryColGroup layout={columnLayout} />
-              <thead>
-                <RunHistoryMobileHeaderRow colSpan={colSpan} />
-                <tr className="hidden md:table-row border-b border-border bg-muted/70 text-left">
-                  {!teamMode ? (
-                    <th
-                      className="hidden md:table-cell w-6 px-1 py-2"
-                      aria-label="Drag to reorder"
-                    />
-                  ) : null}
-                  {teamMode ? (
-                    <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
-                      <span className="hidden sm:inline">Member</span>
-                      <span className="sm:hidden">Who</span>
-                    </th>
-                  ) : null}
-                  <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                    Date
-                  </th>
-                  {showSessionColumn ? (
-                    <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 min-w-0">
-                      Session
-                    </th>
-                  ) : null}
-                  <th className="table-col-header hidden md:table-cell px-4 py-2">Car</th>
-                  <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                    Best
-                  </th>
-                  <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                    <span className="md:hidden">Top 5</span>
-                    <span className="hidden md:inline">Avg top 5</span>
-                  </th>
-                  <th className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                    Avg top 10
-                  </th>
-                  <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                    Median
-                  </th>
-                  <th
-                    className={cn(RUN_HISTORY_ACTION_CELL_CLASS, "text-[10px]")}
-                    aria-label="Setup and laps"
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                <RunHistoryTable
-                  runs={group.runs}
-                  allRunsDescending={compareRunsDescending}
-                  runListSource={teamMode ? "team_runs" : "my_runs"}
-                  userDisplayName={userDisplayName}
-                  displayTimeZone={displayTimeZone}
-                  enableReorder={!teamMode}
-                  viewerUserId={teamMode ? user.id : null}
-                  memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
-                  showMemberColumn={teamMode}
-                  showSessionColumn={showSessionColumn}
-                  matchReasonsById={matchReasonsById}
-                  initialExpandedRunId={
-                    focusRunId && group.runs.some((r) => r.id === focusRunId)
-                      ? focusRunId
-                      : null
-                  }
-                />
-              </tbody>
-            </table>
-          </div>
+        <div className="min-w-0 max-w-full border-t border-border bg-background/60">
+          {multiDriver && driverClusters ? (
+            driverClusters.map((driver, dIdx) => {
+              const driverHasFocus =
+                focusRunId != null && driver.runs.some((r) => r.id === focusRunId);
+              return (
+                <details
+                  key={driver.userId}
+                  className="group/driver min-w-0 max-w-full border-t border-border first:border-t-0"
+                  open={driverHasFocus}
+                >
+                  <summary className="list-none cursor-pointer overflow-x-hidden">
+                    <div className="flex min-w-0 items-center gap-3 py-2.5 pl-4 pr-3 hover:bg-muted/50 transition sm:pl-6 sm:pr-4">
+                      {/* Pace rank — the driver list is a mini leaderboard. */}
+                      <span className="type-timestamp w-4 shrink-0 text-center text-faint">
+                        {dIdx + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">
+                        {driver.name}
+                      </span>
+                      <span className="type-timestamp shrink-0 whitespace-nowrap">
+                        {driver.runs.length} run{driver.runs.length !== 1 ? "s" : ""}
+                        {driver.best != null ? (
+                          <>
+                            {" "}· best{" "}
+                            <span className="text-foreground">{formatLap(driver.best)}</span>
+                          </>
+                        ) : null}
+                      </span>
+                      <ChevronRight
+                        className="h-3.5 w-3.5 shrink-0 text-faint transition-transform group-open/driver:rotate-90"
+                        aria-hidden
+                      />
+                    </div>
+                  </summary>
+                  {renderRunsTable(driver.runs, {
+                    showMemberColumn: false,
+                    initialExpandedRunId: driverHasFocus ? focusRunId : null,
+                  })}
+                </details>
+              );
+            })
+          ) : (
+            renderRunsTable(group.runs, {
+              // Single-driver team group keeps the member column to attribute the
+              // one driver; solo groups have no member column.
+              showMemberColumn: teamMode,
+              initialExpandedRunId: groupHasFocus ? focusRunId : null,
+            })
+          )}
         </div>
       </details>
-      </SurfaceCard>
     );
   }
 
@@ -639,13 +766,17 @@ export default async function RunHistoryPage({
           </div>
         ) : (
           <div className="space-y-2">
-            {viewAll ? (
-              groups.map((group, idx) => renderSessionGroup(group, idx))
-            ) : (
-              <SessionGroupsPager initial={pagerInitial} step={12}>
-                {groups.map((group, idx) => renderSessionGroup(group, idx))}
-              </SessionGroupsPager>
-            )}
+            {/* One glass card holds every session group (approved artifact:
+                sessions-redesign); groups divide with hairlines inside it. */}
+            <SurfaceCard variant="panel" contentClassName="p-0" className="min-w-0 max-w-full">
+              {viewAll ? (
+                groups.map((group, idx) => renderSessionGroup(group, idx))
+              ) : (
+                <SessionGroupsPager initial={pagerInitial} step={12}>
+                  {groups.map((group, idx) => renderSessionGroup(group, idx))}
+                </SessionGroupsPager>
+              )}
+            </SurfaceCard>
             <RunHistoryViewMore
               viewAll={viewAll}
               hasMoreRuns={hasMoreRuns}

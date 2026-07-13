@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { ensureSeedAdditiveTypes } from "@/lib/additives/ensureSeedAdditiveTypes";
 import { AdditiveGaragePanel } from "@/components/additives/AdditiveGaragePanel";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -31,15 +32,20 @@ export default async function AdditivesPage(): Promise<ReactNode> {
     );
   }
 
-  await requireCurrentUser();
+  const user = await requireCurrentUser();
+  const isAdmin = isAuthAdminEmail(user.email);
   const count = await prisma.additiveType.count();
   if (count === 0) {
     await ensureSeedAdditiveTypes();
   }
-  const additiveTypes = await prisma.additiveType.findMany({
+  const additiveTypeRows = await prisma.additiveType.findMany({
     orderBy: { displayName: "asc" },
-    select: { id: true, displayName: true, modelCode: true },
+    select: { id: true, displayName: true, modelCode: true, verifiedAt: true },
   });
+  const additiveTypes = additiveTypeRows.map((t) => ({
+    ...t,
+    verifiedAt: t.verifiedAt ? t.verifiedAt.toISOString() : null,
+  }));
 
   return (
     <>
@@ -54,7 +60,7 @@ export default async function AdditivesPage(): Promise<ReactNode> {
       </header>
       <section className="page-body">
         <div className="max-w-2xl">
-          <AdditiveGaragePanel initialAdditiveTypes={additiveTypes} />
+          <AdditiveGaragePanel initialAdditiveTypes={additiveTypes} isAdmin={isAdmin} />
         </div>
       </section>
     </>

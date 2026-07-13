@@ -38,10 +38,14 @@ export default async function TiresPage(): Promise<ReactNode> {
   if (count === 0) {
     await ensureSeedTireTypes();
   }
-  const tireTypes = await prisma.tireType.findMany({
+  const tireTypeRows = await prisma.tireType.findMany({
     orderBy: { displayName: "asc" },
-    select: { id: true, displayName: true, modelCode: true },
+    select: { id: true, displayName: true, modelCode: true, verifiedAt: true },
   });
+  const tireTypes = tireTypeRows.map((t) => ({
+    ...t,
+    verifiedAt: t.verifiedAt ? t.verifiedAt.toISOString() : null,
+  }));
 
   return (
     <>

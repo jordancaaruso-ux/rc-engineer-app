@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { calibrationsAutoPickableByUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import {
   fingerprintImageBytes,
   hammingDistanceHex,
@@ -27,7 +27,7 @@ export async function buildImageCalibrationCandidates(input: {
   userId: string;
 }): Promise<ImageCalibrationCandidate[]> {
   const rows = await prisma.setupSheetCalibration.findMany({
-    where: calibrationsVisibleToUserWhere(input.userId),
+    where: calibrationsAutoPickableByUserWhere(input.userId),
     select: {
       id: true,
       name: true,

@@ -7,6 +7,7 @@
  * "library" video so sync/mark steps get real seeking.
  */
 
+import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnalyzeFlowClient } from "@/components/videoAnalysis/AnalyzeFlowClient";
 
@@ -70,6 +71,12 @@ let sessionState: unknown = {
 };
 
 export default function AnalyzeFlowPreviewPage() {
+  // Dev-only synthetic preview — never exposed in production.
+  if (process.env.NODE_ENV === "production") notFound();
+  return <AnalyzeFlowPreviewInner />;
+}
+
+function AnalyzeFlowPreviewInner() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {

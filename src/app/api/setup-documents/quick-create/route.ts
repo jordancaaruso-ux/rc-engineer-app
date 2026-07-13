@@ -25,7 +25,7 @@ import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreate
 import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
-import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { calibrationsAutoPickableByUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 
 /**
  * The image-map calibration for a car's setup-sheet model, if one exists — the model's default
@@ -48,7 +48,7 @@ async function resolveModelImageCalibration(
     return { id: model.defaultCalibration.id, name: model.defaultCalibration.name };
   }
   const cals = await prisma.setupSheetCalibration.findMany({
-    where: { ...calibrationsVisibleToUserWhere(userId), setupSheetModelId },
+    where: { ...calibrationsAutoPickableByUserWhere(userId), setupSheetModelId },
     select: { id: true, name: true, calibrationDataJson: true },
     orderBy: { createdAt: "desc" },
   });

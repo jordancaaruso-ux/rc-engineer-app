@@ -9,9 +9,9 @@
  * clean-schematic axle diagram (front/rear toggle, arm angles on the arms) with
  * camber gain for both axles.
  *
- * Trust doctrine: deltas render untagged (instrument-grade); absolutes carry the
- * pack's verification-grade tag. Geometry deltas are neutral ink — direction,
- * not good/bad.
+ * Styled as one of the setup sheet's sections (SectionCard anatomy: inset Eyebrow
+ * header band, bordered label|value rows) so the card reads as part of the sheet.
+ * Geometry deltas are neutral ink — direction, not good/bad.
  */
 
 import { useId, useMemo, useState } from "react";
@@ -22,22 +22,21 @@ import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
 import {
   computeRollCenterFromSnapshot,
   solveRollCenterDiagram,
-  type RollCenterComputation,
 } from "@/lib/rollCenter/computeFromSnapshot";
 import { encodeLabFields, extractGeometryFields } from "@/lib/rollCenter/labState";
 
-/** Deep link into the Roll Center Lab seeded with this sheet (+ optional ghost). */
-function labHref(value: Record<string, unknown>, ghostValue?: Record<string, unknown> | null): string {
+/** Deep link into the Roll Center Lab seeded with this sheet (+ optional ghost slot). */
+function labHref(
+  value: Record<string, unknown>,
+  ghostValue?: Record<string, unknown> | null,
+  labels?: { s?: string; g?: string }
+): string {
   const s = encodeLabFields(extractGeometryFields(value));
   const g = ghostValue ? encodeLabFields(extractGeometryFields(ghostValue)) : null;
-  return `/analysis/roll-center?s=${s}${g ? `&g=${g}` : ""}`;
+  const sl = labels?.s ? `&sl=${encodeURIComponent(labels.s.slice(0, 60))}` : "";
+  const gl = g && labels?.g ? `&gl=${encodeURIComponent(labels.g.slice(0, 60))}` : "";
+  return `/analysis/roll-center?s=${s}${sl}${g ? `&g=${g}` : ""}${gl}`;
 }
-
-const GRADE_LABELS: Record<RollCenterComputation["verificationGrade"], string> = {
-  measured: "measured",
-  "cross-checked": "cross-checked",
-  "cad-verified": "CAD-verified",
-};
 
 function fmtMm(v: number): string {
   return `${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
@@ -115,91 +114,100 @@ export function RollCenterGeometryBlock({ value, baselineValue, className }: Rol
         : "level";
 
   return (
-    <div className={cn("rounded-lg border border-border bg-secondary/60", className)}>
+    <div className={cn("overflow-hidden rounded-md border border-border bg-surface-runna", className)}>
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-controls={bodyId}
-        className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2.5 text-left"
+        className={cn(
+          "flex w-full items-center gap-2 bg-surface-runna-inset px-2 py-1.5 text-left",
+          expanded && "border-b border-border"
+        )}
       >
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="eyebrow-label">Geometry</span>
+          <span className="font-mono text-[11px] tabular-nums font-semibold text-foreground">
+            RC {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)}mm · rake {fmtMm(computed.rakeMm)}
+          </span>
+        </span>
         <svg
           viewBox="0 0 12 12"
           className={cn(
             "h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-150",
-            expanded && "rotate-90"
+            expanded ? "-rotate-90" : "rotate-90"
           )}
           aria-hidden="true"
         >
           <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="type-data-label">Geometry</span>
-        <span className="font-mono text-[11px] tabular-nums">
-          RC {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)}mm · rake {fmtMm(computed.rakeMm)}
-        </span>
-        <span
-          className="ml-auto font-mono text-[9px] uppercase tracking-[0.18em] text-faint border border-border rounded px-1.5 py-0.5"
-          title="Trust grade for absolute values; deltas between setups are exact regardless"
-        >
-          {GRADE_LABELS[computed.verificationGrade]}
-        </span>
       </button>
 
       {expanded && (
-        <div id={bodyId} className="px-3 pb-3 space-y-3">
-          <SegmentedControl
-            size="sm"
-            className="mx-auto max-w-[200px]"
-            ariaLabel="Axle shown in the schematic"
-            options={[
-              { value: "front", label: "Front" },
-              { value: "rear", label: "Rear" },
-            ]}
-            value={axle}
-            onChange={setAxle}
-          />
-
-          {solves && (
-            <AxleSchematic
-              solved={axle === "front" ? solves.front : solves.rear}
-              axleLabel={axle}
-              className="text-foreground"
+        <div id={bodyId}>
+          <div className="p-3 space-y-3">
+            <SegmentedControl
+              size="sm"
+              className="mx-auto max-w-[200px]"
+              ariaLabel="Axle shown in the schematic"
+              options={[
+                { value: "front", label: "Front" },
+                { value: "rear", label: "Rear" },
+              ]}
+              value={axle}
+              onChange={setAxle}
             />
-          )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 items-start">
-            <div className="space-y-0.5">
-              <div className="type-data-label">Roll center F/R</div>
-              <div className="font-mono text-sm tabular-nums">
-                {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)} mm
+            {solves && (
+              <AxleSchematic
+                solved={axle === "front" ? solves.front : solves.rear}
+                axleLabel={axle}
+                className="text-foreground"
+              />
+            )}
+          </div>
+
+          <div className="border-t border-border/80">
+            <div className="flex min-h-[1.9rem] items-stretch border-b border-border/80">
+              <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground flex items-center">
+                Roll center F/R
               </div>
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5 px-2 py-1">
+                <span className="text-sm font-mono tabular-nums font-semibold text-foreground">
+                  {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)} mm
+                </span>
                 <NeutralDelta current={computed.front.rcHeightMm} baseline={baseline?.front.rcHeightMm} unit="F" />
                 <NeutralDelta current={computed.rear.rcHeightMm} baseline={baseline?.rear.rcHeightMm} unit="R" />
               </div>
             </div>
 
-            <div className="space-y-0.5">
-              <div className="type-data-label">Roll axis</div>
-              <div className="text-current">
-                <RollAxisStrip frontMm={computed.front.rcHeightMm} rearMm={computed.rear.rcHeightMm} />
+            <div className="flex min-h-[1.9rem] items-stretch border-b border-border/80">
+              <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground flex items-center">
+                Roll axis
               </div>
-              <div className="font-mono text-[10px] text-muted-foreground tabular-nums">
-                Δ {Math.abs(computed.rakeMm).toFixed(1)}mm · {rakeWord}
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 px-2 py-1">
+                <RollAxisStrip frontMm={computed.front.rcHeightMm} rearMm={computed.rear.rcHeightMm} />
+                <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+                  Δ {Math.abs(computed.rakeMm).toFixed(1)}mm · {rakeWord}
+                </span>
               </div>
             </div>
 
-            <div className="space-y-0.5 col-span-2 sm:col-span-1">
-              <div className="type-data-label">Camber gain F/R</div>
-              <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                {fmtGain(computed.front.camberGainDegPerMm)} / {fmtGain(computed.rear.camberGainDegPerMm)} °/mm
+            <div className="flex min-h-[1.9rem] items-stretch">
+              <div className="w-[38%] shrink-0 border-r border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground flex items-center">
+                Camber gain F/R
+              </div>
+              <div className="flex min-w-0 flex-1 items-center px-2 py-1">
+                <span className="text-sm font-mono tabular-nums font-semibold text-foreground">
+                  {fmtGain(computed.front.camberGainDegPerMm)} / {fmtGain(computed.rear.camberGainDegPerMm)} °/mm
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 border-t border-border/80 px-2 py-2">
             <Link
-              href={labHref(value, baselineValue)}
+              href={labHref(value, baselineValue, { s: "This sheet", g: "Baseline" })}
               className="tap-active inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-muted/60"
             >
               Open in Lab
@@ -250,16 +258,13 @@ export function RollCenterCompareStrip({ a, b, rightLabel, className }: {
     <div className={cn("rounded-md border border-border bg-secondary/60 p-3 space-y-1.5", className)}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="type-data-label">Computed geometry · this run vs {rightLabel}</span>
-        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
-          deltas exact
-        </span>
       </div>
       {row("Roll center front", ca.front.rcHeightMm, cb.front.rcHeightMm)}
       {row("Roll center rear", ca.rear.rcHeightMm, cb.rear.rcHeightMm)}
       {row("Roll axis rake", ca.rakeMm, cb.rakeMm)}
       <div className="pt-1">
         <Link
-          href={labHref(a, b)}
+          href={labHref(a, b, { s: "This run", g: rightLabel })}
           className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition"
         >
           Compare in Lab →

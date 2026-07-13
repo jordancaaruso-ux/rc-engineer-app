@@ -12,6 +12,7 @@ import {
   parseSpeedhiveTransponderNumbersSetting,
 } from "@/lib/speedhive/speedhiveTransponder";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
+import { ProfilePictureSection } from "@/components/settings/ProfilePictureSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { NotificationsSection } from "@/components/settings/NotificationsSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
@@ -64,6 +65,11 @@ export default async function SettingsPage() {
         />
         <SettingsNavSection />
         <NotificationsSection />
+        <ProfilePictureSection
+          initialImage={user.image}
+          name={user.name}
+          email={user.email}
+        />
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (
           <>

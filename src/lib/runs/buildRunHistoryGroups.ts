@@ -25,8 +25,32 @@ export type RunHistoryGroup<T extends RunForHistoryGroup = RunForHistoryGroup> =
   runs: T[];
 };
 
-function dateKey(d: Date): string {
+/**
+ * Calendar day (YYYY-MM-DD) for grouping. With a `timeZone` the day is resolved
+ * in that zone so a run near UTC midnight groups under the same local day its
+ * label shows; without one it falls back to UTC. `en-CA` yields ISO order.
+ */
+function dateKey(d: Date, timeZone?: string | null): string {
+  if (timeZone) {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(d));
+  }
   return new Date(d).toISOString().slice(0, 10);
+}
+
+/**
+ * Per-run track identity for grouping. Keyed on the resolved track *name*, not
+ * the id: legacy/imported runs often carry only a `trackNameSnapshot` with a
+ * null `trackId`, so id-keying would split the same venue (e.g. one "TFTR" day)
+ * into two groups. Same-named tracks are the same session location here.
+ */
+function trackKey(run: RunForHistoryGroup): string {
+  const name = (run.track?.name ?? run.trackNameSnapshot ?? "").trim().toLowerCase();
+  return name ? `name:${name}` : "no-track";
 }
 
 export function runSessionSortInstant(run: RunForHistoryGroup): Date {
@@ -36,11 +60,18 @@ export function runSessionSortInstant(run: RunForHistoryGroup): Date {
 }
 
 export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
-  runs: T[]
+  runs: T[],
+  timeZone?: string | null
 ): RunHistoryGroup<T>[] {
+  // Non-event runs group by day AND track: a single calendar day can span two
+  // venues (especially in team view, where teammates run different tracks the
+  // same day) — keying on day alone merged them and mislabelled the group with
+  // one track. Events keep their own single-venue grouping.
   const byKey = new Map<string, T[]>();
   for (const run of runs) {
-    const key = run.eventId ? `event-${run.eventId}` : `day-${dateKey(runSessionSortInstant(run))}`;
+    const key = run.eventId
+      ? `event-${run.eventId}`
+      : `day-${dateKey(runSessionSortInstant(run), timeZone)}-${trackKey(run)}`;
     const list = byKey.get(key) ?? [];
     list.push(run);
     byKey.set(key, list);
@@ -51,7 +82,7 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
     const isEvent = !!run.eventId && run.event;
     const title = isEvent && run.event
       ? run.event.name
-      : `Test day – ${formatGroupDate(runSessionSortInstant(run))}`;
+      : `Test day – ${formatGroupDate(runSessionSortInstant(run), timeZone)}`;
     const type: RunHistoryGroup["type"] = isEvent ? "Race Meeting" : "Testing";
     const trackName = isEvent && run.event
       ? (run.event.track?.name ?? run.event.trackNameSnapshot ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
@@ -61,11 +92,24 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
           const start = run.event.startDate ? new Date(run.event.startDate) : runSessionSortInstant(run);
           const end = run.event.endDate ? new Date(run.event.endDate) : runSessionSortInstant(run);
           if (dateKey(start) === dateKey(end)) return formatGroupDate(start);
-          return `${formatGroupDate(start)} – ${formatGroupDate(end)}`;
+          // Compact shared segments so multi-day ranges stay on one line:
+          // "26 – 28 Jun 2026" / "28 Jun – 1 Jul 2026".
+          const startLabel = formatGroupDate(start);
+          const endLabel = formatGroupDate(end);
+          const sameYear = start.getFullYear() === end.getFullYear();
+          if (sameYear && start.getMonth() === end.getMonth()) {
+            return `${start.getDate()} – ${endLabel}`;
+          }
+          if (sameYear) {
+            return `${startLabel.replace(/\s\d{4}$/, "")} – ${endLabel}`;
+          }
+          return `${startLabel} – ${endLabel}`;
         })()
-      : formatGroupDate(runSessionSortInstant(run));
+      : formatGroupDate(runSessionSortInstant(run), timeZone);
     groups.push({
-      id: run.eventId ? `event-${run.eventId}` : `day-${dateKey(runSessionSortInstant(run))}`,
+      id: run.eventId
+        ? `event-${run.eventId}`
+        : `day-${dateKey(runSessionSortInstant(run), timeZone)}-${trackKey(run)}`,
       title,
       type,
       trackName,

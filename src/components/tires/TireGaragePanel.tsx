@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { CatalogVerifyControl } from "@/components/assets/CatalogVerifyControl";
 import type { TireTypeOption } from "@/components/tires/TireTypeCombobox";
 
 export function TireGaragePanel({
@@ -21,6 +22,30 @@ export function TireGaragePanel({
   const [editName, setEditName] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+
+  async function toggleVerify(t: TireTypeOption) {
+    const nextVerified = !t.verifiedAt;
+    setVerifyingId(t.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tire-types/${encodeURIComponent(t.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: t.displayName, verified: nextVerified }),
+      });
+      const data = (await res.json()) as { tireType?: TireTypeOption; error?: string };
+      if (!res.ok || !data.tireType) {
+        setError(data.error ?? "Failed to update verification");
+        return;
+      }
+      setTireTypes((prev) => prev.map((row) => (row.id === t.id ? data.tireType! : row)));
+    } catch {
+      setError("Failed to update verification");
+    } finally {
+      setVerifyingId(null);
+    }
+  }
 
   async function addTireType(e: React.FormEvent) {
     e.preventDefault();
@@ -192,26 +217,39 @@ export function TireGaragePanel({
                 </>
               ) : (
                 <>
-                  <span className="text-sm font-medium">{t.displayName}</span>
-                  {isAdmin ? (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(t)}
-                        className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={deletingId === t.id}
-                        onClick={() => void deleteTireType(t)}
-                        className="text-xs px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-60"
-                      >
-                        {deletingId === t.id ? "Deleting…" : "Delete"}
-                      </button>
-                    </div>
-                  ) : null}
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-medium truncate">{t.displayName}</span>
+                    {!t.verifiedAt && !isAdmin ? <CatalogVerifyControl verified={false} isAdmin={false} /> : null}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isAdmin ? (
+                      <CatalogVerifyControl
+                        verified={!!t.verifiedAt}
+                        isAdmin
+                        pending={verifyingId === t.id}
+                        onToggle={() => void toggleVerify(t)}
+                      />
+                    ) : null}
+                    {isAdmin ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(t)}
+                          className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingId === t.id}
+                          onClick={() => void deleteTireType(t)}
+                          className="text-xs px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-60"
+                        >
+                          {deletingId === t.id ? "Deleting…" : "Delete"}
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
                 </>
               )}
               </CardPanel>

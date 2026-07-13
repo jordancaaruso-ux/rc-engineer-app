@@ -1,20 +1,44 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { JrcMark } from "@/components/brand/JrcMark";
+import { useMobileBackHref } from "@/components/layout/MobileBackContext";
 
 /**
- * Mobile-only brand mark, pinned top-left to balance the account avatar
+ * Mobile-only top-left corner control, pinned to balance the account avatar
  * (`AccountMenu`) top-right. White mark on a glass pill (matches the avatar's
- * surface for legibility over the photo wash). Links to the dashboard.
- * Desktop uses the sidebar brand instead.
+ * surface for legibility over the photo wash). Desktop uses the sidebar brand.
+ *
+ * On pages with a back destination it morphs into the back button (the fixed
+ * pill otherwise covered the header's back arrow); everywhere else it's the JRC
+ * mark linking to the dashboard.
  */
+const PILL_CLASS =
+  "tap-active fixed left-4 z-40 flex h-[34px] items-center justify-center rounded-full border border-white/[0.15] bg-card/70 shadow-[0_2px_10px_rgba(0,0,0,0.45)] backdrop-blur-[20px] backdrop-saturate-[1.4] transition-transform duration-150 active:scale-95 md:hidden";
+
 export function MobileBrandMark() {
+  const backHref = useMobileBackHref();
+
+  if (backHref) {
+    return (
+      <Link
+        href={backHref}
+        prefetch
+        aria-label="Back"
+        className={`${PILL_CLASS} w-[34px] text-foreground`}
+        style={{ top: "var(--top-chrome-y)" }}
+      >
+        <ChevronLeft className="size-[19px]" strokeWidth={2.25} aria-hidden />
+      </Link>
+    );
+  }
+
   return (
     <Link
       href="/"
       aria-label="JRC Race Engineer — dashboard"
-      className="tap-active fixed left-4 z-40 flex h-[34px] items-center rounded-full border border-white/[0.15] bg-card/70 px-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.45)] backdrop-blur-[20px] backdrop-saturate-[1.4] transition-transform duration-150 active:scale-95 md:hidden"
+      className={`${PILL_CLASS} px-3.5`}
       style={{ top: "var(--top-chrome-y)" }}
     >
       <JrcMark variant="white" className="h-[15px] opacity-95" />

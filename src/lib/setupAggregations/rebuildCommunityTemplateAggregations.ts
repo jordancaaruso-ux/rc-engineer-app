@@ -25,6 +25,7 @@ export type RebuildCommunityAggregationsExclusionCounts = {
   excludedNoPayload: number;
   excludedNoCar: number;
   excludedNoTemplate: number;
+  excludedUnverifiedTemplate: number;
   excludedNoSurface: number;
   excludedSparseData: number;
   eligibleDocuments: number;
@@ -59,6 +60,7 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
     excludedNoPayload: 0,
     excludedNoCar: 0,
     excludedNoTemplate: 0,
+    excludedUnverifiedTemplate: 0,
     excludedNoSurface: 0,
     excludedSparseData: 0,
     eligibleDocuments: 0,
@@ -94,16 +96,29 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
     select: {
       id: true,
       setupSheetTemplate: true,
-      setupSheetModel: { select: { slug: true } },
+      setupSheetModel: { select: { slug: true, isAuthorized: true } },
     },
   });
   // Prefer the linked model's slug (canonical template key); fall back to the stored string for
   // cars that predate model links. For A800RR both are the same value.
-  const templateByCarId = new Map(
-    cars.map((c) => [
-      c.id,
-      c.setupSheetModel?.slug ? templateKeyFromModelSlug(c.setupSheetModel.slug) : c.setupSheetTemplate,
-    ])
+  //
+  // Verified-identity gate (docs/ASSET_ACCESS_NORTH_STAR.md): a car linked to an UNVERIFIED
+  // chassis model must not form or feed a community bucket — otherwise a user-created duplicate
+  // chassis pollutes/fragments the shared field. Legacy-string cars (no model link) have no
+  // unverified identity behind them, so they still count.
+  const templateByCarId = new Map<string, { key: string | null; unverified: boolean }>(
+    cars.map((c) => {
+      if (c.setupSheetModel?.slug) {
+        return [
+          c.id,
+          {
+            key: templateKeyFromModelSlug(c.setupSheetModel.slug),
+            unverified: !c.setupSheetModel.isAuthorized,
+          },
+        ];
+      }
+      return [c.id, { key: c.setupSheetTemplate, unverified: false }];
+    })
   );
 
   // key = `${template}\x1e${surface}\x1e${gripBucket}` -> per-parameter observation buckets.
@@ -133,7 +148,12 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
       continue;
     }
 
-    const rawTemplate = templateByCarId.get(effectiveCarId)?.trim() ?? "";
+    const templateEntry = templateByCarId.get(effectiveCarId);
+    if (templateEntry?.unverified) {
+      exclusionCounts.excludedUnverifiedTemplate += 1;
+      continue;
+    }
+    const rawTemplate = templateEntry?.key?.trim() ?? "";
     if (!rawTemplate) {
       exclusionCounts.excludedNoTemplate += 1;
       continue;

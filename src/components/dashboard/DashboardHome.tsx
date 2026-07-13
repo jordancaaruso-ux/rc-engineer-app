@@ -15,40 +15,13 @@ import { HeroPanel } from "@/components/ui/HeroPanel";
 import { Reveal } from "@/components/ui/Reveal";
 import { Eyebrow, HubRowTitle, PanelSubtitle, StatStrip, StatTile } from "@/components/ui/panel";
 
-/** Time-of-day greeting + date chip in the user's zone; falls back gracefully on a bad zone. */
-function headerContext(displayTimeZone: string): { daypart: string; dateChip: string } {
-  const now = new Date();
-  try {
-    const hour = Number(
-      new Intl.DateTimeFormat("en-US", {
-        hour: "numeric",
-        hourCycle: "h23",
-        timeZone: displayTimeZone,
-      }).format(now)
-    );
-    const daypart = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-    const dateChip = new Intl.DateTimeFormat("en-AU", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      timeZone: displayTimeZone,
-    }).format(now);
-    return { daypart, dateChip };
-  } catch {
-    return { daypart: "Welcome back", dateChip: "" };
-  }
-}
-
 export function DashboardHome({
   model,
   displayTimeZone,
-  greetingName,
 }: {
   model: DashboardHomeModel;
   /** IANA zone from rc_tz cookie (UTC until cookie exists). */
   displayTimeZone: string;
-  /** First name for the header greeting; null → daypart only. */
-  greetingName?: string | null;
 }) {
   const {
     featuredEvent,
@@ -63,17 +36,12 @@ export function DashboardHome({
     todayDraftSavedAt,
     engineerSuggestionsPrimaryRunId,
   } = model;
-  const { daypart, dateChip } = headerContext(displayTimeZone);
 
   return (
     <>
-      <header className="page-header page-header-dashboard">
+      <header className="page-header">
         <div className="min-w-0">
           <h1 className="page-title">Dashboard</h1>
-          <p className="page-greeting">
-            {greetingName ? `${daypart}, ${greetingName}` : daypart}
-          </p>
-          {dateChip ? <span className="page-header-chip">{dateChip}</span> : null}
         </div>
       </header>
 

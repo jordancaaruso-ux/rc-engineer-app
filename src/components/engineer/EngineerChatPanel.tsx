@@ -96,6 +96,10 @@ const STATUS_LABEL: Record<string, string> = {
 
 const CHAT_MODE_STORAGE_KEY = "engineer-chat-mode";
 
+// History starts collapsed to the most recent few conversations; the rest live
+// behind a "Show all" toggle so the panel doesn't scroll into a wall of threads.
+const HISTORY_COLLAPSED_COUNT = 4;
+
 const CHAT_MODE_META: Array<{ value: EngineerChatMode; label: string; hint: string }> = [
   { value: "quick", label: "Quick", hint: "Trackside — the read + one call, fast" },
   { value: "normal", label: "Normal", hint: "Balanced setup conversation" },
@@ -322,6 +326,8 @@ export function EngineerChatPanel({
   const [loadingThread, setLoadingThread] = useState(false);
 
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
+
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const [chatMode, setChatMode] = useState<EngineerChatMode>("normal");
 
@@ -933,6 +939,22 @@ export function EngineerChatPanel({
 
   const showNewChat = Boolean(threadId || messages.length > 0);
 
+  const canCollapseHistory = threads.length > HISTORY_COLLAPSED_COUNT;
+
+  // Collapsed view shows the most recent few, but always keeps the active
+  // conversation visible so its highlight isn't hidden behind "Show all".
+  const visibleThreads =
+    historyExpanded || !canCollapseHistory
+      ? threads
+      : (() => {
+          const head = threads.slice(0, HISTORY_COLLAPSED_COUNT);
+          if (threadId && !head.some((t) => t.id === threadId)) {
+            const active = threads.find((t) => t.id === threadId);
+            if (active) return [...head, active];
+          }
+          return head;
+        })();
+
 
 
   return (
@@ -1229,9 +1251,11 @@ export function EngineerChatPanel({
 
         ) : (
 
+          <>
+
           <ul className="space-y-1">
 
-            {threads.map((t) => {
+            {visibleThreads.map((t) => {
 
               const active = t.id === threadId;
 
@@ -1314,6 +1338,30 @@ export function EngineerChatPanel({
             })}
 
           </ul>
+
+          {canCollapseHistory ? (
+
+            <button
+
+              type="button"
+
+              onClick={() => setHistoryExpanded((v) => !v)}
+
+              className="tap-active mt-2 w-full rounded-lg border border-transparent px-3 py-1.5 text-left text-[11px] font-medium text-muted-foreground transition hover:border-border/70 hover:bg-muted/30 hover:text-foreground"
+
+            >
+
+              {historyExpanded
+
+                ? "Show fewer"
+
+                : `Show all ${threads.length} conversations`}
+
+            </button>
+
+          ) : null}
+
+          </>
 
         )}
 

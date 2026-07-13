@@ -3,19 +3,42 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { canManageCatalogRow } from "@/lib/assets/catalogAccessLogic";
+import { tireTypeUsedByOthers } from "@/lib/assets/catalogUsage";
 import { suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 
 const TIRE_TYPE_SELECT = {
   id: true,
   displayName: true,
   modelCode: true,
+  verifiedAt: true,
+  createdByUserId: true,
 } as const;
 
-function requireAdmin(user: { email: string | null }) {
-  if (!isAuthAdminEmail(user.email)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-  return null;
+type ManageableTireType = {
+  id: string;
+  verifiedAt: Date | null;
+  createdByUserId: string | null;
+};
+
+/**
+ * Unified catalog rule: admin always; otherwise the creator only while unverified AND
+ * unused by others. The usedByOthers query runs only when it could matter.
+ */
+async function canManageTireType(
+  user: { id: string; email: string | null },
+  row: ManageableTireType
+): Promise<boolean> {
+  if (isAuthAdminEmail(user.email)) return true;
+  const verified = row.verifiedAt != null;
+  const isCreator = row.createdByUserId != null && row.createdByUserId === user.id;
+  if (verified || !isCreator) return false;
+  const usedByOthers = await tireTypeUsedByOthers(row.id, user.id);
+  return canManageCatalogRow(user, {
+    creatorUserId: row.createdByUserId,
+    verified,
+    usedByOthers,
+  });
 }
 
 export async function PATCH(
@@ -27,8 +50,6 @@ export async function PATCH(
   }
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const forbidden = requireAdmin(user);
-  if (forbidden) return forbidden;
 
   const { tireTypeId } = await context.params;
   const existing = await prisma.tireType.findUnique({
@@ -38,11 +59,25 @@ export async function PATCH(
   if (!existing) {
     return NextResponse.json({ error: "Tire type not found" }, { status: 404 });
   }
+  if (!(await canManageTireType(user, existing))) {
+    return NextResponse.json(
+      { error: "Only the creator (while unverified) or an admin can edit this tire type." },
+      { status: 403 }
+    );
+  }
 
   const body = (await request.json().catch(() => null)) as {
     displayName?: string;
     modelCode?: string;
+    verified?: boolean;
   } | null;
+
+  // Verification is admin-only (founder ground truth). Non-admins editing an unverified
+  // row cannot flip it; the manage check above already let them in for name/code edits.
+  const verifiedData: { verifiedAt?: Date | null } = {};
+  if (body && typeof body.verified === "boolean" && isAuthAdminEmail(user.email)) {
+    verifiedData.verifiedAt = body.verified ? new Date() : null;
+  }
 
   const displayName = body?.displayName?.trim();
   if (!displayName) {
@@ -68,8 +103,8 @@ export async function PATCH(
 
   const tireType = await prisma.tireType.update({
     where: { id: tireTypeId },
-    data: { displayName, modelCode },
-    select: TIRE_TYPE_SELECT,
+    data: { displayName, modelCode, ...verifiedData },
+    select: { id: true, displayName: true, modelCode: true, verifiedAt: true },
   });
 
   return NextResponse.json({ tireType });
@@ -84,16 +119,20 @@ export async function DELETE(
   }
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const forbidden = requireAdmin(user);
-  if (forbidden) return forbidden;
 
   const { tireTypeId } = await context.params;
   const existing = await prisma.tireType.findUnique({
     where: { id: tireTypeId },
-    select: { id: true, displayName: true },
+    select: TIRE_TYPE_SELECT,
   });
   if (!existing) {
     return NextResponse.json({ error: "Tire type not found" }, { status: 404 });
+  }
+  if (!(await canManageTireType(user, existing))) {
+    return NextResponse.json(
+      { error: "Only the creator (while unverified and unused) or an admin can delete this tire type." },
+      { status: 403 }
+    );
   }
 
   await prisma.tireType.delete({ where: { id: tireTypeId } });

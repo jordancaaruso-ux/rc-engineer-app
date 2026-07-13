@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { matchTireTypes, suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
 
@@ -55,6 +56,9 @@ export async function POST(request: Request) {
   try {
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isAuthAdminEmail(user.email)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const body = (await request.json()) as {
       displayName?: string;
       modelCode?: string;

@@ -227,7 +227,7 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
       {
         href: "/setup",
         label: "Setup",
-        description: "Setup documents, calibrations, and bulk import.",
+        description: "Your setup documents and bulk import.",
         icon: "wrench",
       },
     ],
@@ -237,7 +237,7 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
     links: [
       {
         href: "/setup-sheet-models",
-        label: "Cars",
+        label: "Chassis types",
         description: "Shared chassis types and setup sheet models (e.g. Mugen MTC3).",
         icon: "layers",
       },
@@ -249,7 +249,7 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
       },
       {
         href: "/tires",
-        label: "Tires",
+        label: "Tire catalog",
         description: "Shared tire compound catalog (e.g. Sweep D32).",
         icon: "circle-dot",
       },
@@ -258,6 +258,12 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
         label: "Additives",
         description: "Shared tire additive catalog (e.g. Mighty Gripper - Yellow).",
         icon: "flask",
+      },
+      {
+        href: "/setup-calibrations",
+        label: "Calibrations",
+        description: "Shared PDF-to-setup mapping profiles; auto-applied once verified.",
+        icon: "wrench",
       },
       {
         href: "/events",

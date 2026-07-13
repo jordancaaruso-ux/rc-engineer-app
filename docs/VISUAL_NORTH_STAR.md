@@ -71,7 +71,7 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 ### Color semantics
 
-- **Yellow = action only** (CTAs, focus rings, active nav). Never use yellow to mean “fast lap” or “good data.”
+- **Yellow = action only** (CTAs, focus rings, active nav — including the page-title timing-line segment, which is nav-position information, not decoration). Never use yellow to mean “fast lap” or “good data.”
 - **Green / red = pace/quality deltas only** (`gain` / `loss` — faster/slower, cleaner/messier). **Volume deltas are neutral:** fewer runs, laps, or wheel time is *less*, not a failure, so those changes render in muted ink with a plain ↑/↓, never green/red (2026-07-10; `DashboardSummaryCard` `DeltaChip`).
 - **Dark text on yellow** — always `primary-foreground` (`#121110`), never white on yellow.
 
@@ -94,7 +94,7 @@ Sora and JetBrains Mono are SIL OFL.
 
 | Element | Tier | Size | Weight | Case / tracking |
 |---------|------|------|--------|-----------------|
-| Page title (`.page-title`) | **Space Grotesk** (`--font-display`) | 22–30px (`clamp`) | **700 bold** | Sentence · `-0.01em` · corner-bracket pseudo-elements (9px, muted ink at full strength, stretch title height, never yellow) |
+| Page title (`.page-title`) | **Space Grotesk** (`--font-display`) | 22–30px (`clamp`) | **700 bold** | Sentence · `-0.01em` · nav-positional timing line beneath (hairline track spanning the title + yellow sector segment skewed −21°, positioned by the page's dock slot; brackets retired 2026-07-13) |
 | Hub row title (`HubRowTitle`, `.hub-row-title`) | Sora | 17–18px | **600 semibold** | Sentence · `tracking-tight` |
 | Hero card title (`PanelTitle`) | Sora | 20–22px | **700** | Sentence · `tracking-tight` |
 | Section header (`.section-title`, `SectionTitle`, `.run-details-tab`) | Sora | 13–14px | 700 | Sentence · `tracking-tight` |
@@ -115,7 +115,7 @@ Sora and JetBrains Mono are SIL OFL.
 ### Rules
 
 1. **Never mix tiers on the same semantic role** — e.g. section labels are always `<Eyebrow>` (mono), never `.ui-title`.
-2. **One display face, one place** — Space Grotesk (`--font-display`) is used for `.page-title` only (uppercase, corner brackets). Everything else is Sora or JetBrains Mono; do not spread the display face to cards, nav, or body.
+2. **One display face, one place** — Space Grotesk (`--font-display`) is used for `.page-title` only (uppercase, timing line). Everything else is Sora or JetBrains Mono; do not spread the display face to cards, nav, or body.
 3. **Mono tracking is always `0.28em`** for uppercase micro labels (`.type-data-label`, `.table-col-header`). Do not use `0.2em` / `0.14em` one-offs.
 4. **Prefer `font-mono` over `font-sans tabular-nums`** for numeric data (setup sheet values, tables, metrics).
 5. **Do not set inline `fontFamily`** in components — globals + shared classes win.
@@ -282,6 +282,8 @@ Track these when prioritizing rework:
 
 | Date | Change |
 |------|--------|
+| 2026-07-13 | **Dashboard header → left-aligned greeting, no date** (supersedes the 2026-07-11 centering) — the summary card read too far from the top. The `Dashboard` label + mono date chip are gone; the personal `Good evening, {name}` greeting is now the whole header, left-aligned in the display face (`.page-greeting` styled like `.page-title` but bracket-free) with a `sr-only` `Dashboard` h1 for a11y. Top/bottom padding tightened so the `Last 30 days` card rides up. The mobile-JRC-pill collision that forced centering no longer applies: the pill links to the page you're already on, so `MobileBrandMark` hides it on `/` (`usePathname`), letting the greeting own the top-left. Other routes' top chrome unchanged. |
+| 2026-07-13 | **Page title → nav-positional timing line** — corner brackets retired (founder-interviewed via artifact, "segment = nav position" variant approved). `.page-title` now carries a 2px hairline track spanning exactly the title's width, with a 4px yellow sector segment (20% wide, `skewX(-21deg)` — the JRC glyph's cut) positioned at the page's slot in the 5-destination dock (`Dashboard · Analysis · Assets · Engineer · Teams`). `AppShell` resolves the slot via `resolveActiveNavId` + `MOBILE_NAV` and sets `data-nav-sector` + `--title-nav-sector` on `.app-shell`; off-dock routes (Add run, Settings, login) show the bare track, no segment. Yellow here is sanctioned: it encodes location (kin to active-nav), not decoration. Title element is now `width: fit-content; margin-inline: auto` (was flex + bracket gap). |
 | 2026-07-11 | **Dashboard header centered** — the dashboard's left-aligned title (locked 2026-07-03) was the only page-header that collided with the fixed mobile JRC pill (top-left) and read misaligned against the account avatar. Reverted to the shared centered `.page-header` band: `Dashboard` title centered between the JRC pill and avatar, with the time-of-day greeting + mono date chip stacked centered beneath it (`.page-header-dashboard` overrides removed; greeting/chip now inherit the base centered `.page-title` column). Unifies the dashboard with every other page. |
 | 2026-07-10 | **Stat-tile baseline lock + tabular-nums sweep** — `StatTile` label now reserves a fixed 2-line box (`line-clamp-2 min-h-[2.6em] leading-[1.3]`) so a wrapping label ("Time driving") no longer shoves its value off the baseline shared by its neighbours in a `grid-cols-3` strip — fixes the dashboard 30-day trio app-wide via the primitive. Audit found the app already sans-tabular-clean (no `font-sans tabular-nums`, no inline `fontFamily`); added `tabular-nums` to the remaining user-facing numeric leaks (`LapComparisonColumnGrid` value line, `RunComparePanel` current/previous cells, `SetupSheetView` value). Tier-C admin/debug/PDF-calibration mono left as-is (identifiers/code, not tabular data). |
 | 2026-07-06 | **Dock → 5 destinations + floating action + account avatar** — Founder-interviewed nav restructure. **Add run** left the dock for a floating yellow `Log run` pill (bottom-right, 48px, draft-aware green dot, `LogRunFab`; suppressed on run + setup create/edit routes via `shouldShowLogRunFab`). **Settings** left the dock for a top-right account avatar menu (`AccountMenu` — Settings · Privacy · Sign out, `useSession` face). **Teams** took the freed slot. Mobile dock is now `Dashboard · Analysis · Assets · Engineer · Teams` (grid-cols-6 → 5). Desktop sidebar unchanged apart from gaining Teams. |

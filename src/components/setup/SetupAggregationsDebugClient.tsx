@@ -85,6 +85,7 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
             excludedNoPayload?: number;
             excludedNoCar?: number;
             excludedNoTemplate?: number;
+            excludedUnverifiedTemplate?: number;
             excludedSparseData?: number;
             eligibleDocuments?: number;
           };
@@ -126,7 +127,7 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
           ? ` Community (eligible uploads by template): ${comm.createdRows ?? 0} rows, ${comm.documentsIncluded ?? 0} docs; deleted ${comm.deletedRows ?? 0} prior.` +
             (comm.exclusionCounts
               ? ` Examined ${comm.exclusionCounts.totalDocumentsExamined ?? "—"} · eligible ${comm.exclusionCounts.eligibleDocuments ?? 0}` +
-                ` · excl: no-template ${comm.exclusionCounts.excludedNoTemplate ?? 0}, sparse ${comm.exclusionCounts.excludedSparseData ?? 0}.`
+                ` · excl: no-template ${comm.exclusionCounts.excludedNoTemplate ?? 0}, unverified-chassis ${comm.exclusionCounts.excludedUnverifiedTemplate ?? 0}, sparse ${comm.exclusionCounts.excludedSparseData ?? 0}.`
               : "")
           : "";
       setMessage(

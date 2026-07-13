@@ -8,8 +8,31 @@ import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
 import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
-import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { canManageCatalogRow } from "@/lib/assets/catalogAccessLogic";
+import { trackUsedByOthers } from "@/lib/assets/catalogUsage";
 import { archiveTrackLegacyDataBeforeDelete } from "@/lib/tracks/legacyTrackSnapshot";
+
+/**
+ * Unified catalog rule for aggregation-affecting track identity (grip/layout tags) and
+ * deletion: admin always; else the creator only while the track is unverified AND unused
+ * by others. Low-stakes contributions (GPS, LiveRC/Speedhive URLs) stay open to any driver.
+ */
+async function canManageTrackIdentity(
+  user: { id: string; email: string | null },
+  track: { id: string; userId: string; verifiedAt: Date | null }
+): Promise<boolean> {
+  if (isAuthAdminEmail(user.email)) return true;
+  const verified = track.verifiedAt != null;
+  const isCreator = track.userId === user.id;
+  if (verified || !isCreator) return false;
+  const usedByOthers = await trackUsedByOthers(track.id, user.id);
+  return canManageCatalogRow(user, {
+    creatorUserId: track.userId,
+    verified,
+    usedByOthers,
+  });
+}
 
 export async function GET(
   _request: Request,
@@ -74,18 +97,27 @@ export async function PATCH(
     longitude?: unknown;
     locationSource?: string | null;
     clearLocation?: boolean;
+    verified?: boolean;
   } | null;
 
   const existing = await prisma.track.findFirst({
     where: communityTrackByIdWhere(trackId),
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, verifiedAt: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
-  if (!canManageCommunityTrack(user, existing)) {
+
+  // Grip/layout tags key the community condition buckets — protect them with the unified
+  // rule. GPS + track URLs are contributions any driver may add, so they stay open.
+  const touchesAggregationIdentity =
+    !!body && ("gripTags" in body || "layoutTags" in body);
+  if (touchesAggregationIdentity && !(await canManageTrackIdentity(user, existing))) {
     return NextResponse.json(
-      { error: "Only the user who added this track or an admin can edit its metadata." },
+      {
+        error:
+          "This track's grip/layout tags are locked — only the creator (while unverified and unused) or an admin can change them.",
+      },
       { status: 403 }
     );
   }
@@ -99,7 +131,12 @@ export async function PATCH(
     longitude?: number | null;
     locationMarkedAt?: Date | null;
     locationSource?: string | null;
+    verifiedAt?: Date | null;
   } = {};
+  // Verification is admin-only (founder ground truth).
+  if (body && typeof body.verified === "boolean" && isAuthAdminEmail(user.email)) {
+    data.verifiedAt = body.verified ? new Date() : null;
+  }
   if (body && "gripTags" in body) {
     data.gripTags = normalizeGripTags(body.gripTags);
   }
@@ -183,14 +220,17 @@ export async function DELETE(
 
   const track = await prisma.track.findFirst({
     where: communityTrackByIdWhere(trackId),
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, verifiedAt: true },
   });
   if (!track) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
-  if (!canManageCommunityTrack(user, track)) {
+  if (!(await canManageTrackIdentity(user, track))) {
     return NextResponse.json(
-      { error: "Only the user who added this track or an admin can delete it." },
+      {
+        error:
+          "Only the creator (while unverified and unused) or an admin can delete this track.",
+      },
       { status: 403 }
     );
   }

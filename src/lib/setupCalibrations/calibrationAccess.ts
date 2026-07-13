@@ -24,6 +24,18 @@ export function calibrationReadableByIdWhere(
   return { id };
 }
 
+/**
+ * Calibrations eligible for cross-user AUTO-PICK: the user's own (verified or not, to unblock
+ * their own uploads) plus any founder-verified calibration from another user. Unverified
+ * calibrations belonging to other users are never auto-applied — a wrong mapping would silently
+ * mis-parse every reuser's setup. See docs/ASSET_ACCESS_NORTH_STAR.md.
+ */
+export function calibrationsAutoPickableByUserWhere(
+  userId: string
+): Prisma.SetupSheetCalibrationWhereInput {
+  return { OR: [{ userId }, { verifiedAt: { not: null } }] };
+}
+
 export function isCalibrationAdmin(user: CalibrationAccessUser): boolean {
   return isAuthAdminEmail(user.email);
 }

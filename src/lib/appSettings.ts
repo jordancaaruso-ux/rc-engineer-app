@@ -82,6 +82,34 @@ export async function getMyNameSetting(userId: string): Promise<string | null> {
   return getUserSetting(userId, APP_SETTING_KEYS.myName);
 }
 
+/**
+ * Batch `myName` lookup for a set of users (e.g. team roster display names).
+ * Returns a `userId → name` map with only the users who have a non-empty value.
+ */
+export async function getMyNameSettingsForUsers(
+  userIds: string[]
+): Promise<Record<string, string>> {
+  if (userIds.length === 0) return {};
+  try {
+    const rows = await prisma.appSetting.findMany({
+      where: { userId: { in: userIds }, key: APP_SETTING_KEYS.myName },
+      select: { userId: true, value: true },
+    });
+    const out: Record<string, string> = {};
+    for (const r of rows) {
+      const v = r.value?.trim();
+      if (v) out[r.userId] = v;
+    }
+    return out;
+  } catch (err) {
+    if (isMissingAppSettingTableError(err)) {
+      console.warn("[appSettings] AppSetting table missing; returning empty name map");
+      return {};
+    }
+    throw err;
+  }
+}
+
 export async function setMyNameSetting(userId: string, value: string | null): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.myName, value);
 }

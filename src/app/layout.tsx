@@ -24,6 +24,8 @@ import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 
 import { bgPreviewBootstrapScript } from "@/lib/appThemePreview";
 
+import { PWA_SPLASH_MARK_SVG } from "@/lib/pwa/splashMark";
+
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
 
@@ -163,10 +165,11 @@ export default function RootLayout({ children }: { children: ReactNode }): React
          * covers the cold-launch gap; `PwaSplashDismiss` fades it once the app is ready.
          * Plain <img> (not next/image) so it paints without a client loader.
          */}
-        <div id="pwa-splash" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/jrc-mark-yellow.svg" alt="" />
-        </div>
+        <div
+          id="pwa-splash"
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: PWA_SPLASH_MARK_SVG }}
+        />
 
         <div className="app-root">
 

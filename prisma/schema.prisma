@@ -257,6 +257,12 @@ model Track {
   /** Multi-select layout tags (e.g. TECHNICAL + FAST). */
   layoutTags String[] @default([])
   createdAt DateTime @default(now())
+  /**
+   * Founder-verified catalog entry. Null = unverified (user-created, live but flagged in the UI).
+   * Gates the edit-lock on grip/layout tags (unified catalog rule) and reserves the identity for
+   * future community use; grip itself is moving to per-run capture. See docs/ASSET_ACCESS_NORTH_STAR.md.
+   */
+  verifiedAt DateTime?
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
@@ -408,6 +414,11 @@ model AdditiveType {
   /** Unique product code — canonical identity. */
   modelCode   String   @unique
   createdAt   DateTime @default(now())
+  /**
+   * Founder-verified catalog entry. Null = unverified (user-created, live but flagged).
+   * Only verified identities feed community aggregations. See docs/ASSET_ACCESS_NORTH_STAR.md.
+   */
+  verifiedAt  DateTime?
 
   createdBy   User?   @relation("AdditiveTypeCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdByUserId String?
@@ -425,6 +436,11 @@ model TireType {
   /** Unique manufacturer/product code — canonical identity. */
   modelCode   String   @unique
   createdAt   DateTime @default(now())
+  /**
+   * Founder-verified catalog entry. Null = unverified (user-created, live but flagged).
+   * Only verified identities feed community aggregations. See docs/ASSET_ACCESS_NORTH_STAR.md.
+   */
+  verifiedAt  DateTime?
 
   createdBy   User?   @relation("TireTypeCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdByUserId String?
@@ -744,6 +760,11 @@ model SetupSheetCalibration {
    * regardless of this field while global mode is enabled.
    */
   communityShared Boolean @default(false)
+  /**
+   * Founder-verified calibration. Null = unverified: usable by its creator, but never
+   * offered to OTHER users by auto-pick until verified. See docs/ASSET_ACCESS_NORTH_STAR.md.
+   */
+  verifiedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String

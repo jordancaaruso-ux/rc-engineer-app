@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { GearSix, ShieldCheck, SignOut } from "@phosphor-icons/react";
+import { avatarSrc } from "@/lib/profileImage/avatarSrc";
 
 /**
  * Account avatar + menu — the home for Settings after it left the mobile dock
@@ -31,7 +32,7 @@ export function AccountMenu() {
 
   const name = session?.user?.name ?? null;
   const email = session?.user?.email ?? null;
-  const image = session?.user?.image ?? null;
+  const image = avatarSrc(session?.user?.image ?? null);
 
   useEffect(() => {
     if (!open) return;

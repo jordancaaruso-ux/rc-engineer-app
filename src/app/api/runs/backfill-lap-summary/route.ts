@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { computePersistedRunLapSummary } from "@/lib/lapAnalysis";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,9 @@ export async function POST(request: Request) {
 
   const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAuthAdminEmail(user.email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let limit = 2000;
   try {

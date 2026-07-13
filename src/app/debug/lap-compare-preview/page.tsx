@@ -11,6 +11,7 @@
  * the dual-seek offset visually.
  */
 
+import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LapComparePanel } from "@/components/videoAnalysis/LapComparePanel";
 import { SectorClipPlayer } from "@/components/videoAnalysis/SectorClipPlayer";
@@ -130,6 +131,12 @@ const MANUAL_LINES = [
 ];
 
 export default function LapComparePreviewPage() {
+  // Dev-only synthetic preview — never exposed in production.
+  if (process.env.NODE_ENV === "production") notFound();
+  return <LapComparePreviewInner />;
+}
+
+function LapComparePreviewInner() {
   const [ready, setReady] = useState(false);
   const [videoOk, setVideoOk] = useState(false);
 

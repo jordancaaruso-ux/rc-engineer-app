@@ -36,3 +36,78 @@ test("buildRunHistoryGroups groups by event and orders newest first", () => {
   assert.equal(groups[0]!.type, "Race Meeting");
   assert.equal(groups[1]!.type, "Testing");
 });
+
+test("buildRunHistoryGroups splits same-day non-event runs by track", () => {
+  const day = "2025-04-05T09:00:00Z";
+  const runs = [
+    {
+      id: "geelong-1",
+      createdAt: new Date(day),
+      sortAt: new Date(day),
+      eventId: null,
+      trackId: "t-geelong",
+      trackNameSnapshot: "Geelong",
+      track: { name: "Geelong" },
+      event: null,
+    },
+    {
+      id: "mr33-1",
+      createdAt: new Date(day),
+      sortAt: new Date("2025-04-05T11:00:00Z"),
+      eventId: null,
+      trackId: "t-mr33",
+      trackNameSnapshot: "MR33 Arena",
+      track: { name: "MR33 Arena" },
+      event: null,
+    },
+    {
+      id: "geelong-2",
+      createdAt: new Date(day),
+      sortAt: new Date("2025-04-05T10:00:00Z"),
+      eventId: null,
+      trackId: "t-geelong",
+      trackNameSnapshot: "Geelong",
+      track: { name: "Geelong" },
+      event: null,
+    },
+  ];
+  const groups = buildRunHistoryGroups(runs);
+  // Two tracks on one day → two groups, each labelled with its own track.
+  assert.equal(groups.length, 2);
+  const byTrack = Object.fromEntries(groups.map((g) => [g.trackName, g.runs.length]));
+  assert.equal(byTrack["Geelong"], 2);
+  assert.equal(byTrack["MR33 Arena"], 1);
+});
+
+test("buildRunHistoryGroups groups by local day, not UTC, when a zone is given", () => {
+  // Both instants are 12 Jul in Australia/Melbourne (UTC+10) but straddle the
+  // UTC midnight boundary (11 Jul vs 12 Jul UTC).
+  const runs = [
+    {
+      id: "late-night",
+      createdAt: new Date("2025-07-11T14:30:00Z"), // 12 Jul 00:30 AEST
+      sortAt: new Date("2025-07-11T14:30:00Z"),
+      eventId: null,
+      trackId: "t1",
+      trackNameSnapshot: "TFTR",
+      track: { name: "TFTR" },
+      event: null,
+    },
+    {
+      id: "next-morning",
+      createdAt: new Date("2025-07-12T02:00:00Z"), // 12 Jul 12:00 AEST
+      sortAt: new Date("2025-07-12T02:00:00Z"),
+      eventId: null,
+      trackId: "t1",
+      trackNameSnapshot: "TFTR",
+      track: { name: "TFTR" },
+      event: null,
+    },
+  ];
+  // UTC keying splits them into two groups…
+  assert.equal(buildRunHistoryGroups(runs).length, 2);
+  // …but the local day keeps them together.
+  const local = buildRunHistoryGroups(runs, "Australia/Melbourne");
+  assert.equal(local.length, 1);
+  assert.equal(local[0]!.runs.length, 2);
+});

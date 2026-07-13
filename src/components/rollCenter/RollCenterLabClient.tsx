@@ -2,21 +2,27 @@
 
 /**
  * Roll Center Lab — the interactive what-if surface (Phase 3,
- * docs/ROLL_CENTER_NORTH_STAR.md). Seeds from any sheet's geometry via the `s`
- * URL param (`g` = ghost), runs the validated engine live as you move shims,
- * animates chassis roll, charts RC migration, lists shim sensitivities, and
- * exports the what-if: change list to clipboard, or straight into a new run's
- * setup form (`/runs/new?labSetup=…`).
+ * docs/ROLL_CENTER_NORTH_STAR.md). Two setup SLOTS, A and B: fill either from
+ * URL seeds (`s`/`g` + `sl`/`gl` labels), the setup picker (own runs ·
+ * downloaded sheets · teammate-shared runs), or by freezing the current
+ * what-if into B. Tap a slot chip to select it: the selected setup renders
+ * solid and drives every value below the diagram; the other renders as the
+ * dashed ghost. Knobs edit whichever slot is selected — both stay live.
  *
- * Everything is client-side sheet vocabulary — no APIs, no persistence. Deltas
- * vs the loaded sheet are instrument-grade; absolutes carry the pack grade.
+ * Delta chips only exist against a real comparison (the other slot) — never
+ * against the blank no-shim car. The diff list reads other → selected in
+ * compare mode, and edits-vs-loaded-sheet in single-setup mode.
+ *
+ * State is client-side sheet vocabulary; the picker reads the same authed
+ * sources as the Load-setup flow (/api/runs/for-picker + /api/setup/options
+ * + /api/runs/teammate-for-picker). Deltas between setups are
+ * instrument-grade; absolutes carry the pack grade.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
-import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
@@ -25,16 +31,37 @@ import {
   computeRollCenterFromSnapshot,
   deriveRollCenterInputs,
 } from "@/lib/rollCenter/computeFromSnapshot";
+import { resolvePackForSnapshot } from "@/lib/rollCenter/packs";
 import {
   LAB_DEFAULT_FIELDS,
   decodeLabFields,
   encodeLabFields,
+  extractGeometryFields,
   labChangeList,
   type GeometrySheetKey,
   type LabFields,
 } from "@/lib/rollCenter/labState";
+import {
+  formatRunPickerLine,
+  formatRunPickerLineWithDriver,
+  formatRunPickerWhenSegment,
+  type RunPickerRun,
+} from "@/lib/runPickerFormat";
 
 const ROLL_MAX_DEG = 3;
+
+/** One searchable setup source: own run, downloaded sheet, or teammate run. */
+type SetupPickerEntry = {
+  id: string;
+  kind: "run" | "sheet" | "team";
+  label: string;
+  when: string;
+  fields: LabFields;
+};
+
+function isJsonObject(v: unknown): v is Record<string, unknown> {
+  return v != null && typeof v === "object" && !Array.isArray(v);
+}
 
 function fmtMm(v: number, dp = 1): string {
   return `${v >= 0 ? "+" : ""}${v.toFixed(dp)}`;
@@ -125,10 +152,12 @@ function KnobRow({
 function MigrationPathChart({
   sweep,
   ghostSweep,
+  ghostName,
   current,
 }: {
   sweep: { roll: number; x: number; z: number }[];
   ghostSweep: { roll: number; x: number; z: number }[] | null;
+  ghostName: string | null;
   current: { x: number; z: number } | null;
 }) {
   const W = 320;
@@ -207,28 +236,106 @@ function MigrationPathChart({
 
       {ghostSweep && (
         <text x={W - PAD.r} y={PAD.t + 8} textAnchor="end" fontSize={7.5} fill="currentColor" fillOpacity={0.5}>
-          dashed = ghost
+          dashed = {ghostName ?? "ghost"}
         </text>
       )}
     </svg>
   );
 }
 
-export function RollCenterLabClient({ seed, ghostSeed }: {
-  seed: string | null;
-  ghostSeed: string | null;
-}) {
-  /** Loaded sheet state = seed merged over the pack baseline; frozen for deltas + change list. */
-  const baseline = useMemo<LabFields>(() => {
-    const decoded = seed ? decodeLabFields(seed) : null;
-    return { ...LAB_DEFAULT_FIELDS, ...(decoded ?? {}) };
-  }, [seed]);
+/* ── Setup slots ──────────────────────────────────────────────────────────── */
 
-  const [fields, setFields] = useState<LabFields>(baseline);
-  const [ghost, setGhost] = useState<LabFields | null>(() => {
-    const decoded = ghostSeed ? decodeLabFields(ghostSeed) : null;
-    return decoded ? { ...LAB_DEFAULT_FIELDS, ...decoded } : null;
+type SlotId = "a" | "b";
+
+type Slot = {
+  fields: LabFields;
+  /** The as-loaded state when the slot came from a real setup; null = blank car. */
+  loaded: LabFields | null;
+  label: string | null;
+};
+
+function slotFromFields(rawFields: LabFields, label: string | null): Slot {
+  const merged = { ...LAB_DEFAULT_FIELDS, ...rawFields };
+  return { fields: merged, loaded: { ...merged }, label };
+}
+
+function slotName(slot: Slot): string {
+  return slot.label ?? (slot.loaded ? "Loaded sheet" : "Blank car");
+}
+
+/** One slot chip: tap to make this setup the solid, editable one. */
+function SlotChip({
+  id,
+  slot,
+  selected,
+  onSelect,
+  onClear,
+}: {
+  id: SlotId;
+  slot: Slot;
+  selected: boolean;
+  onSelect: () => void;
+  onClear?: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 transition",
+        selected
+          ? "border-primary/60 bg-secondary"
+          : "border-dashed border-border text-muted-foreground"
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+        title={slotName(slot)}
+      >
+        <span
+          className={cn(
+            "shrink-0 rounded border px-1 font-mono text-[9px] uppercase tracking-[0.18em]",
+            selected ? "border-primary/60 text-foreground" : "border-border text-faint"
+          )}
+        >
+          {id}
+        </span>
+        <span className="truncate text-xs font-semibold">{slotName(slot)}</span>
+      </button>
+      {onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Clear setup ${id.toUpperCase()}`}
+          className="shrink-0 rounded p-0.5 text-muted-foreground transition hover:text-foreground"
+        >
+          <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+            <path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel }: {
+  seed: string | null;
+  seedLabel?: string | null;
+  ghostSeed: string | null;
+  ghostSeedLabel?: string | null;
+}) {
+  const [slots, setSlots] = useState<{ a: Slot; b: Slot | null }>(() => {
+    const aDecoded = seed ? decodeLabFields(seed) : null;
+    const bDecoded = ghostSeed ? decodeLabFields(ghostSeed) : null;
+    return {
+      a: aDecoded
+        ? slotFromFields(aDecoded, seedLabel ?? null)
+        : { fields: { ...LAB_DEFAULT_FIELDS }, loaded: null, label: null },
+      b: bDecoded ? slotFromFields(bDecoded, ghostSeedLabel ?? null) : null,
+    };
   });
+  const [sel, setSel] = useState<SlotId>("a");
   const [axle, setAxle] = useState<"front" | "rear">("front");
   const [rollDeg, setRollDeg] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -236,28 +343,173 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
   const rollRef = useRef(0);
   rollRef.current = rollDeg;
 
+  // Guard: selection can never point at an empty slot.
+  const activeId: SlotId = sel === "b" && slots.b ? "b" : "a";
+  const otherId: SlotId = activeId === "a" ? "b" : "a";
+  const active = activeId === "b" ? slots.b! : slots.a;
+  const other = activeId === "a" ? slots.b : slots.a;
+  const comparing = slots.b != null;
+  const activeName = slotName(active);
+  const otherName = comparing && other ? slotName(other) : null;
+
+  /* ── Setup picker (own runs + downloaded sheets + teammates) ── */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerSources, setPickerSources] = useState<SetupPickerEntry[] | null>(null);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+
+  const loadPickerSources = async () => {
+    if (pickerSources || pickerLoading) return;
+    setPickerLoading(true);
+    setPickerError(null);
+    const safeJson = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+    const [runsRes, docsRes, teamRes] = await Promise.all([
+      safeJson("/api/runs/for-picker") as Promise<{ runs?: RunPickerRun[] } | null>,
+      safeJson("/api/setup/options") as Promise<{
+        downloadedSetups?: { id: string; originalFilename?: string | null; createdAt?: string; setupData?: unknown }[];
+      } | null>,
+      safeJson("/api/runs/teammate-for-picker") as Promise<{
+        runs?: (RunPickerRun & { userId?: string | null })[];
+        memberDisplayByUserId?: Record<string, string>;
+      } | null>,
+    ]);
+    if (!runsRes && !docsRes && !teamRes) {
+      setPickerError("Couldn't load your setups — check you're signed in.");
+      setPickerLoading(false);
+      return;
+    }
+    const entries: SetupPickerEntry[] = [];
+    for (const run of runsRes?.runs ?? []) {
+      const data = run.setupSnapshot?.data;
+      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      entries.push({
+        id: `run-${run.id}`,
+        kind: "run",
+        label: formatRunPickerLine(run),
+        when: formatRunPickerWhenSegment(run),
+        fields: extractGeometryFields(data),
+      });
+    }
+    for (const sheet of docsRes?.downloadedSetups ?? []) {
+      const data = sheet.setupData;
+      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      entries.push({
+        id: `sheet-${sheet.id}`,
+        kind: "sheet",
+        label: sheet.originalFilename?.trim() || "Downloaded setup",
+        when: sheet.createdAt ? new Date(sheet.createdAt).toLocaleDateString() : "",
+        fields: extractGeometryFields(data),
+      });
+    }
+    for (const run of teamRes?.runs ?? []) {
+      const data = run.setupSnapshot?.data;
+      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      entries.push({
+        id: `team-${run.id}`,
+        kind: "team",
+        label: formatRunPickerLineWithDriver(run, teamRes?.memberDisplayByUserId),
+        when: formatRunPickerWhenSegment(run),
+        fields: extractGeometryFields(data),
+      });
+    }
+    setPickerSources(entries);
+    setPickerLoading(false);
+  };
+
+  const pickerResults = useMemo(() => {
+    if (!pickerSources) return [];
+    const tokens = pickerQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    const matches =
+      tokens.length === 0
+        ? pickerSources
+        : pickerSources.filter((e) => {
+            const hay = `${e.label} ${e.when} ${e.kind}`.toLowerCase();
+            return tokens.every((t) => hay.includes(t));
+          });
+    return matches.slice(0, 30);
+  }, [pickerSources, pickerQuery]);
+
+  /** Keep the URL shareable: mirror slot A (`s`/`sl`) and slot B (`g`/`gl`) into the query string. */
+  const syncUrl = (slotId: SlotId, nextFields: LabFields | null, label: string | null) => {
+    try {
+      const url = new URL(window.location.href);
+      const fieldsParam = slotId === "a" ? "s" : "g";
+      const labelParam = slotId === "a" ? "sl" : "gl";
+      if (nextFields) {
+        url.searchParams.set(fieldsParam, encodeLabFields(nextFields));
+        if (label) url.searchParams.set(labelParam, label.slice(0, 60));
+        else url.searchParams.delete(labelParam);
+      } else {
+        url.searchParams.delete(fieldsParam);
+        url.searchParams.delete(labelParam);
+      }
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      /* best-effort — Lab state itself is unaffected */
+    }
+  };
+
+  const setSlot = (slotId: SlotId, slot: Slot | null) => {
+    setSlots((s) => (slotId === "a" ? { ...s, a: slot ?? s.a } : { ...s, b: slot }));
+    syncUrl(slotId, slot?.fields ?? null, slot?.label ?? null);
+  };
+
+  const loadEntryIntoSlot = (slotId: SlotId, entry: SetupPickerEntry) => {
+    setSlot(slotId, slotFromFields(entry.fields, entry.label));
+  };
+
+  /** Main row tap: load into the selected slot and close the picker. */
+  const loadEntry = (entry: SetupPickerEntry) => {
+    loadEntryIntoSlot(activeId, entry);
+    setPickerOpen(false);
+    setPickerQuery("");
+  };
+
+  /** "vs" tap: load into the other slot (starts the comparison); picker stays open. */
+  const loadEntryAsComparison = (entry: SetupPickerEntry) => {
+    loadEntryIntoSlot(otherId, entry);
+  };
+
+  /** Freeze the current what-if into B (the old "Set ghost = current", unified into slots). */
+  const freezeCurrentToB = () => {
+    setSlot("b", {
+      fields: { ...active.fields },
+      loaded: { ...active.fields },
+      label: active.label ? `${active.label} · copy` : "What-if copy",
+    });
+  };
+
+  const clearSlotB = () => {
+    setSel("a");
+    setSlot("b", null);
+  };
+
+  const fields = active.fields;
   const inputs = useMemo(() => deriveRollCenterInputs(fields as Record<string, unknown>), [fields]);
   const computed = useMemo(
     () => computeRollCenterFromSnapshot(fields as Record<string, unknown>),
     [fields]
   );
-  const baselineComputed = useMemo(
-    () => computeRollCenterFromSnapshot(baseline as Record<string, unknown>),
-    [baseline]
+  const otherFields = other?.fields ?? null;
+  const otherInputs = useMemo(
+    () => (otherFields ? deriveRollCenterInputs(otherFields as Record<string, unknown>) : null),
+    [otherFields]
   );
-  const ghostInputs = useMemo(
-    () => (ghost ? deriveRollCenterInputs(ghost as Record<string, unknown>) : null),
-    [ghost]
+  const otherComputed = useMemo(
+    () => (otherFields ? computeRollCenterFromSnapshot(otherFields as Record<string, unknown>) : null),
+    [otherFields]
   );
-  const ghostComputed = useMemo(
-    () => (ghost ? computeRollCenterFromSnapshot(ghost as Record<string, unknown>) : null),
-    [ghost]
-  );
+  // Delta chips only exist against the other slot — never vs the blank car.
+  const compareComputed = comparing ? otherComputed : null;
 
   const geo = inputs ? inputs.pack[axle] : null;
   const adj = inputs ? (axle === "front" ? inputs.frontAdj : inputs.rearAdj) : null;
-  const ghostGeo = ghostInputs ? ghostInputs.pack[axle] : null;
-  const ghostAdj = ghostInputs ? (axle === "front" ? ghostInputs.frontAdj : ghostInputs.rearAdj) : null;
+  const ghostGeo = comparing && otherInputs ? otherInputs.pack[axle] : null;
+  const ghostAdj = comparing && otherInputs ? (axle === "front" ? otherInputs.frontAdj : otherInputs.rearAdj) : null;
 
   const solved = useMemo(
     () => (geo && adj ? solveAxle(geo, adj, rollDeg) : null),
@@ -286,6 +538,12 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
     }
     return pts.length > 1 ? pts : null;
   }, [ghostGeo, ghostAdj]);
+
+  /** RC sweep paths folded into the schematic's extents so the view never rescales in roll. */
+  const schematicExtraPoints = useMemo(
+    () => [...(sweep ?? []), ...(ghostSweep ?? [])].map((p) => ({ x: p.x, z: p.z })),
+    [sweep, ghostSweep]
+  );
 
   const sensitivities = useMemo(() => {
     if (!geo || !adj) return null;
@@ -322,11 +580,17 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
     return () => cancelAnimationFrame(raf);
   }, [playing]);
 
+  const updateActiveSlot = (update: (slot: Slot) => Slot) => {
+    setSlots((s) =>
+      activeId === "a" ? { ...s, a: update(s.a) } : s.b ? { ...s, b: update(s.b) } : s
+    );
+  };
+
   const setKnob = (keys: GeometrySheetKey[], value: string) => {
-    setFields((f) => {
-      const next = { ...f };
+    updateActiveSlot((slot) => {
+      const next = { ...slot.fields };
       for (const k of keys) next[k] = value;
-      return next;
+      return { ...slot, fields: next };
     });
   };
 
@@ -347,11 +611,13 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
     return inputs.pack.baseChassisCode;
   }, [fields.chassis, inputs]);
 
-  const changes = useMemo(() => labChangeList(fields, baseline), [fields, baseline]);
-  const exportHref = useMemo(
-    () => `/runs/new?labSetup=${encodeLabFields(fields)}&focus=setup`,
-    [fields]
-  );
+  // Compare mode: diff other → selected. Single mode: edits vs the loaded sheet
+  // (a blank-car session has no list — the no-shim default is not a baseline).
+  const changes = useMemo(() => {
+    if (comparing && otherFields) return labChangeList(fields, otherFields);
+    if (active.loaded) return labChangeList(fields, active.loaded);
+    return [];
+  }, [comparing, otherFields, fields, active.loaded]);
 
   const copyChanges = async () => {
     const text = changes.length > 0 ? changes.join("\n") : "no geometry changes";
@@ -364,14 +630,124 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
     }
   };
 
+  /* ── Setups card (slot chips + picker) ── */
+  const setupsCard = (
+    <CardPanel contentClassName="space-y-2">
+      <div className="flex items-center gap-2">
+        <SlotChip id="a" slot={slots.a} selected={activeId === "a"} onSelect={() => setSel("a")} />
+        {slots.b ? (
+          <SlotChip
+            id="b"
+            slot={slots.b}
+            selected={activeId === "b"}
+            onSelect={() => setSel("b")}
+            onClear={clearSlotB}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={freezeCurrentToB}
+            title="Copy the current what-if into slot B, then tweak A against it"
+            className="tap-active flex flex-1 items-center justify-center gap-1 rounded-lg border border-dashed border-border px-2 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-accent/40 hover:text-foreground"
+          >
+            + Compare current…
+          </button>
+        )}
+      </div>
+      <input
+        type="search"
+        value={pickerQuery}
+        placeholder={`Search setups → load into ${activeId.toUpperCase()}…`}
+        onFocus={() => {
+          setPickerOpen(true);
+          void loadPickerSources();
+        }}
+        onClick={() => {
+          // Reopen on tap even when the input never lost focus (post-load state).
+          setPickerOpen(true);
+          void loadPickerSources();
+        }}
+        onChange={(e) => {
+          setPickerQuery(e.target.value);
+          setPickerOpen(true);
+          void loadPickerSources();
+        }}
+        aria-label="Search runs, downloaded setups, and teammate setups"
+        className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+      />
+      {pickerOpen && (
+        <div className="space-y-1">
+          {pickerLoading && <p className="text-xs text-muted-foreground">Loading your setups…</p>}
+          {pickerError && <p className="text-xs text-muted-foreground">{pickerError}</p>}
+          {!pickerLoading && !pickerError && pickerSources && pickerResults.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No matching setups with computable geometry.
+            </p>
+          )}
+          <ul className="max-h-72 space-y-0.5 overflow-y-auto">
+            {pickerResults.map((entry) => (
+              <li key={entry.id} className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => loadEntry(entry)}
+                  title={`Load into setup ${activeId.toUpperCase()}`}
+                  className="flex min-w-0 flex-1 items-baseline gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-muted"
+                >
+                  <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
+                    {entry.kind}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-xs">{entry.label}</span>
+                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-faint">
+                    {entry.when}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadEntryAsComparison(entry)}
+                  title={`Load into setup ${otherId.toUpperCase()} as the comparison`}
+                  className="shrink-0 rounded-md border border-border px-1.5 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-foreground"
+                >
+                  vs
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-foreground"
+            onClick={() => {
+              setPickerOpen(false);
+              setPickerQuery("");
+            }}
+          >
+            Close
+          </button>
+        </div>
+      )}
+      {!comparing && !slots.a.loaded && !pickerOpen && (
+        <p className="text-[10px] leading-relaxed text-faint">
+          Blank no-shim car — play freely, or load a setup to see your real geometry.
+        </p>
+      )}
+    </CardPanel>
+  );
+
   if (!inputs || !computed) {
     return (
-      <CardPanel contentClassName="space-y-3 text-sm text-muted-foreground">
-        <p>This state doesn&apos;t match a supported platform pack (Awesomatix A800R/RR today).</p>
-        <Button variant="outline" onClick={() => setFields({ ...LAB_DEFAULT_FIELDS })}>
-          Reset to A800 baseline
-        </Button>
-      </CardPanel>
+      <div className="flex flex-col gap-3">
+        {setupsCard}
+        <CardPanel contentClassName="space-y-3 text-sm text-muted-foreground">
+          <p>This setup doesn&apos;t match a supported platform pack (Awesomatix A800R/RR today).</p>
+          <Button
+            variant="outline"
+            onClick={() =>
+              updateActiveSlot(() => ({ fields: { ...LAB_DEFAULT_FIELDS }, loaded: null, label: null }))
+            }
+          >
+            Reset {activeId.toUpperCase()} to A800 baseline
+          </Button>
+        </CardPanel>
+      </div>
     );
   }
 
@@ -391,6 +767,9 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* ── Setups (A/B slots + picker) ────────────────────────────── */}
+      {setupsCard}
+
       {/* ── The instrument ─────────────────────────────────────────── */}
       <CardPanel contentClassName="space-y-3">
         <div className="flex items-center gap-2">
@@ -414,7 +793,22 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
         </div>
 
         {solved && (
-          <AxleSchematic solved={solved} ghost={ghostSolved} axleLabel={axle} className="text-foreground" />
+          <div className="aspect-[12/5] w-full">
+            <AxleSchematic
+              solved={solved}
+              ghost={ghostSolved}
+              extraPoints={schematicExtraPoints}
+              fitBox
+              axleLabel={axle}
+              showCamber
+              className="text-foreground"
+            />
+          </div>
+        )}
+        {comparing && (
+          <p className="truncate text-right font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
+            solid = {activeId} · dashed = {otherId}
+          </p>
         )}
 
         <div className="flex items-center gap-3">
@@ -446,29 +840,38 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
 
         <div className="grid grid-cols-3 gap-x-4">
           {[
-            { label: "RC front", value: computed.front.rcHeightMm, base: baselineComputed?.front.rcHeightMm },
-            { label: "RC rear", value: computed.rear.rcHeightMm, base: baselineComputed?.rear.rcHeightMm },
-            { label: "Rake", value: computed.rakeMm, base: baselineComputed?.rakeMm },
+            { label: "RC front", value: computed.front.rcHeightMm, base: compareComputed?.front.rcHeightMm },
+            { label: "RC rear", value: computed.rear.rcHeightMm, base: compareComputed?.rear.rcHeightMm },
+            { label: "Rake", value: computed.rakeMm, base: compareComputed?.rakeMm },
           ].map((s) => (
             <div key={s.label} className="space-y-0.5">
               <div className="type-data-label">{s.label}</div>
               <div className="font-mono text-sm tabular-nums">{fmtMm(s.value)} mm</div>
-              {deltaChip(s.value, s.base, "")}
+              {/* Fixed-height slot: chips appearing/vanishing must not reflow the card */}
+              <div className="h-4">{deltaChip(s.value, s.base, "")}</div>
             </div>
           ))}
         </div>
       </CardPanel>
 
-      {/* ── Adjustments ────────────────────────────────────────────── */}
+      {/* ── Adjustments (edit the selected slot) ───────────────────── */}
       <CardPanel contentClassName="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <Eyebrow>Adjustments · {axle}</Eyebrow>
+          <Eyebrow>
+            Adjustments · {axle}
+            {comparing ? ` · ${activeId.toUpperCase()}` : ""}
+          </Eyebrow>
           <button
             type="button"
             className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition"
-            onClick={() => setFields(baseline)}
+            onClick={() =>
+              updateActiveSlot((slot) => ({
+                ...slot,
+                fields: slot.loaded ? { ...slot.loaded } : { ...LAB_DEFAULT_FIELDS },
+              }))
+            }
           >
-            Reset to loaded
+            {active.loaded ? "Reset to loaded" : "Reset to blank"}
           </button>
         </div>
 
@@ -531,7 +934,12 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
       <CardPanel contentClassName="space-y-3">
         <Eyebrow>RC migration in roll · {axle}</Eyebrow>
         {sweep && (
-          <MigrationPathChart sweep={sweep} ghostSweep={ghostSweep} current={rcAtRoll} />
+          <MigrationPathChart
+            sweep={sweep}
+            ghostSweep={ghostSweep}
+            ghostName={comparing ? otherId.toUpperCase() : null}
+            current={rcAtRoll}
+          />
         )}
         <Eyebrow>Shim sensitivity · {axle}</Eyebrow>
         <div className="space-y-1">
@@ -546,29 +954,15 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
         </div>
       </CardPanel>
 
-      {/* ── Ghost + export ─────────────────────────────────────────── */}
+      {/* ── Differences ────────────────────────────────────────────── */}
       <CardPanel contentClassName="space-y-3">
-        <Eyebrow>Compare &amp; export</Eyebrow>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" className="px-3 py-1 text-xs" onClick={() => setGhost({ ...fields })}>
-            Set ghost = current
-          </Button>
-          {ghost && (
-            <Button variant="outline" className="px-3 py-1 text-xs" onClick={() => setGhost(null)}>
-              Clear ghost
-            </Button>
-          )}
-          {ghostComputed && (
-            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
-              ghost RC {fmtMm(ghostComputed.front.rcHeightMm)} / {fmtMm(ghostComputed.rear.rcHeightMm)} · rake{" "}
-              {fmtMm(ghostComputed.rakeMm)}
-            </span>
-          )}
-        </div>
+        <Eyebrow>{comparing ? "Differences" : "Changes"}</Eyebrow>
 
-        {changes.length > 0 && (
+        {changes.length > 0 ? (
           <div className="rounded-md border border-border bg-secondary/60 p-2.5">
-            <div className="type-data-label mb-1">Changes vs loaded sheet</div>
+            <div className="type-data-label mb-1 truncate">
+              {comparing ? `${otherName} → ${activeName}` : "Changes vs loaded sheet"}
+            </div>
             <ul className="space-y-0.5">
               {changes.map((c) => (
                 <li key={c} className="font-mono text-[10px] leading-relaxed text-muted-foreground">
@@ -577,15 +971,25 @@ export function RollCenterLabClient({ seed, ghostSeed }: {
               ))}
             </ul>
           </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {comparing
+              ? "The two setups have identical geometry."
+              : active.loaded
+                ? "No edits vs the loaded sheet yet."
+                : "Load a setup — or compare two — to see differences here."}
+          </p>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" className="px-3 py-1 text-xs" onClick={copyChanges} disabled={changes.length === 0}>
-            {copied ? "Copied" : "Copy change list"}
+          <Button
+            variant="outline"
+            className="px-3 py-1 text-xs"
+            onClick={copyChanges}
+            disabled={changes.length === 0}
+          >
+            {copied ? "Copied" : comparing ? "Copy differences" : "Copy change list"}
           </Button>
-          <ButtonLink href={exportHref} className={cn("px-3 py-1 text-xs", changes.length === 0 && "opacity-60")}>
-            Log run with this setup
-          </ButtonLink>
         </div>
 
         {computed.assumptions.length > 0 && (

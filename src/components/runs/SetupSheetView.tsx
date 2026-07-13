@@ -272,7 +272,7 @@ export function SetupSheetView({
       data-setup-sheet-template={template.id}
     >
       <div className="text-center border-b-2 border-border pb-2 mb-3">
-        <div className="text-[10px] font-medium text-muted-foreground tracking-widest">SETUP SHEET</div>
+        <div className="type-data-label">Setup sheet</div>
         <div className="text-xs font-medium mt-0.5">{template.label}</div>
       </div>
 

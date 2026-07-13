@@ -9,6 +9,8 @@ export type TireTypeOption = {
   id: string;
   displayName: string;
   modelCode: string;
+  /** ISO string when founder-verified; null/absent = unverified (user-created, flagged). */
+  verifiedAt?: string | null;
 };
 
 export function TireTypeCombobox({

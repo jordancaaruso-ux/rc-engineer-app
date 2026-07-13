@@ -246,14 +246,18 @@ body {
  * PWA native-feel — applies ONLY when launched from the iOS/Android home screen
  * (installed standalone; attribute set by the bootstrap script in layout.tsx).
  * The in-browser experience is deliberately left untouched. These strip the
- * remaining "it's a webpage" tells: whole-document rubber-band overscroll, the
- * grey tap flash, and the long-press callout/selection on chrome. Real content
- * (inputs, prose, tables, chat) keeps selection so lap times / setup values stay
- * copyable.
+ * remaining "it's a webpage" tells: the grey tap flash and the long-press
+ * callout/selection on chrome. Real content (inputs, prose, tables, chat) keeps
+ * selection so lap times / setup values stay copyable.
+ *
+ * We deliberately KEEP the whole-document rubber-band overscroll (`auto`, not
+ * `none`): the springy bounce-back at the top/bottom of a scroll is a core
+ * native-app tell. Suppressing it left a cheap, harsh hard-stop. In standalone
+ * there is no browser pull-to-refresh to guard against, so the bounce is free.
  */
 html[data-standalone="true"],
 html[data-standalone="true"] body {
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: auto;
 }
 
 html[data-standalone="true"] {
@@ -287,19 +291,51 @@ html[data-standalone="true"] #pwa-splash {
   align-items: center;
   justify-content: center;
   background: #121110;
-  transition: opacity 500ms ease;
+  opacity: 1;
+  /*
+   * Safety net: if hydration stalls or PwaSplashDismiss never runs, this clears
+   * the splash on its own after 4s so the app can never hang on the logo. The JS
+   * path (`.pwa-ready`, below) fires well before this and cancels the animation.
+   */
+  animation: pwa-splash-safety 700ms ease 4000ms forwards;
 }
-html[data-standalone="true"] #pwa-splash img {
+html[data-standalone="true"] #pwa-splash svg {
   width: 40vw;
   max-width: 220px;
   height: auto;
+  /* Gentle, consistent entrance so the cold launch reads as intentional. */
+  animation: pwa-splash-mark-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+@keyframes pwa-splash-mark-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pwa-splash-safety {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+/* Primary dismissal: PwaSplashDismiss adds `.pwa-ready` once the app is truly ready. */
 html.pwa-ready[data-standalone="true"] #pwa-splash {
+  animation: none;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 420ms ease;
 }
 html.pwa-splash-done[data-standalone="true"] #pwa-splash {
   display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-standalone="true"] #pwa-splash svg {
+    animation: none;
+  }
 }
 
 /*
@@ -464,31 +500,13 @@ html[data-nav-pending] .page {
 }
 
 /*
- * Dashboard header — the time-of-day greeting + mono date chip that make the
- * dashboard richer than other pages, now stacked centered under the title so it
- * matches every other page's centered band (interviewed 2026-07-11). The old
- * left-aligned title collided with the fixed mobile JRC pill; centering lets the
- * title sit cleanly between the JRC pill (left) and account avatar (right).
- * The greeting + chip inherit the base centered `.page-title` column. */
-.page-greeting {
-  @apply text-[13px] leading-relaxed text-muted-foreground;
-  margin-top: 2px;
-}
-
-.page-header-chip {
-  font-family: var(--font-mono-jb), ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgb(var(--color-muted-foreground));
-  white-space: nowrap;
-}
-
-/*
- * Page title — Space Grotesk sentence case framed by drafting-style corner
- * brackets (per approved artifact: 9px brackets, full title height, muted ink).
- * Pseudo-elements, no markup change. Yellow deliberately NOT used — reserved
- * for actions.
+ * Page title — Space Grotesk over a nav-positional timing line (approved
+ * artifact v4 "segment = nav position", 2026-07-13; replaces the drafting
+ * corner brackets). A hairline track spans the title's width; a yellow sector
+ * segment (skewed to the JRC glyph's ~21° cut) sits at the page's slot in the
+ * 5-destination mobile dock — `--title-nav-sector` + `data-nav-sector` are set
+ * by AppShell from `resolveActiveNavId`. Off-dock routes (settings, add run,
+ * login) show the bare track. Yellow here carries location, not decoration.
  */
 .page-title {
   font-family: var(--font-display), var(--font-ui), sans-serif;
@@ -496,37 +514,60 @@ html[data-nav-pending] .page {
   font-size: clamp(22px, 4vw, 30px);
   letter-spacing: -0.01em;
   line-height: 1.15;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: 16px;
+  position: relative;
+  width: fit-content;
+  margin-inline: auto;
+  padding-bottom: 10px;
   @apply text-foreground;
 }
 
-.page-title::before,
+/* The track — full title width, hairline. */
 .page-title::after {
   content: "";
-  flex: 0 0 auto;
-  width: 9px;
-  border-block: 1.5px solid rgb(var(--color-muted-foreground));
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgb(var(--color-border));
 }
 
+/* The sector segment — 1/5 of the track, positioned by nav slot.
+   z-index lifts it above the track (::after paints later in pseudo order,
+   which would otherwise draw the hairline through the yellow). */
 .page-title::before {
-  border-left: 1.5px solid rgb(var(--color-muted-foreground));
+  content: "";
+  position: absolute;
+  display: none;
+  z-index: 1;
+  bottom: -1px;
+  height: 4px;
+  width: 20%;
+  left: calc(var(--title-nav-sector, 0) * 20%);
+  background: rgb(var(--color-primary));
+  transform: skewX(-21deg);
+  transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
 }
 
-.page-title::after {
-  border-right: 1.5px solid rgb(var(--color-muted-foreground));
+[data-nav-sector] .page-title::before {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-title::before {
+    transition: none;
+  }
 }
 
 .hub-row-title {
   @apply font-semibold tracking-tight;
 }
 
+/* Session row title inside the single Sessions card (approved artifact:
+   sessions-redesign, variant C) — semibold entity-name voice, may wrap. */
 .session-group-title {
   font-family: var(--font-ui);
-  font-weight: 700;
-  @apply text-[13.915px] leading-none tracking-tight text-foreground;
+  font-weight: 600;
+  @apply text-[14.5px] leading-tight tracking-tight text-foreground;
 }
 
 .sidebar-nav .nav-sidebar-label {

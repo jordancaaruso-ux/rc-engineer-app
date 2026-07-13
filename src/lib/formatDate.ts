@@ -282,8 +282,11 @@ export function formatEventDate(d: string | Date): string {
   return new Date(d).toLocaleDateString(LOCALE, DATE_OPTIONS);
 }
 
-export function formatGroupDate(d: string | Date): string {
-  return new Date(d).toLocaleDateString(LOCALE, DATE_OPTIONS);
+export function formatGroupDate(d: string | Date, timeZone?: string | null): string {
+  return new Date(d).toLocaleDateString(
+    LOCALE,
+    timeZone ? { ...DATE_OPTIONS, timeZone } : DATE_OPTIONS
+  );
 }
 
 /**

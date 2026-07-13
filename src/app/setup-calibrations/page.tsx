@@ -11,6 +11,8 @@ import {
 } from "@/lib/setupCalibrations/calibrationAccess";
 import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { UnverifiedBadge } from "@/components/assets/CatalogVerifyControl";
+import { CatalogVerifyToggleButton } from "@/components/assets/CatalogVerifyToggleButton";
 
 export default async function SetupCalibrationsPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -38,6 +40,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
       createdAt: true,
       userId: true,
       communityShared: true,
+      verifiedAt: true,
       setupSheetModelId: true,
       exampleDocumentId: true,
       setupSheetModel: { select: { name: true } },
@@ -49,8 +52,9 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
         <div>
           <h1 className="page-title">Setup calibrations</h1>
           <p className="page-subtitle">
-            Shared calibration profiles for PDF-to-canonical setup mapping. You can edit and delete
-            calibrations you created{isAdmin ? "; as an admin you can manage any calibration" : ""}.
+            Shared calibration profiles for PDF-to-canonical setup mapping. Yours work for you
+            immediately; a calibration is only auto-applied for other drivers once it&rsquo;s
+            verified{isAdmin ? " (use Verify to bless one)" : ""}.
           </p>
         </div>
       </header>
@@ -70,7 +74,10 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
                 <li key={c.id}>
                   <CardPanel contentClassName="px-4 py-3 flex items-center justify-between gap-2">
                   <div>
-                    <div className="ui-title text-sm text-foreground normal-case">{c.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="ui-title text-sm text-foreground normal-case">{c.name}</div>
+                      {!c.verifiedAt ? <UnverifiedBadge /> : null}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {c.setupSheetModel?.name
                         ? `Car type: ${c.setupSheetModel.name}`
@@ -85,6 +92,12 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {isAdmin ? (
+                      <CatalogVerifyToggleButton
+                        endpoint={`/api/setup-calibrations/${c.id}`}
+                        verified={!!c.verifiedAt}
+                      />
+                    ) : null}
                     {canManage ? (
                       <CalibrationDeleteButton calibrationId={c.id} calibrationName={c.name} />
                     ) : null}

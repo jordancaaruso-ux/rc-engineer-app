@@ -16,6 +16,9 @@ import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
 import { TrackLayoutsEditor } from "@/components/tracks/TrackLayoutsEditor";
 import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { UnverifiedBadge } from "@/components/assets/CatalogVerifyControl";
+import { CatalogVerifyToggleButton } from "@/components/assets/CatalogVerifyToggleButton";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -58,6 +61,7 @@ export default async function TrackDetailPage(props: {
       longitude: true,
       locationSource: true,
       userId: true,
+      verifiedAt: true,
     },
   });
 
@@ -90,6 +94,7 @@ export default async function TrackDetailPage(props: {
   ]);
   const canManage = canManageCommunityTrack(user, track);
   const deleteAsAdmin = canManage && track.userId !== user.id;
+  const isAdmin = isAuthAdminEmail(user.email);
 
   return (
     <>
@@ -97,10 +102,19 @@ export default async function TrackDetailPage(props: {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <PageBackLink href="/tracks" />
           <div>
-            <h1 className="page-title">{track.name}</h1>
+            <h1 className="page-title flex items-center gap-2">
+              {track.name}
+              {!track.verifiedAt ? <UnverifiedBadge /> : null}
+            </h1>
             <p className="page-subtitle">Track details. Add or remove from your favourites.</p>
           </div>
         </div>
+        {isAdmin ? (
+          <CatalogVerifyToggleButton
+            endpoint={`/api/tracks/${track.id}`}
+            verified={!!track.verifiedAt}
+          />
+        ) : null}
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
@@ -116,7 +130,7 @@ export default async function TrackDetailPage(props: {
 
           {!canManage ? (
             <p className="text-xs text-muted-foreground leading-snug">
-              Only the user who added this track or an admin can edit metadata (GPS, tags, timing URLs).
+              This track&rsquo;s grip/layout tags are managed by the driver who added it (or an admin).
               Your runs at this venue: {runCount}.
             </p>
           ) : null}

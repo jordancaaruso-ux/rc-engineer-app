@@ -135,12 +135,25 @@ function LinkageLines({
   );
 }
 
-export function AxleSchematic({ solved, ghost, axleLabel, className }: {
+export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, showCamber, className }: {
   solved: SolvedAxle;
   /** Optional second solve drawn dashed underneath (two-setup ghost compare). */
   ghost?: SolvedAxle | null;
+  /**
+   * Extra points folded into the view extents but not drawn — the Lab passes the
+   * full roll-sweep RC path so the viewBox stays put while the RC marker migrates.
+   */
+  extraPoints?: Vec2[];
+  /**
+   * Fill the parent box (h-full w-full, letterboxed) instead of deriving the
+   * rendered height from the drawing extents — callers pin the schematic in a
+   * fixed-aspect container so knob/roll changes never reflow the page.
+   */
+  fitBox?: boolean;
   /** For the accessible name, e.g. "front". */
   axleLabel?: string;
+  /** Label camber above each wheel (Lab: tracks left/right split under roll). */
+  showCamber?: boolean;
   className?: string;
 }) {
   const d = useMemo(() => {
@@ -153,11 +166,14 @@ export function AxleSchematic({ solved, ghost, axleLabel, className }: {
     const contacts = [solved.left.contact.x, solved.right.contact.x].concat(
       ghost ? [ghost.left.contact.x, ghost.right.contact.x] : []
     );
+    const extraXs = (extraPoints ?? []).map((p) => p.x);
+    const extraZs = (extraPoints ?? []).map((p) => p.z);
     const rcZs = [main.rc.z, ...(gh ? [gh.rc.z] : [])];
-    const xMin = Math.min(...contacts) - 16;
-    const xMax = Math.max(...contacts) + 16;
-    const zMin = Math.min(0, ...rcZs) - 8;
-    const zMax = Math.max(tireTopZ, solved.right.innerUpper.z) + 5;
+    const xMin = Math.min(...contacts, ...extraXs) - 16;
+    const xMax = Math.max(...contacts, ...extraXs) + 16;
+    const zMin = Math.min(0, ...rcZs, ...extraZs) - 8;
+    // Camber labels sit above the tire tops — reserve headroom for them.
+    const zMax = Math.max(tireTopZ, solved.right.innerUpper.z, ...extraZs) + (showCamber ? 12 : 5);
 
     const S = VIEW_W / (xMax - xMin);
     // Quantize every rendered coordinate: Node and browser libm differ by 1 ulp on
@@ -172,6 +188,16 @@ export function AxleSchematic({ solved, ghost, axleLabel, className }: {
     const lowerMid = { x: (r.innerLower.x + r.lowerBall.x) / 2, z: (r.innerLower.z + r.lowerBall.z) / 2 };
     const upperMid = { x: (r.innerUpper.x + r.upperBall.x) / 2, z: (r.innerUpper.z + r.upperBall.z) / 2 };
 
+    // Per-wheel camber anchors: the tire quad's top-edge midpoint (leans with the tire).
+    const camberLabels = ([
+      [solved.left, main.tires[0]],
+      [solved.right, main.tires[1]],
+    ] as const).map(([side, corners]) => ({
+      x: (corners[2].x + corners[3].x) / 2,
+      z: (corners[2].z + corners[3].z) / 2,
+      deg: side.camberDeg,
+    }));
+
     return {
       H,
       X,
@@ -183,8 +209,9 @@ export function AxleSchematic({ solved, ghost, axleLabel, className }: {
       upperAngle: armAngleDeg(r.innerUpper, r.upperBall),
       lowerMid,
       upperMid,
+      camberLabels,
     };
-  }, [solved, ghost]);
+  }, [solved, ghost, extraPoints, showCamber]);
 
   if (!d) return null;
 
@@ -198,7 +225,7 @@ export function AxleSchematic({ solved, ghost, axleLabel, className }: {
   return (
     <svg
       viewBox={`0 0 ${VIEW_W} ${d.H.toFixed(1)}`}
-      className={cn("w-full font-mono", className)}
+      className={cn(fitBox ? "h-full w-full" : "w-full", "font-mono", className)}
       role="img"
       aria-label={`${axleLabel ?? "axle"} suspension schematic, roll center ${d.main.rc.z.toFixed(1)}mm`}
     >
@@ -265,6 +292,22 @@ export function AxleSchematic({ solved, ghost, axleLabel, className }: {
       {joints.map((p, i) => (
         <circle key={`joint-${i}`} cx={d.X(p.x)} cy={d.Y(p.z)} r={2.6} fill="currentColor" fillOpacity={0.85} />
       ))}
+
+      {/* Camber per wheel, above each tire — a rolled solve splits left/right */}
+      {showCamber &&
+        d.camberLabels.map((c, i) => (
+          <text
+            key={`camber-${i}`}
+            x={d.X(c.x)}
+            y={d.Y(c.z) - 5}
+            textAnchor="middle"
+            fontSize={9}
+            fill="currentColor"
+            fillOpacity={0.7}
+          >
+            {c.deg.toFixed(1)}°
+          </text>
+        ))}
 
       {/* Arm angles, labeled on the arms they measure (right side) */}
       <text
