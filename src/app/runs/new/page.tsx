@@ -16,6 +16,7 @@ import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { getLastRunForCopyPreview } from "@/lib/runs/getLastRunForCopyPreview";
 import { CopyLastRunFormProvider } from "@/components/runs/CopyLastRunFormProvider";
 import { NewRunCopyLastRunSlot } from "@/components/runs/NewRunCopyLastRunSlot";
+import { decodeLabFields } from "@/lib/rollCenter/labState";
 
 export default async function NewRunPage({
   searchParams,
@@ -59,6 +60,10 @@ export default async function NewRunPage({
   // `?resume=1` is the "new run — tap to log it" notification landing: offer to continue
   // today's in-progress draft (preserving pre-run setup) before falling through to a blank form.
   const resumeDraft = typeof sp.resume === "string" && sp.resume.trim() === "1";
+  // Roll Center Lab export: geometry field values to merge into the setup sheet
+  // (docs/ROLL_CENTER_NORTH_STAR.md Phase 3 "Lab state → draft setup").
+  const labSetupPrefill =
+    typeof sp.labSetup === "string" && sp.labSetup.length > 0 ? decodeLabFields(sp.labSetup) : null;
 
   const [
     dashboardPrefill,
@@ -137,6 +142,7 @@ export default async function NewRunPage({
                 initialEventId={initialEventId}
                 focusSection={focusSection}
                 initialCopyPreviewRun={copyPreviewRun}
+                labSetupPrefill={labSetupPrefill}
               />
             </NewRunImportLinkChooser>
           </CopyLastRunFormProvider>

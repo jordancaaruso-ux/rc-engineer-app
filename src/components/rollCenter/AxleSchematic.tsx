@@ -8,6 +8,9 @@
  *
  * Draws directly from the engine's solved hardpoints, so what you see IS the solve
  * that produced the numbers. Shared by the setup-sheet geometry block and the Lab.
+ * Accepts rolled solves (chassis-roll poses) and an optional GHOST axle — a second
+ * solve drawn dashed underneath for two-setup comparison (yellow stays reserved for
+ * the live RC marker; the ghost RC is a hollow outline).
  */
 
 import { useMemo } from "react";
@@ -39,29 +42,130 @@ function tireCorners(side: SolvedSide): Vec2[] | null {
   ];
 }
 
-export function AxleSchematic({ solved, axleLabel, className }: {
+type AxleDrawing = {
+  tires: [Vec2[], Vec2[]];
+  rc: Vec2;
+};
+
+function axleDrawing(solved: SolvedAxle): AxleDrawing | null {
+  if (!solved.rollCentre) return null;
+  const left = tireCorners(solved.left);
+  const right = tireCorners(solved.right);
+  if (!left || !right) return null;
+  return { tires: [left, right], rc: solved.rollCentre };
+}
+
+/** Linkage lines for one axle: chassis bar, bulkheads, knuckles, arms. */
+function LinkageLines({
+  solved,
+  X,
+  Y,
+  ghost,
+}: {
   solved: SolvedAxle;
+  X: (x: number) => number;
+  Y: (z: number) => number;
+  ghost?: boolean;
+}) {
+  const dash = ghost ? "4 3" : undefined;
+  const o = (full: number) => (ghost ? full * 0.35 : full);
+  return (
+    <g>
+      {/* Chassis plate between the lower-inner mounts + bulkhead posts */}
+      <line
+        x1={X(solved.left.innerLower.x)}
+        y1={Y(solved.left.innerLower.z)}
+        x2={X(solved.right.innerLower.x)}
+        y2={Y(solved.right.innerLower.z)}
+        stroke="currentColor"
+        strokeOpacity={o(0.25)}
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeDasharray={dash}
+      />
+      {[solved.left, solved.right].map((s, i) => (
+        <g key={`legs-${i}`}>
+          <line
+            x1={X(s.innerLower.x)}
+            y1={Y(s.innerLower.z)}
+            x2={X(s.innerUpper.x)}
+            y2={Y(s.innerUpper.z)}
+            stroke="currentColor"
+            strokeOpacity={o(0.22)}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeDasharray={dash}
+          />
+          <line
+            x1={X(s.lowerBall.x)}
+            y1={Y(s.lowerBall.z)}
+            x2={X(s.upperBall.x)}
+            y2={Y(s.upperBall.z)}
+            stroke="currentColor"
+            strokeOpacity={o(0.4)}
+            strokeWidth={2.4}
+            strokeLinecap="round"
+            strokeDasharray={dash}
+          />
+          <line
+            x1={X(s.innerLower.x)}
+            y1={Y(s.innerLower.z)}
+            x2={X(s.lowerBall.x)}
+            y2={Y(s.lowerBall.z)}
+            stroke="currentColor"
+            strokeOpacity={o(0.85)}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeDasharray={dash}
+          />
+          <line
+            x1={X(s.innerUpper.x)}
+            y1={Y(s.innerUpper.z)}
+            x2={X(s.upperBall.x)}
+            y2={Y(s.upperBall.z)}
+            stroke="currentColor"
+            strokeOpacity={o(0.85)}
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeDasharray={dash}
+          />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+export function AxleSchematic({ solved, ghost, axleLabel, className }: {
+  solved: SolvedAxle;
+  /** Optional second solve drawn dashed underneath (two-setup ghost compare). */
+  ghost?: SolvedAxle | null;
   /** For the accessible name, e.g. "front". */
   axleLabel?: string;
   className?: string;
 }) {
   const d = useMemo(() => {
-    const rc = solved.rollCentre;
-    if (!rc) return null;
-    const tiresRaw = [tireCorners(solved.left), tireCorners(solved.right)];
-    if (!tiresRaw[0] || !tiresRaw[1]) return null;
-    const tires = tiresRaw as [Vec2[], Vec2[]];
+    const main = axleDrawing(solved);
+    if (!main) return null;
+    const gh = ghost ? axleDrawing(ghost) : null;
 
-    const tireTopZ = Math.max(...tires.flat().map((p) => p.z));
-    const xMin = solved.left.contact.x - 16;
-    const xMax = solved.right.contact.x + 16;
-    const zMin = Math.min(0, rc.z) - 8;
+    const allTires = [...main.tires.flat(), ...(gh ? gh.tires.flat() : [])];
+    const tireTopZ = Math.max(...allTires.map((p) => p.z));
+    const contacts = [solved.left.contact.x, solved.right.contact.x].concat(
+      ghost ? [ghost.left.contact.x, ghost.right.contact.x] : []
+    );
+    const rcZs = [main.rc.z, ...(gh ? [gh.rc.z] : [])];
+    const xMin = Math.min(...contacts) - 16;
+    const xMax = Math.max(...contacts) + 16;
+    const zMin = Math.min(0, ...rcZs) - 8;
     const zMax = Math.max(tireTopZ, solved.right.innerUpper.z) + 5;
 
     const S = VIEW_W / (xMax - xMin);
-    const H = (zMax - zMin) * S;
-    const X = (x: number) => (x - xMin) * S;
-    const Y = (z: number) => (zMax - z) * S;
+    // Quantize every rendered coordinate: Node and browser libm differ by 1 ulp on
+    // trig/hypot, which otherwise trips React hydration on SSR'd SVG attributes.
+    const q = (n: number) => Math.round(n * 100) / 100;
+    const H = q((zMax - zMin) * S);
+    const X = (x: number) => q((x - xMin) * S);
+    const Y = (z: number) => q((zMax - z) * S);
     const P = (p: Vec2) => `${X(p.x).toFixed(1)},${Y(p.z).toFixed(1)}`;
 
     const r = solved.right;
@@ -73,15 +177,14 @@ export function AxleSchematic({ solved, axleLabel, className }: {
       X,
       Y,
       P,
-      S,
-      tires,
-      rc,
+      main,
+      gh,
       lowerAngle: armAngleDeg(r.innerLower, r.lowerBall),
       upperAngle: armAngleDeg(r.innerUpper, r.upperBall),
       lowerMid,
       upperMid,
     };
-  }, [solved]);
+  }, [solved, ghost]);
 
   if (!d) return null;
 
@@ -97,7 +200,7 @@ export function AxleSchematic({ solved, axleLabel, className }: {
       viewBox={`0 0 ${VIEW_W} ${d.H.toFixed(1)}`}
       className={cn("w-full font-mono", className)}
       role="img"
-      aria-label={`${axleLabel ?? "axle"} suspension schematic, roll center ${d.rc.z.toFixed(1)}mm`}
+      aria-label={`${axleLabel ?? "axle"} suspension schematic, roll center ${d.main.rc.z.toFixed(1)}mm`}
     >
       {/* Ground + car centerline */}
       <line x1={0} y1={d.Y(0)} x2={VIEW_W} y2={d.Y(0)} stroke="currentColor" strokeOpacity={0.3} strokeWidth={1} />
@@ -112,33 +215,38 @@ export function AxleSchematic({ solved, axleLabel, className }: {
         strokeDasharray="3 4"
       />
 
-      {/* Chassis plate between the lower-inner mounts + bulkhead posts up to the upper mounts */}
-      <line
-        x1={d.X(solved.left.innerLower.x)}
-        y1={d.Y(solved.left.innerLower.z)}
-        x2={d.X(solved.right.innerLower.x)}
-        y2={d.Y(solved.right.innerLower.z)}
-        stroke="currentColor"
-        strokeOpacity={0.25}
-        strokeWidth={3}
-        strokeLinecap="round"
-      />
-      {[solved.left, solved.right].map((s, i) => (
-        <line
-          key={`bulkhead-${i}`}
-          x1={d.X(s.innerLower.x)}
-          y1={d.Y(s.innerLower.z)}
-          x2={d.X(s.innerUpper.x)}
-          y2={d.Y(s.innerUpper.z)}
-          stroke="currentColor"
-          strokeOpacity={0.22}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-        />
-      ))}
+      {/* Ghost setup (dashed, faint) under the live one */}
+      {ghost && d.gh && (
+        <g aria-hidden="true">
+          {d.gh.tires.map((corners, i) => (
+            <polygon
+              key={`ghost-tire-${i}`}
+              points={corners.map(d.P).join(" ")}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={0.18}
+              strokeWidth={1}
+              strokeDasharray="4 3"
+              strokeLinejoin="round"
+            />
+          ))}
+          <LinkageLines solved={ghost} X={d.X} Y={d.Y} ghost />
+          <rect
+            x={d.X(d.gh.rc.x) - 3.4}
+            y={d.Y(d.gh.rc.z) - 3.4}
+            width={6.8}
+            height={6.8}
+            transform={`rotate(45 ${d.X(d.gh.rc.x)} ${d.Y(d.gh.rc.z)})`}
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity={0.45}
+            strokeWidth={1.2}
+          />
+        </g>
+      )}
 
       {/* Tires (lean with real camber) */}
-      {d.tires.map((corners, i) => (
+      {d.main.tires.map((corners, i) => (
         <polygon
           key={`tire-${i}`}
           points={corners.map(d.P).join(" ")}
@@ -151,41 +259,7 @@ export function AxleSchematic({ solved, axleLabel, className }: {
         />
       ))}
 
-      {/* Knuckles, then arms on top */}
-      {[solved.left, solved.right].map((s, i) => (
-        <g key={`side-${i}`}>
-          <line
-            x1={d.X(s.lowerBall.x)}
-            y1={d.Y(s.lowerBall.z)}
-            x2={d.X(s.upperBall.x)}
-            y2={d.Y(s.upperBall.z)}
-            stroke="currentColor"
-            strokeOpacity={0.4}
-            strokeWidth={2.4}
-            strokeLinecap="round"
-          />
-          <line
-            x1={d.X(s.innerLower.x)}
-            y1={d.Y(s.innerLower.z)}
-            x2={d.X(s.lowerBall.x)}
-            y2={d.Y(s.lowerBall.z)}
-            stroke="currentColor"
-            strokeOpacity={0.85}
-            strokeWidth={2}
-            strokeLinecap="round"
-          />
-          <line
-            x1={d.X(s.innerUpper.x)}
-            y1={d.Y(s.innerUpper.z)}
-            x2={d.X(s.upperBall.x)}
-            y2={d.Y(s.upperBall.z)}
-            stroke="currentColor"
-            strokeOpacity={0.85}
-            strokeWidth={1.6}
-            strokeLinecap="round"
-          />
-        </g>
-      ))}
+      <LinkageLines solved={solved} X={d.X} Y={d.Y} />
 
       {/* Pivots + balls */}
       {joints.map((p, i) => (
@@ -217,23 +291,23 @@ export function AxleSchematic({ solved, axleLabel, className }: {
       {/* Roll center — the one yellow mark (marker only; doc's visual rule) */}
       <g className="text-primary">
         <rect
-          x={d.X(d.rc.x) - 3.4}
-          y={d.Y(d.rc.z) - 3.4}
+          x={d.X(d.main.rc.x) - 3.4}
+          y={d.Y(d.main.rc.z) - 3.4}
           width={6.8}
           height={6.8}
-          transform={`rotate(45 ${d.X(d.rc.x)} ${d.Y(d.rc.z)})`}
+          transform={`rotate(45 ${d.X(d.main.rc.x)} ${d.Y(d.main.rc.z)})`}
           fill="currentColor"
         />
       </g>
       <text
-        x={d.X(d.rc.x)}
-        y={d.Y(d.rc.z - 5.2) + 4}
+        x={d.X(d.main.rc.x)}
+        y={d.Y(d.main.rc.z - 5.2) + 4}
         textAnchor="middle"
         fontSize={9.5}
         fill="currentColor"
         fillOpacity={0.9}
       >
-        RC {d.rc.z >= 0 ? "+" : ""}{d.rc.z.toFixed(1)}mm
+        RC {d.main.rc.z >= 0 ? "+" : ""}{d.main.rc.z.toFixed(1)}mm
       </text>
     </svg>
   );

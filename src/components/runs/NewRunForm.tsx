@@ -424,6 +424,12 @@ export function NewRunForm(props: {
   focusSection?: "setup" | null;
   /** Server-loaded last run for copy card (avoids client /api/runs/last-any round trip). */
   initialCopyPreviewRun?: CopyPreviewRunRecord | null;
+  /**
+   * Roll Center Lab export (`/runs/new?labSetup=…`): geometry sheet-field values
+   * to merge over the starting setup, so a Lab what-if becomes a loggable run
+   * (docs/ROLL_CENTER_NORTH_STAR.md Phase 3).
+   */
+  labSetupPrefill?: Record<string, string> | null;
 }) {
   const router = useRouter();
   const copyLastRunCtx = useCopyLastRunFormOptional();
@@ -435,6 +441,7 @@ export function NewRunForm(props: {
   const favouriteTracks = props.favouriteTracks ?? [];
   const dashboardPrefill = props.dashboardPrefill ?? null;
   const initialEventId = props.initialEventId?.trim() || null;
+  const labSetupPrefill = props.labSetupPrefill ?? null;
 
   const [sessionType, setSessionType] = useState<"TESTING" | "RACE_MEETING">("TESTING");
   const [meetingSessionType, setMeetingSessionType] = useState<MeetingSessionType>("PRACTICE");
@@ -972,11 +979,28 @@ export function NewRunForm(props: {
   }, [dashboardPrefill, carsList, clearNewTireSetIntent]);
 
   /**
+   * Roll Center Lab export: merge the Lab's geometry field values over whatever
+   * setup the form starts with (and re-apply after "copy last run", so the
+   * what-if — the reason the driver came here — survives the copy).
+   */
+  const labSetupAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!labSetupPrefill || labSetupAppliedRef.current) return;
+    labSetupAppliedRef.current = true;
+    setSetupData((prev) => setupSnapshotWithDerived({ ...prev, ...labSetupPrefill }));
+    setSetupSectionExpanded(true);
+  }, [labSetupPrefill]);
+  useEffect(() => {
+    if (!labSetupPrefill || !lastRunCopyApplied) return;
+    setSetupData((prev) => setupSnapshotWithDerived({ ...prev, ...labSetupPrefill }));
+  }, [labSetupPrefill, lastRunCopyApplied]);
+
+  /**
    * Silent draft autosave (issue: leaving `/runs/new` mid-log lost everything).
    * Only the plain new-run flow — edit/draft runs and deep-linked prefills own
    * their own state and must not be clobbered by a stale local snapshot.
    */
-  const draftAutosaveEnabled = !isEditing && !dashboardPrefill && !initialEventId;
+  const draftAutosaveEnabled = !isEditing && !dashboardPrefill && !initialEventId && !labSetupPrefill;
   const draftHydratedRef = useRef(false);
 
   // Restore once on mount. Runs after the default/prefill effects above so the

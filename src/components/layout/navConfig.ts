@@ -189,6 +189,12 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
     description: "Compare setups across runs and community data.",
     icon: "git-compare",
   },
+  {
+    href: "/analysis/roll-center",
+    label: "Roll Center Lab",
+    description: "What-if suspension geometry — shims, roll, RC migration.",
+    icon: "flask",
+  },
 ];
 
 export type NavHubSection = {

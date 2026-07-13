@@ -12,7 +12,18 @@ import { test } from "node:test";
 import { computeAxleMetrics, solveAxle, solveCamberTrim, ZERO_ADJUSTMENTS } from "./engine";
 import { parseVsuspUrl } from "./vsusp";
 import { AWESOMATIX_A800_PACK, chassisMountShiftMm, resolvePackForSnapshot } from "./packs";
-import { computeRollCenterFromSnapshot, solveRollCenterDiagram } from "./computeFromSnapshot";
+import {
+  computeRollCenterFromSnapshot,
+  deriveRollCenterInputs,
+  solveRollCenterDiagram,
+} from "./computeFromSnapshot";
+import {
+  LAB_DEFAULT_FIELDS,
+  decodeLabFields,
+  encodeLabFields,
+  extractGeometryFields,
+  labChangeList,
+} from "./labState";
 
 const FOUNDER_VSUSP_URL = `https://www.vsusp.com/#0.8%26project_name%3AA800R%20No%20Shims%20-%20STEEL%26trim%7Bbody_roll_angle%3A0%7Cfront.left_bump%3A0%7Crear.left_bump%3A0%7Cfront.right_bump%3A0%7Crear.right_bump%3A0%7D%26front%7Bframe.susp_type%3A0%7Cframe.bottom_y%3A5000%7Cframe.center_to_upper_mount_x%3A19500%7Cframe.bottom_to_upper_mount_y%3A34500%7Cframe.center_to_lower_mount_x%3A10500%7Cframe.bottom_to_lower_mount_y%3A4450%7Ccontrol_arms.upper_length%3A50691%7Ccontrol_arms.lower_length%3A60500%7Cknuckles.hub_to_upper_x%3A16200%7Cknuckles.hub_to_lower_x%3A16300%7Cknuckles.hub_to_lower_y%3A15000%7Cknuckles.hub_to_upper_y%3A14500%7Cknuckles.hub_to_strut_axis%3A14000%7Cknuckles.strut_incl%3A8000%7Csteering.active%3A0%7Csteering.hub_to_outer_tie_rod_x%3A7620%7Csteering.hub_to_outer_tie_rod_y%3A7620%7Cwheels.offset%3A5220%7Cwheels.diameter%3A1500%7Cwheels.diameter_expl%3A52000%7Ctires.size_convention%3A1%7Ctires.section_width%3A19500%7Ctires.aspect_ratio%3A4500%7Ctires.diameter_expl%3A64000%7Ctires.width_expl%3A24300%7Ctires.compression%3A125%7D%26rear%7Bframe.susp_type%3A0%7Cframe.bottom_y%3A5200%7Cframe.center_to_upper_mount_x%3A19500%7Cframe.bottom_to_upper_mount_y%3A34500%7Cframe.center_to_lower_mount_x%3A9000%7Cframe.bottom_to_lower_mount_y%3A4450%7Ccontrol_arms.upper_length%3A49197%7Ccontrol_arms.lower_length%3A60500%7Cknuckles.hub_to_upper_x%3A16200%7Cknuckles.hub_to_lower_x%3A16300%7Cknuckles.hub_to_lower_y%3A15000%7Cknuckles.hub_to_upper_y%3A14500%7Cknuckles.hub_to_strut_axis%3A14000%7Cknuckles.strut_incl%3A8000%7Csteering.active%3A0%7Csteering.hub_to_outer_tie_rod_x%3A7620%7Csteering.hub_to_outer_tie_rod_y%3A7620%7Cwheels.offset%3A5220%7Cwheels.diameter%3A1500%7Cwheels.diameter_expl%3A52000%7Ctires.size_convention%3A1%7Ctires.section_width%3A19500%7Ctires.aspect_ratio%3A4500%7Ctires.diameter_expl%3A64000%7Ctires.width_expl%3A24300%7Ctires.compression%3A125%7D`;
 
@@ -149,6 +160,39 @@ test("diagram solves draw the same geometry the metrics report", () => {
   // Both sides assembled with sensible ordering for drawing.
   assert.ok(solves.front.left.contact.x < 0 && solves.front.right.contact.x > 0);
   assert.equal(solveRollCenterDiagram({ camber_front: "2" }), null);
+});
+
+test("lab codec: extract → encode → decode roundtrips; garbage rejected", () => {
+  const snapshot: Record<string, unknown> = {
+    under_lower_arm_shims_ff: "0.5",
+    under_lower_arm_shims_fr: 0.5,
+    under_hub_shims_front: "1",
+    upper_inner_shims_ff: "0.5",
+    camber_front: "2.0",
+    chassis: "C01B-RC",
+    spring_front: "not-geometry", // must be dropped
+  };
+  const fields = extractGeometryFields(snapshot);
+  assert.equal(fields.under_lower_arm_shims_fr, "0.5"); // numbers stringified
+  assert.ok(!("spring_front" in fields));
+  const decoded = decodeLabFields(encodeLabFields(fields));
+  assert.deepEqual(decoded, fields);
+  // Garbage / hostile input → null, unknown keys stripped.
+  assert.equal(decodeLabFields("not-base64url-json!!"), null);
+  const smuggled = encodeLabFields({ evil_key: "x", camber_front: "2" } as never);
+  assert.deepEqual(decodeLabFields(smuggled), { camber_front: "2" });
+});
+
+test("lab defaults solve to the VSUSP baseline; derive inputs exposed", () => {
+  const inputs = deriveRollCenterInputs(LAB_DEFAULT_FIELDS as Record<string, unknown>);
+  assert.ok(inputs, "lab defaults must fingerprint the A800 pack");
+  const computed = computeRollCenterFromSnapshot(LAB_DEFAULT_FIELDS as Record<string, unknown>);
+  assert.ok(computed);
+  // No shims + pack ride heights = the no-shim VSUSP anchor (camber unset → link default).
+  assert.ok(Math.abs(computed.front.rcHeightMm - -9.09) < 0.02, `front ${computed.front.rcHeightMm}`);
+  assert.ok(Math.abs(computed.rear.rcHeightMm - -8.5) < 0.02, `rear ${computed.rear.rcHeightMm}`);
+  const changes = labChangeList({ ...LAB_DEFAULT_FIELDS, under_hub_shims_front: "0.5" }, LAB_DEFAULT_FIELDS);
+  assert.deepEqual(changes, ["under hub shims front: 0 → 0.5"]);
 });
 
 test("deltas are datum-robust: shim delta survives a base-geometry error", () => {

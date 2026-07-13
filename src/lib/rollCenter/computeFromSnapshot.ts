@@ -191,14 +191,24 @@ function axleAdjustments(
   return adj;
 }
 
-type SnapshotGeometryInputs = {
+export type SnapshotGeometryInputs = {
   pack: RollCenterPack;
   frontAdj: AxleAdjustments;
   rearAdj: AxleAdjustments;
   assumptions: string[];
 };
 
-/** Shared derivation: pack + per-axle adjustments + assumption notes from a snapshot. */
+/**
+ * Shared derivation: pack + per-axle adjustments + assumption notes from a snapshot.
+ * Exported for the Roll Center Lab, which needs the raw adjustments to run rolled
+ * solves and sensitivity sweeps beyond the static metrics.
+ */
+export function deriveRollCenterInputs(
+  data: Record<string, unknown>
+): SnapshotGeometryInputs | null {
+  return deriveSnapshotInputs(data);
+}
+
 function deriveSnapshotInputs(data: Record<string, unknown>): SnapshotGeometryInputs | null {
   const pack = resolvePackForSnapshot(data);
   if (!pack) return null;

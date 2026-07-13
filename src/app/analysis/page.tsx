@@ -41,8 +41,8 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
   ]);
   const model = await loadAnalysisHomeModel(user.id, displayTimeZone);
 
-  const setupComparisonLink = ANALYSIS_HUB_LINKS.find(
-    (link) => link.href === "/setup/comparison"
+  const toolDoorLinks = ANALYSIS_HUB_LINKS.filter(
+    (link) => link.href === "/setup/comparison" || link.href === "/analysis/roll-center"
   );
 
   return (
@@ -63,10 +63,12 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
         <Reveal index={2}>
           <AnalysisVideoCard video={model.video} />
         </Reveal>
-        {setupComparisonLink ? (
+        {toolDoorLinks.length > 0 ? (
           <Reveal index={3}>
             <ul className="flex flex-col gap-2.5">
-              <HubNavLink link={setupComparisonLink} />
+              {toolDoorLinks.map((link) => (
+                <HubNavLink key={link.href} link={link} />
+              ))}
             </ul>
           </Reveal>
         ) : null}

@@ -15,6 +15,7 @@
  */
 
 import { useId, useMemo, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
@@ -23,6 +24,14 @@ import {
   solveRollCenterDiagram,
   type RollCenterComputation,
 } from "@/lib/rollCenter/computeFromSnapshot";
+import { encodeLabFields, extractGeometryFields } from "@/lib/rollCenter/labState";
+
+/** Deep link into the Roll Center Lab seeded with this sheet (+ optional ghost). */
+function labHref(value: Record<string, unknown>, ghostValue?: Record<string, unknown> | null): string {
+  const s = encodeLabFields(extractGeometryFields(value));
+  const g = ghostValue ? encodeLabFields(extractGeometryFields(ghostValue)) : null;
+  return `/analysis/roll-center?s=${s}${g ? `&g=${g}` : ""}`;
+}
 
 const GRADE_LABELS: Record<RollCenterComputation["verificationGrade"], string> = {
   measured: "measured",
@@ -188,11 +197,19 @@ export function RollCenterGeometryBlock({ value, baselineValue, className }: Rol
             </div>
           </div>
 
-          {computed.assumptions.length > 0 && (
-            <p className="text-[10px] leading-relaxed text-faint">
-              Assumed: {computed.assumptions.join(" · ")}
-            </p>
-          )}
+          <div className="flex items-center justify-between gap-2">
+            <Link
+              href={labHref(value, baselineValue)}
+              className="tap-active inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-muted/60"
+            >
+              Open in Lab
+            </Link>
+            {computed.assumptions.length > 0 && (
+              <p className="min-w-0 text-right text-[10px] leading-relaxed text-faint">
+                Assumed: {computed.assumptions.join(" · ")}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -240,6 +257,14 @@ export function RollCenterCompareStrip({ a, b, rightLabel, className }: {
       {row("Roll center front", ca.front.rcHeightMm, cb.front.rcHeightMm)}
       {row("Roll center rear", ca.rear.rcHeightMm, cb.rear.rcHeightMm)}
       {row("Roll axis rake", ca.rakeMm, cb.rakeMm)}
+      <div className="pt-1">
+        <Link
+          href={labHref(a, b)}
+          className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition"
+        >
+          Compare in Lab →
+        </Link>
+      </div>
     </div>
   );
 }
