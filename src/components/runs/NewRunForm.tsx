@@ -4365,15 +4365,16 @@ export function NewRunForm(props: {
       {/* Persistent save actions — pinned bottom-right so they stay reachable
           anywhere in this long form. Portaled to <body> so the app-wide reveal
           transform on `.page-body` children can't trap `fixed` (which stranded
-          the bar at the form's bottom). Mobile offset mirrors LogRunFab (which is
-          suppressed on run create/edit routes, so no collision): dock pad +
-          dock height + gap. Desktop floats at the viewport corner. */}
+          the bar at the form's bottom). Mobile offset clears the bottom dock
+          bar (the Log-run circle is suppressed on run create/edit routes, so
+          no collision): dock pad + 3.5rem bar + gap. Desktop floats at the
+          viewport corner. */}
       {saveBarMounted &&
         createPortal(
           <div
             className={cn(
               "pointer-events-none fixed inset-x-0 z-40 px-4",
-              "bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.25rem)]",
+              "bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.75rem)]",
               "md:inset-x-auto md:right-8 md:bottom-8 md:px-0"
             )}
           >

@@ -111,12 +111,15 @@ async function loadRunHistoryPage(opts: {
   viewAll: boolean;
   hasMoreRuns: boolean;
 }> {
-  const totalRunCount = await perfSpan("countRunHistoryRows", () =>
-    prisma.run.count({ where: opts.where })
-  );
   let viewAll = opts.viewAll;
-  let take = viewAll ? RUN_HISTORY_VIEW_ALL_TAKE : opts.takeWhenNotViewAll;
-  let runs = await fetchRunHistoryRows(opts.where, take);
+  const take = viewAll ? RUN_HISTORY_VIEW_ALL_TAKE : opts.takeWhenNotViewAll;
+  // Count and first-page fetch are independent — run them concurrently rather
+  // than count-then-fetch serially.
+  const [totalRunCount, initialRuns] = await Promise.all([
+    perfSpan("countRunHistoryRows", () => prisma.run.count({ where: opts.where })),
+    fetchRunHistoryRows(opts.where, take),
+  ]);
+  let runs = initialRuns;
 
   if (
     opts.focusRunId &&
@@ -187,9 +190,13 @@ export default async function RunHistoryPage({
   }
 
   const user = await requireCurrentUser();
-  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
-  const userDisplayName = await getMyNameSetting(user.id);
-  const teamsForUser = await listTeamsForUser(user.id);
+  // These three are independent of each other — run them concurrently instead of
+  // three serial round trips before any run data is fetched.
+  const [displayTimeZone, userDisplayName, teamsForUser] = await Promise.all([
+    getExplicitTimeZoneForRunFormatting(),
+    getMyNameSetting(user.id),
+    listTeamsForUser(user.id),
+  ]);
 
   const rawFocus = resolvedSearch.focusRun;
   const focusRunRaw = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;

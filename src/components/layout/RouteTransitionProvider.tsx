@@ -10,7 +10,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { flushSync } from "react-dom";
 import { usePathname } from "next/navigation";
 import { loadingSkeletonForPath } from "@/components/ui/PageSkeletons";
 
@@ -30,13 +29,19 @@ function pathsMatch(current: string, target: string): boolean {
   return current === target || current.startsWith(`${target}/`);
 }
 
-/** Minimum overlay hold so pathname can commit before segment loading.tsx paints. */
-const OVERLAY_MIN_HOLD_MS = 180;
+/**
+ * Max wait before we *reveal* the skeleton. We no longer paint the overlay on
+ * tap — an instant/cached navigation commits well within this window and never
+ * flashes a skeleton at all. Only a navigation that hasn't committed by now
+ * (genuinely slow route/data) reveals the branded skeleton. This replaces the
+ * old forced minimum-hold that made *every* tap sit on grey cards for ~180ms.
+ */
+const OVERLAY_SHOW_DELAY_MS = 120;
 
 /**
- * Backstop: if `beginTransition` paints the overlay but navigation never commits
+ * Backstop: if `beginTransition` arms a transition but navigation never commits
  * (e.g. a touch `pointerdown` that turns into a scroll, not a tap), self-dismiss
- * so the overlay can't strand and hide the whole page.
+ * so a revealed overlay can't strand and hide the whole page.
  */
 const OVERLAY_MAX_HOLD_MS = 1500;
 
@@ -44,69 +49,60 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
-  const overlayStartedAtRef = useRef(0);
+  const pendingHrefRef = useRef<string | null>(null);
+  const showTimerRef = useRef(0);
+  const strandTimerRef = useRef(0);
+
+  const clearTimers = useCallback(() => {
+    window.clearTimeout(showTimerRef.current);
+    window.clearTimeout(strandTimerRef.current);
+    showTimerRef.current = 0;
+    strandTimerRef.current = 0;
+  }, []);
+
+  const reset = useCallback(() => {
+    clearTimers();
+    pendingHrefRef.current = null;
+    setPendingHref(null);
+    setShowOverlay(false);
+  }, [clearTimers]);
 
   const beginTransition = useCallback((href: string) => {
     const target = normalizePath(href);
     const current = normalizePath(pathname ?? "");
     if (pathsMatch(current, target)) return;
-    overlayStartedAtRef.current = performance.now();
-    // Paint overlay synchronously before Link navigation swaps route content.
-    flushSync(() => {
-      setPendingHref(target);
-      setShowOverlay(true);
-    });
-  }, [pathname]);
+    clearTimers();
+    pendingHrefRef.current = target;
+    setPendingHref(target);
+    // Do NOT paint immediately — the current page stays put. Reveal the skeleton
+    // only if the route hasn't committed within the show-delay; fast navigations
+    // swap straight to content with no grey flash.
+    showTimerRef.current = window.setTimeout(() => {
+      if (pendingHrefRef.current) setShowOverlay(true);
+    }, OVERLAY_SHOW_DELAY_MS);
+    strandTimerRef.current = window.setTimeout(reset, OVERLAY_MAX_HOLD_MS);
+  }, [pathname, clearTimers, reset]);
 
   const cancelTransition = useCallback(() => {
-    setShowOverlay(false);
-    setPendingHref(null);
-  }, []);
+    reset();
+  }, [reset]);
 
   useLayoutEffect(() => {
-    if (!pendingHref || !showOverlay) return;
+    if (!pendingHrefRef.current) return;
     const current = normalizePath(pathname ?? "");
-    if (!pathsMatch(current, pendingHref)) {
-      // Navigation hasn't committed. If it never does (scroll gesture, cancelled
-      // tap), force-dismiss so the overlay can't strand and hide the page.
-      const strandGuard = window.setTimeout(() => {
-        setShowOverlay(false);
-        setPendingHref(null);
-      }, OVERLAY_MAX_HOLD_MS);
-      return () => window.clearTimeout(strandGuard);
-    }
+    if (!pathsMatch(current, pendingHrefRef.current)) return;
 
-    // Pathname can update before App Router mounts segment loading.tsx — hold the
-    // branded skeleton until a minimum dwell + extra paints so <main> never gaps.
-    let rafId = 0;
-    let timeoutId = 0;
-    let cancelled = false;
-
-    const finish = () => {
-      if (cancelled) return;
+    // Committed. Cancel any pending reveal; if the skeleton is already showing,
+    // lift it after one frame so the committed segment (content or its own
+    // loading.tsx) paints first and <main> never gaps for a frame.
+    clearTimers();
+    pendingHrefRef.current = null;
+    const rafId = requestAnimationFrame(() => {
       setShowOverlay(false);
       setPendingHref(null);
-    };
-
-    const scheduleDismiss = () => {
-      const elapsed = performance.now() - overlayStartedAtRef.current;
-      const remaining = Math.max(0, OVERLAY_MIN_HOLD_MS - elapsed);
-      timeoutId = window.setTimeout(() => {
-        rafId = requestAnimationFrame(() => {
-          rafId = requestAnimationFrame(() => {
-            rafId = requestAnimationFrame(finish);
-          });
-        });
-      }, remaining);
-    };
-
-    scheduleDismiss();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-      cancelAnimationFrame(rafId);
-    };
-  }, [pathname, pendingHref, showOverlay]);
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [pathname, clearTimers]);
 
   const value = useMemo(
     (): RouteTransitionContextValue => ({ beginTransition, cancelTransition }),

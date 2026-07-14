@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
-import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { CarList } from "@/components/cars/CarList";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
+import { getCachedCarManagerData } from "@/lib/cachedReads";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 
-/** User-specific list — revalidated on car mutations. */
+/** User-specific list — cached reads invalidated on car mutations (carsTag). */
 export const revalidate = 30;
 
 export default async function CarManagerPage(): Promise<ReactNode> {
@@ -36,32 +36,9 @@ export default async function CarManagerPage(): Promise<ReactNode> {
 
   const user = await requireCurrentUser();
   const isAdmin = isAuthAdminEmail(user.email);
+  // Seed must run each load (it may create catalog rows) — keep it out of the cache.
   await ensureAuthorizedSetupSheetCatalog();
-  const [allModels, cars] = await Promise.all([
-    prisma.setupSheetModel.findMany({
-      orderBy: [{ isAuthorized: "desc" }, { name: "asc" }],
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        isAuthorized: true,
-        _count: { select: { cars: true, calibrations: true } },
-      },
-    }),
-    prisma.car.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        chassis: true,
-        notes: true,
-        setupSheetTemplate: true,
-        setupSheetModelId: true,
-        setupSheetModel: { select: { id: true, name: true } },
-      },
-    }),
-  ]);
+  const [allModels, cars] = await getCachedCarManagerData(user.id);
   const authById = new Map(allModels.map((m) => [m.id, m.isAuthorized] as const));
   const setupSheetModels = dedupeSetupSheetModelsForPicker(
     allModels.map((m) => ({

@@ -172,11 +172,10 @@ export default async function RootLayout({
 
         <div className="page-bg" aria-hidden="true">
 
+          {/* Baked wash + CSS dark/vignette only — no runtime filter or blend layers
+              (see .page-bg-img in globals.css). tint/warm/grain removed 2026-07-14. */}
+
           <div className="page-bg-img" />
-
-          <div className="page-bg-tint" />
-
-          <div className="page-bg-warm" />
 
           <div className="page-bg-dark" />
 

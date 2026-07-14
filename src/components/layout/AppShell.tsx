@@ -4,7 +4,6 @@ import type { CSSProperties, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/layout/AccountMenu";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { LogRunFab } from "@/components/layout/LogRunFab";
 import { MobileBrandMark } from "@/components/layout/MobileBrandMark";
 import { MobileTitleCondenser } from "@/components/layout/MobileTitleCondenser";
 import { MobileBackProvider } from "@/components/layout/MobileBackContext";
@@ -54,11 +53,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/*
            * After <main> and outside `.app-shell` (overflow-x-hidden → scroll container)
            * so fixed positioning is not clipped on iOS. See globals.css stacking note.
-           * Mobile-only floating chrome: the dock (destinations), the Log-run FAB
-           * (primary action), and the account avatar (Settings + account).
+           * Mobile-only floating chrome: the dock bar (Ideas cap + destinations,
+           * with the Log-run circle rendered in-row by BottomNav) and the
+           * account avatar (Settings + account).
            */}
           <BottomNav />
-          <LogRunFab />
           <MobileBrandMark />
           <MobileTitleCondenser />
           <AccountMenu />

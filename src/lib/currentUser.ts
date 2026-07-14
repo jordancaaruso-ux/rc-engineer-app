@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -17,8 +18,13 @@ export async function getAuthenticatedApiUser(): Promise<User | null> {
 
 /**
  * Server Components / server actions — redirect to login if missing session.
+ *
+ * Wrapped in React `cache()` so the `auth()` + user lookup is memoized per
+ * request: pages that call it more than once (directly and via
+ * `requireCurrentUserId`) no longer issue duplicate PK queries. In non-render
+ * contexts (route handlers, actions) `cache()` is a no-op — still correct.
  */
-export async function requireCurrentUser(): Promise<User> {
+export const requireCurrentUser = cache(async function requireCurrentUser(): Promise<User> {
   requireDatabaseUrl();
   const session = await auth();
   const id = session?.user?.id;
@@ -30,7 +36,7 @@ export async function requireCurrentUser(): Promise<User> {
     redirect("/login");
   }
   return user;
-}
+});
 
 /** Convenience when only the id is needed (RSC). */
 export async function requireCurrentUserId(): Promise<string> {

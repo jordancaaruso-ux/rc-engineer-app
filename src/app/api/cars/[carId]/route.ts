@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
+import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function GET(
@@ -59,6 +60,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Car not found" }, { status: 404 });
   }
 
+  revalidateAfterCarMutation(user.id);
   return NextResponse.json({ ok: true });
 }
 
@@ -139,6 +141,7 @@ export async function PATCH(
     data,
     select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
   });
+  revalidateAfterCarMutation(user.id);
   return NextResponse.json({ car });
 }
 

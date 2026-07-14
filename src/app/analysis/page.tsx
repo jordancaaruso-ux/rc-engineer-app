@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
-import { loadAnalysisHomeModel } from "@/lib/analysis/loadAnalysisHomeModel";
+import { getCachedAnalysisHomeModel } from "@/lib/cachedReads";
 import { SessionTrendCard } from "@/components/analysis/SessionTrendCard";
 import { RecentRunsCard } from "@/components/analysis/RecentRunsCard";
 import { AnalysisVideoCard } from "@/components/analysis/AnalysisVideoCard";
@@ -39,7 +39,7 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
     requireCurrentUser(),
     getExplicitTimeZoneForRunFormatting(),
   ]);
-  const model = await loadAnalysisHomeModel(user.id, displayTimeZone);
+  const model = await getCachedAnalysisHomeModel(user.id, displayTimeZone);
 
   const toolDoorLinks = ANALYSIS_HUB_LINKS.filter(
     (link) => link.href === "/setup/comparison" || link.href === "/analysis/roll-center"

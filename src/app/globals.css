@@ -52,9 +52,9 @@
 
   /*
    * Mobile bottom dock (see BottomNav.tsx) — clearance the page reserves under
-   * scrolling content: 3.5rem dock + 0.75rem float gap + 0.5rem breathing room.
+   * scrolling content: 3.5rem bar + 0.75rem float gap + 1rem breathing room.
    */
-  --mobile-tab-bar-height: 4.75rem;
+  --mobile-tab-bar-height: 5.25rem;
 
   /*
    * Vertical anchor for the fixed mobile corner chrome (JRC pill + account
@@ -171,33 +171,25 @@ body {
 }
 
 /*
- * TITC sunset scene — uniform blurred photo wash (founder-tuned
- * 2026-07-06: blur 12px · yellow 0 · dark 0.6 — see `--tune-*`).
- * Fixed and the same clarity everywhere;
- * child layers stack blend modes a single element can't. The charcoal
- * gradients on `.page-bg` remain the fallback while the photo loads.
+ * TITC sunset scene — uniform blurred photo wash (founder-tuned 2026-07-06:
+ * blur 12px · yellow 0 · dark 0.6). Fixed, same clarity everywhere. As of the
+ * 2026-07-14 perf bake the blur/grade is pre-baked into the JPEG and the
+ * blend-mode layers are gone (see below). The charcoal gradients on `.page-bg`
+ * remain the fallback while the photo loads.
  */
 .page-bg-img {
   position: absolute;
-  inset: -24px;
-  background: url("/brand/track-hero.jpg") center / cover no-repeat;
-  filter: blur(var(--tune-bg-blur)) saturate(0.6) brightness(0.92);
-}
-
-.page-bg-tint {
-  position: absolute;
   inset: 0;
-  background: rgb(var(--color-accent));
-  mix-blend-mode: soft-light;
-  opacity: var(--tune-bg-yellow);
-}
-
-.page-bg-warm {
-  position: absolute;
-  inset: 0;
-  mix-blend-mode: overlay;
-  opacity: calc(var(--tune-bg-yellow) * 0.6);
-  background: radial-gradient(120% 90% at 50% 8%, rgb(var(--color-accent) / 0.9), transparent 60%);
+  /* BAKED WASH (perf): blur(12px) + saturate(0.6) + brightness(0.92) are baked
+     into the JPEG (via sharp), so there is NO runtime `filter` here. Combined with
+     removing the two `opacity:0` yellow blend layers and the soft-light grain,
+     `.page-bg` now has no mix-blend-mode and no filter anywhere — so every
+     `.glass-card` composites over a FLAT backdrop instead of re-blurring a live
+     6-layer blend group each scroll frame. Dark + vignette stay as CSS below
+     (viewport-relative — must not be baked into a fixed-aspect image).
+     To re-bake if the source photo changes: sharp(track-hero.jpg)
+       .blur(12).modulate({saturation:0.6,brightness:0.92}) → track-hero-baked.jpg */
+  background: url("/brand/track-hero-baked.jpg") center / cover no-repeat;
 }
 
 .page-bg-dark {
@@ -230,15 +222,11 @@ body {
     0 24px 55px -26px rgb(0 0 0 / 0.7);
 }
 
-/* Fine grain so the charcoal wash has texture and never bands or reads as dead-flat. */
-.page-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity: 0.05;
-  mix-blend-mode: soft-light;
-}
+/* Grain retired (2026-07-14 perf bake): the 0.05 soft-light noise was the last
+   mix-blend-mode layer in `.page-bg`; over the real (already-textured) photo it
+   was imperceptible, and keeping it would have re-created the blend group the bake
+   exists to remove. Re-add as a baked-in grain on track-hero-baked.jpg if banding
+   ever appears — never as a runtime mix-blend layer. */
 
 /* All interactive UI above `.page-bg` (z-index 0). Keeps portaled overlays working if they share this subtree. */
 .app-root {
@@ -777,16 +765,19 @@ html[data-nav-pending] .page {
  * from the keyframe, so with no animation the content is simply visible).
  */
 @media (prefers-reduced-motion: no-preference) {
+  /* Snappier entrance: content that is already loaded should read as "instant".
+     Duration + stagger halved (was 460ms / up-to-340ms delay ≈ 800ms tail) so a
+     ready page's lower cards land by ~400ms instead of ~800ms after the tap. */
   .page-body > *:not(.rc-reveal) {
-    animation: rc-reveal 460ms cubic-bezier(0, 0, 0.2, 1) both;
+    animation: rc-reveal 250ms cubic-bezier(0, 0, 0.2, 1) both;
   }
   .page-body > *:not(.rc-reveal):nth-child(1) { animation-delay: 0ms; }
-  .page-body > *:not(.rc-reveal):nth-child(2) { animation-delay: 60ms; }
-  .page-body > *:not(.rc-reveal):nth-child(3) { animation-delay: 120ms; }
-  .page-body > *:not(.rc-reveal):nth-child(4) { animation-delay: 180ms; }
-  .page-body > *:not(.rc-reveal):nth-child(5) { animation-delay: 240ms; }
-  .page-body > *:not(.rc-reveal):nth-child(6) { animation-delay: 300ms; }
-  .page-body > *:not(.rc-reveal):nth-child(n + 7) { animation-delay: 340ms; }
+  .page-body > *:not(.rc-reveal):nth-child(2) { animation-delay: 30ms; }
+  .page-body > *:not(.rc-reveal):nth-child(3) { animation-delay: 60ms; }
+  .page-body > *:not(.rc-reveal):nth-child(4) { animation-delay: 90ms; }
+  .page-body > *:not(.rc-reveal):nth-child(5) { animation-delay: 120ms; }
+  .page-body > *:not(.rc-reveal):nth-child(6) { animation-delay: 150ms; }
+  .page-body > *:not(.rc-reveal):nth-child(n + 7) { animation-delay: 150ms; }
 }
 
 @keyframes rc-draw {

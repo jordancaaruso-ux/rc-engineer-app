@@ -6,7 +6,6 @@ import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel"
 import { DashboardLaunchpadDoors } from "@/components/dashboard/DashboardLaunchpadDoors";
 import { DashboardPreviousRunCard } from "@/components/dashboard/DashboardPreviousRunCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
-import { IdeasSheetFab } from "@/components/dashboard/IdeasSheetFab";
 import { DashboardEngineerSuggestionsSection } from "@/components/dashboard/DashboardEngineerSuggestionsSection";
 import { SHOW_DASHBOARD_ENGINEER_SUGGESTIONS } from "@/lib/featureFlags";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
@@ -95,8 +94,9 @@ export function DashboardHome({
           </Reveal>
         ) : null}
 
-        {/* Desktop keeps the inline Try/Do card (there's room + no FAB); mobile
-            gets the same lists via the bottom-left Ideas sheet below. */}
+        {/* Desktop keeps the inline Try/Do card (there's room + no dock); mobile
+            gets the same lists via the Ideas cap in the bottom dock bar
+            (IdeasDockCap, app-wide). */}
         <Reveal index={5} className="hidden md:block">
         <CardPanel contentClassName="space-y-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -118,8 +118,6 @@ export function DashboardHome({
         </CardPanel>
         </Reveal>
       </section>
-
-      <IdeasSheetFab thingsToTry={thingsToTry} thingsToDo={thingsToDo} />
     </>
   );
 }

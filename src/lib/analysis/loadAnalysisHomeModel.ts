@@ -177,15 +177,23 @@ async function loadRecentRuns(userId: string, timeZone: string): Promise<Analysi
     }
   }
   const pbMins = new Map<string, number | null>();
-  await Promise.all(
-    [...pbPairs.entries()].map(async ([key, pair]) => {
-      const agg = await prisma.run.aggregate({
-        _min: { bestLapSeconds: true },
-        where: { userId, carId: pair.carId, trackId: pair.trackId },
-      });
-      pbMins.set(key, agg._min.bestLapSeconds ?? null);
-    })
-  );
+  if (pbPairs.size > 0) {
+    // One grouped query for all shown car+track pairs instead of one aggregate
+    // round trip per pair (was N+1 on the Analysis hot path).
+    const grouped = await prisma.run.groupBy({
+      by: ["carId", "trackId"],
+      where: {
+        userId,
+        OR: [...pbPairs.values()].map((p) => ({ carId: p.carId, trackId: p.trackId })),
+      },
+      _min: { bestLapSeconds: true },
+    });
+    for (const g of grouped) {
+      if (g.carId && g.trackId) {
+        pbMins.set(`${g.carId}:${g.trackId}`, g._min.bestLapSeconds ?? null);
+      }
+    }
+  }
 
   return shown.map(({ run, metrics }, index) => {
     const pbKey = run.carId && run.trackId ? `${run.carId}:${run.trackId}` : null;

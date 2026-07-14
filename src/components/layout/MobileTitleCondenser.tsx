@@ -33,13 +33,18 @@ export function MobileTitleCondenser() {
     let raf = 0;
     let lastEl: Element | null = null;
     let lastText = "";
+    let lastSector: boolean | null = null;
 
     const resolve = () => {
       const titleEl = document.querySelector<HTMLElement>(".page-title");
       const text = titleEl?.textContent?.trim() ?? "";
-      setHasSector(
-        document.querySelector(".app-shell")?.hasAttribute("data-nav-sector") ?? false,
-      );
+      const sector =
+        document.querySelector(".app-shell")?.hasAttribute("data-nav-sector") ?? false;
+      // Only re-render on an actual change (was firing every observer callback).
+      if (sector !== lastSector) {
+        lastSector = sector;
+        setHasSector(sector);
+      }
       // Nothing meaningful changed → keep the existing observer running.
       if (titleEl === lastEl && text === lastText) return;
       lastEl = titleEl;
@@ -71,9 +76,12 @@ export function MobileTitleCondenser() {
 
     schedule();
     // Re-resolve when the route content mutates (skeleton → real title, etc.).
+    // childList only — the title changes by element swap, never in-place text
+    // edits, so we skip `characterData` which previously fired on every animated
+    // number roll / clock tick and forced a layout read each time.
     const scope = document.querySelector("main.page") ?? document.body;
     const mo = new MutationObserver(schedule);
-    mo.observe(scope, { childList: true, subtree: true, characterData: true });
+    mo.observe(scope, { childList: true, subtree: true });
     window.addEventListener("resize", schedule);
 
     return () => {
