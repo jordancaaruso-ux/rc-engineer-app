@@ -6,6 +6,7 @@ import { AccountMenu } from "@/components/layout/AccountMenu";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { LogRunFab } from "@/components/layout/LogRunFab";
 import { MobileBrandMark } from "@/components/layout/MobileBrandMark";
+import { MobileTitleCondenser } from "@/components/layout/MobileTitleCondenser";
 import { MobileBackProvider } from "@/components/layout/MobileBackContext";
 import { isHiddenNavRoute, MOBILE_NAV, resolveActiveNavId } from "@/components/layout/navConfig";
 import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
@@ -59,6 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <BottomNav />
           <LogRunFab />
           <MobileBrandMark />
+          <MobileTitleCondenser />
           <AccountMenu />
         </MobileBackProvider>
       </PrimaryNavProvider>
