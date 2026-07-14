@@ -3908,7 +3908,7 @@ export function NewRunForm(props: {
                     lastRunTrackId={lastRun?.trackId ?? null}
                     favouriteTrackIds={favouriteTrackIds}
                     favouriteTracks={favouriteTracks}
-                    placeholder="Search or select track"
+                    placeholder="Select track…"
                     aria-label="Track"
                   />
                   {!isEditing ? (

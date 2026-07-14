@@ -44,9 +44,16 @@ export function useAnchoredMenuPosition(
     // Capture phase so scrolls in *any* ancestor container keep the menu anchored.
     window.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);
+    // iOS: opening the keyboard pans/resizes the *visual* viewport without always
+    // firing window scroll events — track it so the menu re-pins under the input.
+    const vv = typeof window.visualViewport !== "undefined" ? window.visualViewport : null;
+    vv?.addEventListener("scroll", update);
+    vv?.addEventListener("resize", update);
     return () => {
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+      vv?.removeEventListener("resize", update);
     };
   }, [open, anchorRef, gap]);
   return pos;
@@ -91,6 +98,22 @@ export function AnchoredMenu({
   const internalRef = useRef<HTMLDivElement>(null);
   const menuRef = externalMenuRef ?? internalRef;
   const pos = useAnchoredMenuPosition(open, anchorRef, gap);
+
+  // Touch scroll-lock: while a menu is open, block page panning underneath it —
+  // the property that makes native <select> feel solid on iOS. JS re-pinning
+  // lags the compositor during touch scroll ("stretchy" menu); preventing the
+  // pan removes the movement instead of chasing it. The menu's own list (and
+  // the anchor input) still receive touches, so internal scrolling works.
+  useEffect(() => {
+    if (!open) return;
+    function onTouchMove(e: TouchEvent) {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || anchorRef.current?.contains(t)) return;
+      if (e.cancelable) e.preventDefault();
+    }
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => document.removeEventListener("touchmove", onTouchMove);
+  }, [open, anchorRef, menuRef]);
 
   useEffect(() => {
     if (!open || !onClose) return;

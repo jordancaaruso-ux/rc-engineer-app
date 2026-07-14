@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
 import { Eyebrow } from "@/components/ui/panel";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -65,22 +64,15 @@ export function CarList({
   const [nameDirty, setNameDirty] = useState(false);
   const [notes, setNotes] = useState("");
   const [setupSheetModelId, setSetupSheetModelId] = useState("");
-  const [modelQuery, setModelQuery] = useState("");
-  const [modelOpen, setModelOpen] = useState(false);
-  const modelInputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false); // "my chassis isn't listed yet"
+  const [showCreateType, setShowCreateType] = useState(false); // admin-only inline create
+  const [newTypeName, setNewTypeName] = useState("");
   const [creatingType, setCreatingType] = useState(false);
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const selectedModel = setupSheetModels.find((m) => m.id === setupSheetModelId) ?? null;
-  const normalizedQuery = modelQuery.trim().toLowerCase();
-  const filteredModels = normalizedQuery
-    ? setupSheetModels.filter((m) => m.name.toLowerCase().includes(normalizedQuery))
-    : setupSheetModels;
-  const exactModelMatch = setupSheetModels.find(
-    (m) => m.name.trim().toLowerCase() === normalizedQuery
-  );
+  const sortedModels = [...setupSheetModels].sort((a, b) => a.name.localeCompare(b.name));
 
   /** Keep the auto-filled name in sync until the user hand-edits it. */
   function onNameChange(value: string) {
@@ -90,20 +82,19 @@ export function CarList({
 
   function selectModel(m: SetupSheetModelOption) {
     setSetupSheetModelId(m.id);
-    setModelQuery(m.name);
     setPending(false);
-    setModelOpen(false);
+    setShowCreateType(false);
     if (!nameDirty) setName(m.name); // auto-fill name from chassis (still editable)
   }
 
   function chooseNotListed() {
     setSetupSheetModelId("");
     setPending(true);
-    setModelOpen(false);
+    setShowCreateType(false);
   }
 
-  async function createTypeFromQuery() {
-    const typed = modelQuery.trim();
+  async function createTypeFromName() {
+    const typed = newTypeName.trim();
     if (!typed || creatingType) return;
     setCreatingType(true);
     setMessage(null);
@@ -116,6 +107,7 @@ export function CarList({
       setSetupSheetModels((prev) =>
         prev.some((m) => m.id === model.id) ? prev : [{ ...model, isAuthorized: false }, ...prev]
       );
+      setNewTypeName("");
       selectModel(model);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to create chassis type");
@@ -129,13 +121,14 @@ export function CarList({
     setNameDirty(false);
     setNotes("");
     setSetupSheetModelId("");
-    setModelQuery("");
     setPending(false);
+    setShowCreateType(false);
+    setNewTypeName("");
   }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    const chosenName = name.trim() || selectedModel?.name || modelQuery.trim();
+    const chosenName = name.trim() || selectedModel?.name || "";
     if (!chosenName) {
       setMessage("Name is required.");
       return;
@@ -183,66 +176,69 @@ export function CarList({
             <label className="block text-[11px] text-muted-foreground mb-1">
               Chassis type <span className="text-amber-600 dark:text-amber-500">*</span>
             </label>
-            <input
-              ref={modelInputRef}
+            {/* Native select (founder decision 2026-07-14): the OS draws the menu —
+                no portal, no JS re-pin, no iOS rubber-banding. Sentinel values map
+                the old menu actions. */}
+            <select
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={modelQuery}
-              placeholder="Search e.g. Mugen MTC3"
+              value={pending ? "__not_listed__" : setupSheetModelId}
               onChange={(e) => {
-                setModelQuery(e.target.value);
-                setSetupSheetModelId("");
-                setPending(false);
-                setModelOpen(true);
+                const v = e.target.value;
+                if (v === "__not_listed__") return chooseNotListed();
+                if (v === "__create__") {
+                  // Keep the current selection; just reveal the create panel.
+                  setShowCreateType(true);
+                  return;
+                }
+                if (!v) {
+                  setSetupSheetModelId("");
+                  setPending(false);
+                  return;
+                }
+                const m = setupSheetModels.find((x) => x.id === v);
+                if (m) selectModel(m);
               }}
-              onFocus={() => setModelOpen(true)}
-            />
-            <AnchoredMenu
-              open={modelOpen}
-              anchorRef={modelInputRef}
-              onClose={() => setModelOpen(false)}
+              aria-label="Chassis type"
             >
-              <div className="max-h-60 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
-                  {filteredModels.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => selectModel(m)}
-                      className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60"
-                    >
-                      <span className="truncate">{m.name}</span>
-                      {m.isAuthorized ? (
-                        <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1 py-0.5 text-[9px] font-medium text-primary">
-                          Authorized
-                        </span>
-                      ) : null}
-                    </button>
-                  ))}
-                  {filteredModels.length === 0 ? (
-                    <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
-                      No matching chassis type.
-                    </p>
-                  ) : null}
-                  {/* Admin-only: mint a new global chassis type from the typed name. */}
-                  {isAdmin && modelQuery.trim() && !exactModelMatch ? (
-                    <button
-                      type="button"
-                      onClick={createTypeFromQuery}
-                      disabled={creatingType}
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-accent hover:bg-muted/60 disabled:opacity-60"
-                    >
-                      {creatingType ? "Creating…" : `+ Create chassis type “${modelQuery.trim()}”`}
-                    </button>
-                  ) : null}
-                  {/* Non-admins can't add types — let them proceed without one (flagged pending). */}
+              <option value="">Select chassis type…</option>
+              {sortedModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.isAuthorized ? `${m.name} · Authorized` : m.name}
+                </option>
+              ))}
+              {/* Non-admins can't add types — let them proceed without one (flagged pending). */}
+              <option value="__not_listed__">My chassis isn’t listed yet — add without a setup sheet</option>
+              {/* Admin-only: mint a new global chassis type. */}
+              {isAdmin ? <option value="__create__">+ Create new chassis type…</option> : null}
+            </select>
+            {showCreateType && isAdmin ? (
+              <div className="mt-2 space-y-2 rounded-md border border-border bg-card p-2">
+                <input
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+                  placeholder="New chassis type name, e.g. Mugen MTC3"
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value)}
+                  aria-label="New chassis type name"
+                />
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={chooseNotListed}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-muted/60"
+                    onClick={() => void createTypeFromName()}
+                    disabled={creatingType || !newTypeName.trim()}
+                    className="btn-surface px-2 py-1 text-xs disabled:opacity-60"
                   >
-                    My chassis isn’t listed yet — add without a setup sheet
+                    {creatingType ? "Creating…" : "Create chassis type"}
                   </button>
+                  <button
+                    type="button"
+                    className="px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowCreateType(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </AnchoredMenu>
+            ) : null}
             {selectedModel ? (
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Uses the shared <span className="text-foreground">{selectedModel.name}</span> setup sheet.
