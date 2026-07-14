@@ -12,6 +12,7 @@ import {
 } from "@/lib/runs/runHistoryFilters";
 import { Button } from "@/components/ui/Button";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
 
 const FILTER_PANEL_SESSION_KEY = "runs-history-filters-open";
 
@@ -69,6 +70,7 @@ function MultiSelect({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const summary =
     selectedIds.length === 0
@@ -85,7 +87,7 @@ function MultiSelect({
   };
 
   return (
-    <div className={`relative ${className ?? ""}`}>
+    <div ref={wrapRef} className={`relative ${className ?? ""}`}>
       <span className={labelClass}>{label}</span>
       <button
         type="button"
@@ -95,36 +97,28 @@ function MultiSelect({
         <span className="truncate">{summary}</span>
         <span className="text-muted-foreground">{open ? "▴" : "▾"}</span>
       </button>
-      {open ? (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-10 cursor-default"
-            aria-label="Close menu"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute left-0 top-full z-20 mt-1 max-h-48 w-full min-w-[12rem] overflow-y-auto rounded-md border border-border bg-card p-2 shadow-lg">
-            {options.length === 0 ? (
-              <p className="px-1 py-1 ui-label-meta">None</p>
-            ) : (
-              options.map((opt) => (
-                <label
-                  key={opt.id}
-                  className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 ui-control hover:bg-muted/50"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedSet.has(opt.id)}
-                    onChange={() => toggle(opt.id)}
-                    className="rounded border-border"
-                  />
-                  <span className="truncate">{opt.label}</span>
-                </label>
-              ))
-            )}
-          </div>
-        </>
-      ) : null}
+      <AnchoredMenu open={open} anchorRef={wrapRef} onClose={() => setOpen(false)}>
+        <div className="max-h-48 w-full min-w-[12rem] overflow-y-auto rounded-md border border-border bg-card p-2 shadow-lg">
+          {options.length === 0 ? (
+            <p className="px-1 py-1 ui-label-meta">None</p>
+          ) : (
+            options.map((opt) => (
+              <label
+                key={opt.id}
+                className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 ui-control hover:bg-muted/50"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(opt.id)}
+                  onChange={() => toggle(opt.id)}
+                  className="rounded border-border"
+                />
+                <span className="truncate">{opt.label}</span>
+              </label>
+            ))
+          )}
+        </div>
+      </AnchoredMenu>
     </div>
   );
 }
@@ -146,6 +140,7 @@ function ScopeSegment({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const hasTeams = teams.length > 0;
   const scopeIsTeam = Boolean(activeTeamId);
   const activeTeam = teams.find((t) => t.id === activeTeamId) ?? null;
@@ -163,7 +158,7 @@ function ScopeSegment({
     }`;
 
   return (
-    <div className="relative flex">
+    <div ref={wrapRef} className="relative flex">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -180,18 +175,11 @@ function ScopeSegment({
           aria-hidden
         />
       </button>
-      {open ? (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-10 cursor-default"
-            aria-label="Close scope menu"
-            onClick={() => setOpen(false)}
-          />
-          <div
-            role="menu"
-            className="absolute left-0 top-full z-20 mt-1 min-w-[13rem] rounded-md border border-border bg-card p-1.5 shadow-lg"
-          >
+      <AnchoredMenu open={open} anchorRef={wrapRef} onClose={() => setOpen(false)} matchAnchorWidth={false}>
+        <div
+          role="menu"
+          className="min-w-[13rem] rounded-md border border-border bg-card p-1.5 shadow-lg"
+        >
             <p className="px-2 pb-1 pt-0.5 ui-label-meta">View</p>
             <button
               type="button"
@@ -232,9 +220,8 @@ function ScopeSegment({
                 </button>
               </>
             )}
-          </div>
-        </>
-      ) : null}
+        </div>
+      </AnchoredMenu>
     </div>
   );
 }

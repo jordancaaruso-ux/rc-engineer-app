@@ -1,16 +1,11 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { AnchoredMenu, useAnchoredMenuPosition } from "@/components/ui/AnchoredMenu";
+
+// Re-exported for back-compat: callers historically imported the hook from here.
+export { useAnchoredMenuPosition };
 
 export type SearchableSelectOption = {
   value: string;
@@ -24,36 +19,6 @@ export type SearchableSelectGroup = {
   label: string;
   options: SearchableSelectOption[];
 };
-
-/**
- * Keeps a portal-rendered menu pinned under its anchor. Fixed positioning +
- * capture-phase scroll listener so the menu escapes any `overflow`/`backdrop-blur`
- * stacking context of ancestor cards (the reason a plain absolute menu renders
- * *behind* the glass Setup card).
- */
-export function useAnchoredMenuPosition(
-  open: boolean,
-  anchorRef: RefObject<HTMLElement | null>
-): { top: number; left: number; width: number } | null {
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  useLayoutEffect(() => {
-    if (!open) return;
-    const el = anchorRef.current;
-    if (!el) return;
-    const update = () => {
-      const r = el.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
-    };
-    update();
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [open, anchorRef]);
-  return pos;
-}
 
 /** Shared menu shell so every dropdown reads as one system (matches AdditiveTypeCombobox). */
 export const SEARCHABLE_MENU_CLASS =
@@ -108,7 +73,6 @@ export function SearchableSelect({
   const anchorRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
-  const pos = useAnchoredMenuPosition(open, anchorRef);
 
   const allOptions = useMemo(() => flattenGroups(options, groups), [options, groups]);
   const selected = useMemo(
@@ -138,17 +102,10 @@ export function SearchableSelect({
     [filteredGroups]
   );
 
-  useEffect(() => {
-    if (!open) return;
-    function onDocMouseDown(e: MouseEvent) {
-      const t = e.target as Node;
-      if (anchorRef.current?.contains(t) || menuRef.current?.contains(t)) return;
-      setOpen(false);
-      setQuery("");
-    }
-    document.addEventListener("mousedown", onDocMouseDown);
-    return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [open]);
+  const closeMenu = () => {
+    setOpen(false);
+    setQuery("");
+  };
 
   function commit(next: string) {
     onChange(next);
@@ -272,14 +229,9 @@ export function SearchableSelect({
         )}
       </div>
 
-      {open && pos
-        ? createPortal(
-            <div
-              ref={menuRef}
-              style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 60 }}
-            >
-              <div className={SEARCHABLE_MENU_CLASS}>
-                <ul role="listbox" id={listboxId}>
+      <AnchoredMenu open={open} anchorRef={anchorRef} onClose={closeMenu} menuRef={menuRef}>
+        <div className={SEARCHABLE_MENU_CLASS}>
+          <ul role="listbox" id={listboxId}>
                   {clearable ? (
                     <li>
                       <button
@@ -333,12 +285,9 @@ export function SearchableSelect({
                       </ul>
                     </li>
                   ))}
-                </ul>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+          </ul>
+        </div>
+      </AnchoredMenu>
     </>
   );
 }

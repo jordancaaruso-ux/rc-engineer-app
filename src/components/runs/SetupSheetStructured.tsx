@@ -12,6 +12,7 @@ import {
   type RefObject,
 } from "react";
 import { cn } from "@/lib/utils";
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
 import {
   coerceSetupValue,
   type PresetWithOtherValue,
@@ -188,6 +189,7 @@ function SetupFieldJumpSearch({
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -217,6 +219,7 @@ function SetupFieldJumpSearch({
         Find setup field
       </label>
       <input
+        ref={inputRef}
         id="setup-field-search"
         type="search"
         autoComplete="off"
@@ -230,9 +233,9 @@ function SetupFieldJumpSearch({
         onBlur={() => window.setTimeout(() => setOpen(false), 180)}
         className="w-full max-w-md rounded-md border border-border bg-surface-runna-inset px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-accent/50"
       />
-      {open && filtered.length > 0 ? (
+      <AnchoredMenu open={open && filtered.length > 0} anchorRef={inputRef}>
         <ul
-          className="absolute z-20 mt-1 max-h-48 w-full max-w-md overflow-auto rounded-md border border-border bg-surface-runna-inset py-1 text-xs shadow-md"
+          className="max-h-48 w-full overflow-auto rounded-md border border-border bg-surface-runna-inset py-1 text-xs shadow-md"
           role="listbox"
         >
           {filtered.slice(0, 50).map((e) => (
@@ -251,7 +254,7 @@ function SetupFieldJumpSearch({
             </li>
           ))}
         </ul>
-      ) : null}
+      </AnchoredMenu>
     </div>
   );
 }

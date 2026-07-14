@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
 import { Eyebrow } from "@/components/ui/panel";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -66,6 +67,7 @@ export function CarList({
   const [setupSheetModelId, setSetupSheetModelId] = useState("");
   const [modelQuery, setModelQuery] = useState("");
   const [modelOpen, setModelOpen] = useState(false);
+  const modelInputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false); // "my chassis isn't listed yet"
   const [creatingType, setCreatingType] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -182,6 +184,7 @@ export function CarList({
               Chassis type <span className="text-amber-600 dark:text-amber-500">*</span>
             </label>
             <input
+              ref={modelInputRef}
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               value={modelQuery}
               placeholder="Search e.g. Mugen MTC3"
@@ -193,15 +196,12 @@ export function CarList({
               }}
               onFocus={() => setModelOpen(true)}
             />
-            {modelOpen ? (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-30 cursor-default"
-                  aria-label="Close chassis menu"
-                  onClick={() => setModelOpen(false)}
-                />
-                <div className="absolute left-0 top-full z-40 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
+            <AnchoredMenu
+              open={modelOpen}
+              anchorRef={modelInputRef}
+              onClose={() => setModelOpen(false)}
+            >
+              <div className="max-h-60 w-full overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
                   {filteredModels.map((m) => (
                     <button
                       key={m.id}
@@ -241,9 +241,8 @@ export function CarList({
                   >
                     My chassis isn’t listed yet — add without a setup sheet
                   </button>
-                </div>
-              </>
-            ) : null}
+              </div>
+            </AnchoredMenu>
             {selectedModel ? (
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Uses the shared <span className="text-foreground">{selectedModel.name}</span> setup sheet.

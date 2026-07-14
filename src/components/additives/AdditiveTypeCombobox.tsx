@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
-import { useAnchoredMenuPosition } from "@/components/ui/SearchableSelect";
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
 
 export type AdditiveTypeOption = {
   id: string;
@@ -47,7 +46,6 @@ export function AdditiveTypeCombobox({
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const menuPos = useAnchoredMenuPosition(isOpen, containerRef);
 
   const loadOptions = useCallback(async (q: string) => {
     setLoading(true);
@@ -105,17 +103,6 @@ export function AdditiveTypeCombobox({
       void loadOptions(query);
     }
   }, [isOpen, query, loadOptions, loadRecent]);
-
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      const t = e.target as Node;
-      if (containerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
-      setIsOpen(false);
-      setShowCreate(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -202,18 +189,15 @@ export function AdditiveTypeCombobox({
         }}
       />
 
-      {isOpen && menuPos
-        ? createPortal(
-            <div
-              ref={menuRef}
-              style={{
-                position: "fixed",
-                top: menuPos.top,
-                left: menuPos.left,
-                width: menuPos.width,
-                zIndex: 60,
-              }}
-            >
+      <AnchoredMenu
+        open={isOpen}
+        anchorRef={containerRef}
+        menuRef={menuRef}
+        onClose={() => {
+          setIsOpen(false);
+          setShowCreate(false);
+        }}
+      >
         <ul
           ref={listRef}
           role="listbox"
@@ -300,10 +284,7 @@ export function AdditiveTypeCombobox({
             </li>
           ) : null}
         </ul>
-            </div>,
-            document.body
-          )
-        : null}
+      </AnchoredMenu>
     </div>
   );
 }

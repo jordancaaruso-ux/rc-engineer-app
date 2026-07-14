@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useRef, useEffect, useState, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { Fragment, useRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
 
 export type TrackOption = {
   id: string;
@@ -61,33 +61,8 @@ export function TrackCombobox({
   const [highlightIndex, setHighlightIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  // The menu is rendered in a portal on <body> so it escapes the card's
-  // backdrop-blur stacking context (otherwise its lower half hides behind the
-  // following setup card). Position is anchored to the input's viewport rect.
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
-
-  const updateMenuPos = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setMenuPos({ top: r.bottom + 4, left: r.left, width: r.width });
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setMenuPos(null);
-      return;
-    }
-    updateMenuPos();
-    const onReflow = () => updateMenuPos();
-    // Capture phase so scrolls in any ancestor container keep the menu anchored.
-    window.addEventListener("scroll", onReflow, true);
-    window.addEventListener("resize", onReflow);
-    return () => {
-      window.removeEventListener("scroll", onReflow, true);
-      window.removeEventListener("resize", onReflow);
-    };
-  }, [isOpen, updateMenuPos]);
+  // The menu renders in a body portal (via AnchoredMenu) so it escapes the
+  // card's backdrop-blur/overflow clip context and stays pinned under the input.
 
   const selectedTrack = value ? (tracks.find((t) => t.id === value) ?? favouriteTracks.find((t) => t.id === value)) : null;
   const selectedLabel = selectedTrack ? (selectedTrack.location ? `${selectedTrack.name} (${selectedTrack.location})` : selectedTrack.name) : "";
@@ -121,18 +96,6 @@ export function TrackCombobox({
     const el = listRef.current?.children[highlightIndex + offset] as HTMLElement | undefined;
     el?.scrollIntoView({ block: "nearest" });
   }, [highlightIndex, isOpen, query, favouriteTracks.length, filtered.length]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      const target = e.target as Node;
-      // The list lives in a body portal, so check it explicitly alongside the input.
-      if (containerRef.current?.contains(target)) return;
-      if (listRef.current?.contains(target)) return;
-      setIsOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   function select(id: string) {
     onChange(id);
@@ -191,13 +154,11 @@ export function TrackCombobox({
         aria-controls="track-combobox-list"
         disabled={disabled}
       />
-      {isOpen && menuPos && typeof document !== "undefined"
-        ? createPortal(
+      <AnchoredMenu open={isOpen} anchorRef={containerRef} onClose={() => setIsOpen(false)}>
         <ul
           id="track-combobox-list"
           ref={listRef}
           role="listbox"
-          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, width: menuPos.width }}
           className="z-50 max-h-56 overflow-auto rounded-md border border-border bg-secondary shadow-lg py-1 text-sm"
         >
           {filtered.length === 0 ? (
@@ -249,10 +210,8 @@ export function TrackCombobox({
               })}
             </>
           )}
-        </ul>,
-          document.body
-        )
-        : null}
+        </ul>
+      </AnchoredMenu>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
 
 export type TireTypeOption = {
   id: string;
@@ -126,17 +127,11 @@ export function TireTypeCombobox({
     setHighlightIndex(0);
   }, [isOpen, query, listRows.recentFiltered.length, listRows.rest.length]);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-        setShowCreate(false);
-        setError(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const closeMenu = () => {
+    setIsOpen(false);
+    setShowCreate(false);
+    setError(null);
+  };
 
   const selectedLabel = selectedOption ? selectedOption.displayName : "";
   const displayValue = isOpen ? query : selectedLabel;
@@ -257,11 +252,11 @@ export function TireTypeCombobox({
         aria-autocomplete="list"
         disabled={disabled}
       />
-      {isOpen && !showCreate && (
+      <AnchoredMenu open={isOpen && !showCreate} anchorRef={containerRef} onClose={closeMenu}>
         <ul
           ref={listRef}
           role="listbox"
-          className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded-md border border-border bg-secondary shadow-md py-1 text-sm"
+          className="w-full max-h-56 overflow-auto rounded-md border border-border bg-secondary shadow-md py-1 text-sm"
         >
           {loading && flatOptions.length === 0 ? (
             <li className="px-3 py-2 text-muted-foreground">Loading…</li>
@@ -331,11 +326,15 @@ export function TireTypeCombobox({
             <li className="px-3 py-2 text-muted-foreground">No matching tire types</li>
           ) : null}
         </ul>
-      )}
-      {isOpen && showCreate && allowInlineCreate && (
+      </AnchoredMenu>
+      <AnchoredMenu
+        open={isOpen && showCreate && allowInlineCreate}
+        anchorRef={containerRef}
+        onClose={closeMenu}
+      >
         <form
           onSubmit={createTireType}
-          className="absolute z-20 mt-1 w-full rounded-md border border-border bg-card shadow-md p-3 space-y-2 text-sm"
+          className="w-full rounded-md border border-border bg-card shadow-md p-3 space-y-2 text-sm"
         >
           <Eyebrow>New tire type</Eyebrow>
           <input
@@ -368,7 +367,7 @@ export function TireTypeCombobox({
             </button>
           </div>
         </form>
-      )}
+      </AnchoredMenu>
     </div>
   );
 }
