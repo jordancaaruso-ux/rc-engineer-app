@@ -3044,25 +3044,14 @@ export function NewRunForm(props: {
       } else {
         // New run saved as draft: send the driver back to the dashboard.
         // Navigating away discards the local tire/battery counters, so the
-        // double-increment-on-return bug can't recur — no delay needed.
-        //
-        // The run is ALREADY persisted at this point, so nothing here may trap
-        // the driver on the log page: refresh the today-draft banner in the
-        // background (never await it — a slow /api/runs/today-draft used to
-        // block the push), and do NOT call router.refresh() right after
-        // router.push() — the refresh aborts the in-flight push and leaves the
-        // app-router wedged (stuck on /runs/new, nav swallowed, button dead
-        // because `saving` never clears). The dashboard's TodayDraftRunProvider
-        // refreshes itself on landing at "/".
+        // double-increment-on-return bug can't recur. The run is ALREADY
+        // persisted here, so refresh the today-draft banner in the background
+        // (never await it — a slow /api/runs/today-draft must not gate nav)
+        // and hand off to navigateAway, which falls back to a hard navigation
+        // if the client-side push is ever swallowed.
         pendingDraftNavigationRef.current = true;
         void todayDraftCtx?.refreshDraft();
-        router.push("/");
-        // Safety net: if the client navigation is ever swallowed, un-wedge the
-        // already-saved run instead of stranding the driver with a dead button.
-        setTimeout(() => {
-          pendingDraftNavigationRef.current = false;
-          setSaving(false);
-        }, 2000);
+        navigateAway("/");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save run";
@@ -3079,15 +3068,31 @@ export function NewRunForm(props: {
 
   function navigateAfterRunComplete(runId: string) {
     pendingCompleteNavigationRef.current = true;
-    // push only — a router.refresh() here would abort the in-flight push and
-    // wedge the router on /runs/new (same freeze the draft path used to hit).
-    // The dashboard reads ?suggestRun from the URL, so no refresh is needed.
-    router.push(`/?suggestRun=${encodeURIComponent(runId)}`);
-    // Safety net mirroring the draft path: never strand an already-saved run.
-    setTimeout(() => {
-      pendingCompleteNavigationRef.current = false;
-      setSaving(false);
-    }, 2000);
+    // The dashboard reads ?suggestRun from the URL, so a soft push is enough.
+    navigateAway(`/?suggestRun=${encodeURIComponent(runId)}`);
+  }
+
+  /**
+   * Leave the log-run page after a save has already persisted the run. Tries a
+   * client-side push first (fast, no full reload), then GUARANTEES departure
+   * with a hard navigation if the push hasn't committed shortly.
+   *
+   * Why the hard fallback exists: a saved run must never strand the driver on
+   * the form. router.push() can silently no-op — an aborted transition (a
+   * router.refresh() racing it, which we no longer do), a wedged app-router, or
+   * an iOS standalone PWA / Capacitor webview where soft nav behaves oddly.
+   * window.location.assign() cannot be swallowed by any of those. Guard on the
+   * current path so a successful soft nav doesn't trigger a wasteful reload.
+   */
+  function navigateAway(href: string) {
+    router.push(href);
+    if (typeof window === "undefined") return;
+    const targetPath = href.split("?")[0]?.split("#")[0] || "/";
+    window.setTimeout(() => {
+      if (window.location.pathname !== targetPath) {
+        window.location.assign(href);
+      }
+    }, 1200);
   }
 
   // Track (with coords) + session time feeding the Conditions tab's weather fetch.
