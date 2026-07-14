@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { NavHubSection } from "@/components/layout/navConfig";
 import { HubNavLink } from "@/components/layout/HubNavLink";
 import { PillToggle } from "@/components/ui/PillToggle";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 /**
  * Assets hub with a Mine / Global scope toggle instead of two stacked sections.
@@ -22,7 +23,14 @@ function scopeLabel(eyebrow: string): string {
   return eyebrow;
 }
 
-export function AssetsHubClient({ sections }: { sections: NavHubSection[] }) {
+export function AssetsHubClient({
+  sections,
+  counts,
+}: {
+  sections: NavHubSection[];
+  /** Live per-destination totals keyed by href (e.g. `/cars` → 4). Mine scope only. */
+  counts?: Record<string, number>;
+}) {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
@@ -62,11 +70,18 @@ export function AssetsHubClient({ sections }: { sections: NavHubSection[] }) {
         onChange={(next) => select(Number(next))}
       />
 
-      <ul className="flex flex-col gap-2.5">
-        {current.links.map((link) => (
-          <HubNavLink key={link.href} link={link} />
-        ))}
-      </ul>
+      <SurfaceCard variant="panel" contentClassName="p-0">
+        <ul className="divide-y divide-border">
+          {current.links.map((link) => (
+            <HubNavLink
+              key={link.href}
+              link={link}
+              variant="row"
+              count={counts?.[link.href]}
+            />
+          ))}
+        </ul>
+      </SurfaceCard>
     </>
   );
 }
