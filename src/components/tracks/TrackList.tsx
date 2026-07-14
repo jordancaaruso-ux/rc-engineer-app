@@ -3,10 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { haptic } from "@/lib/haptics";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
-import { CardPanel } from "@/components/ui/CardPanel";
-import { Eyebrow } from "@/components/ui/panel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { HubRowTitle } from "@/components/ui/panel";
+import { Collapse } from "@/components/ui/Collapse";
+import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
@@ -51,6 +55,7 @@ export function TrackList({
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [existingTrackId, setExistingTrackId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     setTracks(initialTracks);
@@ -70,6 +75,15 @@ export function TrackList({
     search.trim().length > 0 &&
     filteredTracks.length === 0 &&
     !tracks.some((t) => t.name.toLowerCase() === search.trim().toLowerCase());
+
+  // A search that matches nothing auto-opens the add-track row and prefills the name.
+  useEffect(() => {
+    if (searchLooksUnmatched) {
+      setShowAddForm(true);
+      setName((cur) => (cur.trim() ? cur : search.trim()));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchLooksUnmatched]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -134,170 +148,174 @@ export function TrackList({
         />
       </div>
 
-      {searchLooksUnmatched || showAddForm ? (
-        <CardPanel>
-        <form onSubmit={handleAdd} className="space-y-3">
-          <Eyebrow>
-            {searchLooksUnmatched ? "Cannot find it? Add a new track" : "Add track"}
-          </Eyebrow>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
-              <input
-                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Silverstone National"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-muted-foreground mb-1">Location (optional)</label>
-              <input
-                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Melbourne, AU"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">LiveRC URL (optional)</label>
-            <input
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={liveRcUrl}
-              onChange={(e) => setLiveRcUrl(e.target.value)}
-              placeholder="https://tftr.liverc.com/"
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Speedhive URL (optional)</label>
-            <input
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={speedhiveUrl}
-              onChange={(e) => setSpeedhiveUrl(e.target.value)}
-              placeholder="https://speedhive.mylaps.com/practice/4591"
-              autoComplete="off"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="submit"
-              disabled={adding}
-              className={cn(
-                buttonLinkClassName("primary"),
-                adding && "opacity-70 pointer-events-none"
-              )}
-            >
-              {adding ? "Adding…" : "Add track"}
-            </button>
-            {!searchLooksUnmatched ? (
-              <button
-                type="button"
-                className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted/80"
-                onClick={() => setShowAddForm(false)}
-              >
-                Cancel
-              </button>
-            ) : null}
-            {message ? (
-              <span className={cn("text-xs", message === "Track added." ? "text-accent" : "text-muted-foreground")}>
-                {message}
-                {existingTrackId ? (
-                  <>
-                    {" "}
-                    <Link href={`/tracks/${existingTrackId}`} className="underline font-medium">
-                      Open existing track
-                    </Link>
-                  </>
+      <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
+        <ul className="divide-y divide-border">
+          <CollapsibleAddRow
+            label="Add a new track"
+            open={showAddForm}
+            onOpenChange={(next) => {
+              setShowAddForm(next);
+              if (next && search.trim() && !name.trim()) setName(search.trim());
+            }}
+          >
+            <form onSubmit={handleAdd} className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
+                  <input
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Silverstone National"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-muted-foreground mb-1">Location (optional)</label>
+                  <input
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. Melbourne, AU"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] text-muted-foreground mb-1">LiveRC URL (optional)</label>
+                <input
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                  value={liveRcUrl}
+                  onChange={(e) => setLiveRcUrl(e.target.value)}
+                  placeholder="https://tftr.liverc.com/"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-muted-foreground mb-1">Speedhive URL (optional)</label>
+                <input
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                  value={speedhiveUrl}
+                  onChange={(e) => setSpeedhiveUrl(e.target.value)}
+                  placeholder="https://speedhive.mylaps.com/practice/4591"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={adding}
+                  className={cn(
+                    buttonLinkClassName("primary"),
+                    adding && "opacity-70 pointer-events-none"
+                  )}
+                >
+                  {adding ? "Adding…" : "Add track"}
+                </button>
+                {message ? (
+                  <span className={cn("text-xs", message === "Track added." ? "text-accent" : "text-muted-foreground")}>
+                    {message}
+                    {existingTrackId ? (
+                      <>
+                        {" "}
+                        <Link href={`/tracks/${existingTrackId}`} className="underline font-medium">
+                          Open existing track
+                        </Link>
+                      </>
+                    ) : null}
+                  </span>
                 ) : null}
-              </span>
-            ) : null}
-          </div>
-        </form>
-        </CardPanel>
-      ) : (
-        <button
-          type="button"
-          className={cn(buttonLinkClassName("outline"), "text-xs")}
-          onClick={() => {
-            setShowAddForm(true);
-            if (search.trim() && !name.trim()) setName(search.trim());
-          }}
-        >
-          Cannot find it? Add a new track
-        </button>
-      )}
+              </div>
+            </form>
+          </CollapsibleAddRow>
 
-      <div>
-        <Eyebrow className="mb-2">Tracks</Eyebrow>
-        {filteredTracks.length === 0 ? (
-          <CardPanel className="bg-muted/70 text-sm text-muted-foreground">
-            {search.trim() ? "No tracks match your search." : "No tracks yet. Add one above or from Log your run."}
-          </CardPanel>
-        ) : (
-          <ul className="flex flex-col gap-2.5">
-            {filteredTracks.map((t) => (
-              <li key={t.id}>
-                <CardPanel contentClassName="px-4 py-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {favSet.has(t.id) && (
-                      <span className="text-yellow-500 shrink-0" aria-label="Favourite" title="Favourite">
-                        ★
+          {filteredTracks.length === 0 ? (
+            <li className="px-4 py-4 text-sm text-muted-foreground">
+              {search.trim() ? "No tracks match your search." : "No tracks yet. Add one above or from Log your run."}
+            </li>
+          ) : (
+            filteredTracks.map((t) => {
+              const expanded = expandedId === t.id;
+              return (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic("light");
+                      setExpandedId((cur) => (cur === t.id ? null : t.id));
+                    }}
+                    aria-expanded={expanded}
+                    className="tap-active flex w-full items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/50"
+                  >
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      {favSet.has(t.id) && (
+                        <span className="text-yellow-500 shrink-0" aria-label="Favourite" title="Favourite">
+                          ★
+                        </span>
+                      )}
+                      <span className="min-w-0">
+                        <HubRowTitle as="span">{t.name}</HubRowTitle>
+                        {t.location ? (
+                          <span className="text-muted-foreground text-sm ml-2">({t.location})</span>
+                        ) : null}
                       </span>
-                    )}
-                    <div>
+                    </span>
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                        expanded && "rotate-90"
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+
+                  <Collapse open={expanded}>
+                    <div className="space-y-2 px-4 pb-4 pt-0">
+                      <div className="w-fit max-w-full">
+                        <TrackMetaTagsEditor
+                          trackId={t.id}
+                          initialGripTags={t.gripTags ?? []}
+                          initialLayoutTags={t.layoutTags ?? []}
+                          compact
+                          onSaved={(saved) => {
+                            setTracks((prev) =>
+                              prev.map((x) =>
+                                x.id === t.id
+                                  ? { ...x, gripTags: saved.gripTags, layoutTags: saved.layoutTags }
+                                  : x
+                              )
+                            );
+                          }}
+                        />
+                      </div>
+                      {!trackHasMarkedLocation(t) ? (
+                        <TrackLocationNotSetBanner
+                          trackId={t.id}
+                          trackName={t.name}
+                          location={t.location}
+                          initial={{ latitude: t.latitude, longitude: t.longitude }}
+                          showCurrentLocation={false}
+                          onSaved={(saved) => {
+                            setTracks((prev) =>
+                              prev.map((x) => (x.id === t.id ? { ...x, ...saved } : x))
+                            );
+                          }}
+                        />
+                      ) : null}
                       <Link
                         href={`/tracks/${t.id}`}
                         prefetch
-                        className="tap-active inline-block font-medium"
+                        className="tap-active block text-xs text-muted-foreground hover:text-foreground"
                       >
-                        {t.name}
+                        Open track →
                       </Link>
-                      {t.location ? (
-                        <span className="text-muted-foreground text-sm ml-2">({t.location})</span>
-                      ) : null}
                     </div>
-                  </div>
-                  <span className="text-[11px] text-muted-foreground font-mono shrink-0">{t.id.slice(0, 8)}</span>
-                </div>
-                <TrackMetaTagsEditor
-                  trackId={t.id}
-                  initialGripTags={t.gripTags ?? []}
-                  initialLayoutTags={t.layoutTags ?? []}
-                  compact
-                  onSaved={(saved) => {
-                    setTracks((prev) =>
-                      prev.map((x) =>
-                        x.id === t.id
-                          ? { ...x, gripTags: saved.gripTags, layoutTags: saved.layoutTags }
-                          : x
-                      )
-                    );
-                  }}
-                />
-                {!trackHasMarkedLocation(t) ? (
-                  <TrackLocationNotSetBanner
-                    trackId={t.id}
-                    trackName={t.name}
-                    location={t.location}
-                    initial={{ latitude: t.latitude, longitude: t.longitude }}
-                    showCurrentLocation={false}
-                    onSaved={(saved) => {
-                      setTracks((prev) =>
-                        prev.map((x) => (x.id === t.id ? { ...x, ...saved } : x))
-                      );
-                    }}
-                  />
-                ) : null}
-                </CardPanel>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                  </Collapse>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      </SurfaceCard>
     </div>
   );
 }

@@ -7,7 +7,8 @@ import { formatAssetMeta } from "@/lib/assets/formatAssetMeta";
 import type { BatteryApiRow } from "@/lib/assets/createAssetApi";
 import { batteryDisplayLabel } from "@/lib/assets/batteryDisplay";
 import { AssetListRow } from "@/components/assets/AssetListRow";
-import { CardPanel } from "@/components/ui/CardPanel";
+import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { QuickAddBatteryPanel } from "@/components/assets/QuickAddBatteryPanel";
 import { deleteBatteryApi } from "@/lib/assets/createAssetApi";
 
@@ -56,55 +57,59 @@ export function MyBatteriesClient({ initialBatteries }: { initialBatteries: Batt
   }
 
   return (
-    <div className="max-w-2xl space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="max-w-2xl space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
         <p className="ui-caption text-muted-foreground">
           {batteries.length === 0
             ? "No batteries yet."
             : `${batteries.length} pack${batteries.length === 1 ? "" : "s"}`}
         </p>
-        {!showAdd ? (
-          <button type="button" className="btn-surface px-3 py-1.5 text-xs" onClick={() => setShowAdd(true)}>
-            Add battery
-          </button>
-        ) : null}
+        {message ? <p className="text-[11px] text-muted-foreground">{message}</p> : null}
       </div>
 
-      {message ? <p className="text-[11px] text-muted-foreground">{message}</p> : null}
+      <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
+        <ul className="divide-y divide-border">
+          <CollapsibleAddRow
+            label="Add battery"
+            open={showAdd}
+            onOpenChange={(next) => {
+              setShowAdd(next);
+              if (!next) setMessage(null);
+            }}
+          >
+            <QuickAddBatteryPanel
+              onCreated={handleCreated}
+              onCancel={() => {
+                setShowAdd(false);
+                setMessage(null);
+              }}
+            />
+          </CollapsibleAddRow>
 
-      {showAdd ? (
-        <QuickAddBatteryPanel
-          onCreated={handleCreated}
-          onCancel={() => {
-            setShowAdd(false);
-            setMessage(null);
-          }}
-        />
-      ) : null}
-
-      {batteries.length === 0 && !showAdd ? (
-        <CardPanel contentClassName="text-sm text-muted-foreground">
-          Add a battery pack here or{" "}
-          <Link href="/runs/new" prefetch className="text-primary hover:underline">
-            log a run
-          </Link>{" "}
-          and pick a pack in the Battery tab.
-        </CardPanel>
-      ) : (
-        <ul className="flex flex-col gap-2.5">
-          {batteries.map((row) => (
-            <li key={row.id}>
-              <AssetListRow
-                href={`/batteries/${row.id}`}
-                title={row.displayLine}
-                meta={formatAssetMeta(row.stats)}
-                runCount={row.stats.runCount}
-                onDelete={() => handleDelete(row.id)}
-              />
+          {batteries.length === 0 ? (
+            <li className="px-4 py-4 text-sm text-muted-foreground">
+              Add a battery pack here or{" "}
+              <Link href="/runs/new" prefetch className="text-primary hover:underline">
+                log a run
+              </Link>{" "}
+              and pick a pack in the Battery tab.
             </li>
-          ))}
+          ) : (
+            batteries.map((row) => (
+              <li key={row.id}>
+                <AssetListRow
+                  flush
+                  href={`/batteries/${row.id}`}
+                  title={row.displayLine}
+                  meta={formatAssetMeta(row.stats)}
+                  runCount={row.stats.runCount}
+                  onDelete={() => handleDelete(row.id)}
+                />
+              </li>
+            ))
+          )}
         </ul>
-      )}
+      </SurfaceCard>
     </div>
   );
 }

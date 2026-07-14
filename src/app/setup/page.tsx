@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { NewSetupUploadButton } from "@/components/setup/NewSetupUploadButton";
@@ -10,6 +11,7 @@ import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAu
 
 import { SetupRunPdfReviewClient } from "@/components/setup/SetupRunPdfReviewClient";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 
@@ -104,6 +106,7 @@ export default async function SetupPage({
   }
 
   const user = await requireCurrentUser();
+  const isAdmin = isAuthAdminEmail(user.email);
   await ensureAuthorizedSetupSheetCatalog();
   const [documents, runs, calibrations, cars] = await Promise.all([
     prisma.setupDocument.findMany({
@@ -133,12 +136,14 @@ export default async function SetupPage({
         event: { select: { name: true } },
       },
     }),
-    prisma.setupSheetCalibration.findMany({
-      where: calibrationsVisibleToUserWhere(user.id),
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      select: { id: true, name: true, sourceType: true, createdAt: true, communityShared: true },
-    }),
+    isAdmin
+      ? prisma.setupSheetCalibration.findMany({
+          where: calibrationsVisibleToUserWhere(user.id),
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: { id: true, name: true, sourceType: true, createdAt: true, communityShared: true },
+        })
+      : Promise.resolve([]),
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -171,7 +176,7 @@ export default async function SetupPage({
           <PageBackLink href="/assets" />
           <div>
             <h1 className="page-title">Setup</h1>
-            <p className="page-subtitle">One place for setup sheets, run setups, and calibration tools.</p>
+            <p className="page-subtitle">Upload setup sheets and browse the setups from your runs.</p>
           </div>
         </div>
       </header>
@@ -227,84 +232,53 @@ export default async function SetupPage({
             </div>
           </div>
         ) : null}
-        <CardPanel contentClassName="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <Eyebrow>Tools</Eyebrow>
-            <div className="text-xs text-muted-foreground">Compare setups or import many PDFs for a dataset.</div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/setup/comparison"
-              className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-medium hover:bg-muted transition"
-            >
-              Setup comparison
-            </Link>
-            <Link
-              href="/setup/bulk-import"
-              className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-medium hover:bg-muted transition"
-            >
-              Bulk setup import
-            </Link>
-            <Link
-              href="/setup-sheet-models"
-              className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-medium hover:bg-muted transition"
-            >
-              Chassis types
-            </Link>
-            <Link
-              href="/setup/aggregations-debug"
-              className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-medium hover:bg-muted transition"
-            >
-              Aggregation stats (debug)
-            </Link>
-          </div>
-        </CardPanel>
-
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <Eyebrow>Downloaded setups</Eyebrow>
             <div className="flex items-center gap-2">
-              <NewSetupUploadButton defaultSetupSheetModelId={preselectModelId} />
+              <NewSetupUploadButton
+                defaultSetupSheetModelId={preselectModelId}
+                defaultCarId={preselectCarId}
+                cars={cars.map((c) => ({ id: c.id, name: c.name }))}
+              />
               <Link href="/setup-documents" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
                 Open library
               </Link>
             </div>
           </div>
-          {documents.length === 0 ? (
-            <CardPanel>
-              <div className="text-sm text-muted-foreground">No setup documents yet.</div>
-            </CardPanel>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {documents.slice(0, 8).map((doc) => (
-                <li key={doc.id}>
-                  <CardPanel contentClassName="flex items-center justify-between gap-3 px-4 py-2.5">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-foreground">{doc.originalFilename}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {new Date(doc.createdAt).toLocaleDateString()} · {doc.parseStatus}
-                      {doc.createdSetupId ? " · setup created" : ""}
+          <SurfaceCard variant="panel" contentClassName="p-0">
+            {documents.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-muted-foreground">No setup documents yet.</div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {documents.slice(0, 8).map((doc) => (
+                  <li key={doc.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm text-foreground">{doc.originalFilename}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {new Date(doc.createdAt).toLocaleDateString()} · {doc.parseStatus}
+                        {doc.createdSetupId ? " · setup created" : ""}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {doc.createdSetupId ? (
-                      <a
-                        href={`/api/setup-snapshots/${encodeURIComponent(doc.createdSetupId)}/setup-pdf?download=1`}
-                        className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
-                        download
-                      >
-                        PDF
-                      </a>
-                    ) : null}
-                    <Link href={`/setup-documents/${doc.id}`} className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
-                      Review
-                    </Link>
-                  </div>
-                  </CardPanel>
-                </li>
-              ))}
-            </ul>
-          )}
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {doc.createdSetupId ? (
+                        <a
+                          href={`/api/setup-snapshots/${encodeURIComponent(doc.createdSetupId)}/setup-pdf?download=1`}
+                          className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+                          download
+                        >
+                          PDF
+                        </a>
+                      ) : null}
+                      <Link href={`/setup-documents/${doc.id}`} className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
+                        Review
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SurfaceCard>
         </div>
 
         <div className="space-y-2">
@@ -314,68 +288,103 @@ export default async function SetupPage({
               View runs
             </Link>
           </div>
-          {runs.length === 0 ? (
-            <CardPanel>
-              <div className="text-sm text-muted-foreground">No runs saved yet.</div>
-            </CardPanel>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {runs.slice(0, 10).map((run) => (
-                <li key={run.id}>
-                  <CardPanel contentClassName="px-4 py-2.5 text-sm">
-                  <div className="text-foreground">
-                    {run.event?.name ? `${run.event.name} · ` : ""}
-                    {run.track?.name ?? "—"} · {run.car?.name ?? "—"}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {formatRunSessionDisplay({
-                      sessionType: run.sessionType,
-                      meetingSessionType: run.meetingSessionType,
-                      meetingSessionCode: run.meetingSessionCode,
-                      sessionLabel: null,
-                    })}{" "}
-                    · {new Date(run.createdAt).toLocaleString()}
-                  </div>
-                  </CardPanel>
-                </li>
-              ))}
-            </ul>
-          )}
+          <SurfaceCard variant="panel" contentClassName="p-0">
+            {runs.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-muted-foreground">No runs saved yet.</div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {runs.slice(0, 10).map((run) => (
+                  <li key={run.id} className="px-4 py-2.5 text-sm">
+                    <div className="text-foreground">
+                      {run.event?.name ? `${run.event.name} · ` : ""}
+                      {run.track?.name ?? "—"} · {run.car?.name ?? "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {formatRunSessionDisplay({
+                        sessionType: run.sessionType,
+                        meetingSessionType: run.meetingSessionType,
+                        meetingSessionCode: run.meetingSessionCode,
+                        sessionLabel: null,
+                      })}{" "}
+                      · {new Date(run.createdAt).toLocaleString()}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SurfaceCard>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <Eyebrow>
-              Setup calibrations <span className="normal-case opacity-80">(advanced)</span>
-            </Eyebrow>
-            <Link href="/setup-calibrations" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
-              Manage
-            </Link>
+        {isAdmin ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <Eyebrow>
+                Setup calibrations <span className="normal-case opacity-80">(admin)</span>
+              </Eyebrow>
+              <Link href="/setup-calibrations" className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted">
+                Manage
+              </Link>
+            </div>
+            <SurfaceCard variant="panel" contentClassName="p-0">
+              {calibrations.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-muted-foreground">No calibrations saved yet.</div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {calibrations.slice(0, 6).map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-2 px-4 py-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-xs text-foreground">{c.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {c.sourceType} · {new Date(c.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <Link href={`/setup-calibrations/${c.id}`} className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted">
+                        Open
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </SurfaceCard>
           </div>
-          {calibrations.length === 0 ? (
-            <CardPanel>
-              <div className="text-xs text-muted-foreground">No calibrations saved yet.</div>
-            </CardPanel>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {calibrations.slice(0, 6).map((c) => (
-                <li key={c.id}>
-                  <CardPanel contentClassName="flex items-center justify-between gap-2 px-4 py-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-xs text-foreground">{c.name}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {c.sourceType} · {new Date(c.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <Link href={`/setup-calibrations/${c.id}`} className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted">
-                    Open
-                  </Link>
-                  </CardPanel>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        ) : null}
+
+        {isAdmin ? (
+          <CardPanel contentClassName="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Eyebrow>
+                Tools <span className="normal-case opacity-80">(admin)</span>
+              </Eyebrow>
+              <div className="text-xs text-muted-foreground">Compare setups or import many PDFs for a dataset.</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/setup/comparison"
+                className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-medium hover:bg-muted transition"
+              >
+                Setup comparison
+              </Link>
+              <Link
+                href="/setup/bulk-import"
+                className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-medium hover:bg-muted transition"
+              >
+                Bulk setup import
+              </Link>
+              <Link
+                href="/setup-sheet-models"
+                className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-medium hover:bg-muted transition"
+              >
+                Chassis types
+              </Link>
+              <Link
+                href="/setup/aggregations-debug"
+                className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-medium hover:bg-muted transition"
+              >
+                Aggregation stats (debug)
+              </Link>
+            </div>
+          </CardPanel>
+        ) : null}
       </section>
     </>
   );

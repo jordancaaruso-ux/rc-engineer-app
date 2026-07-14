@@ -1,19 +1,31 @@
-import { ASSETS_HUB_SECTIONS } from "@/components/layout/navConfig";
+import { ASSETS_HUB_SECTIONS, type NavHubSection } from "@/components/layout/navConfig";
 import { AssetsHubClient } from "@/components/assets/AssetsHubClient";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
 
 /** Live "Mine" totals change on asset mutations — keep the hub fresh. */
 export const revalidate = 30;
 
+/** Calibrations are an admin-only surface — drop the link for everyone else. */
+function sectionsForUser(isAdmin: boolean): NavHubSection[] {
+  if (isAdmin) return ASSETS_HUB_SECTIONS;
+  return ASSETS_HUB_SECTIONS.map((section) => ({
+    ...section,
+    links: section.links.filter((link) => link.href !== "/setup-calibrations"),
+  }));
+}
+
 export default async function AssetsHubPage() {
   let counts: Record<string, number> | undefined;
+  let isAdmin = false;
 
   if (hasDatabaseUrl()) {
     // requireCurrentUser may redirect — call it outside the try so the redirect
     // isn't swallowed; only the counts are best-effort.
     const user = await requireCurrentUser();
+    isAdmin = isAuthAdminEmail(user.email);
     try {
       const [cars, tireSets, batteries] = await Promise.all([
         prisma.car.count({ where: { userId: user.id } }),
@@ -36,7 +48,7 @@ export default async function AssetsHubPage() {
         </div>
       </header>
       <section className="page-body max-w-2xl flex flex-col gap-3">
-        <AssetsHubClient sections={ASSETS_HUB_SECTIONS} counts={counts} />
+        <AssetsHubClient sections={sectionsForUser(isAdmin)} counts={counts} />
       </section>
     </>
   );

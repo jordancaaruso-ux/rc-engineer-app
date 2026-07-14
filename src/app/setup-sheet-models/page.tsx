@@ -16,6 +16,7 @@ import { canEditSetupSheetModel } from "@/lib/setupSheetModels/modelAccess";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { isAuthorizedCatalogSlug } from "@/lib/setupSheetModels/catalogSuppression";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -146,7 +147,8 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
             <div className="text-sm text-muted-foreground">No chassis types yet.</div>
           </CardPanel>
         ) : (
-          <ul className="flex flex-col gap-2.5">
+          <SurfaceCard variant="panel" contentClassName="p-0">
+          <ul className="divide-y divide-border">
             {sorted.map((m) => {
               const isRecommended = recommendedIds.has(m.id);
               const norm = normalizeSetupSheetModelName(m.name);
@@ -157,8 +159,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
               const canManage = canEditSetupSheetModel(user, m);
 
               return (
-                <li key={m.id}>
-                  <CardPanel contentClassName="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <li key={m.id} className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="ui-title text-sm text-foreground normal-case">{m.name}</div>
@@ -239,11 +240,11 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                       />
                     ) : null}
                   </div>
-                  </CardPanel>
                 </li>
               );
             })}
           </ul>
+          </SurfaceCard>
         )}
 
       </section>

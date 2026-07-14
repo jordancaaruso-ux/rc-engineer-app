@@ -42,10 +42,10 @@ const PAD_TOP = 14;
 const PAD_BOTTOM = 78;
 /** Bottom of the plotted area (top of the marker band). */
 const PLOT_BOTTOM = CHART_HEIGHT - PAD_BOTTOM;
-/** Edge length of the setup-change wrench — sized for a comfortable mobile tap. */
+/** Edge length of the setup-change wrench glyph. */
 const SETUP_ICON = 17;
-/** Square slot for the tire wheel marker (matches TireIndicatorIcon size="lg"). */
-const TIRE_SLOT = 28;
+/** Square slot for the tire wheel marker (TireIndicatorIcon size="sm" — kept close to the wrench glyph size). */
+const TIRE_SLOT = 24;
 /** Top of the setup-change wrench icons, directly below the plot (all faces). Tappable → opens the setup sheet. */
 const SETUP_ROW_TOP = PLOT_BOTTOM + 6;
 /** Top of the tire wheel slot, below the setup row (pace face only). */
@@ -451,13 +451,13 @@ function PaceTrendFace({
                 {displayRun.shortLabel}
               </span>
               {displayRun.tireIndicator ? (
-                <span className="flex min-w-0 items-center gap-1">
+                <span className="flex items-center gap-1">
                   <TireIndicatorIcon
                     indicator={displayRun.tireIndicator}
                     size="sm"
                     className="-my-1 shrink-0"
                   />
-                  <span className="max-w-[110px] truncate text-[10.5px] text-muted-foreground">
+                  <span className="whitespace-nowrap text-[10.5px] text-muted-foreground">
                     {displayRun.tireIndicator.setLabel}
                     {displayRun.tireIndicator.runNumber != null
                       ? ` · run ${displayRun.tireIndicator.runNumber}`
@@ -570,7 +570,7 @@ function PaceTrendFace({
                     style={{ overflow: "visible", pointerEvents: "none" }}
                   >
                     <div className="flex items-center justify-center">
-                      <TireIndicatorIcon indicator={indicator} size="lg" />
+                      <TireIndicatorIcon indicator={indicator} size="sm" />
                     </div>
                   </foreignObject>
                 );

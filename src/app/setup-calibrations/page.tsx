@@ -11,6 +11,8 @@ import {
 } from "@/lib/setupCalibrations/calibrationAccess";
 import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { UnverifiedBadge } from "@/components/assets/CatalogVerifyControl";
 import { CatalogVerifyToggleButton } from "@/components/assets/CatalogVerifyToggleButton";
 
@@ -29,6 +31,30 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
   }
   const user = await requireCurrentUser();
   const isAdmin = isCalibrationAdmin(user);
+
+  // Calibrations are an admin-only surface (founder decision 2026-07-14).
+  if (!isAdmin) {
+    return (
+      <>
+        <header className="page-header">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/assets" />
+            <div>
+              <h1 className="page-title">Setup calibrations</h1>
+              <p className="page-subtitle">Admin-only.</p>
+            </div>
+          </div>
+        </header>
+        <section className="page-body">
+          <CardPanel contentClassName="text-sm text-muted-foreground">
+            Setup calibrations are managed by admins. Your uploaded setup sheets are calibrated
+            automatically — you don&rsquo;t need to touch this.
+          </CardPanel>
+        </section>
+      </>
+    );
+  }
+
   const calibrations = await prisma.setupSheetCalibration.findMany({
     where: calibrationsVisibleToUserWhere(user.id),
     orderBy: { createdAt: "desc" },
@@ -64,15 +90,15 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
             <div className="text-sm text-muted-foreground">No calibrations saved yet.</div>
           </CardPanel>
         ) : (
-          <ul className="flex flex-col gap-2.5">
+          <SurfaceCard variant="panel" contentClassName="p-0">
+          <ul className="divide-y divide-border">
             {calibrations.map((c) => {
               const { formFields, textFields, regionFields, imageFields } = calibrationMappingCounts(
                 normalizeCalibrationData(c.calibrationDataJson)
               );
               const canManage = canManageCalibration(user, c);
               return (
-                <li key={c.id}>
-                  <CardPanel contentClassName="px-4 py-3 flex items-center justify-between gap-2">
+                <li key={c.id} className="px-4 py-3 flex items-center justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="ui-title text-sm text-foreground normal-case">{c.name}</div>
@@ -108,11 +134,11 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
                       {canManage ? "Edit" : "View"}
                     </Link>
                   </div>
-                  </CardPanel>
                 </li>
               );
             })}
           </ul>
+          </SurfaceCard>
         )}
       </section>
     </>

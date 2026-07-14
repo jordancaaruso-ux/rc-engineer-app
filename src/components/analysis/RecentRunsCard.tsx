@@ -166,7 +166,7 @@ export function RecentRunsCard({ runs }: { runs: AnalysisRecentRun[] }) {
                       </Link>
                       <span className="flex shrink-0 items-center gap-2">
                         {run.tireIndicator ? (
-                          <TireIndicatorIcon indicator={run.tireIndicator} />
+                          <TireIndicatorIcon indicator={run.tireIndicator} well />
                         ) : null}
                         {run.carId ? (
                           <button

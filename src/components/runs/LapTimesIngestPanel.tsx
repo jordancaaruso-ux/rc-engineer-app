@@ -246,10 +246,14 @@ function resolveScanStatusMessage(opts: {
   totalCandidates: number;
   unimportedCount: number;
   candidateCount: number;
+  olderCount: number;
 }): string | null {
-  const { scanMessage, totalCandidates, unimportedCount, candidateCount } = opts;
+  const { scanMessage, totalCandidates, unimportedCount, candidateCount, olderCount } = opts;
   if (scanMessage) return scanMessage;
   if (candidateCount === 0) {
+    if (olderCount > 0) {
+      return `No sessions from today yet — ${olderCount} older session${olderCount === 1 ? "" : "s"} available below.`;
+    }
     if (totalCandidates > 0 && unimportedCount === 0) {
       const n = totalCandidates;
       return `Found ${n} session${n === 1 ? "" : "s"} for your driver — all already imported.`;
@@ -347,6 +351,10 @@ export function LapTimesIngestPanel({
   const [debugOpen, setDebugOpen] = useState(false);
   const [scanTotals, setScanTotals] = useState<{ total: number; unimported: number } | null>(null);
   const [showAllRecentRuns, setShowAllRecentRuns] = useState(false);
+  /** Unimported sessions completed before today (first-scan backlog) — collapsed by default. */
+  const [dayScanOlderCandidates, setDayScanOlderCandidates] = useState<ScanDayCandidate[] | null>(null);
+  const [dayScanOlderTotal, setDayScanOlderTotal] = useState(0);
+  const [showOlderSessions, setShowOlderSessions] = useState(false);
   /** `${blockId}:${driverId}` for lap preview */
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
 
@@ -484,6 +492,25 @@ export function LapTimesIngestPanel({
     return sortSessionsNewestFirst(Array.from(byUrl.values()), (r) => r.sortIso);
   }, [sortedEventRaceSessions, sortedDayScanCandidates]);
 
+  // Backlog list (unimported sessions from before today) — collapsed behind "Show older sessions".
+  const olderPickerRows = useMemo<ImportPickerCandidate[]>(() => {
+    if (!dayScanOlderCandidates?.length) return [];
+    const seenUrls = new Set(mergedImportCandidates.map((c) => c.sessionUrl.trim()));
+    return sortSessionsNewestFirst(
+      dayScanOlderCandidates.filter((c) => c.sessionUrl.trim() && !seenUrls.has(c.sessionUrl.trim())),
+      (c) => c.sessionCompletedAtIso
+    ).map((c) => ({
+      key: `older:${c.sessionId}`,
+      sessionUrl: c.sessionUrl,
+      title: c.driverName?.trim() || "Run",
+      when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime),
+      bestLapSeconds: c.bestLapSeconds ?? null,
+      timingSource: c.timingSource,
+      alreadyImported: c.alreadyImported,
+      sortIso: c.sessionCompletedAtIso,
+    }));
+  }, [dayScanOlderCandidates, mergedImportCandidates]);
+
   const canExpandImportRows = mergedImportCandidates.length > RECENT_RUNS_COLLAPSED;
 
   // Total for the status line — the track scan may report more unimported sessions than it returns rows for.
@@ -560,7 +587,14 @@ export function LapTimesIngestPanel({
     setDebugOpen(false);
     setScanTotals(null);
     setShowAllRecentRuns(false);
+    setDayScanOlderCandidates(null);
+    setDayScanOlderTotal(0);
+    setShowOlderSessions(false);
     try {
+      // Local start-of-day: the picker defaults to today's sessions; older unimported
+      // sessions (e.g. a new user's Speedhive history) come back collapsed separately.
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
       const res = await fetch("/api/laps/scan-day-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -568,6 +602,7 @@ export function LapTimesIngestPanel({
           ...(useTrack ? { trackId: tid } : { dayUrl: url }),
           eventId: lapImportEventId?.trim() || undefined,
           runId: editingRunId?.trim() || undefined,
+          todayStartIso: useTrack ? todayStart.toISOString() : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -594,9 +629,18 @@ export function LapTimesIngestPanel({
         typeof (data as { unimportedCount?: unknown }).unimportedCount === "number"
           ? (data as { unimportedCount: number }).unimportedCount
           : candidates.length;
+      const olderCandidates = Array.isArray((data as { olderCandidates?: unknown }).olderCandidates)
+        ? ((data as { olderCandidates: ScanDayCandidate[] }).olderCandidates)
+        : [];
+      const olderCount =
+        typeof (data as { olderCount?: unknown }).olderCount === "number"
+          ? (data as { olderCount: number }).olderCount
+          : olderCandidates.length;
       setDayScanIndexKind(ik === "results" || ik === "practice" ? ik : null);
       setDayScanHasDriverName(hasDriver);
       setDayScanCandidates(candidates);
+      setDayScanOlderCandidates(olderCandidates);
+      setDayScanOlderTotal(olderCount);
       setDiscoveryDebug(dbg ?? null);
       setScanTotals({ total: totalCandidates, unimported: unimportedCount });
       setDayScanMessage(
@@ -605,6 +649,7 @@ export function LapTimesIngestPanel({
           totalCandidates,
           unimportedCount,
           candidateCount: candidates.length,
+          olderCount,
         })
       );
     } catch {
@@ -1053,6 +1098,47 @@ export function LapTimesIngestPanel({
                     eventRaceHint ??
                     "No sessions found yet — check your driver name in Settings, or add a LiveRC/Speedhive URL on the track or event."}
                 </p>
+              ) : null}
+              {!dayScanBusy && olderPickerRows.length > 0 ? (
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    className="w-full rounded-md border border-dashed border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-surface-runna-inset transition"
+                    onClick={() => setShowOlderSessions((prev) => !prev)}
+                  >
+                    {showOlderSessions
+                      ? "Hide older sessions"
+                      : `Show older sessions (${dayScanOlderTotal})`}
+                  </button>
+                  {showOlderSessions ? (
+                    <>
+                      <ul className="space-y-1">
+                        {olderPickerRows.map((row) => (
+                          <li key={row.key}>
+                            <SessionImportListRow
+                              title={row.title}
+                              when={row.when}
+                              bestLapSeconds={row.bestLapSeconds}
+                              timingSource={row.timingSource}
+                              isActive={activeImportUrl === row.sessionUrl.trim()}
+                              actionLabel="Import"
+                              disabled={urlBusy}
+                              onClick={() => {
+                                if (activeImportUrl === row.sessionUrl.trim()) return;
+                                void importFromSessionUrl(row.sessionUrl);
+                              }}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                      {dayScanOlderTotal > olderPickerRows.length ? (
+                        <p className="ui-label-meta">
+                          Showing the {olderPickerRows.length} most recent of {dayScanOlderTotal} older sessions.
+                        </p>
+                      ) : null}
+                    </>
+                  ) : null}
+                </div>
               ) : null}
               {eventRaceHint && mergedImportCandidates.length > 0 ? (
                 <p className="ui-label-meta">{eventRaceHint}</p>

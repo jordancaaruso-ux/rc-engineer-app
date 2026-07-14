@@ -7,8 +7,9 @@ import { useEffect, useMemo, useState } from "react";
 import { carTemplateSelectGroups, type CarForTemplateGroup } from "@/lib/cars/setupSheetTemplateCarGroups";
 import { labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
 import { cn } from "@/lib/utils";
-import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
+import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 
 type CarOption = CarForTemplateGroup;
 
@@ -87,97 +88,94 @@ export function SetupDocumentLibraryClient({
 
   return (
     <section className="page-body">
-      <CardPanel>
-        <Eyebrow>Upload setup sheet</Eyebrow>
-        <p className="mt-1 text-xs text-muted-foreground">
-          PDF and images are stored as setup documents. Parsing creates draft values for review.
-        </p>
-        {cars.length === 0 ? (
-          <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
-            Add a car under{" "}
-            <Link href="/cars" className="underline hover:text-foreground">
-              Cars
-            </Link>{" "}
-            before uploading setup sheets.
-          </p>
-        ) : (
-          <label className="mt-3 block text-xs">
-            <span className="text-muted-foreground">Setup sheet type (shared by all cars of that type)</span>
-            <select
-              className="mt-1 block w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-              value={uploadCarId}
-              onChange={(e) => setUploadCarId(e.target.value)}
-              disabled={uploading}
-            >
-              <option value="">Select type…</option>
-              {templateGroups.map((g) => (
-                <option key={g.key} value={g.defaultCarId}>
-                  {g.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <div className="mt-3 flex items-center gap-3">
-          <label className="inline-flex cursor-pointer items-center rounded-md border border-border bg-muted/60 px-3 py-2 text-xs hover:bg-muted">
-            <input
-              type="file"
-              className="hidden"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
-              disabled={uploading || cars.length === 0}
-              onChange={(e) => onSelect(e.currentTarget.files?.[0] ?? null)}
-            />
-            {uploading ? "Uploading…" : "Upload setup sheet"}
-          </label>
-          <span className="text-[11px] text-muted-foreground">Max 12 MB</span>
-        </div>
-        {status ? <p className="mt-2 text-xs text-muted-foreground">{status}</p> : null}
-        {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
-      </CardPanel>
+      <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
+        <ul className="divide-y divide-border">
+          <CollapsibleAddRow label="Upload setup sheet">
+            <p className="text-xs text-muted-foreground">
+              PDF and images are stored as setup documents. Parsing creates draft values for review.
+            </p>
+            {cars.length === 0 ? (
+              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                Add a car under{" "}
+                <Link href="/cars" className="underline hover:text-foreground">
+                  Cars
+                </Link>{" "}
+                before uploading setup sheets.
+              </p>
+            ) : (
+              <label className="mt-3 block text-xs">
+                <span className="text-muted-foreground">Setup sheet type (shared by all cars of that type)</span>
+                <select
+                  className="mt-1 block w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                  value={uploadCarId}
+                  onChange={(e) => setUploadCarId(e.target.value)}
+                  disabled={uploading}
+                >
+                  <option value="">Select type…</option>
+                  {templateGroups.map((g) => (
+                    <option key={g.key} value={g.defaultCarId}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="mt-3 flex items-center gap-3">
+              <label className="inline-flex cursor-pointer items-center rounded-md border border-border bg-muted/60 px-3 py-2 text-xs hover:bg-muted">
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  disabled={uploading || cars.length === 0}
+                  onChange={(e) => onSelect(e.currentTarget.files?.[0] ?? null)}
+                />
+                {uploading ? "Uploading…" : "Upload setup sheet"}
+              </label>
+              <span className="text-[11px] text-muted-foreground">Max 12 MB</span>
+            </div>
+            {status ? <p className="mt-2 text-xs text-muted-foreground">{status}</p> : null}
+            {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+          </CollapsibleAddRow>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <Eyebrow>Setup documents</Eyebrow>
-        </div>
-        {initialDocuments.length === 0 ? (
-          <CardPanel>
-            <div className="text-sm text-muted-foreground">No setup documents uploaded yet.</div>
-          </CardPanel>
-        ) : (
-          <ul className="flex flex-col gap-2.5">
-            {initialDocuments.map((doc) => (
-              <li key={doc.id}>
-                <CardPanel contentClassName="flex items-center justify-between gap-4 px-4 py-3">
+          <li className="bg-muted/20 px-4 pb-1.5 pt-3">
+            <Eyebrow>Setup documents</Eyebrow>
+          </li>
+
+          {initialDocuments.length === 0 ? (
+            <li className="px-4 py-3 text-sm text-muted-foreground">No setup documents uploaded yet.</li>
+          ) : (
+            initialDocuments.map((doc) => (
+              <li key={doc.id} className="flex items-center justify-between gap-4 px-4 py-3">
                 <div className="min-w-0">
                   <div className="truncate ui-title text-sm normal-case">{doc.originalFilename}</div>
                   <div className="mt-0.5 text-[11px] text-muted-foreground">
                     {doc.createdAtLabel ?? doc.createdAt} · {doc.sourceType} ·{" "}
                     <span className={cn(statusClass(doc.parseStatus))}>{doc.parseStatus}</span>
-                  {doc.importStatus && doc.importStatus !== "COMPLETED" ? (
-                    <>
-                      {" "}
-                      · <span
-                          className={cn(
-                            doc.importStatus === "FAILED"
-                              ? "text-destructive"
-                              : doc.importStatus === "COMPLETED_WITH_WARNINGS"
-                                ? "text-amber-200"
-                                : "text-muted-foreground"
-                          )}
-                        >
-                        {doc.importStatus}
-                      </span>
-                      {doc.lastCompletedStage ? <span className="ml-1 font-mono text-[10px] opacity-80">({doc.lastCompletedStage})</span> : null}
-                    </>
-                  ) : null}
+                    {doc.importStatus && doc.importStatus !== "COMPLETED" ? (
+                      <>
+                        {" "}
+                        · <span
+                            className={cn(
+                              doc.importStatus === "FAILED"
+                                ? "text-destructive"
+                                : doc.importStatus === "COMPLETED_WITH_WARNINGS"
+                                  ? "text-amber-200"
+                                  : "text-muted-foreground"
+                            )}
+                          >
+                          {doc.importStatus}
+                        </span>
+                        {doc.lastCompletedStage ? <span className="ml-1 font-mono text-[10px] opacity-80">({doc.lastCompletedStage})</span> : null}
+                      </>
+                    ) : null}
                     {doc.createdSetupId ? " · setup created" : ""}
                     {doc.setupSheetTemplate
                       ? ` · ${labelForSetupSheetTemplate(doc.setupSheetTemplate)}`
                       : ""}
                   </div>
-                {doc.importStatus === "FAILED" && doc.importErrorMessage ? (
-                  <div className="mt-1 text-[11px] text-destructive line-clamp-2">{doc.importErrorMessage}</div>
-                ) : null}
+                  {doc.importStatus === "FAILED" && doc.importErrorMessage ? (
+                    <div className="mt-1 text-[11px] text-destructive line-clamp-2">{doc.importErrorMessage}</div>
+                  ) : null}
                 </div>
                 <Link
                   href={`/setup-documents/${doc.id}`}
@@ -185,12 +183,11 @@ export function SetupDocumentLibraryClient({
                 >
                   Review
                 </Link>
-                </CardPanel>
               </li>
-            ))}
-          </ul>
-        )}
-      </div>
+            ))
+          )}
+        </ul>
+      </SurfaceCard>
     </section>
   );
 }

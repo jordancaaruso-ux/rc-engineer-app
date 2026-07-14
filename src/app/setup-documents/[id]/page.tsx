@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
 import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDocumentReviewClient";
@@ -219,6 +220,7 @@ export default async function SetupDocumentDetailPage({
       })()
     : 0;
   const showImageCalibrateCta = isImage && linkedCalibrationFields === 0;
+  const isAdmin = isAuthAdminEmail(user.email);
 
   return (
     <>
@@ -230,21 +232,45 @@ export default async function SetupDocumentDetailPage({
       </header>
       {showImageCalibrateCta && !aiReviewFields ? (
         <div className="page-body pb-0">
-          <CardPanel contentClassName="p-3 flex items-center justify-between gap-3">
-            <div className="text-xs">
-              <div className="font-medium text-foreground">Teach the app this screenshot</div>
-              <div className="text-muted-foreground">
-                Draw rectangles around each value once. Future uploads of this template will import
-                automatically.
+          {isAdmin ? (
+            <CardPanel contentClassName="p-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs">
+                <div className="font-medium text-foreground">Calibrate this sheet style (admin)</div>
+                <div className="text-muted-foreground">
+                  This image has no calibration yet — map its boxes once and every future upload of
+                  this template imports automatically.
+                </div>
               </div>
-            </div>
-            <Link
-              href={`/setup-documents/${doc.id}/calibrate-image`}
-              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-            >
-              Open image calibration
-            </Link>
-          </CardPanel>
+              <div className="flex shrink-0 items-center gap-2">
+                {doc.setupSheetModelId ? (
+                  <Link
+                    href={`/setup-sheet-models/${doc.setupSheetModelId}`}
+                    className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                  >
+                    Model workbench
+                  </Link>
+                ) : null}
+                <Link
+                  href={`/setup-documents/${doc.id}/calibrate-image`}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                >
+                  Open box editor
+                </Link>
+              </div>
+            </CardPanel>
+          ) : (
+            <CardPanel contentClassName="p-3">
+              <div className="text-xs">
+                <div className="font-medium text-foreground">
+                  This sheet style isn’t readable automatically yet
+                </div>
+                <div className="text-muted-foreground">
+                  Your sheet is saved{doc.carId ? " to your car" : ""}. Values will import
+                  automatically once this sheet style is supported — no action needed.
+                </div>
+              </div>
+            </CardPanel>
+          )}
         </div>
       ) : null}
       <AutoRefreshWhileProcessing

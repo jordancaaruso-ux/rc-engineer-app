@@ -14,11 +14,14 @@ import {
 export function TireIndicatorIcon({
   indicator,
   size = "md",
+  well = false,
   className,
 }: {
   indicator: RunTireIndicator;
   /** lg = 28px slot / 20px disc (session-trend markers); md = 32px slot (mobile rows / cards); sm = 24px slot (desktop table rows). */
   size?: "sm" | "md" | "lg";
+  /** Sit the icon on a bordered charcoal tile matching the adjacent action buttons (mobile action row). */
+  well?: boolean;
   className?: string;
 }) {
   const title = formatTireIndicatorTitle(indicator);
@@ -30,6 +33,7 @@ export function TireIndicatorIcon({
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center",
         size === "lg" ? "h-7 w-7" : size === "md" ? "h-8 w-8" : "h-6 w-6",
+        well && "rounded-md border border-border bg-background",
         indicator.changed ? "text-foreground" : "text-faint",
         className
       )}

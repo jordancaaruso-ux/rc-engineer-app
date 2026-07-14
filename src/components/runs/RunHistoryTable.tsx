@@ -158,7 +158,7 @@ function RunHistoryActionButtons({
       )}
     >
       {tireIndicator ? (
-        <TireIndicatorIcon indicator={tireIndicator} size={mobile ? "md" : "sm"} />
+        <TireIndicatorIcon indicator={tireIndicator} size={mobile ? "md" : "sm"} well={mobile} />
       ) : mobile ? (
         // Fixed-width slot so stat columns stay aligned across rows.
         <span className="h-8 w-8 shrink-0" aria-hidden />

@@ -10,6 +10,8 @@ import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
 
+import { auth } from "@/auth";
+
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
 
 import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLinkBridge";
@@ -139,7 +141,12 @@ export const viewport: Viewport = {
 
 
 
-export default function RootLayout({ children }: { children: ReactNode }): ReactNode {
+export default async function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}): Promise<ReactNode> {
+  const session = await auth();
 
   return (
 
@@ -229,7 +236,7 @@ export default function RootLayout({ children }: { children: ReactNode }): React
 
           >{`(function(){try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;document.cookie='${RC_TIMEZONE_COOKIE}='+encodeURIComponent(tz)+';path=/;max-age=31536000;SameSite=Lax';}catch(e){}})();`}</Script>
 
-          <AuthSessionProvider>
+          <AuthSessionProvider session={session}>
 
             <TimeZoneCookieSync />
 

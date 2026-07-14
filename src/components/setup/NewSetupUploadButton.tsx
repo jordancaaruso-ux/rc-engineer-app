@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -8,19 +9,27 @@ import {
   QUICK_CREATE_SETUP_ACCEPT_MIME,
 } from "@/lib/setupDocuments/quickCreateSetupClient";
 
-type UploadStage = "idle" | "uploading" | "detecting" | "creating" | "done";
+type UploadStage = "idle" | "uploading" | "matching" | "creating" | "done";
 
 function stageLabel(stage: UploadStage): string {
   if (stage === "uploading") return "Uploading…";
-  if (stage === "detecting") return "Detecting chassis…";
+  if (stage === "matching") return "Reading sheet…";
   if (stage === "creating") return "Creating setup…";
   return "New setup";
 }
 
+type CarOption = { id: string; name: string };
+
 export function NewSetupUploadButton({
   defaultSetupSheetModelId = null,
+  defaultCarId = null,
+  cars = [],
 }: {
   defaultSetupSheetModelId?: string | null;
+  /** Pre-resolved car (e.g. ?carId= entry point) — skips the picker for images. */
+  defaultCarId?: string | null;
+  /** The user's cars, for the image "which car is this for?" picker. */
+  cars?: CarOption[];
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -28,6 +37,9 @@ export function NewSetupUploadButton({
 
   const [stage, setStage] = useState<UploadStage>("idle");
   const [error, setError] = useState<string | null>(null);
+  /** Image waiting on a car choice before it uploads. */
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingCarId, setPendingCarId] = useState<string>("");
 
   const busy = stage !== "idle" && stage !== "done";
 
@@ -39,24 +51,27 @@ export function NewSetupUploadButton({
   function scheduleStageHints() {
     clearStageTimers();
     stageTimersRef.current.push(
-      window.setTimeout(() => setStage((s) => (s === "uploading" ? "detecting" : s)), 900)
+      window.setTimeout(() => setStage((s) => (s === "uploading" ? "matching" : s)), 900)
     );
     stageTimersRef.current.push(
-      window.setTimeout(() => setStage((s) => (s === "detecting" ? "creating" : s)), 2600)
+      window.setTimeout(() => setStage((s) => (s === "matching" ? "creating" : s)), 2600)
     );
   }
 
   const upload = useCallback(
-    async (file: File) => {
+    async (file: File, carId?: string | null) => {
       setError(null);
       setStage("uploading");
       scheduleStageHints();
-      // Auto-detect the chassis from the fingerprint; pass a model only when the entry point set one.
-      // 3-minute timeout: the AI front door (identify + schema draft for a brand-new car) runs
-      // inline before the response; the slow vision read itself happens after the response.
+      // PDFs auto-match a calibration by fingerprint; images read only through the chosen car's
+      // sheet calibration. 3-minute timeout: slow reads finish after the response and the
+      // document page live-refreshes until done.
       const result = await postQuickCreateSetup(
         file,
-        defaultSetupSheetModelId ? { setupSheetModelId: defaultSetupSheetModelId } : {},
+        {
+          ...(defaultSetupSheetModelId ? { setupSheetModelId: defaultSetupSheetModelId } : {}),
+          ...(carId ? { carId } : {}),
+        },
         { timeoutMs: 180_000 }
       );
       clearStageTimers();
@@ -66,20 +81,34 @@ export function NewSetupUploadButton({
         return;
       }
       setStage("done");
-      const data = result.data;
-      const docId = data.documentId;
-      const isImageMime = file.type?.toLowerCase().startsWith("image/");
-      if (isImageMime && data.pickSource === "none" && !data.setupId && !data.detectedModelId) {
-        router.push(`/setup-documents/${docId}/calibrate-image`);
-        router.refresh();
-      } else {
-        router.push(`/setup-documents/${docId}`);
-        router.refresh();
-      }
+      router.push(`/setup-documents/${result.data.documentId}`);
+      router.refresh();
       setStage("idle");
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- router/prop are stable external deps
     [router, defaultSetupSheetModelId]
+  );
+
+  /** Route a chosen file: PDFs upload straight away; images need a car first. */
+  const handleFile = useCallback(
+    (file: File) => {
+      const isImage = (file.type || "").toLowerCase().startsWith("image/");
+      if (!isImage || defaultSetupSheetModelId || defaultCarId) {
+        void upload(file, defaultCarId);
+        return;
+      }
+      if (cars.length === 0) {
+        setError("Add a car first — setups attach to one of your cars.");
+        return;
+      }
+      if (cars.length === 1) {
+        void upload(file, cars[0]!.id);
+        return;
+      }
+      setPendingImage(file);
+      setPendingCarId(cars[0]!.id);
+    },
+    [cars, defaultCarId, defaultSetupSheetModelId, upload]
   );
 
   function openFilePicker() {
@@ -92,7 +121,7 @@ export function NewSetupUploadButton({
     const f = ev.currentTarget.files?.[0] ?? null;
     ev.currentTarget.value = "";
     if (!f) return;
-    void upload(f);
+    handleFile(f);
   }
 
   function onPaste(ev: React.ClipboardEvent) {
@@ -100,7 +129,14 @@ export function NewSetupUploadButton({
     const f = clipboardEventToImageFile(ev);
     if (!f) return;
     ev.preventDefault();
-    void upload(f);
+    handleFile(f);
+  }
+
+  function confirmPendingImage() {
+    const file = pendingImage;
+    if (!file || !pendingCarId) return;
+    setPendingImage(null);
+    void upload(file, pendingCarId);
   }
 
   return (
@@ -119,7 +155,7 @@ export function NewSetupUploadButton({
           onClick={openFilePicker}
           disabled={busy}
           className="rounded-md border border-primary/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
-          title="Upload any setup sheet — the chassis is detected automatically"
+          title="Upload a setup sheet (PDF or image)"
         >
           {stageLabel(stage)}
         </button>
@@ -132,9 +168,47 @@ export function NewSetupUploadButton({
           Paste image
         </div>
       </div>
+      {pendingImage ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card/60 px-2 py-1.5">
+          <span className="text-xs text-muted-foreground">Which car is this for?</span>
+          <select
+            value={pendingCarId}
+            onChange={(ev) => setPendingCarId(ev.currentTarget.value)}
+            className="ui-control rounded-md border border-border bg-secondary px-2 py-1 text-xs text-foreground"
+          >
+            {cars.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={confirmPendingImage}
+            className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={() => setPendingImage(null)}
+            className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}
       {error ? (
         <span className="text-xs text-destructive" role="alert">
           {error}
+          {error.startsWith("Add a car") ? (
+            <>
+              {" "}
+              <Link href="/cars" className="underline">
+                Add car
+              </Link>
+            </>
+          ) : null}
         </span>
       ) : null}
     </div>

@@ -128,12 +128,19 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as
-    | { dayUrl?: string; eventId?: string | null; trackId?: string | null; runId?: string | null }
+    | {
+        dayUrl?: string;
+        eventId?: string | null;
+        trackId?: string | null;
+        runId?: string | null;
+        todayStartIso?: string | null;
+      }
     | null;
   const dayUrl = body?.dayUrl?.trim() ?? "";
   const eventId = typeof body?.eventId === "string" ? body.eventId.trim() : "";
   const trackId = typeof body?.trackId === "string" ? body.trackId.trim() : "";
   const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
+  const todayStartIso = typeof body?.todayStartIso === "string" ? body.todayStartIso.trim() : "";
 
   if (!dayUrl && trackId) {
     const track = await prisma.track.findFirst({
@@ -167,14 +174,14 @@ export async function POST(request: Request) {
         liveRcUrl: liveRcUrl || null,
         speedhiveUrl: speedhiveUrl || null,
         eventRaceClass,
+        visibleSinceIso: todayStartIso || null,
       }),
       speedhiveUrl ? hasSpeedhiveIdentityForUser(user.id) : Promise.resolve(false),
     ]);
     const hasDriverNameSetting = Boolean(
       (liveRcUrl && discovered.liveRcDriverName?.trim()) || (speedhiveUrl && speedhiveIdentity)
     );
-    const displaySessions = discovered.unimportedCandidates;
-    const discoveredCandidates: ScanDayUrlCandidateRow[] = displaySessions.map((c) => ({
+    const toCandidateRow = (c: (typeof discovered.unimportedCandidates)[number]): ScanDayUrlCandidateRow => ({
       sessionId: c.sessionId,
       sessionUrl: c.sessionUrl,
       driverName: c.label,
@@ -185,7 +192,9 @@ export async function POST(request: Request) {
       linkedRunId: c.linkedRunId,
       timingSource: c.timingSource,
       bestLapSeconds: c.bestLapSeconds ?? null,
-    }));
+    });
+    const discoveredCandidates: ScanDayUrlCandidateRow[] = discovered.unimportedCandidates.map(toCandidateRow);
+    const olderCandidates: ScanDayUrlCandidateRow[] = discovered.olderUnimportedCandidates.map(toCandidateRow);
     const linkedCandidates =
       runId && (await prisma.run.findFirst({ where: { id: runId, userId: user.id }, select: { id: true } }))
         ? await linkedScanCandidatesForRun(user.id, runId)
@@ -197,6 +206,8 @@ export async function POST(request: Request) {
       indexKind: "practice" as ScanDayUrlIndexKind,
       liveRcDriverName: discovered.liveRcDriverName,
       candidates,
+      olderCandidates,
+      olderCount: discovered.olderUnimportedTotal,
       totalCandidates: discovered.candidates.length,
       unimportedCount: discovered.unimportedTotal,
       matchedCount: candidates.length,

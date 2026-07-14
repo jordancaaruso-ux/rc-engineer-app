@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
 import { ImageCalibrationEditorClient } from "@/components/setup-documents/ImageCalibrationEditorClient";
 import { buildCalibrationFieldCatalog } from "@/lib/setupCalibrations/calibrationFieldCatalog";
@@ -31,6 +32,8 @@ export default async function CalibrateImagePage({
   }
   const { id } = await params;
   const user = await requireCurrentUser();
+  // Calibration is admin-only machinery (founder ruling 2026-07-07); users land on the document.
+  if (!isAuthAdminEmail(user.email)) redirect(`/setup-documents/${id}`);
   const doc = await prisma.setupDocument.findFirst({
     where: { id, userId: user.id },
     select: {

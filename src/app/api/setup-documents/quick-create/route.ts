@@ -285,11 +285,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         };
       } else {
         imageBlockReason =
-          "This car's setup sheet has no image map yet. Open its calibration, click “Derive image map” once, then re-upload the screenshot.";
+          "This sheet style isn’t readable automatically yet. Your sheet is saved — values will import automatically once it’s supported.";
       }
     } else if (carId) {
       imageBlockReason =
-        "This car has no setup sheet model yet. Build its sheet from the AcroForm PDF before importing screenshots.";
+        "This car’s sheet style isn’t supported yet. Your sheet is saved — values will import automatically once it’s supported.";
     } else {
       imageNeedsCar = true;
     }
@@ -388,7 +388,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       pickUserNote = `Recognized as ${detectedModelName ?? "a known chassis"}, but you have no ${detectedModelName ?? "matching"} car yet. Add one to import this setup.`;
     } else if (notRecognized) {
       pickUserNote =
-        "This chassis isn’t recognized from the sheet layout. Pick a chassis type and calibrate it once to teach the app.";
+        "This sheet layout isn’t recognized yet. Your sheet is saved — it will import automatically once its chassis is supported.";
     }
   }
 
@@ -509,9 +509,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       ?? (aiExtractionRan
         ? `AI read ${aiDiag?.importedCount ?? 0} values from the sheet — glance over the ${Array.isArray(aiDiag?.flaggedKeys) ? aiDiag.flaggedKeys.length : 0} flagged fields (mostly checkboxes) before creating the setup.`
         : mimeType.startsWith("image/")
-          ? "No image calibration matched — draw regions once to teach the app this sheet."
+          ? "This sheet style isn’t readable automatically yet. Your sheet is saved — values will import automatically once it’s supported."
           : pickUserNote
-            ?? "This chassis isn’t recognized from the sheet layout. Pick a chassis type and calibrate it once to teach the app.");
+            ?? "This sheet layout isn’t recognized yet. Your sheet is saved — it will import automatically once its chassis is supported.");
   }
   if (calibrationModelMismatch && pickUserNote) {
     needsReview = true;

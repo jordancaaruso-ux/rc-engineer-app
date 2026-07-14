@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
-import { CardPanel } from "@/components/ui/CardPanel";
-import { Eyebrow } from "@/components/ui/panel";
+import { Eyebrow, HubRowTitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { formatEventDate } from "@/lib/formatDate";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
@@ -47,7 +48,8 @@ function splitEvents(events: EventItem[]) {
   return splitEventsForPicker(events);
 }
 
-function EventSection({
+/** A subheader row + the section's event rows, flush inside the single card's `<ul>`. */
+function EventSectionRows({
   title,
   subtitle,
   events,
@@ -59,33 +61,38 @@ function EventSection({
   emptyMessage: string;
 }) {
   return (
-    <section className="space-y-2">
-      <div>
+    <>
+      <li className="bg-muted/20 px-4 pb-1.5 pt-3">
         <Eyebrow>{title}</Eyebrow>
         {subtitle ? <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p> : null}
-      </div>
+      </li>
       {events.length === 0 ? (
-        <CardPanel contentClassName="text-sm text-muted-foreground">
-          {emptyMessage}
-        </CardPanel>
+        <li className="px-4 py-3 text-sm text-muted-foreground">{emptyMessage}</li>
       ) : (
-        <ul className="flex flex-col gap-2.5">
-          {events.map((ev) => (
-            <li key={ev.id}>
-              <CardPanel contentClassName="px-4 py-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/events/${ev.id}`} className="font-medium hover:underline">
-                  {ev.name}
-                </Link>
-                {ev.hasLiveRcLink ? (
-                  <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                    LiveRC linked
-                  </span>
-                ) : (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                    Planned
-                  </span>
-                )}
+        events.map((ev) => (
+          <li key={ev.id}>
+            <Link
+              href={`/events/${ev.id}`}
+              prefetch
+              className="tap-active block px-4 py-3 transition hover:bg-muted/50"
+            >
+              <div className="flex items-center gap-2">
+                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <HubRowTitle as="span">{ev.name}</HubRowTitle>
+                  {ev.hasLiveRcLink ? (
+                    <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                      LiveRC linked
+                    </span>
+                  ) : (
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      Planned
+                    </span>
+                  )}
+                </span>
+                <ChevronRight
+                  className="h-4 w-4 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
               </div>
               <div className="text-sm text-muted-foreground mt-0.5 flex flex-wrap gap-x-3 gap-y-0">
                 {(ev.track || ev.trackLabel) && (
@@ -106,12 +113,11 @@ function EventSection({
               {ev.notes && (
                 <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{ev.notes}</p>
               )}
-              </CardPanel>
-            </li>
-          ))}
-        </ul>
+            </Link>
+          </li>
+        ))
       )}
-    </section>
+    </>
   );
 }
 
@@ -138,6 +144,7 @@ export function EventList({
   const [controlledAdditiveTypeId, setControlledAdditiveTypeId] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const { upcoming, past } = useMemo(() => splitEvents(events), [events]);
 
@@ -237,6 +244,7 @@ export function EventList({
       setControlAdditiveEnabled(false);
       setControlledAdditiveTypeId("");
       setMessage("Event created.");
+      setAddOpen(false);
       router.refresh();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to create event");
@@ -246,11 +254,11 @@ export function EventList({
   }
 
   return (
-    <div className="space-y-8">
-      <SurfaceCard variant="panel" overflowHidden={false}>
-        <form onSubmit={handleAdd} className="space-y-3">
-        <Eyebrow>New event</Eyebrow>
-        <div className="grid gap-3 md:grid-cols-2">
+    <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
+      <ul className="divide-y divide-border">
+        <CollapsibleAddRow label="New event" open={addOpen} onOpenChange={setAddOpen}>
+          <form onSubmit={handleAdd} className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
             <input
@@ -385,22 +393,23 @@ export function EventList({
             </span>
           )}
         </div>
-        </form>
-      </SurfaceCard>
+          </form>
+        </CollapsibleAddRow>
 
-      <EventSection
-        title="Upcoming events"
-        subtitle="End date is today or later."
-        events={upcoming}
-        emptyMessage="No upcoming events. Create one above or log a race meeting from Log your run."
-      />
+        <EventSectionRows
+          title="Upcoming events"
+          subtitle="End date is today or later."
+          events={upcoming}
+          emptyMessage="No upcoming events. Create one above or log a race meeting from Log your run."
+        />
 
-      <EventSection
-        title="Past events"
-        subtitle="End date before today."
-        events={past}
-        emptyMessage="No past events yet."
-      />
-    </div>
+        <EventSectionRows
+          title="Past events"
+          subtitle="End date before today."
+          events={past}
+          emptyMessage="No past events yet."
+        />
+      </ul>
+    </SurfaceCard>
   );
 }

@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { haptic } from "@/lib/haptics";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
-import { CardPanel } from "@/components/ui/CardPanel";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { HubRowTitle } from "@/components/ui/panel";
+import { Collapse } from "@/components/ui/Collapse";
+import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { CatalogVerifyControl } from "@/components/assets/CatalogVerifyControl";
 import type { TireTypeOption } from "@/components/tires/TireTypeCombobox";
 
@@ -23,6 +28,8 @@ export function TireGaragePanel({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   async function toggleVerify(t: TireTypeOption) {
     const nextVerified = !t.verifiedAt;
@@ -82,6 +89,7 @@ export function TireGaragePanel({
         )
       );
       setNewName("");
+      setAddOpen(false);
     } catch {
       setError("Failed to add tire type");
     } finally {
@@ -153,110 +161,138 @@ export function TireGaragePanel({
   }
 
   return (
-    <div className="space-y-4">
-      <form onSubmit={addTireType} className="flex flex-wrap gap-2 items-start">
-        <input
-          className="flex-1 min-w-[12rem] rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-          placeholder="e.g. Sweep D32"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          aria-label="New tire type name"
-        />
-        <button
-          type="submit"
-          disabled={creating || !newName.trim()}
-          className={cn(
-            buttonLinkClassName("primary"),
-            "text-sm px-4 py-2",
-            (creating || !newName.trim()) && "opacity-60 pointer-events-none"
-          )}
-        >
-          {creating ? "Adding…" : "Add"}
-        </button>
-      </form>
+    <div className="space-y-2">
+      {error ? <p className="text-sm text-destructive px-1">{error}</p> : null}
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
+        <ul className="divide-y divide-border">
+          <CollapsibleAddRow label="Add tire type" open={addOpen} onOpenChange={setAddOpen}>
+            <form onSubmit={addTireType} className="flex flex-wrap gap-2 items-start">
+              <input
+                className="flex-1 min-w-[12rem] rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+                placeholder="e.g. Sweep D32"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                aria-label="New tire type name"
+              />
+              <button
+                type="submit"
+                disabled={creating || !newName.trim()}
+                className={cn(
+                  buttonLinkClassName("primary"),
+                  "text-sm px-4 py-2",
+                  (creating || !newName.trim()) && "opacity-60 pointer-events-none"
+                )}
+              >
+                {creating ? "Adding…" : "Add"}
+              </button>
+            </form>
+          </CollapsibleAddRow>
 
-      {tireTypes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No tire types yet.</p>
-      ) : (
-        <ul className="flex flex-col gap-2.5">
-          {tireTypes.map((t) => (
-            <li key={t.id}>
-              <CardPanel contentClassName="px-4 py-3 flex flex-wrap items-center gap-2 justify-between">
-              {editingId === t.id ? (
-                <>
-                  <input
-                    className="flex-1 min-w-[10rem] rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    aria-label="Edit tire type name"
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={savingId === t.id || !editName.trim()}
-                      onClick={() => void saveEdit(t.id)}
+          {tireTypes.length === 0 ? (
+            <li className="px-4 py-4 text-sm text-muted-foreground">No tire types yet.</li>
+          ) : (
+            tireTypes.map((t) => {
+              // Non-admins have no per-row actions — render a plain, non-expanding row.
+              if (!isAdmin) {
+                return (
+                  <li key={t.id} className="flex items-center gap-2 px-4 py-3">
+                    <HubRowTitle as="span" className="min-w-0 flex-1 truncate">
+                      {t.displayName}
+                    </HubRowTitle>
+                    {!t.verifiedAt ? <CatalogVerifyControl verified={false} isAdmin={false} /> : null}
+                  </li>
+                );
+              }
+              const expanded = expandedId === t.id;
+              return (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic("light");
+                      setExpandedId((cur) => (cur === t.id ? null : t.id));
+                    }}
+                    aria-expanded={expanded}
+                    className="tap-active flex w-full items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/50"
+                  >
+                    <HubRowTitle as="span" className="min-w-0 flex-1 truncate">
+                      {t.displayName}
+                    </HubRowTitle>
+                    <CatalogVerifyControl verified={!!t.verifiedAt} isAdmin />
+                    <ChevronRight
                       className={cn(
-                        buttonLinkClassName("primary"),
-                        "text-xs px-3 py-1.5",
-                        (savingId === t.id || !editName.trim()) && "opacity-60 pointer-events-none"
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                        expanded && "rotate-90"
                       )}
-                    >
-                      {savingId === t.id ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelEdit}
-                      className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/50"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-medium truncate">{t.displayName}</span>
-                    {!t.verifiedAt && !isAdmin ? <CatalogVerifyControl verified={false} isAdmin={false} /> : null}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {isAdmin ? (
-                      <CatalogVerifyControl
-                        verified={!!t.verifiedAt}
-                        isAdmin
-                        pending={verifyingId === t.id}
-                        onToggle={() => void toggleVerify(t)}
-                      />
-                    ) : null}
-                    {isAdmin ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => startEdit(t)}
-                          className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/50"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          disabled={deletingId === t.id}
-                          onClick={() => void deleteTireType(t)}
-                          className="text-xs px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-60"
-                        >
-                          {deletingId === t.id ? "Deleting…" : "Delete"}
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                </>
-              )}
-              </CardPanel>
-            </li>
-          ))}
+                      aria-hidden
+                    />
+                  </button>
+
+                  <Collapse open={expanded}>
+                    <div className="px-4 pb-4 pt-0">
+                      {editingId === t.id ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            className="flex-1 min-w-[10rem] rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            aria-label="Edit tire type name"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            disabled={savingId === t.id || !editName.trim()}
+                            onClick={() => void saveEdit(t.id)}
+                            className={cn(
+                              buttonLinkClassName("primary"),
+                              "text-xs px-3 py-1.5",
+                              (savingId === t.id || !editName.trim()) && "opacity-60 pointer-events-none"
+                            )}
+                          >
+                            {savingId === t.id ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CatalogVerifyControl
+                            verified={!!t.verifiedAt}
+                            isAdmin
+                            pending={verifyingId === t.id}
+                            onToggle={() => void toggleVerify(t)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => startEdit(t)}
+                            className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingId === t.id}
+                            onClick={() => void deleteTireType(t)}
+                            className="text-xs px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-60"
+                          >
+                            {deletingId === t.id ? "Deleting…" : "Delete"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </Collapse>
+                </li>
+              );
+            })
+          )}
         </ul>
-      )}
+      </SurfaceCard>
     </div>
   );
 }

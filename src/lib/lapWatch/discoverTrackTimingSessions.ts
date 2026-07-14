@@ -21,10 +21,18 @@ export async function discoverTrackTimingSessions(input: {
   speedhiveUrl: string | null;
   eventRaceClass?: string | null;
   referenceDate?: Date;
+  /**
+   * Recency window start (caller's local start-of-day). Unimported sessions completed before this
+   * (or with no timestamp) are returned separately as `olderUnimportedCandidates` so the picker can
+   * collapse a first-scan backlog instead of listing months of history as "to import".
+   */
+  visibleSinceIso?: string | null;
 }): Promise<{
   candidates: TrackTimingDiscoveredSession[];
   unimportedCandidates: TrackTimingDiscoveredSession[];
   unimportedTotal: number;
+  olderUnimportedCandidates: TrackTimingDiscoveredSession[];
+  olderUnimportedTotal: number;
   mostRecentSession: TrackTimingDiscoveredSession | null;
   liveRcDriverName: string | null;
   hint: string | null;
@@ -45,6 +53,8 @@ export async function discoverTrackTimingSessions(input: {
       candidates: [],
       unimportedCandidates: [],
       unimportedTotal: 0,
+      olderUnimportedCandidates: [],
+      olderUnimportedTotal: 0,
       mostRecentSession: null,
       liveRcDriverName: null,
       hint: "Add a LiveRC or Speedhive organization URL on the track page.",
@@ -96,17 +106,35 @@ export async function discoverTrackTimingSessions(input: {
   });
 
   const unimported = merged.filter((c) => !c.alreadyImported);
+
+  const visibleSinceParsed = input.visibleSinceIso ? new Date(input.visibleSinceIso) : null;
+  const visibleSinceMs =
+    visibleSinceParsed && !Number.isNaN(visibleSinceParsed.getTime())
+      ? visibleSinceParsed.getTime()
+      : null;
+  const isWithinWindow = (c: TrackTimingDiscoveredSession): boolean => {
+    if (visibleSinceMs == null) return true;
+    if (!c.sessionCompletedAtIso) return false;
+    const t = new Date(c.sessionCompletedAtIso).getTime();
+    return Number.isFinite(t) && t >= visibleSinceMs;
+  };
+  const fresh = unimported.filter(isWithinWindow);
+  const older = unimported.filter((c) => !isWithinWindow(c));
+
   const MAX_RECENT_RUNS = 10;
-  const unimportedRecent = unimported.slice(0, MAX_RECENT_RUNS);
+  const MAX_OLDER_RUNS = 30;
+  const unimportedRecent = fresh.slice(0, MAX_RECENT_RUNS);
   const hints = [lr?.hint, sh?.hint].filter(Boolean) as string[];
 
   return {
     candidates: merged,
     unimportedCandidates: unimportedRecent,
-    unimportedTotal: unimported.length,
+    unimportedTotal: fresh.length,
+    olderUnimportedCandidates: older.slice(0, MAX_OLDER_RUNS),
+    olderUnimportedTotal: older.length,
     mostRecentSession: unimportedRecent[0] ?? merged[0] ?? null,
     liveRcDriverName,
-    hint: unimportedRecent.length > 0 ? null : hints[0] ?? null,
+    hint: unimported.length > 0 ? null : hints[0] ?? null,
     liveRcDebug: lr?.debug ?? null,
     speedhiveOrganizationId: sh?.organizationId ?? null,
     speedhivePracticeLocationId: sh?.practiceLocationId ?? null,
