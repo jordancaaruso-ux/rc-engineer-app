@@ -368,6 +368,12 @@ export type ImageCalibrationReference = {
   headerTokens: string[];
   /** Optional anchor crops for affine alignment of new uploads. */
   anchors?: ImageCalibrationAnchor[];
+  /**
+   * Normalized bounding box of the sheet's printed content (outer table border) in the
+   * reference image. Uploads from other renderers carry different outer margins; mapping the
+   * upload's detected content box onto this one fixes global scale + offset deterministically.
+   */
+  contentBox?: ImageRegion;
 };
 
 export type ImageCalibration = {
@@ -482,6 +488,7 @@ export function normalizeImageCalibration(value: unknown): ImageCalibration | un
     .map((t) => (typeof t === "string" ? t.trim().toLowerCase() : ""))
     .filter(Boolean);
   const pageRegion = isImageRegion(ref.pageRegion) ? normalizeImageRegion(ref.pageRegion) : undefined;
+  const contentBox = isImageRegion(ref.contentBox) ? normalizeImageRegion(ref.contentBox) : undefined;
   const anchorsRaw = Array.isArray(ref.anchors) ? ref.anchors : [];
   const anchors: ImageCalibrationAnchor[] = [];
   for (const a of anchorsRaw) {
@@ -519,6 +526,7 @@ export function normalizeImageCalibration(value: unknown): ImageCalibration | un
       pHash64,
       headerTokens,
       anchors: anchors.length ? anchors : undefined,
+      contentBox,
     },
     fields,
   };
