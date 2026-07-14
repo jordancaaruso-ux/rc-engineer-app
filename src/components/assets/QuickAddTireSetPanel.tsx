@@ -60,8 +60,8 @@ export function QuickAddTireSetPanel({
       <div className="space-y-1">
         <Eyebrow>New tire set</Eyebrow>
         <p className="text-[11px] text-muted-foreground leading-snug">
-          Search the catalog or type a new compound — tap <span className="font-medium text-foreground">Create…</span>{" "}
-          in the list if it is not there yet.
+          Pick a compound from the list, or choose{" "}
+          <span className="font-medium text-foreground">+ Add new tire type…</span> if it is not there yet.
         </p>
       </div>
 
@@ -71,7 +71,7 @@ export function QuickAddTireSetPanel({
           value={tireTypeId}
           onChange={setTireTypeId}
           onSelectedTypeChange={setSelectedType}
-          placeholder="Search or add tire type"
+          placeholder="Select tire type…"
           aria-label="Tire type"
         />
         {selectedType ? (

@@ -344,7 +344,7 @@ export function RunTireSelectionPanel({
               onSelectedTypeChange={(option) => {
                 if (option) handleCompoundPicked(option.id, option);
               }}
-              placeholder="Search or add tire type"
+              placeholder="Select tire type…"
               aria-label="Tire type"
             />
           </div>

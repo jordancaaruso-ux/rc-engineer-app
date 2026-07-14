@@ -341,7 +341,7 @@ export function EventList({
           <TireTypeCombobox
             value={controlledTireTypeId}
             onChange={setControlledTireTypeId}
-            placeholder="Search spec tire type"
+            placeholder="Select spec tire type…"
             aria-label="Event spec tire type"
           />
         </div>
@@ -362,7 +362,7 @@ export function EventList({
             <AdditiveTypeCombobox
               value={controlledAdditiveTypeId}
               onChange={setControlledAdditiveTypeId}
-              placeholder="Search spec additive"
+              placeholder="Select spec additive…"
               aria-label="Event spec additive type"
               allowInlineCreate={false}
             />

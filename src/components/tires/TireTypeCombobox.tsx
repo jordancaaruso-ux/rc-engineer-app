@@ -1,10 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { useCallback, useEffect, useState } from "react";
 import { Eyebrow } from "@/components/ui/panel";
-import { buttonLinkClassName } from "@/components/ui/ButtonLink";
-import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
 
 export type TireTypeOption = {
   id: string;
@@ -14,11 +11,19 @@ export type TireTypeOption = {
   verifiedAt?: string | null;
 };
 
+const CREATE_VALUE = "__create_tire_type__";
+
+/**
+ * Tire type picker — a native `<select>` (fully native 2026-07-14 for the iOS
+ * feel). Options load up-front so the OS menu is populated; "Recently used" and
+ * "All types" become `<optgroup>`s, and an inline "+ Add new tire type…" option
+ * reveals a small create panel below (replaces the old create-from-query row).
+ */
 export function TireTypeCombobox({
   value,
   onChange,
   onSelectedTypeChange,
-  placeholder = "Search tire type",
+  placeholder = "Select tire type…",
   "aria-label": ariaLabel = "Tire type",
   disabled,
   className,
@@ -38,30 +43,18 @@ export function TireTypeCombobox({
   const [options, setOptions] = useState<TireTypeOption[]>([]);
   const [recentOptions, setRecentOptions] = useState<TireTypeOption[]>([]);
   const [selectedOption, setSelectedOption] = useState<TireTypeOption | null>(null);
-  const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const [highlightIndex, setHighlightIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState("");
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
 
-  const loadOptions = useCallback(async (q: string) => {
-    setLoading(true);
+  const loadAll = useCallback(async () => {
     try {
-      const url = q.trim()
-        ? `/api/tire-types?q=${encodeURIComponent(q.trim())}&limit=40`
-        : "/api/tire-types?limit=40";
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch("/api/tire-types?limit=200", { cache: "no-store" });
       const data = (await res.json()) as { tireTypes?: TireTypeOption[] };
       setOptions(data.tireTypes ?? []);
     } catch {
       setOptions([]);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -76,8 +69,16 @@ export function TireTypeCombobox({
   }, []);
 
   useEffect(() => {
+    void loadAll();
+    void loadRecent();
+  }, [loadAll, loadRecent]);
+
+  // Resolve the selected option (label + onSelectedTypeChange) — targeted fetch
+  // when the current value isn't in the loaded lists.
+  useEffect(() => {
     if (!value) {
       setSelectedOption(null);
+      onSelectedTypeChange?.(null);
       return;
     }
     const fromList = [...recentOptions, ...options].find((o) => o.id === value);
@@ -87,7 +88,7 @@ export function TireTypeCombobox({
       return;
     }
     let cancelled = false;
-    fetch(`/api/tire-types?limit=200`, { cache: "no-store" })
+    fetch("/api/tire-types?limit=200", { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { tireTypes?: TireTypeOption[] }) => {
         if (cancelled) return;
@@ -103,58 +104,37 @@ export function TireTypeCombobox({
     };
   }, [value, options, recentOptions, onSelectedTypeChange]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    void loadRecent();
-    const t = window.setTimeout(() => {
-      void loadOptions(query);
-    }, query.trim() ? 150 : 0);
-    return () => window.clearTimeout(t);
-  }, [isOpen, query, loadOptions, loadRecent]);
+  const recentIds = new Set(recentOptions.map((o) => o.id));
+  const rest = options.filter((o) => !recentIds.has(o.id));
+  const known = new Set([...recentOptions, ...options].map((o) => o.id));
+  const extra = selectedOption && !known.has(selectedOption.id) ? [selectedOption] : [];
 
-  const listRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const recentFiltered = recentOptions.filter(
-      (o) => !q || o.displayName.toLowerCase().includes(q) || o.modelCode.toLowerCase().includes(q)
-    );
-    const recentIds = new Set(recentFiltered.map((o) => o.id));
-    const rest = options.filter((o) => !recentIds.has(o.id));
-    return { recentFiltered, rest };
-  }, [query, recentOptions, options]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setHighlightIndex(0);
-  }, [isOpen, query, listRows.recentFiltered.length, listRows.rest.length]);
-
-  const closeMenu = () => {
-    setIsOpen(false);
-    setShowCreate(false);
-    setError(null);
-  };
-
-  const selectedLabel = selectedOption ? selectedOption.displayName : "";
-  const displayValue = isOpen ? query : selectedLabel;
-  const flatOptions = [...listRows.recentFiltered, ...listRows.rest];
-  const showCreateRow =
-    allowInlineCreate &&
-    query.trim().length > 0 &&
-    !flatOptions.some((o) => o.displayName.toLowerCase() === query.trim().toLowerCase());
-
-  function select(id: string, option?: TireTypeOption) {
+  function pick(id: string) {
+    const opt =
+      [...recentOptions, ...options, ...extra].find((o) => o.id === id) ?? null;
     onChange(id);
-    if (option) {
-      setSelectedOption(option);
-      onSelectedTypeChange?.(option);
-    }
-    setQuery("");
-    setIsOpen(false);
+    setSelectedOption(opt);
+    onSelectedTypeChange?.(opt);
     setShowCreate(false);
     setError(null);
   }
 
-  async function createTireType(e: React.FormEvent) {
-    e.preventDefault();
+  function handleChange(next: string) {
+    if (next === CREATE_VALUE) {
+      setShowCreate(true);
+      setError(null);
+      return;
+    }
+    if (!next) {
+      onChange("");
+      setSelectedOption(null);
+      onSelectedTypeChange?.(null);
+      return;
+    }
+    pick(next);
+  }
+
+  async function createTireType() {
     const displayName = newDisplayName.trim();
     if (!displayName) return;
     setCreating(true);
@@ -171,7 +151,11 @@ export function TireTypeCombobox({
         error?: string;
       };
       if (res.status === 409 && data.existing) {
-        select(data.existing.id, data.existing);
+        setOptions((prev) =>
+          prev.some((o) => o.id === data.existing!.id) ? prev : [data.existing!, ...prev]
+        );
+        pick(data.existing.id);
+        setNewDisplayName("");
         return;
       }
       if (!res.ok || !data.tireType) {
@@ -179,7 +163,8 @@ export function TireTypeCombobox({
         return;
       }
       setOptions((prev) => [data.tireType!, ...prev.filter((o) => o.id !== data.tireType!.id)]);
-      select(data.tireType.id, data.tireType);
+      pick(data.tireType.id);
+      setNewDisplayName("");
     } catch {
       setError("Failed to create tire type");
     } finally {
@@ -187,155 +172,42 @@ export function TireTypeCombobox({
     }
   }
 
-  function openCreatePanel() {
-    const name = query.trim() || newDisplayName.trim();
-    setNewDisplayName(name);
-    setShowCreate(true);
-    setError(null);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (showCreate) return;
-    if (!isOpen) {
-      if (e.key === "Enter" || e.key === "ArrowDown" || e.key === " ") {
-        e.preventDefault();
-        setIsOpen(true);
-      }
-      return;
-    }
-    if (e.key === "Escape") {
-      e.preventDefault();
-      setIsOpen(false);
-      setQuery("");
-      return;
-    }
-    const totalRows = flatOptions.length + (showCreateRow ? 1 : 0);
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightIndex((i) => (i < totalRows - 1 ? i + 1 : i));
-      return;
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightIndex((i) => (i > 0 ? i - 1 : 0));
-      return;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (highlightIndex < flatOptions.length) {
-        const item = flatOptions[highlightIndex];
-        if (item) select(item.id, item);
-      } else if (showCreateRow) {
-        openCreatePanel();
-      }
-    }
-  }
-
-  let rowIndex = 0;
+  const renderOption = (o: TireTypeOption) => (
+    <option key={o.id} value={o.id}>
+      {o.displayName}
+    </option>
+  );
 
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
-      <input
-        type="text"
-        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-        placeholder={placeholder}
-        value={displayValue}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setIsOpen(true);
-          setShowCreate(false);
-        }}
-        onFocus={() => setIsOpen(true)}
-        onKeyDown={handleKeyDown}
+    <div className={className}>
+      <select
+        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none disabled:opacity-60"
+        value={value}
+        onChange={(e) => handleChange(e.target.value)}
         aria-label={ariaLabel}
-        aria-expanded={isOpen}
-        aria-autocomplete="list"
         disabled={disabled}
-      />
-      <AnchoredMenu open={isOpen && !showCreate} anchorRef={containerRef} onClose={closeMenu}>
-        <ul
-          ref={listRef}
-          role="listbox"
-          className="w-full max-h-56 overflow-auto rounded-md border border-border bg-secondary shadow-md py-1 text-sm"
-        >
-          {loading && flatOptions.length === 0 ? (
-            <li className="px-3 py-2 text-muted-foreground">Loading…</li>
-          ) : null}
-          {!query.trim() && listRows.recentFiltered.length > 0 ? (
-            <>
-              <li className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Recently used
-              </li>
-              {listRows.recentFiltered.map((o) => {
-                const i = rowIndex++;
-                return (
-                  <li
-                    key={`recent-${o.id}`}
-                    role="option"
-                    aria-selected={value === o.id}
-                    className={cn(
-                      "px-3 py-2 cursor-pointer",
-                      i === highlightIndex ? "bg-accent/20 text-foreground" : "text-foreground hover:bg-muted"
-                    )}
-                    onMouseEnter={() => setHighlightIndex(i)}
-                    onClick={() => select(o.id, o)}
-                  >
-                    <div className="font-medium">{o.displayName}</div>
-                  </li>
-                );
-              })}
-              {listRows.rest.length > 0 ? (
-                <li className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border-t border-border mt-1">
-                  All types
-                </li>
-              ) : null}
-            </>
-          ) : null}
-          {listRows.rest.map((o) => {
-            const i = rowIndex++;
-            return (
-              <li
-                key={o.id}
-                role="option"
-                aria-selected={value === o.id}
-                className={cn(
-                  "px-3 py-2 cursor-pointer",
-                  i === highlightIndex ? "bg-accent/20 text-foreground" : "text-foreground hover:bg-muted"
-                )}
-                onMouseEnter={() => setHighlightIndex(i)}
-                onClick={() => select(o.id, o)}
-              >
-                <div className="font-medium">{o.displayName}</div>
-              </li>
-            );
-          })}
-          {showCreateRow ? (
-            <li
-              role="option"
-              className={cn(
-                "px-3 py-2 cursor-pointer border-t border-border text-accent",
-                highlightIndex === rowIndex ? "bg-accent/20" : "hover:bg-muted"
-              )}
-              onMouseEnter={() => setHighlightIndex(rowIndex)}
-              onClick={openCreatePanel}
-            >
-              Create “{query.trim()}”…
-            </li>
-          ) : null}
-          {!loading && flatOptions.length === 0 && !showCreateRow ? (
-            <li className="px-3 py-2 text-muted-foreground">No matching tire types</li>
-          ) : null}
-        </ul>
-      </AnchoredMenu>
-      <AnchoredMenu
-        open={isOpen && showCreate && allowInlineCreate}
-        anchorRef={containerRef}
-        onClose={closeMenu}
       >
-        <form
-          onSubmit={createTireType}
-          className="w-full rounded-md border border-border bg-card shadow-md p-3 space-y-2 text-sm"
-        >
+        <option value="" disabled>
+          {placeholder}
+        </option>
+        {recentOptions.length > 0 ? (
+          <optgroup label="Recently used">{recentOptions.map(renderOption)}</optgroup>
+        ) : null}
+        {rest.length > 0 ? (
+          recentOptions.length > 0 ? (
+            <optgroup label="All types">{rest.map(renderOption)}</optgroup>
+          ) : (
+            rest.map(renderOption)
+          )
+        ) : null}
+        {extra.map(renderOption)}
+        {allowInlineCreate ? (
+          <option value={CREATE_VALUE}>+ Add new tire type…</option>
+        ) : null}
+      </select>
+
+      {showCreate && allowInlineCreate ? (
+        <div className="mt-2 space-y-2 rounded-md border border-border bg-card p-3">
           <Eyebrow>New tire type</Eyebrow>
           <input
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
@@ -343,31 +215,30 @@ export function TireTypeCombobox({
             value={newDisplayName}
             onChange={(e) => setNewDisplayName(e.target.value)}
             aria-label="Tire type name"
-            required
           />
           {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <button
-              type="submit"
+              type="button"
+              onClick={() => void createTireType()}
               disabled={creating || !newDisplayName.trim()}
-              className={cn(
-                buttonLinkClassName("primary"),
-                "text-xs px-3 py-1.5",
-                (creating || !newDisplayName.trim()) && "opacity-60 pointer-events-none"
-              )}
+              className="btn-surface px-2 py-1 text-xs disabled:opacity-60"
             >
               {creating ? "Adding…" : "Add tire type"}
             </button>
             <button
               type="button"
-              className="text-xs text-muted-foreground hover:text-foreground px-2"
-              onClick={() => setShowCreate(false)}
+              className="px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setShowCreate(false);
+                setError(null);
+              }}
             >
               Cancel
             </button>
           </div>
-        </form>
-      </AnchoredMenu>
+        </div>
+      ) : null}
     </div>
   );
 }

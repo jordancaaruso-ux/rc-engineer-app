@@ -3295,7 +3295,7 @@ export function NewRunForm(props: {
                       setPreferredTireType({ id: option.id, displayName: option.displayName });
                     }
                   }}
-                  placeholder="Search spec tire type"
+                  placeholder="Select spec tire type…"
                   aria-label="Event spec tire type"
                 />
               </div>
@@ -3328,7 +3328,7 @@ export function NewRunForm(props: {
                         setAdditiveTypeId(id);
                       }
                     }}
-                    placeholder="Search spec additive"
+                    placeholder="Select spec additive…"
                     aria-label="Event spec additive type"
                     allowInlineCreate={false}
                   />
@@ -3444,7 +3444,7 @@ export function NewRunForm(props: {
                 <TireTypeCombobox
                   value={newEventControlledTireTypeId}
                   onChange={setNewEventControlledTireTypeId}
-                  placeholder="Search spec tire type"
+                  placeholder="Select spec tire type…"
                   aria-label="Event spec tire type"
                 />
               </div>
@@ -3465,7 +3465,7 @@ export function NewRunForm(props: {
                   <AdditiveTypeCombobox
                     value={newEventControlledAdditiveTypeId}
                     onChange={setNewEventControlledAdditiveTypeId}
-                    placeholder="Search spec additive"
+                    placeholder="Select spec additive…"
                     aria-label="Event spec additive type"
                     allowInlineCreate={false}
                   />
