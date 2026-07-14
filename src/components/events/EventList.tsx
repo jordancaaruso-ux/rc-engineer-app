@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { Eyebrow, HubRowTitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { formatEventDate } from "@/lib/formatDate";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
@@ -139,6 +140,7 @@ export function EventList({
   const [notes, setNotes] = useState("");
   const [practiceSourceUrl, setPracticeSourceUrl] = useState("");
   const [resultsSourceUrl, setResultsSourceUrl] = useState("");
+  const [tireControlled, setTireControlled] = useState(false);
   const [controlledTireTypeId, setControlledTireTypeId] = useState("");
   const [controlAdditiveEnabled, setControlAdditiveEnabled] = useState(false);
   const [controlledAdditiveTypeId, setControlledAdditiveTypeId] = useState("");
@@ -213,7 +215,7 @@ export function EventList({
           notes: notes.trim() || null,
           practiceSourceUrl: practiceSourceUrl.trim() || null,
           resultsSourceUrl: resultsSourceUrl.trim() || null,
-          controlledTireTypeId: controlledTireTypeId.trim() || null,
+          controlledTireTypeId: tireControlled ? controlledTireTypeId.trim() || null : null,
           controlledAdditiveTypeId: controlAdditiveEnabled ? controlledAdditiveTypeId.trim() || null : null,
         }),
       });
@@ -240,6 +242,7 @@ export function EventList({
       setNotes("");
       setPracticeSourceUrl("");
       setResultsSourceUrl("");
+      setTireControlled(false);
       setControlledTireTypeId("");
       setControlAdditiveEnabled(false);
       setControlledAdditiveTypeId("");
@@ -344,34 +347,53 @@ export function EventList({
             placeholder="LiveRC results / race timing page URL"
           />
         </div>
-        <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Controlled / spec tire (optional)</label>
-          <TireTypeCombobox
-            value={controlledTireTypeId}
-            onChange={setControlledTireTypeId}
-            placeholder="Select spec tire type…"
-            aria-label="Event spec tire type"
+        <div className="space-y-1.5">
+          <label className="block text-[11px] text-muted-foreground">Tire</label>
+          <SegmentedControl<"open" | "controlled">
+            ariaLabel="Event tire — open or controlled"
+            size="sm"
+            value={tireControlled ? "controlled" : "open"}
+            onChange={(v) => {
+              const on = v === "controlled";
+              setTireControlled(on);
+              if (!on) setControlledTireTypeId("");
+            }}
+            options={[
+              { value: "open", label: "Open" },
+              { value: "controlled", label: "Controlled" },
+            ]}
           />
-        </div>
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={controlAdditiveEnabled}
-              onChange={(e) => {
-                setControlAdditiveEnabled(e.target.checked);
-                if (!e.target.checked) setControlledAdditiveTypeId("");
-              }}
-              className="h-3.5 w-3.5 shrink-0 accent-primary"
+          {tireControlled ? (
+            <TireTypeCombobox
+              value={controlledTireTypeId}
+              onChange={setControlledTireTypeId}
+              placeholder="Select control tire type…"
+              aria-label="Event control tire type"
             />
-            <span>Control additive</span>
-          </label>
+          ) : null}
+        </div>
+        <div className="space-y-1.5">
+          <label className="block text-[11px] text-muted-foreground">Additive</label>
+          <SegmentedControl<"open" | "controlled">
+            ariaLabel="Event additive — open or controlled"
+            size="sm"
+            value={controlAdditiveEnabled ? "controlled" : "open"}
+            onChange={(v) => {
+              const on = v === "controlled";
+              setControlAdditiveEnabled(on);
+              if (!on) setControlledAdditiveTypeId("");
+            }}
+            options={[
+              { value: "open", label: "Open" },
+              { value: "controlled", label: "Controlled" },
+            ]}
+          />
           {controlAdditiveEnabled ? (
             <AdditiveTypeCombobox
               value={controlledAdditiveTypeId}
               onChange={setControlledAdditiveTypeId}
-              placeholder="Select spec additive…"
-              aria-label="Event spec additive type"
+              placeholder="Select control additive…"
+              aria-label="Event control additive type"
               allowInlineCreate={false}
             />
           ) : null}

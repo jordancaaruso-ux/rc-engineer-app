@@ -27,11 +27,18 @@ import { RunTireSelectionPanel, type NewTireSetIntent } from "@/components/runs/
 import { RunAdditiveTimingPanel } from "@/components/runs/RunAdditiveTimingPanel";
 import { QuickAddBatteryPanel } from "@/components/assets/QuickAddBatteryPanel";
 import { collectSetupSheetTemplateKeys } from "@/lib/setupSheetModels/collectTemplateKeys";
-import { applyRunContextToSetupSnapshot, parseWarmerTimingMinutes } from "@/lib/runs/applyRunContextToSetupSnapshot";
+import { applyRunContextToSetupSnapshot } from "@/lib/runs/applyRunContextToSetupSnapshot";
+import { formatTirePrepSummaryFromSnapshot } from "@/lib/runs/runTireContextDisplay";
 import {
-  formatAdditiveTimingLine,
-  formatTirePrepSummaryFromSnapshot,
-} from "@/lib/runs/runTireContextDisplay";
+  normalizeTirePrep,
+  tirePrepFromLegacy,
+  derivedWarmerTimingMinutes,
+  pruneTirePrepForSave,
+  tirePrepHasContent,
+  formatTirePrepLine,
+  emptyTirePrepStep,
+  type TirePrepStep,
+} from "@/lib/runs/tirePrep";
 import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
@@ -46,6 +53,8 @@ import { LogRunProgressRail, type RunProgressSection } from "@/components/runs/L
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { PagedCard, type PagedCardFace } from "@/components/ui/PagedCard";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
+import { Switch } from "@/components/ui/Switch";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
 import { normalizeLapTimes } from "@/lib/runLaps";
@@ -174,6 +183,8 @@ type LastRun = {
   tireRunNumber: number;
   additiveTypeId?: string | null;
   warmerTimingMinutes?: number | null;
+  /** Ordered tire-prep applications (see src/lib/runs/tirePrep.ts); JSON on the run. */
+  tirePrep?: unknown;
   additiveType?: { id: string; displayName: string; modelCode: string } | null;
   setupSnapshot: { id: string; data: unknown };
   event?: EventOption | null;
@@ -305,11 +316,26 @@ function setupSnapshotWithDerived(raw: unknown): SetupSnapshotData {
 }
 
 /**
+ * Run-context selections (tires, battery, additive) are mirrored into the setup
+ * snapshot by the deterministic sync (`applyRunContextToSetupSnapshot`) so they
+ * ride along in the saved sheet — but they are captured on their own Tires /
+ * Battery tabs, not the chassis sheet. They must NOT count toward the "changes
+ * since loaded" setup diff, or picking today's tires reads as a setup change.
+ */
+const RUN_CONTEXT_SETUP_KEYS = new Set([
+  "tires",
+  "tires_setup",
+  "battery",
+  "additive",
+  "additive_time",
+]);
+
+/**
  * localStorage key for the silent autosave of an in-progress (never-saved) new-run
  * form. Only used on the plain `/runs/new` flow — edit / draft runs live in the DB.
  * Bump the version suffix if the persisted shape changes incompatibly.
  */
-const NEW_RUN_DRAFT_STORAGE_KEY = "rc-engineer-new-run-draft-v1";
+const NEW_RUN_DRAFT_STORAGE_KEY = "rc-engineer-new-run-draft-v2";
 
 /** Fields we silently persist so leaving and returning to `/runs/new` doesn't lose work. */
 type NewRunDraftSnapshot = {
@@ -324,7 +350,7 @@ type NewRunDraftSnapshot = {
   tireSetId: string;
   newTireSetIntent: NewTireSetIntent | null;
   additiveTypeId: string;
-  warmerTimingMinutes: string;
+  tirePrep: TirePrepStep[];
   batteryId: string;
   setupData: SetupSnapshotData;
   setupBaselineSnapshotId: string | null;
@@ -352,7 +378,7 @@ function newRunDraftHasContent(s: NewRunDraftSnapshot): boolean {
       s.newTireSetIntent ||
       s.batteryId ||
       s.additiveTypeId ||
-      s.warmerTimingMinutes.trim() ||
+      (s.tirePrep && tirePrepHasContent(s.tirePrep)) ||
       s.notes.trim() ||
       s.raceClass.trim() ||
       s.setupChangesText.trim() ||
@@ -468,7 +494,10 @@ export function NewRunForm(props: {
   } | null>(null);
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
   const [additiveTypeId, setAdditiveTypeId] = useState<string>("");
-  const [warmerTimingMinutes, setWarmerTimingMinutes] = useState<string>("");
+  /** Ordered tire-prep applications toward the run (see src/lib/runs/tirePrep.ts).
+   *  Starts with one blank row ready (most runs have at least one application);
+   *  blank rows are pruned on save, so the default never persists by itself. */
+  const [tirePrep, setTirePrep] = useState<TirePrepStep[]>([emptyTirePrepStep()]);
   const [additiveTypesById, setAdditiveTypesById] = useState<
     Record<string, { id: string; displayName: string }>
   >({});
@@ -494,6 +523,7 @@ export function NewRunForm(props: {
   const [newEventEndDate, setNewEventEndDate] = useState("");
   const [newEventPracticeUrl, setNewEventPracticeUrl] = useState("");
   const [newEventResultsUrl, setNewEventResultsUrl] = useState("");
+  const [newEventTireControlled, setNewEventTireControlled] = useState(false);
   const [newEventControlledTireTypeId, setNewEventControlledTireTypeId] = useState("");
   const [newEventControlAdditiveEnabled, setNewEventControlAdditiveEnabled] = useState(false);
   const [newEventControlledAdditiveTypeId, setNewEventControlledAdditiveTypeId] = useState("");
@@ -557,6 +587,9 @@ export function NewRunForm(props: {
   const [showNewBatteryPanel, setShowNewBatteryPanel] = useState(false);
 
   const [shareWithTeam, setShareWithTeam] = useState(true);
+  // Null until the team check resolves; the share toggle only renders when the
+  // driver is actually on a team (otherwise sharing is a no-op).
+  const [hasTeams, setHasTeams] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [, startCopyTransition] = useTransition();
@@ -578,7 +611,7 @@ export function NewRunForm(props: {
   const [loadSetupSelection, setLoadSetupSelection] = useState("");
   const [loadOtherSetupSelection, setLoadOtherSetupSelection] = useState("");
   const [setupSource, setSetupSource] = useState<"previous_runs" | "other" | "new">("previous_runs");
-  const [otherSetupSource, setOtherSetupSource] = useState<"downloaded_setups">("downloaded_setups");
+  const [newSetupMode, setNewSetupMode] = useState<"blank" | "upload">("blank");
   const [downloadedSetups, setDownloadedSetups] = useState<DownloadedSetupOption[]>([]);
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
   /**
@@ -609,8 +642,8 @@ export function NewRunForm(props: {
   newTireSetIntentRef.current = newTireSetIntent;
   const additiveTypeIdRef = useRef(additiveTypeId);
   additiveTypeIdRef.current = additiveTypeId;
-  const warmerTimingMinutesRef = useRef(warmerTimingMinutes);
-  warmerTimingMinutesRef.current = warmerTimingMinutes;
+  const tirePrepRef = useRef(tirePrep);
+  tirePrepRef.current = tirePrep;
   const batteryIdRef = useRef(batteryId);
   batteryIdRef.current = batteryId;
   const tireRunUserTouchedRef = useRef(false);
@@ -775,11 +808,17 @@ export function NewRunForm(props: {
     // draft→complete cycle" behavior.
     setRunsCompleted(Math.max(0, (r.tireRunNumber ?? 1) - 1));
     setAdditiveTypeId(r.additiveTypeId ?? r.additiveType?.id ?? "");
-    setWarmerTimingMinutes(
-      r.warmerTimingMinutes != null && Number.isFinite(r.warmerTimingMinutes)
-        ? String(Math.floor(r.warmerTimingMinutes))
-        : ""
-    );
+    {
+      const steps =
+        Array.isArray(r.tirePrep) && r.tirePrep.length > 0
+          ? normalizeTirePrep(r.tirePrep)
+          : tirePrepFromLegacy(
+              r.warmerTimingMinutes,
+              Boolean(r.additiveTypeId ?? r.additiveType?.id)
+            );
+      // Always keep one row ready — blank rows are pruned on save.
+      setTirePrep(steps.length > 0 ? steps : [emptyTirePrepStep()]);
+    }
     if (r.additiveType) {
       setAdditiveTypesById((prev) => ({
         ...prev,
@@ -1036,8 +1075,10 @@ export function NewRunForm(props: {
         if (typeof s.tireSetId === "string") setTireSetId(s.tireSetId);
         if (s.newTireSetIntent !== undefined) setNewTireSetIntent(s.newTireSetIntent);
         if (typeof s.additiveTypeId === "string") setAdditiveTypeId(s.additiveTypeId);
-        if (typeof s.warmerTimingMinutes === "string")
-          setWarmerTimingMinutes(s.warmerTimingMinutes);
+        if (Array.isArray(s.tirePrep)) {
+          const steps = normalizeTirePrep(s.tirePrep);
+          setTirePrep(steps.length > 0 ? steps : [emptyTirePrepStep()]);
+        }
         if (typeof s.batteryId === "string") setBatteryId(s.batteryId);
         if (s.setupData) setSetupData(s.setupData);
         if (s.setupBaselineSnapshotId !== undefined)
@@ -1075,7 +1116,7 @@ export function NewRunForm(props: {
       tireSetId,
       newTireSetIntent,
       additiveTypeId,
-      warmerTimingMinutes,
+      tirePrep,
       batteryId,
       setupData,
       setupBaselineSnapshotId,
@@ -1118,7 +1159,7 @@ export function NewRunForm(props: {
     tireSetId,
     newTireSetIntent,
     additiveTypeId,
-    warmerTimingMinutes,
+    tirePrep,
     batteryId,
     setupData,
     setupBaselineSnapshotId,
@@ -1172,7 +1213,7 @@ export function NewRunForm(props: {
       nextTireSetId: string,
       nextBatteryId: string,
       nextAdditiveTypeId: string,
-      nextWarmerTimingMinutes: string
+      nextTirePrep: TirePrepStep[]
     ) => {
       // NEW-set intent has no row yet — a synthetic set keeps the sheet's tire line honest.
       const intent = newTireSetIntentRef.current;
@@ -1194,7 +1235,7 @@ export function NewRunForm(props: {
           tireSet: tire,
           batteryLabel: bat ? `${bat.label}${bat.packNumber != null ? ` #${bat.packNumber}` : ""}` : "",
           additiveDisplayName: additive?.displayName ?? null,
-          warmerTimingMinutes: parseWarmerTimingMinutes(nextWarmerTimingMinutes),
+          warmerTimingMinutes: derivedWarmerTimingMinutes(nextTirePrep),
         });
         if (JSON.stringify(next) === JSON.stringify(prev)) return prev;
         return applyDerivedFieldsToSnapshot(next);
@@ -1208,16 +1249,16 @@ export function NewRunForm(props: {
       nextTireSetId,
       nextBatteryId,
       additiveTypeIdRef.current,
-      warmerTimingMinutesRef.current
+      tirePrepRef.current
     );
   }
 
-  function applyAdditiveTimingToSetupSnapshot(nextAdditiveTypeId: string, nextWarmerTimingMinutes: string) {
+  function applyAdditiveTimingToSetupSnapshot(nextAdditiveTypeId: string, nextTirePrep: TirePrepStep[]) {
     applyRunContextToSetupSnapshotLocal(
       tireSetIdRef.current,
       batteryIdRef.current,
       nextAdditiveTypeId,
-      nextWarmerTimingMinutes
+      nextTirePrep
     );
   }
 
@@ -1229,14 +1270,14 @@ export function NewRunForm(props: {
       tireSetId,
       batteryId,
       additiveTypeId,
-      warmerTimingMinutes
+      tirePrep
     );
   }, [
     tireSetId,
     newTireSetIntent,
     batteryId,
     additiveTypeId,
-    warmerTimingMinutes,
+    tirePrep,
     applyRunContextToSetupSnapshotLocal,
   ]);
 
@@ -1254,7 +1295,9 @@ export function NewRunForm(props: {
    */
   const setupChangedRowsSinceBaseline = useMemo(() => {
     if (!setupBaselineData) return [] as ReturnType<typeof buildSetupDiffRows>;
-    return buildSetupDiffRows(setupData, setupBaselineData).filter((r) => r.changed);
+    return buildSetupDiffRows(setupData, setupBaselineData).filter(
+      (r) => r.changed && !RUN_CONTEXT_SETUP_KEYS.has(r.key)
+    );
   }, [setupData, setupBaselineData]);
   const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
 
@@ -1339,23 +1382,41 @@ export function NewRunForm(props: {
   /** Race meeting + event with a track: run track follows the event (picker disabled). */
   const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
 
+  // Event-mandated controlled tire / additive. When set, the run's Tires step is
+  // locked to them (chosen at the event, not overridable in a run). Both derive
+  // purely from the selected event's config.
+  const specTireType = useMemo(
+    () =>
+      needsEvent && eventId && eventControlledTireTypeId.trim() && preferredTireType
+        ? preferredTireType
+        : null,
+    [needsEvent, eventId, eventControlledTireTypeId, preferredTireType]
+  );
+  const controlAdditive = useMemo(() => {
+    const id = eventControlledAdditiveTypeId.trim();
+    if (!(needsEvent && eventId && eventControlAdditiveEnabled && id)) return null;
+    return { id, displayName: additiveTypesById[id]?.displayName ?? "Control additive" };
+  }, [
+    needsEvent,
+    eventId,
+    eventControlAdditiveEnabled,
+    eventControlledAdditiveTypeId,
+    additiveTypesById,
+  ]);
+
   /**
    * Per-card completion for the floating progress rail. Required = the exact
    * "Run complete" bar the save gate enforces (car · track · rating · feel-when-
-   * eligible · controlled additive when the event enforces one · a setup
-   * snapshot). Tires are the one recommended-but-optional nudge. Session + Event
-   * carry no gate, so they always read complete — they stay in the rail as scroll
-   * anchors / a full map of the form.
+   * eligible · a setup snapshot). Tires are the one recommended-but-optional
+   * nudge; a controlled additive is auto-filled (running none is allowed) so it
+   * is never a blocker. Session + Event carry no gate, so they always read
+   * complete — they stay in the rail as scroll anchors / a full map of the form.
    */
   const railSections = useMemo<RunProgressSection[]>(() => {
     const hasTrack = Boolean(
       trackId.trim() || (trackLockedToEvent && selectedEventForRun?.trackId)
     );
-    const requiresControlledAdditive = Boolean(
-      needsEvent && eventId && eventControlAdditiveEnabled && eventControlledAdditiveTypeId.trim()
-    );
-    const missingAdditive = requiresControlledAdditive && !additiveTypeId.trim();
-    const detailsRequired = (carId ? 0 : 1) + (hasTrack ? 0 : 1) + (missingAdditive ? 1 : 0);
+    const detailsRequired = (carId ? 0 : 1) + (hasTrack ? 0 : 1);
     const hasTires = Boolean(tireSetId || newTireSetIntent);
     const hasSetup = Object.keys(setupData).length > 0;
     const ratingMissing = carRating == null || carRating < 1 || carRating > 10;
@@ -1810,6 +1871,9 @@ export function NewRunForm(props: {
       baselineData: setupBaselineData,
     };
     setSetupSource(next);
+    // "New" has no selection step to trigger the reveal, so open the sheet on
+    // arrival — the driver came here to build/upload a setup.
+    if (next === "new") setSetupSectionExpanded(true);
     const stash = setupSourceStashRef.current[next];
     if (stash) {
       setSetupData(stash.setupData);
@@ -1851,6 +1915,8 @@ export function NewRunForm(props: {
     setActiveSetupData(next, carId || null);
     setSetupBaselineSnapshotId(picked.setupSnapshot?.id ?? null);
     setSetupBaselineData(cloneSetupSnapshot(next));
+    // Reveal the loaded sheet so it's obvious the setup is now part of the run.
+    setSetupSectionExpanded(true);
   }
 
   function applyDownloadedSetupOnly(docId: string) {
@@ -1869,6 +1935,8 @@ export function NewRunForm(props: {
     setActiveSetupData(next, picked.carId ?? carId ?? null);
     setSetupBaselineSnapshotId(picked.baselineSetupSnapshotId ?? null);
     setSetupBaselineData(cloneSetupSnapshot(next));
+    // Reveal the loaded sheet so it's obvious the setup is now part of the run.
+    setSetupSectionExpanded(true);
   }
 
   /** Faces for the setup-source PagedCard — the segment IS the source choice;
@@ -1900,21 +1968,10 @@ export function NewRunForm(props: {
       },
       {
         id: "other",
-        label: "Other setup sources",
-        shortLabel: "Other",
+        label: "Downloaded setups",
+        shortLabel: "Downloaded",
         content: (
           <div className="space-y-2 pt-0.5">
-            <div className="space-y-1 text-sm">
-              <div className="text-sm font-medium text-muted-foreground">Other source</div>
-              <SearchableSelect
-                aria-label="Other setup source"
-                className="max-w-2xl"
-                searchable={false}
-                value={otherSetupSource}
-                onChange={(next) => setOtherSetupSource(next as "downloaded_setups")}
-                options={[{ value: "downloaded_setups", label: "Downloaded setups" }]}
-              />
-            </div>
             <div className="space-y-1 text-sm">
               <div className="text-sm font-medium text-muted-foreground break-words min-w-0 leading-snug">
                 {loadOtherSetupLabel}
@@ -1935,25 +1992,47 @@ export function NewRunForm(props: {
                 }))}
               />
             </div>
-            {carId ? (
-              <RunLogQuickSetupUpload
-                carId={carId}
-                onImported={handleQuickSetupImported}
-                onRefetchList={() => void refreshDownloadedSetups()}
-                variant={downloadedSetups.length === 0 ? "banner" : "inline"}
-              />
+            {downloadedSetups.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                No downloaded setups for this car yet. Switch to{" "}
+                <span className="font-medium">New</span> to upload a setup sheet.
+              </p>
             ) : null}
           </div>
         ),
       },
       {
         id: "new",
-        label: "New blank setup",
+        label: "New setup",
         shortLabel: "New",
         content: (
-          <p className="pt-0.5 text-[11px] text-muted-foreground">
-            Blank setup for this car — edit the sheet below, or lock in when you are ready.
-          </p>
+          <div className="space-y-2 pt-0.5">
+            <SegmentedControl<"blank" | "upload">
+              ariaLabel="New setup source"
+              value={newSetupMode}
+              onChange={(next) => setNewSetupMode(next)}
+              options={[
+                { value: "blank", label: "Write from scratch" },
+                { value: "upload", label: "Upload sheet" },
+              ]}
+            />
+            {newSetupMode === "blank" ? (
+              <p className="text-[11px] text-muted-foreground">
+                Blank setup for this car — edit the sheet below, or lock in when you are ready.
+              </p>
+            ) : carId ? (
+              <RunLogQuickSetupUpload
+                carId={carId}
+                onImported={handleQuickSetupImported}
+                onRefetchList={() => void refreshDownloadedSetups()}
+                variant="inline"
+              />
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Choose a car first to upload a setup sheet.
+              </p>
+            )}
+          </div>
         ),
       },
     ];
@@ -2152,6 +2231,22 @@ export function NewRunForm(props: {
     };
   }, [needsEvent]);
 
+  // Team membership gates the share toggle — sharing does nothing with no team.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/teams", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { teams: [] }))
+      .then((d: { teams?: unknown[] }) => {
+        if (alive) setHasTeams(Array.isArray(d.teams) && d.teams.length > 0);
+      })
+      .catch(() => {
+        if (alive) setHasTeams(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (!showNewEventPanel) return;
     // Make track hard to miss: default new event track to current track selection.
@@ -2183,17 +2278,39 @@ export function NewRunForm(props: {
       setEventControlledTireTypeId("");
       setEventControlAdditiveEnabled(false);
       setEventControlledAdditiveTypeId("");
+      setPreferredTireType(null);
       return;
     }
     const ev = events.find((e) => e.id === eventId);
     if (!ev) return;
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
-    setEventControlledTireTypeId(ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "");
+    const nextControlledTireId = ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "";
+    setEventControlledTireTypeId(nextControlledTireId);
+    // Steer the tire picker to the spec compound and power the Spec/Open pill.
+    // (Manual event selection never ran applyEventOption, so this was the missing
+    // hydration that kept the pill from showing.)
+    if (nextControlledTireId) {
+      const display =
+        ev.controlledTireType?.displayName ?? ev.controlledTireLabel ?? "Spec tire";
+      setPreferredTireType({ id: nextControlledTireId, displayName: display });
+    } else {
+      setPreferredTireType(null);
+    }
     const nextControlledAdditiveId =
       ev.controlledAdditiveTypeId?.trim() ?? ev.controlledAdditiveType?.id ?? "";
     setEventControlAdditiveEnabled(Boolean(nextControlledAdditiveId));
     setEventControlledAdditiveTypeId(nextControlledAdditiveId);
+    // Cache the control additive's name so the Control/Open pill reads it.
+    if (nextControlledAdditiveId && ev.controlledAdditiveType) {
+      setAdditiveTypesById((prev) => ({
+        ...prev,
+        [ev.controlledAdditiveType!.id]: {
+          id: ev.controlledAdditiveType!.id,
+          displayName: ev.controlledAdditiveType!.displayName,
+        },
+      }));
+    }
   }, [needsEvent, eventId, events]);
 
   function applyCopyFromPreview() {
@@ -2255,11 +2372,13 @@ export function NewRunForm(props: {
     } else {
       setAdditiveTypeId("");
     }
-    setWarmerTimingMinutes(
-      r.warmerTimingMinutes != null && Number.isFinite(r.warmerTimingMinutes)
-        ? String(Math.floor(r.warmerTimingMinutes))
-        : ""
-    );
+    {
+      const steps =
+        Array.isArray(r.tirePrep) && r.tirePrep.length > 0
+          ? normalizeTirePrep(r.tirePrep)
+          : tirePrepFromLegacy(r.warmerTimingMinutes, Boolean(nextAdditiveId));
+      setTirePrep(steps.length > 0 ? steps : [emptyTirePrepStep()]);
+    }
 
     const nextBatId = r.batteryId || r.battery?.id || "";
     if (nextBatId && batteries.some((b) => b.id === nextBatId)) {
@@ -2469,6 +2588,7 @@ export function NewRunForm(props: {
       setNewEventEndDate("");
       setNewEventPracticeUrl("");
       setNewEventResultsUrl("");
+      setNewEventTireControlled(false);
       setNewEventControlledTireTypeId("");
       setNewEventControlAdditiveEnabled(false);
       setNewEventControlledAdditiveTypeId("");
@@ -2650,21 +2770,15 @@ export function NewRunForm(props: {
       const missingCarRating = carRating == null || carRating < 1 || carRating > 10;
       const missingFeelVsLastRun =
         feelVsLastRunEligible && handlingUi.feelVsLastRun == null;
-      const requiresControlledAdditive = Boolean(
-        needsEvent &&
-          eventId &&
-          eventControlAdditiveEnabled &&
-          eventControlledAdditiveTypeId.trim()
-      );
-      const missingAdditive = requiresControlledAdditive && !additiveTypeId.trim();
+      // A controlled additive is auto-filled (running none is allowed), so it is
+      // never a save blocker.
       const missingSetup = Object.keys(setupData).length === 0;
-      if (missingCarRating || missingFeelVsLastRun || missingAdditive || missingSetup) {
+      if (missingCarRating || missingFeelVsLastRun || missingSetup) {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
         if (missingFeelVsLastRun) {
           parts.push("pick how this run felt vs your last run on this car");
         }
-        if (missingAdditive) parts.push("select the required additive on the Tires tab");
         if (missingSetup) {
           parts.push("attach a setup — copy last run, load a past setup, or upload a sheet");
         }
@@ -2672,15 +2786,14 @@ export function NewRunForm(props: {
           show: true,
           carRating: missingCarRating,
           feelVsLastRun: missingFeelVsLastRun,
-          additive: missingAdditive,
+          additive: false,
           setup: missingSetup,
         });
         setInlineError(`Before Run complete: ${parts.join("; ")}.`);
-        if (missingAdditive) setRunDetailsTab("tires");
         // Only the setup field lives outside the feedback card — scroll there when
         // that's the sole blocker so the amber-highlighted Setup card is in view.
         const scrollTarget: Element | null =
-          missingSetup && !missingCarRating && !missingFeelVsLastRun && !missingAdditive
+          missingSetup && !missingCarRating && !missingFeelVsLastRun
             ? document.querySelector(".run-section--setup")
             : feedbackRequiredRef.current;
         window.requestAnimationFrame(() => {
@@ -2756,7 +2869,7 @@ export function NewRunForm(props: {
               : undefined,
           tireRunNumber: Math.max(1, runsCompleted + 1),
           additiveTypeId: additiveTypeId || null,
-          warmerTimingMinutes: parseWarmerTimingMinutes(warmerTimingMinutes),
+          tirePrep: pruneTirePrepForSave(tirePrep),
           batteryId: batteryId || null,
           batteryRunNumber: Math.max(1, batteryRunsCompleted + 1),
           setupData: applyDerivedFieldsToSnapshot(setupData),
@@ -3234,7 +3347,7 @@ export function NewRunForm(props: {
 
           {eventId ? (
             <div className="mt-2 space-y-2 text-sm">
-              {selectedEventTrackLiveRc ? (
+              {!selectedEventForRun?.trackId ? null : selectedEventTrackLiveRc ? (
                 <p className="text-[11px] text-muted-foreground">
                   Lap times are pulled from this track&apos;s LiveRC link automatically.
                 </p>
@@ -3274,65 +3387,34 @@ export function NewRunForm(props: {
                   </div>
                 </>
               )}
-              <div className="space-y-1">
-                <label
-                  htmlFor="event-controlled-tire-type"
-                  className="block text-xs font-medium text-muted-foreground"
-                >
-                  Controlled / spec tire (optional)
-                </label>
-                <TireTypeCombobox
-                  value={eventControlledTireTypeId}
-                  onChange={(id) => {
-                    setEventControlledTireTypeId(id);
-                    if (id && sessionType === "RACE_MEETING") {
-                      setTireSetId("");
-                      clearNewTireSetIntent();
-                    }
-                  }}
-                  onSelectedTypeChange={(option) => {
-                    if (option && sessionType === "RACE_MEETING") {
-                      setPreferredTireType({ id: option.id, displayName: option.displayName });
-                    }
-                  }}
-                  placeholder="Select spec tire type…"
-                  aria-label="Event spec tire type"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={eventControlAdditiveEnabled}
-                    onChange={(e) => {
-                      setEventControlAdditiveEnabled(e.target.checked);
-                      if (!e.target.checked) {
-                        setEventControlledAdditiveTypeId("");
-                      } else if (
-                        sessionType === "RACE_MEETING" &&
-                        eventControlledAdditiveTypeId.trim()
-                      ) {
-                        setAdditiveTypeId(eventControlledAdditiveTypeId.trim());
-                      }
-                    }}
-                    className="h-3 w-3 shrink-0 accent-primary"
-                  />
-                  <span>Control additive</span>
-                </label>
-                {eventControlAdditiveEnabled ? (
-                  <AdditiveTypeCombobox
-                    value={eventControlledAdditiveTypeId}
-                    onChange={(id) => {
-                      setEventControlledAdditiveTypeId(id);
-                      if (id && sessionType === "RACE_MEETING") {
-                        setAdditiveTypeId(id);
-                      }
-                    }}
-                    placeholder="Select spec additive…"
-                    aria-label="Event spec additive type"
-                    allowInlineCreate={false}
-                  />
-                ) : null}
+              {/* Open vs Controlled is event config — set when the event is created
+                  (New event panel or the Events page). Read-only here; a controlled
+                  event locks the run's Tires step to it. */}
+              <div className="rounded-md border border-border bg-secondary/60 px-3 py-2 text-[11px] text-muted-foreground space-y-0.5">
+                <div>
+                  Tire:{" "}
+                  {eventControlledTireTypeId.trim() ? (
+                    <span className="font-medium text-foreground">
+                      Controlled ·{" "}
+                      {preferredTireType?.displayName ??
+                        selectedEventForRun?.controlledTireType?.displayName ??
+                        selectedEventForRun?.controlledTireLabel ??
+                        "set"}
+                    </span>
+                  ) : (
+                    <span className="font-medium text-foreground">Open</span>
+                  )}
+                </div>
+                <div>
+                  Additive:{" "}
+                  {controlAdditive ? (
+                    <span className="font-medium text-foreground">
+                      Controlled · {controlAdditive.displayName}
+                    </span>
+                  ) : (
+                    <span className="font-medium text-foreground">Open</span>
+                  )}
+                </div>
               </div>
             </div>
           ) : null}
@@ -3411,7 +3493,9 @@ export function NewRunForm(props: {
                   />
                 </div>
               </div>
-              {newEventTrackLiveRc ? (
+              {/* Timing URLs are only relevant once a track without a LiveRC link
+                  is chosen — otherwise laps auto-pull (or the track is unknown). */}
+              {!newEventTrackId ? null : newEventTrackLiveRc ? (
                 <p className="text-[11px] text-muted-foreground">
                   Lap times are pulled from this track&apos;s LiveRC link automatically.
                 </p>
@@ -3439,34 +3523,53 @@ export function NewRunForm(props: {
                   </div>
                 </>
               )}
-              <div className="space-y-1">
-                <label className="block ui-label-meta">Controlled / spec tire (optional)</label>
-                <TireTypeCombobox
-                  value={newEventControlledTireTypeId}
-                  onChange={setNewEventControlledTireTypeId}
-                  placeholder="Select spec tire type…"
-                  aria-label="Event spec tire type"
+              <div className="space-y-1.5">
+                <label className="block ui-label-meta">Tire</label>
+                <SegmentedControl<"open" | "controlled">
+                  ariaLabel="Event tire — open or controlled"
+                  size="sm"
+                  value={newEventTireControlled ? "controlled" : "open"}
+                  onChange={(v) => {
+                    const on = v === "controlled";
+                    setNewEventTireControlled(on);
+                    if (!on) setNewEventControlledTireTypeId("");
+                  }}
+                  options={[
+                    { value: "open", label: "Open" },
+                    { value: "controlled", label: "Controlled" },
+                  ]}
                 />
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newEventControlAdditiveEnabled}
-                    onChange={(e) => {
-                      setNewEventControlAdditiveEnabled(e.target.checked);
-                      if (!e.target.checked) setNewEventControlledAdditiveTypeId("");
-                    }}
-                    className="h-3 w-3 shrink-0 accent-primary"
+                {newEventTireControlled ? (
+                  <TireTypeCombobox
+                    value={newEventControlledTireTypeId}
+                    onChange={setNewEventControlledTireTypeId}
+                    placeholder="Select control tire type…"
+                    aria-label="Event control tire type"
                   />
-                  <span>Control additive</span>
-                </label>
+                ) : null}
+              </div>
+              <div className="space-y-1.5">
+                <label className="block ui-label-meta">Additive</label>
+                <SegmentedControl<"open" | "controlled">
+                  ariaLabel="Event additive — open or controlled"
+                  size="sm"
+                  value={newEventControlAdditiveEnabled ? "controlled" : "open"}
+                  onChange={(v) => {
+                    const on = v === "controlled";
+                    setNewEventControlAdditiveEnabled(on);
+                    if (!on) setNewEventControlledAdditiveTypeId("");
+                  }}
+                  options={[
+                    { value: "open", label: "Open" },
+                    { value: "controlled", label: "Controlled" },
+                  ]}
+                />
                 {newEventControlAdditiveEnabled ? (
                   <AdditiveTypeCombobox
                     value={newEventControlledAdditiveTypeId}
                     onChange={setNewEventControlledAdditiveTypeId}
-                    placeholder="Select spec additive…"
-                    aria-label="Event spec additive type"
+                    placeholder="Select control additive…"
+                    aria-label="Event control additive type"
                     allowInlineCreate={false}
                   />
                 ) : null}
@@ -3499,42 +3602,23 @@ export function NewRunForm(props: {
             </div>
           )}
 
-          <div className="space-y-3 border-t border-border pt-3">
+          <div className="space-y-2 border-t border-border pt-3">
             <Eyebrow dot="muted">Session</Eyebrow>
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="space-y-1">
-                <label className="block ui-label-meta">Type</label>
-                <SearchableSelect
-                  aria-label="Meeting session type"
-                  className="min-w-[160px]"
-                  value={meetingSessionType}
-                  onChange={(next) => {
-                    setMeetingSessionType(next as MeetingSessionType);
-                    if (next !== "OTHER") setMeetingSessionCustom("");
-                  }}
-                  options={[
-                    { value: "PRACTICE", label: "Practice" },
-                    { value: "SEEDING", label: "Seeding" },
-                    { value: "QUALIFYING", label: "Qualifying" },
-                    { value: "RACE", label: "Race" },
-                    { value: "OTHER", label: "Other" },
-                  ]}
-                />
-              </div>
-              {meetingSessionType === "OTHER" && (
-                <div className="space-y-1">
-                  <label className="block ui-label-meta">Custom session type</label>
-                  <input
-                    type="text"
-                    className="form-control px-3 py-2 text-sm min-w-[140px]"
-                    placeholder="e.g. Warm-up"
-                    value={meetingSessionCustom}
-                    onChange={(e) => setMeetingSessionCustom(e.target.value)}
-                    aria-label="Custom session type"
-                  />
-                </div>
-              )}
-            </div>
+            <SegmentedControl<MeetingSessionType>
+              ariaLabel="Meeting session type"
+              size="sm"
+              value={meetingSessionType === "OTHER" ? "PRACTICE" : meetingSessionType}
+              onChange={(next) => {
+                setMeetingSessionType(next);
+                setMeetingSessionCustom("");
+              }}
+              options={[
+                { value: "PRACTICE", label: "Practice" },
+                { value: "SEEDING", label: "Seeding" },
+                { value: "QUALIFYING", label: "Qualifying" },
+                { value: "RACE", label: "Race" },
+              ]}
+            />
           </div>
         </SurfaceCard>
       ) : null}
@@ -3595,9 +3679,9 @@ export function NewRunForm(props: {
                     ? `${newTireSetIntent.displayName} · new set`
                     : "—";
                 const extras: string[] = [];
-                const additive = formatAdditiveTimingLine(
-                  additiveTypeId ? additiveTypesById[additiveTypeId] ?? null : null,
-                  parseWarmerTimingMinutes(warmerTimingMinutes)
+                const additive = formatTirePrepLine(
+                  tirePrep,
+                  additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null
                 );
                 if (additive) extras.push(additive);
                 const prep = formatTirePrepSummaryFromSnapshot(setupData);
@@ -3707,6 +3791,7 @@ export function NewRunForm(props: {
                 applyTireBatteryToSetupSnapshot(intent ? "" : tireSetIdRef.current, batteryIdRef.current);
               }}
               preferredTireType={preferredTireType}
+              specTireType={specTireType}
               runsCompleted={runsCompleted}
               onRunsCompletedChange={setRunsCompleted}
               onRunsCompletedUserTouched={() => {
@@ -3731,20 +3816,12 @@ export function NewRunForm(props: {
                     })
                     .catch(() => {});
                 }
-                applyAdditiveTimingToSetupSnapshot(id, warmerTimingMinutesRef.current);
+                applyAdditiveTimingToSetupSnapshot(id, tirePrepRef.current);
               }}
-              warmerTimingMinutes={warmerTimingMinutes}
-              onWarmerTimingMinutesChange={(value) => {
-                setWarmerTimingMinutes(value);
-                applyAdditiveTimingToSetupSnapshot(additiveTypeIdRef.current, value);
-              }}
-              requireAdditive={
-                needsEvent &&
-                Boolean(eventId) &&
-                eventControlAdditiveEnabled &&
-                Boolean(eventControlledAdditiveTypeId.trim())
-              }
+              tirePrep={tirePrep}
+              onTirePrepChange={setTirePrep}
               highlightMissing={completeValidation.additive}
+              controlAdditive={controlAdditive}
             />
           </div>
               ),
@@ -4121,13 +4198,19 @@ export function NewRunForm(props: {
                   />
                 </>
               )}
-              <button
-                type="button"
-                onClick={() => setSetupSectionExpanded(true)}
-                className="btn-surface self-start px-3 py-2 text-xs font-medium"
-              >
-                Edit setup
-              </button>
+              {isEditing ? (
+                // New-run flow reveals the sheet automatically on selection (see
+                // applyPastSetupOnly / applyDownloadedSetupOnly / the "new" source),
+                // so this manual opener is only needed for the edit-run "Setup used"
+                // summary, where no re-selection happens.
+                <button
+                  type="button"
+                  onClick={() => setSetupSectionExpanded(true)}
+                  className="btn-surface self-start px-3 py-2 text-xs font-medium"
+                >
+                  Edit setup
+                </button>
+              ) : null}
             </div>
             {setupChangedRowsSinceBaseline.length > 0 ? (
               <div className="max-w-2xl rounded-md border border-border bg-muted/50 p-2 text-xs">
@@ -4297,9 +4380,10 @@ export function NewRunForm(props: {
                       highlightMissing={completeValidation.feelVsLastRun}
                     />
                   </div>
-                  <textarea
+                  <AutoGrowTextarea
+                    minRows={2}
                     className={cn(
-                      "form-control h-32 w-full resize-none px-3 py-2 text-sm",
+                      "form-control w-full px-3 py-2 text-sm",
                       isDraft && notes.trim().length === 0
                         ? "border-amber-500/50 ring-1 ring-amber-500/30"
                         : "border-border"
@@ -4345,15 +4429,21 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={shareWithTeam}
-          onChange={(e) => setShareWithTeam(e.target.checked)}
-          className="shrink-0 rounded border-border"
-        />
-        Share this run with my teams
-      </label>
+      {hasTeams ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
+          <div className="min-w-0">
+            <div className="text-sm text-foreground">Share this run with my teams</div>
+            <div className="text-[11px] text-muted-foreground leading-snug">
+              Teammates can see this run and its setup.
+            </div>
+          </div>
+          <Switch
+            checked={shareWithTeam}
+            onChange={setShareWithTeam}
+            ariaLabel="Share this run with my teams"
+          />
+        </div>
+      ) : null}
 
       {editingCompletedRun ? (
         <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-md">

@@ -8,8 +8,8 @@ import {
 /**
  * Tire state at a glance for a run row: Disc icon with the set's run count in
  * the corner ("1" = new set). Bright when the set changed vs the previous
- * same-car run, faint when it's the same set still going. Purely
- * informational — never a button.
+ * same-car run, faint when it's the same set still going. Presentational only —
+ * sessions rows wrap it in a button that toggles the tire-prep panel.
  */
 export function TireIndicatorIcon({
   indicator,

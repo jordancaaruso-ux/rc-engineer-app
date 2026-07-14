@@ -1,11 +1,23 @@
 import { getBoolFromSetupString } from "@/lib/a800rrSetupRead";
 import { CALIBRATION_PAIR_GROUPS } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import type { SetupSnapshotData } from "@/lib/runSetup";
+import { normalizeTirePrep, formatTirePrepLine } from "@/lib/runs/tirePrep";
 
+/**
+ * Additive + timing line for read surfaces. When a `tirePrep` sequence exists it
+ * renders the full ordered applications ("VP · 20m bench + 10m warmers 55°C");
+ * otherwise it falls back to the legacy single additive + warmer-minutes line so
+ * runs logged before the sequence model still read correctly.
+ */
 export function formatAdditiveTimingLine(
   additiveType: { displayName: string } | null | undefined,
-  warmerTimingMinutes: number | null | undefined
+  warmerTimingMinutes: number | null | undefined,
+  tirePrep?: unknown
 ): string | null {
+  const steps = normalizeTirePrep(tirePrep);
+  if (steps.length > 0) {
+    return formatTirePrepLine(steps, additiveType?.displayName ?? null);
+  }
   const parts: string[] = [];
   if (additiveType?.displayName?.trim()) parts.push(additiveType.displayName.trim());
   if (warmerTimingMinutes != null && Number.isFinite(warmerTimingMinutes)) {
@@ -42,6 +54,7 @@ export function formatRunTiresDetailLine(params: {
   tireRunNumber: number;
   additiveType?: { displayName: string } | null;
   warmerTimingMinutes?: number | null;
+  tirePrep?: unknown;
   setupSnapshotData?: unknown;
 }): string {
   // Wear-first identity: the compound + which run this was on the set. Set numbers are
@@ -50,7 +63,11 @@ export function formatRunTiresDetailLine(params: {
     ? `${params.tireSet.label} · run ${params.tireRunNumber}`
     : "—";
   const extras: string[] = [];
-  const additive = formatAdditiveTimingLine(params.additiveType, params.warmerTimingMinutes);
+  const additive = formatAdditiveTimingLine(
+    params.additiveType,
+    params.warmerTimingMinutes,
+    params.tirePrep
+  );
   if (additive) extras.push(additive);
   const prep = formatTirePrepSummaryFromSnapshot(params.setupSnapshotData);
   if (prep) extras.push(prep);

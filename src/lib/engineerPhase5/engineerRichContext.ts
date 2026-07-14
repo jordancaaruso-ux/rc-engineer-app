@@ -8,6 +8,7 @@ import { detectOutcomeIntent } from "@/lib/engineerPhase5/parameterEffects/inten
 import { buildParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/query";
 import type { ParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/types";
 import { formatGripTagsForDisplay, formatLayoutTagsForDisplay } from "@/lib/trackMetaTags";
+import { normalizeTirePrep, tirePrepHasContent, formatTirePrepLine } from "@/lib/runs/tirePrep";
 import { encodeTrackConditionSignature } from "@/lib/trackConditionSignature";
 import {
   describeSky,
@@ -57,6 +58,8 @@ export type EngineerRichContextV1 = {
     additiveType: string | null;
     additiveTypeModelCode: string | null;
     warmerTimingMinutes: number | null;
+    /** Human-readable tire-prep sequence, e.g. "VP · 20m bench + 10m warmers 55°C (towels)". */
+    tirePrep: string | null;
   };
   track: null | {
     id: string;
@@ -161,6 +164,7 @@ const runSelectRich = {
   tireRunNumber: true,
   additiveTypeId: true,
   warmerTimingMinutes: true,
+  tirePrep: true,
   conditionsAirTempC: true,
   conditionsTrackTempC: true,
   conditionsCloudCoverPct: true,
@@ -453,8 +457,9 @@ export async function buildEngineerRichContextV1(params: {
           additiveType: run.additiveType?.displayName ?? null,
           additiveTypeModelCode: run.additiveType?.modelCode ?? null,
           warmerTimingMinutes: run.warmerTimingMinutes ?? null,
+          tirePrep: formatTirePrepLine(normalizeTirePrep(run.tirePrep), run.additiveType?.displayName ?? null),
         }
-      : run.additiveType || run.warmerTimingMinutes != null
+      : run.additiveType || run.warmerTimingMinutes != null || tirePrepHasContent(normalizeTirePrep(run.tirePrep))
         ? {
             id: "",
             label: "",
@@ -464,6 +469,7 @@ export async function buildEngineerRichContextV1(params: {
             additiveType: run.additiveType?.displayName ?? null,
             additiveTypeModelCode: run.additiveType?.modelCode ?? null,
             warmerTimingMinutes: run.warmerTimingMinutes ?? null,
+            tirePrep: formatTirePrepLine(normalizeTirePrep(run.tirePrep), run.additiveType?.displayName ?? null),
           }
         : null,
     track: run.track

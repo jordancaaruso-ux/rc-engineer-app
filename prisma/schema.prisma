@@ -836,8 +836,20 @@ model Run {
   additiveType   AdditiveType? @relation(fields: [additiveTypeId], references: [id], onDelete: SetNull)
   additiveTypeId String?
 
-  /** Optional warmer timing in minutes (independent of additive selection). */
+  /**
+   * Legacy single "warmer timing" in minutes. Superseded by `tirePrep` (the
+   * ordered application sequence); kept in sync as a derived total (sum of
+   * warmer-step minutes) so older read surfaces + aggregations keep working.
+   */
   warmerTimingMinutes Int?
+
+  /**
+   * Ordered tire-prep applications toward the run — see `src/lib/runs/tirePrep.ts`.
+   * Each step: { appliedAdditive, minutes, warmers, towels, temperatureC }.
+   * Null on runs logged before the sequence model (synthesize from
+   * `warmerTimingMinutes` on read).
+   */
+  tirePrep Json?
 
   battery   Battery? @relation(fields: [batteryId], references: [id])
   batteryId String?

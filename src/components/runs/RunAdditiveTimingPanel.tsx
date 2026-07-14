@@ -3,6 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { RulerPicker } from "@/components/ui/RulerPicker";
+import { haptic } from "@/lib/haptics";
+import {
+  AdditiveDropIcon,
+  WarmerSteamIcon,
+  TowelRollIcon,
+} from "@/components/runs/TirePrepIcons";
+import {
+  MAX_TIRE_PREP_STEPS,
+  TIRE_PREP_TEMP_MIN_C,
+  TIRE_PREP_TEMP_MAX_C,
+  emptyTirePrepStep,
+  type TirePrepStep,
+} from "@/lib/runs/tirePrep";
 import {
   AdditiveTypeCombobox,
   type AdditiveTypeOption,
@@ -11,11 +26,18 @@ import {
 type Props = {
   additiveTypeId: string;
   onAdditiveTypeIdChange: (id: string) => void;
-  warmerTimingMinutes: string;
-  onWarmerTimingMinutesChange: (value: string) => void;
+  /** Ordered tire-prep applications toward the run. */
+  tirePrep: TirePrepStep[];
+  onTirePrepChange: (steps: TirePrepStep[]) => void;
   prefillFieldClass?: string;
   requireAdditive?: boolean;
   highlightMissing?: boolean;
+  /**
+   * When the linked event mandates a control additive, the run is locked to it
+   * (set at the event, not overridable) — the driver can only record they ran
+   * none this run. Absent = normal free picker.
+   */
+  controlAdditive?: { id: string; displayName: string } | null;
 };
 
 function chipClass(selected: boolean) {
@@ -27,16 +49,121 @@ function chipClass(selected: boolean) {
   );
 }
 
+/** Which ruler drawer is open: one per panel, keyed by row + which value. */
+type OpenRuler = { row: number; kind: "min" | "temp" } | null;
+
+const MINUTES_RULER = {
+  min: 1,
+  max: 90,
+  defaultValue: 20,
+  // Fine labels through the habitual low range, coarser above.
+  labelAt: (v: number) => (v <= 20 ? v % 5 === 0 : v % 10 === 0),
+};
+const TEMP_RULER = {
+  min: TIRE_PREP_TEMP_MIN_C,
+  max: TIRE_PREP_TEMP_MAX_C,
+  defaultValue: 55,
+  labelAt: (v: number) => v % 10 === 0,
+};
+
+function ValueChip({
+  value,
+  unit,
+  open,
+  onClick,
+  ariaLabel,
+}: {
+  value: number | null;
+  unit: string;
+  open: boolean;
+  onClick: () => void;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      aria-expanded={open}
+      onClick={onClick}
+      className={cn(
+        "min-w-[58px] flex-none rounded-lg border px-2 py-1.5 text-center font-mono text-[13px] tabular-nums transition",
+        open
+          ? "border-accent bg-accent/10 text-foreground"
+          : "border-border bg-secondary hover:border-muted-foreground/40",
+        value == null ? "text-faint" : "text-foreground"
+      )}
+    >
+      {value == null ? "—" : value}
+      <span className="ml-px text-[11px] text-faint">{unit}</span>
+    </button>
+  );
+}
+
+function IconToggle({
+  on,
+  hidden,
+  onToggle,
+  ariaLabel,
+  children,
+}: {
+  on: boolean;
+  hidden?: boolean;
+  onToggle: () => void;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      onClick={() => {
+        haptic("light");
+        onToggle();
+      }}
+      className={cn(
+        "grid h-[34px] w-[34px] flex-none place-items-center rounded-lg border transition",
+        on
+          ? "border-accent/60 bg-accent/10 text-accent"
+          : "border-border text-faint hover:border-muted-foreground/40 hover:text-muted-foreground",
+        hidden && "invisible pointer-events-none"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function RunAdditiveTimingPanel({
   additiveTypeId,
   onAdditiveTypeIdChange,
-  warmerTimingMinutes,
-  onWarmerTimingMinutesChange,
+  tirePrep,
+  onTirePrepChange,
   prefillFieldClass,
   requireAdditive = false,
   highlightMissing = false,
+  controlAdditive = null,
 }: Props) {
   const [recentTypes, setRecentTypes] = useState<AdditiveTypeOption[]>([]);
+  // A controlled event locks the additive; "ran none" is the only escape.
+  const [ranNone, setRanNone] = useState(false);
+  const [openRuler, setOpenRuler] = useState<OpenRuler>(null);
+  const controlId = controlAdditive?.id ?? null;
+
+  // Reset the none-escape whenever the mandated additive changes (event switch).
+  useEffect(() => {
+    setRanNone(false);
+  }, [controlId]);
+
+  // Keep the run's additive in sync with the lock: the control unless the driver
+  // opted out to none.
+  useEffect(() => {
+    if (!controlAdditive) return;
+    const target = ranNone ? "" : controlAdditive.id;
+    if (additiveTypeId !== target) onAdditiveTypeIdChange(target);
+  }, [controlAdditive, ranNone, additiveTypeId, onAdditiveTypeIdChange]);
 
   const loadRecentTypes = useCallback(async () => {
     try {
@@ -52,6 +179,30 @@ export function RunAdditiveTimingPanel({
     void loadRecentTypes();
   }, [loadRecentTypes]);
 
+  const updateStep = (i: number, patch: Partial<TirePrepStep>) => {
+    onTirePrepChange(tirePrep.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  };
+  const removeStep = (i: number) => {
+    onTirePrepChange(tirePrep.filter((_, idx) => idx !== i));
+    setOpenRuler((cur) => {
+      if (!cur) return cur;
+      if (cur.row === i) return null;
+      return cur.row > i ? { ...cur, row: cur.row - 1 } : cur;
+    });
+  };
+  const addStep = () => {
+    if (tirePrep.length >= MAX_TIRE_PREP_STEPS) return;
+    // Pre-fill toggles/temp from the previous step for speed; blank the time.
+    const prev = tirePrep[tirePrep.length - 1];
+    const next: TirePrepStep = prev ? { ...prev, minutes: null } : emptyTirePrepStep();
+    onTirePrepChange([...tirePrep, next]);
+    // The common flow is add → set time: open the new row's minutes ruler.
+    setOpenRuler({ row: tirePrep.length, kind: "min" });
+  };
+  const toggleRuler = (row: number, kind: "min" | "temp") => {
+    setOpenRuler((cur) => (cur && cur.row === row && cur.kind === kind ? null : { row, kind }));
+  };
+
   return (
     <div
       className={cn(
@@ -62,6 +213,21 @@ export function RunAdditiveTimingPanel({
     >
       <Eyebrow dot="muted">Tire prep</Eyebrow>
 
+      {controlAdditive ? (
+        <div className="space-y-1.5">
+          <div className="type-data-label">Control additive</div>
+          <SegmentedControl<"control" | "none">
+            ariaLabel="Control additive or none this run"
+            size="sm"
+            value={ranNone ? "none" : "control"}
+            onChange={(v) => setRanNone(v === "none")}
+            options={[
+              { value: "control", label: controlAdditive.displayName },
+              { value: "none", label: "None" },
+            ]}
+          />
+        </div>
+      ) : (
       <div className="space-y-2">
           {recentTypes.length > 0 ? (
             <div className="space-y-1.5">
@@ -106,20 +272,141 @@ export function RunAdditiveTimingPanel({
             />
           </div>
         </div>
+      )}
 
-      <div className="space-y-1">
-        <label className="type-data-label block">Warmer timing</label>
-        <input
-          type="number"
-          min={0}
-          step={1}
-          inputMode="numeric"
-          className="w-full max-w-xs form-control px-3 py-2 text-sm"
-          placeholder="Optional"
-          value={warmerTimingMinutes}
-          onChange={(e) => onWarmerTimingMinutesChange(e.target.value)}
-          aria-label="Warmer timing in minutes"
-        />
+      {/* Applications — ordered prep steps toward the run. One-line rows: minutes,
+          additive/warmers/towels icon toggles, temp (warmers only); tapping a
+          value opens its ruler in a drawer under the row. */}
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <span className="type-data-label">Applications</span>
+          <span className="font-mono text-[10px] text-faint">
+            {tirePrep.length}/{MAX_TIRE_PREP_STEPS} · toward run
+          </span>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-border bg-white/[0.015]">
+          {tirePrep.map((step, i) => {
+            const minOpen = openRuler?.row === i && openRuler.kind === "min";
+            const tempOpen = openRuler?.row === i && openRuler.kind === "temp";
+            return (
+              <div key={i} className="border-t border-border first:border-t-0">
+                <div className="flex min-h-[48px] items-center gap-2 py-2 pl-3 pr-2.5">
+                  <span className="w-3 flex-none font-mono text-[11px] tabular-nums text-faint">
+                    {i + 1}
+                  </span>
+                  <ValueChip
+                    value={step.minutes}
+                    unit="m"
+                    open={minOpen}
+                    onClick={() => toggleRuler(i, "min")}
+                    ariaLabel={`Minutes, application ${i + 1}`}
+                  />
+                  <div className="ml-0.5 flex flex-none gap-1.5">
+                    <IconToggle
+                      on={step.appliedAdditive}
+                      onToggle={() => updateStep(i, { appliedAdditive: !step.appliedAdditive })}
+                      ariaLabel="Additive this application"
+                    >
+                      <AdditiveDropIcon className="h-[18px] w-[18px]" />
+                    </IconToggle>
+                    <IconToggle
+                      on={step.warmers}
+                      onToggle={() => {
+                        // Leaving the warmers clears warmer-only detail so it can't linger hidden.
+                        if (step.warmers) {
+                          updateStep(i, { warmers: false, towels: false, temperatureC: null });
+                          if (tempOpen) setOpenRuler(null);
+                        } else {
+                          updateStep(i, { warmers: true });
+                        }
+                      }}
+                      ariaLabel="In warmers"
+                    >
+                      <WarmerSteamIcon className="h-[18px] w-[18px]" />
+                    </IconToggle>
+                    <IconToggle
+                      on={step.towels}
+                      hidden={!step.warmers}
+                      onToggle={() => updateStep(i, { towels: !step.towels })}
+                      ariaLabel="Towels between warmer and tire"
+                    >
+                      <TowelRollIcon className="h-[18px] w-[18px]" />
+                    </IconToggle>
+                  </div>
+                  {step.warmers ? (
+                    <ValueChip
+                      value={step.temperatureC}
+                      unit="°"
+                      open={tempOpen}
+                      onClick={() => toggleRuler(i, "temp")}
+                      ariaLabel={`Warmer temperature, application ${i + 1}`}
+                    />
+                  ) : null}
+                  <span className="flex-1" />
+                  <button
+                    type="button"
+                    aria-label={`Remove application ${i + 1}`}
+                    onClick={() => {
+                      haptic("light");
+                      removeStep(i);
+                    }}
+                    className="grid h-[26px] w-[26px] flex-none place-items-center rounded-md text-[13px] text-faint transition hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    ✕
+                  </button>
+                </div>
+                {minOpen || tempOpen ? (
+                  <div className="border-t border-border bg-secondary">
+                    {minOpen ? (
+                      <RulerPicker
+                        value={step.minutes}
+                        onChange={(v) => updateStep(i, { minutes: v })}
+                        min={MINUTES_RULER.min}
+                        max={MINUTES_RULER.max}
+                        defaultValue={MINUTES_RULER.defaultValue}
+                        labelAt={MINUTES_RULER.labelAt}
+                        unit="min"
+                        ariaLabel={`Minutes ruler, application ${i + 1}`}
+                      />
+                    ) : (
+                      <RulerPicker
+                        value={step.temperatureC}
+                        onChange={(v) => updateStep(i, { temperatureC: v })}
+                        min={TEMP_RULER.min}
+                        max={TEMP_RULER.max}
+                        defaultValue={TEMP_RULER.defaultValue}
+                        labelAt={TEMP_RULER.labelAt}
+                        unit="°C"
+                        ariaLabel={`Warmer temperature ruler, application ${i + 1}`}
+                      />
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+
+          {tirePrep.length === 0 ? (
+            <p className="px-3 py-2.5 text-xs text-muted-foreground">No tire prep logged.</p>
+          ) : null}
+
+          {tirePrep.length < MAX_TIRE_PREP_STEPS ? (
+            <button
+              type="button"
+              onClick={() => {
+                haptic("light");
+                addStep();
+              }}
+              className={cn(
+                "w-full py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-white/[0.02] hover:text-foreground",
+                tirePrep.length > 0 && "border-t border-dashed border-border"
+              )}
+            >
+              + Add application
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );

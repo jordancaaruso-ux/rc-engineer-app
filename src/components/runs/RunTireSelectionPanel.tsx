@@ -40,6 +40,12 @@ type Props = {
   onNewSetIntentChange: (intent: NewTireSetIntent | null) => void;
   /** Compound to activate in the picker (event spec tire). Never forces a selection. */
   preferredTireType?: { id: string; displayName: string } | null;
+  /**
+   * When the linked event mandates a controlled/spec tire, the picker is locked
+   * to that compound (no `+ Compound`, other compounds hidden) — the driver still
+   * picks which set of it they're on. Set at the event; not overridable in a run.
+   */
+  specTireType?: { id: string; displayName: string } | null;
   runsCompleted: number;
   onRunsCompletedChange: (value: number) => void;
   onRunsCompletedUserTouched: () => void;
@@ -91,6 +97,7 @@ export function RunTireSelectionPanel({
   newSetIntent,
   onNewSetIntentChange,
   preferredTireType,
+  specTireType,
   runsCompleted,
   onRunsCompletedChange,
   onRunsCompletedUserTouched,
@@ -198,6 +205,16 @@ export function RunTireSelectionPanel({
     [rows, tireSetId]
   );
 
+  // A controlled event locks the compound list to the mandated tire (always
+  // keeping any already-selected set visible so history is never hidden).
+  const specLocked = Boolean(specTireType);
+  const visibleGroups = useMemo(() => {
+    if (!specTireType) return groups;
+    const keep = new Set<string>([specTireType.id]);
+    if (selectedRow) keep.add(groupKeyForSet(selectedRow));
+    return groups.filter((g) => keep.has(g.key));
+  }, [groups, specTireType, selectedRow]);
+
   // Mirror an *external* selection change into the view: when the selected set or NEW-set intent
   // changes (auto-default, edit hydrate, copy-prefill, event spec), snap the view to its compound
   // — but only once per selection. Keying on a primitive token (not the row object) means a picker
@@ -232,8 +249,8 @@ export function RunTireSelectionPanel({
       const hit = groups.find((g) => g.key === viewGroupKey);
       if (hit) return hit;
     }
-    return groups[0];
-  }, [groups, viewGroupKey]);
+    return visibleGroups[0] ?? groups[0];
+  }, [groups, visibleGroups, viewGroupKey]);
 
   function handleSelectRow(row: PickerRow) {
     onSelectExistingSet(row.id, row);
@@ -308,21 +325,31 @@ export function RunTireSelectionPanel({
 
   return (
     <div className="space-y-3 text-sm">
+      {specTireType ? (
+        <div className="rounded-md border border-border bg-secondary/60 px-3 py-2 text-[11px] text-muted-foreground">
+          Controlled tire ·{" "}
+          <span className="font-medium text-foreground">{specTireType.displayName}</span>{" "}
+          — pick which set you&apos;re on.
+        </div>
+      ) : null}
+
       <div className={cn("space-y-2", prefillFieldClass)}>
         <div className="flex items-end justify-between gap-3">
           <Eyebrow dot="muted">Tire set</Eyebrow>
-          <button
-            type="button"
-            className="btn-surface px-3 py-1.5 text-xs shrink-0"
-            onClick={() => setShowCompoundPicker((v) => !v)}
-          >
-            {showCompoundPicker ? "Cancel" : "+ Compound"}
-          </button>
+          {!specLocked ? (
+            <button
+              type="button"
+              className="btn-surface px-3 py-1.5 text-xs shrink-0"
+              onClick={() => setShowCompoundPicker((v) => !v)}
+            >
+              {showCompoundPicker ? "Cancel" : "+ Compound"}
+            </button>
+          ) : null}
         </div>
 
-        {groups.length > 0 ? (
+        {visibleGroups.length > 0 && !specLocked ? (
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tire compounds">
-            {groups.map((g) => (
+            {visibleGroups.map((g) => (
               <button
                 key={g.key}
                 type="button"
@@ -335,7 +362,7 @@ export function RunTireSelectionPanel({
           </div>
         ) : null}
 
-        {showCompoundPicker ? (
+        {showCompoundPicker && !specLocked ? (
           <div className="space-y-1">
             <div className="type-data-label">Tire type</div>
             <TireTypeCombobox

@@ -46,6 +46,7 @@ export type CompareRunShape = {
   tireRunNumber: number;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
+  tirePrep?: unknown;
   setupSnapshot?: { id: string; data?: unknown } | null;
   /** On-track session instant when known (import / timing). */
   sessionCompletedAt?: Date | string | null;
@@ -284,6 +285,7 @@ export function RunComparePanel({
                   tireRunNumber: baseRun.tireRunNumber,
                   additiveType: baseRun.additiveType,
                   warmerTimingMinutes: baseRun.warmerTimingMinutes,
+                  tirePrep: baseRun.tirePrep,
                 })}
               </p>
             </div>

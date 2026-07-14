@@ -17,6 +17,7 @@ import {
   applyRunContextToSetupSnapshot,
   parseWarmerTimingMinutes,
 } from "@/lib/runs/applyRunContextToSetupSnapshot";
+import { normalizeTirePrep, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
 import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysForCar";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
@@ -57,6 +58,8 @@ type RunUpsertBody = {
   tireRunNumber?: number;
   additiveTypeId?: string | null;
   warmerTimingMinutes?: number | null;
+  /** Ordered tire-prep applications (see src/lib/runs/tirePrep.ts). */
+  tirePrep?: unknown;
   batteryId?: string | null;
   batteryRunNumber?: number;
   setupData?: unknown;
@@ -472,7 +475,13 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     }
   }
 
-  const warmerTimingMinutes = parseWarmerTimingMinutes(body.warmerTimingMinutes);
+  // Tire-prep sequence is the source of truth; keep the legacy Int in sync as a
+  // derived total (sum of warmer-step minutes) so older reads + aggregations work.
+  const tirePrep = normalizeTirePrep(body.tirePrep);
+  const warmerTimingMinutes =
+    tirePrep.length > 0
+      ? derivedWarmerTimingMinutes(tirePrep)
+      : parseWarmerTimingMinutes(body.warmerTimingMinutes);
 
   const carForSheetKeys = await prisma.car.findFirst({
     where: { id: carId, userId: params.userId },
@@ -608,6 +617,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         tireRunNumber,
         additiveTypeId,
         warmerTimingMinutes,
+        tirePrep: tirePrep as unknown as PrismaTypes.InputJsonValue,
         batteryId: body.batteryId ?? null,
         batteryRunNumber,
         setupSnapshotId: setupSnapshot.id,
@@ -656,6 +666,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       tireRunNumber,
       additiveTypeId,
       warmerTimingMinutes,
+      tirePrep: tirePrep as unknown as PrismaTypes.InputJsonValue,
       batteryId: body.batteryId ?? null,
       batteryRunNumber,
       setupSnapshotId: setupSnapshot.id,

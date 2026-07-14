@@ -7,6 +7,7 @@ import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 
@@ -34,6 +35,9 @@ export function EventMetaEditor(props: Props) {
   const [startDate, setStartDate] = useState(eventDateToYmd(props.initialStartDate));
   const [endDate, setEndDate] = useState(eventDateToYmd(props.initialEndDate));
   const [notes, setNotes] = useState(props.initialNotes ?? "");
+  const [tireControlled, setTireControlled] = useState(
+    Boolean(props.initialControlledTireTypeId)
+  );
   const [controlledTireTypeId, setControlledTireTypeId] = useState(props.initialControlledTireTypeId ?? "");
   const [controlAdditiveEnabled, setControlAdditiveEnabled] = useState(
     Boolean(props.initialControlledAdditiveTypeId)
@@ -89,7 +93,7 @@ export function EventMetaEditor(props: Props) {
           startDate,
           endDate,
           notes: notes.trim() || null,
-          controlledTireTypeId: controlledTireTypeId.trim() || null,
+          controlledTireTypeId: tireControlled ? controlledTireTypeId.trim() || null : null,
           controlledAdditiveTypeId: controlAdditiveEnabled ? controlledAdditiveTypeId.trim() || null : null,
         }),
       });
@@ -195,37 +199,58 @@ export function EventMetaEditor(props: Props) {
           placeholder="Optional notes"
         />
       </div>
-      <div>
-        <label className="block text-[11px] text-muted-foreground mb-1">Controlled / spec tire (optional)</label>
-        <TireTypeCombobox
-          value={controlledTireTypeId}
-          onChange={setControlledTireTypeId}
-          placeholder="Select spec tire type…"
-          aria-label="Event spec tire type"
-        />
-      </div>
-      <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            checked={controlAdditiveEnabled}
-            onChange={(e) => {
-              setControlAdditiveEnabled(e.target.checked);
-              if (!e.target.checked) setControlledAdditiveTypeId("");
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <label className="block text-[11px] text-muted-foreground">Tire</label>
+          <SegmentedControl<"open" | "controlled">
+            ariaLabel="Event tire — open or controlled"
+            size="sm"
+            value={tireControlled ? "controlled" : "open"}
+            onChange={(v) => {
+              const on = v === "controlled";
+              setTireControlled(on);
+              if (!on) setControlledTireTypeId("");
             }}
-            className="h-3.5 w-3.5 shrink-0 accent-primary"
+            options={[
+              { value: "open", label: "Open" },
+              { value: "controlled", label: "Controlled" },
+            ]}
           />
-          <span>Control additive</span>
-        </label>
-        {controlAdditiveEnabled ? (
-          <AdditiveTypeCombobox
-            value={controlledAdditiveTypeId}
-            onChange={setControlledAdditiveTypeId}
-            placeholder="Select spec additive…"
-            aria-label="Event spec additive type"
-            allowInlineCreate={false}
+          {tireControlled ? (
+            <TireTypeCombobox
+              value={controlledTireTypeId}
+              onChange={setControlledTireTypeId}
+              placeholder="Select control tire type…"
+              aria-label="Event control tire type"
+            />
+          ) : null}
+        </div>
+        <div className="space-y-1.5">
+          <label className="block text-[11px] text-muted-foreground">Additive</label>
+          <SegmentedControl<"open" | "controlled">
+            ariaLabel="Event additive — open or controlled"
+            size="sm"
+            value={controlAdditiveEnabled ? "controlled" : "open"}
+            onChange={(v) => {
+              const on = v === "controlled";
+              setControlAdditiveEnabled(on);
+              if (!on) setControlledAdditiveTypeId("");
+            }}
+            options={[
+              { value: "open", label: "Open" },
+              { value: "controlled", label: "Controlled" },
+            ]}
           />
-        ) : null}
+          {controlAdditiveEnabled ? (
+            <AdditiveTypeCombobox
+              value={controlledAdditiveTypeId}
+              onChange={setControlledAdditiveTypeId}
+              placeholder="Select control additive…"
+              aria-label="Event control additive type"
+              allowInlineCreate={false}
+            />
+          ) : null}
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <button

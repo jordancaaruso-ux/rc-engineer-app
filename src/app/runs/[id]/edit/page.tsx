@@ -90,6 +90,7 @@ export default async function EditRunPage({
       tireRunNumber: true,
       additiveTypeId: true,
       warmerTimingMinutes: true,
+      tirePrep: true,
       additiveType: { select: { id: true, displayName: true, modelCode: true } },
       batteryId: true,
       battery: { select: { id: true, label: true, packNumber: true, initialRunCount: true } },
@@ -218,6 +219,7 @@ export default async function EditRunPage({
             tireRunNumber: run.tireRunNumber,
             additiveTypeId: run.additiveTypeId,
             warmerTimingMinutes: run.warmerTimingMinutes,
+            tirePrep: run.tirePrep,
             additiveType: run.additiveType,
             setupSnapshot: run.setupSnapshot,
             event: run.event

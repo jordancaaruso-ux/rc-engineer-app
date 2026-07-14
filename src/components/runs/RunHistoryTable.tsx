@@ -17,7 +17,7 @@ import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { MatchReason } from "@/lib/runs/runHistoryFilters";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
-import { formatAdditiveTimingLine } from "@/lib/runs/runTireContextDisplay";
+import { TirePrepStepsList, resolveTirePrepSteps } from "@/components/runs/TirePrepStepsList";
 import {
   computeTireIndicatorsByRunId,
   type RunTireIndicator,
@@ -111,6 +111,7 @@ type Run = {
   tireSet?: { id: string; label: string; setNumber: number | null } | null;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
+  tirePrep?: unknown;
   event?: { name: string; track?: { name: string } | null } | null;
   setupSnapshot?: { id: string; data?: unknown } | null;
   lapSession?: unknown;
@@ -137,12 +138,17 @@ type ExpandedLapStat = "best" | "avg5" | "avg10" | "mistakes" | null;
 function RunHistoryActionButtons({
   onSetup,
   onLaps,
+  onTirePrep,
+  tirePrepOpen = false,
   tireIndicator,
   layout,
   className,
 }: {
   onSetup: () => void;
   onLaps: () => void;
+  /** Tap the tire indicator → toggle the inline tire-prep panel under the row. */
+  onTirePrep?: () => void;
+  tirePrepOpen?: boolean;
   tireIndicator: RunTireIndicator | null;
   layout: "mobile" | "desktop";
   className?: string;
@@ -158,7 +164,24 @@ function RunHistoryActionButtons({
       )}
     >
       {tireIndicator ? (
-        <TireIndicatorIcon indicator={tireIndicator} size={mobile ? "md" : "sm"} well={mobile} />
+        onTirePrep ? (
+          <button
+            type="button"
+            onClick={onTirePrep}
+            aria-expanded={tirePrepOpen}
+            aria-label="Show tire prep"
+            title="Tire prep for this run"
+            className={cn(
+              "inline-flex shrink-0 items-center justify-center rounded-md transition",
+              tirePrepOpen && "bg-accent/10 ring-1 ring-accent/50",
+              !tirePrepOpen && "hover:bg-muted/80"
+            )}
+          >
+            <TireIndicatorIcon indicator={tireIndicator} size={mobile ? "md" : "sm"} well={mobile} />
+          </button>
+        ) : (
+          <TireIndicatorIcon indicator={tireIndicator} size={mobile ? "md" : "sm"} well={mobile} />
+        )
       ) : mobile ? (
         // Fixed-width slot so stat columns stay aligned across rows.
         <span className="h-8 w-8 shrink-0" aria-hidden />
@@ -274,6 +297,8 @@ export function RunHistoryTable({
   });
   const [setupModalRunId, setSetupModalRunId] = useState<string | null>(null);
   const [lapModalRunId, setLapModalRunId] = useState<string | null>(null);
+  /** Run whose inline tire-prep panel is open (toggled from the tire indicator). */
+  const [prepOpenRunId, setPrepOpenRunId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<
     { runId: string; edge: "above" | "below" } | null
@@ -571,6 +596,10 @@ export function RunHistoryTable({
                           layout="mobile"
                           onSetup={() => setSetupModalRunId(run.id)}
                           onLaps={() => setLapModalRunId(run.id)}
+                          onTirePrep={() =>
+                            setPrepOpenRunId((cur) => (cur === run.id ? null : run.id))
+                          }
+                          tirePrepOpen={prepOpenRunId === run.id}
                           tireIndicator={tireIndicatorsByRunId.get(run.id) ?? null}
                         />
                       </div>
@@ -643,11 +672,29 @@ export function RunHistoryTable({
                   layout="desktop"
                   onSetup={() => setSetupModalRunId(run.id)}
                   onLaps={() => setLapModalRunId(run.id)}
+                  onTirePrep={() =>
+                    setPrepOpenRunId((cur) => (cur === run.id ? null : run.id))
+                  }
+                  tirePrepOpen={prepOpenRunId === run.id}
                   tireIndicator={tireIndicatorsByRunId.get(run.id) ?? null}
                 />
               </td>
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
             </tr>
+            {prepOpenRunId === run.id ? (
+              <tr className="border-b border-border/80">
+                <td colSpan={totalCols} className="px-3 pb-2.5 pt-0 md:px-4">
+                  <div className="rounded-lg border border-border bg-secondary/60 px-3 py-2.5">
+                    {run.additiveType?.displayName ? (
+                      <div className="mb-1.5 text-xs font-semibold text-foreground">
+                        {run.additiveType.displayName}
+                      </div>
+                    ) : null}
+                    <TirePrepStepsList steps={resolveTirePrepSteps(run)} />
+                  </div>
+                </td>
+              </tr>
+            ) : null}
             {runMatchReasons && runMatchReasons.length > 0 && !isExpanded ? (
               <tr className="border-b border-border/80">
                 <td colSpan={totalCols} className="px-2 pb-1.5 pt-0 md:px-3">
@@ -942,11 +989,11 @@ function RunDetail({
   const tireSetDisplay = run.tireSet
     ? `${run.tireSet.label} · run ${run.tireRunNumber}`
     : "—";
-  // Tire prep = additive + warmer timing only. Compound toggles (ST205, ABH,
-  // AT15, …) are setup-sheet parameters, not tire prep — they live on the setup
-  // sheet and are intentionally excluded here.
-  const additiveLine = formatAdditiveTimingLine(run.additiveType, run.warmerTimingMinutes);
-  const tirePrepDisplay = additiveLine ?? "—";
+  // Additive well = the product; Tire prep well = the application sequence.
+  // Compound toggles (ST205, ABH, AT15, …) are setup-sheet parameters, not tire
+  // prep — they live on the setup sheet and are intentionally excluded here.
+  const additiveDisplay = run.additiveType?.displayName ?? "—";
+  const tirePrepSteps = resolveTirePrepSteps(run);
 
   // Lap stats / grid / graph split into three nodes so the driver-compare
   // switcher can slot its notebook tabs between the stats and the lap card.
@@ -1107,7 +1154,17 @@ function RunDetail({
           {hasMeetingType ? <StatWellCell label="Session" value={meetingType} /> : null}
           <StatWellCell label="Car" value={carDisplay} valueClassName="whitespace-normal break-words" />
           <StatWellCell label="Tire set" value={tireSetDisplay} valueClassName="whitespace-normal break-words" />
-          <StatWellCell label="Tire prep" value={tirePrepDisplay} valueClassName="whitespace-normal break-words" />
+          <StatWellCell label="Additive" value={additiveDisplay} valueClassName="whitespace-normal break-words" />
+          <StatWellCell
+            label="Tire prep"
+            value={
+              tirePrepSteps.length > 0 ? (
+                <TirePrepStepsList steps={tirePrepSteps} />
+              ) : (
+                "—"
+              )
+            }
+          />
         </StatWellGrid>
       </div>
 

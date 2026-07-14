@@ -18,6 +18,7 @@ export type CopyPreviewRunRecord = Prisma.RunGetPayload<{
     tireRunNumber: true;
     additiveTypeId: true;
     warmerTimingMinutes: true;
+    tirePrep: true;
     batteryId: true;
     batteryRunNumber: true;
     practiceDayUrl: true;

@@ -23,6 +23,7 @@ export async function getLastRunForCopyPreview(userId: string) {
       tireRunNumber: true,
       additiveTypeId: true,
       warmerTimingMinutes: true,
+      tirePrep: true,
       batteryId: true,
       batteryRunNumber: true,
       practiceDayUrl: true,
