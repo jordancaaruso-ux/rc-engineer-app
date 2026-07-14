@@ -307,10 +307,8 @@ type TextRequest = { key: string; numericOnly: boolean; cropPng: Buffer };
  * One call per import is dramatically cheaper than one call per field. When OPENAI_API_KEY is
  * missing, returns an empty map and the caller leaves text fields unset.
  */
-async function batchOcrTextRegions(requests: TextRequest[]): Promise<Record<string, string>> {
+async function ocrBatch(requests: TextRequest[], apiKey: string): Promise<Record<string, string>> {
   if (requests.length === 0) return {};
-  const apiKey = getOpenAiApiKey();
-  if (!apiKey) return {};
 
   const labelHeight = 24;
   const padding = 8;
@@ -404,6 +402,26 @@ async function batchOcrTextRegions(requests: TextRequest[]): Promise<Record<stri
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * OCR all text regions. Stacking every crop into ONE call makes gpt-4o-mini mis-map the
+ * [key]->value labels once there are many crops (measured on the MTC3 sheet: 73 crops in one
+ * stack scrambled numeric values — spring 4.5 read as "Medium", shock oil 500 as "30wt";
+ * ~8 crops per call read cleanly). So chunk into small batches, run them in parallel, and merge.
+ */
+async function batchOcrTextRegions(requests: TextRequest[]): Promise<Record<string, string>> {
+  if (requests.length === 0) return {};
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) return {};
+
+  const CHUNK = 8;
+  const chunks: TextRequest[][] = [];
+  for (let i = 0; i < requests.length; i += CHUNK) chunks.push(requests.slice(i, i + CHUNK));
+  const results = await Promise.all(chunks.map((chunk) => ocrBatch(chunk, apiKey)));
+  const merged: Record<string, string> = {};
+  for (const r of results) Object.assign(merged, r);
+  return merged;
 }
 
 function applyFieldKindNormalization(rawValue: string, fieldKey: string): string {
