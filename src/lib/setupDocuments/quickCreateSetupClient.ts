@@ -171,3 +171,37 @@ export function clipboardEventToImageFile(ev: { clipboardData: DataTransfer | nu
   }
   return null;
 }
+
+export type ReadClipboardImageResult =
+  | { ok: true; file: File }
+  | { ok: false; reason: string };
+
+/**
+ * Read the first image on the clipboard via the async Clipboard API. Unlike a `paste` event
+ * (desktop-only — mobile browsers don't fire `paste` on non-editable elements and there's no
+ * Ctrl+V), `navigator.clipboard.read()` works on a user gesture on mobile (iOS Safari 13.4+,
+ * Android Chrome), behind a permission prompt. Must be called from a click/tap handler.
+ */
+export async function readImageFromClipboard(): Promise<ReadClipboardImageResult> {
+  const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+  if (!clip || typeof clip.read !== "function") {
+    return { ok: false, reason: "This browser can't paste from the clipboard — use the upload button." };
+  }
+  try {
+    const items = await clip.read();
+    for (const item of items) {
+      const type = item.types.find((t) => t.toLowerCase().startsWith("image/"));
+      if (!type) continue;
+      const blob = await item.getType(type);
+      const ext = (type.split("/")[1] || "png").split(";")[0] || "png";
+      return { ok: true, file: new File([blob], `pasted-setup.${ext}`, { type }) };
+    }
+    return { ok: false, reason: "No image on the clipboard — copy a screenshot first." };
+  } catch (e) {
+    const name = e instanceof Error ? e.name : "";
+    if (name === "NotAllowedError") {
+      return { ok: false, reason: "Clipboard access was blocked — allow paste, or use the upload button." };
+    }
+    return { ok: false, reason: "Couldn't read the clipboard — use the upload button instead." };
+  }
+}

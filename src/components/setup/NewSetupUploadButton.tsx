@@ -7,6 +7,7 @@ import {
   clipboardEventToImageFile,
   postQuickCreateSetup,
   QUICK_CREATE_SETUP_ACCEPT_MIME,
+  readImageFromClipboard,
 } from "@/lib/setupDocuments/quickCreateSetupClient";
 
 type UploadStage = "idle" | "uploading" | "matching" | "creating" | "done";
@@ -132,6 +133,19 @@ export function NewSetupUploadButton({
     handleFile(f);
   }
 
+  // Tap-to-paste for mobile (and click-to-paste on desktop): the `paste` event never fires on
+  // touch, so pull the image straight off the clipboard via the async Clipboard API.
+  async function onPasteTap() {
+    if (busy) return;
+    setError(null);
+    const res = await readImageFromClipboard();
+    if (!res.ok) {
+      setError(res.reason);
+      return;
+    }
+    handleFile(res.file);
+  }
+
   function confirmPendingImage() {
     const file = pendingImage;
     if (!file || !pendingCarId) return;
@@ -159,14 +173,16 @@ export function NewSetupUploadButton({
         >
           {stageLabel(stage)}
         </button>
-        <div
-          tabIndex={0}
+        <button
+          type="button"
+          onClick={onPasteTap}
           onPaste={onPaste}
-          className="rounded border border-dashed border-border/80 bg-card/40 px-2 py-1 ui-label-meta outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
-          title="Click here, then Ctrl+V to paste a screenshot"
+          disabled={busy}
+          className="rounded border border-dashed border-border/80 bg-card/40 px-2 py-1 ui-label-meta outline-none focus-visible:ring-1 focus-visible:ring-accent/40 disabled:opacity-60"
+          title="Tap to paste a copied screenshot (or click here, then Ctrl+V)"
         >
           Paste image
-        </div>
+        </button>
       </div>
       {pendingImage ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card/60 px-2 py-1.5">

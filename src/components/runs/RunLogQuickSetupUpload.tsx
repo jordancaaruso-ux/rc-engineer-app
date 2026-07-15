@@ -8,6 +8,7 @@ import {
   clipboardEventToImageFile,
   postQuickCreateSetup,
   QUICK_CREATE_SETUP_ACCEPT_MIME,
+  readImageFromClipboard,
 } from "@/lib/setupDocuments/quickCreateSetupClient";
 
 type UploadStage = "idle" | "uploading" | "detecting" | "creating" | "done";
@@ -126,6 +127,20 @@ export function RunLogQuickSetupUpload(props: {
     void runUpload(f);
   }
 
+  // Tap-to-paste: the `paste` event never fires on touch, so read the image straight off the
+  // clipboard via the async Clipboard API (works on iOS Safari / Android Chrome on a gesture).
+  async function onPasteTap() {
+    if (busy) return;
+    setError(null);
+    setInfo(null);
+    const res = await readImageFromClipboard();
+    if (!res.ok) {
+      setError(res.reason);
+      return;
+    }
+    void runUpload(res.file);
+  }
+
   const controls = (
     <div className="flex flex-wrap items-center gap-2">
       <input
@@ -144,20 +159,24 @@ export function RunLogQuickSetupUpload(props: {
       >
         {stageLabel(stage)}
       </button>
-      <div
-        role="group"
+      <button
+        type="button"
         aria-label="Paste setup screenshot from clipboard"
-        tabIndex={0}
+        disabled={busy}
+        onClick={onPasteTap}
         onPaste={onPaste}
         className={cn(
-          // Clipboard paste is a desktop-only paradigm (no Ctrl+V on phones, and a
-          // touch keyboard can't paste an image into a div) — hide it below `sm`.
-          "hidden sm:block min-h-[2rem] rounded border border-dashed border-border bg-surface-runna-inset px-2 py-1.5 text-[11px] text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-accent/50",
+          // Tap reads the clipboard via the async Clipboard API (mobile-friendly); on desktop the
+          // same control still accepts a Ctrl+V paste after focus.
+          "min-h-[2rem] rounded border border-dashed border-border bg-surface-runna-inset px-2 py-1.5 text-[11px] text-muted-foreground text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/50 disabled:opacity-60",
           variant === "banner" ? "flex-1 min-w-[8rem] max-w-md" : "min-w-[6rem] flex-1 max-w-xs"
         )}
       >
-        Click here, then <span className="font-medium text-foreground">Ctrl+V</span> to paste a screenshot
-      </div>
+        <span className="sm:hidden">Paste a screenshot</span>
+        <span className="hidden sm:inline">
+          Click here, then <span className="font-medium text-foreground">Ctrl+V</span> to paste a screenshot
+        </span>
+      </button>
       {onRefetchList ? (
         <button
           type="button"
