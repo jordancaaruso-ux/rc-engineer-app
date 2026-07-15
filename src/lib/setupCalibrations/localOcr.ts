@@ -14,10 +14,16 @@ import * as ort from "onnxruntime-node";
  * The recognition model + its char dictionary ship in ./models and are traced into the serverless
  * function via `outputFileTracingIncludes` in next.config. Loading is lazy + cached across
  * invocations; a load failure degrades gracefully (empty result → caller keeps its fallback).
+ *
+ * Model = PP-OCRv3 ENGLISH rec (latin + digits + punctuation). Chosen over the multilingual ch v4
+ * model because ch drops small decimal points on repeated digits (5.5→"55", 2.2→"22") — a
+ * confident-wrong failure on setup NUMBERS, which are what matter. The en model reads those
+ * correctly; it's slightly weaker on prose names, but those are metadata and the confidence flag
+ * catches them.
  */
 
-const MODEL_PATH = path.join(process.cwd(), "src/lib/setupCalibrations/models/ppocrv4-rec.onnx");
-const DICT_PATH = path.join(process.cwd(), "src/lib/setupCalibrations/models/ppocr_keys_v1.txt");
+const MODEL_PATH = path.join(process.cwd(), "src/lib/setupCalibrations/models/ppocrv3-en-rec.onnx");
+const DICT_PATH = path.join(process.cwd(), "src/lib/setupCalibrations/models/en_dict.txt");
 
 // Below this confidence a read is flagged for review rather than trusted silently (the driver's
 // "glance-review the uncertain ones" bar). Empty reads always flag.
