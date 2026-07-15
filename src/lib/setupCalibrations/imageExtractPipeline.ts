@@ -931,30 +931,11 @@ export async function mapExtractedImageWithCalibration(input: {
       if (!importedKeys.includes(key)) importedKeys.push(key);
     };
 
-    if (process.env.SETUP_LOCAL_OCR === "1") {
-      // Local PP-OCR (offline, ~3s, no OpenAI quota/latency). Empty/low-confidence reads are
-      // flagged for a glance rather than trusted silently or dropped. See localOcr.ts.
-      ocrEngine = "local";
-      const local = await withStageTimeout(
-        "image_ocr_local",
-        60000,
-        () =>
-          recognizeTextRegionsLocally(
-            textRequests.map((r) => ({ key: r.key, cropPng: r.cropPng, numericOnly: r.numericOnly }))
-          ),
-        input.onStage
-      );
-      if (local.unavailable) warnings.push("local_ocr_unavailable");
-      for (const req of textRequests) {
-        const v = local.values[req.key];
-        if (v != null) applyValue(req.key, v, req.numericOnly);
-      }
-      flaggedTextKeys.push(...local.flaggedKeys);
-    } else {
-      // Cloud consensus OCR (two shifted passes + solo tiebreaks) legitimately runs long under a
-      // throttled org TPM budget with 429 back-off — a real MTC3 upload timed out at the old 120s
-      // cap and failed to zero fields (2026-07-15). Give it 210s; the outer map cap (240s) and the
-      // route's maxDuration (300s) sit above it, so this fires first if OCR ever overruns.
+    // Cloud consensus OCR (two shifted passes + solo tiebreaks) legitimately runs long under a
+    // throttled org TPM budget with 429 back-off — a real MTC3 upload timed out at the old 120s
+    // cap and failed to zero fields (2026-07-15). Give it 210s; the outer map cap (240s) and the
+    // route's maxDuration (300s) sit above it, so this fires first if OCR ever overruns.
+    const runCloudOcr = async () => {
       const ocrResults = await withStageTimeout(
         "image_ocr_text_regions",
         210000,
@@ -968,6 +949,36 @@ export async function mapExtractedImageWithCalibration(input: {
         const raw = ocrResults[req.key];
         if (raw != null) applyValue(req.key, raw, req.numericOnly);
       }
+    };
+
+    // Local PP-OCR is the DEFAULT (offline, ~3s, no OpenAI quota/latency); SETUP_LOCAL_OCR=0 is a
+    // kill switch back to cloud. Empty/low-confidence reads are flagged for a glance rather than
+    // trusted silently or dropped. If the model can't load at runtime (e.g. a serverless tracing
+    // quirk), fall back to cloud so the worst case is exactly today's behaviour, never zero.
+    if (process.env.SETUP_LOCAL_OCR !== "0") {
+      ocrEngine = "local";
+      const local = await withStageTimeout(
+        "image_ocr_local",
+        60000,
+        () =>
+          recognizeTextRegionsLocally(
+            textRequests.map((r) => ({ key: r.key, cropPng: r.cropPng, numericOnly: r.numericOnly }))
+          ),
+        input.onStage
+      );
+      if (local.unavailable) {
+        warnings.push("local_ocr_unavailable_fell_back_to_cloud");
+        ocrEngine = "cloud";
+        await runCloudOcr();
+      } else {
+        for (const req of textRequests) {
+          const v = local.values[req.key];
+          if (v != null) applyValue(req.key, v, req.numericOnly);
+        }
+        flaggedTextKeys.push(...local.flaggedKeys);
+      }
+    } else {
+      await runCloudOcr();
     }
   }
 
