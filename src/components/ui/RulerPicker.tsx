@@ -10,11 +10,22 @@ import { haptic } from "@/lib/haptics";
  *
  * A fixed yellow needle sits at the center; the tick track scrolls beneath it.
  * Drag / flick / native scroll all work; tapping a numeric label jumps to it;
- * on scroll-settle the track snaps to the nearest integer. Each detent crossed
- * fires a light haptic. `onChange` streams live while scrubbing (the parent
- * value chip follows), settling on the snapped value.
+ * on scroll-settle the track snaps to a value per `snapStep` / `magnetTo`.
+ * Each detent crossed fires a haptic (heavier on magnet multiples). `onChange`
+ * streams live while scrubbing (the parent value chip follows), settling on the
+ * snapped value.
+ *
+ * Snapping (founder-tuned 2026-07-15 via the feel-test artifact):
+ *  - `snapStep` is the base grid (minutes: 1 → every value; temp: 5 → 5° steps).
+ *  - `magnetTo` + `magnetRadius` add a sticky detent: minutes snap to any integer
+ *    but multiples of 5 magnetically grab within `magnetRadius` units, so a casual
+ *    scrub lands on 5s while a deliberate stop still reaches a 17.
+ *
+ * The scroll track claims horizontal panning (`touch-pan-x`) and carries
+ * `data-no-swipe` so a host `PagedCard` never mistakes a ruler scrub for a page
+ * swipe (the card behind it must not flip while you dial a value).
  */
-const PX_PER_UNIT = 9;
+const PX_PER_UNIT = 11;
 const SNAP_DELAY_MS = 120;
 
 type Props = {
@@ -28,6 +39,12 @@ type Props = {
   labelAt: (v: number) => boolean;
   unit: string;
   ariaLabel: string;
+  /** Base snap grid: 1 = every integer, 5 = only multiples of 5. Default 1. */
+  snapStep?: number;
+  /** Value multiple that magnetically grabs on settle (e.g. 5 for sticky-5s). */
+  magnetTo?: number;
+  /** Pull radius (in units) for `magnetTo`; within this a value snaps to the magnet. */
+  magnetRadius?: number;
   className?: string;
 };
 
@@ -40,11 +57,16 @@ export function RulerPicker({
   labelAt,
   unit,
   ariaLabel,
+  snapStep = 1,
+  magnetTo,
+  magnetRadius = 0,
   className,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const readoutRef = useRef<HTMLSpanElement | null>(null);
+  const needleRef = useRef<HTMLSpanElement | null>(null);
   const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastValue = useRef<number | null>(null);
   /** Ignore scroll events caused by our own programmatic positioning. */
   const settling = useRef(false);
@@ -58,11 +80,23 @@ export function RulerPicker({
     [min]
   );
 
+  /** Snap a continuous position to a value: base grid, with a magnetic pull toward `magnetTo`. */
+  const settleValue = useCallback(
+    (raw: number) => {
+      if (magnetTo && magnetTo > 0) {
+        const m = Math.round(raw / magnetTo) * magnetTo;
+        if (Math.abs(raw - m) <= magnetRadius) return clamp(m);
+      }
+      return clamp(Math.round(raw / snapStep) * snapStep);
+    },
+    [clamp, magnetTo, magnetRadius, snapStep]
+  );
+
   const valueAt = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return min;
-    return clamp(Math.round((el.scrollLeft - PX_PER_UNIT / 2) / PX_PER_UNIT) + min);
-  }, [clamp, min]);
+    return settleValue((el.scrollLeft - PX_PER_UNIT / 2) / PX_PER_UNIT + min);
+  }, [settleValue, min]);
 
   // Initial position (and external value sync while not actively scrubbing).
   useEffect(() => {
@@ -85,10 +119,23 @@ export function RulerPicker({
     if (!el) return;
     const v = valueAt();
     if (v !== lastValue.current) {
+      // Multiples of the magnet are the "strong" detents — heavier buzz + a brief
+      // needle flare (the only feedback on iOS web, where haptics are silent).
+      const heavy = magnetTo != null && magnetTo > 0 && v % magnetTo === 0;
       lastValue.current = v;
       if (readoutRef.current) readoutRef.current.textContent = `${v} ${unit}`;
       onChange(v);
-      haptic("light");
+      haptic(heavy ? "medium" : "light");
+      if (heavy && needleRef.current) {
+        const n = needleRef.current;
+        n.style.boxShadow = "0 0 16px rgba(255,214,10,0.95)";
+        n.style.height = "26px";
+        if (pulseTimer.current) clearTimeout(pulseTimer.current);
+        pulseTimer.current = setTimeout(() => {
+          n.style.boxShadow = "";
+          n.style.height = "";
+        }, 150);
+      }
     }
     if (settling.current) return;
     if (snapTimer.current) clearTimeout(snapTimer.current);
@@ -96,11 +143,12 @@ export function RulerPicker({
       const settled = valueAt();
       el.scrollTo({ left: leftFor(settled), behavior: "smooth" });
     }, SNAP_DELAY_MS);
-  }, [leftFor, onChange, unit, valueAt]);
+  }, [leftFor, magnetTo, onChange, unit, valueAt]);
 
   useEffect(() => {
     return () => {
       if (snapTimer.current) clearTimeout(snapTimer.current);
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
     };
   }, []);
 
@@ -157,6 +205,7 @@ export function RulerPicker({
 
   return (
     <div
+      data-no-swipe
       className={cn("relative pb-3 pt-2.5", className)}
       role="slider"
       aria-label={ariaLabel}
@@ -169,8 +218,9 @@ export function RulerPicker({
         className="pointer-events-none absolute left-1/2 top-1.5 z-[3] -translate-x-1/2 font-mono text-[11px] tabular-nums text-accent"
       />
       <span
+        ref={needleRef}
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-6 z-[2] h-5 w-0.5 -translate-x-1/2 rounded-[1px] bg-accent shadow-[0_0_8px_rgba(255,214,10,0.5)]"
+        className="pointer-events-none absolute left-1/2 top-6 z-[2] h-5 w-0.5 -translate-x-1/2 rounded-[1px] bg-accent shadow-[0_0_8px_rgba(255,214,10,0.5)] transition-[height,box-shadow] duration-100"
       />
       <span
         aria-hidden
@@ -187,7 +237,7 @@ export function RulerPicker({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onClick={onTrackClick}
-        className="mt-3.5 cursor-grab select-none overflow-y-hidden overflow-x-auto overscroll-contain active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mt-3.5 cursor-grab touch-pan-x select-none overflow-y-hidden overflow-x-auto overscroll-contain active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div className="flex h-[34px] items-start px-[50%]">{ticks}</div>
       </div>

@@ -37,6 +37,15 @@ export const TIRE_PREP_MINUTE_MARKERS = [5, 10, 15, 20, 30, 40, 50, 60] as const
 export const TIRE_PREP_TEMP_MIN_C = 40;
 export const TIRE_PREP_TEMP_MAX_C = 100;
 
+/**
+ * Default values that pre-fill a newly added application so its boxes are never
+ * blank (founder decision 2026-07-15: a shown default IS the logged value). These
+ * apply only when the driver explicitly adds an application — the section starts
+ * empty, so ignoring tire prep still saves nothing.
+ */
+export const TIRE_PREP_DEFAULT_MINUTES = 20;
+export const TIRE_PREP_DEFAULT_TEMP_C = 70;
+
 const MINUTES_HARD_MAX = 600;
 const TEMP_HARD_MAX = 250;
 
@@ -60,6 +69,23 @@ function coerceTemp(raw: unknown): number | null {
 
 export function emptyTirePrepStep(): TirePrepStep {
   return { appliedAdditive: true, minutes: null, warmers: false, towels: false, temperatureC: null };
+}
+
+/**
+ * A freshly added application, pre-filled with the logged-by-default values.
+ * Carries the previous step's on/off choices forward (bench vs warmers, towels,
+ * additive) for fast repeat prep, but resets the numeric boxes to the fixed
+ * defaults so they read a value immediately (`—` is never shown on add).
+ */
+export function newTirePrepStep(prev?: TirePrepStep): TirePrepStep {
+  const warmers = prev ? prev.warmers : false;
+  return {
+    appliedAdditive: prev ? prev.appliedAdditive : true,
+    minutes: TIRE_PREP_DEFAULT_MINUTES,
+    warmers,
+    towels: warmers ? Boolean(prev?.towels) : false,
+    temperatureC: warmers ? TIRE_PREP_DEFAULT_TEMP_C : null,
+  };
 }
 
 function normalizeTirePrepStep(raw: unknown): TirePrepStep | null {

@@ -36,7 +36,6 @@ import {
   pruneTirePrepForSave,
   tirePrepHasContent,
   formatTirePrepLine,
-  emptyTirePrepStep,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
 import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
@@ -495,9 +494,9 @@ export function NewRunForm(props: {
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
   const [additiveTypeId, setAdditiveTypeId] = useState<string>("");
   /** Ordered tire-prep applications toward the run (see src/lib/runs/tirePrep.ts).
-   *  Starts with one blank row ready (most runs have at least one application);
-   *  blank rows are pruned on save, so the default never persists by itself. */
-  const [tirePrep, setTirePrep] = useState<TirePrepStep[]>([emptyTirePrepStep()]);
+   *  Starts empty — the driver adds applications on demand, and an added row is
+   *  pre-filled with logged-by-default values. Skipping tire prep saves nothing. */
+  const [tirePrep, setTirePrep] = useState<TirePrepStep[]>([]);
   const [additiveTypesById, setAdditiveTypesById] = useState<
     Record<string, { id: string; displayName: string }>
   >({});
@@ -816,8 +815,8 @@ export function NewRunForm(props: {
               r.warmerTimingMinutes,
               Boolean(r.additiveTypeId ?? r.additiveType?.id)
             );
-      // Always keep one row ready — blank rows are pruned on save.
-      setTirePrep(steps.length > 0 ? steps : [emptyTirePrepStep()]);
+      // Show whatever the run had; no auto-seeded blank row (add on demand).
+      setTirePrep(steps);
     }
     if (r.additiveType) {
       setAdditiveTypesById((prev) => ({
@@ -1076,8 +1075,7 @@ export function NewRunForm(props: {
         if (s.newTireSetIntent !== undefined) setNewTireSetIntent(s.newTireSetIntent);
         if (typeof s.additiveTypeId === "string") setAdditiveTypeId(s.additiveTypeId);
         if (Array.isArray(s.tirePrep)) {
-          const steps = normalizeTirePrep(s.tirePrep);
-          setTirePrep(steps.length > 0 ? steps : [emptyTirePrepStep()]);
+          setTirePrep(normalizeTirePrep(s.tirePrep));
         }
         if (typeof s.batteryId === "string") setBatteryId(s.batteryId);
         if (s.setupData) setSetupData(s.setupData);
@@ -2377,7 +2375,7 @@ export function NewRunForm(props: {
         Array.isArray(r.tirePrep) && r.tirePrep.length > 0
           ? normalizeTirePrep(r.tirePrep)
           : tirePrepFromLegacy(r.warmerTimingMinutes, Boolean(nextAdditiveId));
-      setTirePrep(steps.length > 0 ? steps : [emptyTirePrepStep()]);
+      setTirePrep(steps);
     }
 
     const nextBatId = r.batteryId || r.battery?.id || "";

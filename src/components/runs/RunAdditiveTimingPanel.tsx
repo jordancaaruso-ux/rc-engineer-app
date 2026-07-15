@@ -15,7 +15,9 @@ import {
   MAX_TIRE_PREP_STEPS,
   TIRE_PREP_TEMP_MIN_C,
   TIRE_PREP_TEMP_MAX_C,
-  emptyTirePrepStep,
+  TIRE_PREP_DEFAULT_MINUTES,
+  TIRE_PREP_DEFAULT_TEMP_C,
+  newTirePrepStep,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
 import {
@@ -55,14 +57,20 @@ type OpenRuler = { row: number; kind: "min" | "temp" } | null;
 const MINUTES_RULER = {
   min: 1,
   max: 90,
-  defaultValue: 20,
+  defaultValue: TIRE_PREP_DEFAULT_MINUTES,
+  // Every minute reachable, but 5s magnetically grab (founder-tuned 2026-07-15).
+  snapStep: 1,
+  magnetTo: 5,
+  magnetRadius: 1,
   // Fine labels through the habitual low range, coarser above.
   labelAt: (v: number) => (v <= 20 ? v % 5 === 0 : v % 10 === 0),
 };
 const TEMP_RULER = {
   min: TIRE_PREP_TEMP_MIN_C,
   max: TIRE_PREP_TEMP_MAX_C,
-  defaultValue: 55,
+  defaultValue: TIRE_PREP_DEFAULT_TEMP_C,
+  // 5° steps only — no 1° refinement needed for warmer temps.
+  snapStep: 5,
   labelAt: (v: number) => v % 10 === 0,
 };
 
@@ -192,9 +200,9 @@ export function RunAdditiveTimingPanel({
   };
   const addStep = () => {
     if (tirePrep.length >= MAX_TIRE_PREP_STEPS) return;
-    // Pre-fill toggles/temp from the previous step for speed; blank the time.
-    const prev = tirePrep[tirePrep.length - 1];
-    const next: TirePrepStep = prev ? { ...prev, minutes: null } : emptyTirePrepStep();
+    // Carry the previous step's on/off choices forward; pre-fill the numeric
+    // boxes with the logged-by-default values so nothing reads "—".
+    const next = newTirePrepStep(tirePrep[tirePrep.length - 1]);
     onTirePrepChange([...tirePrep, next]);
     // The common flow is add → set time: open the new row's minutes ruler.
     setOpenRuler({ row: tirePrep.length, kind: "min" });
@@ -318,7 +326,11 @@ export function RunAdditiveTimingPanel({
                           updateStep(i, { warmers: false, towels: false, temperatureC: null });
                           if (tempOpen) setOpenRuler(null);
                         } else {
-                          updateStep(i, { warmers: true });
+                          // Fill the temp box with the default so it never reads "—".
+                          updateStep(i, {
+                            warmers: true,
+                            temperatureC: step.temperatureC ?? TIRE_PREP_DEFAULT_TEMP_C,
+                          });
                         }
                       }}
                       ariaLabel="In warmers"
@@ -365,6 +377,9 @@ export function RunAdditiveTimingPanel({
                         min={MINUTES_RULER.min}
                         max={MINUTES_RULER.max}
                         defaultValue={MINUTES_RULER.defaultValue}
+                        snapStep={MINUTES_RULER.snapStep}
+                        magnetTo={MINUTES_RULER.magnetTo}
+                        magnetRadius={MINUTES_RULER.magnetRadius}
                         labelAt={MINUTES_RULER.labelAt}
                         unit="min"
                         ariaLabel={`Minutes ruler, application ${i + 1}`}
@@ -376,6 +391,7 @@ export function RunAdditiveTimingPanel({
                         min={TEMP_RULER.min}
                         max={TEMP_RULER.max}
                         defaultValue={TEMP_RULER.defaultValue}
+                        snapStep={TEMP_RULER.snapStep}
                         labelAt={TEMP_RULER.labelAt}
                         unit="°C"
                         ariaLabel={`Warmer temperature ruler, application ${i + 1}`}

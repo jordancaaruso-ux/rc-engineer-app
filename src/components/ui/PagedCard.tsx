@@ -190,10 +190,12 @@ export function PagedCard({
       // Primary button / single touch only.
       if (e.pointerType === "mouse" && e.button !== 0) return;
       // Drags starting inside a text control belong to the control (cursor
-      // placement / text selection), never to paging.
+      // placement / text selection), never to paging. `[data-no-swipe]` opts a
+      // horizontally-scrolling child out too (e.g. RulerPicker's tape track), so
+      // scrubbing it never flips the card to another face.
       if (
         e.target instanceof Element &&
-        e.target.closest("input, textarea, select, [contenteditable='true']")
+        e.target.closest("input, textarea, select, [contenteditable='true'], [data-no-swipe]")
       ) {
         return;
       }

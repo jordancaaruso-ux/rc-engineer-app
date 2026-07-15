@@ -11,6 +11,9 @@ import {
   tirePrepHasContent,
   formatTirePrepLine,
   emptyTirePrepStep,
+  newTirePrepStep,
+  TIRE_PREP_DEFAULT_MINUTES,
+  TIRE_PREP_DEFAULT_TEMP_C,
   MAX_TIRE_PREP_STEPS,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
@@ -82,6 +85,33 @@ test("derivedWarmerTimingMinutes sums warmer steps only; null when none in warme
     null
   );
   assert.equal(derivedWarmerTimingMinutes([]), null);
+});
+
+test("newTirePrepStep pre-fills defaults and carries prev on/off choices", () => {
+  // First step: fixed defaults, bench (temp irrelevant until warmers on).
+  assert.deepEqual(newTirePrepStep(), {
+    appliedAdditive: true,
+    minutes: TIRE_PREP_DEFAULT_MINUTES,
+    warmers: false,
+    towels: false,
+    temperatureC: null,
+  });
+  // From a bench step: minutes reset to the default, no temp.
+  assert.deepEqual(newTirePrepStep(step({ minutes: 8, warmers: false, appliedAdditive: false })), {
+    appliedAdditive: false,
+    minutes: TIRE_PREP_DEFAULT_MINUTES,
+    warmers: false,
+    towels: false,
+    temperatureC: null,
+  });
+  // From a warmer step: carry warmers/towels, default the temp box.
+  assert.deepEqual(newTirePrepStep(step({ minutes: 12, warmers: true, towels: true, temperatureC: 60 })), {
+    appliedAdditive: true,
+    minutes: TIRE_PREP_DEFAULT_MINUTES,
+    warmers: true,
+    towels: true,
+    temperatureC: TIRE_PREP_DEFAULT_TEMP_C,
+  });
 });
 
 test("pruneTirePrepForSave drops blank rows but keeps warmer/timed steps", () => {
