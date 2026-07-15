@@ -12,6 +12,7 @@ import { normalizeTemplateExtractedValue } from "@/lib/setupCalibrations/applyTe
 import { getCalibrationFieldKind } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { interpretAwesomatixSetupSnapshot } from "@/lib/setupDocuments/awesomatixImportPostProcess";
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
+import { recognizeTextRegionsLocally } from "@/lib/setupCalibrations/localOcr";
 import {
   fingerprintImageBytes,
   hammingDistanceHex,
@@ -744,6 +745,10 @@ export type ImageMappingDiagnostic = {
   alignment: { anchorMatchScore: number; pHashHamming: number | null; detectedPageRegion?: ImageRegion };
   /** Self-check trail: fields where the two OCR passes disagreed + the tiebreak verdicts. */
   ocrConsensus?: OcrConsensusMeta;
+  /** Which text-OCR engine produced the values. */
+  ocrEngine?: "cloud" | "local";
+  /** Text keys read empty or low-confidence — surface for a glance rather than trust silently. */
+  flaggedTextKeys?: string[];
   warnings?: string[];
 };
 
@@ -910,34 +915,59 @@ export async function mapExtractedImageWithCalibration(input: {
   }
 
   const ocrMeta: OcrConsensusMeta = { disagreements: [], tiebroken: [] };
+  const flaggedTextKeys: string[] = [];
+  let ocrEngine: "cloud" | "local" = "cloud";
   if (textRequests.length > 0) {
-    // Consensus OCR (two shifted passes + solo tiebreaks) on a ~73-text-field sheet legitimately
-    // runs long under a throttled org TPM budget with 429 back-off — a real MTC3 upload timed out
-    // at the old 120s cap and failed to zero fields (observed 2026-07-15), while the same sheet
-    // read clean a day earlier. Give it 210s; the outer mapExtractedImageWithCalibration cap (240s)
-    // and the route's maxDuration (300s) sit above it, so this fires first if OCR ever overruns.
-    const ocrResults = await withStageTimeout(
-      "image_ocr_text_regions",
-      210000,
-      () => batchOcrTextRegions(textRequests, ocrMeta),
-      input.onStage
-    );
-    if (Object.keys(ocrResults).length === 0 && !getOpenAiApiKey()) {
-      warnings.push("ocr_unavailable_no_openai_key");
-    }
-    for (const req of textRequests) {
-      const raw = ocrResults[req.key];
-      if (raw == null) continue;
-      const normalized = applyFieldKindNormalization(raw, req.key);
-      if (!normalized) continue;
-      if (req.numericOnly) {
+    const applyValue = (key: string, raw: string, numericOnly: boolean) => {
+      const normalized = applyFieldKindNormalization(raw, key);
+      if (!normalized) return;
+      if (numericOnly) {
         const m = normalized.match(/-?\d+(?:\.\d+)?/);
-        if (!m) continue;
-        parsedData[req.key] = m[0];
+        if (!m) return;
+        parsedData[key] = m[0];
       } else {
-        parsedData[req.key] = normalized;
+        parsedData[key] = normalized;
       }
-      if (!importedKeys.includes(req.key)) importedKeys.push(req.key);
+      if (!importedKeys.includes(key)) importedKeys.push(key);
+    };
+
+    if (process.env.SETUP_LOCAL_OCR === "1") {
+      // Local PP-OCR (offline, ~3s, no OpenAI quota/latency). Empty/low-confidence reads are
+      // flagged for a glance rather than trusted silently or dropped. See localOcr.ts.
+      ocrEngine = "local";
+      const local = await withStageTimeout(
+        "image_ocr_local",
+        60000,
+        () =>
+          recognizeTextRegionsLocally(
+            textRequests.map((r) => ({ key: r.key, cropPng: r.cropPng, numericOnly: r.numericOnly }))
+          ),
+        input.onStage
+      );
+      if (local.unavailable) warnings.push("local_ocr_unavailable");
+      for (const req of textRequests) {
+        const v = local.values[req.key];
+        if (v != null) applyValue(req.key, v, req.numericOnly);
+      }
+      flaggedTextKeys.push(...local.flaggedKeys);
+    } else {
+      // Cloud consensus OCR (two shifted passes + solo tiebreaks) legitimately runs long under a
+      // throttled org TPM budget with 429 back-off — a real MTC3 upload timed out at the old 120s
+      // cap and failed to zero fields (2026-07-15). Give it 210s; the outer map cap (240s) and the
+      // route's maxDuration (300s) sit above it, so this fires first if OCR ever overruns.
+      const ocrResults = await withStageTimeout(
+        "image_ocr_text_regions",
+        210000,
+        () => batchOcrTextRegions(textRequests, ocrMeta),
+        input.onStage
+      );
+      if (Object.keys(ocrResults).length === 0 && !getOpenAiApiKey()) {
+        warnings.push("ocr_unavailable_no_openai_key");
+      }
+      for (const req of textRequests) {
+        const raw = ocrResults[req.key];
+        if (raw != null) applyValue(req.key, raw, req.numericOnly);
+      }
     }
   }
 
@@ -954,6 +984,8 @@ export async function mapExtractedImageWithCalibration(input: {
       detectedPageRegion: input.extracted.detectedPageRegion,
     },
     ocrConsensus: ocrMeta.disagreements.length ? ocrMeta : undefined,
+    ocrEngine,
+    flaggedTextKeys: flaggedTextKeys.length ? flaggedTextKeys : undefined,
     warnings: warnings.length ? warnings : undefined,
   };
 

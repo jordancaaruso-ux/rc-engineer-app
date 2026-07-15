@@ -1,9 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // onnxruntime-node ships a native .node binary; keep it external so webpack doesn't try to
+  // bundle it (local PP-OCR text reader, src/lib/setupCalibrations/localOcr.ts).
+  serverExternalPackages: ["onnxruntime-node"],
   // Belt-and-suspenders: never trace dev PDF folders into serverless bundles (production uses Blob).
   outputFileTracingExcludes: {
     "*": ["./public/uploads/**/*", "./.local-uploads/**/*"],
+  },
+  // The PP-OCR recognition model + dict are read at runtime by path (not import), so the tracer
+  // can't see them — include them explicitly in the setup-document functions that run extraction.
+  outputFileTracingIncludes: {
+    "/api/setup-documents/**": ["./src/lib/setupCalibrations/models/**/*"],
   },
   experimental: {
     // Reuse a recently-fetched RSC payload from the client Router Cache instead of
