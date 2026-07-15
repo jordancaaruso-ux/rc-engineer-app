@@ -184,7 +184,11 @@ export function RulerPicker({
     const is10 = v % 10 === 0;
     const is5 = v % 5 === 0;
     ticks.push(
-      <span key={v} className="relative flex w-[9px] flex-none flex-col items-center">
+      <span
+        key={v}
+        style={{ width: PX_PER_UNIT }}
+        className="relative flex flex-none flex-col items-center"
+      >
         <span
           className={cn(
             "w-px",
