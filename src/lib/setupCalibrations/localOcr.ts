@@ -3,7 +3,7 @@ import "server-only";
 import path from "node:path";
 import { readFileSync } from "node:fs";
 import sharp from "sharp";
-import * as ort from "onnxruntime-node";
+import type * as Ort from "onnxruntime-node";
 
 /**
  * Local, offline text recognition for calibration crops — PP-OCRv4 (RapidOCR) recognition model
@@ -39,7 +39,24 @@ export type LocalOcrResult = {
   unavailable: boolean;
 };
 
-let sessionPromise: Promise<ort.InferenceSession> | null = null;
+// onnxruntime-node ships a native binary. Load it LAZILY (dynamic import inside the loader, NOT a
+// top-level static import) so a load failure on a serverless runtime where the native binding isn't
+// traced into the bundle degrades to `unavailable` (→ cloud OCR fallback in the caller) instead of
+// throwing at module-initialization. A static import here crashes cold-start for EVERY route that
+// transitively imports this file (all setup-document imports — PDF acroforms included, which don't
+// even use OCR), turning a graceful fallback into a hard 500. See recognizeTextRegionsLocally's catch.
+let ortPromise: Promise<typeof Ort> | null = null;
+function loadOrt(): Promise<typeof Ort> {
+  if (!ortPromise) {
+    ortPromise = (import("onnxruntime-node") as Promise<typeof Ort>).catch((e) => {
+      ortPromise = null; // allow retry on a later request
+      throw e;
+    });
+  }
+  return ortPromise;
+}
+
+let sessionPromise: Promise<Ort.InferenceSession> | null = null;
 let labels: string[] | null = null;
 
 function loadLabels(): string[] {
@@ -51,18 +68,20 @@ function loadLabels(): string[] {
   return labels;
 }
 
-function getSession(): Promise<ort.InferenceSession> {
+function getSession(): Promise<Ort.InferenceSession> {
   if (!sessionPromise) {
-    sessionPromise = ort.InferenceSession.create(MODEL_PATH).catch((e) => {
-      sessionPromise = null; // allow retry on a later request
-      throw e;
-    });
+    sessionPromise = loadOrt()
+      .then((ort) => ort.InferenceSession.create(MODEL_PATH))
+      .catch((e) => {
+        sessionPromise = null; // allow retry on a later request
+        throw e;
+      });
   }
   return sessionPromise;
 }
 
 /** PP-OCR rec preprocessing: RGB, fixed height 48, keep aspect, normalize to [-1,1], CHW tensor. */
-async function toTensor(cropPng: Buffer): Promise<ort.Tensor> {
+async function toTensor(ort: typeof Ort, cropPng: Buffer): Promise<Ort.Tensor> {
   const meta = await sharp(cropPng).metadata();
   const H = 48;
   const W = Math.max(16, Math.min(1200, Math.round((H * (meta.width ?? 1)) / (meta.height ?? 1))));
@@ -78,7 +97,7 @@ async function toTensor(cropPng: Buffer): Promise<ort.Tensor> {
 }
 
 /** Greedy CTC decode of the rec output [1, T, C] → text + mean per-step confidence. */
-function ctcDecode(out: ort.Tensor, chars: string[]): { text: string; conf: number } {
+function ctcDecode(out: Ort.Tensor, chars: string[]): { text: string; conf: number } {
   const [, T, C] = out.dims as number[];
   const d = out.data as Float32Array;
   const picked: string[] = [];
@@ -111,9 +130,13 @@ export async function recognizeTextRegionsLocally(requests: LocalOcrRequest[]): 
   const flaggedKeys: string[] = [];
   if (requests.length === 0) return { values, confidence, flaggedKeys, unavailable: false };
 
-  let session: ort.InferenceSession;
+  let ort: typeof Ort;
+  let session: Ort.InferenceSession;
   let chars: string[];
   try {
+    // loadOrt() first: on a runtime where the native binding can't load this throws here and we
+    // fall back to cloud OCR — never past module load, so callers importing this file don't crash.
+    ort = await loadOrt();
     [session, chars] = [await getSession(), loadLabels()];
   } catch (e) {
     console.warn(`[local-ocr] model unavailable: ${(e as Error).message?.slice(0, 200)}`);
@@ -126,7 +149,7 @@ export async function recognizeTextRegionsLocally(requests: LocalOcrRequest[]): 
     let text = "";
     let conf = 0;
     try {
-      const out = await session.run({ [inName]: await toTensor(req.cropPng) });
+      const out = await session.run({ [inName]: await toTensor(ort, req.cropPng) });
       const decoded = ctcDecode(out[outName]!, chars);
       conf = decoded.conf;
       // Strip the printed label prefix; the pipeline applies the same field-kind normalization
