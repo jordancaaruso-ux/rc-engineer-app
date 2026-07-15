@@ -243,7 +243,11 @@ export function RulerPicker({
         onClick={onTrackClick}
         className="mt-3.5 cursor-grab touch-pan-x select-none overflow-y-hidden overflow-x-auto overscroll-contain active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="flex h-[34px] items-start px-[50%]">{ticks}</div>
+        {/* w-max so the track sizes to its content — otherwise it collapses to
+            the viewport width, the ticks overflow, and the trailing px-[50%] pad
+            lands inside the box instead of after the last tick, cutting the last
+            ~half-viewport of values off from ever reaching the center needle. */}
+        <div className="flex h-[34px] w-max items-start px-[50%]">{ticks}</div>
       </div>
     </div>
   );
