@@ -217,6 +217,17 @@ async function regionInk(
   } catch { return null; }
 }
 
+/** Shrink a region toward its center (keep the inner `f` fraction of each dimension). Checkbox
+ *  marks (dot/X) concentrate in the box center; printed labels and diagram lines that clip a
+ *  box edge sit at the periphery. Measuring the center cancels that edge bias and turns faint
+ *  black marks (full-box gap ~0.02) into large center gaps (~0.12), cleanly separable from noise. */
+function shrinkRegion(r: ImageRegion, f: number): ImageRegion {
+  const dw = (r.wPct * (1 - f)) / 2;
+  const dh = (r.hPct * (1 - f)) / 2;
+  return { xPct: r.xPct + dw, yPct: r.yPct + dh, wPct: r.wPct * f, hPct: r.hPct * f };
+}
+const GROUP_OPTION_CENTER_FRACTION = 0.55;
+
 type TextRequest = { key: string; numericOnly: boolean; cropPng: Buffer };
 
 /**
@@ -292,15 +303,25 @@ async function ocrBatch(requests: TextRequest[], apiKey: string, model = "gpt-4o
     ],
   });
   // Retry on rate limits / transient errors — the loop fires many chunks against a 30k-TPM org.
+  // Per-attempt abort: a hung connection without it wedges the whole run indefinitely.
   let res: Response | null = null;
   for (let attempt = 0; attempt < 7; attempt++) {
-    res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body,
-    });
-    if (res.ok) break;
-    if (res.status === 429 || res.status >= 500) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    try {
+      res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        signal: controller.signal,
+        body,
+      });
+    } catch {
+      res = null; // aborted/hung — retry
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (res?.ok) break;
+    if (!res || res.status === 429 || res.status >= 500) {
       await new Promise((r) => setTimeout(r, 3000 * Math.pow(1.8, attempt) + Math.random() * 1000));
       continue;
     }
@@ -477,6 +498,30 @@ export type ReadResult = {
 };
 
 /** Mirror of production: align (plain resize for full-page ref) -> crop OCR + darkness -> normalize -> interpret. */
+/**
+ * Build the text-field crops exactly as the reader would (same alignment + fill-in-line removal),
+ * without running any OCR. Used by the local-OCR (Tesseract) bench to measure a cloud-free reader.
+ */
+export async function buildTextRequests(imageBytes: Buffer, cal: ImageCalibration): Promise<TextRequest[]> {
+  const ref = cal.reference;
+  const aligned = await alignToReference(imageBytes, ref);
+  const W = ref.widthPx, H = ref.heightPx;
+  const out: TextRequest[] = [];
+  for (const field of cal.fields) {
+    if (field.kind !== "text") continue;
+    const px = regionToPixels(field.region, W, H);
+    if (!px) continue;
+    out.push({
+      key: field.key,
+      numericOnly: Boolean((field as { numericOnly?: boolean }).numericOnly),
+      cropPng: await removeFillInLines(await sharp(aligned).extract(px).png().toBuffer()),
+    });
+  }
+  return out;
+}
+
+export type { TextRequest };
+
 export async function readImageThroughCalibration(
   imageBytes: Buffer,
   cal: ImageCalibration,
@@ -490,6 +535,37 @@ export async function readImageThroughCalibration(
   const parsedData: Record<string, string> = {};
   const groupDetail: ReadResult["groupDetail"] = {};
   const textRequests: TextRequest[] = [];
+
+  // First pass over groups: measure ink and detect the SHEET'S MARK STYLE. Marks on one
+  // digital sheet are homogeneous: either the red editable-PDF appearance or a black
+  // rendering (PetitRC style). If several groups fire the red test, the sheet is
+  // red-style and any group without red ink is simply unmarked — which lets the
+  // black-style gap threshold drop low enough to catch faint black marks without
+  // false-marking unmarked groups on red-style sheets.
+  type GroupScores = Array<{ value: string; darkness: number; redness: number }>;
+  const RED_FLOOR = 0.008;
+  const groupInk = new Map<string, GroupScores>();
+  let redStyleGroups = 0;
+  for (const field of cal.fields) {
+    if (field.kind !== "singleChoiceGroup" && field.kind !== "multiSelectGroup") continue;
+    const opts = (field as { options: Array<{ value: string; region: ImageRegion }> }).options;
+    const scores: GroupScores = [];
+    for (const opt of opts) {
+      const ink = await regionInk(aligned, shrinkRegion(opt.region, GROUP_OPTION_CENTER_FRACTION), W, H);
+      if (ink == null) continue;
+      scores.push({ value: opt.value, ...ink });
+    }
+    groupInk.set(field.key, scores);
+    if (scores.length > 0) {
+      const maxRed = Math.max(...scores.map((s) => s.redness));
+      const minRed = Math.min(...scores.map((s) => s.redness));
+      // Compare against the group MINIMUM: chroma noise is uniform (max ~ min), real marks
+      // tower over the cleanest unmarked option. A median lands ON a mark when half the
+      // group is marked and wrongly rejects it.
+      if (maxRed >= RED_FLOOR && maxRed >= 3 * Math.max(minRed, 0.002)) redStyleGroups++;
+    }
+  }
+  const sheetIsRedStyle = redStyleGroups >= 3;
 
   for (const field of cal.fields) {
     if (field.kind === "text") {
@@ -509,31 +585,35 @@ export async function readImageThroughCalibration(
       if (value !== "") parsedData[field.key] = value;
     } else {
       const opts = (field as { options: Array<{ value: string; region: ImageRegion }> }).options;
-      const scores: Array<{ value: string; darkness: number; redness: number }> = [];
-      for (const opt of opts) {
-        const ink = await regionInk(aligned, opt.region, W, H);
-        if (ink != null) scores.push({ value: opt.value, ...ink });
-      }
+      const scores = groupInk.get(field.key) ?? [];
       if (scores.length === 0) continue;
-      // Mark detection, two tiers:
+      // Mark detection, style-aware:
       //  1) REDNESS — the editable PDF's checkbox appearance renders red; red ink is a
       //     near-deterministic signal (black print/blue text/white paper all score ~0).
-      //  2) Fallback: largest-GAP clustering on darkness within the group (absolute
-      //     thresholds don't transfer across render resolutions).
-      const RED_FLOOR = 0.008;
+      //  2) Red-style sheet, group without red → unmarked (marks are homogeneous per sheet).
+      //  3) Black-style sheet → largest-GAP clustering on darkness. Threshold measured:
+      //     black marks gap >= 0.014 over their group; unmarked groups spread <= ~0.005 on
+      //     black-style sheets (red-style sheets' larger unmarked spreads are excluded by 2).
       const maxRed = Math.max(...scores.map((s) => s.redness));
-      const medianRed = [...scores.map((s) => s.redness)].sort((a, b) => a - b)[Math.floor(scores.length / 2)] ?? 0;
+      const minRed = Math.min(...scores.map((s) => s.redness));
       let marked: typeof scores;
       let gate: string;
-      // Dominance guard: a real mark towers over the group's (noise) median; uniform
-      // JPEG chroma noise raises all options together and fails the 3x test.
-      if (maxRed >= RED_FLOOR && maxRed >= 3 * Math.max(medianRed, 0.002)) {
-        const cut = Math.max(RED_FLOOR, maxRed * 0.4);
+      // Dominance guard vs the group MINIMUM: uniform JPEG chroma noise raises all options
+      // together (max ~ min) and fails the 3x test; real marks tower over the cleanest
+      // unmarked option. On an established red-style sheet even a fully-marked group is
+      // legitimate — bypass dominance but demand a firmer absolute floor (real marks
+      // measure >= 0.088; noise <= 0.004).
+      const redDominant = maxRed >= RED_FLOOR && maxRed >= 3 * Math.max(minRed, 0.002);
+      if (redDominant || (sheetIsRedStyle && maxRed >= 0.03)) {
+        const cut = Math.max(sheetIsRedStyle && !redDominant ? 0.015 : RED_FLOOR, maxRed * 0.4);
         marked = scores.filter((s) => s.redness >= cut).sort((a, b) => b.redness - a.redness);
         gate = `red>=${cut.toFixed(3)}`;
+      } else if (sheetIsRedStyle) {
+        marked = [];
+        gate = "red-style-sheet:no-red-in-group";
       } else {
         scores.sort((a, b) => b.darkness - a.darkness);
-        const MIN_GAP = 0.025;
+        const MIN_GAP = 0.05;
         let splitIdx = -1, largestGap = 0;
         for (let i = 0; i < scores.length - 1; i++) {
           const gap = scores[i]!.darkness - scores[i + 1]!.darkness;

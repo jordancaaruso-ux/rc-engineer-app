@@ -558,7 +558,11 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
             }
           },
         }),
-        45000,
+        // Consensus OCR (two shifted passes + solo tiebreaks) legitimately runs 60-210s on a
+        // ~73-text-field sheet under throttled org TPM; 45s then 120s each killed the mapping and
+        // left the doc with the stale basic parse (observed live 2026-07-14 and 2026-07-15). This
+        // cap sits just above the inner image_ocr_text_regions timeout (210s); export maxDuration >= 300.
+        240000,
         "mapExtractedImageWithCalibration"
       );
       if (procDbg()) {

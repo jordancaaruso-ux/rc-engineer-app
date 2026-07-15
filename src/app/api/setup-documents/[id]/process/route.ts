@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+
+// Image imports run consensus OCR in after(); the function must outlive the 180s mapping cap.
+export const maxDuration = 300;
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";

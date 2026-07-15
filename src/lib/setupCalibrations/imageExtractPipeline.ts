@@ -431,6 +431,16 @@ async function regionDarkness(aligned: Buffer, region: ImageRegion, widthPx: num
   return ink?.darkness ?? null;
 }
 
+/** Shrink a region toward its center (keep the inner `f` fraction of each dimension). Checkbox
+ *  marks concentrate centrally; printed labels / diagram lines that clip a box edge sit at the
+ *  periphery — measuring the center cancels that edge bias. */
+function shrinkRegion(r: ImageRegion, f: number): ImageRegion {
+  const dw = (r.wPct * (1 - f)) / 2;
+  const dh = (r.hPct * (1 - f)) / 2;
+  return { xPct: r.xPct + dw, yPct: r.yPct + dh, wPct: r.wPct * f, hPct: r.hPct * f };
+}
+const GROUP_OPTION_CENTER_FRACTION = 0.55;
+
 /**
  * darkness: 1 - mean brightness (any ink). redness: mean(max(0, R - (G+B)/2)) — high only for
  * red marks; black print, white paper, and blue typed values all score ~0. Editable-PDF
@@ -517,6 +527,16 @@ const OCR_SYSTEM_PROMPT =
  * instead of semantic keys: a label like [camber_rear] primes the model's domain prior (camber
  * is usually negative) and it hallucinates minus signs onto positive values.
  */
+/** Billing/quota exhaustion (`insufficient_quota`) returns HTTP 429 but is NOT transient —
+ *  retrying it just burns the whole OCR budget (~5 min of back-off) and still yields zero fields
+ *  (observed live 2026-07-15). Thrown to fail the import fast with an honest message instead. */
+export class OpenAiQuotaError extends Error {
+  constructor() {
+    super("OpenAI quota exceeded (insufficient_quota) — automatic sheet reading is unavailable until billing is restored.");
+    this.name = "OpenAiQuotaError";
+  }
+}
+
 async function ocrBatch(requests: TextRequest[], apiKey: string, model = "gpt-4o-mini"): Promise<Record<string, string>> {
   if (requests.length === 0) return {};
 
@@ -592,6 +612,10 @@ async function ocrBatch(requests: TextRequest[], apiKey: string, model = "gpt-4o
       }
       if (res.ok) break;
       if (res.status === 429 || res.status >= 500) {
+        if (res.status === 429) {
+          const errBody = await res.text().catch(() => "");
+          if (errBody.includes("insufficient_quota")) throw new OpenAiQuotaError();
+        }
         await new Promise((r) => setTimeout(r, 2000 * Math.pow(1.8, attempt) + Math.random() * 500));
         continue;
       }
@@ -619,7 +643,8 @@ async function ocrBatch(requests: TextRequest[], apiKey: string, model = "gpt-4o
       out[realKey] = typeof v === "string" ? v.trim() : v == null ? "" : String(v).trim();
     }
     return out;
-  } catch {
+  } catch (e) {
+    if (e instanceof OpenAiQuotaError) throw e; // fail fast — not a swallowable transient
     return {};
   }
 }
@@ -721,6 +746,37 @@ export async function mapExtractedImageWithCalibration(input: {
   const widthPx = input.extracted.widthPx;
   const heightPx = input.extracted.heightPx;
 
+  // First pass over groups: measure ink and detect the SHEET'S MARK STYLE. Marks on one
+  // digital sheet are homogeneous: either the red editable-PDF appearance or a black
+  // rendering (PetitRC style). If several groups fire the red test, the sheet is red-style
+  // and any group without red ink is simply unmarked — which lets the black-style gap
+  // threshold sit low enough to catch faint black marks without false-marking unmarked
+  // groups on red-style sheets.
+  const RED_FLOOR = 0.008;
+  type GroupScores = Array<{ value: string; darkness: number; redness: number }>;
+  const groupInk = new Map<string, GroupScores>();
+  let redStyleGroups = 0;
+  for (const field of fields) {
+    if (field.kind !== "singleChoiceGroup" && field.kind !== "multiSelectGroup") continue;
+    const scores: GroupScores = [];
+    for (const opt of field.options) {
+      // Measure the box CENTER, not the whole box: marks (dot/X) concentrate centrally while
+      // printed labels / diagram lines that clip a box edge sit at the periphery. This turns
+      // faint black marks (full-box gap ~0.02, overlapping printed-label bias) into large
+      // center gaps (~0.12), cleanly separable. Verified on a real PetitRC black-mark sheet.
+      const ink = await regionInk(aligned, shrinkRegion(opt.region, GROUP_OPTION_CENTER_FRACTION), widthPx, heightPx);
+      if (ink == null) continue;
+      scores.push({ value: opt.value, ...ink });
+    }
+    groupInk.set(field.key, scores);
+    if (scores.length > 0) {
+      const maxRed = Math.max(...scores.map((s) => s.redness));
+      const minRed = Math.min(...scores.map((s) => s.redness));
+      if (maxRed >= RED_FLOOR && maxRed >= 3 * Math.max(minRed, 0.002)) redStyleGroups++;
+    }
+  }
+  const sheetIsRedStyle = redStyleGroups >= 3;
+
   for (const field of fields) {
     if (field.kind === "text") {
       textFields++;
@@ -753,31 +809,34 @@ export async function mapExtractedImageWithCalibration(input: {
       }
     } else if (field.kind === "singleChoiceGroup" || field.kind === "multiSelectGroup") {
       groupFields++;
-      const scores: Array<{ value: string; darkness: number; redness: number }> = [];
-      for (const opt of field.options) {
-        const ink = await regionInk(aligned, opt.region, widthPx, heightPx);
-        if (ink == null) continue;
-        scores.push({ value: opt.value, ...ink });
-      }
+      const scores = groupInk.get(field.key) ?? [];
       if (scores.length === 0) {
         warnings.push(`group_no_options:${field.key}`);
         continue;
       }
-      // Mark detection, two tiers (validated to 100% on the MTC3 synthetic gold set):
+      // Mark detection, style-aware (validated to 100% on the MTC3 synthetic gold set
+      // incl. a grayscale case, plus a real PetitRC black-mark sheet):
       //  1) REDNESS — editable-PDF checkbox appearances render red; red ink is a
       //     near-deterministic signal (black print / blue text / white paper all score ~0).
-      //     Dominance guard: a real mark towers over the group's noise median.
-      //  2) Fallback: largest-GAP clustering on darkness within the group — absolute
-      //     thresholds do not transfer across render resolutions (unmarked boxes on a crisp
-      //     1400px render read darker than marked boxes on a soft 1210px screenshot).
-      const RED_FLOOR = 0.008;
-      const MIN_GAP = 0.025;
+      //     Dominance guard vs the group MINIMUM: uniform JPEG chroma noise raises all
+      //     options together (max ~ min); real marks tower over the cleanest unmarked
+      //     option. On an established red-style sheet even a fully-marked group is
+      //     legitimate — bypass dominance but demand a firmer absolute floor (real marks
+      //     measure >= 0.088; noise <= 0.004).
+      //  2) Red-style sheet, group without red → unmarked (marks are homogeneous per sheet).
+      //  3) Black-style sheet → largest-GAP clustering on center darkness. With center
+      //     measurement (above), real black marks gap ~0.12 over their group while unmarked
+      //     groups spread <= ~0.02 — a wide, reliable margin.
+      const MIN_GAP = 0.05;
       const maxRed = Math.max(...scores.map((s) => s.redness));
-      const medianRed = [...scores.map((s) => s.redness)].sort((a, b) => a - b)[Math.floor(scores.length / 2)] ?? 0;
+      const minRed = Math.min(...scores.map((s) => s.redness));
+      const redDominant = maxRed >= RED_FLOOR && maxRed >= 3 * Math.max(minRed, 0.002);
       let marked: typeof scores;
-      if (maxRed >= RED_FLOOR && maxRed >= 3 * Math.max(medianRed, 0.002)) {
-        const cut = Math.max(RED_FLOOR, maxRed * 0.4);
+      if (redDominant || (sheetIsRedStyle && maxRed >= 0.03)) {
+        const cut = Math.max(sheetIsRedStyle && !redDominant ? 0.015 : RED_FLOOR, maxRed * 0.4);
         marked = scores.filter((s) => s.redness >= cut).sort((a, b) => b.redness - a.redness);
+      } else if (sheetIsRedStyle) {
+        marked = [];
       } else {
         scores.sort((a, b) => b.darkness - a.darkness);
         let splitIdx = -1;
@@ -811,9 +870,14 @@ export async function mapExtractedImageWithCalibration(input: {
 
   const ocrMeta: OcrConsensusMeta = { disagreements: [], tiebroken: [] };
   if (textRequests.length > 0) {
+    // Consensus OCR (two shifted passes + solo tiebreaks) on a ~73-text-field sheet legitimately
+    // runs long under a throttled org TPM budget with 429 back-off — a real MTC3 upload timed out
+    // at the old 120s cap and failed to zero fields (observed 2026-07-15), while the same sheet
+    // read clean a day earlier. Give it 210s; the outer mapExtractedImageWithCalibration cap (240s)
+    // and the route's maxDuration (300s) sit above it, so this fires first if OCR ever overruns.
     const ocrResults = await withStageTimeout(
       "image_ocr_text_regions",
-      120000,
+      210000,
       () => batchOcrTextRegions(textRequests, ocrMeta),
       input.onStage
     );

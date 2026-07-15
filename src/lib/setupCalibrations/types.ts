@@ -323,7 +323,10 @@ export type ImageCalibrationField =
   | {
       kind: "singleChoiceGroup";
       key: string;
-      options: Array<{ value: string; region: ImageRegion }>;
+      /** baselineDarkness: per-option unmarked darkness measured on the blank reference
+       *  render. Recorded for analysis; NOT used by detection — print weight differs per
+       *  renderer, so blank baselines do not transfer to other renderers' sheets. */
+      options: Array<{ value: string; region: ImageRegion; baselineDarkness?: number }>;
       /**
        * Mark-detection gates. Defaults preserve legacy behavior (0.45 / 0.08); blank-sheet
        * calibrations set lower values measured on real sheets — a red X in a white box reads
@@ -335,7 +338,7 @@ export type ImageCalibrationField =
   | {
       kind: "multiSelectGroup";
       key: string;
-      options: Array<{ value: string; region: ImageRegion }>;
+      options: Array<{ value: string; region: ImageRegion; baselineDarkness?: number }>;
       /** Per-option darkness above which an option counts as marked (legacy default 0.5). */
       minWinnerDarkness?: number;
     };
@@ -442,14 +445,22 @@ export function normalizeImageCalibrationField(value: unknown): ImageCalibration
   }
   if (kind === "singleChoiceGroup" || kind === "multiSelectGroup") {
     const optionsRaw = Array.isArray(v.options) ? v.options : [];
-    const options: Array<{ value: string; region: ImageRegion }> = [];
+    const options: Array<{ value: string; region: ImageRegion; baselineDarkness?: number }> = [];
     for (const o of optionsRaw) {
       if (!o || typeof o !== "object") continue;
       const oo = o as Record<string, unknown>;
       const optionValue = typeof oo.value === "string" ? oo.value.trim() : "";
       if (!optionValue) continue;
       if (!isImageRegion(oo.region)) continue;
-      options.push({ value: optionValue, region: normalizeImageRegion(oo.region) });
+      const baselineDarkness =
+        typeof oo.baselineDarkness === "number" && Number.isFinite(oo.baselineDarkness)
+          ? clampPct(oo.baselineDarkness)
+          : undefined;
+      options.push({
+        value: optionValue,
+        region: normalizeImageRegion(oo.region),
+        ...(baselineDarkness != null ? { baselineDarkness } : {}),
+      });
     }
     if (options.length === 0) return null;
     const minWinnerDarkness =

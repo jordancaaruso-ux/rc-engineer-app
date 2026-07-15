@@ -21,14 +21,17 @@ import {
 } from "./mtc3-common";
 
 const CASES_DIR = join(process.cwd(), "scripts", "setup-extract-eval", "mtc3-loop", "cases");
-const N_CASES = 5;
+const N_CASES = 6;
 // (width, jpeg quality) per case — bracketing real screenshots like mugen test setup.jpg (1210px).
-const DEGRADE: Array<{ width: number; quality: number }> = [
+// The grayscale case turns the red marks grey-black, exercising the black-style gap path
+// (PetitRC-style sheets) with known gold.
+const DEGRADE: Array<{ width: number; quality: number; grayscale?: boolean }> = [
   { width: 1210, quality: 80 },
   { width: 1000, quality: 70 },
   { width: 1400, quality: 85 },
   { width: 1210, quality: 90 },
   { width: 1100, quality: 75 },
+  { width: 1300, quality: 80, grayscale: true },
 ];
 
 function mulberry32(seed: number) {
@@ -80,15 +83,21 @@ function mutateValue(example: string, rnd: () => number): string {
   return example;
 }
 
+type ChosenMark = { key: string; value: string; region: ImageRegion };
+
 async function fillCase(input: {
   caseIndex: number;
   live: LiveCalibration;
   geo: Map<string, AcroFieldInfo>;
   examplesByKey: Map<string, string[]>;
-}): Promise<{ pdfBytes: Buffer }> {
+  /** When true, DON'T fill PDF checkboxes; return the chosen options so the caller composites
+   *  faithful solid BLACK marks on the render (PetitRC-style) instead of the PDF's red glyphs. */
+  blackMarks?: boolean;
+}): Promise<{ pdfBytes: Buffer; chosenMarks: ChosenMark[] }> {
   const rnd = mulberry32(1000 + input.caseIndex * 77);
   const pdf = await PDFDocument.load(readFileSync(EDITABLE_PDF), { ignoreEncryption: true });
   const form = pdf.getForm();
+  const chosenMarks: ChosenMark[] = [];
 
   // 1) Clear everything (the CW base ships with 44 prefilled values).
   for (const f of form.getFields()) {
@@ -134,24 +143,46 @@ async function fillCase(input: {
     }
     return false;
   };
+  const mark = (calKey: string, opt: { value: string; region: ImageRegion }) => {
+    if (input.blackMarks) chosenMarks.push({ key: calKey, value: opt.value, region: opt.region });
+    else markWidget(opt.region);
+  };
   for (const calField of input.live.imageCalibration.fields) {
     if (calField.kind !== "singleChoiceGroup" && calField.kind !== "multiSelectGroup") continue;
     const opts = (calField as { options: Array<{ value: string; region: ImageRegion }> }).options;
     if (calField.kind === "singleChoiceGroup") {
       if (rnd() < 0.25) continue; // unmarked group: must import nothing.
-      markWidget(opts[Math.floor(rnd() * opts.length)]!.region);
+      mark(calField.key, opts[Math.floor(rnd() * opts.length)]!);
     } else {
       if (rnd() < 0.15) continue;
       const n = rnd() < 0.6 ? 1 : 2;
       const picked = new Set<number>();
       while (picked.size < Math.min(n, opts.length)) picked.add(Math.floor(rnd() * opts.length));
-      for (const i of picked) markWidget(opts[i]!.region);
+      for (const i of picked) mark(calField.key, opts[i]!);
     }
   }
 
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   form.updateFieldAppearances(font);
-  return { pdfBytes: Buffer.from(await pdf.save()) };
+  return { pdfBytes: Buffer.from(await pdf.save()), chosenMarks };
+}
+
+/** Composite faithful solid black marks (PetitRC style) onto a rendered sheet at chosen option
+ *  regions. Circles roughly fill the checkbox, like a hand-inked dot. */
+async function compositeBlackMarks(png: Buffer, marks: ChosenMark[]): Promise<Buffer> {
+  const meta = await sharp(png).metadata();
+  const W = meta.width ?? 1684;
+  const H = meta.height ?? 1190;
+  const circles = marks
+    .map((m) => {
+      const cx = (m.region.xPct + m.region.wPct / 2) * W;
+      const cy = (m.region.yPct + m.region.hPct / 2) * H;
+      const r = 0.42 * Math.min(m.region.wPct * W, m.region.hPct * H);
+      return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="#111111"/>`;
+    })
+    .join("");
+  const svg = Buffer.from(`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${circles}</svg>`);
+  return sharp(png).composite([{ input: svg, top: 0, left: 0 }]).png().toBuffer();
 }
 
 async function main() {
@@ -185,17 +216,28 @@ async function main() {
 
   for (let i = 0; i < N_CASES; i++) {
     const name = `case-${String(i + 1).padStart(2, "0")}`;
-    const { pdfBytes } = await fillCase({ caseIndex: i, live, geo, examplesByKey });
-    const gold = await extractGoldFromFilledPdf(pdfBytes, live);
-    const png = await renderPdfPage1ToPng(pdfBytes, 1684);
     const d = DEGRADE[i % DEGRADE.length]!;
+    const blackMarks = Boolean(d.grayscale);
+    const { pdfBytes, chosenMarks } = await fillCase({ caseIndex: i, live, geo, examplesByKey, blackMarks });
+    const gold = await extractGoldFromFilledPdf(pdfBytes, live);
+    // Black-style case: choices came from composited marks, not PDF checkboxes — fold them into gold.
+    if (blackMarks) {
+      const byKey = new Map<string, string[]>();
+      for (const m of chosenMarks) byKey.set(m.key, [...(byKey.get(m.key) ?? []), m.value]);
+      for (const f of live.imageCalibration.fields) {
+        if (f.kind !== "singleChoiceGroup" && f.kind !== "multiSelectGroup") continue;
+        gold.values[f.key] = (byKey.get(f.key) ?? []).join(",");
+      }
+    }
+    let png = await renderPdfPage1ToPng(pdfBytes, 1684);
+    if (blackMarks) png = await compositeBlackMarks(await sharp(png).grayscale().png().toBuffer(), chosenMarks);
     const jpg = await sharp(png).resize(d.width).jpeg({ quality: d.quality }).toBuffer();
     writeFileSync(join(CASES_DIR, `${name}.filled.pdf`), pdfBytes);
     writeFileSync(join(CASES_DIR, `${name}.jpg`), jpg);
     writeFileSync(join(CASES_DIR, `${name}.gold.json`), JSON.stringify(gold, null, 2));
     console.log(
       `${name}: ${Object.values(gold.values).filter(Boolean).length} filled fields ` +
-        `(${d.width}px q${d.quality}), ${gold.unscoredKeys.length} unscored`
+        `(${d.width}px q${d.quality}${blackMarks ? " black-marks" : ""}), ${gold.unscoredKeys.length} unscored`
     );
   }
 }

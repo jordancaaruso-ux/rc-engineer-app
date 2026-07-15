@@ -42,9 +42,27 @@ gen-synthetics (once, or after calibration structure changes)
 ## Key findings (2026-07-14, all validated on the gold set)
 
 - **Redness beats darkness for marks**: editable-PDF checkbox appearances render red;
-  `mean(max(0, R-(G+B)/2))` is ~0 for print/blue-text/paper. Dominance guard: max ≥ 3× group
-  median. Fallback: largest-gap darkness clustering (absolute gates don't transfer across
-  render resolutions).
+  `mean(max(0, R-(G+B)/2))` is ~0 for print/blue-text/paper. Dominance guard vs the group
+  MINIMUM (a median lands on a mark when half the group is marked). Fallback: largest-gap
+  darkness clustering (absolute gates don't transfer across render resolutions).
+- **Mark styles are homogeneous per sheet** (2026-07-15, from a real PetitRC black-mark
+  sheet): if ≥3 groups fire the red test, the sheet is red-style → no-red groups are simply
+  unmarked; otherwise (black-style, e.g. PetitRC renders) use the gap path. Per-option
+  blank-render baselines were tried and REJECTED: print weight differs between renderers.
+- **Measure the box CENTER, not the whole box** (the key black-mark fix, 2026-07-15): a mark
+  (dot/X) concentrates in the checkbox center; printed labels and diagram lines that clip a
+  box edge sit at the periphery. Measuring the inner 55% (`GROUP_OPTION_CENTER_FRACTION`)
+  turns faint black marks — full-box gap ~0.024, *overlapping* printed-label bias ~0.018, so
+  no full-box threshold separates them — into large center gaps ~0.12 (marked center ~0.30,
+  unmarked ~0.15). Black-style `MIN_GAP` is then a comfortable 0.05. Applies to red marks too.
+- **Faithful black-mark gold case**: case-06 grayscales the sheet AND composites solid black
+  dots at the chosen option centers (`compositeBlackMarks`, `blackMarks` in gen-synthetics),
+  with gold taken from those choices — a real PetitRC-style render, not greyed-red glyphs
+  (which were unrealistically faint). A real PetitRC sheet lives at `cases/petitrc-real.jpeg`
+  (fetch-blob.ts pulls uploads from Vercel blob via BLOB_READ_WRITE_TOKEN).
+- **The consensus-OCR run legitimately takes 60–120s** on a ~73-text-field sheet. Production
+  `mapExtractedImageWithCalibration` cap raised 45s→180s and the upload routes carry
+  `maxDuration=300`; the 45s cap was killing the read and leaving the stale basic parse.
 - **Semantic OCR labels hallucinate signs**: `[camber_rear]` primes "camber is negative" →
   reads "2" as "-2". Neutral aliases (f1…) fix it. Survived re-chunking and model upgrades —
   it was actually `interpretAwesomatixSetupSnapshot` applying the app's canonical sign
