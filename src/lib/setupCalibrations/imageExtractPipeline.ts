@@ -44,6 +44,32 @@ async function withStageTimeout<T>(
   }
 }
 
+/** Otsu threshold over an option-darkness histogram — the sheet-adaptive marked/unmarked split
+ *  for black-style sheets. Renderer-independent (adapts to each sheet's own mark/blank levels),
+ *  unlike a fixed floor. Returns null when the distribution is nearly unimodal (all-blank or
+ *  all-marked) so the caller falls back to the per-group gap heuristic. */
+function otsuDarknessThreshold(values: number[]): number | null {
+  if (values.length < 8) return null;
+  const bins = 64;
+  const hist = new Array(bins).fill(0);
+  for (const v of values) hist[Math.min(bins - 1, Math.max(0, Math.floor(v * bins)))]++;
+  const total = values.length;
+  let sumAll = 0;
+  for (let i = 0; i < bins; i++) sumAll += i * hist[i];
+  let wB = 0, sumB = 0, best = 0, thr = 0;
+  for (let t = 0; t < bins; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = total - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB, mF = (sumAll - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best) { best = between; thr = (t + 0.5) / bins; }
+  }
+  return best > 0 ? thr : null;
+}
+
 export type ImageRawExtraction = {
   version: 1;
   /** PNG bytes of the upload after alignment (or the original after standardisation). */
@@ -776,6 +802,16 @@ export async function mapExtractedImageWithCalibration(input: {
     }
   }
   const sheetIsRedStyle = redStyleGroups >= 3;
+  // Black-style sheets: one sheet-adaptive darkness threshold beats per-group gap-splitting.
+  // Marks and blanks form a bimodal distribution across the whole sheet; the per-group largest-gap
+  // heuristic both false-POSITIVES (a group with no mark still has a "biggest gap", so it marks the
+  // darkest option) and false-NEGATIVES (the biggest gap lands between two strong marks, dropping a
+  // faint-but-real one). Otsu over all option darknesses splits them once, renderer-independently.
+  // Real case 2026-07-15: recovered a dropped multi-select mark (b=0.238) and killed a false
+  // positive (bypass=0.173) at T=0.227 — both of which the gap heuristic got wrong.
+  const blackThreshold = sheetIsRedStyle
+    ? null
+    : otsuDarknessThreshold([...groupInk.values()].flat().map((s) => s.darkness));
 
   for (const field of fields) {
     if (field.kind === "text") {
@@ -837,7 +873,12 @@ export async function mapExtractedImageWithCalibration(input: {
         marked = scores.filter((s) => s.redness >= cut).sort((a, b) => b.redness - a.redness);
       } else if (sheetIsRedStyle) {
         marked = [];
+      } else if (blackThreshold != null) {
+        // Black-style: sheet-adaptive Otsu threshold (see blackThreshold above).
+        scores.sort((a, b) => b.darkness - a.darkness);
+        marked = scores.filter((s) => s.darkness >= blackThreshold);
       } else {
+        // Fallback: per-group largest-gap split (nearly-unimodal sheet → no global threshold).
         scores.sort((a, b) => b.darkness - a.darkness);
         let splitIdx = -1;
         let largestGap = 0;
