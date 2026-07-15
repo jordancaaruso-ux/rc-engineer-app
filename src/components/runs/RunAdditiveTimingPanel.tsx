@@ -58,10 +58,8 @@ const MINUTES_RULER = {
   min: 1,
   max: 90,
   defaultValue: TIRE_PREP_DEFAULT_MINUTES,
-  // Every minute reachable, but 5s magnetically grab (founder-tuned 2026-07-15).
+  // Linear through the whole scroll — every minute reachable, no magnet (founder, 2026-07-15).
   snapStep: 1,
-  magnetTo: 5,
-  magnetRadius: 1,
   // Fine labels through the habitual low range, coarser above.
   labelAt: (v: number) => (v <= 20 ? v % 5 === 0 : v % 10 === 0),
 };
@@ -378,8 +376,6 @@ export function RunAdditiveTimingPanel({
                         max={MINUTES_RULER.max}
                         defaultValue={MINUTES_RULER.defaultValue}
                         snapStep={MINUTES_RULER.snapStep}
-                        magnetTo={MINUTES_RULER.magnetTo}
-                        magnetRadius={MINUTES_RULER.magnetRadius}
                         labelAt={MINUTES_RULER.labelAt}
                         unit="min"
                         ariaLabel={`Minutes ruler, application ${i + 1}`}

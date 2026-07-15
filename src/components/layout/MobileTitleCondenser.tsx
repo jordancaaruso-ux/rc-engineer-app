@@ -10,10 +10,16 @@ import { usePathname } from "next/navigation";
  *
  * Reads the current title text + nav-sector straight from the DOM (`.page-title`
  * / `.app-shell[data-nav-sector]`), so it needs zero per-page wiring and stays a
- * behaviour-only addition. Reveal is driven by an IntersectionObserver (fires
- * regardless of which element actually scrolls — more robust than a window
- * scroll listener), with the root inset from the top by the corner-chrome band
- * so the handoff lands exactly as the big title passes behind the pills.
+ * behaviour-only addition.
+ *
+ * Reveal is driven by a capture-phase scroll listener (catches whichever element
+ * actually scrolls, window or a nested container) that reads the live title rect
+ * each frame and applies **hysteresis** at the top edge of the screen: the
+ * compact title only reveals once the big title has scrolled fully off the top
+ * (its bottom passes y=0) and hides the moment it re-enters, so the big and
+ * compact titles are never visible at the same time — on the way down or up
+ * (the old single-snapshot IntersectionObserver could reveal too early and get
+ * stuck shown).
  *
  * A MutationObserver re-resolves the title whenever the route content changes,
  * so it survives the `loading.tsx` skeleton → real-title swap (the skeleton has
@@ -29,66 +35,72 @@ export function MobileTitleCondenser() {
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
-    let io: IntersectionObserver | null = null;
-    let raf = 0;
+    let rafResolve = 0;
+    let rafShown = 0;
+    let titleEl: HTMLElement | null = null;
     let lastEl: Element | null = null;
     let lastText = "";
     let lastSector: boolean | null = null;
 
+    // Reveal the compact title ONLY once the big title has scrolled fully above
+    // the top edge of the screen (its bottom passes y=0), so the big and compact
+    // titles are never on screen at the same time. Small hysteresis with *both*
+    // thresholds off-screen (reveal at −6, hide the moment it re-enters at 0)
+    // kills boundary flicker without ever letting the two overlap.
+    const updateShown = () => {
+      if (!titleEl) {
+        setShown(false);
+        return;
+      }
+      const titleBottom = titleEl.getBoundingClientRect().bottom;
+      setShown((prev) => (prev ? titleBottom < 0 : titleBottom <= -6));
+    };
+
     const resolve = () => {
-      const titleEl = document.querySelector<HTMLElement>(".page-title");
-      const text = titleEl?.textContent?.trim() ?? "";
+      const el = document.querySelector<HTMLElement>(".page-title");
+      const text = el?.textContent?.trim() ?? "";
       const sector =
         document.querySelector(".app-shell")?.hasAttribute("data-nav-sector") ?? false;
-      // Only re-render on an actual change (was firing every observer callback).
       if (sector !== lastSector) {
         lastSector = sector;
         setHasSector(sector);
       }
-      // Nothing meaningful changed → keep the existing observer running.
-      if (titleEl === lastEl && text === lastText) return;
-      lastEl = titleEl;
-      lastText = text;
-      setTitle(text);
-
-      io?.disconnect();
-      io = null;
-      if (!titleEl || !text) {
-        setShown(false);
-        return;
+      if (el !== lastEl || text !== lastText) {
+        lastEl = el;
+        lastText = text;
+        titleEl = el && text ? el : null;
+        setTitle(text);
       }
-      const corner = document.querySelector('[aria-label="Account and settings"]');
-      const bandBottom = corner ? corner.getBoundingClientRect().bottom : 54;
-      io = new IntersectionObserver(
-        ([entry]) => {
-          // Shown once the big title has risen fully above the corner band.
-          setShown(entry.boundingClientRect.bottom <= bandBottom + 1);
-        },
-        { root: null, threshold: 0, rootMargin: `-${Math.ceil(bandBottom)}px 0px 0px 0px` },
-      );
-      io.observe(titleEl);
+      updateShown();
     };
 
-    const schedule = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(resolve);
+    const scheduleResolve = () => {
+      cancelAnimationFrame(rafResolve);
+      rafResolve = requestAnimationFrame(resolve);
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(rafShown);
+      rafShown = requestAnimationFrame(updateShown);
     };
 
-    schedule();
+    scheduleResolve();
     // Re-resolve when the route content mutates (skeleton → real title, etc.).
     // childList only — the title changes by element swap, never in-place text
     // edits, so we skip `characterData` which previously fired on every animated
     // number roll / clock tick and forced a layout read each time.
     const scope = document.querySelector("main.page") ?? document.body;
-    const mo = new MutationObserver(schedule);
+    const mo = new MutationObserver(scheduleResolve);
     mo.observe(scope, { childList: true, subtree: true });
-    window.addEventListener("resize", schedule);
+    // Capture phase so scrolling in any nested container still updates us.
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    window.addEventListener("resize", scheduleResolve);
 
     return () => {
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(rafResolve);
+      cancelAnimationFrame(rafShown);
       mo.disconnect();
-      io?.disconnect();
-      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      window.removeEventListener("resize", scheduleResolve);
     };
   }, [pathname]);
 

@@ -48,7 +48,6 @@ import { useCopyLastRunFormOptional } from "@/components/runs/CopyLastRunFormCon
 import { useTodayDraftRunOptional } from "@/components/layout/TodayDraftRunProvider";
 import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
-import { LogRunProgressRail, type RunProgressSection } from "@/components/runs/LogRunProgressRail";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { PagedCard, type PagedCardFace } from "@/components/ui/PagedCard";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -1410,50 +1409,6 @@ export function NewRunForm(props: {
    * is never a blocker. Session + Event carry no gate, so they always read
    * complete — they stay in the rail as scroll anchors / a full map of the form.
    */
-  const railSections = useMemo<RunProgressSection[]>(() => {
-    const hasTrack = Boolean(
-      trackId.trim() || (trackLockedToEvent && selectedEventForRun?.trackId)
-    );
-    const detailsRequired = (carId ? 0 : 1) + (hasTrack ? 0 : 1);
-    const hasTires = Boolean(tireSetId || newTireSetIntent);
-    const hasSetup = Object.keys(setupData).length > 0;
-    const ratingMissing = carRating == null || carRating < 1 || carRating > 10;
-    const feelMissing = feelVsLastRunEligible && handlingUi.feelVsLastRun == null;
-    return [
-      { id: "session", label: "Session", requiredMissing: 0, recommendedMissing: 0 },
-      { id: "event", label: "Event", requiredMissing: 0, recommendedMissing: 0 },
-      {
-        id: "details",
-        label: "Details",
-        requiredMissing: detailsRequired,
-        recommendedMissing: hasTires ? 0 : 1,
-      },
-      { id: "setup", label: "Setup", requiredMissing: hasSetup ? 0 : 1, recommendedMissing: 0 },
-      {
-        id: "feedback",
-        label: "Feel",
-        requiredMissing: (ratingMissing ? 1 : 0) + (feelMissing ? 1 : 0),
-        recommendedMissing: 0,
-      },
-    ];
-  }, [
-    carId,
-    trackId,
-    trackLockedToEvent,
-    selectedEventForRun,
-    needsEvent,
-    eventId,
-    eventControlAdditiveEnabled,
-    eventControlledAdditiveTypeId,
-    additiveTypeId,
-    tireSetId,
-    newTireSetIntent,
-    setupData,
-    carRating,
-    handlingUi.feelVsLastRun,
-    feelVsLastRunEligible,
-  ]);
-
   const tracksGpsFingerprint = useMemo(
     () =>
       tracksList
@@ -3152,7 +3107,6 @@ export function NewRunForm(props: {
       onSubmit={(e) => e.preventDefault()}
       noValidate
     >
-      <LogRunProgressRail sections={railSections} />
       {carsList.length === 0 ? (
         <CardPanel contentClassName="text-sm text-muted-foreground">
           <div className="text-sm text-muted-foreground">

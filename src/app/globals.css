@@ -582,15 +582,22 @@ html[data-nav-pending] .page {
 }
 
 /* Scrim grounding the top band on scroll so the label reads over content. Fades
-   with the parent (opacity groups the subtree); full-width to the viewport. */
+   with the parent (opacity groups the subtree); full-width to the viewport.
+   Tight + lighter-topped (founder tuner 2026-07-15): starts fading almost
+   immediately so there's no hard grey slab, and the top is semi-transparent so
+   content still shows through behind the pills. */
 .title-condenser::before {
   content: "";
   position: fixed;
   inset-inline: 0;
   top: 0;
-  height: calc(var(--top-chrome-y) + 46px);
+  height: calc(var(--top-chrome-y) + 58px);
   z-index: -1;
-  background: linear-gradient(rgb(var(--color-background)) 45%, transparent);
+  background: linear-gradient(
+    rgb(var(--color-background) / 0.7) 0%,
+    rgb(var(--color-background) / 0.7) 12%,
+    rgb(var(--color-background) / 0) 100%
+  );
   pointer-events: none;
 }
 
