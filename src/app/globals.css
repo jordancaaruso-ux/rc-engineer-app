@@ -675,24 +675,43 @@ html[data-nav-pending] .page {
   @apply text-sm leading-snug tracking-tight text-foreground;
 }
 
-/* Mono uppercase micro labels — Eyebrow, StatTile labels, table column headers. One tracking value. */
+/* Small metric/field labels — Sora sentence case, muted grey (2026-07-16 one-voice pass).
+   Grey so the label recedes under its (also-Sora) value; was mono, then white — both blended
+   with the value. Only lap/stint figures keep mono now (see .lap-figure). */
 .type-data-label {
-  @apply font-mono text-[10px] uppercase tracking-[0.28em] text-faint;
+  @apply font-sans text-[12px] font-semibold tracking-normal text-muted-foreground;
 }
 
-/* Card eyebrow — same mono micro-label, but yellow (accent). Stat/table labels stay faint via .type-data-label. */
+/* Section signpost (redesigned 2026-07-16): Sora bold uppercase ink with a 3px accent tick.
+   Was 10px mono 0.28em yellow — bumped to a readable heading so sections stop being glanced over.
+   Stat/table micro-labels stay small + faint via .type-data-label (unchanged). */
 .eyebrow-label {
-  @apply font-mono text-[10px] uppercase tracking-[0.28em] text-primary;
+  @apply inline-flex items-center gap-2 font-sans text-[17px] font-bold uppercase leading-tight tracking-normal text-foreground;
+}
+.eyebrow-label::before {
+  content: "";
+  @apply h-[1em] w-[3px] flex-none rounded-[2px] bg-primary;
+}
+/* Hairline rule under the label block — applied by the Eyebrow component wrapper. */
+.eyebrow-root {
+  @apply border-b border-border pb-1.5;
 }
 
-/* Timestamps and IDs — mono data voice without uppercase/tracking. */
+/* Timestamps and IDs — Sora now (one-voice pass); tabular figures, muted grey. */
 .type-timestamp {
-  @apply font-mono text-[10px] tabular-nums text-faint;
+  @apply font-sans text-[11px] tabular-nums text-muted-foreground;
 }
 
-/* Table column headers — mono faint uppercase (sessions, compare, archetypes). */
+/* Table column headers — Sora sentence case, muted grey (sessions, compare, archetypes). */
 .table-col-header {
-  @apply font-mono text-[10px] uppercase tracking-[0.28em] text-faint font-normal;
+  @apply font-sans text-[12px] font-semibold tracking-normal text-muted-foreground;
+}
+
+/* Lap-figure — the ONLY surviving JetBrains Mono voice (2026-07-16 one-voice pass):
+   racing-clock figures (best lap, avg top 5/10, median, stint). Apply to those values only;
+   every other number is Sora with tabular-nums. */
+.lap-figure {
+  @apply font-mono tabular-nums;
 }
 
 /* Strong emphasis (.ui-strong / .btn-brand): Sora bold, normal case. */
@@ -875,6 +894,88 @@ html[data-nav-pending] .page {
   }
 }
 
+/* Ambient "log a run" glow — a faint yellow ring radiates outward on a slow beat
+   (founder pick 2026-07-16, "aura ping"). Shared by the dashboard Start-run bar
+   and the dock Log-run circle so drivers learn "yellow glow = log a run" once;
+   both breathe on the same clock. The ring is a pseudo-element so it never fights
+   the host's own base shadow, and inherits its border-radius (bar or circle). */
+@keyframes rc-logrun-aura {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.45);
+    opacity: 1;
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(255, 214, 10, 0);
+    opacity: 0;
+  }
+  100% {
+    box-shadow: 0 0 0 16px rgba(255, 214, 10, 0);
+    opacity: 0;
+  }
+}
+.logrun-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.45);
+  animation: rc-logrun-aura 3.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logrun-glow::after {
+    animation: none;
+    box-shadow: 0 0 22px 2px rgba(255, 214, 10, 0.28);
+  }
+}
+
+/* On-face "moving hotspot" (founder pick 2026-07-16: bold + offset). A soft
+   bright spot drifts across the yellow face like a reflection sliding as the
+   phone tilts. Lives in its own overflow-clipped layer so it stays inside the
+   button shape, while the aura ring on ::after still radiates outward. Runs on a
+   7.6s beat — every 2nd aura ping ("offset"), so the two never lockstep. Sits
+   above the fill (z-1) but below content (which is lifted to z-2). */
+.logrun-fx {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.logrun-fx::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    closest-side,
+    rgba(255, 255, 255, 0.55),
+    rgba(255, 255, 255, 0.16) 46%,
+    rgba(255, 255, 255, 0) 78%
+  );
+  background-repeat: no-repeat;
+  background-size: 62% 240%;
+  background-position: -25% 50%;
+  animation: rc-logrun-hotspot 7.6s ease-in-out infinite;
+}
+@keyframes rc-logrun-hotspot {
+  0% {
+    background-position: -25% 50%;
+  }
+  50% {
+    background-position: 125% 50%;
+  }
+  100% {
+    background-position: -25% 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logrun-fx::before {
+    animation: none;
+    background-position: 60% 50%;
+  }
+}
+
 /* Instant tap feedback on mobile nav, hub rows, and buttons */
 .tap-active {
   @apply transition-transform duration-75 active:scale-[0.97] active:opacity-90;
@@ -995,3 +1096,8 @@ html.video-overlay-fullscreen-active body {
 }
 
 /* Hairline / glow surfaces retired June 2026 — cards use `.glass-card` (frosted). */
+
+
+
+
+

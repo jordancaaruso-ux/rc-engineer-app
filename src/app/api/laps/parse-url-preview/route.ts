@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     sessionHint: parsed.sessionHint ?? null,
     sessionCompletedAtIso: parsed.sessionCompletedAtIso ?? null,
     discoveredRaceUrls: parsed.discoveredRaceUrls ?? null,
+    discoveredSessions: parsed.discoveredSessions ?? null,
     message: parsed.message ?? null,
     errorCode: parsed.errorCode ?? null,
     url: v.normalized,

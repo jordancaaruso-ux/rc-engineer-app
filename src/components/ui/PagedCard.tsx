@@ -298,8 +298,9 @@ export function PagedCard({
 
   /* Segmented control — names each face and switches to it; the discovery
      affordance that replaced pagination dots. Yellow stays action-only, so
-     the active segment reads as a raised neutral chip, not the accent. */
-  const control = (
+     the active segment reads as a raised neutral chip, not the accent.
+     A single face needs no picker (wizard mode filters faces per step). */
+  const control = count < 2 ? null : (
     <div
       role="tablist"
       aria-label="Card views"

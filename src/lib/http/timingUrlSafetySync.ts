@@ -5,6 +5,7 @@ const TIMING_HOST_SUFFIXES = [
   "rcprotiming.com",
   "mylaps.com",
   "rctrack.info",
+  "myrcm.ch",
 ];
 
 function hostnameAllowed(hostname: string, allowAnyPublicHost: boolean): boolean {

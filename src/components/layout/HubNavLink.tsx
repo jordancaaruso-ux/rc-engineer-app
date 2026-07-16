@@ -97,7 +97,7 @@ export function HubNavLink({
               <Icon className="h-4 w-4" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <HubRowTitle as="span" className="block">
+              <HubRowTitle as="span" className="block text-[17px] sm:text-[18px]">
                 {link.label}
               </HubRowTitle>
             </span>
@@ -124,7 +124,7 @@ export function HubNavLink({
             <Icon className="size-[15px]" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
-            <HubRowTitle as="span" className="block">
+            <HubRowTitle as="span" className="block text-[17px] sm:text-[18px]">
               {link.label}
             </HubRowTitle>
           </span>

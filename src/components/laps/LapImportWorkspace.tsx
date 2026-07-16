@@ -27,6 +27,16 @@ type ImportResultRow =
   | { url: string; success: true; importedSessionId: string }
   | { url: string; success: false; error: string };
 
+type DiscoveredSession = { url: string; label: string; group: string };
+
+/** A MyRCM class (report) URL without a `reportKey` — pasting it lists sessions to pick from. */
+function isMyRcmCategoryLine(line: string): boolean {
+  return (
+    /^https?:\/\/(www\.)?myrcm\.ch\/myrcm\/report\/[a-z]{2}\/\d+\/\d+(?:[/?#]|$)/i.test(line) &&
+    !/[?&]reportKey=\d+/i.test(line)
+  );
+}
+
 export function LapImportWorkspace() {
   const searchParams = useSearchParams();
   const sessionIdFromQuery = searchParams.get("sessionId");
@@ -42,6 +52,8 @@ export function LapImportWorkspace() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detailJson, setDetailJson] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [myRcmSessions, setMyRcmSessions] = useState<DiscoveredSession[] | null>(null);
+  const [myRcmSelected, setMyRcmSelected] = useState<Set<string>>(new Set());
 
   const loadSessions = useCallback(async () => {
     setListErr(null);
@@ -102,6 +114,91 @@ export function LapImportWorkspace() {
     void loadSessionDetail(sessionIdFromQuery);
   }, [sessionIdFromQuery, sessions, loadSessionDetail]);
 
+  const runImport = useCallback(
+    async (urls: string[]) => {
+      setBusy(true);
+      setHint(null);
+      setLastResults([]);
+      try {
+        const res = await fetch("/api/lap-time-sessions/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            urls,
+            ...(eventIdFromQuery ? { eventId: eventIdFromQuery } : {}),
+          }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          setHint((data as { error?: string })?.error ?? "Import failed.");
+          return;
+        }
+        const raw = (data as { results?: unknown }).results;
+        const mapped: ImportResultRow[] = [];
+        if (Array.isArray(raw)) {
+          for (const r of raw) {
+            if (!r || typeof r !== "object") continue;
+            const o = r as Record<string, unknown>;
+            const url = typeof o.url === "string" ? o.url : "";
+            if (o.success === true && typeof o.importedSessionId === "string") {
+              mapped.push({ url, success: true, importedSessionId: o.importedSessionId });
+            } else if (o.success === false && typeof o.error === "string") {
+              mapped.push({ url, success: false, error: o.error });
+            }
+          }
+        }
+        setLastResults(mapped);
+        const ok = mapped.filter((m) => m.success).length;
+        const fail = mapped.length - ok;
+        setHint(
+          mapped.length === 0
+            ? "No results returned."
+            : `Imported ${ok} session${ok === 1 ? "" : "s"}${fail > 0 ? ` · ${fail} failed` : ""}.`
+        );
+        await loadSessions();
+      } catch {
+        setHint("Import request failed.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [eventIdFromQuery, loadSessions]
+  );
+
+  /** MyRCM class page: fetch its sessions so the user can pick the one they raced. */
+  const previewMyRcmCategory = useCallback(async (categoryUrl: string) => {
+    setBusy(true);
+    setHint("Finding sessions…");
+    setLastResults([]);
+    setMyRcmSessions(null);
+    setMyRcmSelected(new Set());
+    try {
+      const res = await fetch("/api/laps/parse-url-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: categoryUrl }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { discoveredSessions?: DiscoveredSession[] | null; message?: string | null; error?: string }
+        | null;
+      if (!res.ok) {
+        setHint(data?.error ?? "Could not read this MyRCM page.");
+        return;
+      }
+      const found = Array.isArray(data?.discoveredSessions) ? data!.discoveredSessions! : [];
+      if (found.length === 0) {
+        setHint(data?.message ?? "No result sessions found on this MyRCM page.");
+        return;
+      }
+      setMyRcmSessions(found);
+      setHint(data?.message ?? `Found ${found.length} sessions — pick the one you raced.`);
+    } catch {
+      setHint("Request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   async function onImport() {
     const urls = text
       .split(/\r?\n/)
@@ -111,51 +208,32 @@ export function LapImportWorkspace() {
       setHint("Paste one or more URLs (one per line).");
       return;
     }
-    setBusy(true);
-    setHint(null);
-    setLastResults([]);
-    try {
-      const res = await fetch("/api/lap-time-sessions/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          urls,
-          ...(eventIdFromQuery ? { eventId: eventIdFromQuery } : {}),
-        }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        setHint((data as { error?: string })?.error ?? "Import failed.");
-        return;
-      }
-      const raw = (data as { results?: unknown }).results;
-      const mapped: ImportResultRow[] = [];
-      if (Array.isArray(raw)) {
-        for (const r of raw) {
-          if (!r || typeof r !== "object") continue;
-          const o = r as Record<string, unknown>;
-          const url = typeof o.url === "string" ? o.url : "";
-          if (o.success === true && typeof o.importedSessionId === "string") {
-            mapped.push({ url, success: true, importedSessionId: o.importedSessionId });
-          } else if (o.success === false && typeof o.error === "string") {
-            mapped.push({ url, success: false, error: o.error });
-          }
-        }
-      }
-      setLastResults(mapped);
-      const ok = mapped.filter((m) => m.success).length;
-      const fail = mapped.length - ok;
-      setHint(
-        mapped.length === 0
-          ? "No results returned."
-          : `Imported ${ok} session${ok === 1 ? "" : "s"}${fail > 0 ? ` · ${fail} failed` : ""}.`
-      );
-      await loadSessions();
-    } catch {
-      setHint("Import request failed.");
-    } finally {
-      setBusy(false);
+    // A single MyRCM class URL → show a session picker instead of importing the whole class.
+    if (urls.length === 1 && isMyRcmCategoryLine(urls[0]!)) {
+      await previewMyRcmCategory(urls[0]!);
+      return;
     }
+    await runImport(urls);
+  }
+
+  function toggleMyRcmSession(url: string) {
+    setMyRcmSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) next.delete(url);
+      else next.add(url);
+      return next;
+    });
+  }
+
+  async function importSelectedMyRcm() {
+    const urls = [...myRcmSelected];
+    if (urls.length === 0) {
+      setHint("Select at least one session to import.");
+      return;
+    }
+    setMyRcmSessions(null);
+    setMyRcmSelected(new Set());
+    await runImport(urls);
   }
 
   return (
@@ -163,7 +241,8 @@ export function LapImportWorkspace() {
       <CardPanel className="max-w-3xl" contentClassName="space-y-3">
         <Eyebrow>Import from URLs</Eyebrow>
         <p className="text-[11px] text-muted-foreground leading-snug">
-          Paste LiveRC (or other supported) timing links — one per line. LiveRC event hub URLs expand to each race result.
+          Paste LiveRC, Speedhive, or MyRCM timing links — one per line. LiveRC event hub URLs expand to each race result;
+          a MyRCM class URL (<code className="text-[10px]">myrcm.ch/myrcm/report/…</code>) lists its sessions to pick from.
           Use <code className="text-[10px]">?eventId=…</code> on this page to filter by that event&apos;s race classes. Failed lines do not cancel the rest.
         </p>
         <textarea
@@ -199,6 +278,51 @@ export function LapImportWorkspace() {
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {myRcmSessions ? (
+          <div className="space-y-2 border-t border-border pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <Eyebrow>MyRCM sessions</Eyebrow>
+              <button
+                type="button"
+                onClick={() => {
+                  setMyRcmSessions(null);
+                  setMyRcmSelected(new Set());
+                  setHint(null);
+                }}
+                className="text-[10px] text-muted-foreground underline"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Pick the session(s) you raced. Each becomes an importable session with the full field.
+            </p>
+            <ul className="flex max-h-72 flex-col gap-1 overflow-auto">
+              {myRcmSessions.map((s) => (
+                <li key={s.url}>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-[11px] hover:bg-muted">
+                    <input
+                      type="checkbox"
+                      checked={myRcmSelected.has(s.url)}
+                      onChange={() => toggleMyRcmSession(s.url)}
+                      className="accent-primary"
+                    />
+                    <span className="text-foreground">{s.label}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              disabled={busy || myRcmSelected.size === 0}
+              onClick={() => void importSelectedMyRcm()}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 disabled:opacity-50"
+            >
+              {busy ? "Importing…" : `Import ${myRcmSelected.size || ""} selected`.trim()}
+            </button>
+          </div>
         ) : null}
       </CardPanel>
 

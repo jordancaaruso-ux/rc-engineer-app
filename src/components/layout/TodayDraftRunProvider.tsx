@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -42,13 +43,24 @@ export function TodayDraftRunProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void (async () => {
-      await refreshDraft();
-      if (pathname === "/") {
-        router.refresh();
-      }
-    })();
-  }, [refreshDraft, pathname, router]);
+    void refreshDraft();
+  }, [refreshDraft, pathname]);
+
+  // Refresh the dashboard's server data when the driver ARRIVES at "/", but
+  // never synchronously during the navigation: calling `router.refresh()` while
+  // the client push is still settling aborts it and half-commits, wedging the
+  // App Router so every later soft `<Link>` nav no-ops until a hard relaunch
+  // (the documented "router.refresh aborting push" PWA/webview failure). We
+  // defer past the transition (macrotask) and only fire on an actual arrival,
+  // not on every re-render, so the refresh can't race the inbound nav.
+  const prevPathnameRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevPathnameRef.current;
+    prevPathnameRef.current = pathname;
+    if (pathname !== "/" || prev === "/" || prev === null) return;
+    const id = window.setTimeout(() => router.refresh(), 0);
+    return () => window.clearTimeout(id);
+  }, [pathname, router]);
 
   useEffect(() => {
     if (!draftRunId) return;

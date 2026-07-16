@@ -46,7 +46,12 @@ export function DashboardEngineerSuggestionsSection({
   return (
     <HeroPanel className={cn(className)}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <Eyebrow dot="muted">Engineer suggestions</Eyebrow>
+        <Eyebrow dot="muted">Engineer&apos;s read</Eyebrow>
+        {/* The Engineer ships on the dashboard before it's fully refined (north-star
+            "visible pillar, foundations first") — the badge sets that expectation. */}
+        <span className="rounded-md border border-border px-1.5 py-px text-[10px] font-semibold text-muted-foreground">
+          Early
+        </span>
         <SectionMetaInline>{scopeLine(carName, trackName, eventName)}</SectionMetaInline>
       </div>
       <div className="mt-1.5">

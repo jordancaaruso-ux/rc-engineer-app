@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Eyebrow } from "@/components/ui/panel";
 
 export type TireTypeOption = {
@@ -48,6 +48,21 @@ export function TireTypeCombobox({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Notify the parent of the resolved option through a stable funnel:
+  //  - a ref keeps the latest callback without putting it in effect deps
+  //    (an inline parent callback would otherwise re-fire the resolve effect
+  //     every render → onCommit → re-render → infinite loop / "max update depth"),
+  //  - dedupe by id so re-resolving the same selection can't re-commit in a cycle.
+  const onSelectedTypeChangeRef = useRef(onSelectedTypeChange);
+  onSelectedTypeChangeRef.current = onSelectedTypeChange;
+  const lastReportedIdRef = useRef<string | null>(null);
+  const reportSelected = useCallback((opt: TireTypeOption | null) => {
+    const id = opt?.id ?? null;
+    if (lastReportedIdRef.current === id) return;
+    lastReportedIdRef.current = id;
+    onSelectedTypeChangeRef.current?.(opt);
+  }, []);
+
   const loadAll = useCallback(async () => {
     try {
       const res = await fetch("/api/tire-types?limit=200", { cache: "no-store" });
@@ -78,13 +93,13 @@ export function TireTypeCombobox({
   useEffect(() => {
     if (!value) {
       setSelectedOption(null);
-      onSelectedTypeChange?.(null);
+      reportSelected(null);
       return;
     }
     const fromList = [...recentOptions, ...options].find((o) => o.id === value);
     if (fromList) {
       setSelectedOption(fromList);
-      onSelectedTypeChange?.(fromList);
+      reportSelected(fromList);
       return;
     }
     let cancelled = false;
@@ -94,15 +109,15 @@ export function TireTypeCombobox({
         if (cancelled) return;
         const hit = (d.tireTypes ?? []).find((o) => o.id === value) ?? null;
         setSelectedOption(hit);
-        onSelectedTypeChange?.(hit);
+        reportSelected(hit);
       })
       .catch(() => {
-        if (!cancelled) onSelectedTypeChange?.(null);
+        if (!cancelled) reportSelected(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [value, options, recentOptions, onSelectedTypeChange]);
+  }, [value, options, recentOptions, reportSelected]);
 
   const recentIds = new Set(recentOptions.map((o) => o.id));
   const rest = options.filter((o) => !recentIds.has(o.id));
@@ -114,7 +129,7 @@ export function TireTypeCombobox({
       [...recentOptions, ...options, ...extra].find((o) => o.id === id) ?? null;
     onChange(id);
     setSelectedOption(opt);
-    onSelectedTypeChange?.(opt);
+    reportSelected(opt);
     setShowCreate(false);
     setError(null);
   }
@@ -128,7 +143,7 @@ export function TireTypeCombobox({
     if (!next) {
       onChange("");
       setSelectedOption(null);
-      onSelectedTypeChange?.(null);
+      reportSelected(null);
       return;
     }
     pick(next);

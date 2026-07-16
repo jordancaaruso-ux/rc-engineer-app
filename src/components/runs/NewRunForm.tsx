@@ -50,6 +50,15 @@ import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { PagedCard, type PagedCardFace } from "@/components/ui/PagedCard";
+import { LogRunWizardRail, type WizardStepStatus } from "@/components/runs/LogRunWizardRail";
+import {
+  crossesSeam,
+  nextWalkStep,
+  prevWalkStep,
+  walkStepIds,
+  type WizardStepId,
+} from "@/lib/runs/wizardWalk";
+import type { NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
 import { Switch } from "@/components/ui/Switch";
@@ -71,7 +80,6 @@ import {
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
-import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDialog";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions";
@@ -454,6 +462,15 @@ export function NewRunForm(props: {
    * (docs/ROLL_CENTER_NORTH_STAR.md Phase 3).
    */
   labSetupPrefill?: Record<string, string> | null;
+  /**
+   * Log-run wizard entry payload (flag-gated rework, 2026-07-16). When set the
+   * form renders as a 7-step icon-rail wizard instead of the long single page:
+   * the entry screen already resolved car / session / continue-vs-fresh, and
+   * the walk visits only always-new + declared-changed steps.
+   */
+  wizard?: NewRunWizardEntry | null;
+  /** Wizard mode: Back on the first walk step returns to the entry screen. */
+  onExitWizard?: () => void;
 }) {
   const router = useRouter();
   const copyLastRunCtx = useCopyLastRunFormOptional();
@@ -467,20 +484,35 @@ export function NewRunForm(props: {
   const initialEventId = props.initialEventId?.trim() || null;
   const labSetupPrefill = props.labSetupPrefill ?? null;
 
-  const [sessionType, setSessionType] = useState<"TESTING" | "RACE_MEETING">("TESTING");
-  const [meetingSessionType, setMeetingSessionType] = useState<MeetingSessionType>("PRACTICE");
+  // Wizard entry (page 1) seeds session + car identity; classic mode starts blank.
+  const wizard = props.wizard ?? null;
+  const wizardActive = wizard != null;
+  const [sessionType, setSessionType] = useState<"TESTING" | "RACE_MEETING">(
+    wizard?.sessionType ?? "TESTING"
+  );
+  const [meetingSessionType, setMeetingSessionType] = useState<MeetingSessionType>(
+    wizard?.meetingSessionType ?? "PRACTICE"
+  );
+  /** "A Main" etc. for main-event sessions (wizard page 1 / LiveRC detection); persisted on save. */
+  const [sessionLabel, setSessionLabel] = useState<string | null>(wizard?.sessionLabel ?? null);
   const [meetingSessionCustom, setMeetingSessionCustom] = useState<string>(""); // when type is OTHER
   /**
    * Legacy run field; lap import uses track LiveRC URL. Kept for edit-run hydrate only.
    */
   const [practiceDayUrl, setPracticeDayUrl] = useState<string>("");
-  const [carId, setCarId] = useState<string>(props.cars[0]?.id ?? "");
+  const [carId, setCarId] = useState<string>(
+    (wizard?.carId && props.cars.some((c) => c.id === wizard.carId) ? wizard.carId : null) ??
+      props.cars[0]?.id ??
+      ""
+  );
   const [tracksList, setTracksList] = useState<TrackOption[]>(tracks);
-  const [trackId, setTrackId] = useState<string>("");
+  const [trackId, setTrackId] = useState<string>(wizard?.trackId ?? "");
   /** Named layout ran this session (descriptive; empty = none). */
-  const [trackLayoutId, setTrackLayoutId] = useState<string>("");
+  const [trackLayoutId, setTrackLayoutId] = useState<string>(wizard?.trackLayoutId ?? "");
   /** Optional running direction for this session. */
-  const [trackDirection, setTrackDirection] = useState<"" | "CW" | "CCW">("");
+  const [trackDirection, setTrackDirection] = useState<"" | "CW" | "CCW">(
+    wizard?.trackDirection ?? ""
+  );
   const [tireSets, setTireSets] = useState<TireSetOption[]>([]);
   const [tireSetId, setTireSetId] = useState<string>("");
   /** NEW-set choice — pure form state; the set row is created when the run is saved. */
@@ -511,7 +543,7 @@ export function NewRunForm(props: {
     setBatteryRunsInput(String(Math.max(0, Math.floor(n))));
 
   const [events, setEvents] = useState<EventOption[]>([]);
-  const [eventId, setEventId] = useState<string>("");
+  const [eventId, setEventId] = useState<string>(wizard?.eventId ?? "");
   const [showNewEventPanel, setShowNewEventPanel] = useState(false);
   const [newEventName, setNewEventName] = useState("");
   const [newEventTrackId, setNewEventTrackId] = useState<string>("");
@@ -536,7 +568,11 @@ export function NewRunForm(props: {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsLoadError, setEventsLoadError] = useState<string | null>(null);
 
-  const [replicateLast, setReplicateLast] = useState(false);
+  // Wizard "continue" reuses the shipped replicate-last machinery: the entry
+  // candidate IS this car's last run (/api/runs/last?carId), so seeding
+  // replicateLast=true makes the per-car load effect copy track/session/event/
+  // tires/battery/setup exactly as the copy card would.
+  const [replicateLast, setReplicateLast] = useState(wizard?.continuing ?? false);
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
   const [replicateLoaded, setReplicateLoaded] = useState(false);
 
@@ -578,8 +614,42 @@ export function NewRunForm(props: {
   const [feedbackFace, setFeedbackFace] = useState<"feedback" | "handling">("feedback");
   /** Required 1-10 overall car rating; null until the driver sets one. Server enforces presence at "Run complete". */
   const [carRating, setCarRating] = useState<number | null>(null);
-  type RunDetailsTab = "car" | "tires" | "battery" | "conditions" | "track";
+  type RunDetailsTab = "car" | "tires" | "battery" | "conditions" | "track" | "prep";
   const [runDetailsTab, setRunDetailsTab] = useState<RunDetailsTab>("car");
+
+  // ---- Log-run wizard chrome (only when props.wizard is set) ----
+  const wizardWalk = useMemo<readonly WizardStepId[]>(
+    () =>
+      wizard
+        ? walkStepIds(wizard.continuing, new Set(wizard.changed))
+        : walkStepIds(false, new Set()),
+    [wizard]
+  );
+  const [wizardStep, setWizardStep] = useState<WizardStepId>(wizardWalk[0] ?? "equipment");
+  // Keep the details-tab state in sync with the wizard step: Equipment shows
+  // the Tires|Battery faces, Prep its own face. (The wizard reuses the details
+  // PagedCard with per-step face filtering.)
+  useEffect(() => {
+    if (!wizardActive) return;
+    if (wizardStep === "equipment") setRunDetailsTab("tires");
+    else if (wizardStep === "prep") setRunDetailsTab("prep");
+  }, [wizardActive, wizardStep]);
+  /** Which Run-details faces each wizard step shows. */
+  const wizardDetailFaceIds: Partial<Record<WizardStepId, RunDetailsTab[]>> = {
+    equipment: ["tires", "battery"],
+    prep: ["prep"],
+  };
+  const wizardShowsDetails =
+    !wizardActive || wizardDetailFaceIds[wizardStep] !== undefined;
+  /** "Run completed?" interstitial (once per run, at the pre-run→after-run seam). */
+  const [seamOpen, setSeamOpen] = useState(false);
+  const seamSeenRef = useRef(false);
+  const [wizardSummaryOpen, setWizardSummaryOpen] = useState(false);
+  const goToWizardStep = (id: WizardStepId) => {
+    setSeamOpen(false);
+    setWizardStep(id);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "instant" });
+  };
   const [trackSaveWarning, setTrackSaveWarning] = useState(false);
 
   const [showNewBatteryPanel, setShowNewBatteryPanel] = useState(false);
@@ -596,10 +666,9 @@ export function NewRunForm(props: {
   const [completeValidation, setCompleteValidation] = useState<{
     show: boolean;
     carRating: boolean;
-    feelVsLastRun: boolean;
     additive: boolean;
     setup: boolean;
-  }>({ show: false, carRating: false, feelVsLastRun: false, additive: false, setup: false });
+  }>({ show: false, carRating: false, additive: false, setup: false });
 
   const [copyCarWarning, setCopyCarWarning] = useState<string | null>(null);
   const [copyTrackWarning, setCopyTrackWarning] = useState<string | null>(null);
@@ -651,6 +720,14 @@ export function NewRunForm(props: {
     setNewTireSetIntent(null);
     newTireSetIntentRef.current = null;
   }, []);
+  /**
+   * True once the driver has explicitly chosen/imported/edited a setup since the
+   * last copy-from-last-run or car change. Guards the `replicateLast`-armed
+   * effects below from overwriting a driver-controlled setup with the last run's
+   * snapshot when the async `/api/runs/last` fetch resolves late (the
+   * "edits revert on blur" bug). Reset at the top of the copy/car-change effect.
+   */
+  const setupTouchedByUserRef = useRef(false);
   /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
   const pendingCompleteNavigationRef = useRef(false);
   const pendingDraftNavigationRef = useRef(false);
@@ -1044,7 +1121,8 @@ export function NewRunForm(props: {
    * Only the plain new-run flow — edit/draft runs and deep-linked prefills own
    * their own state and must not be clobbered by a stale local snapshot.
    */
-  const draftAutosaveEnabled = !isEditing && !dashboardPrefill && !initialEventId && !labSetupPrefill;
+  const draftAutosaveEnabled =
+    !isEditing && !dashboardPrefill && !initialEventId && !labSetupPrefill && !wizardActive;
   const draftHydratedRef = useRef(false);
 
   // Restore once on mount. Runs after the default/prefill effects above so the
@@ -1298,7 +1376,7 @@ export function NewRunForm(props: {
   }, [setupData, setupBaselineData]);
   const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
 
-  /** Prior run on this car exists → show “feel vs last run” (−3…+3). */
+  /** Prior run on this car exists → seed a neutral "feel vs last run" on save. */
   const feelVsLastRunEligible = useMemo(() => {
     if (!carId) return false;
     if (isEditing && editRun?.id) {
@@ -1311,20 +1389,18 @@ export function NewRunForm(props: {
     setCompleteValidation((prev) => {
       if (!prev.show) return prev;
       const carOk = carRating != null && carRating >= 1 && carRating <= 10;
-      const feelOk = !feelVsLastRunEligible || handlingUi.feelVsLastRun != null;
       const setupOk = Object.keys(setupData).length > 0;
-      if (carOk && feelOk && setupOk) {
-        return { show: false, carRating: false, feelVsLastRun: false, additive: false, setup: false };
+      if (carOk && setupOk) {
+        return { show: false, carRating: false, additive: false, setup: false };
       }
       return {
         show: true,
         carRating: prev.carRating && !carOk,
-        feelVsLastRun: prev.feelVsLastRun && !feelOk,
         additive: prev.additive,
         setup: prev.setup && !setupOk,
       };
     });
-  }, [carRating, handlingUi.feelVsLastRun, feelVsLastRunEligible, setupData]);
+  }, [carRating, setupData]);
 
   useEffect(() => {
     if (completeValidation.show) return;
@@ -1482,19 +1558,22 @@ export function NewRunForm(props: {
   }, [isEditing, trackLockedToEvent, tracksList, favouriteTrackIds]);
 
   useEffect(() => {
-    if (isEditing || trackLockedToEvent) return;
+    if (isEditing || trackLockedToEvent || wizardActive) return;
     if (trackId.trim() || trackPickedManuallyRef.current) return;
     const t = window.setTimeout(() => {
       void runTrackAutoDetect();
     }, 800);
     return () => window.clearTimeout(t);
-  }, [isEditing, trackLockedToEvent, trackId, tracksGpsFingerprint, runTrackAutoDetect]);
+  }, [isEditing, trackLockedToEvent, wizardActive, trackId, tracksGpsFingerprint, runTrackAutoDetect]);
 
   // Effortless capture: silently pull conditions for a pinned track as soon as
   // one is selected — no permission prompt, no need to open the Conditions tab.
   // (Device-location fallback stays an explicit tap in RunConditionsSection.)
   useEffect(() => {
     if (isEditing) return;
+    // Wizard: conditions are captured at Run complete for the actual session
+    // window (founder decision 2026-07-16) — no pre-run fetch.
+    if (wizardActive) return;
     if (!isConditionsEmpty(conditions)) return;
     const resolvedId =
       trackId.trim() ||
@@ -1521,7 +1600,7 @@ export function NewRunForm(props: {
     return () => {
       cancelled = true;
     };
-  }, [isEditing, conditions, trackId, trackLockedToEvent, selectedEventForRun, tracksList, lapIngest]);
+  }, [isEditing, wizardActive, conditions, trackId, trackLockedToEvent, selectedEventForRun, tracksList, lapIngest]);
 
   useEffect(() => {
     if (runDetailsTab !== "track") return;
@@ -1815,6 +1894,9 @@ export function NewRunForm(props: {
 
   function handleSetupSourceChange(next: "previous_runs" | "other" | "new") {
     if (next === setupSource) return;
+    // Switching source is an explicit setup choice — protect it from the
+    // last-run auto-apply the same way an edit or pick does.
+    setupTouchedByUserRef.current = true;
     // Lossless source switching: the source control is a swipeable face now, so
     // passing through a face (including "New") must not destroy anything. Leaving
     // a source stashes its sheet + baseline; returning restores it exactly.
@@ -1862,6 +1944,7 @@ export function NewRunForm(props: {
     }
     const picked = pickerRuns.find((r) => r.id === runId);
     if (!picked) return;
+    setupTouchedByUserRef.current = true;
     setLoadSetupSelection(runId);
     const next = setupSnapshotWithDerived(picked.setupSnapshot?.data);
     setSetupData(next);
@@ -1882,6 +1965,7 @@ export function NewRunForm(props: {
     }
     const picked = downloadedSetups.find((d) => d.id === docId);
     if (!picked) return;
+    setupTouchedByUserRef.current = true;
     setLoadOtherSetupSelection(docId);
     const next = setupSnapshotWithDerived(picked.setupData);
     setSetupData(next);
@@ -2007,6 +2091,7 @@ export function NewRunForm(props: {
       const list = await refreshDownloadedSetups();
       const picked = list.find((x) => x.id === documentId);
       if (!picked) return;
+      setupTouchedByUserRef.current = true;
       setSetupSource("other");
       setLoadOtherSetupSelection(documentId);
       const next = setupSnapshotWithDerived(picked.setupData);
@@ -2052,6 +2137,10 @@ export function NewRunForm(props: {
       return;
     }
     let alive = true;
+    // A car change or a fresh copy-from-last-run is a clean slate: forget any
+    // prior manual setup selection so this run's last-run snapshot can apply,
+    // then re-arm the guard as soon as the driver touches the setup again.
+    setupTouchedByUserRef.current = false;
     setReplicateLoaded(false);
     setStatus(null);
 
@@ -2096,11 +2185,16 @@ export function NewRunForm(props: {
           if (typeof lastRun.practiceDayUrl === "string" && lastRun.practiceDayUrl.trim()) {
             setPracticeDayUrl(lastRun.practiceDayUrl);
           }
-          const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot?.data);
-          setSetupData(nextSetup);
-          setActiveSetupData(nextSetup, carId || null);
-          setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
-          setSetupBaselineData(cloneSetupSnapshot(nextSetup));
+          // Only apply the last-run setup if the driver hasn't already picked or
+          // edited one since this copy/car-change — otherwise a late fetch would
+          // clobber their work (the "edits revert on blur" bug).
+          if (!setupTouchedByUserRef.current) {
+            const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot?.data);
+            setSetupData(nextSetup);
+            setActiveSetupData(nextSetup, carId || null);
+            setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
+            setSetupBaselineData(cloneSetupSnapshot(nextSetup));
+          }
         } else {
           // Keep current form state unless user explicitly copies last run.
         }
@@ -2145,12 +2239,59 @@ export function NewRunForm(props: {
     if (typeof lastRun.practiceDayUrl === "string" && lastRun.practiceDayUrl.trim()) {
       setPracticeDayUrl(lastRun.practiceDayUrl);
     }
-    const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot?.data);
-    setSetupData(nextSetup);
-    setActiveSetupData(nextSetup, carId || null);
-    setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
-    setSetupBaselineData(cloneSetupSnapshot(nextSetup));
+    // Don't overwrite a setup the driver has already picked or edited (see the
+    // guard in the load effect above).
+    if (!setupTouchedByUserRef.current) {
+      const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot?.data);
+      setSetupData(nextSetup);
+      setActiveSetupData(nextSetup, carId || null);
+      setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
+      setSetupBaselineData(cloneSetupSnapshot(nextSetup));
+    }
   }, [replicateLast, lastRun, carId, clearNewTireSetIntent]);
+
+  // Wizard page-1 identity (session, event, track) must win over the continued
+  // run's values — the replicate effects above copy the last run's context, so
+  // re-assert the entry payload once the copy has landed (declared after those
+  // effects so it runs later in the same commit).
+  const wizardSessionAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!wizard || wizardSessionAppliedRef.current) return;
+    if (wizard.continuing && !replicateLoaded) return;
+    wizardSessionAppliedRef.current = true;
+    setSessionType(wizard.sessionType);
+    if (wizard.sessionType === "RACE_MEETING") {
+      setMeetingSessionType(wizard.meetingSessionType ?? "PRACTICE");
+      setMeetingSessionCustom("");
+    }
+    setSessionLabel(wizard.sessionLabel);
+    setEventId(wizard.eventId ?? "");
+    if (wizard.trackId) {
+      trackPickedManuallyRef.current = true;
+      setTrackId(wizard.trackId);
+      setTrackLayoutId(wizard.trackLayoutId ?? "");
+      setTrackDirection(wizard.trackDirection ?? "");
+      layoutPickedManuallyRef.current = true;
+    } else if (wizard.sessionType === "RACE_MEETING") {
+      // Race meeting: the run's track follows the event (trackLockedToEvent) —
+      // drop any track the copy carried so a stale venue can't be submitted.
+      setTrackId("");
+      setTrackLayoutId("");
+      setTrackDirection("");
+    }
+  }, [wizard, replicateLoaded]);
+
+  // Wizard race meetings: keep the run's track following the selected event
+  // (classic mode does this in applyEventOption on manual pick; the wizard sets
+  // eventId programmatically, and the events list loads async).
+  useEffect(() => {
+    if (!wizardActive || !needsEvent) return;
+    const evTrackId = selectedEventForRun?.trackId ? String(selectedEventForRun.trackId) : null;
+    if (!evTrackId || trackId === evTrackId) return;
+    setTrackId(evTrackId);
+    setTrackLayoutId(selectedEventForRun?.trackLayoutId ?? "");
+    setTrackDirection((selectedEventForRun?.trackDirection as "" | "CW" | "CCW") ?? "");
+  }, [wizardActive, needsEvent, selectedEventForRun, trackId]);
 
   useEffect(() => {
     if (!needsEvent) return;
@@ -2379,6 +2520,9 @@ export function NewRunForm(props: {
     setLoadSetupSelection(r.id);
     setSetupSource("previous_runs");
     setReplicateLast(true);
+    // Reveal the copied setup sheet — every other load path expands it, and a
+    // silently-attached-but-hidden setup reads as "the setup didn't come across."
+    setSetupSectionExpanded(true);
     setPrefillHighlights(highlights);
     });
   }
@@ -2721,24 +2865,18 @@ export function NewRunForm(props: {
     }
     if (intent === "completed") {
       const missingCarRating = carRating == null || carRating < 1 || carRating > 10;
-      const missingFeelVsLastRun =
-        feelVsLastRunEligible && handlingUi.feelVsLastRun == null;
       // A controlled additive is auto-filled (running none is allowed), so it is
       // never a save blocker.
       const missingSetup = Object.keys(setupData).length === 0;
-      if (missingCarRating || missingFeelVsLastRun || missingSetup) {
+      if (missingCarRating || missingSetup) {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
-        if (missingFeelVsLastRun) {
-          parts.push("pick how this run felt vs your last run on this car");
-        }
         if (missingSetup) {
           parts.push("attach a setup — copy last run, load a past setup, or upload a sheet");
         }
         setCompleteValidation({
           show: true,
           carRating: missingCarRating,
-          feelVsLastRun: missingFeelVsLastRun,
           additive: false,
           setup: missingSetup,
         });
@@ -2746,7 +2884,7 @@ export function NewRunForm(props: {
         // Only the setup field lives outside the feedback card — scroll there when
         // that's the sole blocker so the amber-highlighted Setup card is in view.
         const scrollTarget: Element | null =
-          missingSetup && !missingCarRating && !missingFeelVsLastRun
+          missingSetup && !missingCarRating
             ? document.querySelector(".run-section--setup")
             : feedbackRequiredRef.current;
         window.requestAnimationFrame(() => {
@@ -2754,7 +2892,7 @@ export function NewRunForm(props: {
         });
         return;
       }
-      setCompleteValidation({ show: false, carRating: false, feelVsLastRun: false, additive: false, setup: false });
+      setCompleteValidation({ show: false, carRating: false, additive: false, setup: false });
     }
     // Setup edits ride along with the run automatically — the payload always
     // includes `setupData`, so unsaved sheet changes are stored either way. No
@@ -2762,6 +2900,32 @@ export function NewRunForm(props: {
     // made the inline review easy to miss and it read as a dead button).
     setSaving(true);
     setSaveSuccess(false);
+    // Wizard: conditions capture happens NOW, at Run complete, for the actual
+    // session window (founder decision 2026-07-16). Silent and best-effort —
+    // no coords or a slow fetch simply saves without weather.
+    let conditionsForSave = conditions;
+    if (wizardActive && intent === "completed" && isConditionsEmpty(conditionsForSave)) {
+      const weatherTrack = tracksList.find((t) => t.id === resolvedTrackId);
+      if (weatherTrack?.latitude != null && weatherTrack?.longitude != null) {
+        const sets = buildImportedLapSetsFromIngest(lapIngest);
+        const atIso = (sets.find((s) => s.isPrimaryUser) ?? sets[0])?.sessionCompletedAt ?? null;
+        const params = new URLSearchParams({
+          lat: String(weatherTrack.latitude),
+          lon: String(weatherTrack.longitude),
+        });
+        if (atIso) params.set("at", atIso);
+        try {
+          const ctrl = new AbortController();
+          const timeoutId = window.setTimeout(() => ctrl.abort(), 4000);
+          const res = await fetch(`/api/weather?${params.toString()}`, { signal: ctrl.signal });
+          window.clearTimeout(timeoutId);
+          const d = (await res.json()) as { conditions?: RunConditions };
+          if (d?.conditions) conditionsForSave = d.conditions;
+        } catch {
+          /* silent — weather is a bonus, never a chore */
+        }
+      }
+    }
     try {
       let lapTimes: number[];
       if (lapIngest.sourceKind === "url") {
@@ -2898,8 +3062,9 @@ export function NewRunForm(props: {
           ),
           carRating,
           shareWithTeam,
-          conditions: isConditionsEmpty(conditions) ? null : conditions,
-          sessionLabel: null,
+          conditions: isConditionsEmpty(conditionsForSave) ? null : conditionsForSave,
+          sessionLabel:
+            sessionType === "RACE_MEETING" && sessionLabel?.trim() ? sessionLabel.trim() : null,
           importedLapSets,
           importedLapTimeSessionIds:
             lapIngest.sourceKind === "url"
@@ -3021,31 +3186,34 @@ export function NewRunForm(props: {
 
   function navigateAfterRunComplete(runId: string) {
     pendingCompleteNavigationRef.current = true;
-    // The dashboard reads ?suggestRun from the URL, so a soft push is enough.
+    // The dashboard reads ?suggestRun from the URL — a hard load carries it fine.
     navigateAway(`/?suggestRun=${encodeURIComponent(runId)}`);
   }
 
   /**
-   * Leave the log-run page after a save has already persisted the run. Tries a
-   * client-side push first (fast, no full reload), then GUARANTEES departure
-   * with a hard navigation if the push hasn't committed shortly.
+   * Leave the log-run page after a save has already persisted the run.
    *
-   * Why the hard fallback exists: a saved run must never strand the driver on
-   * the form. router.push() can silently no-op — an aborted transition (a
-   * router.refresh() racing it, which we no longer do), a wedged app-router, or
-   * an iOS standalone PWA / Capacitor webview where soft nav behaves oddly.
-   * window.location.assign() cannot be swallowed by any of those. Guard on the
-   * current path so a successful soft nav doesn't trigger a wasteful reload.
+   * ALWAYS a hard navigation (window.location.assign) in the browser — never a
+   * soft router.push. A saved run must never strand the driver on the form, and
+   * the App Router's soft transition has wedged twice in the installed PWA /
+   * webview: a half-committed navigation leaves the URL "changed" but the page
+   * frozen and the bottom nav dead, which also defeated the previous
+   * push-then-1.2s-fallback guard (the guard saw the path had "arrived" and
+   * skipped the hard nav). A real document load cannot be swallowed by the
+   * router or a stale service worker and lands on a fresh dashboard every time;
+   * the run is already saved, so the reload cost is irrelevant.
    */
   function navigateAway(href: string) {
-    router.push(href);
-    if (typeof window === "undefined") return;
-    const targetPath = href.split("?")[0]?.split("#")[0] || "/";
-    window.setTimeout(() => {
-      if (window.location.pathname !== targetPath) {
+    if (typeof window !== "undefined") {
+      // Hold the "Saved ✓" confirmation on the button for a beat so the save
+      // reads as done, then hard-reload. Without this the screen jumps while
+      // the button still says "Saving…", which feels like nothing happened.
+      window.setTimeout(() => {
         window.location.assign(href);
-      }
-    }, 1200);
+      }, 600);
+      return;
+    }
+    router.push(href);
   }
 
   // Track (with coords) + session time feeding the Conditions tab's weather fetch.
@@ -3085,6 +3253,176 @@ export function NewRunForm(props: {
     );
   }
 
+  // Tire-prep panel — shared by the classic Tires face and the wizard's own
+  // Prep step (declared once so both render identical wiring).
+  const prepPanelJsx = (
+    <RunAdditiveTimingPanel
+      additiveTypeId={additiveTypeId}
+      onAdditiveTypeIdChange={(id) => {
+        setAdditiveTypeId(id);
+        if (id && !additiveTypesById[id]) {
+          void fetch("/api/additive-types?limit=200", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((data: { additiveTypes?: Array<{ id: string; displayName: string }> }) => {
+              const hit = (data.additiveTypes ?? []).find((t) => t.id === id);
+              if (hit) {
+                setAdditiveTypesById((prev) => ({ ...prev, [id]: hit }));
+              }
+            })
+            .catch(() => {});
+        }
+        applyAdditiveTimingToSetupSnapshot(id, tirePrepRef.current);
+      }}
+      tirePrep={tirePrep}
+      onTirePrepChange={setTirePrep}
+      highlightMissing={completeValidation.additive}
+      controlAdditive={controlAdditive}
+    />
+  );
+
+  // Rail badges: ✓ when the step's key data is in; amber dot when Run-complete
+  // validation flagged it. Cheap heuristics — the server stays the authority.
+  const wizardLapsIn = wizardActive && buildImportedLapSetsFromIngest(lapIngest).length > 0;
+  const wizardPrepIn = tirePrep.length > 0 || Boolean(additiveTypeId);
+  const wizardStepStatus: Partial<Record<WizardStepId, WizardStepStatus>> = {
+    equipment: { done: Boolean(tireSetId || newTireSetIntent) },
+    prep: { done: wizardPrepIn },
+    setup: {
+      done: setupBaselineData != null || Object.keys(setupData).length > 0,
+      attention: completeValidation.setup,
+    },
+    laps: { done: wizardLapsIn },
+    feel: {
+      done: carRating != null,
+      attention: completeValidation.carRating,
+    },
+  };
+  const wizardNextStepId = wizardActive ? nextWalkStep(wizardStep, wizardWalk) : null;
+  const wizardPrevStepId = wizardActive ? prevWalkStep(wizardStep, wizardWalk) : null;
+  /** One flipping Save: rating in ⇒ this save completes the run. */
+  const wizardSaveCompletes = carRating != null;
+  const advanceWizard = () => {
+    if (!wizardNextStepId) return;
+    if (!seamSeenRef.current && crossesSeam(wizardStep, wizardNextStepId)) {
+      seamSeenRef.current = true;
+      setSeamOpen(true);
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "instant" });
+      return;
+    }
+    goToWizardStep(wizardNextStepId);
+  };
+
+  // Wizard live-header summary rows (label, value, missing?, jump target).
+  const wizardSummaryMeter = (() => {
+    const parts = [
+      wizardLapsIn,
+      notes.trim().length > 0,
+      isHandlingAssessmentMeaningful(handlingUi),
+      wizardPrepIn,
+      Boolean(tireSetId || newTireSetIntent),
+    ];
+    return Math.round((100 * ((wizardSaveCompletes ? 1 : 0) + parts.filter(Boolean).length)) / (1 + parts.length));
+  })();
+  const wizardSummaryRows: Array<{
+    key: string;
+    label: string;
+    value: string;
+    state: "ok" | "chg" | "miss";
+    go: WizardStepId | "entry";
+  }> = wizardActive
+    ? [
+        {
+          key: "session",
+          label: "Session",
+          value: [
+            sessionType === "RACE_MEETING"
+              ? sessionLabel ||
+                (meetingSessionType === "OTHER"
+                  ? meetingSessionCustom.trim() || "Race meeting"
+                  : meetingSessionType.charAt(0) + meetingSessionType.slice(1).toLowerCase())
+              : "Testing",
+            tracksList.find((t) => t.id === trackId)?.name ?? null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          state: "ok",
+          go: "entry",
+        },
+        {
+          key: "car",
+          label: "Car",
+          value: carsList.find((c) => c.id === carId)?.name ?? "—",
+          state: carId ? "ok" : "miss",
+          go: "entry",
+        },
+        {
+          key: "tires",
+          label: "Tires",
+          value: (() => {
+            const t = tireSets.find((x) => x.id === tireSetId);
+            if (t) return tireSetDisplayLine(t);
+            if (newTireSetIntent) return `${newTireSetIntent.displayName} · new set`;
+            return "not set";
+          })(),
+          state: tireSetId || newTireSetIntent ? "ok" : "miss",
+          go: "equipment",
+        },
+        {
+          key: "battery",
+          label: "Battery",
+          value: (() => {
+            const b = batteries.find((x) => x.id === batteryId);
+            return b ? `${b.label}${b.packNumber != null ? ` #${b.packNumber}` : ""}` : "—";
+          })(),
+          state: batteryId ? "ok" : "miss",
+          go: "equipment",
+        },
+        {
+          key: "prep",
+          label: "Prep",
+          value: wizardPrepIn
+            ? formatTirePrepLine(
+                tirePrep,
+                additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null
+              ) || "logged"
+            : "none",
+          state: wizardPrepIn ? "ok" : "miss",
+          go: "prep",
+        },
+        {
+          key: "setup",
+          label: "Setup",
+          value:
+            setupChangeCountSinceBaseline > 0
+              ? `${setupChangeCountSinceBaseline} change${setupChangeCountSinceBaseline === 1 ? "" : "s"} from loaded`
+              : Object.keys(setupData).length > 0
+                ? "as loaded"
+                : "not attached",
+          state:
+            setupChangeCountSinceBaseline > 0
+              ? "chg"
+              : Object.keys(setupData).length > 0
+                ? "ok"
+                : "miss",
+          go: "setup",
+        },
+        {
+          key: "laps",
+          label: "Laps",
+          value: wizardLapsIn ? "imported" : "not imported",
+          state: wizardLapsIn ? "ok" : "miss",
+          go: "laps",
+        },
+        {
+          key: "rating",
+          label: "Rating",
+          value: carRating != null ? `${carRating} / 10` : "not rated",
+          state: carRating != null ? "ok" : "miss",
+          go: "feel",
+        },
+      ]
+    : [];
+
   return (
     <>
     <TrackLocationMarkDialog
@@ -3107,6 +3445,137 @@ export function NewRunForm(props: {
       onSubmit={(e) => e.preventDefault()}
       noValidate
     >
+      {wizardActive ? (
+        <div className="space-y-1.5">
+          <LogRunWizardRail
+            current={wizardStep}
+            walk={wizardWalk}
+            continuing={Boolean(wizard?.continuing)}
+            statusById={wizardStepStatus}
+            onSelect={goToWizardStep}
+          />
+
+          {/* Live-header summary: the whole run at a glance, rows jump to steps. */}
+          <div className="overflow-hidden rounded-xl border border-border bg-card/70">
+            <button
+              type="button"
+              onClick={() => setWizardSummaryOpen((v) => !v)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left"
+              aria-expanded={wizardSummaryOpen}
+            >
+              <span
+                className={cn(
+                  "rounded-md border px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.14em]",
+                  wizardSaveCompletes
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                    : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300"
+                )}
+              >
+                {wizardSaveCompletes ? "Complete" : "Draft"}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-foreground">
+                {wizardSummaryRows.find((r) => r.key === "session")?.value || "This run"}
+              </span>
+              <span
+                className={cn(
+                  "text-[10px] text-faint transition-transform",
+                  wizardSummaryOpen && "rotate-180"
+                )}
+                aria-hidden
+              >
+                ▾
+              </span>
+            </button>
+            <div className="h-[3px] bg-border">
+              <div
+                className="h-full bg-primary transition-[width] duration-300"
+                style={{ width: `${wizardSummaryMeter}%` }}
+              />
+            </div>
+            {wizardSummaryOpen ? (
+              <div className="px-1.5 pb-1.5 pt-1">
+                <div className="flex justify-between px-1.5 pb-1 font-mono text-[8.5px] uppercase tracking-[0.14em] text-faint">
+                  <span>run {wizardSummaryMeter}% logged</span>
+                  <span>{wizardSaveCompletes ? "rating in ✓" : "add a rating to finish"}</span>
+                </div>
+                {wizardSummaryRows.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => {
+                      if (r.go === "entry") props.onExitWizard?.();
+                      else goToWizardStep(r.go);
+                    }}
+                    className="flex w-full items-baseline justify-between gap-3 rounded-lg px-1.5 py-1 text-left hover:bg-muted"
+                  >
+                    <span className="text-[10.5px] text-muted-foreground">{r.label}</span>
+                    <span
+                      className={cn(
+                        "min-w-0 truncate font-mono text-[10px]",
+                        r.state === "miss"
+                          ? "text-amber-600 dark:text-amber-300"
+                          : r.state === "chg"
+                            ? "text-primary"
+                            : "text-foreground"
+                      )}
+                    >
+                      {r.value}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <p className="px-1 text-right font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
+            {seamOpen
+              ? "Pre-run logged"
+              : wizardWalk.indexOf(wizardStep) >= 0
+                ? `Step ${wizardWalk.indexOf(wizardStep) + 1} of ${wizardWalk.length}`
+                : "Carried over · editing"}
+          </p>
+        </div>
+      ) : null}
+
+      {/* "Run completed?" seam — shown once, crossing pre-run → after-run. */}
+      {wizardActive && seamOpen ? (
+        <SurfaceCard
+          variant="panel"
+          overflowHidden={false}
+          className="border-emerald-500/40"
+          contentClassName="space-y-3 text-center"
+        >
+          <p className="text-sm font-bold text-foreground">Pre-run logged ✓</p>
+          <p className="text-lg font-bold text-foreground">Run completed?</p>
+          <p className="text-xs text-muted-foreground">
+            Equipment and setup are in. Save now and finish after the run, or log the
+            result if it&apos;s already happened.
+          </p>
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              className={cn(
+                "w-full rounded-lg border border-border bg-secondary px-3 py-3 text-sm font-semibold text-foreground hover:border-faint",
+                (!canSave || saving) && "pointer-events-none opacity-60"
+              )}
+              onClick={(e) => saveRun(e, "draft")}
+              disabled={!canSave || saving}
+            >
+              {saving ? "Saving…" : "Not yet — save draft 💾"}
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-lg bg-primary px-3 py-3 text-sm font-bold text-primary-foreground hover:bg-[#E6BE00]"
+              onClick={() => {
+                if (wizardNextStepId) goToWizardStep(wizardNextStepId);
+                else setSeamOpen(false);
+              }}
+            >
+              Yes — laps &amp; feel →
+            </button>
+          </div>
+        </SurfaceCard>
+      ) : null}
       {carsList.length === 0 ? (
         <CardPanel contentClassName="text-sm text-muted-foreground">
           <div className="text-sm text-muted-foreground">
@@ -3125,7 +3594,7 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      {!externalCopyLastRunCard && !isDraft && !isEditing && copyPreviewRun ? (
+      {!externalCopyLastRunCard && !isDraft && !isEditing && !wizardActive && copyPreviewRun ? (
         <CopyLastRunCard
           run={copyPreviewRunToPickerRun(copyPreviewRun)}
           applied={lastRunCopyApplied}
@@ -3133,15 +3602,20 @@ export function NewRunForm(props: {
         />
       ) : null}
 
-      <div className="flex items-center gap-3 pt-2">
-        <div className="h-px flex-1 bg-border/60" />
-        <Eyebrow dot="muted" className="shrink-0 justify-center">
-          Before the run
-        </Eyebrow>
-        <div className="h-px flex-1 bg-border/60" />
-      </div>
+      {!wizardActive ? (
+        <div className="flex items-center gap-3 pt-2">
+          <div className="h-px flex-1 bg-border/60" />
+          <Eyebrow dot="muted" className="shrink-0 justify-center">
+            Before the run
+          </Eyebrow>
+          <div className="h-px flex-1 bg-border/60" />
+        </div>
+      ) : null}
 
-      {/* 2. Session type: Testing or Race Meeting only */}
+      {/* 2. Session type: Testing or Race Meeting only. Wizard v2: session,
+          event, and track are resolved on the entry screen — these cards stay
+          mounted (their effects drive event→track sync) but never render. */}
+      <div hidden={wizardActive} className="space-y-3">
       <SurfaceCard
         variant="panel"
         overflowHidden={false}
@@ -3595,14 +4069,16 @@ export function NewRunForm(props: {
           </div>
         </SurfaceCard>
       ) : null}
+      </div>
 
+      <div hidden={!wizardShowsDetails || (wizardActive && seamOpen)}>
       <SurfaceCard
         variant="panel"
         overflowHidden={false}
         className={cn("run-section--details", isDraft && "border-emerald-500/40")}
         contentClassName="space-y-3"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className={cn("flex flex-wrap items-center justify-between gap-2", wizardActive && "hidden")}>
           <div className="flex items-center gap-2">
             <Eyebrow>Run details</Eyebrow>
             <PrefillBadge
@@ -3684,7 +4160,7 @@ export function NewRunForm(props: {
           heightMode="adaptive"
           activeId={runDetailsTab}
           onActiveIdChange={(id) => setRunDetailsTab(id as RunDetailsTab)}
-          faces={[
+          faces={([
             {
               id: "car",
               label: "Car",
@@ -3774,28 +4250,7 @@ export function NewRunForm(props: {
               copyTireWarning={copyTireWarning}
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
             />
-            <RunAdditiveTimingPanel
-              additiveTypeId={additiveTypeId}
-              onAdditiveTypeIdChange={(id) => {
-                setAdditiveTypeId(id);
-                if (id && !additiveTypesById[id]) {
-                  void fetch("/api/additive-types?limit=200", { cache: "no-store" })
-                    .then((r) => r.json())
-                    .then((data: { additiveTypes?: Array<{ id: string; displayName: string }> }) => {
-                      const hit = (data.additiveTypes ?? []).find((t) => t.id === id);
-                      if (hit) {
-                        setAdditiveTypesById((prev) => ({ ...prev, [id]: hit }));
-                      }
-                    })
-                    .catch(() => {});
-                }
-                applyAdditiveTimingToSetupSnapshot(id, tirePrepRef.current);
-              }}
-              tirePrep={tirePrep}
-              onTirePrepChange={setTirePrep}
-              highlightMissing={completeValidation.additive}
-              controlAdditive={controlAdditive}
-            />
+            {wizardActive ? null : prepPanelJsx}
           </div>
               ),
             },
@@ -4027,13 +4482,33 @@ export function NewRunForm(props: {
           </div>
               ),
             },
-          ]}
+          ] as PagedCardFace[])
+            .concat(
+              wizardActive
+                ? [
+                    {
+                      id: "prep",
+                      label: "Prep",
+                      content: <div className="space-y-3 pt-1">{prepPanelJsx}</div>,
+                    },
+                  ]
+                : []
+            )
+            .filter(
+              (f) =>
+                !wizardActive ||
+                (wizardDetailFaceIds[wizardStep] ?? []).includes(f.id as RunDetailsTab)
+            )}
         />
           </>
         )}
       </SurfaceCard>
+      </div>
 
-      <div ref={setupSectionRef}>
+      <div
+        ref={setupSectionRef}
+        hidden={wizardActive && (seamOpen || wizardStep !== "setup")}
+      >
       <SurfaceCard
         variant="panel"
         overflowHidden={false}
@@ -4255,7 +4730,12 @@ export function NewRunForm(props: {
             </div>
             <SetupSheetView
               value={setupData}
-              onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
+              onChange={(next) => {
+                // A hand edit takes ownership of the setup — never let the
+                // last-run auto-apply overwrite it.
+                setupTouchedByUserRef.current = true;
+                setSetupData(applyDerivedFieldsToSnapshot(next));
+              }}
               template={setupTemplate}
               enableFieldSearch
             />
@@ -4275,23 +4755,25 @@ export function NewRunForm(props: {
       </SurfaceCard>
       </div>
 
-      <div className="flex items-center gap-3 pt-2">
-        <div
-          className={cn(
-            "h-px flex-1",
-            isDraft ? "bg-amber-500/50" : "bg-border/60"
-          )}
-        />
-        <Eyebrow dot="muted" className="shrink-0 justify-center">
-          After the run
-        </Eyebrow>
-        <div
-          className={cn(
-            "h-px flex-1",
-            isDraft ? "bg-amber-500/50" : "bg-border/60"
-          )}
-        />
-      </div>
+      {!wizardActive ? (
+        <div className="flex items-center gap-3 pt-2">
+          <div
+            className={cn(
+              "h-px flex-1",
+              isDraft ? "bg-amber-500/50" : "bg-border/60"
+            )}
+          />
+          <Eyebrow dot="muted" className="shrink-0 justify-center">
+            After the run
+          </Eyebrow>
+          <div
+            className={cn(
+              "h-px flex-1",
+              isDraft ? "bg-amber-500/50" : "bg-border/60"
+            )}
+          />
+        </div>
+      ) : null}
 
       {isDraft ? (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-foreground">
@@ -4304,6 +4786,7 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
+      <div hidden={wizardActive && (seamOpen || wizardStep !== "laps")}>
       <LapTimesIngestPanel
         value={lapIngest}
         onChange={setLapIngest}
@@ -4315,7 +4798,9 @@ export function NewRunForm(props: {
         editingRunId={isEditing ? editRun?.id ?? null : null}
         isDraftResume={isDraft}
       />
+      </div>
 
+      <div hidden={wizardActive && (seamOpen || wizardStep !== "feel")}>
       <SurfaceCard variant="panel" overflowHidden={false} className="run-section--feedback" contentClassName="space-y-3 text-sm">
         <Eyebrow>Feedback</Eyebrow>
         <PagedCard
@@ -4329,46 +4814,19 @@ export function NewRunForm(props: {
               id: "feedback",
               label: "Feedback",
               content: (
-                <div className="space-y-3">
-                  <div ref={feedbackRequiredRef} className="space-y-3">
-                    {completeValidation.show ? (
-                      <div
-                        role="alert"
-                        className="rounded-md border border-amber-500/50 bg-amber-500/15 px-2.5 py-2 text-[11px] leading-snug text-amber-950 dark:text-amber-100"
-                      >
-                        {inlineError ?? "Complete the highlighted fields below before Run complete."}
-                      </div>
-                    ) : null}
-                    <CarHandlingRatingQuickPick
-                      value={carRating}
-                      onChange={(n) => setCarRating((cur) => (cur === n ? null : n))}
-                      highlightMissing={completeValidation.carRating}
-                    />
-                    <FeelVsLastRunQuickPick
-                      value={handlingUi.feelVsLastRun}
-                      onChange={(feelVsLastRun) =>
-                        setHandlingUi((cur) => ({ ...cur, feelVsLastRun }))
-                      }
-                      eligible={feelVsLastRunEligible}
-                      highlightMissing={completeValidation.feelVsLastRun}
-                    />
-                  </div>
-                  <AutoGrowTextarea
-                    minRows={2}
-                    className={cn(
-                      "form-control w-full px-3 py-2 text-sm",
-                      isDraft && notes.trim().length === 0
-                        ? "border-amber-500/50 ring-1 ring-amber-500/30"
-                        : "border-border"
-                    )}
-                    placeholder={
-                      isDraft && notes.trim().length === 0
-                        ? "How did the run feel? Grip, balance, any issues, what you'd change…"
-                        : "Notes…"
-                    }
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    aria-label="Session notes"
+                <div ref={feedbackRequiredRef} className="space-y-3">
+                  {completeValidation.show ? (
+                    <div
+                      role="alert"
+                      className="rounded-md border border-amber-500/50 bg-amber-500/15 px-2.5 py-2 text-[11px] leading-snug text-amber-950 dark:text-amber-100"
+                    >
+                      {inlineError ?? "Complete the highlighted fields below before Run complete."}
+                    </div>
+                  ) : null}
+                  <CarHandlingRatingQuickPick
+                    value={carRating}
+                    onChange={(n) => setCarRating((cur) => (cur === n ? null : n))}
+                    highlightMissing={completeValidation.carRating}
                   />
                 </div>
               ),
@@ -4383,7 +4841,27 @@ export function NewRunForm(props: {
             },
           ]}
         />
+        {/* Notes sit outside the paged region so the box is always fully visible
+            and free to grow, regardless of which face is showing. */}
+        <AutoGrowTextarea
+          minRows={3}
+          className={cn(
+            "form-control w-full px-3 py-2 text-sm",
+            isDraft && notes.trim().length === 0
+              ? "border-amber-500/50 ring-1 ring-amber-500/30"
+              : "border-border"
+          )}
+          placeholder={
+            isDraft && notes.trim().length === 0
+              ? "How did the run feel? Grip, balance, any issues, what you'd change…"
+              : "Notes…"
+          }
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          aria-label="Session notes"
+        />
       </SurfaceCard>
+      </div>
 
 
       {inlineError && !completeValidation.show ? (
@@ -4402,7 +4880,7 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      {hasTeams ? (
+      {hasTeams && (!wizardActive || (!seamOpen && wizardStep === "feel")) ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
           <div className="min-w-0">
             <div className="text-sm text-foreground">Share this run with my teams</div>
@@ -4442,7 +4920,55 @@ export function NewRunForm(props: {
             )}
           >
             <div className="mx-auto flex max-w-md flex-wrap justify-end gap-2 md:mx-0 md:max-w-none">
-          {editingCompletedRun ? (
+          {wizardActive ? (
+            seamOpen ? null : (
+              <>
+                <button
+                  type="button"
+                  className={fabPillOutlineClass}
+                  onClick={() => {
+                    if (wizardPrevStepId) goToWizardStep(wizardPrevStepId);
+                    else props.onExitWizard?.();
+                  }}
+                  title={wizardPrevStepId ? "Previous step" : "Back to the entry screen"}
+                >
+                  ← Back
+                </button>
+                {/* One Save — what it does follows the data: a rated run
+                    completes, an unrated one stays a draft. */}
+                <button
+                  type="button"
+                  className={cn(
+                    wizardSaveCompletes && !wizardNextStepId
+                      ? fabPillPrimaryClass
+                      : fabPillOutlineClass,
+                    (!canSave || saving) && "opacity-70 pointer-events-none"
+                  )}
+                  onClick={(e) => saveRun(e, wizardSaveCompletes ? "completed" : "draft")}
+                  disabled={!canSave || saving}
+                  aria-busy={saving && !saveSuccess}
+                  title={
+                    wizardSaveCompletes
+                      ? "Rating is in — saving completes the run."
+                      : "Saves as a draft — add a rating to finish."
+                  }
+                >
+                  {saveSuccess
+                    ? "Saved ✓"
+                    : saving
+                      ? "Saving…"
+                      : wizardSaveCompletes
+                        ? "Save & complete 🏁"
+                        : "Save draft"}
+                </button>
+                {wizardNextStepId ? (
+                  <button type="button" className={fabPillPrimaryClass} onClick={advanceWizard}>
+                    Next →
+                  </button>
+                ) : null}
+              </>
+            )
+          ) : editingCompletedRun ? (
             <button
               type="button"
               className={cn(
@@ -4451,10 +4977,10 @@ export function NewRunForm(props: {
               )}
               onClick={(e) => saveRun(e, "completed")}
               disabled={!canSave || saving}
-              aria-busy={saving}
+              aria-busy={saving && !saveSuccess}
               title="Save changes without affecting completion or tire/battery run counts."
             >
-              {saving ? "Saving…" : saveSuccess ? "Saved" : "Save edits"}
+              {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save edits"}
             </button>
           ) : (
             <>
@@ -4466,10 +4992,10 @@ export function NewRunForm(props: {
                 )}
                 onClick={(e) => saveRun(e, "draft")}
                 disabled={!canSave || saving}
-                aria-busy={saving}
+                aria-busy={saving && !saveSuccess}
                 title="Save what you have so far and finish logging after the run."
               >
-                {saving ? "Saving…" : saveSuccess ? "Saved" : "Save draft"}
+                {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save draft"}
               </button>
               <button
                 type="button"
@@ -4479,13 +5005,15 @@ export function NewRunForm(props: {
                 )}
                 onClick={(e) => saveRun(e, "completed")}
                 disabled={!canSave || saving}
-                aria-busy={saving}
+                aria-busy={saving && !saveSuccess}
                 title="Mark this run finished. It will stop showing up in the incomplete-runs banner."
               >
-                {saving ? "Saving…" : saveSuccess ? "Saved" : "Run complete"}
-                <span className="text-sm leading-none" aria-hidden>
-                  🏁
-                </span>
+                {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Run complete"}
+                {!saveSuccess && (
+                  <span className="text-sm leading-none" aria-hidden>
+                    🏁
+                  </span>
+                )}
               </button>
             </>
           )}

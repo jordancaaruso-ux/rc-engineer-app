@@ -43,7 +43,7 @@ export function HubRowTitle({
   return (
     <Tag
       className={cn(
-        "hub-row-title text-[17px] text-foreground sm:text-[18px]",
+        "hub-row-title text-[13px] text-foreground",
         className
       )}
     >
@@ -70,7 +70,7 @@ export function Eyebrow({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center", className)}>
+    <div className={cn("eyebrow-root mb-2 flex items-center", className)}>
       <span className="eyebrow-label">{children}</span>
     </div>
   );

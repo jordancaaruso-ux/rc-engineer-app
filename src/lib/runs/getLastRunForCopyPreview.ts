@@ -34,7 +34,7 @@ export async function getLastRunForCopyPreview(userId: string) {
       tireSet: { select: { id: true, label: true, setNumber: true } },
       additiveType: { select: { id: true, displayName: true, modelCode: true } },
       battery: { select: { id: true, label: true, packNumber: true } },
-      event: { select: { id: true, name: true } },
+      event: { select: { id: true, name: true, endDate: true } },
       setupSnapshot: { select: { id: true, data: true } },
     },
   });

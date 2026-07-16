@@ -11,7 +11,6 @@ import { Eyebrow, StatStrip, StatTile } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { PagedCard } from "@/components/ui/PagedCard";
 import { DashboardMetricTile } from "@/components/dashboard/DashboardMetricTile";
-import { DashboardTodayStrip } from "@/components/dashboard/DashboardTodayStrip";
 
 /**
  * Reflective dashboard centerpiece — an Apple-widget-style paged card. Swipe
@@ -22,22 +21,20 @@ import { DashboardTodayStrip } from "@/components/dashboard/DashboardTodayStrip"
  *
  * Colour semantics: green is reserved for a genuine PACE win (a fresh record /
  * the celebration); volume (runs, laps, wheel time) stays neutral ink; yellow
- * stays reserved for the one action (the Today strip's log-run button).
+ * stays reserved for the one action (the Start-a-run CTA above this card).
+ *
+ * The finish-your-draft nudge that used to live here (DashboardTodayStrip) moved
+ * up into the dashboard's primary Start-run CTA on 2026-07-16 — it flips to
+ * "Finish today's run" when a draft exists, so this card is pure summary again.
  */
 export function DashboardSummaryCard({
   summary,
   records,
   newPb,
-  todayRunCount,
-  serverDraftRunId,
-  serverDraftSavedAt,
 }: {
   summary: DashboardSummary;
   records: DashboardRecord[];
   newPb: DashboardNewPb | null;
-  todayRunCount: number;
-  serverDraftRunId: string | null;
-  serverDraftSavedAt: string | null;
 }) {
   const { hasData } = summary;
 
@@ -47,13 +44,6 @@ export function DashboardSummaryCard({
 
       {/* The earned "little judgement": a real record just fell. */}
       {newPb ? <NewPbBanner newPb={newPb} /> : null}
-
-      {/* Renders only when today has an unfinished run (owns its own top margin). */}
-      <DashboardTodayStrip
-        todayRunCount={todayRunCount}
-        serverDraftRunId={serverDraftRunId}
-        serverDraftSavedAt={serverDraftSavedAt}
-      />
 
       {hasData ? (
         <PagedCard

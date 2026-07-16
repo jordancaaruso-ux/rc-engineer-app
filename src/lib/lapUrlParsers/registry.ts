@@ -2,12 +2,14 @@ import type { LapUrlParseContext, LapUrlParser } from "./types";
 import { stubUrlParser } from "./stubParser";
 import { httpTimingParser } from "./httpTimingParser";
 import { liveRcParser } from "./liveRcParser";
+import { myRcmParser } from "./myRcmParser";
 import { speedhiveParser } from "./speedhiveParser";
 import { speedhivePracticeParser } from "./speedhivePracticeParser";
 
 /** Order: specific parsers first; stub last. */
 const parsers: LapUrlParser[] = [
   liveRcParser,
+  myRcmParser,
   speedhivePracticeParser,
   speedhiveParser,
   httpTimingParser,

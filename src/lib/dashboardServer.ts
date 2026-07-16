@@ -18,7 +18,7 @@ import {
 } from "@/lib/runHandlingAssessment";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { pickFeaturedEvent } from "@/lib/eventActive";
-import { formatFeaturedEventDateLabel } from "@/lib/formatDate";
+import { calendarYmdInTimeZone, formatFeaturedEventDateLabel } from "@/lib/formatDate";
 import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
 import { loadUserScopedEvents, userCanAccessEvent } from "@/lib/events/eventParticipation";
 import { resolveEventTrackLabel } from "@/lib/tracks/legacyTrackSnapshot";
@@ -261,6 +261,14 @@ export type DashboardHomeModel = {
     endDate: string;
     dateLabel: string;
     runCount: number;
+    /** Calendar days until the event starts in the user's zone (0 = today); null unless status is "next". */
+    daysUntilStart: number | null;
+    /** Most recent completed session day at the event's track — the "what you ran there last time" line. */
+    lastVisit: null | {
+      dateIso: string;
+      bestLap: number | null;
+      runCount: number;
+    };
     latest: null | {
       bestLap: number | null;
       avgTop5: number | null;
@@ -299,6 +307,50 @@ export type DashboardHomeModel = {
       current: string;
     }>;
   }>;
+  /**
+   * Track-day pit board: today's runs, latest first — one line per run with the
+   * best/avg, the best-lap delta vs the run before it today, and what setup
+   * changed going into it. Today-only by design (the dashboard's "now & next"
+   * boundary — see docs/DASHBOARD_NORTH_STAR.md); depth lives in Sessions.
+   */
+  todayStrip: Array<{
+    runId: string;
+    when: string;
+    runLabel: string;
+    bestLap: number | null;
+    avgTop5: number | null;
+    lapCount: number;
+    loggingComplete: boolean;
+    /** Best-lap delta vs the previous run today (negative = faster); null on the first run of the day. */
+    bestDeltaVsPrev: number | null;
+    changedRows: Array<{
+      key: string;
+      label: string;
+      unit: string;
+      previous: string | null;
+      current: string;
+    }>;
+  }>;
+  /** Where today is happening — names the track-day header. From the latest run logged today. */
+  todayContext: null | {
+    trackName: string | null;
+    eventName: string | null;
+    carName: string | null;
+  };
+  /**
+   * Off-day "last time out" digest: the most recent completed session day —
+   * when/where, pace, pace vs the previous visit to the same track, plus how
+   * the car felt and what changed on the final run (from `recentRun`).
+   */
+  lastSessionDigest: null | {
+    dateIso: string;
+    trackName: string | null;
+    runCount: number;
+    bestLap: number | null;
+    /** Day-best delta vs the previous completed day at the same track (negative = faster). */
+    bestDeltaVsPrevVisit: number | null;
+    prevVisitDateIso: string | null;
+  };
   recentRun: null | {
     id: string;
     carId: string | null;
@@ -645,6 +697,31 @@ export async function loadDashboardHomeModel(
     timeZone
   );
 
+  // Most recent completed session day at a given track — the "what you ran there
+  // last time" line on the event-prep card and the digest's previous-visit delta.
+  const latestVisitAtTrack = (
+    trackId: string,
+    beforeYmd: string | null
+  ): { date: Date; ymd: string; bestLap: number | null; runCount: number } | null => {
+    let visit: { date: Date; ymd: string; bestLap: number | null; runCount: number } | null = null;
+    for (let i = summaryInputs.length - 1; i >= 0; i--) {
+      const r = summaryInputs[i];
+      if (r.trackId !== trackId) continue;
+      const ymd = calendarYmdInTimeZone(r.effectiveAt, timeZone);
+      if (beforeYmd && ymd >= beforeYmd) continue;
+      if (!visit) {
+        visit = { date: r.effectiveAt, ymd, bestLap: null, runCount: 0 };
+      } else if (ymd !== visit.ymd) {
+        break;
+      }
+      visit.runCount += 1;
+      if (r.bestLapSeconds != null && (visit.bestLap == null || r.bestLapSeconds < visit.bestLap)) {
+        visit.bestLap = r.bestLapSeconds;
+      }
+    }
+    return visit;
+  };
+
   let featuredBlock: DashboardHomeModel["featuredEvent"] = null;
   if (featuredPick) {
     const featuredEvent = scopedEvents.find((event) => event.id === featuredPick.id);
@@ -684,6 +761,20 @@ export async function loadDashboardHomeModel(
         };
       }
 
+      // Days until the event starts (calendar days in the user's zone) — the
+      // off-day prep card's countdown. Only meaningful for an upcoming event.
+      let daysUntilStart: number | null = null;
+      if (featuredPick.featuredStatus === "next") {
+        const todayYmd = calendarYmdInTimeZone(new Date(), timeZone);
+        const startYmd = calendarYmdInTimeZone(featuredEvent.startDate, timeZone);
+        const diffMs = Date.parse(startYmd) - Date.parse(todayYmd);
+        daysUntilStart = Number.isFinite(diffMs) ? Math.max(0, Math.round(diffMs / 86_400_000)) : null;
+      }
+
+      const lastVisit = featuredEvent.trackId
+        ? latestVisitAtTrack(featuredEvent.trackId, null)
+        : null;
+
       featuredBlock = {
         id: featuredEvent.id,
         name: featuredEvent.name,
@@ -693,6 +784,14 @@ export async function loadDashboardHomeModel(
         endDate: featuredEvent.endDate.toISOString(),
         dateLabel: formatFeaturedEventDateLabel(featuredEvent, timeZone),
         runCount,
+        daysUntilStart,
+        lastVisit: lastVisit
+          ? {
+              dateIso: lastVisit.date.toISOString(),
+              bestLap: lastVisit.bestLap,
+              runCount: lastVisit.runCount,
+            }
+          : null,
         latest,
       };
     }
@@ -749,6 +848,74 @@ export async function loadDashboardHomeModel(
       }
       prevSnapshot = cur;
     }
+  }
+
+  // Track-day pit board rows — latest run first. Delta compares each run's best
+  // against the run logged immediately before it today (first-of-day has none).
+  const changesByRunId = new Map(todaysChanges.map((c) => [c.runId, c.rows]));
+  const todayStrip: DashboardHomeModel["todayStrip"] = [];
+  {
+    let prevBest: number | null = null;
+    for (const r of todaysRuns) {
+      const m = computeIncludedLapMetricsFromRun(r);
+      const best = typeof r.bestLapSeconds === "number" ? r.bestLapSeconds : m.bestLap;
+      const avg5 = typeof r.avgTop5LapSeconds === "number" ? r.avgTop5LapSeconds : m.averageTop5;
+      todayStrip.push({
+        runId: r.id,
+        when: resolveRunDisplayInstant({
+          createdAt: r.createdAt,
+          sessionCompletedAt: r.sessionCompletedAt,
+          loggingCompletedAt: r.loggingCompletedAt,
+          sortAt: r.sortAt,
+        }).toISOString(),
+        runLabel: formatRunSessionDisplay(r),
+        bestLap: best,
+        avgTop5: avg5,
+        lapCount: m.lapCount,
+        loggingComplete: r.loggingComplete === true || Boolean(r.loggingCompletedAt),
+        bestDeltaVsPrev: best != null && prevBest != null ? best - prevBest : null,
+        changedRows: changesByRunId.get(r.id) ?? [],
+      });
+      if (best != null) prevBest = best;
+    }
+    todayStrip.reverse();
+  }
+  const lastTodayRun = todaysRuns.length > 0 ? todaysRuns[todaysRuns.length - 1] : null;
+  const todayContext: DashboardHomeModel["todayContext"] = lastTodayRun
+    ? {
+        trackName: lastTodayRun.track?.name ?? null,
+        eventName: lastTodayRun.event?.name ?? null,
+        carName: lastTodayRun.car?.name ?? null,
+      }
+    : null;
+
+  // Off-day digest — the most recent completed session day, with the day-best
+  // compared against the previous completed day at the same track.
+  let lastSessionDigest: DashboardHomeModel["lastSessionDigest"] = null;
+  if (summaryInputs.length > 0) {
+    const lastInput = summaryInputs[summaryInputs.length - 1];
+    const lastYmd = calendarYmdInTimeZone(lastInput.effectiveAt, timeZone);
+    const dayRows = summaryInputs.filter(
+      (r) => calendarYmdInTimeZone(r.effectiveAt, timeZone) === lastYmd
+    );
+    const dayBest = dayRows.reduce<number | null>(
+      (acc, r) =>
+        r.bestLapSeconds != null && (acc == null || r.bestLapSeconds < acc)
+          ? r.bestLapSeconds
+          : acc,
+      null
+    );
+    const dayTrackId = lastInput.trackId;
+    const prevVisit = dayTrackId ? latestVisitAtTrack(dayTrackId, lastYmd) : null;
+    lastSessionDigest = {
+      dateIso: lastInput.effectiveAt.toISOString(),
+      trackName: lastInput.trackName,
+      runCount: dayRows.length,
+      bestLap: dayBest,
+      bestDeltaVsPrevVisit:
+        dayBest != null && prevVisit?.bestLap != null ? dayBest - prevVisit.bestLap : null,
+      prevVisitDateIso: prevVisit ? prevVisit.date.toISOString() : null,
+    };
   }
 
   let recent: DashboardHomeModel["recentRun"] = null;
@@ -851,6 +1018,9 @@ export async function loadDashboardHomeModel(
         .reverse()
         .find((r) => r.loggingComplete === false)?.createdAt.toISOString() ?? null,
     todaysChanges,
+    todayStrip,
+    todayContext,
+    lastSessionDigest,
     recentRun: recent,
     summary,
     records,

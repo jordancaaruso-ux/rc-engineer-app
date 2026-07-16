@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // LAN dev origin (phone testing + headless verification drive the app via this
+  // IP). Next 16 blocks cross-origin /_next/* dev requests from unlisted origins,
+  // which silently kills hydration — pages render but nothing is clickable.
+  allowedDevOrigins: ["192.168.1.112"],
   // onnxruntime-node ships a native .node binary; keep it external so webpack doesn't try to
   // bundle it (local PP-OCR text reader, src/lib/setupCalibrations/localOcr.ts).
   serverExternalPackages: ["onnxruntime-node"],

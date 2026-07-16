@@ -17,6 +17,8 @@ import { getLastRunForCopyPreview } from "@/lib/runs/getLastRunForCopyPreview";
 import { CopyLastRunFormProvider } from "@/components/runs/CopyLastRunFormProvider";
 import { NewRunCopyLastRunSlot } from "@/components/runs/NewRunCopyLastRunSlot";
 import { decodeLabFields } from "@/lib/rollCenter/labState";
+import { LogRunWizardHost } from "@/components/runs/LogRunWizardHost";
+import { toEntryCandidate } from "@/lib/runs/entryCandidate";
 
 export default async function NewRunPage({
   searchParams,
@@ -104,6 +106,60 @@ export default async function NewRunPage({
   const favSet = new Set(favouriteTrackIds);
   const favouriteTracks = allTracks.filter((t) => favSet.has(t.id));
   const tracks = allTracks;
+
+  // Log-run wizard is the primary flow for a manual "new run" (founder 2026-07-16).
+  // Deep-link flows that only the classic single-page form renders — imported-lap
+  // attach, resume-draft, Roll Center lab export, focus=setup, import error — fall
+  // back to classic. `?wizard=0` (or NEXT_PUBLIC_LOGRUN_WIZARD=0) forces classic
+  // anywhere; `?wizard=1` forces the wizard even in those deep-link contexts.
+  const wizardForced =
+    process.env.NEXT_PUBLIC_LOGRUN_WIZARD === "1" ||
+    (typeof sp.wizard === "string" && sp.wizard === "1");
+  const wizardDisabled =
+    process.env.NEXT_PUBLIC_LOGRUN_WIZARD === "0" ||
+    (typeof sp.wizard === "string" && sp.wizard === "0");
+  const classicOnlyContext =
+    importedLapTimeSessionIdRaw.length > 0 ||
+    resumeDraft ||
+    focusSection === "setup" ||
+    labSetupPrefill != null ||
+    importFailed;
+  const wizardEnabled = !wizardDisabled && (wizardForced || !classicOnlyContext);
+  if (wizardEnabled) {
+    const wizardDrafts = await loadTodaysIncompleteRuns(user.id);
+    return (
+      <>
+        <header className="page-header">
+          <div className="min-w-0">
+            <h1 className="page-title">Log your run</h1>
+            <p className="page-subtitle">Pick the car, continue or start fresh, and go.</p>
+          </div>
+        </header>
+        <section className="page-body max-w-3xl">
+          <LogRunWizardHost
+            entryCars={cars.map((c) => ({ id: c.id, name: c.name }))}
+            entryTracks={tracks}
+            initialCandidate={toEntryCandidate(copyPreviewRun)}
+            currentEventId={initialEventId}
+            drafts={wizardDrafts.map((d) => ({
+              id: d.id,
+              carName: d.carName,
+              trackName: d.trackName,
+              eventName: d.eventName,
+              sessionLabel: d.sessionLabel,
+              createdAt: d.createdAt,
+            }))}
+            cars={cars}
+            tracks={tracks}
+            favouriteTrackIds={favouriteTrackIds}
+            favouriteTracks={favouriteTracks}
+            dashboardPrefill={dashboardPrefill}
+            initialCopyPreviewRun={copyPreviewRun}
+          />
+        </section>
+      </>
+    );
+  }
 
   return (
     <>

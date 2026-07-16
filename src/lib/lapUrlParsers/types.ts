@@ -53,6 +53,11 @@ export interface LapUrlParseResult {
   errorCode?: string;
   /** LiveRC event hub (`p=view_event`): child race result URLs discovered on the page (no laps on the hub itself). */
   discoveredRaceUrls?: string[];
+  /**
+   * MyRCM category (class) page: the labeled result sessions it contains (no laps on the category itself).
+   * The user picks the one they raced; each `url` is a single-session import (`…?reportKey=<n>`).
+   */
+  discoveredSessions?: Array<{ url: string; label: string; group: string }>;
 }
 
 export type LapUrlParseContext = {

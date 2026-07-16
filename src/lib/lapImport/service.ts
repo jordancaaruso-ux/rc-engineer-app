@@ -27,6 +27,7 @@ export function inferSourceType(url: string): string {
   const u = url.toLowerCase();
   if (u.includes("liverc") || u.includes("live-rc")) return "liverc";
   if (u.includes("speedhive") || u.includes("api2.mylaps.com")) return "speedhive";
+  if (u.includes("myrcm.ch")) return "myrcm";
   return "timing_url";
 }
 
@@ -41,6 +42,7 @@ export function serializeParsePayload(parsed: LapUrlParseResult): Record<string,
     sessionHint: parsed.sessionHint ?? null,
     sessionCompletedAtIso: parsed.sessionCompletedAtIso ?? null,
     discoveredRaceUrls: parsed.discoveredRaceUrls ?? null,
+    discoveredSessions: parsed.discoveredSessions ?? null,
     message: parsed.message ?? null,
     errorCode: parsed.errorCode ?? null,
   };
