@@ -3,7 +3,10 @@ import "server-only";
 import { load } from "cheerio";
 import type { CheerioAPI } from "cheerio";
 import { parseLiveRcSessionDisplayTimeToUtcIso } from "@/lib/lapUrlParsers/livercSessionTime";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+import {
+  liveRcNameMatchesConfigured,
+  normalizeLiveRcDriverNameForMatch,
+} from "@/lib/lapWatch/liveRcNameNormalize";
 
 export { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 
@@ -274,7 +277,7 @@ export function filterPracticeSessionsByTargetDriver(
   if (!raw) return sessions;
   const want = normalizeLiveRcDriverNameForMatch(raw);
   if (!want) return sessions;
-  return sessions.filter((s) => normalizeLiveRcDriverNameForMatch(s.driverName) === want);
+  return sessions.filter((s) => liveRcNameMatchesConfigured(s.driverName, want));
 }
 
 /**

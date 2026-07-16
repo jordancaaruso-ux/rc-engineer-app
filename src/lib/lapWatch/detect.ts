@@ -11,7 +11,10 @@ import {
   isLiveRcResultsDiscoveryUrl,
   raceListRowMatchesEventClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+import {
+  liveRcNameMatchesConfigured,
+  normalizeLiveRcDriverNameForMatch,
+} from "@/lib/lapWatch/liveRcNameNormalize";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 
@@ -356,7 +359,7 @@ export async function checkWatchedLapSources(params: {
         // Practice + driver targeting: match canonical imported session driver, not list-row heuristics.
         if (targetMode === "driver" && isPracticeListPage && targetNorm && t.kind === "practice") {
           const canonNorm = normalizeLiveRcDriverNameForMatch(canonicalDriver);
-          if (canonNorm !== targetNorm) {
+          if (!liveRcNameMatchesConfigured(canonicalDriver, targetNorm)) {
             logWatch(runId, "driver_match_skip", {
               sourceId: s.id,
               reason: "canonical_driver_does_not_match_target",
@@ -374,7 +377,7 @@ export async function checkWatchedLapSources(params: {
           t.kind === "race" ||
           !targetNorm ||
           t.kind !== "practice" ||
-          normalizeLiveRcDriverNameForMatch(enriched.displayDriverName) === targetNorm;
+          liveRcNameMatchesConfigured(enriched.displayDriverName, targetNorm);
         if (shouldAdvanceLastSeen && importedWhen && !Number.isNaN(importedWhen.getTime())) {
           maxSeen = maxDate(maxSeen, importedWhen);
         }

@@ -1,5 +1,8 @@
 import type { LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+import {
+  liveRcNameMatchesConfigured,
+  normalizeLiveRcDriverNameForMatch,
+} from "@/lib/lapWatch/liveRcNameNormalize";
 
 export type PickPrimarySessionDriverOpts = {
   liveRcDriverId: string | null;
@@ -33,13 +36,13 @@ export function pickPrimarySessionDriver(
   const idWant = opts.liveRcDriverId?.trim();
   if (idWant) {
     const byId = drivers.find((d) => d.driverId.trim() === idWant);
-    if (byId && (!nameWant || normalizeLiveRcDriverNameForMatch(byId.driverName) === nameWant)) {
+    if (byId && (!nameWant || liveRcNameMatchesConfigured(byId.driverName, nameWant))) {
       return byId;
     }
   }
 
   if (nameWant) {
-    const byName = drivers.find((d) => normalizeLiveRcDriverNameForMatch(d.driverName) === nameWant);
+    const byName = drivers.find((d) => liveRcNameMatchesConfigured(d.driverName, nameWant));
     if (byName) return byName;
   }
 

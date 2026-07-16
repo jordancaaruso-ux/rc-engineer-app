@@ -1,7 +1,10 @@
 import type { LapRow } from "@/lib/lapAnalysis";
 import type { LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
 import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+import {
+  liveRcNameMatchesConfigured,
+  normalizeLiveRcDriverNameForMatch,
+} from "@/lib/lapWatch/liveRcNameNormalize";
 
 function lapRowsFromNums(nums: number[]): LapRow[] {
   return nums.map((t, i) => ({
@@ -88,7 +91,7 @@ export function buildImportedIngestPlanFromPayload(
 
   let working = outDrivers;
   if (opts.mode === "practice_user_only" && wantNorm) {
-    const matched = outDrivers.filter((d) => normalizeLiveRcDriverNameForMatch(d.driverName) === wantNorm);
+    const matched = outDrivers.filter((d) => liveRcNameMatchesConfigured(d.driverName, wantNorm));
     if (matched.length > 0) working = matched;
     else if (outDrivers.length === 1 && outDrivers[0]!.driverName === "Practice") {
       working = outDrivers;

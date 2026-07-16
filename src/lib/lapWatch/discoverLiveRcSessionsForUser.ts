@@ -10,7 +10,10 @@ import {
   isLiveRcResultsDiscoveryUrl,
   raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+import {
+  liveRcNameMatchesConfigured,
+  normalizeLiveRcDriverNameForMatch,
+} from "@/lib/lapWatch/liveRcNameNormalize";
 import {
   resolveMostRecentPracticeListUrl,
   resolveRaceEventHubUrl,
@@ -94,18 +97,6 @@ export type DiscoverLiveRcSessionsResult = {
   };
   debug: LiveRcTrackDiscoveryDebug;
 };
-
-function practiceRowMatchesDriverRelaxed(normRow: string, driverNorm: string): boolean {
-  const tokens = driverNorm.split(/\s+/).filter((t) => t.length >= 2);
-  if (tokens.length < 2) return false;
-  return tokens.every((t) => normRow.includes(t));
-}
-
-function practiceRowMatchesDriver(normRow: string, driverNorm: string): boolean {
-  if (!driverNorm || !normRow) return false;
-  if (normRow === driverNorm) return true;
-  return practiceRowMatchesDriverRelaxed(normRow, driverNorm);
-}
 
 function sessionSortKey(iso: string | null): number {
   if (!iso?.trim()) return 0;
@@ -253,10 +244,7 @@ export async function discoverLiveRcSessionsForUser(input: {
 
       let practiceMatched = 0;
       for (const r of rows) {
-        if (driverNorm) {
-          const normRow = normalizeLiveRcDriverNameForMatch(r.driverName);
-          if (!practiceRowMatchesDriver(normRow, driverNorm)) continue;
-        }
+        if (driverNorm && !liveRcNameMatchesConfigured(r.driverName, driverNorm)) continue;
         practiceMatched++;
         discovered.push({
           sessionUrl: r.sessionUrl,

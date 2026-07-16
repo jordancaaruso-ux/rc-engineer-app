@@ -8,7 +8,10 @@ import { load, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import type { LapImportLapRow, LapUrlParseResult, LapUrlSessionDriver } from "./types";
 import { fetchUrlText } from "./fetchText";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+import {
+  liveRcNameMatchesConfigured,
+  normalizeLiveRcDriverNameForMatch,
+} from "@/lib/lapWatch/liveRcNameNormalize";
 import {
   extractLiveRcRaceSessionWhenRaw,
   parseLiveRcSessionDisplayTimeToUtcIso,
@@ -646,9 +649,7 @@ function pickPrimaryRaceDriver(
   if (!raw) return driversWithLaps[0]!;
   const want = normalizeLiveRcDriverNameForMatch(raw);
   if (!want) return driversWithLaps[0]!;
-  const matched = driversWithLaps.find(
-    (d) => normalizeLiveRcDriverNameForMatch(d.driverName) === want
-  );
+  const matched = driversWithLaps.find((d) => liveRcNameMatchesConfigured(d.driverName, want));
   return matched ?? driversWithLaps[0]!;
 }
 

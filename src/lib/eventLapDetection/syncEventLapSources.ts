@@ -13,6 +13,7 @@ import {
   raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { enrichImportedSessionForWatch } from "@/lib/lapWatch/enrichImportedSessionForWatch";
+import { liveRcNameMatchesConfigured } from "@/lib/lapWatch/liveRcNameNormalize";
 import { resolveImportedSessionDisplayTimeIso, resolveImportedSessionHasWallClockTime } from "@/lib/lapImport/labels";
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
@@ -184,8 +185,7 @@ async function syncPracticeForEvent(
     });
     if (!enriched) continue;
 
-    const canonNorm = normalizeLiveRcDriverNameForMatch(enriched.displayDriverName);
-    if (canonNorm !== liveNorm) continue;
+    if (!liveRcNameMatchesConfigured(enriched.displayDriverName, liveNorm)) continue;
 
     const displayIso = enriched.sessionCompletedAtIso;
     const when = displayIso ? new Date(displayIso) : null;
@@ -269,8 +269,7 @@ async function syncResultsForEvent(
     });
     if (!enriched) continue;
 
-    const canonNorm = normalizeLiveRcDriverNameForMatch(enriched.displayDriverName);
-    if (liveNorm && canonNorm !== liveNorm) continue;
+    if (liveNorm && !liveRcNameMatchesConfigured(enriched.displayDriverName, liveNorm)) continue;
 
     const displayIso = enriched.sessionCompletedAtIso;
     const when = displayIso ? new Date(displayIso) : null;
@@ -333,11 +332,9 @@ async function syncDiscoveredForEvent(
     if (!enriched) continue;
 
     if (kind === "practice") {
-      const canonNorm = normalizeLiveRcDriverNameForMatch(enriched.displayDriverName);
-      if (canonNorm !== liveNorm) continue;
+      if (!liveRcNameMatchesConfigured(enriched.displayDriverName, liveNorm)) continue;
     } else {
-      const canonNorm = normalizeLiveRcDriverNameForMatch(enriched.displayDriverName);
-      if (liveNorm && canonNorm !== liveNorm) continue;
+      if (liveNorm && !liveRcNameMatchesConfigured(enriched.displayDriverName, liveNorm)) continue;
     }
 
     const displayIso = enriched.sessionCompletedAtIso;

@@ -10,7 +10,10 @@ import {
   isLiveRcResultsDiscoveryUrl,
   raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+import {
+  liveRcNameMatchesConfigured,
+  normalizeLiveRcDriverNameForMatch,
+} from "@/lib/lapWatch/liveRcNameNormalize";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
 import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
@@ -102,19 +105,6 @@ function mergeLinkedScanCandidates(
   const linkedUrls = new Set(linked.map((c) => c.sessionUrl.trim()));
   const others = discovered.filter((c) => !linkedUrls.has(c.sessionUrl.trim()));
   return [...linked, ...others];
-}
-
-/** True when every normalized token (length ≥2) from the setting appears in the row string (order-independent). */
-function practiceRowMatchesDriverRelaxed(normRow: string, driverNorm: string): boolean {
-  const tokens = driverNorm.split(/\s+/).filter((t) => t.length >= 2);
-  if (tokens.length < 2) return false;
-  return tokens.every((t) => normRow.includes(t));
-}
-
-function practiceRowMatchesDriver(normRow: string, driverNorm: string): boolean {
-  if (!driverNorm || !normRow) return false;
-  if (normRow === driverNorm) return true;
-  return practiceRowMatchesDriverRelaxed(normRow, driverNorm);
 }
 
 /**
@@ -284,9 +274,8 @@ export async function POST(request: Request) {
     }
 
     candidates = rows.map((r) => {
-      const normRow = normalizeLiveRcDriverNameForMatch(r.driverName);
       const matchesDriver =
-        driverNorm.length === 0 ? null : practiceRowMatchesDriver(normRow, driverNorm);
+        driverNorm.length === 0 ? null : liveRcNameMatchesConfigured(r.driverName, driverNorm);
       const linkedRunId = importedMap.get(r.sessionUrl) ?? null;
       return {
         sessionId: r.sessionId,

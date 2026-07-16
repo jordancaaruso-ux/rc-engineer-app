@@ -9,7 +9,7 @@ import {
   parseLiveRcRaceResultTableRows,
   type ParsedLiveRcResultRow,
 } from "@/lib/lapUrlParsers/livercRaceResult";
-import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
+import { liveRcNameMatchesConfigured } from "@/lib/lapWatch/liveRcNameNormalize";
 
 export async function inferLiveRcDriverIdFromRecentImports(
   userId: string,
@@ -31,7 +31,7 @@ export async function inferLiveRcDriverIdFromRecentImports(
       const d = raw as { driverName?: string; driverId?: string };
       const id = typeof d.driverId === "string" ? d.driverId.trim() : "";
       if (!id || id.startsWith("sd-")) continue;
-      if (normalizeLiveRcDriverNameForMatch(d.driverName ?? "") !== driverNorm) continue;
+      if (!liveRcNameMatchesConfigured(d.driverName ?? "", driverNorm)) continue;
       return id;
     }
   }
@@ -46,7 +46,7 @@ export function countNameMatchesByDriverId(
   for (const [, rows] of pages) {
     const matchedIds = new Set<string>();
     for (const r of rows) {
-      if (normalizeLiveRcDriverNameForMatch(r.driverName) !== driverNorm) continue;
+      if (!liveRcNameMatchesConfigured(r.driverName, driverNorm)) continue;
       matchedIds.add(r.driverId);
     }
     for (const id of matchedIds) {
@@ -65,7 +65,7 @@ export function idAppearsWithName(
     if (
       rows.some(
         (r) =>
-          r.driverId === driverId && normalizeLiveRcDriverNameForMatch(r.driverName) === driverNorm
+          r.driverId === driverId && liveRcNameMatchesConfigured(r.driverName, driverNorm)
       )
     ) {
       return true;
