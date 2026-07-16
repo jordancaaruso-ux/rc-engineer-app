@@ -24,6 +24,15 @@ import { detectActiveRaceMeetingAtTrack } from "@/lib/lapWatch/detectActiveRaceM
 
 const RACE_HUB_ROW_CAP = 40;
 const RACE_FETCH_CONCURRENCY = 5;
+/** Per-page timeout for the membership crawl — short, so one stuck LiveRC page can't eat the budget. */
+const RACE_FETCH_TIMEOUT_MS = 9_000;
+/**
+ * Wall-clock ceiling for the whole race-page membership crawl. Once exceeded we stop opening new
+ * pages and resolve from what we have (rows are newest-first, so the most recent sessions are
+ * always fetched first). Guarantees the route returns partial results instead of blowing the
+ * serverless function timeout and returning nothing — the failure seen trackside under load.
+ */
+const RACE_CRAWL_BUDGET_MS = 35_000;
 
 export type DiscoveredSession = {
   sessionUrl: string;
@@ -55,6 +64,10 @@ export type LiveRcTrackDiscoveryDebug = {
     hubRows: number;
     hubRowsAfterClassFilter: number;
     resultPagesFetched: number;
+    /** Pages left unfetched because the crawl wall-clock budget was hit (newest-first, so these are the oldest). */
+    resultPagesSkippedForBudget: number;
+    /** Total wall-clock spent on the race-page membership crawl. */
+    crawlMs: number;
     canonicalDriverId: string | null;
     sessionsWithDriverId: number;
   };
@@ -133,6 +146,8 @@ function emptyDebug(partial?: Partial<LiveRcTrackDiscoveryDebug>): LiveRcTrackDi
       hubRows: 0,
       hubRowsAfterClassFilter: 0,
       resultPagesFetched: 0,
+      resultPagesSkippedForBudget: 0,
+      crawlMs: 0,
       canonicalDriverId: null,
       sessionsWithDriverId: 0,
     },
@@ -277,13 +292,48 @@ export async function discoverLiveRcSessionsForUser(input: {
       );
 
       const urlsToCheck = withTime.map((r) => r.sessionUrl.trim()).filter(Boolean);
-      debug.race.resultPagesFetched = urlsToCheck.length;
       const pageRowsByUrl = new Map<string, ReturnType<typeof parseLiveRcRaceResultTableRows>>();
 
+      // Membership crawl: open each race page (newest-first) to see which contain the driver. LiveRC's
+      // hub doesn't list drivers, so this is unavoidable — but it's bounded by a wall-clock budget and a
+      // short per-page timeout so a slow LiveRC (live-event load) can't stall the whole route.
+      const crawlStart = Date.now();
+      let pagesFetched = 0;
+      let pagesSkippedForBudget = 0;
+      let slowestFetchMs = 0;
+
       await mapPool(urlsToCheck, RACE_FETCH_CONCURRENCY, async (sessionUrl) => {
-        const fetched = await fetchUrlText(sessionUrl);
+        if (Date.now() - crawlStart > RACE_CRAWL_BUDGET_MS) {
+          pagesSkippedForBudget++;
+          pageRowsByUrl.set(sessionUrl, []);
+          return;
+        }
+        const fetchStart = Date.now();
+        const fetched = await fetchUrlText(sessionUrl, { timeoutMs: RACE_FETCH_TIMEOUT_MS });
+        const fetchMs = Date.now() - fetchStart;
+        if (fetchMs > slowestFetchMs) slowestFetchMs = fetchMs;
+        pagesFetched++;
         pageRowsByUrl.set(sessionUrl, fetched.ok ? parseLiveRcRaceResultTableRows(fetched.text) : []);
       });
+
+      const crawlMs = Date.now() - crawlStart;
+      debug.race.resultPagesFetched = pagesFetched;
+      debug.race.resultPagesSkippedForBudget = pagesSkippedForBudget;
+      debug.race.crawlMs = crawlMs;
+      if (pagesSkippedForBudget > 0) {
+        console.warn(
+          "[liverc-discovery] race crawl budget exhausted",
+          JSON.stringify({
+            userId: input.userId,
+            hubUrl: raceResolved.indexUrl,
+            pagesFetched,
+            pagesSkippedForBudget,
+            crawlMs,
+            slowestFetchMs,
+            budgetMs: RACE_CRAWL_BUDGET_MS,
+          })
+        );
+      }
 
       const canonicalId = await resolveCanonicalLiveRcDriverId(input.userId, pageRowsByUrl, driverNorm);
       debug.race.canonicalDriverId = canonicalId;

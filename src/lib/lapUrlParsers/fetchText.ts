@@ -6,11 +6,18 @@ export type FetchTextResult =
   | { ok: false; error: string; status?: number };
 
 const MAX_BYTES = 1_500_000;
-const TIMEOUT_MS = 18_000;
+const DEFAULT_TIMEOUT_MS = 18_000;
 
-export async function fetchUrlText(url: string): Promise<FetchTextResult> {
+export async function fetchUrlText(
+  url: string,
+  options?: { timeoutMs?: number }
+): Promise<FetchTextResult> {
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutMs =
+    typeof options?.timeoutMs === "number" && options.timeoutMs > 0
+      ? options.timeoutMs
+      : DEFAULT_TIMEOUT_MS;
+  const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       redirect: "follow",

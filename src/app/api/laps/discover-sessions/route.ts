@@ -5,6 +5,9 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
 
 export const dynamic = "force-dynamic";
+// LiveRC discovery opens one race page per hub row to find the driver's sessions; give it the full
+// serverless headroom so a slow live-event LiveRC returns partial results instead of a dropped request.
+export const maxDuration = 60;
 
 /**
  * Discover the user's most recent timing sessions at a track (LiveRC and/or Speedhive).

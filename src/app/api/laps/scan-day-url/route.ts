@@ -17,6 +17,11 @@ import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPa
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import { hasSpeedhiveIdentityForUser } from "@/lib/speedhive/speedhiveDriverSettings";
 
+export const dynamic = "force-dynamic";
+// Same LiveRC discovery crawl as /discover-sessions — give it the full serverless headroom so a slow
+// live-event LiveRC returns partial results instead of a dropped request.
+export const maxDuration = 60;
+
 export type ScanDayUrlIndexKind = "practice" | "results";
 
 export type ScanDayUrlCandidateRow = {
