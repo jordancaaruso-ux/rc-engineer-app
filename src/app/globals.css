@@ -854,6 +854,80 @@ html[data-nav-pending] .page {
 }
 
 /* ---------------------------------------------------------------------------
+   Login cinematic backdrop (2026-07-17)
+   The sign-in screen gets a slow Ken Burns drift on the blurred track photo plus
+   a one-shot specular sheen across the auth card, so it feels like a premium
+   instrument booting up rather than a bare form. The photo stays scaled up so its
+   blurred, semi-transparent edges never reach the viewport. Reduced motion pins
+   the photo still and drops the sheen (the card still fades in via .rc-reveal).
+--------------------------------------------------------------------------- */
+@keyframes rc-login-pan {
+  from {
+    transform: scale(1.14) translate3d(1%, 1.4%, 0);
+  }
+  to {
+    transform: scale(1.22) translate3d(-1.5%, -2%, 0);
+  }
+}
+@keyframes rc-login-photo-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.login-bg-photo {
+  transform: scale(1.14);
+  will-change: transform, opacity;
+  animation:
+    rc-login-pan 36s ease-in-out infinite alternate,
+    rc-login-photo-in 1400ms ease-out both;
+}
+
+@keyframes rc-login-sheen {
+  0% {
+    transform: translateX(-130%) skewX(-18deg);
+    opacity: 0;
+  }
+  14% {
+    opacity: 0.4;
+  }
+  55% {
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+.login-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 34%,
+    rgba(255, 255, 255, 0.1) 48%,
+    rgba(255, 214, 10, 0.07) 53%,
+    transparent 68%
+  );
+  animation: rc-login-sheen 2400ms cubic-bezier(0.2, 0.7, 0.3, 1) 620ms 1 both;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-bg-photo {
+    animation: none;
+  }
+  .login-sheen::after {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Log-run floating progress rail (2026-07-10)
    Chips pop in as cards dock; a jumped-to card flashes a yellow ring. The rail
    scrolls horizontally without a visible scrollbar when the chips overflow.
