@@ -1,14 +1,15 @@
 /**
- * Payload the wizard host derives for the wizard-hosted NewRunForm (v4,
- * founder interview 2026-07-17 evening): there is no pre-choice entry phase
- * any more — the host computes this synchronously at load (continue
- * pre-applied when the last run is recent, blank otherwise) and the form's
- * Session step carries the "Continued from run X" status + New-log switch.
- * Continuing prefills every later step (the "what changed" chips retired).
+ * Payload the wizard host derives for the wizard-hosted NewRunForm.
+ *
+ * v6 (founder interview 2026-07-17, "prefill is a tap, never automatic"):
+ * the host ALWAYS derives a blank entry (deriveFreshEntry) — the form's
+ * Session step offers the car's last run on a manifest card and
+ * applyWizardPrefill applies it in-form, reusing deriveContinueEntry for the
+ * session identity rules (a race meeting re-attaches its own event and stays a
+ * race meeting; a testing run carries its track). `continuing` therefore stays
+ * false in the wizard payload.
  */
 
-import { eventDateToYmd } from "@/lib/eventDateParse";
-import { localTodayYmd } from "@/lib/events/splitEventsForPicker";
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
 import {
   defaultUiSession,
@@ -33,9 +34,8 @@ export type NewRunWizardEntry = {
   trackDirection: "CW" | "CCW" | null;
 };
 
-/** Last run older than this → the wizard lands blank instead of pre-continued
- *  (founder 2026-07-17: ~two weekends; an outing that far out isn't
- *  "continuing" anything). */
+/** v6: staleness no longer gates the prefill offer (an old run is still
+ *  offered, honestly dated) — kept only as a wording threshold reference. */
 export const CONTINUE_STALE_MS = 14 * 24 * 60 * 60 * 1000;
 
 export function isCandidateStale(candidate: EntryCandidate, now = Date.now()): boolean {
@@ -43,10 +43,14 @@ export function isCandidateStale(candidate: EntryCandidate, now = Date.now()): b
 }
 
 /**
- * Continue-from-last-run context. A deep-linked event wins; otherwise the
- * candidate's event re-attaches only while still active (end date
- * today-or-later), else its track carries as a testing baseline. (The GPS
- * venue-mismatch swap happens later, inside the form, once location resolves.)
+ * Continue-from-last-run context. A deep-linked event wins; otherwise a race
+ * meeting stays a race meeting and re-attaches its OWN event — even a past one,
+ * since the driver is usually logging more runs from that meeting. When the run
+ * had no formal event we keep the RACE_MEETING session type and carry the venue
+ * instead. A race meeting never silently degrades to testing on copy (matches
+ * the classic copy-last-run path). Only a genuinely testing run carries forward
+ * as testing. (A real venue change is caught later by the in-form GPS
+ * venue-mismatch swap, once location resolves.)
  */
 export function deriveContinueEntry(
   candidate: EntryCandidate,
@@ -58,7 +62,10 @@ export function deriveContinueEntry(
     trackLayoutId: null,
     trackDirection: null,
   };
-  const race = (evId: string): NewRunWizardEntry => {
+  // `evId` re-attaches to a live event (track then derives from it); when null
+  // (event ended, or the run never had one) keep the race-meeting type but
+  // carry the venue so nothing is lost.
+  const race = (evId: string | null): NewRunWizardEntry => {
     const d = defaultUiSession(candidate, true, true);
     const ui: UiSessionType = d.type === "TESTING" ? "PRACTICE" : d.type;
     const meeting = uiSessionToMeeting(ui);
@@ -68,17 +75,18 @@ export function deriveContinueEntry(
       meetingSessionType: meeting.meetingSessionType as "PRACTICE" | "QUALIFYING" | "RACE" | null,
       sessionLabel: meeting.sessionLabel,
       eventId: evId,
-      trackId: null,
+      trackId: evId ? null : (candidate.trackId ?? null),
     };
   };
   if (currentEventId) return race(currentEventId);
   const wasRace =
-    candidate.meetingSessionType != null && candidate.meetingSessionType !== "TESTING";
-  const eventActive =
-    candidate.eventId != null &&
-    candidate.eventEndIso != null &&
-    eventDateToYmd(candidate.eventEndIso) >= localTodayYmd();
-  if (wasRace && candidate.eventId && eventActive) return race(candidate.eventId);
+    candidate.sessionType === "RACE_MEETING" ||
+    candidate.sessionType === "PRACTICE" ||
+    (candidate.meetingSessionType != null && candidate.meetingSessionType !== "TESTING");
+  // Re-attach the run's own event (past events included — the GPS venue-swap
+  // catches a genuine change of venue); race(null) keeps the type + venue when
+  // the run had no formal event.
+  if (wasRace) return race(candidate.eventId);
   return {
     ...base,
     sessionType: "TESTING",
@@ -86,6 +94,43 @@ export function deriveContinueEntry(
     sessionLabel: null,
     eventId: null,
     trackId: candidate.trackId ?? null,
+  };
+}
+
+/**
+ * Wizard payload for hosting an EXISTING run (draft resume / edit — founder
+ * 2026-07-17: "all edits open in the wizard"). Mirrors the run's own identity
+ * so the first paint matches the editRun hydrate that lands right after; the
+ * form skips its wizard re-assert effect when editing, so these values only
+ * seed initial state (SEEDING/OTHER meeting sessions fall back to PRACTICE for
+ * one frame — the hydrate restores the real value).
+ */
+export function deriveEditEntry(run: {
+  carId?: string | null;
+  sessionType?: string | null;
+  meetingSessionType?: string | null;
+  sessionLabel?: string | null;
+  eventId?: string | null;
+  trackId?: string | null;
+  trackLayoutId?: string | null;
+  trackDirection?: "CW" | "CCW" | null;
+}): NewRunWizardEntry {
+  const isRace = run.sessionType === "RACE_MEETING" || run.sessionType === "PRACTICE";
+  const sub = run.meetingSessionType;
+  return {
+    carId: run.carId ?? "",
+    continuing: false,
+    sessionType: isRace ? "RACE_MEETING" : "TESTING",
+    meetingSessionType: isRace
+      ? sub === "QUALIFYING" || sub === "RACE" || sub === "PRACTICE"
+        ? sub
+        : "PRACTICE"
+      : null,
+    sessionLabel: run.sessionLabel ?? null,
+    eventId: isRace ? (run.eventId ?? null) : null,
+    trackId: run.trackId ?? null,
+    trackLayoutId: run.trackLayoutId ?? null,
+    trackDirection: run.trackDirection ?? null,
   };
 }
 

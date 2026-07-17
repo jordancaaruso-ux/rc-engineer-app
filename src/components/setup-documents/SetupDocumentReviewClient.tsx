@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { FileText } from "lucide-react";
 import { interpretAwesomatixSetupSnapshot } from "@/lib/setupDocuments/awesomatixImportPostProcess";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
@@ -333,6 +334,12 @@ export function SetupDocumentReviewClient({
   const calibrationSelectionChanged =
     (selectedCalibrationId || "") !== (liveDoc.calibrationProfileId || "");
   const showSetupSheet = mappedKeys.length > 0 || hasProcessedResult;
+  // An explicit "Save setup" affordance is shown in the normal view whenever the document has usable
+  // values to save (or already saved). Saving also happens automatically via the effect above, but
+  // the button makes the action visible and confirms the saved state (never a silent-only flow).
+  const canSaveSetup =
+    (liveDoc.parseStatus === "PARSED" || liveDoc.parseStatus === "PARTIAL") &&
+    (hasProcessedResult || mappedKeys.length >= 1);
   const activeCalibrationName =
     storedCalibration?.name ?? selectedCalibration?.name ?? null;
 
@@ -394,7 +401,7 @@ export function SetupDocumentReviewClient({
   const derivedValidation = liveDerived.diagnostics?.validation;
   const resolutionHints = liveDerived.diagnostics?.resolutionHints;
 
-  async function saveDraft() {
+  async function saveDraft(): Promise<boolean> {
     setSavingDraft(true);
     setError(null);
     setStatus(null);
@@ -415,17 +422,34 @@ export function SetupDocumentReviewClient({
       };
       if (!res.ok) {
         setError(data.error || "Failed to save draft");
-        return;
+        return false;
       }
       if (data.document) {
         setLiveDoc((cur) => ({ ...cur, ...data.document }));
       }
-      setStatus(mode === "manual" ? "Structured setup saved." : "Draft saved.");
+      setStatus(mode === "manual" ? "Corrections saved." : "Draft saved.");
+      return true;
     } catch {
       setError("Failed to save draft");
+      return false;
     } finally {
       setSavingDraft(false);
     }
+  }
+
+  /** Header [Confirm]: persist the corrections, then drop back to the read-only view. */
+  async function confirmEdits() {
+    const ok = await saveDraft();
+    if (ok) setMode("review");
+  }
+
+  /** Header [Cancel]: discard unsaved local edits and drop back to the read-only view. */
+  function cancelEdits() {
+    setSetupData(
+      postProcessImportedSetup(normalizeSetupData(liveDoc.parsedDataJson), useA800SheetPostProcess(liveDoc))
+    );
+    setError(null);
+    setMode("review");
   }
 
   async function persistCarLink(nextCarId: string) {
@@ -784,14 +808,18 @@ export function SetupDocumentReviewClient({
     }
   }
 
+  const displayName = (doc.originalFilename || "Setup").replace(/\.[^.]+$/, "");
+
   return (
     <section className="page-body">
       <CardPanel contentClassName="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="ui-title text-sm normal-case">{doc.originalFilename}</h2>
-            {docSetupSheetModelName ? (
-              <p className="mt-0.5 text-xs text-muted-foreground">{docSetupSheetModelName}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="ui-title text-[15px] normal-case">{displayName}</h2>
+            {docCarName || docSetupSheetModelName ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {docCarName ?? docSetupSheetModelName}
+              </p>
             ) : null}
             {activeCalibrationName ? (
               <p className="text-xs text-muted-foreground">
@@ -800,29 +828,53 @@ export function SetupDocumentReviewClient({
             ) : awaitingCalibration ? (
               <p className="text-xs text-amber-200/90">No calibration selected yet</p>
             ) : null}
+            {liveDoc.parsedSetupManuallyEdited && mode === "review" ? (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Includes manual corrections.</p>
+            ) : null}
             {liveDoc.importStatus === "PROCESSING" ? (
               <p className="mt-1 text-xs text-muted-foreground">Importing…</p>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {mode === "manual" ? (
+              <>
+                <button
+                  type="button"
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                  onClick={() => void confirmEdits()}
+                  disabled={savingDraft}
+                >
+                  {savingDraft ? "Saving…" : "Confirm"}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                  onClick={cancelEdits}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                onClick={() => setMode("manual")}
+              >
+                Edit setup
+              </button>
+            )}
             <button
               type="button"
               className={cn(
-                "rounded-md border px-2.5 py-1 text-xs",
+                "rounded-md px-2 py-1.5 text-[11px]",
                 showDebug
-                  ? "border-amber-500/50 bg-amber-500/15 text-amber-100"
-                  : "border-border text-muted-foreground hover:bg-muted"
+                  ? "border border-amber-500/50 bg-amber-500/15 text-amber-100"
+                  : "text-faint hover:text-muted-foreground"
               )}
               onClick={() => setShowDebug((d) => !d)}
             >
-              {showDebug ? "Debug on" : "Debug"}
+              Debug
             </button>
-            <Link
-              href="/setup"
-              className="rounded-md border border-primary/50 bg-primary/20 px-3 py-1.5 text-xs font-medium hover:bg-primary/30"
-            >
-              Done — back to Setup
-            </Link>
           </div>
         </div>
         {showDebug ? (
@@ -1284,161 +1336,134 @@ export function SetupDocumentReviewClient({
         </>
         ) : null}
 
-        {!showDebug ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs hover:bg-muted"
-            onClick={() => setMode((m) => (m === "manual" ? "review" : "manual"))}
-          >
-            {mode === "manual" ? "Done editing" : "Edit setup"}
-          </button>
-        </div>
-        ) : null}
       </CardPanel>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <div className={mode === "manual" ? "xl:sticky xl:top-4 xl:self-start" : ""}>
-          <CardPanel contentClassName="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <Eyebrow>Original sheet</Eyebrow>
-              <button
-                type="button"
-                className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted"
-                onClick={() => setOriginalOpen(true)}
-              >
-                View Original Sheet
-              </button>
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              View-only reference. Use the structured setup on the right for edits.
+      {canSaveSetup || liveDoc.createdSetupId ? (
+        <div className="space-y-1.5">
+          <button
+            type="button"
+            onClick={createSetup}
+            disabled={creatingSetup || Boolean(liveDoc.createdSetupId) || savingCarLink}
+            className="tap-active flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-[13px] font-bold tracking-tight text-primary-foreground transition hover:bg-[#E6BE00] disabled:cursor-default disabled:opacity-60"
+          >
+            {liveDoc.createdSetupId
+              ? "Setup saved ✓"
+              : creatingSetup
+                ? "Saving…"
+                : "Save setup"}
+          </button>
+          {liveDoc.createdSetupId ? (
+            <p className="text-center text-[11px] text-muted-foreground">
+              This sheet is saved to your setups{docCarName ? ` for ${docCarName}` : ""}.
             </p>
-          </CardPanel>
-        </div>
-
-        <div className="space-y-3">
-          <div className={mode === "manual" ? "xl:sticky xl:top-4 xl:z-10" : ""}>
-            <CardPanel contentClassName="p-3">
-              <Eyebrow>
-                {mode === "manual" ? "Edit structured setup" : "Review parsed setup"}
-              </Eyebrow>
-              {liveDoc.parsedSetupManuallyEdited ? (
-                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-                  This document includes saved manual corrections to structured fields.
-                </p>
-              ) : null}
-              <p className="mt-1 text-xs text-muted-foreground">
-                {mode === "manual"
-                  ? "Adjust values to fix mis-mapped or ambiguous PDF fields, then save changes."
-                  : "Check values look right. Use Edit setup above to fix anything wrong."}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {showDebug ? (
-                <select
-                  className="rounded-md border border-border bg-muted/60 px-2 py-1.5 text-xs"
-                  value={liveDoc.carId ?? ""}
-                  disabled={savingCarLink}
-                  onChange={(e) => void persistCarLink(e.target.value)}
-                >
-                  <option value="">Select car…</option>
-                  {cars.map((car) => (
-                    <option key={car.id} value={car.id}>
-                      {car.name}
-                    </option>
-                  ))}
-                </select>
-                ) : null}
-                {mode === "manual" ? (
-                  <button
-                    type="button"
-                    className="rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
-                    onClick={saveDraft}
-                    disabled={savingDraft}
-                  >
-                    {savingDraft ? "Saving…" : "Save changes"}
-                  </button>
-                ) : null}
-                {showDebug || calibrationSelectionChanged ? (
-                <button
-                  type="button"
-                  className="rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
-                  onClick={reparseNow}
-                  disabled={reparsing}
-                >
-                  {reparsing ? "Re-parsing…" : "Re-parse"}
-                </button>
-                ) : null}
-                {showDebug ? (
-                <button
-                  type="button"
-                  className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
-                  onClick={createSetup}
-                  disabled={
-                    creatingSetup || Boolean(liveDoc.createdSetupId) || savingCarLink
-                  }
-                >
-                  {liveDoc.createdSetupId ? "Setup already created" : creatingSetup ? "Creating…" : "Create setup from document"}
-                </button>
-                ) : null}
-              </div>
-              {showDebug ? (
-              <div className="mt-3 rounded border border-border/70 bg-muted/40 p-2">
-                <Eyebrow>New text template</Eyebrow>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <input
-                    className="min-w-[18rem] rounded-md border border-border bg-card px-2 py-1.5 text-xs"
-                    value={calibrationName}
-                    onChange={(e) => setCalibrationName(e.target.value)}
-                    placeholder="Calibration name"
-                  />
-                  <button
-                    type="button"
-                    className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
-                    onClick={saveCalibration}
-                    disabled={savingCalibration || (doc.mimeType ?? "") !== "application/pdf"}
-                  >
-                    {savingCalibration ? "Creating…" : "Create text template"}
-                  </button>
-                </div>
-              </div>
-              ) : null}
-            </CardPanel>
-          </div>
-
-          {showSetupSheet ? (
-            <SetupSheetView
-              value={setupData}
-              onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
-              template={reviewSetupTemplate ?? undefined}
-              highlightChangedKeys={calibrationHighlightKeys}
-              readOnly={mode === "review"}
-            />
-          ) : (
-            <CardPanel contentClassName="p-4 text-sm text-muted-foreground">
-              {liveDoc.importStatus === "PROCESSING"
-                ? "Importing setup values…"
-                : awaitingCalibration
-                  ? "Select a calibration above to import values from this sheet."
-                  : "No setup values imported yet."}
-            </CardPanel>
-          )}
-
-          {showDebug ? (
-          <CardPanel contentClassName="p-3">
-            <Eyebrow>Extracted text</Eyebrow>
-            <div className="mt-1 rounded border border-border/70 bg-muted/40 p-2 text-[11px] text-muted-foreground">
-              <div>Text length: {(liveDoc.extractedText ?? "").length}</div>
-              <div>Mapped field count: {mappedKeys.length}</div>
-              <div className="truncate">Mapped keys: {mappedKeys.length ? mappedKeys.join(", ") : "none"}</div>
-              <div>Parser note: {status?.trim() || "—"}</div>
-            </div>
-            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-[11px] text-muted-foreground">
-              {liveDoc.extractedText?.trim() || "No extracted text available."}
-            </pre>
-          </CardPanel>
           ) : null}
         </div>
-      </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => setOriginalOpen(true)}
+        className="tap-active flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card/60 px-4 py-2.5 text-[13px] font-semibold tracking-tight text-foreground hover:bg-muted"
+      >
+        <FileText className="size-4 text-muted-foreground" strokeWidth={2} aria-hidden />
+        View original sheet
+      </button>
+
+      {showDebug ? (
+        <CardPanel contentClassName="p-3">
+          <Eyebrow>Document tools</Eyebrow>
+          {liveDoc.parsedSetupManuallyEdited ? (
+            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+              This document includes saved manual corrections to structured fields.
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              className="rounded-md border border-border bg-muted/60 px-2 py-1.5 text-xs"
+              value={liveDoc.carId ?? ""}
+              disabled={savingCarLink}
+              onChange={(e) => void persistCarLink(e.target.value)}
+            >
+              <option value="">Select car…</option>
+              {cars.map((car) => (
+                <option key={car.id} value={car.id}>
+                  {car.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
+              onClick={reparseNow}
+              disabled={reparsing}
+            >
+              {reparsing ? "Re-parsing…" : "Re-parse"}
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+              onClick={createSetup}
+              disabled={
+                creatingSetup || Boolean(liveDoc.createdSetupId) || savingCarLink
+              }
+            >
+              {liveDoc.createdSetupId ? "Setup already created" : creatingSetup ? "Creating…" : "Create setup from document"}
+            </button>
+          </div>
+          <div className="mt-3 rounded border border-border/70 bg-muted/40 p-2">
+            <Eyebrow>New text template</Eyebrow>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                className="min-w-[18rem] rounded-md border border-border bg-card px-2 py-1.5 text-xs"
+                value={calibrationName}
+                onChange={(e) => setCalibrationName(e.target.value)}
+                placeholder="Calibration name"
+              />
+              <button
+                type="button"
+                className="rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
+                onClick={saveCalibration}
+                disabled={savingCalibration || (doc.mimeType ?? "") !== "application/pdf"}
+              >
+                {savingCalibration ? "Creating…" : "Create text template"}
+              </button>
+            </div>
+          </div>
+        </CardPanel>
+      ) : null}
+
+      {showSetupSheet ? (
+        <SetupSheetView
+          value={setupData}
+          onChange={(next) => setSetupData(applyDerivedFieldsToSnapshot(next))}
+          template={reviewSetupTemplate ?? undefined}
+          highlightChangedKeys={calibrationHighlightKeys}
+          readOnly={mode === "review"}
+        />
+      ) : (
+        <CardPanel contentClassName="p-4 text-sm text-muted-foreground">
+          {liveDoc.importStatus === "PROCESSING"
+            ? "Importing setup values…"
+            : awaitingCalibration
+              ? "Select a calibration above to import values from this sheet."
+              : "No setup values imported yet."}
+        </CardPanel>
+      )}
+
+      {showDebug ? (
+        <CardPanel contentClassName="p-3">
+          <Eyebrow>Extracted text</Eyebrow>
+          <div className="mt-1 rounded border border-border/70 bg-muted/40 p-2 text-[11px] text-muted-foreground">
+            <div>Text length: {(liveDoc.extractedText ?? "").length}</div>
+            <div>Mapped field count: {mappedKeys.length}</div>
+            <div className="truncate">Mapped keys: {mappedKeys.length ? mappedKeys.join(", ") : "none"}</div>
+            <div>Parser note: {status?.trim() || "—"}</div>
+          </div>
+          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-[11px] text-muted-foreground">
+            {liveDoc.extractedText?.trim() || "No extracted text available."}
+          </pre>
+        </CardPanel>
+      ) : null}
 
       {originalOpen ? (
         <div

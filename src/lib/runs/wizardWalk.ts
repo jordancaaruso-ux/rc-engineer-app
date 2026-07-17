@@ -47,6 +47,22 @@ export function stepLabel(id: WizardStepId): string {
   return WIZARD_STEPS[stepIndex(id)].label;
 }
 
+/**
+ * Landing step when the wizard hosts an EXISTING run (draft resume / edit —
+ * founder 2026-07-17: "finishing a draft opens the wizard at the first
+ * unfinished step"). Walks the step order and returns the first step whose
+ * data is still missing; a fully-logged run (editing a completed one) lands
+ * back on Session for a top-down review.
+ */
+export function firstUnfinishedStep(
+  doneById: Partial<Record<WizardStepId, boolean>>,
+): WizardStepId {
+  for (const s of WIZARD_STEPS) {
+    if (!doneById[s.id]) return s.id;
+  }
+  return "session";
+}
+
 /** Next walk step after `current` in global step order (null = at the end). */
 export function nextWalkStep(
   current: WizardStepId,

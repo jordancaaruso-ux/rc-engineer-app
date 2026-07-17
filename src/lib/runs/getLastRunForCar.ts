@@ -18,6 +18,7 @@ export async function getLastRunForCar(userId: string, carId: string): Promise<E
       trackId: true,
       trackNameSnapshot: true,
       eventId: true,
+      sessionType: true,
       meetingSessionType: true,
       sessionLabel: true,
       car: { select: { id: true, name: true } },

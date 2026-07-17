@@ -4,6 +4,7 @@ import type { EntryCandidate } from "./entryCandidate";
 import {
   CONTINUE_STALE_MS,
   deriveContinueEntry,
+  deriveEditEntry,
   deriveFreshEntry,
   isCandidateStale,
 } from "./wizardEntry";
@@ -20,6 +21,7 @@ function candidate(overrides: Partial<EntryCandidate> = {}): EntryCandidate {
     eventId: null,
     eventName: null,
     eventEndIso: null,
+    sessionType: "TESTING",
     meetingSessionType: null,
     sessionLabel: null,
     whenIso: new Date().toISOString(),
@@ -47,6 +49,7 @@ test("continue: a deep-linked event wins outright", () => {
 test("continue: a race candidate's still-active event re-attaches", () => {
   const e = deriveContinueEntry(
     candidate({
+      sessionType: "RACE_MEETING",
       meetingSessionType: "QUALIFYING",
       eventId: "event-1",
       eventEndIso: new Date(Date.now() + DAY_MS).toISOString(),
@@ -58,16 +61,32 @@ test("continue: a race candidate's still-active event re-attaches", () => {
   assert.equal(e.trackId, null);
 });
 
-test("continue: an ended event carries only the track, as testing", () => {
+test("continue: a past race event still re-attaches (driver keeps logging that meeting)", () => {
   const e = deriveContinueEntry(
     candidate({
+      sessionType: "RACE_MEETING",
       meetingSessionType: "RACE",
       eventId: "event-1",
       eventEndIso: new Date(Date.now() - 3 * DAY_MS).toISOString(),
     }),
     null,
   );
-  assert.equal(e.sessionType, "TESTING");
+  assert.equal(e.sessionType, "RACE_MEETING");
+  assert.equal(e.meetingSessionType, "RACE");
+  assert.equal(e.sessionLabel, "Main");
+  assert.equal(e.eventId, "event-1");
+  // Track derives from the re-attached event.
+  assert.equal(e.trackId, null);
+});
+
+test("continue: a race meeting with no formal event stays a race meeting", () => {
+  const e = deriveContinueEntry(
+    candidate({ sessionType: "RACE_MEETING", meetingSessionType: null, eventId: null }),
+    null,
+  );
+  assert.equal(e.sessionType, "RACE_MEETING");
+  // No sub-session on the source run → defaults to Practice.
+  assert.equal(e.meetingSessionType, "PRACTICE");
   assert.equal(e.eventId, null);
   assert.equal(e.trackId, "track-1");
 });
@@ -78,6 +97,49 @@ test("continue: a testing candidate carries its track", () => {
   assert.equal(e.eventId, null);
   assert.equal(e.trackId, "track-1");
   assert.equal(e.carId, "car-1");
+});
+
+test("edit: mirrors the run's own identity (race meeting keeps event + label)", () => {
+  const e = deriveEditEntry({
+    carId: "car-1",
+    sessionType: "RACE_MEETING",
+    meetingSessionType: "QUALIFYING",
+    sessionLabel: null,
+    eventId: "event-1",
+    trackId: "track-1",
+    trackLayoutId: "layout-1",
+    trackDirection: "CCW",
+  });
+  assert.equal(e.continuing, false);
+  assert.equal(e.sessionType, "RACE_MEETING");
+  assert.equal(e.meetingSessionType, "QUALIFYING");
+  assert.equal(e.eventId, "event-1");
+  assert.equal(e.trackId, "track-1");
+  assert.equal(e.trackDirection, "CCW");
+});
+
+test("edit: SEEDING/OTHER fall back to PRACTICE (hydrate restores the real value)", () => {
+  const e = deriveEditEntry({
+    carId: "car-1",
+    sessionType: "RACE_MEETING",
+    meetingSessionType: "SEEDING",
+    eventId: "event-1",
+  });
+  assert.equal(e.meetingSessionType, "PRACTICE");
+});
+
+test("edit: a testing run carries no event and its own track", () => {
+  const e = deriveEditEntry({
+    carId: "car-1",
+    sessionType: "TESTING",
+    eventId: "event-stale", // trailing pointer must not attach on a testing run
+    trackId: "track-1",
+    sessionLabel: null,
+  });
+  assert.equal(e.sessionType, "TESTING");
+  assert.equal(e.meetingSessionType, null);
+  assert.equal(e.eventId, null);
+  assert.equal(e.trackId, "track-1");
 });
 
 test("fresh: blank testing without an event; race practice with a deep link", () => {

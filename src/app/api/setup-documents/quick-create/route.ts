@@ -18,7 +18,7 @@ import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
-import type { RepickOutcome } from "@/lib/setupCalibrations/autoPickCalibration";
+import type { ChassisCandidate, RepickOutcome } from "@/lib/setupCalibrations/autoPickCalibration";
 import {
   applyPostFingerprintPickLinks,
   pickCalibrationByFingerprint,
@@ -87,6 +87,10 @@ type QuickCreateResponse = {
   carCandidates: Array<{ id: string; name: string }>;
   /** No calibration anywhere matched this sheet's layout. */
   notRecognized: boolean;
+  /** PDF matches >1 chassis and hints couldn't split them — driver must pick which chassis. */
+  needsChassisDisambiguation: boolean;
+  /** The chassis models to offer as a tap-to-answer question when disambiguation is needed. */
+  chassisCandidates: ChassisCandidate[];
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -102,6 +106,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   let mimeType = "";
   let explicitCarIdRaw: string | null = null;
   let explicitModelIdRaw: string | null = null;
+  /** When true, a chassis/car mismatch returns 409 BEFORE creating anything (Assets upload flow). */
+  let blockOnModelMismatch = false;
   /** When set, the file was already stored via client Blob upload (avoids the 4.5MB body limit). */
   let preStoredPath: string | null = null;
   let multipartFile: File | null = null;
@@ -113,6 +119,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       mimeType?: string;
       carId?: string;
       setupSheetModelId?: string;
+      blockOnModelMismatch?: boolean;
     } | null;
     if (!body?.storagePath?.trim()) {
       return NextResponse.json({ error: "Missing storagePath" }, { status: 400 });
@@ -125,6 +132,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     mimeType = (body.mimeType || "").toLowerCase();
     explicitCarIdRaw = typeof body.carId === "string" ? body.carId : null;
     explicitModelIdRaw = typeof body.setupSheetModelId === "string" ? body.setupSheetModelId : null;
+    blockOnModelMismatch = body.blockOnModelMismatch === true;
   } else if (ct.includes("multipart/form-data")) {
     const form = await request.formData().catch(() => null);
     if (!form) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
@@ -137,6 +145,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     mimeType = (file.type || "").toLowerCase();
     explicitCarIdRaw = form.get("carId") as string | null;
     explicitModelIdRaw = form.get("setupSheetModelId") as string | null;
+    blockOnModelMismatch = form.get("blockOnModelMismatch") === "1";
   } else {
     return NextResponse.json(
       { error: "Expected multipart/form-data or application/json" },
@@ -241,22 +250,45 @@ export async function POST(request: Request): Promise<NextResponse> {
   };
   let pickUserNote: string | null = null;
   let calibrationModelMismatch = false;
+  let mismatchDetectedModelId: string | null = null;
+  let mismatchDetectedModelName: string | null = null;
   // Image uploads are car-driven: block (don't process, don't AI-guess) when the car's sheet has
   // no derived image map, or when there's no car context to read the image against.
   let imageBlockReason: string | null = null;
   let imageNeedsCar = false;
+  // PDF matches >1 chassis and hints couldn't split them: block auto-import and ask the driver
+  // which chassis it is (tap-to-answer on the review screen) rather than render a wrong template.
+  let chassisBlockReason: string | null = null;
+  let chassisCandidatesForReview: ChassisCandidate[] = [];
   if (mimeType === PDF_MIME) {
     try {
+      // Cheap disambiguation hints: the file name + the chassis models the uploader owns a car for.
+      const uploaderCars = await prisma.car.findMany({
+        where: { userId: user.id, setupSheetModelId: { not: null } },
+        select: { setupSheetModelId: true },
+        distinct: ["setupSheetModelId"],
+      });
+      const uploaderModelIds = uploaderCars
+        .map((c) => c.setupSheetModelId)
+        .filter((id): id is string => Boolean(id));
       const pick = await pickCalibrationByFingerprint({
         userId: user.id,
         bytes,
         debugPrefix: "quickCreate:auto",
         carSetupSheetModelId: setupSheetModelId,
         carSetupSheetModelName: carSetupSheetModelName,
+        originalFilename,
+        uploaderModelIds,
       });
       outcome = pick;
       pickUserNote = pick.userNote;
       calibrationModelMismatch = pick.modelMismatch;
+      mismatchDetectedModelId = pick.detectedSheetModelId ?? null;
+      mismatchDetectedModelName = pick.detectedSheetModelName ?? null;
+      if (pick.needsChassisDisambiguation && pick.chassisCandidates?.length) {
+        chassisBlockReason = pick.userNote;
+        chassisCandidatesForReview = pick.chassisCandidates;
+      }
       if (pick.pickedCalibrationId) {
         await applyPostFingerprintPickLinks({
           userId: user.id,
@@ -296,6 +328,25 @@ export async function POST(request: Request): Promise<NextResponse> {
     } else {
       imageNeedsCar = true;
     }
+  }
+
+  // Blocking mismatch confirm (Assets upload flow, 2026-07-17): when the caller asked for it and
+  // the PDF fingerprints as a different chassis than the chosen car's sheet model, bail out with
+  // 409 BEFORE storing the file or creating the document. The client shows "Change car / Use
+  // anyway" and retries (without the flag) on confirm. Note: on the client-Blob path the file
+  // already sits in Blob storage — the retry re-sends the same storagePath, nothing is orphaned.
+  if (blockOnModelMismatch && calibrationModelMismatch) {
+    return NextResponse.json(
+      {
+        error:
+          pickUserNote ?? "This sheet matches a different chassis than the selected car.",
+        mismatchBlocked: true,
+        detectedModelId: mismatchDetectedModelId,
+        detectedModelName: mismatchDetectedModelName,
+        targetModelName: carSetupSheetModelName,
+      },
+      { status: 409 }
+    );
   }
 
   // Auto-detect the chassis from the fingerprint. Models are global, so the picked calibration's
@@ -374,10 +425,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   }
 
-  // Chassis not recognized: no calibration anywhere matched this PDF/image layout.
+  // Chassis not recognized: no calibration anywhere matched this PDF/image layout. A cross-chassis
+  // ambiguity is NOT "not recognized" — we recognized several; the driver just needs to pick one.
   const notRecognized =
     !outcome.pickedCalibrationId &&
     !detectedModelId &&
+    !chassisBlockReason &&
     (mimeType === PDF_MIME || mimeType.startsWith("image/"));
 
   // Persist a plain-language note (shown on the review screen via calibrationResolvedDebug).
@@ -437,6 +490,15 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? SetupDocumentImportStages.CALIBRATION_SELECTED
         : SetupDocumentImportStages.AWAITING_CALIBRATION,
       lastCompletedStage: SetupDocumentImportStages.FILE_PERSISTED,
+      // Persist the chassis choices so the review screen can render the tap-to-answer question.
+      ...(chassisBlockReason
+        ? {
+            importDiagnosticJson: {
+              kind: "needs_chassis_disambiguation_v1",
+              candidates: chassisCandidatesForReview,
+            } as object,
+          }
+        : {}),
       ...(pickedCalibrationId
         ? {
             calibrationProfileId: pickedCalibrationId,
@@ -466,7 +528,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   let needsReview = false;
   let needsReviewReason: string | null = null;
   const imageBlocked = Boolean(imageBlockReason) || imageNeedsCar;
-  if (imageBlocked) {
+  if (chassisBlockReason) {
+    // Do NOT run the import pipeline and do NOT render any template: the PDF matches >1 chassis and
+    // we won't guess. The review screen asks the driver which chassis, then re-picks scoped.
+    needsReview = true;
+    needsReviewReason = chassisBlockReason;
+  } else if (imageBlocked) {
     // Do NOT run the import pipeline: no derived calibration means no values to read, and we never
     // fall back to AI-guessing the sheet. Surface the actionable reason for the review screen.
     needsReview = true;
@@ -574,6 +641,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     detectedModelName,
     carCandidates,
     notRecognized,
+    needsChassisDisambiguation: Boolean(chassisBlockReason),
+    chassisCandidates: chassisCandidatesForReview,
   };
   return NextResponse.json(payload, { status: 201 });
 }

@@ -4,28 +4,20 @@ import { useMemo, useState } from "react";
 import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import type { WizardDraftRow } from "@/components/runs/WizardStartControls";
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
-import {
-  deriveContinueEntry,
-  deriveFreshEntry,
-  isCandidateStale,
-} from "@/lib/runs/wizardEntry";
+import { deriveFreshEntry } from "@/lib/runs/wizardEntry";
 import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import type { TrackOption } from "@/components/runs/TrackCombobox";
 
 /**
- * Log-run wizard host (v4, founder interview 2026-07-17 evening): no
- * pre-choice entry phase. The form IS the wizard from step 1 — it mounts
- * immediately on the Session step with every tab live, and the start context
- * is derived here, synchronously:
+ * Log-run wizard host (v6, founder interview 2026-07-17: "prefill should
+ * always be an option — never automatic"). The wizard ALWAYS lands blank; the
+ * Session step's prefill/manifest card offers the selected car's last run and
+ * a single tap applies it in-form (NewRunForm's applyWizardPrefill). There is
+ * no staleness cutoff any more — an old run is still offered, honestly dated.
  *
- * - Recent last run (≤14 days) → **pre-continued**: the run lands already
- *   carrying that run's context, zero taps. The Session step shows the
- *   "Continued from run X" status + a New-log switch.
- * - Stale / no last run → blank new log (GPS fills the track in-form).
- *
- * Switching modes remounts the form via the key (after the switch row's
- * two-tap confirm — it discards what's entered).
+ * "Start blank instead" (the applied card's undo) remounts the form via the
+ * key for a clean slate (GPS venue auto-pick re-runs).
  */
 
 type FormProps = Parameters<typeof NewRunForm>[0];
@@ -53,32 +45,23 @@ export function LogRunWizardHost({
   dashboardPrefill: DashboardNewRunPrefill | null;
   initialCopyPreviewRun: CopyPreviewRunRecord | null;
 }) {
-  // A candidate with no car can't be continued (nothing to copy from).
+  // A candidate with no car can't be prefilled (nothing to copy from). Only
+  // used as the manifest card's instant placeholder while the form's own
+  // per-car last-run fetch resolves.
   const candidate = initialCandidate?.carId ? initialCandidate : null;
   const defaultCarId = entryCars[0]?.id ?? "";
 
-  // Contextual default, decided once at mount: continue only while the last
-  // run is recent. (Initializer runs once — the 14-day boundary crossing
-  // between server and client render is a non-issue.)
-  const [mode, setMode] = useState<"continued" | "fresh">(() =>
-    candidate && !isCandidateStale(candidate) ? "continued" : "fresh"
-  );
-  // Bumped on every explicit switch so re-picking the same mode still remounts.
-  // (The auto-vs-manual copy wording retired 2026-07-17 late — the state reads
-  // the same however it landed.)
-  const [switchSeq, setSwitchSeq] = useState(0);
+  // Bumped by "Start blank instead" so the remount fully clears the run.
+  const [restartSeq, setRestartSeq] = useState(0);
 
   const entry = useMemo(
-    () =>
-      mode === "continued" && candidate
-        ? deriveContinueEntry(candidate, currentEventId)
-        : deriveFreshEntry(defaultCarId, currentEventId),
-    [mode, candidate, currentEventId, defaultCarId]
+    () => deriveFreshEntry(defaultCarId, currentEventId),
+    [defaultCarId, currentEventId]
   );
 
   return (
     <NewRunForm
-      key={`${mode}:${switchSeq}`}
+      key={`blank:${restartSeq}`}
       cars={cars}
       tracks={tracks}
       favouriteTrackIds={favouriteTrackIds}
@@ -90,10 +73,7 @@ export function LogRunWizardHost({
       wizardCandidate={candidate}
       wizardDrafts={drafts}
       wizardDeepLinkedEventId={currentEventId}
-      onWizardRestart={(m) => {
-        setMode(m);
-        setSwitchSeq((s) => s + 1);
-      }}
+      onWizardRestart={() => setRestartSeq((s) => s + 1)}
     />
   );
 }

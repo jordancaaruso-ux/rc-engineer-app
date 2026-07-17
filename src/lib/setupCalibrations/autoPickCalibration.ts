@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { calibrationsAutoPickableByUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import {
   fingerprintPdfFormFieldsFromBytes,
@@ -16,11 +17,19 @@ export type CalibrationFingerprint = {
   setupSheetModelName: string | null;
 };
 
+export type ChassisCandidate = { modelId: string; modelName: string };
+
 export type RepickOutcome = {
   pickedCalibrationId: string | null;
   pickedCalibrationName: string | null;
-  pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "none";
+  pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "needs_disambiguation" | "none";
   pickDebug: string;
+  /**
+   * Set only when `pickSource === "needs_disambiguation"`: the distinct chassis models whose
+   * calibrations all match this PDF's fingerprint. Nothing is auto-applied — the caller must
+   * disambiguate (filename/garage hint, then ask the driver which chassis it is).
+   */
+  crossModelCandidates?: ChassisCandidate[];
 };
 
 export type ExactPickResult =
@@ -29,6 +38,16 @@ export type ExactPickResult =
   | {
       kind: "ambiguous";
       names: string[];
+      suggestedCalibrationId: string;
+      suggestedCalibrationName: string;
+    }
+  | {
+      // Multiple exact fingerprint matches spanning >1 distinct chassis model (e.g. Mugen MTC3 and
+      // Awesomatix A800RR share the same generic AcroForm field names). Not auto-applied — the
+      // wrong chassis silently mis-templates the whole sheet. Caller must disambiguate.
+      kind: "ambiguous_cross_model";
+      candidates: CalibrationFingerprint[];
+      models: ChassisCandidate[];
       suggestedCalibrationId: string;
       suggestedCalibrationName: string;
     };
@@ -131,6 +150,25 @@ export function pickExactCalibration(
   if (matches.length > 1) {
     // Candidates are passed in most-recent-first order (see buildCalibrationFingerprints orderBy).
     const first = matches[0]!;
+    // Distinct linked chassis among the matches (collapse duplicate model rows by normalized name;
+    // unlinked/null-model calibrations are generic and don't identify a chassis).
+    const modelByNorm = new Map<string, ChassisCandidate>();
+    for (const m of matches) {
+      const modelId = m.setupSheetModelId?.trim() || null;
+      const modelName = m.setupSheetModelName?.trim() || null;
+      if (!modelId || !modelName) continue;
+      const norm = normalizeSetupSheetModelName(modelName);
+      if (!modelByNorm.has(norm)) modelByNorm.set(norm, { modelId, modelName });
+    }
+    if (modelByNorm.size >= 2) {
+      return {
+        kind: "ambiguous_cross_model",
+        candidates: matches,
+        models: [...modelByNorm.values()],
+        suggestedCalibrationId: first.calibrationId,
+        suggestedCalibrationName: first.calibrationName,
+      };
+    }
     return {
       kind: "ambiguous",
       names: matches.map((m) => m.calibrationName),
@@ -174,6 +212,17 @@ export async function repickCalibrationForBytes(
       pickedCalibrationName: result.calibrationName,
       pickSource: "exact_fingerprint",
       pickDebug: `${prefix} exact=${result.calibrationName}`,
+    };
+  }
+  if (result.kind === "ambiguous_cross_model") {
+    // Never auto-apply across chassis — the fingerprint can't tell them apart. Hand the distinct
+    // models back for filename/garage disambiguation or a tap-to-answer chassis question.
+    return {
+      pickedCalibrationId: null,
+      pickedCalibrationName: null,
+      pickSource: "needs_disambiguation",
+      pickDebug: `${prefix} ambiguous_cross_model (${result.models.map((m) => m.modelName).join(" | ")})`,
+      crossModelCandidates: result.models,
     };
   }
   if (result.kind === "ambiguous") {

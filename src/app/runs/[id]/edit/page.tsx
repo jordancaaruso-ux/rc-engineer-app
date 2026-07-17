@@ -8,6 +8,7 @@ import { RunVideoAnalysisSection } from "@/components/videoAnalysis/RunVideoAnal
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
+import { deriveEditEntry } from "@/lib/runs/wizardEntry";
 
 export const dynamic = "force-dynamic";
 
@@ -180,12 +181,45 @@ export default async function EditRunPage({
   const favSet = new Set(favouriteTrackIds);
   const favouriteTracks = allTracks.filter((t) => favSet.has(t.id));
 
+  // All edits open in the wizard (founder 2026-07-17): finishing a draft
+  // resumes at the first unfinished step; editing a completed run reviews from
+  // Session. `?wizard=0` (or NEXT_PUBLIC_LOGRUN_WIZARD=0) forces the classic
+  // single-page editor; the imported-lap attach deep link stays classic (its
+  // prefill lands mid-form on lap ingest).
+  const wizardForced =
+    process.env.NEXT_PUBLIC_LOGRUN_WIZARD === "1" ||
+    (typeof sp.wizard === "string" && sp.wizard === "1");
+  const wizardDisabled =
+    process.env.NEXT_PUBLIC_LOGRUN_WIZARD === "0" ||
+    (typeof sp.wizard === "string" && sp.wizard === "0");
+  const classicOnlyContext =
+    typeof sp.importedLapTimeSessionId === "string" &&
+    sp.importedLapTimeSessionId.trim().length > 0;
+  const wizardEnabled = !wizardDisabled && (wizardForced || !classicOnlyContext);
+  const wizardEntry = wizardEnabled
+    ? deriveEditEntry({
+        carId: run.carId ?? run.car?.id ?? null,
+        sessionType: run.sessionType,
+        meetingSessionType: run.meetingSessionType,
+        sessionLabel: run.sessionLabel,
+        eventId: run.eventId,
+        trackId: run.trackId,
+        trackLayoutId: run.trackLayoutId ?? run.trackLayout?.id ?? null,
+        trackDirection: run.trackDirection ?? null,
+      })
+    : null;
+  const finishingDraft = wizardEnabled && run.loggingComplete === false;
+
   return (
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">Edit run</h1>
-          <p className="page-subtitle">Update notes, laps, tire context, or setup details.</p>
+          <h1 className="page-title">{finishingDraft ? "Finish your run" : "Edit run"}</h1>
+          <p className="page-subtitle">
+            {finishingDraft
+              ? "Pick up where you left off — laps, feedback, done."
+              : "Update notes, laps, tire context, or setup details."}
+          </p>
         </div>
       </header>
       <section className="page-body">
@@ -195,6 +229,7 @@ export default async function EditRunPage({
           favouriteTrackIds={favouriteTrackIds}
           favouriteTracks={favouriteTracks}
           dashboardPrefill={dashboardPrefill}
+          wizard={wizardEntry}
           editRun={{
             id: run.id,
             createdAt: run.createdAt.toISOString(),

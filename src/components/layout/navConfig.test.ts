@@ -12,7 +12,7 @@ import {
 test("mobile dock is five pure destinations, in order, without add-run or settings", () => {
   assert.deepEqual(
     MOBILE_NAV.map((item) => item.id),
-    ["dashboard", "analysis", "assets", "engineer", "teams"]
+    ["dashboard", "analysis", "engineer", "assets", "teams"]
   );
 });
 

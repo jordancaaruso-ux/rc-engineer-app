@@ -25,8 +25,10 @@ import type { WizardStepStatus } from "@/components/runs/LogRunWizardRail";
  *   links, which scrolled away): the persistent "what now" —
  *   "Next: <step> →" naming the destination tab (founder 2026-07-17) through
  *   Prep · the seam pair on Setup ("Run done — laptimes →" / "Not run yet —
- *   save draft 💾") · "Next: Feedback →" on Laps · Save on Feedback
- *   (label/color follow the DECLARED badge — Save never decides completion).
+ *   save draft 💾") · "Next: Feedback →" on Laps · a matching pair on Feedback
+ *   ("Save draft 💾" / "Mark run complete 🏁" — founder 2026-07-17: the
+ *   in-content mark-complete button + Draft badge were retired, so completion
+ *   lives here). Editing an already-complete run collapses to "Save edits".
  * - **Escape hatch** top-left, where the brand pill normally sits: "← Save &
  *   exit" — the founder's fix for the flow feeling trapped; one tap banks the
  *   draft (or the declared complete) and leaves.
@@ -65,26 +67,30 @@ export function LogRunWizardBottomBar({
   current,
   statusById,
   onSelect,
-  markedComplete,
+  editingCompleted,
   canSave,
   saving,
   saveSuccess,
   onSave,
   onSaveDraft,
+  onComplete,
   onExit,
 }: {
   current: WizardStepId;
   statusById?: Partial<Record<WizardStepId, WizardStepStatus>>;
   onSelect: (id: WizardStepId) => void;
-  /** Declared completion state — styles the Save action, never decided here. */
-  markedComplete: boolean;
+  /** The run was already saved complete — the Feedback pair collapses to a
+   *  single "Save edits" that preserves completion (no un-complete). */
+  editingCompleted: boolean;
   canSave: boolean;
   saving: boolean;
   saveSuccess: boolean;
-  /** Save with the declared intent (Feedback action + the escape hatch). */
+  /** Save preserving the current completion (Feedback "Save edits" + escape). */
   onSave: () => void;
-  /** Explicit draft save — the Setup boundary's "Not run yet" walk-away. */
+  /** Explicit draft save — the Setup boundary + Feedback's left button. */
   onSaveDraft: () => void;
+  /** Feedback "Mark run complete 🏁": validates, saves complete, then leaves. */
+  onComplete: () => void;
   /** "← Save & exit": banks the run and leaves (plain exit when unsaveable). */
   onExit: () => void;
 }) {
@@ -122,13 +128,6 @@ export function LogRunWizardBottomBar({
 
   const nextId = nextWalkStep(current, walkStepIds());
   const busy = !canSave || saving;
-  const saveLabel = saveSuccess
-    ? "Saved ✓"
-    : saving
-      ? "Saving…"
-      : markedComplete
-        ? "Save 🏁"
-        : "Save 💾";
 
   return createPortal(
     <>
@@ -172,23 +171,40 @@ export function LogRunWizardBottomBar({
               </button>
             </>
           ) : current === "feel" ? (
-            <button
-              type="button"
-              className={cn(
-                markedComplete ? PILL_PRIMARY : PILL_OUTLINE,
-                busy && "pointer-events-none opacity-60"
-              )}
-              onClick={onSave}
-              disabled={busy}
-              aria-busy={saving && !saveSuccess}
-              title={
-                markedComplete
-                  ? "Marked complete — saving finishes the run."
-                  : "Saves as a draft — tap the Draft badge to mark complete."
-              }
-            >
-              {saveLabel}
-            </button>
+            editingCompleted ? (
+              <button
+                type="button"
+                className={cn(PILL_PRIMARY, busy && "pointer-events-none opacity-60")}
+                onClick={onSave}
+                disabled={busy}
+                aria-busy={saving && !saveSuccess}
+                title="Save changes — the run stays complete."
+              >
+                {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save edits"}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={cn(PILL_OUTLINE, busy && "pointer-events-none opacity-60")}
+                  onClick={onSaveDraft}
+                  disabled={busy}
+                  title="Save what you have — finish the run any time."
+                >
+                  {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save draft 💾"}
+                </button>
+                <button
+                  type="button"
+                  className={cn(PILL_PRIMARY, busy && "pointer-events-none opacity-60")}
+                  onClick={onComplete}
+                  disabled={busy}
+                  aria-busy={saving && !saveSuccess}
+                  title="Mark this run finished and save."
+                >
+                  {saving ? "Saving…" : "Mark run complete 🏁"}
+                </button>
+              </>
+            )
           ) : nextId ? (
             <button type="button" className={PILL_PRIMARY} onClick={() => onSelect(nextId)}>
               Next: {stepLabel(nextId)} →

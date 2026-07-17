@@ -18,6 +18,7 @@ export function SurfaceCard({
   contentClassName,
   overflowHidden = true,
   muted = false,
+  bare = false,
 }: {
   children: ReactNode;
   variant?: "hero" | "panel";
@@ -27,9 +28,24 @@ export function SurfaceCard({
   overflowHidden?: boolean;
   /** Subtle grey-out after an action (e.g. copy last run applied). */
   muted?: boolean;
+  /**
+   * Drop the glass chrome entirely (no border, fill, radius, or padding) and
+   * render the content as a plain section — for surfaces that live INSIDE
+   * another card (e.g. the log-run wizard's unified Session card) without
+   * changing the children's structure between modes.
+   */
+  bare?: boolean;
 }) {
   const isHero = variant === "hero";
   const radiusClass = isHero ? "rounded-2xl" : "rounded-xl";
+
+  if (bare) {
+    return (
+      <div className={className}>
+        <div className={cn("relative", contentClassName)}>{children}</div>
+      </div>
+    );
+  }
 
   return (
     <div

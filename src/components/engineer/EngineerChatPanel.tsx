@@ -1109,9 +1109,7 @@ export function EngineerChatPanel({
 
           <p className="text-[11px] text-muted-foreground leading-snug">
 
-            Ask about setup, handling, or laps. Set a primary run in{" "}
-
-            <span className="text-foreground/80">Compare &amp; trend</span> to anchor answers.
+            Ask about setup, handling, or laps.
 
           </p>
 

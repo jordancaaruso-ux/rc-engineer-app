@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import {
   buildCalibrationFingerprints,
   repickCalibrationForBytes,
+  type ChassisCandidate,
   type RepickOutcome,
 } from "@/lib/setupCalibrations/autoPickCalibration";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
@@ -16,6 +17,10 @@ export type FingerprintPickContext = {
   /** Target setup sheet model (chassis type) — fingerprint is scoped here first. */
   carSetupSheetModelId?: string | null;
   carSetupSheetModelName?: string | null;
+  /** Uploaded file name — a cheap disambiguation hint when the fingerprint spans >1 chassis. */
+  originalFilename?: string | null;
+  /** Setup-sheet-model ids of cars the uploader owns — the other cheap disambiguation hint. */
+  uploaderModelIds?: readonly string[];
 };
 
 export type FingerprintPickResult = RepickOutcome & {
@@ -25,7 +30,49 @@ export type FingerprintPickResult = RepickOutcome & {
   /** When PDF matches a different chassis type than selected. */
   detectedSheetModelId?: string | null;
   detectedSheetModelName?: string | null;
+  /** True when the PDF matches >1 chassis and hints couldn't split them — ask the driver. */
+  needsChassisDisambiguation?: boolean;
+  /** The chassis models to offer as a tap-to-answer question when disambiguation is needed. */
+  chassisCandidates?: ChassisCandidate[];
 };
+
+/** A model-name token (≥3 chars) appears in the file name, e.g. "MTC3_CW.pdf" → Mugen MTC3. */
+function filenameHitsModel(filename: string | null | undefined, modelName: string): boolean {
+  if (!filename?.trim()) return false;
+  const fn = filename.toLowerCase();
+  return modelName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3)
+    .some((t) => fn.includes(t));
+}
+
+/**
+ * Narrow cross-chassis fingerprint matches to a single chassis using cheap signals, without ever
+ * silently guessing: an intersection of both signals wins; else a lone file-name hit; else a lone
+ * garage match. Returns null when the signals can't split it (→ ask the driver).
+ */
+export function narrowChassisByHints(
+  candidates: ChassisCandidate[],
+  filename: string | null | undefined,
+  uploaderModelIds: readonly string[] | undefined
+): (ChassisCandidate & { basis: string }) | null {
+  const garage = new Set((uploaderModelIds ?? []).map((s) => s.trim()).filter(Boolean));
+  const byFilename = candidates.filter((c) => filenameHitsModel(filename, c.modelName));
+  const byGarage = candidates.filter((c) => garage.has(c.modelId));
+  const intersection = byFilename.filter((c) => garage.has(c.modelId));
+  if (intersection.length === 1) return { ...intersection[0]!, basis: "file name + your garage" };
+  if (byFilename.length === 1) return { ...byFilename[0]!, basis: "file name" };
+  if (byGarage.length === 1) return { ...byGarage[0]!, basis: "your garage" };
+  return null;
+}
+
+function chassisAskNote(models: ChassisCandidate[]): string {
+  const names = models.map((m) => m.modelName);
+  const list =
+    names.length <= 2 ? names.join(" or ") : `${names.slice(0, -1).join(", ")}, or ${names.at(-1)}`;
+  return `This sheet's layout is shared by more than one chassis (${list}). Tell me which one it is and I'll import it correctly.`;
+}
 
 function humanPickNote(outcome: RepickOutcome): string | null {
   if (outcome.pickSource === "exact_fingerprint" && outcome.pickedCalibrationName) {
@@ -142,6 +189,45 @@ export async function pickCalibrationByFingerprint(
       debugPrefix: prefix,
       suggestOnAmbiguous: true,
     });
+    // Fingerprint spans >1 chassis (e.g. MTC3 & A800RR share generic Text1..N fields). Try cheap
+    // hints (file name, uploader's garage) before ever rendering a guess; else ask the driver.
+    if (outcome.pickSource === "needs_disambiguation" && outcome.crossModelCandidates?.length) {
+      const resolved = narrowChassisByHints(
+        outcome.crossModelCandidates,
+        input.originalFilename,
+        input.uploaderModelIds
+      );
+      if (resolved) {
+        const scoped = scopeCandidates(candidates, resolved.modelId, resolved.modelName);
+        const scopedOutcome = await repickCalibrationForBytes(input.bytes, scoped, {
+          debugPrefix: `${prefix}:disambig`,
+          suggestOnAmbiguous: true,
+        });
+        if (scopedOutcome.pickedCalibrationId) {
+          outcome = {
+            ...scopedOutcome,
+            pickDebug: `${prefix} disambiguated=${resolved.modelName} by ${resolved.basis} → ${scopedOutcome.pickDebug}`,
+          };
+        } else {
+          // Resolved a chassis but couldn't land a calibration for it — fall back to asking.
+          return {
+            ...outcome,
+            userNote: chassisAskNote(outcome.crossModelCandidates),
+            modelMismatch: false,
+            needsChassisDisambiguation: true,
+            chassisCandidates: outcome.crossModelCandidates,
+          };
+        }
+      } else {
+        return {
+          ...outcome,
+          userNote: chassisAskNote(outcome.crossModelCandidates),
+          modelMismatch: false,
+          needsChassisDisambiguation: true,
+          chassisCandidates: outcome.crossModelCandidates,
+        };
+      }
+    }
   }
 
   let modelMismatch = false;

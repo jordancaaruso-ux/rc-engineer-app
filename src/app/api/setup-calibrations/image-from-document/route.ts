@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import {
   calibrationReadableByIdWhere,
   canManageCalibration,
+  verifiedAtForNewCalibration,
 } from "@/lib/setupCalibrations/calibrationAccess";
 import { prisma } from "@/lib/prisma";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
@@ -282,6 +283,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       sourceType: "awesomatix_image_v1",
       calibrationDataJson: ({ templateType: "image_region_v1", imageCalibration } as unknown) as object,
       exampleDocumentId,
+      // Admin-authored calibrations are auto-trusted for cross-user auto-pick.
+      verifiedAt: verifiedAtForNewCalibration(user),
     },
     select: { id: true },
   });

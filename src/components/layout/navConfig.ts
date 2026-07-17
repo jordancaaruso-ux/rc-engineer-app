@@ -131,22 +131,22 @@ const ADD_RUN: PrimaryNavItem = {
   prefetch: false,
 };
 const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: BarChart3 };
-const ASSETS: PrimaryNavItem = { id: "assets", href: "/assets", label: "Assets", icon: Car };
+const ASSETS: PrimaryNavItem = { id: "assets", href: "/assets", label: "Garage", icon: Car };
 const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: Sparkles };
 const TEAMS: PrimaryNavItem = { id: "teams", href: "/teams", label: "Teams", icon: Users };
 const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: Settings };
 
-export const PRIMARY_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSETS, ENGINEER, TEAMS, SETTINGS];
+export const PRIMARY_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ENGINEER, ASSETS, TEAMS, SETTINGS];
 
 /** Desktop sidebar: full section list, natural top-to-bottom order. */
-export const DESKTOP_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ASSETS, ENGINEER, TEAMS, SETTINGS];
+export const DESKTOP_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ENGINEER, ASSETS, TEAMS, SETTINGS];
 
 /**
  * Mobile bottom dock: five pure destinations. `Add run` is now a floating pill
  * FAB (`LogRunFab`) and `Settings` lives behind the account avatar
  * (`AccountMenu`), so neither sits in the dock. See `shouldShowLogRunFab`.
  */
-export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ASSETS, ENGINEER, TEAMS];
+export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ENGINEER, ASSETS, TEAMS];
 
 export type NavHubIconKey =
   | "car"
@@ -218,7 +218,7 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
       },
       {
         href: "/setup",
-        label: "Setup",
+        label: "My setups",
         description: "Your setup documents and bulk import.",
         icon: "wrench",
       },

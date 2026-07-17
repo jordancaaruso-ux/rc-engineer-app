@@ -9,6 +9,7 @@ import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrat
 import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDocumentReviewClient";
 import { AutoRefreshWhileProcessing } from "@/components/setup-documents/AutoRefreshWhileProcessing";
 import { AiExtractionReviewPanel, type AiReviewField } from "@/components/setup-documents/AiExtractionReviewPanel";
+import { ChassisDisambiguationPrompt, type ChassisChoice } from "@/components/setup-documents/ChassisDisambiguationPrompt";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { loadSetupSheetModelById } from "@/lib/setupSheetModels/resolveModelForCar";
@@ -139,6 +140,17 @@ export default async function SetupDocumentDetailPage({
 
   const isImage = doc.sourceType === "IMAGE" || (doc.mimeType ?? "").startsWith("image/");
 
+  // Cross-chassis ambiguity: the upload matched >1 chassis and hints couldn't split them. Offer a
+  // tap-to-answer question instead of rendering a guessed template (quick-create sets this marker).
+  const chassisDisambig =
+    doc.importDiagnosticJson &&
+    typeof doc.importDiagnosticJson === "object" &&
+    (doc.importDiagnosticJson as { kind?: string }).kind === "needs_chassis_disambiguation_v1"
+      ? ((doc.importDiagnosticJson as { candidates?: unknown }).candidates as ChassisChoice[] | undefined)
+      : undefined;
+  const chassisCandidates =
+    Array.isArray(chassisDisambig) && !doc.setupSheetModelId ? chassisDisambig : null;
+
   // AI-read documents get the side-by-side review panel: model schema supplies labels,
   // sections, and choice options; the AI diagnostic supplies confidence + flagged keys.
   let aiReviewFields: AiReviewField[] | null = null;
@@ -227,7 +239,7 @@ export default async function SetupDocumentDetailPage({
       <header className="page-header">
         <div>
           <h1 className="page-title">Review setup</h1>
-          <p className="page-subtitle">Check the imported values look right, then return to Setup.</p>
+          <p className="page-subtitle">Check the imported values look right.</p>
         </div>
       </header>
       {showImageCalibrateCta && !aiReviewFields ? (
@@ -272,6 +284,9 @@ export default async function SetupDocumentDetailPage({
             </CardPanel>
           )}
         </div>
+      ) : null}
+      {chassisCandidates && chassisCandidates.length > 0 ? (
+        <ChassisDisambiguationPrompt docId={doc.id} candidates={chassisCandidates} />
       ) : null}
       <AutoRefreshWhileProcessing
         active={doc.importStatus === "PENDING" || doc.importStatus === "PROCESSING"}

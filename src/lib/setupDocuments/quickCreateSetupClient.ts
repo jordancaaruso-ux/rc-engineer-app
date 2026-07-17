@@ -16,7 +16,7 @@ export type QuickCreateSetupResponse = {
   setupId: string | null;
   calibrationId: string | null;
   calibrationName: string | null;
-  pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "none";
+  pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "needs_disambiguation" | "none";
   pickDebug: string;
   parseStatus: "PENDING" | "PARSED" | "PARTIAL" | "FAILED";
   needsReview: boolean;
@@ -33,15 +33,24 @@ export type QuickCreateSetupResponse = {
   notRecognized?: boolean;
 };
 
+/** 409 payload when the server blocked on a chassis/car mismatch (blockOnModelMismatch). */
+export type QuickCreateMismatchInfo = {
+  detectedModelId: string | null;
+  detectedModelName: string | null;
+  targetModelName: string | null;
+};
+
 export type PostQuickCreateSetupResult =
   | { ok: true; data: QuickCreateSetupResponse }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; mismatch?: QuickCreateMismatchInfo };
 
 export type QuickCreateSetupTarget = {
   /** Preferred: chassis / setup sheet model (one per car type). */
   setupSheetModelId?: string;
   /** Optional: link to a specific car when model is omitted. */
   carId?: string;
+  /** Ask the server to 409 (nothing created) when the sheet reads as a different chassis than the car. */
+  blockOnModelMismatch?: boolean;
 };
 
 function uploadErrorMessage(status: number, fallback?: string): string {
@@ -49,6 +58,30 @@ function uploadErrorMessage(status: number, fallback?: string): string {
     return "File too large for direct upload. Try again — the app should stream large files automatically.";
   }
   return fallback?.trim() || `Upload failed (${status})`;
+}
+
+type QuickCreateErrorBody = Partial<QuickCreateSetupResponse> & {
+  error?: string;
+  mismatchBlocked?: boolean;
+  targetModelName?: string | null;
+};
+
+/** Shared failure shape; carries the mismatch payload when the server 409-blocked. */
+function quickCreateFailure(status: number, data: QuickCreateErrorBody): PostQuickCreateSetupResult {
+  return {
+    ok: false,
+    status,
+    error: uploadErrorMessage(status, data.error),
+    ...(data.mismatchBlocked
+      ? {
+          mismatch: {
+            detectedModelId: data.detectedModelId ?? null,
+            detectedModelName: data.detectedModelName ?? null,
+            targetModelName: data.targetModelName ?? null,
+          },
+        }
+      : {}),
+  };
 }
 
 function parseQuickCreateResponse(
@@ -107,19 +140,14 @@ export async function postQuickCreateSetup(
           mimeType: file.type,
           ...(modelId ? { setupSheetModelId: modelId } : {}),
           ...(carId ? { carId } : {}),
+          ...(target.blockOnModelMismatch ? { blockOnModelMismatch: true } : {}),
         }),
         signal: controller.signal,
       });
-      const data = (await res.json().catch(() => ({}))) as Partial<QuickCreateSetupResponse> & {
-        error?: string;
-      };
+      const data = (await res.json().catch(() => ({}))) as QuickCreateErrorBody;
       const parsed = parseQuickCreateResponse(data);
       if (!res.ok || !parsed) {
-        return {
-          ok: false,
-          status: res.status,
-          error: uploadErrorMessage(res.status, data.error),
-        };
+        return quickCreateFailure(res.status, data);
       }
       return { ok: true, data: parsed };
     }
@@ -128,21 +156,16 @@ export async function postQuickCreateSetup(
     fd.set("file", file);
     if (modelId) fd.set("setupSheetModelId", modelId);
     if (carId) fd.set("carId", carId);
+    if (target.blockOnModelMismatch) fd.set("blockOnModelMismatch", "1");
     const res = await fetch("/api/setup-documents/quick-create", {
       method: "POST",
       body: fd,
       signal: controller.signal,
     });
-    const data = (await res.json().catch(() => ({}))) as Partial<QuickCreateSetupResponse> & {
-      error?: string;
-    };
+    const data = (await res.json().catch(() => ({}))) as QuickCreateErrorBody;
     const parsed = parseQuickCreateResponse(data);
     if (!res.ok || !parsed) {
-      return {
-        ok: false,
-        status: res.status,
-        error: uploadErrorMessage(res.status, data.error),
-      };
+      return quickCreateFailure(res.status, data);
     }
     return { ok: true, data: parsed };
   } catch (e) {

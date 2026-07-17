@@ -284,7 +284,6 @@ export function LapTimesIngestPanel({
   trackLiveRcUrl,
   trackSpeedhiveUrl,
   editingRunId,
-  isDraftResume,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
@@ -301,8 +300,6 @@ export function LapTimesIngestPanel({
   trackSpeedhiveUrl?: string | null;
   /** When editing a run, linked timing imports stay visible in discovery even if already imported. */
   editingRunId?: string | null;
-  /** Draft being finished — show saved lap import with emerald styling like other draft sections. */
-  isDraftResume?: boolean;
 }) {
   const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
@@ -415,7 +412,6 @@ export function LapTimesIngestPanel({
   const activeImportUrl = activeImportBlock?.sourceUrl.trim() ?? "";
 
   const hasLinkedLapImport = Boolean(activeImportBlock);
-  const showDraftLapSavedStyle = Boolean(isDraftResume && hasLinkedLapImport);
 
   const sortedDayScanCandidates = useMemo(() => {
     if (!dayScanCandidates?.length) return [];
@@ -945,20 +941,10 @@ export function LapTimesIngestPanel({
     <SurfaceCard
       variant="panel"
       overflowHidden={false}
-      className={cn(showDraftLapSavedStyle && "border-emerald-500/40")}
       contentClassName="space-y-3"
     >
       <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Lap times</Eyebrow>
-        {showDraftLapSavedStyle ? (
-          <span
-            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
-            title="Lap times were saved when this draft was logged."
-          >
-            <span aria-hidden>✓</span>
-            <span>Saved from draft</span>
-          </span>
-        ) : null}
         {hasLinkedLapImport && isUrlTab(tab) ? (
           <button
             type="button"
@@ -983,12 +969,7 @@ export function LapTimesIngestPanel({
         <div className="space-y-2 text-sm">
           {hasTrackDiscovery || lapImportEventId?.trim() ? (
             <div
-              className={cn(
-                "space-y-2 rounded-md border p-2",
-                showDraftLapSavedStyle
-                  ? "border-emerald-500/35 bg-emerald-500/5"
-                  : "border-border bg-surface-runna"
-              )}
+              className="space-y-2 rounded-md border border-border bg-surface-runna p-2"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-baseline gap-2">

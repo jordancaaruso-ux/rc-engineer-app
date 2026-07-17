@@ -1,5 +1,6 @@
 import { ASSETS_HUB_SECTIONS, type NavHubSection } from "@/components/layout/navConfig";
 import { AssetsHubClient } from "@/components/assets/AssetsHubClient";
+import { UploadSetupSheetBar, type UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
@@ -20,6 +21,8 @@ function sectionsForUser(isAdmin: boolean): NavHubSection[] {
 export default async function AssetsHubPage() {
   let counts: Record<string, number> | undefined;
   let isAdmin = false;
+  /** Cars for the Upload-setup-sheet flow; null hides the bar (DB missing / hiccup). */
+  let uploadCars: UploadSetupCar[] | null = null;
 
   if (hasDatabaseUrl()) {
     // requireCurrentUser may redirect — call it outside the try so the redirect
@@ -27,11 +30,22 @@ export default async function AssetsHubPage() {
     const user = await requireCurrentUser();
     isAdmin = isAuthAdminEmail(user.email);
     try {
-      const [cars, tireSets] = await Promise.all([
+      const [cars, tireSets, carRows] = await Promise.all([
         prisma.car.count({ where: { userId: user.id } }),
         prisma.tireSet.count({ where: { userId: user.id, archivedAt: null } }),
+        prisma.car.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, name: true, setupSheetModel: { select: { name: true } } },
+          take: 25,
+        }),
       ]);
       counts = { "/cars": cars, "/tire-sets": tireSets };
+      uploadCars = carRows.map((c) => ({
+        id: c.id,
+        name: c.name,
+        chassisName: c.setupSheetModel?.name ?? null,
+      }));
     } catch {
       // Counts are decoration — a DB hiccup shouldn't blank the hub.
       counts = undefined;
@@ -47,6 +61,7 @@ export default async function AssetsHubPage() {
         </div>
       </header>
       <section className="page-body max-w-2xl flex flex-col gap-3">
+        {uploadCars ? <UploadSetupSheetBar cars={uploadCars} /> : null}
         <AssetsHubClient sections={sectionsForUser(isAdmin)} counts={counts} />
       </section>
     </>

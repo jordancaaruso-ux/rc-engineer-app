@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import { CalendarPlus } from "lucide-react";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
@@ -8,12 +7,8 @@ import { DashboardNextEventPrepCard } from "@/components/dashboard/DashboardNext
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
 import { DashboardTodaySoFarCard } from "@/components/dashboard/DashboardTodaySoFarCard";
-import { DashboardEngineerSuggestionsSection } from "@/components/dashboard/DashboardEngineerSuggestionsSection";
-import { SHOW_DASHBOARD_ENGINEER_SUGGESTIONS } from "@/lib/featureFlags";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { HeroPanel } from "@/components/ui/HeroPanel";
 import { Reveal } from "@/components/ui/Reveal";
-import { Eyebrow } from "@/components/ui/panel";
 
 /**
  * Adaptive dashboard — two modes, auto-switched (docs/DASHBOARD_NORTH_STAR.md,
@@ -21,7 +16,7 @@ import { Eyebrow } from "@/components/ui/panel";
  * next action, verdicts not evidence; depth lives in Analysis / Sessions.
  *
  *   Track day (run/draft today, or an active event):
- *     CTA → Today so far → Engineer's read → Things to try → 30-day summary
+ *     CTA → Today so far → Things to try → 30-day summary
  *   Off day:
  *     CTA → Next event prep → Last-session digest → Try/Do lists → 30-day summary
  *
@@ -49,7 +44,6 @@ export function DashboardHome({
     todayStrip,
     todayContext,
     lastSessionDigest,
-    engineerSuggestionsPrimaryRunId,
   } = model;
 
   // Server-resolved mode. The client draft provider can only add a draft the
@@ -58,25 +52,6 @@ export function DashboardHome({
     hasRunToday || Boolean(todayDraftRunId) || featuredEvent?.status === "active";
 
   const nextEvent = featuredEvent?.status === "next" ? featuredEvent : null;
-
-  const engineerRead =
-    SHOW_DASHBOARD_ENGINEER_SUGGESTIONS && isTrackDay ? (
-      <Suspense
-        fallback={
-          <HeroPanel>
-            <Eyebrow dot="muted">Engineer&apos;s read</Eyebrow>
-            <p className="ui-caption mt-1.5">Loading…</p>
-          </HeroPanel>
-        }
-      >
-        <DashboardEngineerSuggestionsSection
-          primaryRunId={engineerSuggestionsPrimaryRunId}
-          carName={recentRun?.carName ?? "Car"}
-          trackName={recentRun?.trackName ?? null}
-          eventName={recentRun?.eventName ?? null}
-        />
-      </Suspense>
-    ) : null;
 
   return (
     <>
@@ -101,10 +76,8 @@ export function DashboardHome({
               <DashboardTodaySoFarCard strip={todayStrip} context={todayContext} />
             </Reveal>
 
-            {engineerRead ? <Reveal index={2}>{engineerRead}</Reveal> : null}
-
             {/* The driver's own experiment list, live during a session. */}
-            <Reveal index={3}>
+            <Reveal index={2}>
               <CardPanel>
                 <ActionItemListPanel
                   list="try"

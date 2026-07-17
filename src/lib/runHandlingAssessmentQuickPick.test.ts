@@ -16,9 +16,9 @@ test("formatFeelVsLastRunQuickLabel maps quick-pick values including Similar", (
   assert.equal(formatFeelVsLastRunQuickLabel(3), "Much better");
 });
 
-test("coerceFeelVsLastRunForCompleteRun requires selection when prior run exists", () => {
+test("coerceFeelVsLastRunForCompleteRun no longer blocks when prior run exists (picker retired)", () => {
   const result = coerceFeelVsLastRunForCompleteRun(null, true);
-  assert.equal(result.error, "Pick how this run felt vs your last run on this car before marking complete.");
+  assert.equal(result.error, undefined);
   assert.equal(result.parsed, null);
 });
 

@@ -247,7 +247,6 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
     const params = new URLSearchParams();
     params.set("runId", engineerCompareState.runIdA);
     params.set("compareRunId", engineerCompareState.runIdB);
-    params.set("engineerTab", "compare");
     router.push(`/engineer?${params.toString()}`);
   }, [engineerCompareState, router]);
 

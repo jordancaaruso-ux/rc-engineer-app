@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { calibrationsVisibleToUserWhere, calibrationReadableByIdWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import {
+  calibrationsVisibleToUserWhere,
+  calibrationReadableByIdWhere,
+  verifiedAtForNewCalibration,
+} from "@/lib/setupCalibrations/calibrationAccess";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -72,6 +76,8 @@ export async function POST(request: Request) {
       calibrationDataJson: (body.calibrationDataJson ?? {}) as object,
       exampleDocumentId: body.exampleDocumentId ?? inheritedExampleDocumentId ?? null,
       setupSheetModelId,
+      // Admin-authored calibrations are auto-trusted for cross-user auto-pick.
+      verifiedAt: verifiedAtForNewCalibration(user),
     },
     select: { id: true, name: true },
   });

@@ -14,6 +14,8 @@ export type EntryCandidate = {
   eventName: string | null;
   /** Event end date (ISO) — lets the entry screen tell whether the event is still active. */
   eventEndIso: string | null;
+  /** Coarse session type of the run ("TESTING" | "RACE_MEETING" | legacy "PRACTICE"). */
+  sessionType: string | null;
   meetingSessionType: string | null;
   sessionLabel: string | null;
   whenIso: string;
@@ -27,6 +29,7 @@ type CandidateRow = {
   trackId: string | null;
   trackNameSnapshot?: string | null;
   eventId: string | null;
+  sessionType?: string | null;
   meetingSessionType: string | null;
   sessionLabel: string | null;
   car?: { id: string; name: string } | null;
@@ -46,6 +49,7 @@ export function toEntryCandidate(row: CandidateRow | null | undefined): EntryCan
     eventId: row.eventId ?? row.event?.id ?? null,
     eventName: row.event?.name ?? null,
     eventEndIso: eventEnd ? new Date(eventEnd).toISOString() : null,
+    sessionType: row.sessionType ?? null,
     meetingSessionType: row.meetingSessionType ?? null,
     sessionLabel: row.sessionLabel ?? null,
     whenIso: row.createdAt.toISOString(),

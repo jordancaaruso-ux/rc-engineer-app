@@ -40,6 +40,15 @@ export function isCalibrationAdmin(user: CalibrationAccessUser): boolean {
   return isAuthAdminEmail(user.email);
 }
 
+/**
+ * Admin-authored calibrations are auto-trusted: stamped `verifiedAt` on create so they immediately
+ * enter every user's cross-user auto-pick pool (see {@link calibrationsAutoPickableByUserWhere})
+ * without a manual verify step. Non-admins get null (unverified until a founder verifies).
+ */
+export function verifiedAtForNewCalibration(creator: CalibrationAccessUser): Date | null {
+  return isCalibrationAdmin(creator) ? new Date() : null;
+}
+
 /** True when the user may edit or delete this calibration (creator or admin). */
 export function canManageCalibration(
   user: CalibrationAccessUser,

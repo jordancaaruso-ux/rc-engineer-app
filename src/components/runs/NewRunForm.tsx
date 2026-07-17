@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
@@ -51,14 +51,21 @@ import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { PagedCard, type PagedCardFace } from "@/components/ui/PagedCard";
 import { LogRunWizardRail, type WizardStepStatus } from "@/components/runs/LogRunWizardRail";
 import { LogRunWizardBottomBar } from "@/components/runs/LogRunWizardBottomBar";
-import { nextWalkStep, stepLabel, walkStepIds, type WizardStepId } from "@/lib/runs/wizardWalk";
-import type { NewRunWizardEntry } from "@/lib/runs/wizardEntry";
+import {
+  firstUnfinishedStep,
+  nextWalkStep,
+  stepLabel,
+  walkStepIds,
+  type WizardStepId,
+} from "@/lib/runs/wizardWalk";
+import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
 import {
-  WizardStartControls,
+  WizardPrefillCard,
   WizardDraftsCard,
   type WizardDraftRow,
+  type WizardPrefillRow,
 } from "@/components/runs/WizardStartControls";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
@@ -107,6 +114,30 @@ import {
 import { mergeUniqueById } from "@/lib/assets/mergeAssetLists";
 
 /**
+ * v6 Session step (founder 2026-07-17, artifact round 2 "Mix 3"): in wizard
+ * mode the Car / Day type / Event / Track blocks render INSIDE one Session
+ * card as flattened sections (the inner SurfaceCards go `bare`); classic mode
+ * keeps them as separate cards — same children, different chrome.
+ */
+function WizardSessionGroup({
+  active,
+  children,
+}: {
+  active: boolean;
+  children: ReactNode;
+}) {
+  if (!active) return <>{children}</>;
+  // No card title here: the bottom-nav step is already labelled "Session", and
+  // the first real field carries its own "Car" eyebrow — a redundant top-level
+  // "Session" heading read as an empty section sitting above Car (founder, phone).
+  return (
+    <SurfaceCard variant="panel" overflowHidden={false} contentClassName="space-y-4">
+      {children}
+    </SurfaceCard>
+  );
+}
+
+/**
  * Floating save-action pills — same DNA as the global `LogRunFab` pill
  * (h-12 rounded-full, Sora bold, yellow glow + charcoal shadow + specular rim)
  * so the persistent actions read as one system across the app.
@@ -115,13 +146,6 @@ const fabPillPrimaryClass =
   "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full bg-primary px-4 font-sans text-sm font-bold text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-150 hover:bg-[#E6BE00] active:scale-95 touch-manipulation";
 const fabPillOutlineClass =
   "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full border border-white/10 bg-card px-4 font-sans text-sm font-bold text-foreground shadow-[0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.12)] transition-transform duration-150 hover:bg-muted active:scale-95 touch-manipulation";
-
-/**
- * v5.1: the only in-content wizard action left — Feedback's "Mark run
- * complete 🏁" declaration (forward motion lives in the pinned action row).
- */
-const wizardEndLinkPrimaryClass =
-  "tap-active inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 font-sans text-xs font-bold text-primary-foreground transition-transform duration-150 hover:bg-[#E6BE00] active:scale-95 touch-manipulation";
 
 type CarOption = {
   id: string;
@@ -478,7 +502,8 @@ export function NewRunForm(props: {
   /** URL `?eventId=` deep link — explicit intent, never overridden by the GPS venue swap. */
   wizardDeepLinkedEventId?: string | null;
   /** Switch continue ↔ new-log (host remounts the form with the other payload). */
-  onWizardRestart?: (mode: "continued" | "fresh") => void;
+  /** "Start blank instead" — the host remounts the form for a clean slate (v6). */
+  onWizardRestart?: () => void;
 }) {
   const router = useRouter();
   const copyLastRunCtx = useCopyLastRunFormOptional();
@@ -565,9 +590,11 @@ export function NewRunForm(props: {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsLoadError, setEventsLoadError] = useState<string | null>(null);
 
-  // Wizard "continue" reuses the shipped replicate-last machinery: the entry
-  // candidate IS this car's last run (/api/runs/last?carId), so seeding
-  // replicateLast=true makes the per-car load effect copy track/session/event/
+  // Wizard v6: the run always lands blank (`wizard.continuing` is always
+  // false), so this stays false in wizard mode — the per-car load effect just
+  // FETCHES lastRun (feeding the prefill manifest card) without applying it;
+  // applyWizardPrefill copies on tap. Classic copy-last-run still seeds true to
+  // make the per-car load effect copy track/session/event/
   // tires/setup exactly as the copy card would.
   const [replicateLast, setReplicateLast] = useState(wizard?.continuing ?? false);
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
@@ -618,22 +645,43 @@ export function NewRunForm(props: {
   const wizardWalk = useMemo<readonly WizardStepId[]>(() => walkStepIds(), []);
   // v4: the walk starts ON the Session step — the host pre-derived the context
   // (continue pre-applied when recent), so nothing is locked and every tab is
-  // live from the first render.
-  const [wizardStep, setWizardStep] = useState<WizardStepId>("session");
+  // live from the first render. Hosting an EXISTING run (draft resume / edit,
+  // founder 2026-07-17) lands on the first unfinished step instead — for a
+  // draft that's usually Laps, the fewest taps to finish; a completed run
+  // falls through to Session for a top-down review.
+  const [wizardStep, setWizardStep] = useState<WizardStepId>(() => {
+    const r = props.editRun;
+    if (!wizardActive || !r?.id) return "session";
+    const setupKeyCount =
+      r.setupSnapshot?.data && typeof r.setupSnapshot.data === "object"
+        ? Object.keys(r.setupSnapshot.data as object).length
+        : 0;
+    return firstUnfinishedStep({
+      session: Boolean(r.trackId ?? r.track?.id ?? r.event?.trackId),
+      equipment: Boolean(r.tireSetId),
+      prep:
+        (Array.isArray(r.tirePrep) && r.tirePrep.length > 0) ||
+        Boolean(r.additiveTypeId ?? r.additiveType?.id) ||
+        r.warmerTimingMinutes != null,
+      setup: setupKeyCount > 0,
+      laps:
+        (Array.isArray(r.lapTimes) && r.lapTimes.length > 0) ||
+        (r.importedLapSets?.length ?? 0) > 0,
+      feel: r.carRating != null,
+    });
+  });
   // Keep the details-tab state in sync with the wizard step: Session shows the
   // Car face (+ Track), Equipment the Tires face, Prep its own face. (The
   // wizard reuses the details PagedCard with per-step face filtering.)
   useEffect(() => {
     if (!wizardActive) return;
-    if (wizardStep === "session") setRunDetailsTab("track");
-    else if (wizardStep === "equipment") setRunDetailsTab("tires");
+    if (wizardStep === "equipment") setRunDetailsTab("tires");
     else if (wizardStep === "prep") setRunDetailsTab("prep");
   }, [wizardActive, wizardStep]);
-  /** Which Run-details faces each wizard step shows. Car left the PagedCard on
-   *  the Session step (founder 2026-07-17: car is the FIRST selection — it
-   *  drives what continue/copy means) — it renders as its own card up top. */
+  /** Which Run-details faces each wizard step shows. The Session step shows
+   *  NO details card (v6): Car and Track render inside the unified Session
+   *  card (trackPanelJsx is shared with the classic "Track" face). */
   const wizardDetailFaceIds: Partial<Record<WizardStepId, RunDetailsTab[]>> = {
-    session: ["track"],
     equipment: ["tires"],
     prep: ["prep"],
   };
@@ -644,9 +692,12 @@ export function NewRunForm(props: {
    * just saves — completion is the driver's call, made on the Draft/Complete
    * badge in the live summary (or the "Mark run complete" row on Feedback).
    * Gate to declare = rating + track; setup-missing is still caught by the
-   * existing complete-save validation.
+   * existing complete-save validation. Editing an already-completed run seeds
+   * true (and stays locked true — un-completing isn't a thing).
    */
-  const [wizardMarkedComplete, setWizardMarkedComplete] = useState(false);
+  const [wizardMarkedComplete, setWizardMarkedComplete] = useState(
+    props.editRun?.loggingComplete === true
+  );
   /**
    * Wizard car swap (founder 2026-07-17 evening): changing the car on the
    * Session step keeps the day context (event/track/session/laps/notes) and
@@ -657,6 +708,15 @@ export function NewRunForm(props: {
    */
   const wizardCarSwapPlanRef = useRef<{ plan: CarSwapPlan; toName: string } | null>(null);
   const [wizardCarSwapNote, setWizardCarSwapNote] = useState<string | null>(null);
+  /**
+   * v6 (founder 2026-07-17): prefill is a TAP, never automatic. The wizard
+   * lands blank; tapping the manifest card's "Prefill this run" applies the
+   * car's last run in-form (applyWizardPrefill) and flips this. The applied
+   * session identity is stashed so the summary's "prefilled" chips can compare
+   * live values against what the tap actually set.
+   */
+  const [wizardPrefillApplied, setWizardPrefillApplied] = useState(false);
+  const wizardAppliedPlanRef = useRef<NewRunWizardEntry | null>(null);
   // Live summary starts EXPANDED (founder 2026-07-17: "always visible" —
   // collapsible, but the run state should never start hidden).
   const [wizardSummaryOpen, setWizardSummaryOpen] = useState(true);
@@ -702,15 +762,19 @@ export function NewRunForm(props: {
    */
   const [showSetupSourceControls, setShowSetupSourceControls] = useState(false);
   /**
-   * "Saved from draft" collapse flags for the two other muted sections the
+   * Draft-resume collapse flags for the two other muted sections the
    * driver already filled in when they logged the draft. Drafts open with
    * these sections rolled up to a read-only summary + "Edit" button; new-run
    * mode leaves them expanded since the driver is still filling them out.
    * Seeded from `editRun` at construction so the initial render matches the
-   * final state (no flash of expanded → collapsed).
+   * final state (no flash of expanded → collapsed). Wizard-hosted edits stay
+   * expanded — the steps already segment the form, so a rolled-up summary
+   * with an Edit button would just make a step look empty.
    */
   const initialDraftCollapsed =
-    Boolean(props.editRun?.id) && props.editRun?.loggingComplete === false;
+    Boolean(props.editRun?.id) &&
+    props.editRun?.loggingComplete === false &&
+    !wizardActive;
   const [sessionExpanded, setSessionExpanded] = useState<boolean>(!initialDraftCollapsed);
   const [runDetailsExpanded, setRunDetailsExpanded] = useState<boolean>(!initialDraftCollapsed);
 
@@ -943,7 +1007,7 @@ export function NewRunForm(props: {
     setShareWithTeam(r.shareWithTeam !== false);
     // When reloading a saved run — especially a draft being completed — the
     // setup, session type, and run details are already nailed down. Keep the
-    // Setup sheet collapsed so the user sees the "Saved from draft" summary
+    // Setup sheet collapsed so the user sees the draft-resume summary
     // with diff rows, and can hit Edit only if something needs to change.
     setSetupSectionExpanded(false);
   }, [editRun, carsList, clearNewTireSetIntent]);
@@ -1350,8 +1414,18 @@ export function NewRunForm(props: {
   ]);
 
   const loadedSetupRun = useMemo(
-    () => (loadSetupSelection ? pickerRuns.find((r) => r.id === loadSetupSelection) ?? null : null),
-    [loadSetupSelection, pickerRuns]
+    () => {
+      if (loadSetupSelection) return pickerRuns.find((r) => r.id === loadSetupSelection) ?? null;
+      // New-run flow: the setup auto-copied from the car's last run (replicate /
+      // car-swap) never sets `loadSetupSelection`, so the summary would fall back
+      // to a generic "Loaded setup". The baseline snapshot points straight back at
+      // that source run — resolve it so the label names the run instead. Skip in
+      // edit/draft, where the baseline is the run's OWN snapshot (would self-match).
+      if (!isEditing && setupBaselineSnapshotId)
+        return pickerRuns.find((r) => r.setupSnapshot?.id === setupBaselineSnapshotId) ?? null;
+      return null;
+    },
+    [loadSetupSelection, pickerRuns, setupBaselineSnapshotId, isEditing]
   );
 
   /**
@@ -2292,6 +2366,14 @@ export function NewRunForm(props: {
   const wizardSessionAppliedRef = useRef(false);
   useEffect(() => {
     if (!wizard || wizardSessionAppliedRef.current) return;
+    // Hosting an existing run (draft resume / edit): the editRun hydrate above
+    // is the truth — the entry payload only seeded initial state (it can't
+    // carry SEEDING/OTHER meeting sessions), so re-asserting it would clobber
+    // the run's real values.
+    if (isEditing) {
+      wizardSessionAppliedRef.current = true;
+      return;
+    }
     if (wizard.continuing && !replicateLoaded) return;
     wizardSessionAppliedRef.current = true;
     setSessionType(wizard.sessionType);
@@ -2314,7 +2396,7 @@ export function NewRunForm(props: {
       setTrackLayoutId("");
       setTrackDirection("");
     }
-  }, [wizard, replicateLoaded]);
+  }, [wizard, replicateLoaded, isEditing]);
 
   // Wizard race meetings: keep the run's track following the selected event
   // (classic mode does this in applyEventOption on manual pick; the wizard sets
@@ -2328,12 +2410,11 @@ export function NewRunForm(props: {
     setTrackDirection((selectedEventForRun?.trackDirection as "" | "CW" | "CCW") ?? "");
   }, [wizardActive, needsEvent, selectedEventForRun, trackId]);
 
-  // ---- Wizard GPS at landing (v4, founder 2026-07-17): location resolves once,
-  // right after mount. A blank new log gets its track auto-picked; a continued
-  // run at a DIFFERENT venue than the carried one gets the venue swapped to
-  // where we actually are (the setup still carries — that's the value), with a
-  // note on the Session step's status card. Never fires over a URL-deep-linked
-  // event, an edit, or anything the driver already touched by hand. ----
+  // ---- Wizard GPS at landing (v6): location resolves once, right after
+  // mount, and auto-picks the track on the blank landing. Prefilling later at
+  // a different venue keeps the detected track (applyWizardPrefill's venue
+  // check — the setup still carries, that's the value). Never fires over a
+  // URL-deep-linked event, an edit, or anything the driver touched by hand. ----
   const wizardGpsRanRef = useRef(false);
   const wizardGpsAppliedRef = useRef(false);
   /** Set by manual session/event/track edits — GPS never overrides a human. */
@@ -2370,56 +2451,13 @@ export function NewRunForm(props: {
   }, [wizardActive, isEditing, tracksList, favouriteTrackIds]);
   useEffect(() => {
     if (!wizardActive || !wizard || !wizardDetection || wizardGpsAppliedRef.current) return;
-    // Continuing: wait for the carried context to land before judging a mismatch.
-    if (wizard.continuing && !replicateLoaded) return;
     if (wizardCtxTouchedRef.current) {
       wizardGpsAppliedRef.current = true;
       return;
     }
-    if (wizard.continuing) {
-      // Explicit ?eventId= deep link = intent; the detected venue never overrides it.
-      if (props.wizardDeepLinkedEventId) {
-        wizardGpsAppliedRef.current = true;
-        return;
-      }
-      if (trackId && trackId !== wizardDetection.trackId) {
-        // At a different track than the carried run (even mid-event — being
-        // somewhere else beats a re-attached event): testing baseline here.
-        wizardGpsAppliedRef.current = true;
-        const fromName =
-          tracksList.find((t) => t.id === trackId)?.name ??
-          props.wizardCandidate?.trackName ??
-          "last run's";
-        setSessionType("TESTING");
-        setSessionLabel(null);
-        setEventId("");
-        trackPickedManuallyRef.current = true;
-        setTrackId(wizardDetection.trackId);
-        setTrackLayoutId("");
-        setTrackDirection("");
-        setWizardVenueSwapNote(
-          `At ${wizardDetection.trackName} now — carries your ${fromName} setup here`
-        );
-        return;
-      }
-      if (trackId) {
-        // Same venue as the carried run — nothing to do.
-        wizardGpsAppliedRef.current = true;
-        return;
-      }
-      if (!eventId) {
-        // Carried run had no venue at all — fill from location like a fresh log.
-        wizardGpsAppliedRef.current = true;
-        trackPickedManuallyRef.current = true;
-        setTrackId(wizardDetection.trackId);
-        setTrackAutoDetectMessage(
-          `Detected ${wizardDetection.trackName} (${Math.round(wizardDetection.distanceM)} m away).`
-        );
-      }
-      // eventId set but its track not synced yet → wait; this effect re-runs on trackId.
-      return;
-    }
-    // Fresh log: auto-pick the venue when none is set.
+    // v6: the wizard always lands blank (prefill is a tap) — GPS just fills
+    // the venue when none is set. The carried-venue mismatch check moved to
+    // tap time, inside applyWizardPrefill.
     wizardGpsAppliedRef.current = true;
     if (!trackId && !eventId) {
       trackPickedManuallyRef.current = true;
@@ -2428,17 +2466,7 @@ export function NewRunForm(props: {
         `Detected ${wizardDetection.trackName} (${Math.round(wizardDetection.distanceM)} m away).`
       );
     }
-  }, [
-    wizardActive,
-    wizard,
-    wizardDetection,
-    replicateLoaded,
-    trackId,
-    eventId,
-    tracksList,
-    props.wizardDeepLinkedEventId,
-    props.wizardCandidate,
-  ]);
+  }, [wizardActive, wizard, wizardDetection, trackId, eventId]);
 
   useEffect(() => {
     if (!needsEvent) return;
@@ -2939,7 +2967,12 @@ export function NewRunForm(props: {
 
   async function saveRun(
     e?: React.MouseEvent,
-    intent: "draft" | "completed" = "completed"
+    intent: "draft" | "completed" = "completed",
+    opts?: {
+      /** Wizard "← Save & exit" on an EDITED run: draft saves normally stay
+       *  in place while editing, but the escape must still leave the page. */
+      exitAfter?: boolean;
+    }
   ) {
     e?.preventDefault();
     if (pendingCompleteNavigationRef.current || pendingDraftNavigationRef.current) return;
@@ -3248,13 +3281,21 @@ export function NewRunForm(props: {
       if (intent === "completed") {
         navigateAfterRunComplete(run.id);
       } else if (isEditing) {
-        await todayDraftCtx?.refreshDraft();
-        const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
-          `/api/runs/last?carId=${carId}`
-        ).catch(() => ({ lastRun: null }));
-        setLastRun(refreshed);
-        if (replicateLast && refreshed) {
-          setRunsCompleted(refreshed.tireRunNumber ?? 0);
+        if (opts?.exitAfter) {
+          // Wizard escape on an edited run: the save landed — leave like the
+          // new-run draft path does instead of silently staying put.
+          pendingDraftNavigationRef.current = true;
+          void todayDraftCtx?.refreshDraft();
+          navigateAway("/");
+        } else {
+          await todayDraftCtx?.refreshDraft();
+          const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
+            `/api/runs/last?carId=${carId}`
+          ).catch(() => ({ lastRun: null }));
+          setLastRun(refreshed);
+          if (replicateLast && refreshed) {
+            setRunsCompleted(refreshed.tireRunNumber ?? 0);
+          }
         }
       } else {
         // New run saved as draft: send the driver back to the dashboard.
@@ -3401,10 +3442,13 @@ export function NewRunForm(props: {
   const wizardNextStepId = wizardActive ? nextWalkStep(wizardStep, wizardWalk) : null;
   /** v5: Save's intent follows the DECLARED state, never the data. */
   const wizardSaveCompletes = wizardMarkedComplete;
-  // Rating is the completion gate — clearing it un-declares.
+  // Rating is the completion gate — clearing it un-declares. An already-
+  // completed run stays declared (saves must never flip it back to draft).
   useEffect(() => {
-    if (wizardMarkedComplete && carRating == null) setWizardMarkedComplete(false);
-  }, [wizardMarkedComplete, carRating]);
+    if (wizardMarkedComplete && carRating == null && !editingCompletedRun) {
+      setWizardMarkedComplete(false);
+    }
+  }, [wizardMarkedComplete, carRating, editingCompletedRun]);
   // Once the rating lands, drop its complete-validation highlight (set by a
   // badge tap while unrated); the setup flag keeps the banner if still missing.
   useEffect(() => {
@@ -3415,35 +3459,6 @@ export function NewRunForm(props: {
     }
   }, [carRating]);
   /**
-   * The Draft/Complete badge tap (and Feedback's "Mark run complete" row):
-   * toggles the declaration when the gate (rating + track) is met; otherwise
-   * jumps to the missing piece instead of being a dead control.
-   */
-  const handleWizardCompleteToggle = () => {
-    if (wizardMarkedComplete) {
-      setWizardMarkedComplete(false);
-      return;
-    }
-    if (carRating == null) {
-      setCompleteValidation((v) => ({ ...v, show: true, carRating: true }));
-      goToWizardStep("feel");
-      return;
-    }
-    const resolvedTrackId =
-      trackId.trim() ||
-      (trackLockedToEvent && selectedEventForRun?.trackId
-        ? String(selectedEventForRun.trackId)
-        : "");
-    if (!resolvedTrackId) {
-      setTrackSaveWarning(true);
-      goToWizardStep("session");
-      setRunDetailsTab("track");
-      return;
-    }
-    setWizardMarkedComplete(true);
-  };
-
-  /**
    * Session-step car select (wizard). Car is the FIRST selection — it drives
    * what continue/copy means, so a mid-context change computes the swap plan
    * (class + sheet compare) BEFORE the carId effect fires and consumes it.
@@ -3452,7 +3467,10 @@ export function NewRunForm(props: {
     if (!nextId || nextId === carId) return;
     const from = carsList.find((c) => c.id === carId);
     const to = carsList.find((c) => c.id === nextId);
-    if (wizard?.continuing && from && to) {
+    // Layered swap only once a prefill has landed — before that the run is
+    // blank, so a car change is a plain re-pick (the per-car fetch refreshes
+    // the manifest card's offer on its own).
+    if (wizardPrefillApplied && from && to) {
       wizardCarSwapPlanRef.current = {
         plan: planCarSwap(from, to, { setupHandEdited: setupTouchedByUserRef.current }),
         toName: to.name,
@@ -3464,37 +3482,166 @@ export function NewRunForm(props: {
     setCarId(nextId);
   };
 
+  // ---- v6 prefill (founder 2026-07-17, artifact round 3): the wizard lands
+  // blank and the Session step's manifest card OFFERS the selected car's last
+  // run — one explicit tap applies it. `lastRun` is already fetched per-car by
+  // the load effect above (fresh mode fetches without applying), so the offer
+  // rows and the apply itself are synchronous. ----
+
+  /** The per-car last run shaped as an EntryCandidate so deriveContinueEntry's
+   *  session rules (active event re-attaches, else testing at the carried
+   *  track) apply identically to the old continue path. */
+  const wizardLastRunCandidate = useMemo<EntryCandidate | null>(() => {
+    if (!wizardActive || !lastRun) return null;
+    return {
+      runId: lastRun.id,
+      carId: lastRun.carId ?? lastRun.car?.id ?? carId ?? null,
+      carName: lastRun.car?.name ?? lastRun.carNameSnapshot ?? null,
+      trackId: lastRun.trackId ?? lastRun.track?.id ?? null,
+      trackName: lastRun.track?.name ?? lastRun.trackNameSnapshot ?? null,
+      eventId: lastRun.eventId ?? lastRun.event?.id ?? null,
+      eventName: lastRun.event?.name ?? null,
+      eventEndIso: lastRun.event?.endDate
+        ? new Date(lastRun.event.endDate).toISOString()
+        : null,
+      sessionType: lastRun.sessionType ?? null,
+      meetingSessionType: lastRun.meetingSessionType ?? null,
+      sessionLabel: lastRun.sessionLabel ?? null,
+      whenIso: lastRun.createdAt,
+    };
+  }, [wizardActive, lastRun, carId]);
+
+  const wizardPrefillPlan = useMemo(
+    () =>
+      wizardLastRunCandidate
+        ? deriveContinueEntry(wizardLastRunCandidate, props.wizardDeepLinkedEventId ?? null)
+        : null,
+    [wizardLastRunCandidate, props.wizardDeepLinkedEventId]
+  );
+
+  /** One tap fills exactly what the offer card listed. Mirrors the retired
+   *  auto-continue copy (tires/setup) plus prep + additive (the manifest
+   *  promises them, so the tap must deliver them). */
+  const applyWizardPrefill = () => {
+    if (!lastRun || !wizardPrefillPlan) return;
+    const plan = { ...wizardPrefillPlan };
+    // Venue reality check (the kept GPS venue-swap rule, now at tap time): if
+    // the run already has a venue — GPS auto-pick or a manual pick — and the
+    // carried venue differs, stay HERE and bring the setup over as a testing
+    // baseline ("you didn't teleport").
+    const carriedVenueTrackId = plan.eventId
+      ? lastRun.event?.trackId
+        ? String(lastRun.event.trackId)
+        : null
+      : plan.trackId;
+    const currentTrackId = trackId.trim() || null;
+    let venueNote: string | null = null;
+    const venueSwapped =
+      currentTrackId != null && carriedVenueTrackId != null && currentTrackId !== carriedVenueTrackId;
+    if (venueSwapped) {
+      const hereName = tracksList.find((t) => t.id === currentTrackId)?.name ?? "this track";
+      const fromName = lastRun.track?.name ?? lastRun.trackNameSnapshot ?? "last run's track";
+      plan.sessionType = "TESTING";
+      plan.meetingSessionType = null;
+      plan.sessionLabel = null;
+      plan.eventId = null;
+      plan.trackId = currentTrackId;
+      venueNote = `At ${hereName} now — carries your ${fromName} setup here`;
+    }
+    // Session identity.
+    setSessionType(plan.sessionType);
+    setMeetingSessionType(plan.meetingSessionType ?? "PRACTICE");
+    setMeetingSessionCustom("");
+    setSessionLabel(plan.sessionLabel);
+    setEventId(plan.eventId ?? "");
+    if (!venueSwapped && !plan.eventId && plan.trackId) {
+      trackPickedManuallyRef.current = true;
+      setTrackId(plan.trackId);
+      setTrackLayoutId(lastRun.trackLayoutId ?? lastRun.trackLayout?.id ?? "");
+      setTrackDirection(lastRun.trackDirection ?? "");
+      layoutPickedManuallyRef.current = true;
+      setTrackAutoDetectMessage(null);
+    }
+    // Tires.
+    const prevTireId = lastRun.tireSetId ?? "";
+    const validTireId =
+      prevTireId && tireSets.some((ts) => ts.id === prevTireId) ? prevTireId : "";
+    setTireSetId(validTireId);
+    clearNewTireSetIntent();
+    setRunsCompleted(validTireId ? (lastRun.tireRunNumber ?? 0) : 0);
+    // Prep + additive (legacy warmer minutes fall back like the classic copy).
+    const nextAdditiveId = lastRun.additiveTypeId ?? lastRun.additiveType?.id ?? "";
+    setAdditiveTypeId(nextAdditiveId);
+    if (lastRun.additiveType) {
+      const at = lastRun.additiveType;
+      setAdditiveTypesById((prev) => ({
+        ...prev,
+        [at.id]: { id: at.id, displayName: at.displayName },
+      }));
+    }
+    setTirePrep(
+      Array.isArray(lastRun.tirePrep) && lastRun.tirePrep.length > 0
+        ? normalizeTirePrep(lastRun.tirePrep)
+        : tirePrepFromLegacy(lastRun.warmerTimingMinutes, Boolean(nextAdditiveId))
+    );
+    if (typeof lastRun.practiceDayUrl === "string" && lastRun.practiceDayUrl.trim()) {
+      setPracticeDayUrl(lastRun.practiceDayUrl);
+    }
+    // Setup — an explicit tap overrides anything picked so far (and a missing
+    // snapshot stays truly blank; derived-keys manufacture would fake out
+    // "setup attached").
+    setupTouchedByUserRef.current = false;
+    const nextSetup = lastRun.setupSnapshot?.data
+      ? setupSnapshotWithDerived(lastRun.setupSnapshot.data)
+      : ({} as SetupSnapshotData);
+    setSetupData(nextSetup);
+    setActiveSetupData(nextSetup, carId || null);
+    setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
+    setSetupBaselineData(cloneSetupSnapshot(nextSetup));
+
+    setWizardVenueSwapNote(venueNote);
+    setWizardCarSwapNote(null);
+    wizardAppliedPlanRef.current = plan;
+    setWizardPrefillApplied(true);
+  };
+
   // Wizard live-header summary rows (label, value, missing?, jump target).
-  // The meter is six discrete sectors — one per logged item (founder redesign
-  // 2026-07-17, artifact round 1): same item set as the old percentage.
+  // The meter is one sector per logged area, aligned with the wizard step bar
+  // (founder 2026-07-17: the old 6 counted tires/prep/laps/notes/handling/rating
+  // and ignored Session + Setup, so a fully-prepped draft read "2 of 6"). Now
+  // it mirrors the six steps — Session · Tires · Prep · Setup · Laps — with the
+  // Feedback step split into two sectors the founder tracks separately: the
+  // rating/notes quick take, then the detailed handling assessment.
   const wizardSummaryParts: Array<{ key: string; filled: boolean }> = [
+    { key: "session", filled: Boolean(carId && trackId) },
     { key: "tires", filled: Boolean(tireSetId || newTireSetIntent) },
     { key: "prep", filled: wizardPrepIn },
+    { key: "setup", filled: setupBaselineData != null || Object.keys(setupData).length > 0 },
     { key: "laps", filled: wizardLapsIn },
-    { key: "notes", filled: notes.trim().length > 0 },
-    { key: "handling", filled: isHandlingAssessmentMeaningful(handlingUi) },
-    { key: "rating", filled: carRating != null },
+    { key: "feedback", filled: carRating != null || notes.trim().length > 0 },
+    { key: "handling", filled: isHandlingAssessmentMeaningful(persistedFromUiState(handlingUi)) },
   ];
   const wizardSummaryLogged = wizardSummaryParts.filter((p) => p.filled).length;
-  // "Prefilled" chips (founder round 2): on a continued run, rows whose value
-  // still equals what the copy carried in are marked; editing makes the value
-  // this run's own and the chip drops. Value equality against the carried
-  // source (wizard payload + lastRun) — no touch tracking, so programmatic
-  // copies like a car-swap re-derive stay honestly marked too.
+  // "Prefilled" chips (founder round 2): on a prefilled run, rows whose value
+  // still equals what the tap carried in are marked; editing makes the value
+  // this run's own and the chip drops. Value equality against the applied
+  // plan + lastRun — no touch tracking, so programmatic copies like a
+  // car-swap re-derive stay honestly marked too.
+  const wizardAppliedPlan = wizardAppliedPlanRef.current;
   const wizardPrefilled: Partial<Record<string, boolean>> = (() => {
-    if (!wizardActive || !wizard?.continuing || !replicateLoaded) return {};
+    if (!wizardActive || !wizardPrefillApplied || !wizardAppliedPlan) return {};
     const sessionUnchanged =
-      sessionType === wizard.sessionType &&
-      (wizard.sessionType !== "RACE_MEETING" ||
-        meetingSessionType === (wizard.meetingSessionType ?? "PRACTICE")) &&
-      (sessionLabel ?? null) === wizard.sessionLabel &&
-      eventId === (wizard.eventId ?? "") &&
-      (wizard.trackId
-        ? trackId === wizard.trackId
-        : wizard.sessionType === "RACE_MEETING" || trackId === "");
+      sessionType === wizardAppliedPlan.sessionType &&
+      (wizardAppliedPlan.sessionType !== "RACE_MEETING" ||
+        meetingSessionType === (wizardAppliedPlan.meetingSessionType ?? "PRACTICE")) &&
+      (sessionLabel ?? null) === wizardAppliedPlan.sessionLabel &&
+      eventId === (wizardAppliedPlan.eventId ?? "") &&
+      (wizardAppliedPlan.trackId
+        ? trackId === wizardAppliedPlan.trackId
+        : wizardAppliedPlan.sessionType === "RACE_MEETING" || trackId === "");
     return {
       session: sessionUnchanged,
-      car: carId === wizard.carId,
+      car: carId === wizardAppliedPlan.carId,
       tires: Boolean(tireSetId) && !newTireSetIntent && tireSetId === (lastRun?.tireSetId ?? ""),
       prep:
         wizardPrepIn &&
@@ -3610,6 +3757,258 @@ export function NewRunForm(props: {
       ]
     : [];
 
+  // v6 manifest card rows. OFFER = the promise (from the car's last run +
+  // the derived plan); APPLIED = the same five rows reading LIVE state, so
+  // car swaps and manual edits stay truthful. Locked round 3: the card keeps
+  // all five rows in both states and only gains ✓s.
+  const titleCaseSession = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+  const wizardPrefillKindLabel = lastRun
+    ? lastRun.sessionLabel?.trim() ||
+      (lastRun.sessionType === "TESTING" || !lastRun.meetingSessionType
+        ? "Testing"
+        : titleCaseSession(lastRun.meetingSessionType))
+    : props.wizardCandidate?.sessionLabel?.trim() ||
+      (props.wizardCandidate?.meetingSessionType &&
+      props.wizardCandidate.meetingSessionType !== "TESTING"
+        ? titleCaseSession(props.wizardCandidate.meetingSessionType)
+        : "Testing");
+  const wizardPrefillWhenIso = lastRun?.createdAt ?? props.wizardCandidate?.whenIso ?? "";
+  const wizardPrefillRows: WizardPrefillRow[] = wizardActive
+    ? wizardPrefillApplied
+      ? [
+          {
+            key: "session",
+            label: "Session",
+            value:
+              sessionType === "RACE_MEETING"
+                ? `Race meeting · ${
+                    sessionLabel ||
+                    (meetingSessionType === "OTHER"
+                      ? meetingSessionCustom.trim() || "Other"
+                      : titleCaseSession(meetingSessionType))
+                  }`
+                : "Testing",
+          },
+          {
+            key: "track",
+            label: "Track",
+            value: tracksList.find((t) => t.id === trackId)?.name ?? "track needed",
+          },
+          {
+            key: "tires",
+            label: "Tires",
+            value: wizardSummaryRows.find((r) => r.key === "tires")?.value ?? "—",
+            jump: "equipment",
+          },
+          {
+            key: "prep",
+            label: "Prep",
+            value: wizardSummaryRows.find((r) => r.key === "prep")?.value ?? "—",
+            jump: "prep",
+          },
+          {
+            key: "setup",
+            label: "Setup",
+            value:
+              Object.keys(setupData).length > 0
+                ? `${Object.keys(setupData).length} values · ${
+                    setupChangeCountSinceBaseline > 0
+                      ? `${setupChangeCountSinceBaseline} changed`
+                      : "as last run"
+                  }`
+                : "not attached",
+            jump: "setup",
+          },
+        ]
+      : [
+          {
+            key: "session",
+            label: "Session",
+            value: wizardPrefillPlan
+              ? wizardPrefillPlan.sessionType === "RACE_MEETING"
+                ? `Race meeting · ${
+                    wizardPrefillPlan.sessionLabel ||
+                    titleCaseSession(wizardPrefillPlan.meetingSessionType ?? "PRACTICE")
+                  }`
+                : "Testing"
+              : "…",
+          },
+          {
+            key: "track",
+            label: "Track",
+            value:
+              lastRun?.track?.name ??
+              lastRun?.trackNameSnapshot ??
+              props.wizardCandidate?.trackName ??
+              "—",
+          },
+          {
+            key: "tires",
+            label: "Tires",
+            value: lastRun
+              ? lastRun.tireSet
+                ? tireSetDisplayLine(lastRun.tireSet)
+                : "—"
+              : "…",
+          },
+          {
+            key: "prep",
+            label: "Prep",
+            value: lastRun
+              ? formatTirePrepLine(
+                  Array.isArray(lastRun.tirePrep) && lastRun.tirePrep.length > 0
+                    ? normalizeTirePrep(lastRun.tirePrep)
+                    : tirePrepFromLegacy(
+                        lastRun.warmerTimingMinutes,
+                        Boolean(lastRun.additiveTypeId ?? lastRun.additiveType?.id)
+                      ),
+                  lastRun.additiveType?.displayName ?? null
+                ) ?? "—"
+              : "…",
+          },
+          {
+            key: "setup",
+            label: "Setup",
+            // Count through the same derived pass the apply runs, so the
+            // promise matches what actually lands (raw-key counts drift ±1).
+            value: lastRun
+              ? lastRun.setupSnapshot?.data &&
+                typeof lastRun.setupSnapshot.data === "object" &&
+                Object.keys(lastRun.setupSnapshot.data as object).length > 0
+                ? `${Object.keys(setupSnapshotWithDerived(lastRun.setupSnapshot.data)).length} values · as last run`
+                : "none saved"
+              : "…",
+          },
+        ]
+    : [];
+  /** Card shows while there is (or will be) something to offer: the fetched
+   *  last run, or the server candidate while the per-car fetch resolves. No
+   *  prior run on this car → no card at all. */
+  const wizardPrefillCardVisible =
+    wizardActive &&
+    !isEditing &&
+    (lastRun != null ||
+      (!replicateLoaded && props.wizardCandidate != null && props.wizardCandidate.carId === carId));
+
+  /** Track picker section — the classic Run-details "Track" face; the wizard
+   *  renders it inside the unified Session card instead (v6). Lifted like
+   *  prepPanelJsx so both modes share one source. */
+  const trackPanelJsx = (
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <Eyebrow dot="muted">Track</Eyebrow>
+                <Link
+                  href="/tracks"
+                  className="btn-surface px-2 py-1 text-[11px]"
+                >
+                  Track library
+                </Link>
+              </div>
+              {trackLockedToEvent ? (
+                <div className="space-y-1">
+                  <div className="inset-panel-deep px-3 py-2 text-sm text-foreground">
+                    {(() => {
+                      const t = tracksList.find((x) => x.id === trackId);
+                      if (!t) return "—";
+                      return `${t.name}${t.location ? ` (${t.location})` : ""}`;
+                    })()}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Track is set by the selected event. Change the event (or its track in Events) to use a
+                    different venue.
+                  </p>
+                </div>
+              ) : (
+                <div className={prefillFieldClass(Boolean(prefillHighlights?.track))}>
+                  <TrackCombobox
+                    tracks={tracksList}
+                    value={trackId}
+                    onChange={(id) => {
+                      trackPickedManuallyRef.current = true;
+                      wizardCtxTouchedRef.current = true;
+                      setTrackId(id);
+                      // Layout belongs to a track; clear it so a stale layout from the
+                      // previous track can't be submitted, and re-allow event auto-fill.
+                      setTrackLayoutId("");
+                      setTrackDirection("");
+                      layoutPickedManuallyRef.current = false;
+                      setCopyTrackWarning(null);
+                      setNearbyTrackSuggestions([]);
+                      setTrackAutoDetectMessage(null);
+                    }}
+                    lastRunTrackId={lastRun?.trackId ?? null}
+                    favouriteTrackIds={favouriteTrackIds}
+                    favouriteTracks={favouriteTracks}
+                    placeholder="Select track…"
+                    aria-label="Track"
+                  />
+                  {!isEditing ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn-surface px-2.5 py-1 text-[11px] font-medium disabled:opacity-60"
+                        disabled={trackAutoDetectLoading}
+                        onClick={() => void runTrackAutoDetect()}
+                      >
+                        {trackAutoDetectLoading ? "Detecting…" : "Detect from location"}
+                      </button>
+                      {trackAutoDetectMessage ? (
+                        <span className="text-[11px] text-muted-foreground leading-snug">
+                          {trackAutoDetectMessage}
+                          {trackAutoDetectMessage.includes("Track library") ? (
+                            <>
+                              {" "}
+                              <Link href="/tracks" className="font-medium text-foreground underline">
+                                Track library
+                              </Link>
+                            </>
+                          ) : null}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <TrackNearbySuggestions
+                    suggestions={nearbyTrackSuggestions}
+                    onSelect={(id) => {
+                      trackPickedManuallyRef.current = true;
+                      setTrackId(id);
+                      setTrackLayoutId("");
+                      setTrackDirection("");
+                      layoutPickedManuallyRef.current = false;
+                      setCopyTrackWarning(null);
+                      setNearbyTrackSuggestions([]);
+                      setTrackAutoDetectMessage(null);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            {copyTrackWarning && (
+              <div className="text-[11px] text-muted-foreground">{copyTrackWarning}</div>
+            )}
+            {trackId.trim() ? (
+              <RunLayoutPicker
+                trackId={trackId}
+                layoutId={trackLayoutId}
+                direction={trackDirection}
+                onLayoutChange={(id) => {
+                  layoutPickedManuallyRef.current = true;
+                  setTrackLayoutId(id);
+                }}
+                onDirectionChange={(dir) => {
+                  layoutPickedManuallyRef.current = true;
+                  setTrackDirection(dir);
+                }}
+                inheritedFromEvent={Boolean(
+                  selectedEventForRun?.trackLayoutId &&
+                    trackLayoutId === selectedEventForRun.trackLayoutId
+                )}
+              />
+            ) : null}
+          </div>
+  );
+
   return (
     <>
     <TrackLocationMarkDialog
@@ -3650,33 +4049,24 @@ export function NewRunForm(props: {
 
           {/* Live-header summary: the whole run at a glance, rows jump to steps.
               Founder redesign 2026-07-17 (artifact rounds 1+2): type a notch up,
-              the 3px hairline meter replaced by six −21° sectors (page-title
-              timing-line DNA, one per logged item), "prefilled" chips on rows a
+              the 3px hairline meter replaced by step-aligned −21° sectors
+              (page-title timing-line DNA, one per logged area), "prefilled" chips on rows a
               continued run carried in — the chips replace the old standalone
               "✓ Carried over from last run" line. */}
           <div className="overflow-hidden rounded-xl border border-border bg-card/70">
             <div className="flex w-full items-center gap-2 px-3 py-2.5">
-              {/* The badge IS the completion control (v5, M3): tap to declare
-                  the run complete once rating + track are in; tap again to
-                  hold it as a draft. Unrated tap jumps to Feedback instead. */}
-              <button
-                type="button"
-                onClick={handleWizardCompleteToggle}
-                aria-pressed={wizardMarkedComplete}
-                title={
-                  wizardMarkedComplete
-                    ? "Marked complete — tap to hold as draft"
-                    : "Tap to mark this run complete"
-                }
-                className={cn(
-                  "tap-active shrink-0 rounded-md border px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.09em] touch-manipulation",
-                  wizardMarkedComplete
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
-                    : "border-dashed border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-300"
-                )}
-              >
-                {wizardMarkedComplete ? "Complete 🏁" : "Draft ▸"}
-              </button>
+              {/* Completion is no longer a header control (founder 2026-07-17):
+                  the tappable Draft/Complete badge is retired — "Mark run
+                  complete" lives in the pinned Feedback action bar. An
+                  already-completed run keeps a static 🏁 status tag. */}
+              {wizardMarkedComplete ? (
+                <span
+                  className="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.09em] text-emerald-600 dark:text-emerald-300"
+                  title="This run is marked complete."
+                >
+                  Complete 🏁
+                </span>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setWizardSummaryOpen((v) => !v)}
@@ -3709,7 +4099,7 @@ export function NewRunForm(props: {
                   {wizardMarkedComplete
                     ? "marked complete 🏁"
                     : carRating != null
-                      ? "rating in ✓ — tap Draft to complete"
+                      ? "rating in ✓ — mark complete on Feedback"
                       : "add a rating to finish"}
                 </span>
               </div>
@@ -3779,7 +4169,13 @@ export function NewRunForm(props: {
         </CardPanel>
       ) : null}
 
-      {isEditing && editRun?.id && editRun.importedLapSets && editRun.importedLapSets.length >= 2 ? (
+      {isEditing &&
+      editRun?.id &&
+      editRun.importedLapSets &&
+      editRun.importedLapSets.length >= 2 &&
+      // Wizard-hosted edit: the field-session recap belongs to the Laps step,
+      // not floating above every other step's content.
+      (!wizardActive || wizardStep === "laps") ? (
         <div className="space-y-2">
           <ImportedFieldSessionCard importedLapSets={editRun.importedLapSets} />
         </div>
@@ -3803,63 +4199,74 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      {/* 2. Session type: Testing or Race Meeting only. Wizard v4: this IS the
-          Session step — the start status ("Continued from run X" / "New log")
-          rides on top, and the same cards serve mid-walk edits; they stay
-          mounted either way (their effects drive event→track sync). */}
+      {/* 2. Session step. Wizard v6 (founder 2026-07-17): the run lands BLANK —
+          the manifest card on top OFFERS the car's last run (one tap applies
+          it via applyWizardPrefill), and Car + Day type + Event + Track render
+          together inside ONE Session card (WizardSessionGroup flattens the
+          classic blocks). Classic mode keeps the separate cards. */}
       <div hidden={wizardActive && wizardStep !== "session"} className="space-y-3">
       {wizard ? (
         <>
           <WizardDraftsCard drafts={props.wizardDrafts ?? []} />
 
-          {/* Car — the FIRST selection (founder 2026-07-17): it decides what
-              the continue/copy below carries. Changing it mid-context keeps
-              the day and swaps the car-bound layers (see handleWizardCarChange). */}
-          <CardPanel contentClassName="space-y-2">
-            <Eyebrow>Car</Eyebrow>
-            <select
-              value={carId}
-              onChange={(e) => handleWizardCarChange(e.target.value)}
-              className="w-full rounded-lg border border-border bg-secondary px-3 py-3 text-sm text-foreground"
-              aria-label="Car"
-            >
-              {carsList.length === 0 ? <option value="">No cars yet</option> : null}
-              {carsList.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </CardPanel>
-
-          <WizardStartControls
-            continuing={wizard.continuing}
-            candidate={props.wizardCandidate ?? null}
-            venueSwapNote={wizardVenueSwapNote}
-            carSwapNote={wizardCarSwapNote}
-            onSwitch={props.onWizardRestart}
-          />
+          {wizardPrefillCardVisible ? (
+            <WizardPrefillCard
+              applied={wizardPrefillApplied}
+              loading={!replicateLoaded}
+              kindLabel={wizardPrefillKindLabel}
+              whenIso={wizardPrefillWhenIso}
+              rows={wizardPrefillRows}
+              note={wizardVenueSwapNote}
+              subNote={wizardCarSwapNote}
+              onPrefill={applyWizardPrefill}
+              onStartBlank={props.onWizardRestart}
+              onJump={goToWizardStep}
+            />
+          ) : null}
         </>
+      ) : null}
+      <WizardSessionGroup active={wizardActive}>
+      {wizard ? (
+        <div className="space-y-2">
+          {/* Car — the FIRST selection: it decides what the prefill offer
+              carries. Changing it mid-context keeps the day and swaps the
+              car-bound layers (see handleWizardCarChange). */}
+          <Eyebrow dot="muted">Car</Eyebrow>
+          <select
+            value={carId}
+            onChange={(e) => handleWizardCarChange(e.target.value)}
+            className="w-full rounded-lg border border-border bg-secondary px-3 py-3 text-sm text-foreground"
+            aria-label="Car"
+          >
+            {carsList.length === 0 ? <option value="">No cars yet</option> : null}
+            {carsList.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
       ) : null}
       <SurfaceCard
         variant="panel"
+        bare={wizardActive}
         overflowHidden={false}
-        className={cn("run-section--session", isDraft && "border-emerald-500/40", prefillFieldClass(Boolean(prefillHighlights?.session)))}
+        className={cn(
+          "run-section--session",
+          isDraft && "border-emerald-500/40",
+          prefillFieldClass(Boolean(prefillHighlights?.session)),
+          wizardActive && "border-t border-border/60 pt-4"
+        )}
         contentClassName="space-y-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Eyebrow>Session type</Eyebrow>
+            {/* Wizard: the unified card is already labelled "Session", so this
+                section reads as the day-type choice (artifact round 2). */}
+            <Eyebrow dot={wizardActive ? "muted" : undefined}>
+              {wizardActive ? "Day type" : "Session type"}
+            </Eyebrow>
             <PrefillBadge show={prefillHighlights?.session} />
-            {isDraft ? (
-              <span
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
-                title="This was saved when the draft was logged. Click Edit to change."
-              >
-                <span aria-hidden>✓</span>
-                <span>Saved from draft</span>
-              </span>
-            ) : null}
           </div>
           {isDraft ? (
             <button
@@ -3949,7 +4356,17 @@ export function NewRunForm(props: {
       ) : null}
 
       {needsEvent && (sessionExpanded || !isDraft) ? (
-        <SurfaceCard variant="panel" overflowHidden={false} className={cn("run-section--event", prefillFieldClass(Boolean(prefillHighlights?.event)))} contentClassName="space-y-3">
+        <SurfaceCard
+          variant="panel"
+          bare={wizardActive}
+          overflowHidden={false}
+          className={cn(
+            "run-section--event",
+            prefillFieldClass(Boolean(prefillHighlights?.event)),
+            wizardActive && "border-t border-border/60 pt-4"
+          )}
+          contentClassName="space-y-3"
+        >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <Eyebrow>Event / Race meeting</Eyebrow>
@@ -4298,6 +4715,12 @@ export function NewRunForm(props: {
           </div>
         </SurfaceCard>
       ) : null}
+      {/* Wizard: Track completes the unified Session card (the classic mode
+          keeps this content as the Run-details "Track" face). */}
+      {wizardActive ? (
+        <div className="border-t border-border/60 pt-4">{trackPanelJsx}</div>
+      ) : null}
+      </WizardSessionGroup>
       </div>
 
       <div hidden={!wizardShowsDetails}>
@@ -4317,15 +4740,6 @@ export function NewRunForm(props: {
                 prefillHighlights?.tires
               }
             />
-            {isDraft ? (
-              <span
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
-                title="This was saved when the draft was logged. Click Edit to change."
-              >
-                <span aria-hidden>✓</span>
-                <span>Saved from draft</span>
-              </span>
-            ) : null}
           </div>
           {isDraft ? (
             <button
@@ -4495,121 +4909,7 @@ export function NewRunForm(props: {
                 trackSaveWarning && runDetailsTab !== "track"
                   ? "ring-2 ring-inset ring-amber-500/55"
                   : undefined,
-              content: (
-          <div className="space-y-3 pt-1">
-            <div className="space-y-1 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <Eyebrow dot="muted">Track</Eyebrow>
-                <Link
-                  href="/tracks"
-                  className="btn-surface px-2 py-1 text-[11px]"
-                >
-                  Track library
-                </Link>
-              </div>
-              {trackLockedToEvent ? (
-                <div className="space-y-1">
-                  <div className="inset-panel-deep px-3 py-2 text-sm text-foreground">
-                    {(() => {
-                      const t = tracksList.find((x) => x.id === trackId);
-                      if (!t) return "—";
-                      return `${t.name}${t.location ? ` (${t.location})` : ""}`;
-                    })()}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Track is set by the selected event. Change the event (or its track in Events) to use a
-                    different venue.
-                  </p>
-                </div>
-              ) : (
-                <div className={prefillFieldClass(Boolean(prefillHighlights?.track))}>
-                  <TrackCombobox
-                    tracks={tracksList}
-                    value={trackId}
-                    onChange={(id) => {
-                      trackPickedManuallyRef.current = true;
-                      wizardCtxTouchedRef.current = true;
-                      setTrackId(id);
-                      // Layout belongs to a track; clear it so a stale layout from the
-                      // previous track can't be submitted, and re-allow event auto-fill.
-                      setTrackLayoutId("");
-                      setTrackDirection("");
-                      layoutPickedManuallyRef.current = false;
-                      setCopyTrackWarning(null);
-                      setNearbyTrackSuggestions([]);
-                      setTrackAutoDetectMessage(null);
-                    }}
-                    lastRunTrackId={lastRun?.trackId ?? null}
-                    favouriteTrackIds={favouriteTrackIds}
-                    favouriteTracks={favouriteTracks}
-                    placeholder="Select track…"
-                    aria-label="Track"
-                  />
-                  {!isEditing ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        className="btn-surface px-2.5 py-1 text-[11px] font-medium disabled:opacity-60"
-                        disabled={trackAutoDetectLoading}
-                        onClick={() => void runTrackAutoDetect()}
-                      >
-                        {trackAutoDetectLoading ? "Detecting…" : "Detect from location"}
-                      </button>
-                      {trackAutoDetectMessage ? (
-                        <span className="text-[11px] text-muted-foreground leading-snug">
-                          {trackAutoDetectMessage}
-                          {trackAutoDetectMessage.includes("Track library") ? (
-                            <>
-                              {" "}
-                              <Link href="/tracks" className="font-medium text-foreground underline">
-                                Track library
-                              </Link>
-                            </>
-                          ) : null}
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <TrackNearbySuggestions
-                    suggestions={nearbyTrackSuggestions}
-                    onSelect={(id) => {
-                      trackPickedManuallyRef.current = true;
-                      setTrackId(id);
-                      setTrackLayoutId("");
-                      setTrackDirection("");
-                      layoutPickedManuallyRef.current = false;
-                      setCopyTrackWarning(null);
-                      setNearbyTrackSuggestions([]);
-                      setTrackAutoDetectMessage(null);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            {copyTrackWarning && (
-              <div className="text-[11px] text-muted-foreground">{copyTrackWarning}</div>
-            )}
-            {trackId.trim() ? (
-              <RunLayoutPicker
-                trackId={trackId}
-                layoutId={trackLayoutId}
-                direction={trackDirection}
-                onLayoutChange={(id) => {
-                  layoutPickedManuallyRef.current = true;
-                  setTrackLayoutId(id);
-                }}
-                onDirectionChange={(dir) => {
-                  layoutPickedManuallyRef.current = true;
-                  setTrackDirection(dir);
-                }}
-                inheritedFromEvent={Boolean(
-                  selectedEventForRun?.trackLayoutId &&
-                    trackLayoutId === selectedEventForRun.trackLayoutId
-                )}
-              />
-            ) : null}
-          </div>
-              ),
+              content: trackPanelJsx,
             },
           ] as PagedCardFace[])
             .concat(
@@ -4653,15 +4953,6 @@ export function NewRunForm(props: {
           <div className="flex flex-wrap items-center gap-2">
             <Eyebrow>Setup</Eyebrow>
             <PrefillBadge show={prefillHighlights?.setup} />
-            {isDraft && !setupSectionExpanded && setupBaselineData ? (
-              <span
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
-                title="This was saved when the draft was logged. Click Edit to change."
-              >
-                <span aria-hidden>✓</span>
-                <span>Saved from draft</span>
-              </span>
-            ) : null}
             {setupChangeCountSinceBaseline > 0 ? (
               <span
                 className="type-data-label inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-0.5 text-muted-foreground"
@@ -4927,17 +5218,6 @@ export function NewRunForm(props: {
         </div>
       ) : null}
 
-      {isDraft ? (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-foreground">
-          <span className="font-medium text-amber-700 dark:text-amber-300">
-            Draft run.
-          </span>{" "}
-          Finish logging how the session went, then hit{" "}
-          <span className="font-medium">Run complete</span> below to take it off the
-          unfinished list.
-        </div>
-      ) : null}
-
       <div hidden={wizardActive && wizardStep !== "laps"}>
       <LapTimesIngestPanel
         value={lapIngest}
@@ -4948,7 +5228,6 @@ export function NewRunForm(props: {
         trackLiveRcUrl={tracksList.find((t) => t.id === trackId)?.liveRcUrl ?? null}
         trackSpeedhiveUrl={tracksList.find((t) => t.id === trackId)?.speedhiveUrl ?? null}
         editingRunId={isEditing ? editRun?.id ?? null : null}
-        isDraftResume={isDraft}
       />
       </div>
 
@@ -5058,23 +5337,6 @@ export function NewRunForm(props: {
       {/* v5.1: forward motion moved to the pinned action row (bottom chrome /
           desktop pills) — the only in-content row left is Feedback's
           completion declaration, beside the rating that gates it. */}
-      {wizardActive && wizardStep === "feel" ? (
-        <div className="flex flex-col items-end gap-2 pt-1">
-          {wizardMarkedComplete ? (
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              Marked complete — Save finishes it 🏁
-            </p>
-          ) : (
-            <button
-              type="button"
-              className={wizardEndLinkPrimaryClass}
-              onClick={handleWizardCompleteToggle}
-            >
-              Mark run complete 🏁
-            </button>
-          )}
-        </div>
-      ) : null}
 
       {/* v5.1 wizard chrome (mobile): step tabs replace the app dock, the
           persistent action row rides above them, and the "← Save & exit"
@@ -5085,17 +5347,22 @@ export function NewRunForm(props: {
           current={wizardStep}
           statusById={wizardStepStatus}
           onSelect={goToWizardStep}
-          markedComplete={wizardSaveCompletes}
+          editingCompleted={editingCompletedRun}
           canSave={canSave}
           saving={saving}
           saveSuccess={saveSuccess}
           onSave={() => saveRun(undefined, wizardSaveCompletes ? "completed" : "draft")}
           onSaveDraft={() => saveRun(undefined, "draft")}
+          onComplete={() => saveRun(undefined, "completed")}
           onExit={() => {
             // The escape banks whatever is here and leaves (saveRun navigates
-            // after saving); with nothing saveable it's a plain exit.
-            if (canSave && !saving) void saveRun(undefined, wizardSaveCompletes ? "completed" : "draft");
-            else router.push("/");
+            // after saving; exitAfter covers edit-mode draft saves, which
+            // otherwise stay in place); with nothing saveable it's a plain exit.
+            if (canSave && !saving) {
+              void saveRun(undefined, wizardSaveCompletes ? "completed" : "draft", {
+                exitAfter: true,
+              });
+            } else router.push("/");
           }}
         />
       ) : null}
@@ -5119,10 +5386,11 @@ export function NewRunForm(props: {
             <div className="mx-auto flex max-w-md flex-wrap justify-end gap-2 md:mx-0 md:max-w-none">
           {wizardActive ? (
             /* Desktop only — mobile's actions live in the wizard bottom
-               chrome. Mirrors its step logic (v5.1): "Next: <step>" through
-               Prep, the seam pair on Setup, "Next: Feedback" on Laps, Save on
-               Feedback. Save is honest — the declared badge decides intent
-               and color. */
+               chrome. Mirrors its step logic: "Next: <step>" through Prep, the
+               seam pair on Setup, "Next: Feedback" on Laps, and on Feedback the
+               same Save-draft / Mark-complete pair (founder 2026-07-17 — the
+               declared Draft badge was retired; complete is an explicit
+               action). Editing a complete run → single "Save edits". */
             <div className="hidden gap-2 md:flex">
               {wizardStep === "setup" ? (
                 <>
@@ -5147,23 +5415,50 @@ export function NewRunForm(props: {
                   </button>
                 </>
               ) : wizardStep === "feel" ? (
-                <button
-                  type="button"
-                  className={cn(
-                    wizardSaveCompletes ? fabPillPrimaryClass : fabPillOutlineClass,
-                    (!canSave || saving) && "opacity-70 pointer-events-none"
-                  )}
-                  onClick={(e) => saveRun(e, wizardSaveCompletes ? "completed" : "draft")}
-                  disabled={!canSave || saving}
-                  aria-busy={saving && !saveSuccess}
-                  title={
-                    wizardSaveCompletes
-                      ? "Marked complete — saving finishes the run."
-                      : "Saves as a draft — mark complete on the Draft badge."
-                  }
-                >
-                  {saveSuccess ? "Saved ✓" : saving ? "Saving…" : wizardSaveCompletes ? "Save 🏁" : "Save 💾"}
-                </button>
+                editingCompletedRun ? (
+                  <button
+                    type="button"
+                    className={cn(
+                      fabPillPrimaryClass,
+                      (!canSave || saving) && "opacity-70 pointer-events-none"
+                    )}
+                    onClick={(e) => saveRun(e, "completed")}
+                    disabled={!canSave || saving}
+                    aria-busy={saving && !saveSuccess}
+                    title="Save changes — the run stays complete."
+                  >
+                    {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save edits"}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={cn(
+                        fabPillOutlineClass,
+                        (!canSave || saving) && "opacity-70 pointer-events-none"
+                      )}
+                      onClick={(e) => saveRun(e, "draft")}
+                      disabled={!canSave || saving}
+                      aria-busy={saving && !saveSuccess}
+                      title="Save what you have — finish the run any time."
+                    >
+                      {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save draft 💾"}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        fabPillPrimaryClass,
+                        (!canSave || saving) && "opacity-70 pointer-events-none"
+                      )}
+                      onClick={(e) => saveRun(e, "completed")}
+                      disabled={!canSave || saving}
+                      aria-busy={saving && !saveSuccess}
+                      title="Mark this run finished and save."
+                    >
+                      {saving ? "Saving…" : "Mark run complete 🏁"}
+                    </button>
+                  </>
+                )
               ) : (
                 <>
                   <button

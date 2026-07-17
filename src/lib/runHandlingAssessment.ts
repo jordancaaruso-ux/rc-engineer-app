@@ -70,13 +70,9 @@ export function coerceFeelVsLastRunForCompleteRun(
   const parsed = parseHandlingAssessmentJson(raw);
   const feel = parsed?.feelVsLastRun ?? null;
 
-  if (hasPriorRunOnCar && feel == null) {
-    return {
-      parsed,
-      error: "Pick how this run felt vs your last run on this car before marking complete.",
-    };
-  }
-
+  // The "feel vs last run" quick-pick was retired from the complete flow, so
+  // completion is never blocked on it. When it's absent and there's no prior
+  // run to compare against, seed a neutral 0; otherwise pass through untouched.
   if (!hasPriorRunOnCar && feel == null) {
     if (!parsed) return { parsed: { version: 6, feelVsLastRun: 0 } };
     return { parsed: { ...parsed, feelVsLastRun: 0 } };
