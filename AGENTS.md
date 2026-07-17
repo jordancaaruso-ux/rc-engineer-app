@@ -112,3 +112,13 @@ Commit trailers like `Made-with: Cursor` are welcome — they make it easy to au
 - **Calibration auto-detection**: `src/lib/setupCalibrations/autoPickCalibration.ts`.
 
 When changes affect community aggregation stats, remember to rebuild via `POST /api/setup-aggregations/rebuild` — stored rows are materialized and don't update automatically.
+
+## Cursor Cloud specific instructions
+
+Standard build/test/run commands live in `docs/HOW_WE_BUILD.md` and `package.json` scripts; env vars in `.env.example`. Notes below are only the non-obvious cloud-dev caveats.
+
+- **Local dev DB is local Postgres.** The update script does NOT create a database. On a fresh VM, start Postgres and ensure a dev DB + `.env.local` exist (`DATABASE_URL`, `AUTH_SECRET`, `AUTH_DEV_ALLOW_ANY_EMAIL=1`, `AUTH_URL=http://localhost:3000`). A working local value is `postgresql://postgres:postgres@localhost:5432/rc_engineer_dev`.
+- **Schema init: use `npm run db:push`, NOT `db:migrate:deploy`, for a fresh local DB.** `migrate deploy` fails on an empty DB because migration `20260402102912_finalize_after_track_ownership` is backdated so it sorts before `20260402120000_init_postgres` (Prisma error P3018 / `relation "User" does not exist`). `db push` builds the full schema straight from `prisma/schema.prisma`. Prod is unaffected (it uses committed migrations + the reconcile flow). Never run `db push` against a prod `DATABASE_URL` (see Prisma section above). Optionally `npm run db:seed` after.
+- **Auth without SMTP:** with no `EMAIL_SERVER`/`EMAIL_FROM`, magic links are NOT emailed — they are printed to the `npm run dev` terminal as `[auth] Magic link for <email>:` followed by the callback URL. The verify page redirects to `?delivery=console`. Submit the email at `/login`, grab the URL from the dev log, and open it to complete sign-in. `AUTH_DEV_ALLOW_ANY_EMAIL=1` bypasses the allowlist locally.
+- **AI flows need `OPENAI_API_KEY`.** Core logging (runs, tracks, cars, setup sheets) works without it; the Engineer chat and AI extraction endpoints require it.
+- **Run locally with `npx next build`, not `npm run build`** — `npm run build` is the Vercel pipeline (`prisma migrate deploy` first) and will hit the migration-ordering issue above against a local DB.
