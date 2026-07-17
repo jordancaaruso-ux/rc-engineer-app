@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { listTeamPeerUserIds } from "@/lib/teamAccess";
+import { withIncludedBestLapForPicker } from "@/lib/lapAnalysis";
 
 /**
  * Teammate-visible runs for unanchored pickers (Roll Center Lab setup slots).
@@ -60,6 +61,8 @@ export async function GET() {
       carNameSnapshot: true,
       trackNameSnapshot: true,
       lapTimes: true,
+      lapSession: true,
+      bestLapSeconds: true,
       setupSnapshot: { select: { id: true, data: true } },
       car: { select: { name: true, setupSheetTemplate: true } },
       track: { select: { name: true } },
@@ -78,5 +81,9 @@ export async function GET() {
     members.map((m) => [m.id, m.name?.trim() || m.email?.trim() || m.id.slice(0, 8)] as const)
   );
 
-  return NextResponse.json({ runs, memberDisplayByUserId, hasTeammates });
+  return NextResponse.json({
+    runs: runs.map(withIncludedBestLapForPicker),
+    memberDisplayByUserId,
+    hasTeammates,
+  });
 }

@@ -36,7 +36,6 @@ const runSelectForPdfReview = {
   sessionLabel: true,
   carId: true,
   tireSetId: true,
-  batteryId: true,
   setupSnapshotId: true,
   car: {
     select: {
@@ -106,7 +105,6 @@ export async function PATCH(request: Request, { params }: Params) {
       id: true,
       carId: true,
       tireSetId: true,
-      batteryId: true,
       setupSnapshotId: true,
       setupSnapshot: { select: { id: true, data: true } },
     },
@@ -140,22 +138,11 @@ export async function PATCH(request: Request, { params }: Params) {
         },
       })
     : null;
-  const battery = run.batteryId
-    ? await prisma.battery.findFirst({
-        where: { id: run.batteryId, userId: user.id },
-        select: { label: true, packNumber: true },
-      })
-    : null;
-
   const tireValue = tireSet ? tireSelectionFromTireSet(tireSet) : undefined;
-  const batteryLabel = battery
-    ? `${battery.label}${battery.packNumber != null ? ` #${battery.packNumber}` : ""}`
-    : "";
 
   resolvedData = normalizeSetupSnapshotForStorage({
     ...resolvedData,
     tires: tireValue || resolvedData.tires,
-    battery: batteryLabel || resolvedData.battery,
   });
 
   const setupDeltaJson = previousId

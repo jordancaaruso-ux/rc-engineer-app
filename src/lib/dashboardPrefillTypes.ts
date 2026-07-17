@@ -13,8 +13,6 @@ export type DashboardSerializedRun = {
   eventId: string | null;
   tireSetId: string | null;
   tireRunNumber: number;
-  batteryId?: string | null;
-  batteryRunNumber?: number;
   setupSnapshot: { id: string; data: unknown };
   event?: {
     id: string;
@@ -27,7 +25,6 @@ export type DashboardSerializedRun = {
   } | null;
   track?: { id: string; name: string } | null;
   tireSet?: { id: string; label: string; setNumber?: number | null } | null;
-  battery?: { id: string; label: string; packNumber?: number | null } | null;
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;

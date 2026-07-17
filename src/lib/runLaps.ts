@@ -12,13 +12,8 @@ export function computeLapMetrics(laps: number[]): LapMetrics {
   return computeLapMetricsCore(laps);
 }
 
-export function bestLap(value: unknown): number | null {
-  return computeLapMetricsCore(normalizeLapTimes(value)).bestLap;
-}
-
-export function avgTop5(value: unknown): number | null {
-  return computeLapMetricsCore(normalizeLapTimes(value)).averageTop5;
-}
+// NOTE: raw best/avg helpers were removed on purpose — they ignored per-lap
+// exclusions. Use computeIncludedLapMetricsFromRun (lapAnalysis) instead.
 
 export function formatLap(n: number | null): string {
   if (n == null) return "—";

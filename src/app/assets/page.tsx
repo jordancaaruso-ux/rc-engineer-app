@@ -27,12 +27,11 @@ export default async function AssetsHubPage() {
     const user = await requireCurrentUser();
     isAdmin = isAuthAdminEmail(user.email);
     try {
-      const [cars, tireSets, batteries] = await Promise.all([
+      const [cars, tireSets] = await Promise.all([
         prisma.car.count({ where: { userId: user.id } }),
         prisma.tireSet.count({ where: { userId: user.id, archivedAt: null } }),
-        prisma.battery.count({ where: { userId: user.id, archivedAt: null } }),
       ]);
-      counts = { "/cars": cars, "/tire-sets": tireSets, "/batteries": batteries };
+      counts = { "/cars": cars, "/tire-sets": tireSets };
     } catch {
       // Counts are decoration — a DB hiccup shouldn't blank the hub.
       counts = undefined;

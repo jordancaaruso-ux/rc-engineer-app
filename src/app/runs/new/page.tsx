@@ -71,7 +71,8 @@ export default async function NewRunPage({
     dashboardPrefill,
     incompleteRunsForImport,
     todaysDrafts,
-    cars,
+    carsByCreated,
+    carLastRuns,
     allTracks,
     favouriteTrackIds,
     copyPreviewRun,
@@ -84,7 +85,19 @@ export default async function NewRunPage({
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        carClass: true,
+        setupSheetTemplate: true,
+        setupSheetModelId: true,
+      },
+    }),
+    prisma.run.groupBy({
+      by: ["carId"],
+      where: { userId: user.id, carId: { not: null } },
+      _max: { createdAt: true },
     }),
     prisma.track.findMany({
       where: {},
@@ -102,6 +115,18 @@ export default async function NewRunPage({
     getFavouriteTrackIdsForUser(user.id),
     getLastRunForCopyPreview(user.id),
   ]);
+
+  // Car picker order: most recently interacted first — the car's latest run
+  // (runs are logged live, so run.createdAt ≈ when it was driven) or the car's
+  // creation, whichever is newer. Top car doubles as the pre-selected default.
+  const lastRunAtByCar = new Map(
+    carLastRuns.map((g) => [g.carId, g._max.createdAt?.getTime() ?? 0]),
+  );
+  const cars = [...carsByCreated].sort(
+    (a, b) =>
+      Math.max(lastRunAtByCar.get(b.id) ?? 0, b.createdAt.getTime()) -
+      Math.max(lastRunAtByCar.get(a.id) ?? 0, a.createdAt.getTime()),
+  );
 
   const favSet = new Set(favouriteTrackIds);
   const favouriteTracks = allTracks.filter((t) => favSet.has(t.id));
@@ -138,7 +163,6 @@ export default async function NewRunPage({
         <section className="page-body max-w-3xl">
           <LogRunWizardHost
             entryCars={cars.map((c) => ({ id: c.id, name: c.name }))}
-            entryTracks={tracks}
             initialCandidate={toEntryCandidate(copyPreviewRun)}
             currentEventId={initialEventId}
             drafts={wizardDrafts.map((d) => ({

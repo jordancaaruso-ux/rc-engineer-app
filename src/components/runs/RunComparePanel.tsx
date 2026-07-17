@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { bestLap, avgTop5, formatLap } from "@/lib/runLaps";
+import { formatLap } from "@/lib/runLaps";
+import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
 import { buildSetupDiffRows, normalizeSetupData } from "@/lib/setupDiff";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { formatRunPickerLine } from "@/lib/runPickerFormat";
@@ -149,17 +150,21 @@ export function RunComparePanel({
       ? "Compare this completed run to your working setup or another run."
       : "Compare to your runs on the same setup sheet model, or other runs on this car.";
 
+  // Included laps only — excluded laps must not leak into compare metrics.
+  const baseMetrics = computeIncludedLapMetricsFromRun(baseRun);
+  const baselineMetrics = baselineRun ? computeIncludedLapMetricsFromRun(baselineRun) : null;
+
   const lapsRight =
     mode === "current_setup"
       ? "—"
-      : baselineRun
-        ? formatLap(bestLap(baselineRun.lapTimes))
+      : baselineMetrics
+        ? formatLap(baselineMetrics.bestLap)
         : "—";
   const avgRight =
     mode === "current_setup"
       ? "—"
-      : baselineRun
-        ? formatLap(avgTop5(baselineRun.lapTimes))
+      : baselineMetrics
+        ? formatLap(baselineMetrics.averageTop5)
         : "—";
 
   const notesCompareRight =
@@ -248,13 +253,13 @@ export function RunComparePanel({
           <div className="grid gap-3 sm:grid-cols-2">
             <LapBlock
               title="Best lap"
-              left={formatLap(bestLap(baseRun.lapTimes))}
+              left={formatLap(baseMetrics.bestLap)}
               right={lapsRight}
               rightLabel={rightLabel}
             />
             <LapBlock
               title="Avg top 5"
-              left={formatLap(avgTop5(baseRun.lapTimes))}
+              left={formatLap(baseMetrics.averageTop5)}
               right={avgRight}
               rightLabel={rightLabel}
             />

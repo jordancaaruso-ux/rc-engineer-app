@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
+import { withIncludedBestLapForPicker } from "@/lib/lapAnalysis";
 
 /** Past runs for Load setup + Compare pickers (newest first). */
 export async function GET(request: Request) {
@@ -37,6 +38,8 @@ export async function GET(request: Request) {
       carNameSnapshot: true,
       trackNameSnapshot: true,
       lapTimes: true,
+      lapSession: true,
+      bestLapSeconds: true,
       setupSnapshot: { select: { id: true, data: true } },
       car: { select: { name: true, setupSheetTemplate: true } },
       track: { select: { name: true } },
@@ -44,5 +47,5 @@ export async function GET(request: Request) {
     },
   });
 
-  return NextResponse.json({ runs });
+  return NextResponse.json({ runs: runs.map(withIncludedBestLapForPicker) });
 }

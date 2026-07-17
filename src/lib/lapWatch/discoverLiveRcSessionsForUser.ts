@@ -159,7 +159,7 @@ function buildHint(
 
   const { practice, race, summary } = debug;
   if (summary.totalMatched > 0 && summary.alreadyImported === summary.totalMatched) {
-    return `All ${summary.totalMatched} matching session(s) are already imported. Use “Show import debug” below to see what LiveRC returned.`;
+    return `All ${summary.totalMatched} matching session(s) are already imported.`;
   }
   if (practice.resolveError && race.resolveError) {
     return `Could not resolve practice or race pages from LiveRC (${practice.resolveError}; ${race.resolveError}).`;
@@ -173,7 +173,7 @@ function buildHint(
   if (practice.rowsOnPage === 0 && race.hubRows === 0) {
     return "LiveRC returned no sessions on the resolved practice day or race hub. You may need to wait until timing is posted.";
   }
-  return "No matching sessions found at this track. Use “Show import debug” below for details.";
+  return "No matching sessions found at this track.";
 }
 
 export async function discoverLiveRcSessionsForUser(input: {

@@ -8,6 +8,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CarDeleteClient } from "@/components/cars/CarDeleteClient";
+import { CarClassEdit } from "@/components/cars/CarClassEdit";
 import {
   CarSetupSheetModelCard,
   showLegacySetupSheetTemplateEdit,
@@ -47,6 +48,7 @@ export default async function CarDetailPage(props: {
       id: true,
       name: true,
       chassis: true,
+      carClass: true,
       notes: true,
       setupSheetTemplate: true,
       setupSheetModelId: true,
@@ -105,36 +107,6 @@ export default async function CarDetailPage(props: {
     }
   }
 
-  const batteryRunRows = await prisma.run.findMany({
-    where: { userId: user.id, carId, batteryId: { not: null } },
-    select: { batteryId: true },
-  });
-  const batteryIds = [...new Set(batteryRunRows.map((r) => r.batteryId!))];
-  const runsOnCarByBattery = new Map<string, number>();
-  for (const r of batteryRunRows) {
-    const id = r.batteryId!;
-    runsOnCarByBattery.set(id, (runsOnCarByBattery.get(id) ?? 0) + 1);
-  }
-  const batteriesOnCar =
-    batteryIds.length > 0
-      ? await prisma.battery.findMany({
-          where: { userId: user.id, id: { in: batteryIds } },
-          orderBy: [{ label: "asc" }, { packNumber: "asc" }],
-          select: { id: true, label: true, packNumber: true },
-        })
-      : [];
-  const latestBatteryRunGlobal = await prisma.run.findMany({
-    where: { userId: user.id, batteryId: { in: batteryIds } },
-    orderBy: { createdAt: "desc" },
-    select: { batteryId: true, batteryRunNumber: true },
-  });
-  const globalBatteryCount = new Map<string, number>();
-  for (const r of latestBatteryRunGlobal) {
-    if (r.batteryId && !globalBatteryCount.has(r.batteryId)) {
-      globalBatteryCount.set(r.batteryId, r.batteryRunNumber);
-    }
-  }
-
   // Setup sheet models are global — never scope this read by userId.
   const modelRow = car.setupSheetModelId
     ? await prisma.setupSheetModel.findUnique({
@@ -183,6 +155,8 @@ export default async function CarDetailPage(props: {
             </div>
           </CardPanel>
 
+          <CarClassEdit carId={car.id} currentClass={car.carClass} />
+
           {car.setupSheetModel ? (
             <CarSetupSheetModelCard
               carId={car.id}
@@ -230,33 +204,6 @@ export default async function CarDetailPage(props: {
                     <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
                       {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} on this car · set
                       total {globalTireCount.get(ts.id) ?? "—"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardPanel>
-
-          <CardPanel contentClassName="space-y-3">
-            <Eyebrow>Batteries used with this car</Eyebrow>
-            {batteriesOnCar.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No batteries linked on runs for this car yet. Log a run and select a battery pack.
-              </p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {batteriesOnCar.map((b) => (
-                  <li
-                    key={b.id}
-                    className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
-                  >
-                    <span className="text-foreground">
-                      {b.label}
-                      {b.packNumber != null ? ` · Pack #${b.packNumber}` : ""}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
-                      {runsOnCarByBattery.get(b.id) ?? 0} run{runsOnCarByBattery.get(b.id) === 1 ? "" : "s"} on this car ·
-                      pack total {globalBatteryCount.get(b.id) ?? "—"}
                     </span>
                   </li>
                 ))}

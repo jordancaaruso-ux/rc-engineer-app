@@ -53,6 +53,10 @@ export type SetupSheetModalRun = {
   event?: { name: string; track?: { name: string } | null } | null;
   setupSnapshot?: { id: string; data?: unknown } | null;
   lapTimes?: unknown;
+  /** Per-lap inclusion flags (rows from history/analysis loaders). */
+  lapSession?: unknown;
+  /** Exclusion-aware best lap (rows from the picker APIs). */
+  bestLapSeconds?: number | null;
 };
 
 /** A standalone library setup sheet (upload or PetitRC download) pickable as a compare baseline. */

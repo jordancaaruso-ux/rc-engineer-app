@@ -189,12 +189,15 @@ function SessionImportListRow({
   disabled?: boolean;
   onClick: () => void;
 }) {
+  const sourceLabel =
+    timingSource === "speedhive" ? "Speedhive" : timingSource === "liverc" ? "LiveRC" : null;
+  const meta = [sourceLabel, when].filter(Boolean).join(" · ");
   return (
     <button
       type="button"
       disabled={disabled}
       className={cn(
-        "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition",
+        "flex w-full items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition",
         isActive
           ? "border-accent/50 bg-accent/10"
           : "border-border bg-surface-runna hover:bg-surface-runna-inset",
@@ -202,63 +205,62 @@ function SessionImportListRow({
       )}
       onClick={onClick}
     >
-      <span className="min-w-0">
-        <span className="block truncate font-medium text-foreground">{title}</span>
-        {when ? <span className="block truncate text-[10px] text-muted-foreground">{when}</span> : null}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold text-foreground">{title}</span>
+        {meta ? <span className="mt-0.5 block truncate text-[11px] text-faint">{meta}</span> : null}
       </span>
-      <span className="shrink-0 flex flex-col items-end gap-0.5">
-        {bestLapSeconds != null ? (
-          <span className="flex flex-col items-end leading-tight">
-            <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Best</span>
-            <span className="font-mono text-[12px] font-medium tabular-nums text-foreground">
-              {formatLap(bestLapSeconds)}
-            </span>
+      {bestLapSeconds != null ? (
+        <span className="flex shrink-0 flex-col items-end leading-tight">
+          <span className="text-[9px] font-medium uppercase tracking-wide text-faint">Best</span>
+          <span className="lap-figure text-[12.5px] font-medium text-foreground">
+            {formatLap(bestLapSeconds)}
           </span>
-        ) : null}
-        {timingSource ? (
-          <span
-            className={cn(
-              "rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide",
-              timingSource === "speedhive"
-                ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
-                : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
-            )}
-          >
-            {timingSource === "speedhive" ? "Speedhive" : "LiveRC"}
+        </span>
+      ) : null}
+      {isActive ? (
+        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-foreground">
+          <span aria-hidden className="text-emerald-500">
+            ✓
           </span>
-        ) : null}
-        {isActive ? (
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-foreground">
-            <span aria-hidden>✓</span>
-            Imported
-          </span>
-        ) : (
-          <span className="ui-title text-[10px] text-muted-foreground">{actionLabel}</span>
-        )}
-      </span>
+          Imported
+        </span>
+      ) : (
+        <span className="shrink-0 rounded-full border border-accent/45 bg-accent/5 px-3 py-1 text-[11px] font-bold text-accent">
+          {actionLabel}
+        </span>
+      )}
     </button>
   );
 }
 
-/** One scan-status line — prefer server hint; fall back to totals when all are imported. */
-function resolveScanStatusMessage(opts: {
+/** Empty-state headline + optional detail line for the import picker. */
+type ScanStatus = { title: string; detail: string | null };
+
+/** Scan status — prefer server hint; fall back to totals when all are imported. */
+function resolveScanStatus(opts: {
   scanMessage: string | null;
   totalCandidates: number;
   unimportedCount: number;
   candidateCount: number;
   olderCount: number;
-}): string | null {
+}): ScanStatus | null {
   const { scanMessage, totalCandidates, unimportedCount, candidateCount, olderCount } = opts;
-  if (scanMessage) return scanMessage;
+  if (scanMessage) return { title: scanMessage, detail: null };
   if (candidateCount === 0) {
     if (olderCount > 0) {
-      return `No sessions from today yet — ${olderCount} older session${olderCount === 1 ? "" : "s"} available below.`;
+      return {
+        title: "No sessions from today yet",
+        detail: `${olderCount} older session${olderCount === 1 ? "" : "s"} available below.`,
+      };
     }
     if (totalCandidates > 0 && unimportedCount === 0) {
       const n = totalCandidates;
-      return `Found ${n} session${n === 1 ? "" : "s"} for your driver — all already imported.`;
+      return {
+        title: "No new sessions to import",
+        detail: `Found ${n} session${n === 1 ? "" : "s"} for your driver — all already imported.`,
+      };
     }
-    return "No new sessions to import.";
+    return { title: "No new sessions to import", detail: null };
   }
   return null;
 }
@@ -271,35 +273,6 @@ type EventRaceSessionRow = {
   sessionCompletedAtIso: string | null;
   alreadyImported: boolean;
   existingImportedSessionId: string | null;
-};
-
-type DiscoveryDebugPayload = {
-  trackOrigin: string | null;
-  liveRcDriverName: string | null;
-  liveRcDriverNameNormalized: string | null;
-  practice: {
-    resolveError: string | null;
-    indexUrl: string | null;
-    activityDate: string | null;
-    fetchError: string | null;
-    rowsOnPage: number;
-    rowsMatchingDriver: number;
-    sampleDriverNamesOnPage: string[];
-  };
-  race: {
-    resolveError: string | null;
-    hubUrl: string | null;
-    hubRows: number;
-    hubRowsAfterClassFilter: number;
-    resultPagesFetched: number;
-    canonicalDriverId: string | null;
-    sessionsWithDriverId: number;
-  };
-  summary: {
-    totalMatched: number;
-    alreadyImported: number;
-    unimported: number;
-  };
 };
 
 export function LapTimesIngestPanel({
@@ -343,12 +316,10 @@ export function LapTimesIngestPanel({
   const [urlInput, setUrlInput] = useState("");
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
   const [dayScanBusy, setDayScanBusy] = useState(false);
-  const [dayScanMessage, setDayScanMessage] = useState<string | null>(null);
+  const [dayScanStatus, setDayScanStatus] = useState<ScanStatus | null>(null);
   const [dayScanCandidates, setDayScanCandidates] = useState<ScanDayCandidate[] | null>(null);
   const [dayScanIndexKind, setDayScanIndexKind] = useState<"practice" | "results" | null>(null);
   const [dayScanHasDriverName, setDayScanHasDriverName] = useState<boolean>(true);
-  const [discoveryDebug, setDiscoveryDebug] = useState<DiscoveryDebugPayload | null>(null);
-  const [debugOpen, setDebugOpen] = useState(false);
   const [scanTotals, setScanTotals] = useState<{ total: number; unimported: number } | null>(null);
   const [showAllRecentRuns, setShowAllRecentRuns] = useState(false);
   /** Unimported sessions completed before today (first-scan backlog) — collapsed by default. */
@@ -577,14 +548,15 @@ export function LapTimesIngestPanel({
     const tid = trackId?.trim() ?? "";
     const useTrack = hasTrackDiscovery;
     if (!useTrack && !url) {
-      setDayScanMessage("Select a track with a LiveRC or Speedhive URL on the Tracks page.");
+      setDayScanStatus({
+        title: "No timing source for this track",
+        detail: "Select a track with a LiveRC or Speedhive URL on the Tracks page.",
+      });
       return;
     }
     setDayScanBusy(true);
-    setDayScanMessage(null);
+    setDayScanStatus(null);
     setDayScanIndexKind(null);
-    setDiscoveryDebug(null);
-    setDebugOpen(false);
     setScanTotals(null);
     setShowAllRecentRuns(false);
     setDayScanOlderCandidates(null);
@@ -607,7 +579,10 @@ export function LapTimesIngestPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setDayScanMessage((data as { error?: string })?.error || "Scan failed.");
+        setDayScanStatus({
+          title: "Scan failed",
+          detail: (data as { error?: string })?.error || null,
+        });
         setDayScanCandidates(null);
         return;
       }
@@ -620,7 +595,6 @@ export function LapTimesIngestPanel({
         typeof (data as { scanMessage?: unknown }).scanMessage === "string"
           ? ((data as { scanMessage: string }).scanMessage.trim() || null)
           : null;
-      const dbg = (data as { discoveryDebug?: DiscoveryDebugPayload }).discoveryDebug;
       const totalCandidates =
         typeof (data as { totalCandidates?: unknown }).totalCandidates === "number"
           ? (data as { totalCandidates: number }).totalCandidates
@@ -641,10 +615,9 @@ export function LapTimesIngestPanel({
       setDayScanCandidates(candidates);
       setDayScanOlderCandidates(olderCandidates);
       setDayScanOlderTotal(olderCount);
-      setDiscoveryDebug(dbg ?? null);
       setScanTotals({ total: totalCandidates, unimported: unimportedCount });
-      setDayScanMessage(
-        resolveScanStatusMessage({
+      setDayScanStatus(
+        resolveScanStatus({
           scanMessage,
           totalCandidates,
           unimportedCount,
@@ -653,7 +626,7 @@ export function LapTimesIngestPanel({
         })
       );
     } catch {
-      setDayScanMessage("Scan failed.");
+      setDayScanStatus({ title: "Scan failed", detail: null });
     } finally {
       setDayScanBusy(false);
     }
@@ -686,7 +659,7 @@ export function LapTimesIngestPanel({
     if (!confirmReplaceIfNeeded(sessionUrl)) return;
     setUrlInput(sessionUrl);
     setUrlMessage(null);
-    setDayScanMessage(null);
+    setDayScanStatus(null);
     await fetchUrlPreviewWithUrl(sessionUrl);
   }
 
@@ -1018,27 +991,14 @@ export function LapTimesIngestPanel({
               )}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <Eyebrow>Sessions to import</Eyebrow>
-                  <p className="mt-1 ui-label-meta">
-                    {eventRaceBusy || dayScanBusy
-                      ? `Checking ${
-                          [
-                            (hasLiveRcTrack || lapImportEventId?.trim()) && "LiveRC",
-                            hasSpeedhiveTrack && "Speedhive",
-                          ]
-                            .filter(Boolean)
-                            .join(", ") || "timing sources"
-                        }…`
-                      : hasLinkedLapImport
-                        ? "One session imported — pick another to replace it (newest first)."
-                        : importPickerTotal > 0
-                          ? !showAllRecentRuns && importPickerTotal > RECENT_RUNS_COLLAPSED
-                            ? `Showing ${Math.min(RECENT_RUNS_COLLAPSED, importPickerTotal)} of ${importPickerTotal} sessions (newest first)`
-                            : `${importPickerTotal} session${importPickerTotal === 1 ? "" : "s"} to import`
-                          : "Practice and event sessions at this track, newest first."}
-                  </p>
-                </div>
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="type-data-label">Sessions to import</span>
+                  {importPickerTotal > 0 ? (
+                    <span className="text-[12px] font-semibold tabular-nums text-foreground">
+                      {importPickerTotal}
+                    </span>
+                  ) : null}
+                </span>
                 <button
                   type="button"
                   disabled={eventRaceBusy || dayScanBusy}
@@ -1092,12 +1052,36 @@ export function LapTimesIngestPanel({
                   ) : null}
                 </div>
               ) : null}
+              {(eventRaceBusy || dayScanBusy) && importPickerRows.length === 0 ? (
+                <div role="status" className="flex flex-col items-center gap-2.5 px-3 py-5 text-center">
+                  <span
+                    aria-hidden
+                    className="h-[22px] w-[22px] animate-spin rounded-full border-2 border-accent/20 border-t-accent"
+                  />
+                  <p className="text-sm font-semibold text-foreground">Searching for new runs…</p>
+                </div>
+              ) : null}
               {!eventRaceBusy && !dayScanBusy && mergedImportCandidates.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {dayScanMessage ??
-                    eventRaceHint ??
-                    "No sessions found yet — check your driver name in Settings, or add a LiveRC/Speedhive URL on the track or event."}
-                </p>
+                (() => {
+                  const status: ScanStatus = dayScanStatus ??
+                    (eventRaceHint
+                      ? { title: "No sessions to import yet", detail: eventRaceHint }
+                      : {
+                          title: "No sessions found yet",
+                          detail:
+                            "Check your driver name in Settings, or add a LiveRC/Speedhive URL on the track or event.",
+                        });
+                  return (
+                    <div className="px-3 py-4 text-center">
+                      <p className="text-sm font-semibold text-foreground text-balance">
+                        {status.title}
+                      </p>
+                      {status.detail ? (
+                        <p className="mt-1 text-xs text-muted-foreground">{status.detail}</p>
+                      ) : null}
+                    </div>
+                  );
+                })()
               ) : null}
               {!dayScanBusy && olderPickerRows.length > 0 ? (
                 <div className="space-y-1">
@@ -1142,22 +1126,6 @@ export function LapTimesIngestPanel({
               ) : null}
               {eventRaceHint && mergedImportCandidates.length > 0 ? (
                 <p className="ui-label-meta">{eventRaceHint}</p>
-              ) : null}
-              {discoveryDebug ? (
-                <div className="border-t border-border pt-2">
-                  <button
-                    type="button"
-                    className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
-                    onClick={() => setDebugOpen((v) => !v)}
-                  >
-                    {debugOpen ? "Hide import debug" : "Show import debug"}
-                  </button>
-                  {debugOpen ? (
-                    <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted/50 p-2 text-[10px] text-muted-foreground whitespace-pre-wrap break-all">
-                      {JSON.stringify(discoveryDebug, null, 2)}
-                    </pre>
-                  ) : null}
-                </div>
               ) : null}
             </div>
           ) : hasUrlScan ? (

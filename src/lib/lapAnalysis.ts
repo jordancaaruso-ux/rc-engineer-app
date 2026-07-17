@@ -263,6 +263,23 @@ export function computePersistedRunLapSummary(run: {
   };
 }
 
+/**
+ * Picker APIs: resolve the exclusion-aware best lap onto `bestLapSeconds`
+ * (stored column when set, else recomputed from lapSession flags) and drop the
+ * heavy `lapSession` blob from the payload — picker lines only need the number.
+ */
+export function withIncludedBestLapForPicker<
+  T extends { lapTimes: unknown; lapSession: unknown; bestLapSeconds: number | null },
+>(run: T): Omit<T, "lapSession"> {
+  const { lapSession, ...rest } = run;
+  return {
+    ...rest,
+    bestLapSeconds:
+      run.bestLapSeconds ??
+      computeIncludedLapMetricsFromRun({ lapTimes: run.lapTimes, lapSession }).bestLap,
+  };
+}
+
 export function importedSetToLapRows(
   laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>
 ): LapRow[] {

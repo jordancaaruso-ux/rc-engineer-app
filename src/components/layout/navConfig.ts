@@ -74,7 +74,6 @@ const ASSETS_PREFIXES = [
   "/tracks",
   "/tire-sets",
   "/tires",
-  "/batteries",
   "/cars",
   "/assets",
   "/garage",
@@ -152,7 +151,6 @@ export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ASSETS, ENGINE
 export type NavHubIconKey =
   | "car"
   | "disc"
-  | "battery"
   | "layers"
   | "map-pin"
   | "circle-dot"
@@ -217,12 +215,6 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
         label: "Tires",
         description: "Your tire sets and run wear history.",
         icon: "disc",
-      },
-      {
-        href: "/batteries",
-        label: "Batteries",
-        description: "Your battery packs and run history.",
-        icon: "battery",
       },
       {
         href: "/setup",

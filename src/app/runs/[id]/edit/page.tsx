@@ -92,9 +92,6 @@ export default async function EditRunPage({
       warmerTimingMinutes: true,
       tirePrep: true,
       additiveType: { select: { id: true, displayName: true, modelCode: true } },
-      batteryId: true,
-      battery: { select: { id: true, label: true, packNumber: true, initialRunCount: true } },
-      batteryRunNumber: true,
       setupSnapshot: { select: { id: true, data: true } },
       notes: true,
       driverNotes: true,
@@ -188,7 +185,7 @@ export default async function EditRunPage({
       <header className="page-header">
         <div>
           <h1 className="page-title">Edit run</h1>
-          <p className="page-subtitle">Update notes, laps, tire/battery context, or setup details.</p>
+          <p className="page-subtitle">Update notes, laps, tire context, or setup details.</p>
         </div>
       </header>
       <section className="page-body">
@@ -241,9 +238,6 @@ export default async function EditRunPage({
             tireSet: run.tireSet
               ? { id: run.tireSet.id, label: run.tireSet.label, setNumber: run.tireSet.setNumber }
               : null,
-            batteryId: run.batteryId,
-            batteryRunNumber: run.batteryRunNumber,
-            battery: run.battery ? { id: run.battery.id, label: run.battery.label, packNumber: run.battery.packNumber } : null,
             notes: run.notes,
             driverNotes: run.driverNotes,
             handlingProblems: run.handlingProblems,

@@ -1,19 +1,20 @@
 "use client";
 
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
-import { Drop, Gauge, Timer, Tire, Wrench } from "@phosphor-icons/react";
+import { Drop, Flag, Gauge, Timer, Tire, Wrench } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { WIZARD_STEPS, type WizardStepId } from "@/lib/runs/wizardWalk";
 
 /**
- * Jumpable icon rail for the Log-run wizard (founder spec 2026-07-16 v2): all
- * steps always visible and tappable; the walk (after-run + declared changed)
- * is bright, carried-over steps are dimmed but reachable; the current step
- * gets the yellow active treatment; completed steps get a ✓ badge. A dashed
- * divider marks the pre-run → after-run seam (before Laps).
+ * Jumpable icon rail for the Log-run wizard (founder spec 2026-07-16 v2;
+ * Session tab folded in 2026-07-17; v4 same evening: nothing is ever locked —
+ * every step is live from the first render). All steps visible and tappable;
+ * the current step gets the yellow active treatment; completed steps get a
+ * ✓ badge. A dashed divider marks the pre-run → after-run seam (before Laps).
  */
 
 const STEP_ICONS: Record<WizardStepId, PhosphorIcon> = {
+  session: Flag,
   equipment: Tire,
   prep: Drop,
   setup: Wrench,
@@ -30,18 +31,13 @@ export type WizardStepStatus = {
 
 export function LogRunWizardRail({
   current,
-  walk,
-  continuing,
   statusById,
   onSelect,
 }: {
   current: WizardStepId;
-  walk: readonly WizardStepId[];
-  continuing: boolean;
   statusById?: Partial<Record<WizardStepId, WizardStepStatus>>;
   onSelect: (id: WizardStepId) => void;
 }) {
-  const walkSet = new Set(walk);
   // One template column per step, plus a thin divider column at the seam.
   const cells: Array<WizardStepId | "seam"> = [];
   WIZARD_STEPS.forEach((s, i) => {
@@ -71,7 +67,6 @@ export function LogRunWizardRail({
         const s = WIZARD_STEPS[WIZARD_STEPS.findIndex((x) => x.id === c)];
         const Icon = STEP_ICONS[s.id];
         const cur = s.id === current;
-        const carried = continuing && !walkSet.has(s.id);
         const st = statusById?.[s.id];
         return (
           <button
@@ -79,15 +74,13 @@ export function LogRunWizardRail({
             type="button"
             role="tab"
             aria-selected={cur}
-            aria-label={`${s.label}${cur ? " (current)" : carried ? " (carried over)" : ""}`}
+            aria-label={`${s.label}${cur ? " (current)" : ""}`}
             onClick={() => onSelect(s.id)}
             className={cn(
               "relative flex flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 transition-colors",
               cur
                 ? "bg-primary text-primary-foreground"
-                : carried
-                  ? "text-faint hover:text-muted-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             <span className="relative">

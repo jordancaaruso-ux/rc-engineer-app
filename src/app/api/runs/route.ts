@@ -60,8 +60,6 @@ type RunUpsertBody = {
   warmerTimingMinutes?: number | null;
   /** Ordered tire-prep applications (see src/lib/runs/tirePrep.ts). */
   tirePrep?: unknown;
-  batteryId?: string | null;
-  batteryRunNumber?: number;
   setupData?: unknown;
   /** When set, server merges setupData onto this snapshot (full or sparse) and stores audit delta. */
   setupBaselineSnapshotId?: string | null;
@@ -111,7 +109,7 @@ type RunUpsertBody = {
    * `draft` = save progress without marking logging complete.
    * Omitted or `completed` = treat as logging complete (backward compatible).
    * On PUT, if the run was already `loggingComplete`, `draft` is ignored: logging stays complete
-   * and stored tire/battery run numbers are not overwritten from the body.
+   * and stored tire run numbers are not overwritten from the body.
    */
   loggingIntent?: "draft" | "completed";
   /** True when opening Log your run from dashboard detected-session prefill (metadata only; does not affect completion). */
@@ -206,7 +204,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     loggingComplete: boolean;
     loggingCompletedAt: Date | null;
     tireRunNumber: number;
-    batteryRunNumber: number;
   } | null = null;
   if (params.mode === "update") {
     const runId = typeof body.runId === "string" ? body.runId.trim() : "";
@@ -221,7 +218,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         loggingComplete: true,
         loggingCompletedAt: true,
         tireRunNumber: true,
-        batteryRunNumber: true,
       },
     });
     if (!ex) {
@@ -230,7 +226,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     existingUpdate = ex;
   }
 
-  /** Editing a run already marked complete: never revert to draft or rewrite tire/battery run # from the client. */
+  /** Editing a run already marked complete: never revert to draft or rewrite the tire run # from the client. */
   const loggingWasAlreadyComplete = existingUpdate?.loggingComplete === true;
   const loggingComplete = loggingWasAlreadyComplete ? true : body.loggingIntent !== "draft";
 
@@ -284,19 +280,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
       ? Math.max(1, Math.floor(body.tireRunNumber))
       : 1;
-  const batteryRunNumberFromBody =
-    typeof body.batteryRunNumber === "number" && Number.isFinite(body.batteryRunNumber)
-      ? Math.max(1, Math.floor(body.batteryRunNumber))
-      : 1;
 
   const tireRunNumber =
     loggingWasAlreadyComplete && existingUpdate
       ? Math.max(1, Math.floor(Number(existingUpdate.tireRunNumber) || 1))
       : tireRunNumberFromBody;
-  const batteryRunNumber =
-    loggingWasAlreadyComplete && existingUpdate
-      ? Math.max(1, Math.floor(Number(existingUpdate.batteryRunNumber) || 1))
-      : batteryRunNumberFromBody;
 
   const lapTimes = Array.isArray(body.lapTimes)
     ? body.lapTimes.filter((n) => typeof n === "number" && Number.isFinite(n))
@@ -422,8 +410,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     tireSetId = createdTireSet.id;
   }
 
-  // Run-context tire/battery MUST be applied before persisting the snapshot; otherwise loaded
-  // baseline / client setupData leaks stale tires+battery into DB (overwrite ran after create).
+  // Run-context tires MUST be applied before persisting the snapshot; otherwise loaded
+  // baseline / client setupData leaks stale tires into DB (overwrite ran after create).
   const tireSet =
     createdTireSet ??
     (tireSetId
@@ -434,16 +422,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       : null);
   if (tireSetId && !tireSet) {
     return NextResponse.json({ error: "Tire set not found" }, { status: 400 });
-  }
-
-  const battery = body.batteryId
-    ? await prisma.battery.findFirst({
-        where: { id: body.batteryId, userId: params.userId },
-        select: { id: true, label: true, packNumber: true },
-      })
-    : null;
-  if (body.batteryId && !battery) {
-    return NextResponse.json({ error: "Battery not found" }, { status: 400 });
   }
 
   const additiveTypeId =
@@ -491,13 +469,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     ? await getSetupSheetFieldKeysForCarRow(params.userId, carForSheetKeys)
     : new Set<string>();
 
-  const batteryLabel = battery ? `${battery.label}${battery.packNumber != null ? ` #${battery.packNumber}` : ""}` : "";
   resolvedData = normalizeSetupSnapshotForStorage(
     applyRunContextToSetupSnapshot({
       resolvedData,
       sheetKeys,
       tireSet,
-      batteryLabel,
       additiveDisplayName: additiveType?.displayName ?? null,
       warmerTimingMinutes,
     })
@@ -618,8 +594,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         additiveTypeId,
         warmerTimingMinutes,
         tirePrep: tirePrep as unknown as PrismaTypes.InputJsonValue,
-        batteryId: body.batteryId ?? null,
-        batteryRunNumber,
         setupSnapshotId: setupSnapshot.id,
         sourceSetupDocumentId: pdfLinks.sourceSetupDocumentId,
         sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,
@@ -667,8 +641,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       additiveTypeId,
       warmerTimingMinutes,
       tirePrep: tirePrep as unknown as PrismaTypes.InputJsonValue,
-      batteryId: body.batteryId ?? null,
-      batteryRunNumber,
       setupSnapshotId: setupSnapshot.id,
       sourceSetupDocumentId: pdfLinks.sourceSetupDocumentId,
       sourceSetupCalibrationId: pdfLinks.sourceSetupCalibrationId,

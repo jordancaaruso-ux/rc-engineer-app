@@ -9,6 +9,7 @@ import {
 } from "@/lib/teammateRunAccess";
 import { setupSheetScopeFromCar } from "@/lib/setupCompare/setupSheetScope";
 import { carIdsMatchingSetupSheetScopeForUser } from "@/lib/carSetupScope";
+import { withIncludedBestLapForPicker } from "@/lib/lapAnalysis";
 
 const pickerRunSelect = {
   id: true,
@@ -26,6 +27,8 @@ const pickerRunSelect = {
   carNameSnapshot: true,
   trackNameSnapshot: true,
   lapTimes: true,
+  lapSession: true,
+  bestLapSeconds: true,
   tireRunNumber: true,
   setupSnapshot: { select: { id: true, data: true } },
   car: {
@@ -115,7 +118,7 @@ export async function GET(request: Request) {
     return tb - ta;
   });
 
-  return NextResponse.json({ runs });
+  return NextResponse.json({ runs: runs.map(withIncludedBestLapForPicker) });
 }
 
 async function loadPickerRuns(

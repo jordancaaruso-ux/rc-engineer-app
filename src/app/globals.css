@@ -375,6 +375,15 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Log-run wizard v5: while its step chrome is mounted it owns the bottom edge
+   AND the top-left corner — the global dock and the brand pill yield (the
+   wizard chrome stamps this attribute on <body>; its "← Save & exit" escape
+   takes the brand pill's spot). */
+body[data-logrun-wizard-chrome] .bottom-nav,
+body[data-logrun-wizard-chrome] .mobile-brand-mark {
+  display: none;
+}
+
 /* NOTE: Avoid creating sibling stacking contexts here.
    Mobile nav uses fixed overlays from the sidebar; if <main> and the sidebar
    are both forced into equal z-index stacking contexts, DOM order can cause

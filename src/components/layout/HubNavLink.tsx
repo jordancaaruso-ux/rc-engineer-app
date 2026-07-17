@@ -4,7 +4,6 @@ import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
-  Battery,
   Calendar,
   Car,
   ChevronRight,
@@ -26,7 +25,6 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard";
 const HUB_ICON_MAP: Record<NavHubIconKey, LucideIcon> = {
   car: Car,
   disc: Disc,
-  battery: Battery,
   layers: Layers,
   "map-pin": MapPin,
   "circle-dot": CircleDot,

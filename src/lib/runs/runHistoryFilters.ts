@@ -384,7 +384,6 @@ const SYNONYM_GROUPS: string[][] = [
   ["qualifying", "quals", "qual", "q"],
   ["practice", "prac"],
   ["race", "final", "main"],
-  ["battery", "batt", "pack"],
   ["motor", "engine"],
 ];
 

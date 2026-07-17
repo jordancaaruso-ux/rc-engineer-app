@@ -1,68 +1,53 @@
 /**
- * Log-run wizard step model + filtered-walk logic (founder interviews 2026-07-16,
- * v2 after the walkthrough-artifact session).
+ * Log-run wizard step model (founder interviews 2026-07-16 → 2026-07-17 v5).
  *
- * Five steps: Equipment (tires + battery) · Prep · Setup are before-run and
- * declarable — when continuing a copied run they only join the walk if flagged
- * "changed" on the entry screen. Laps · Feel are after-run and always walked
- * (laps BEFORE feel — import the data, then rate it). A fresh log walks
- * everything. Carried steps stay reachable via the icon rail and the
- * live-header summary rows.
- *
- * Entry chips are finer-grained than steps (Tires and Battery are separate
- * chips but share the Equipment step) — `CHIP_TO_STEP` maps them down.
+ * Six steps. Session (car + day type + event/track) is the old entry screen
+ * folded into the wizard as its first tab (2026-07-17): the Continue / New-log
+ * choice happens there, and every later step is walked on every run —
+ * continuing prefills the steps instead of skipping them (the "what changed"
+ * chips + filtered-walk logic retired with that decision). Laps · Feel are
+ * after-run (laps BEFORE feel — import the data, then rate it). The `preRun`
+ * flag only places the dashed divider on the step bar/rail — the "Run
+ * completed?" interstitial that used to fire on crossing it was retired in v5
+ * (tabs are primary nav; end-of-step rows carry the walk-away moment).
  */
 
-export type WizardStepId = "equipment" | "prep" | "setup" | "laps" | "feel";
-
-/** Entry-screen "what changed" chips (copy flow). */
-export type WizardChangeChip = "tires" | "battery" | "setup" | "prep";
-
-export const CHIP_TO_STEP: Record<WizardChangeChip, WizardStepId> = {
-  tires: "equipment",
-  battery: "equipment",
-  setup: "setup",
-  prep: "prep",
-};
+export type WizardStepId = "session" | "equipment" | "prep" | "setup" | "laps" | "feel";
 
 export type WizardStepDef = {
   id: WizardStepId;
   label: string;
-  /** Walked every run (after-run data); false = declarable via entry chips. */
-  always: boolean;
-  /** Before the pre-run→after-run seam ("Run completed?" interstitial). */
+  /** Before the pre-run→after-run boundary (dashed divider on the step bar). */
   preRun: boolean;
 };
 
 export const WIZARD_STEPS: readonly WizardStepDef[] = [
-  { id: "equipment", label: "Equipment", always: false, preRun: true },
-  { id: "prep", label: "Prep", always: false, preRun: true },
-  { id: "setup", label: "Setup", always: false, preRun: true },
-  { id: "laps", label: "Laps", always: true, preRun: false },
-  { id: "feel", label: "Feel", always: true, preRun: false },
+  { id: "session", label: "Session", preRun: true },
+  // Label renamed Equipment → Tires (founder 2026-07-17); the id stays
+  // "equipment" because step ids ride in wizard payloads and jump targets.
+  { id: "equipment", label: "Tires", preRun: true },
+  { id: "prep", label: "Prep", preRun: true },
+  { id: "setup", label: "Setup", preRun: true },
+  { id: "laps", label: "Laps", preRun: false },
+  // Label renamed Feel → Feedback (founder 2026-07-16); the id stays "feel"
+  // because step ids ride in wizard payloads and jump targets.
+  { id: "feel", label: "Feedback", preRun: false },
 ] as const;
 
-/** Steps in this run's walk, in global order. */
-export function walkStepIds(
-  continuing: boolean,
-  changedChips: ReadonlySet<string>,
-): WizardStepId[] {
-  const changedSteps = new Set(
-    [...changedChips].map((c) => CHIP_TO_STEP[c as WizardChangeChip]).filter(Boolean),
-  );
-  return WIZARD_STEPS.filter(
-    (s) => !continuing || s.always || changedSteps.has(s.id),
-  ).map((s) => s.id);
+/** Every run walks every step, in order (continue = prefilled, fresh = blank). */
+export function walkStepIds(): WizardStepId[] {
+  return WIZARD_STEPS.map((s) => s.id);
 }
 
 export function stepIndex(id: WizardStepId): number {
   return WIZARD_STEPS.findIndex((s) => s.id === id);
 }
 
-/**
- * Next walk step after `current` in global step order. Works from a carried
- * (off-walk) step too — Next resumes the walk at the first walk step past it.
- */
+export function stepLabel(id: WizardStepId): string {
+  return WIZARD_STEPS[stepIndex(id)].label;
+}
+
+/** Next walk step after `current` in global step order (null = at the end). */
 export function nextWalkStep(
   current: WizardStepId,
   walk: readonly WizardStepId[],
@@ -74,26 +59,3 @@ export function nextWalkStep(
   return null;
 }
 
-/** Previous walk step before `current` in global step order (null = at the start). */
-export function prevWalkStep(
-  current: WizardStepId,
-  walk: readonly WizardStepId[],
-): WizardStepId | null {
-  const ci = stepIndex(current);
-  let prev: WizardStepId | null = null;
-  for (const id of walk) {
-    if (stepIndex(id) < ci) prev = id;
-    else break;
-  }
-  return prev;
-}
-
-/**
- * True when advancing current→next crosses the pre-run→after-run boundary —
- * the moment the "Run completed?" interstitial appears (once per run).
- */
-export function crossesSeam(current: WizardStepId, next: WizardStepId): boolean {
-  const cur = WIZARD_STEPS[stepIndex(current)];
-  const nxt = WIZARD_STEPS[stepIndex(next)];
-  return Boolean(cur?.preRun) && !nxt?.preRun;
-}

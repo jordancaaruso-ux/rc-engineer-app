@@ -9,12 +9,11 @@ export type RunContextSnapshotInput = {
   resolvedData: SetupSnapshotData;
   sheetKeys: Set<string>;
   tireSet: TireSetForSnapshot | null;
-  batteryLabel: string;
   additiveDisplayName: string | null;
   warmerTimingMinutes: number | null;
 };
 
-/** Merge run-context tire, battery, additive, and prep booleans into a setup snapshot. Skips keys absent from the sheet. */
+/** Merge run-context tire, additive, and prep booleans into a setup snapshot. Skips keys absent from the sheet. */
 export function applyRunContextToSetupSnapshot(input: RunContextSnapshotInput): SetupSnapshotData {
   const next: SetupSnapshotData = { ...input.resolvedData };
 
@@ -23,12 +22,6 @@ export function applyRunContextToSetupSnapshot(input: RunContextSnapshotInput): 
     next.tires = tireValue;
   } else if ("tires" in next) {
     delete next.tires;
-  }
-
-  if (input.batteryLabel) {
-    next.battery = input.batteryLabel;
-  } else if ("battery" in next) {
-    delete next.battery;
   }
 
   if (input.sheetKeys.has("additive")) {

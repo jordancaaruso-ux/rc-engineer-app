@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { canViewPeerRuns } from "@/lib/teammateRunAccess";
 import { listTeamPeerUserIds } from "@/lib/teamAccess";
 import { setupSheetScopeFromCar } from "@/lib/setupCompare/setupSheetScope";
+import { withIncludedBestLapForPicker } from "@/lib/lapAnalysis";
 
 const pickerRunSelect = {
   id: true,
@@ -22,6 +23,8 @@ const pickerRunSelect = {
   carNameSnapshot: true,
   trackNameSnapshot: true,
   lapTimes: true,
+  lapSession: true,
+  bestLapSeconds: true,
   tireRunNumber: true,
   setupSnapshot: { select: { id: true, data: true } },
   car: {
@@ -121,5 +124,9 @@ export async function GET(request: Request) {
     members.map((m) => [m.id, m.name?.trim() || m.email?.trim() || m.id.slice(0, 8)] as const)
   );
 
-  return NextResponse.json({ runs, memberDisplayByUserId, hasTeammates });
+  return NextResponse.json({
+    runs: runs.map(withIncludedBestLapForPicker),
+    memberDisplayByUserId,
+    hasTeammates,
+  });
 }

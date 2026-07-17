@@ -15,7 +15,7 @@ import { useMobileBackHref } from "@/components/layout/MobileBackContext";
  * mark linking to the dashboard.
  */
 const PILL_CLASS =
-  "tap-active fixed left-4 z-40 flex h-[34px] items-center justify-center rounded-full border border-white/[0.15] bg-card/70 shadow-[0_2px_10px_rgba(0,0,0,0.45)] backdrop-blur-[20px] backdrop-saturate-[1.4] transition-transform duration-150 active:scale-95 md:hidden";
+  "mobile-brand-mark tap-active fixed left-4 z-40 flex h-[34px] items-center justify-center rounded-full border border-white/[0.15] bg-card/70 shadow-[0_2px_10px_rgba(0,0,0,0.45)] backdrop-blur-[20px] backdrop-saturate-[1.4] transition-transform duration-150 active:scale-95 md:hidden";
 
 export function MobileBrandMark() {
   const backHref = useMobileBackHref();

@@ -19,15 +19,13 @@ export type CopyPreviewRunRecord = Prisma.RunGetPayload<{
     additiveTypeId: true;
     warmerTimingMinutes: true;
     tirePrep: true;
-    batteryId: true;
-    batteryRunNumber: true;
     practiceDayUrl: true;
     lapTimes: true;
+    bestLapSeconds: true;
     car: { select: { id: true; name: true } };
     track: { select: { id: true; name: true } };
     tireSet: { select: { id: true; label: true; setNumber: true } };
     additiveType: { select: { id: true; displayName: true; modelCode: true } };
-    battery: { select: { id: true; label: true; packNumber: true } };
     event: { select: { id: true; name: true } };
     setupSnapshot: { select: { id: true; data: true } };
   };

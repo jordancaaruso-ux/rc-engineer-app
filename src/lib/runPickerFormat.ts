@@ -1,4 +1,5 @@
-import { bestLap, formatLap } from "@/lib/runLaps";
+import { formatLap } from "@/lib/runLaps";
+import { computeIncludedLapMetricsFromRun } from "@/lib/lapAnalysis";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunPickerScanDate, RUN_DATETIME_LOCALE } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
@@ -22,6 +23,10 @@ export type RunPickerRun = {
   track?: { name: string } | null;
   trackNameSnapshot?: string | null;
   lapTimes?: unknown;
+  /** Per-lap inclusion flags — present on rows loaded with the full run (history, analysis, last). */
+  lapSession?: unknown;
+  /** Exclusion-aware summary — present on rows from the picker APIs (see withIncludedBestLapForPicker). */
+  bestLapSeconds?: number | null;
   /** Present when run comes from for-picker / last APIs (load setup). */
   setupSnapshot?: { id: string; data?: unknown } | null;
   /** On-track session time when known (import). */
@@ -115,8 +120,23 @@ export function formatRunListScanLine(run: RunPickerRun): string {
   return `${lead} — ${runType} — ${track} — ${car}`;
 }
 
-function appendBestLap(base: string, lapTimes: unknown): string {
-  const lap = bestLap(lapTimes);
+/**
+ * Best lap honoring per-lap exclusions: recompute from lapSession flags when the
+ * blob is present; otherwise trust the exclusion-aware `bestLapSeconds` from the
+ * picker APIs; legacy shapes with neither fall back to the raw lap list.
+ */
+function pickerBestLap(run: RunPickerRun): number | null {
+  if (run.lapSession === undefined && run.bestLapSeconds !== undefined) {
+    return run.bestLapSeconds;
+  }
+  return computeIncludedLapMetricsFromRun({
+    lapTimes: run.lapTimes,
+    lapSession: run.lapSession,
+  }).bestLap;
+}
+
+function appendBestLap(base: string, run: RunPickerRun): string {
+  const lap = pickerBestLap(run);
   if (lap == null) return base;
   return `${base} — ${formatLap(lap)}`;
 }
@@ -125,7 +145,7 @@ function appendBestLap(base: string, lapTimes: unknown): string {
  * One-line summary for run pickers (compare, setup modal, history).
  */
 export function formatRunPickerLine(run: RunPickerRun): string {
-  return appendBestLap(formatRunListScanLine(run), run.lapTimes);
+  return appendBestLap(formatRunListScanLine(run), run);
 }
 
 /** Team Sessions: prefix picker line with driver name when `userId` is known. */
@@ -177,7 +197,7 @@ export function formatCopyLastRunCardSummary(
   const track = run.track?.name ?? run.trackNameSnapshot ?? "—";
   const car = run.car?.name ?? run.carNameSnapshot ?? "—";
   const parts = [date, time, track, car];
-  const lap = bestLap(run.lapTimes);
+  const lap = pickerBestLap(run);
   if (lap != null) parts.push(formatLap(lap));
   return parts.join(" · ");
 }
