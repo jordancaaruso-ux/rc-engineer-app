@@ -169,66 +169,348 @@ async function detectLikelyPageRegion(input: {
   }
 }
 
+type DetectContentBoxOpts = {
+  /** Expected sheet width/height (from calibration reference content box). */
+  expectedAspect?: number;
+  /**
+   * `auto` (default): strip browser chrome if present → dark-desktop paper island → lines → ink bbox.
+   * `lines`: line/ink only (used when refining a paper crop — avoids recursion).
+   */
+  phase?: "auto" | "lines";
+  /** Set after chrome has been cropped away so we don't strip twice. */
+  skipChromeStrip?: boolean;
+};
+
+/** Aspect of the calibration's content box in pixels (fallback: full reference canvas). */
+function expectedAspectFromRef(ref: {
+  widthPx: number;
+  heightPx: number;
+  contentBox?: ImageRegion;
+}): number | undefined {
+  if (ref.widthPx <= 0 || ref.heightPx <= 0) return undefined;
+  if (ref.contentBox && ref.contentBox.wPct > 0 && ref.contentBox.hPct > 0) {
+    return (ref.contentBox.wPct * ref.widthPx) / (ref.contentBox.hPct * ref.heightPx);
+  }
+  return ref.widthPx / ref.heightPx;
+}
+
+function aspectError(aspect: number, expected?: number): number {
+  if (!expected || expected <= 0) return 0;
+  return Math.abs(aspect - expected) / expected;
+}
+
 /**
- * Find the sheet's OUTER BORDER LINES: within each edge band, the row/column with the highest
- * dark fraction is the printed frame line. Threshold-free argmax stays put when JPEG
- * compression fades a thin line. Used with `reference.contentBox` to map uploads from other
- * renderers (different outer margins) onto the calibration reference frame — measured to fix
- * a whole one-row-down misread class on real screenshots while staying identity for uploads
- * that already match the reference geometry.
+ * Find the printed setup-sheet frame inside a screenshot (full-bleed or small-in-frame).
+ * Handles moderate letterboxing and sheets that only fill ~1/3 of a desktop screenshot.
+ * Keep in sync with scripts/setup-extract-eval/mtc3-loop/mtc3-common.ts.
  */
-async function detectContentBox(image: Buffer): Promise<ImageRegion | null> {
-  const SAMPLE_W = 800;
+async function detectContentBox(
+  image: Buffer,
+  opts?: DetectContentBoxOpts
+): Promise<ImageRegion | null> {
   try {
-    const meta = await sharp(image).metadata();
-    const W0 = meta.width ?? 0;
-    const H0 = meta.height ?? 0;
-    if (W0 <= 0 || H0 <= 0) return null;
-    const sampleH = Math.max(1, Math.round((SAMPLE_W * H0) / W0));
-    const { data, info } = await sharp(image)
-      .removeAlpha()
-      .grayscale()
-      .resize(SAMPLE_W, sampleH, { fit: "fill" })
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const { width, height } = info;
-    const rowFrac = new Array<number>(height).fill(0);
-    const colFrac = new Array<number>(width).fill(0);
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if ((data[y * width + x] ?? 255) < 200) {
-          rowFrac[y]!++;
-          colFrac[x]!++;
+  const meta = await sharp(image).metadata();
+  const W0 = meta.width ?? 0;
+  const H0 = meta.height ?? 0;
+  if (W0 <= 0 || H0 <= 0) return null;
+
+  // Higher sample for small-in-frame sheets: at 800px a 1/3-screen border becomes sub-pixel grey.
+  const SAMPLE_W = Math.min(1600, Math.max(800, W0));
+  const sampleH = Math.max(1, Math.round((SAMPLE_W * H0) / W0));
+  const { data, info } = await sharp(image)
+    .removeAlpha()
+    .grayscale()
+    .resize(SAMPLE_W, sampleH, { fit: "fill" })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const DARK = 200;
+  const PAPER = 175;
+  const expected = opts?.expectedAspect;
+  const phase = opts?.phase ?? "auto";
+
+  const brightInt = new Float64Array((width + 1) * (height + 1));
+  const darkInt = new Float64Array((width + 1) * (height + 1));
+  for (let y = 0; y < height; y++) {
+    let rowB = 0;
+    let rowD = 0;
+    for (let x = 0; x < width; x++) {
+      const p = data[y * width + x] ?? 255;
+      rowB += p;
+      rowD += p < DARK ? 1 : 0;
+      const i = (y + 1) * (width + 1) + (x + 1);
+      brightInt[i] = brightInt[y * (width + 1) + (x + 1)]! + rowB;
+      darkInt[i] = darkInt[y * (width + 1) + (x + 1)]! + rowD;
+    }
+  }
+  const rectSum = (integ: Float64Array, l: number, t: number, r: number, b: number) => {
+    const A = integ[t * (width + 1) + l]!;
+    const B = integ[t * (width + 1) + (r + 1)]!;
+    const C = integ[(b + 1) * (width + 1) + l]!;
+    const D = integ[(b + 1) * (width + 1) + (r + 1)]!;
+    return D - B - C + A;
+  };
+  const rectMeanBright = (l: number, t: number, r: number, b: number) => {
+    const area = (r - l + 1) * (b - t + 1);
+    return area <= 0 ? 0 : rectSum(brightInt, l, t, r, b) / area;
+  };
+  const edgeDarkFrac = (l: number, t: number, r: number, b: number) => {
+    const top = rectSum(darkInt, l, t, r, t) / (r - l + 1);
+    const bot = rectSum(darkInt, l, b, r, b) / (r - l + 1);
+    const left = rectSum(darkInt, l, t, l, b) / (b - t + 1);
+    const right = rectSum(darkInt, r, t, r, b) / (b - t + 1);
+    return (top + bot + left + right) / 4;
+  };
+
+  const corner = Math.max(4, Math.round(Math.min(width, height) * 0.04));
+  const cornerBright =
+    (rectMeanBright(0, 0, corner - 1, corner - 1) +
+      rectMeanBright(width - corner, 0, width - 1, corner - 1) +
+      rectMeanBright(0, height - corner, corner - 1, height - 1) +
+      rectMeanBright(width - corner, height - corner, width - 1, height - 1)) /
+    4;
+
+  // Browser-window screenshots (PetitRC in Chrome): dark tab/URL bar on top, sheet below.
+  // Without this, content-box locks onto the whole window and every field crop is wrong.
+  if (phase === "auto" && !opts?.skipChromeStrip) {
+    const topH = Math.max(8, Math.round(height * 0.12));
+    const topMean = rectMeanBright(0, 0, width - 1, topH - 1);
+    const bodyMean = rectMeanBright(
+      Math.round(width * 0.08),
+      Math.round(height * 0.28),
+      Math.round(width * 0.92) - 1,
+      Math.round(height * 0.88) - 1
+    );
+    if (topMean < 115 && bodyMean > 170) {
+      let cutY = -1;
+      for (let y = Math.round(height * 0.04); y < Math.round(height * 0.45); y++) {
+        const rowMean = rectMeanBright(Math.round(width * 0.05), y, Math.round(width * 0.95) - 1, y);
+        if (rowMean < 200) continue;
+        let ok = true;
+        for (let k = 1; k <= 3; k++) {
+          if (rectMeanBright(Math.round(width * 0.05), y + k, Math.round(width * 0.95) - 1, y + k) < 190) {
+            ok = false;
+            break;
+          }
+        }
+        if (ok) {
+          cutY = y;
+          break;
+        }
+      }
+      if (cutY > Math.round(height * 0.03) && cutY < Math.round(height * 0.4)) {
+        const src = {
+          left: 0,
+          top: Math.max(0, Math.round((cutY / height) * H0) - 2),
+          width: W0,
+          height: 0,
+        };
+        src.height = H0 - src.top;
+        if (src.height > 64) {
+          try {
+            const crop = await sharp(image).extract(src).png().toBuffer();
+            const inner = await detectContentBox(crop, {
+              expectedAspect: expected,
+              phase: "auto",
+              skipChromeStrip: true,
+            });
+            if (inner) {
+              return {
+                xPct: src.left / W0 + inner.xPct * (src.width / W0),
+                yPct: src.top / H0 + inner.yPct * (src.height / H0),
+                wPct: inner.wPct * (src.width / W0),
+                hPct: inner.hPct * (src.height / H0),
+              };
+            }
+          } catch {
+            /* fall through */
+          }
         }
       }
     }
-    for (let y = 0; y < height; y++) rowFrac[y]! /= width;
-    for (let x = 0; x < width; x++) colFrac[x]! /= height;
-    const band = 0.18;
-    const argmaxIn = (arr: number[], from: number, to: number): { idx: number; val: number } => {
-      let idx = -1;
-      let val = -1;
-      for (let i = Math.max(0, from); i < Math.min(arr.length, to); i++) {
-        if (arr[i]! > val) {
-          val = arr[i]!;
-          idx = i;
+  }
+
+  // Dark desktop: sheet = bright paper island. Refine with a lines pass on that crop so we
+  // lock to the printed frame (not the JPEG’s outer white margin).
+  if (phase === "auto" && cornerBright < 120) {
+    let minX = width;
+    let minY = height;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if ((data[y * width + x] ?? 0) >= PAPER) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
         }
       }
-      return { idx, val };
-    };
-    const top = argmaxIn(rowFrac, 0, Math.round(height * band));
-    const bottom = argmaxIn(rowFrac, Math.round(height * (1 - band)), height);
-    const left = argmaxIn(colFrac, 0, Math.round(width * band));
-    const right = argmaxIn(colFrac, Math.round(width * (1 - band)), width);
-    const MIN_LINE_FRAC = 0.35;
-    if (top.val < MIN_LINE_FRAC || bottom.val < MIN_LINE_FRAC || left.val < MIN_LINE_FRAC || right.val < MIN_LINE_FRAC) return null;
-    if (bottom.idx <= top.idx || right.idx <= left.idx) return null;
-    return {
-      xPct: left.idx / width,
-      yPct: top.idx / height,
-      wPct: (right.idx - left.idx + 1) / width,
-      hPct: (bottom.idx - top.idx + 1) / height,
-    };
+    }
+    if (maxX > minX && maxY > minY) {
+      const islandW = maxX - minX + 1;
+      const islandH = maxY - minY + 1;
+      if (islandW / width >= 0.12 && islandH / height >= 0.12) {
+        const src = {
+          left: Math.max(0, Math.round((minX / width) * W0)),
+          top: Math.max(0, Math.round((minY / height) * H0)),
+          width: Math.min(W0, Math.round((islandW / width) * W0)),
+          height: Math.min(H0, Math.round((islandH / height) * H0)),
+        };
+        if (src.width > 16 && src.height > 16) {
+          try {
+            const crop = await sharp(image).extract(src).png().toBuffer();
+            const inner = await detectContentBox(crop, { expectedAspect: expected, phase: "lines" });
+            if (inner) {
+              return {
+                xPct: src.left / W0 + inner.xPct * (src.width / W0),
+                yPct: src.top / H0 + inner.yPct * (src.height / H0),
+                wPct: inner.wPct * (src.width / W0),
+                hPct: inner.hPct * (src.height / H0),
+              };
+            }
+          } catch {
+            /* fall through */
+          }
+        }
+        // Fallback: island itself when aspect is close enough.
+        if (aspectError(islandW / islandH, expected) <= 0.25) {
+          return {
+            xPct: minX / width,
+            yPct: minY / height,
+            wPct: islandW / width,
+            hPct: islandH / height,
+          };
+        }
+      }
+    }
+  }
+
+  // Line-peak scoring (local edge ink — not diluted by desktop margins).
+  const rowFrac = new Array<number>(height).fill(0);
+  const colFrac = new Array<number>(width).fill(0);
+  let inkMinX = width;
+  let inkMinY = height;
+  let inkMaxX = -1;
+  let inkMaxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if ((data[y * width + x] ?? 255) < DARK) {
+        rowFrac[y]!++;
+        colFrac[x]!++;
+        if (x < inkMinX) inkMinX = x;
+        if (y < inkMinY) inkMinY = y;
+        if (x > inkMaxX) inkMaxX = x;
+        if (y > inkMaxY) inkMaxY = y;
+      }
+    }
+  }
+  for (let y = 0; y < height; y++) rowFrac[y]! /= width;
+  for (let x = 0; x < width; x++) colFrac[x]! /= height;
+
+  const collectPeaks = (frac: number[], minFrac: number, maxCount: number): number[] => {
+    const peaks: Array<{ i: number; v: number }> = [];
+    for (let i = 0; i < frac.length; i++) {
+      const v = frac[i]!;
+      if (v < minFrac) continue;
+      const prev = i > 0 ? frac[i - 1]! : 0;
+      const next = i + 1 < frac.length ? frac[i + 1]! : 0;
+      if (v >= prev && v >= next) peaks.push({ i, v });
+    }
+    peaks.sort((a, b) => b.v - a.v);
+    return peaks
+      .slice(0, maxCount)
+      .map((p) => p.i)
+      .sort((a, b) => a - b);
+  };
+
+  // Diluted 1/3-screen borders sit ~0.10–0.17 globally; full-bleed borders are much stronger.
+  const hPeaks = collectPeaks(rowFrac, 0.06, 36);
+  const vPeaks = collectPeaks(colFrac, 0.06, 36);
+  const minW = Math.max(8, Math.round(width * 0.12));
+  const minH = Math.max(8, Math.round(height * 0.12));
+  let best: { score: number; box: ImageRegion } | null = null;
+
+  if (hPeaks.length >= 2 && vPeaks.length >= 2) {
+    for (let ti = 0; ti < hPeaks.length; ti++) {
+      const top = hPeaks[ti]!;
+      for (let bi = ti + 1; bi < hPeaks.length; bi++) {
+        const bottom = hPeaks[bi]!;
+        const hPx = bottom - top + 1;
+        if (hPx < minH) continue;
+        for (let li = 0; li < vPeaks.length; li++) {
+          const left = vPeaks[li]!;
+          for (let ri = li + 1; ri < vPeaks.length; ri++) {
+            const right = vPeaks[ri]!;
+            const wPx = right - left + 1;
+            if (wPx < minW) continue;
+
+            const aErr = aspectError(wPx / hPx, expected);
+            if (expected && aErr > 0.22) continue;
+
+            const insetX = Math.max(1, Math.round(wPx * 0.06));
+            const insetY = Math.max(1, Math.round(hPx * 0.06));
+            const iL = left + insetX;
+            const iT = top + insetY;
+            const iR = right - insetX;
+            const iB = bottom - insetY;
+            if (iR <= iL || iB <= iT) continue;
+            const interior = rectMeanBright(iL, iT, iR, iB);
+            if (interior < PAPER) continue;
+
+            const border = edgeDarkFrac(left, top, right, bottom);
+            if (border < 0.28) continue;
+
+            const area = (wPx * hPx) / (width * height);
+            const score = border * 2.2 + interior / 255 + (1 - aErr) * 1.5 + area * 0.35;
+            if (!best || score > best.score) {
+              best = {
+                score,
+                box: {
+                  xPct: left / width,
+                  yPct: top / height,
+                  wPct: wPx / width,
+                  hPct: hPx / height,
+                },
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+  if (best) return best.box;
+
+  // Light-desktop fallback: on a bright wallpaper the only dark pixels are sheet ink/frame.
+  // Their bounding box is the sheet even when thin borders vanish after downscale.
+  if (inkMaxX > inkMinX && inkMaxY > inkMinY && cornerBright >= 120) {
+    const pad = Math.max(1, Math.round(Math.min(width, height) * 0.004));
+    const left = Math.max(0, inkMinX - pad);
+    const top = Math.max(0, inkMinY - pad);
+    const right = Math.min(width - 1, inkMaxX + pad);
+    const bottom = Math.min(height - 1, inkMaxY + pad);
+    const wPx = right - left + 1;
+    const hPx = bottom - top + 1;
+    if (wPx >= minW && hPx >= minH) {
+      const aErr = aspectError(wPx / hPx, expected);
+      const interior = rectMeanBright(
+        left + Math.round(wPx * 0.05),
+        top + Math.round(hPx * 0.05),
+        right - Math.round(wPx * 0.05),
+        bottom - Math.round(hPx * 0.05)
+      );
+      if (aErr <= 0.25 && interior >= PAPER) {
+        return {
+          xPct: left / width,
+          yPct: top / height,
+          wPct: wPx / width,
+          hPct: hPx / height,
+        };
+      }
+    }
+  }
+
+  return null;
   } catch {
     return null;
   }
@@ -239,7 +521,9 @@ async function alignByContentBox(
   imageBytes: Buffer,
   ref: { widthPx: number; heightPx: number; contentBox: ImageRegion }
 ): Promise<Buffer | null> {
-  const uploadBox = await detectContentBox(imageBytes);
+  const uploadBox = await detectContentBox(imageBytes, {
+    expectedAspect: expectedAspectFromRef(ref),
+  });
   if (!uploadBox) return null;
   // Snap to identity when the upload already matches the reference geometry (same renderer):
   // plain resize is bit-exact there, while box-mapping adds ±1px detection quantization.

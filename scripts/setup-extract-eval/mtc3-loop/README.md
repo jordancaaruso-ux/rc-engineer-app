@@ -17,6 +17,9 @@ line removal, neutral OCR labels, consensus OCR (shifted-chunk double pass + gpt
 |---|---|
 | `gen-synthetics.ts` | Build/refresh the test set: 5 seeded synthetic fills + the Soren case → `cases/` (jpg + gold.json) |
 | `score.ts` | Read every case through the LIVE calibration, diff vs gold. `--choices-only` (free, no OCR), `--runs=2`, `--case=case-01` |
+| `score-padded.ts` | Letterbox + ⅓-screen (center/corner, light/dark desktop) regression; `--with-ocr` for full text |
+| `score-ronald.ts` | Real PetitRC case (Ronald Volker) — prefer `setup.jpg` from the page, not a browser-window screenshot |
+| `compare-align-ocr.ts` | Full OCR: case-01 vs a padded variant; every field must agree |
 | `read-real.ts --img=<path>` | Read any real jpg (no gold); prints all values for eyeballing |
 | `nudge-region.ts` | Targeted live region fix: `--key=X --trim-left=0.1` or `--set='{json}'`; dry-run default, `--apply` writes |
 | `set-content-box.ts` | Recompute + persist `reference.contentBox` from a blank render |
@@ -30,13 +33,15 @@ Run everything via `npx dotenv-cli -e .env.local -- npx tsx scripts/setup-extrac
 
 ```
 gen-synthetics (once, or after calibration structure changes)
-  → score --runs=2
+  → score --choices-only --runs=2   (fast: marks + alignment)
+  → score-padded                    (screenshot letterbox regression)
+  → score --runs=2                  (full OCR, slow)
   → for each FAIL: dump-crops → classify (region / OCR / mark-gate)
       region  → nudge-region --apply    (live DB, instant)
       OCR     → fix in mtc3-common reader, then PORT to imageExtractPipeline.ts
       gate    → fix detection logic, then PORT
   → repeat until 100% twice
-  → read-real on real JPGs (final exam — different renderer geometry)
+  → compare-align-ocr / read-real on real JPGs (final exam — different renderer geometry)
 ```
 
 ## Key findings (2026-07-14, all validated on the gold set)
@@ -71,14 +76,26 @@ gen-synthetics (once, or after calibration structure changes)
   shifted chunk boundaries; disagreements solo-tiebroken on gpt-4o.
 - **Fill-in lines read as minus signs** → whiten any crop row ≥70% dark.
 - **Different renderers shift geometry** (real jpg aspect 1.427 vs ref 1.415 → one-row-down
-  misreads). Content-box alignment: argmax border-line detection per edge band, box→box
-  mapping, identity-snap within 0.5%.
+  misreads). Content-box alignment: box→box mapping, identity-snap within 0.5%.
+- **Screenshot margins / small-in-frame** (2026-07-18): band-argmax and “must be ≥40% of the
+  image” both fail real PetitRC-style screenshots (sheet in ~⅓ of a desktop window). Detector
+  now: (1) dark-desktop → bright paper island, refine frame on that crop; (2) score border
+  rectangles by local edge ink + paper interior + aspect match to the blank; (3) light-desktop
+  fallback = bounding box of ink. Sample at up to 1600px so thin borders survive. Validate with
+  `score-padded.ts` (letterbox + third-center/corner × light/dark).
 
 ## Converged state
 
 2026-07-14: **1236/1236 (100%) across 6 sheets × 2 runs** (5 synthetic + Soren) pre-alignment;
 re-verified after content-box alignment landed. Real `mugen-test-setup.jpg` reads clean
 (header prose, all numerics, choice groups) — founder eyeball + green-light pending.
+
+2026-07-18 (screenshot letterbox + ⅓-screen):
+- Choices: **30/30** on pad-10% / pad-18% / asymmetric **and** third-center/corner × light/dark.
+- Full OCR: **103/103** on 6/7 padded variants; one flaky text field on third-center-light
+  (`above_rear_wheel_arch_height` 4.9→14.9) — OCR under heavy downscale, not a wrong crop.
+- Workbench green-light for MTC3 still needs founder eyeball of 1–3 real filled sheets at
+  `/setup-sheet-models/<mtc3-id>`.
 
 ## Generalizing to other cars
 
