@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { chipToggleClass } from "@/components/ui/chipToggle";
@@ -86,11 +87,30 @@ export function RunLayoutPicker({
         ) : null}
       </div>
       {layouts.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground leading-snug">
-          {loading
-            ? "Loading layouts…"
-            : "No layouts saved for this track. Add them on the track page to select one here."}
-        </p>
+        loading ? (
+          <p className="text-[11px] text-muted-foreground leading-snug">Loading layouts…</p>
+        ) : (
+          <Link
+            href={`/tracks/${encodeURIComponent(trackId)}`}
+            className="btn-surface inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px]"
+            aria-label="Add a layout on the track page"
+            title="Add a layout"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 2.5v7M2.5 6h7" />
+            </svg>
+            Add layout
+          </Link>
+        )
       ) : (
         <SearchableSelect
           aria-label="Track layout"

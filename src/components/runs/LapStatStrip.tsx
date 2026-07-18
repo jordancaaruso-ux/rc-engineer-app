@@ -82,9 +82,14 @@ export function StatWellGrid({
 }
 
 /**
- * A single strip cell — mono uppercase label + tabular mono value. When
- * `onToggle` is supplied the cell is a button (tap-to-expand lap breakdown) and
- * lights an inset yellow ring while expanded.
+ * A single strip cell — Sora micro-label + value. Values are Sora by default
+ * (one-voice pass, 2026-07-16); pass `mono` to render lap-derived racing-clock
+ * figures (best lap, avg top 5/10, median, stint, consistency) in the surviving
+ * JetBrains Mono voice via `.lap-figure`. Everything else — car, tire, additive,
+ * dates, counts, conditions, ratings, setup values — stays Sora.
+ *
+ * When `onToggle` is supplied the cell is a button (tap-to-expand lap breakdown)
+ * and lights an inset yellow ring while expanded.
  */
 export function StatWellCell({
   label,
@@ -95,6 +100,7 @@ export function StatWellCell({
   onToggle,
   valueClassName,
   alignValue = false,
+  mono = false,
 }: {
   label: string;
   value: ReactNode;
@@ -110,6 +116,11 @@ export function StatWellCell({
    * there, where the reserve would just add a gap).
    */
   alignValue?: boolean;
+  /**
+   * Render the value in JetBrains Mono (`.lap-figure`). Reserve for lap-derived
+   * performance figures only — the sole surviving mono surface. Defaults to Sora.
+   */
+  mono?: boolean;
 }) {
   const base = "min-w-0 border-l border-t border-border px-3 py-2 text-left";
   const labelNode = (
@@ -125,7 +136,8 @@ export function StatWellCell({
   const valueNode = (
     <div
       className={cn(
-        "mt-1 font-mono text-[13px] font-medium tabular-nums text-foreground",
+        "mt-1 text-[13px] font-medium tabular-nums text-foreground",
+        mono && "lap-figure",
         valueClassName
       )}
     >

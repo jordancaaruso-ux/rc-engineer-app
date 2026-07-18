@@ -49,14 +49,14 @@ import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { PagedCard, type PagedCardFace } from "@/components/ui/PagedCard";
-import { LogRunWizardRail, type WizardStepStatus } from "@/components/runs/LogRunWizardRail";
-import { LogRunWizardBottomBar } from "@/components/runs/LogRunWizardBottomBar";
+import {
+  LogRunWizardBottomBar,
+  type WizardSheetRow,
+} from "@/components/runs/LogRunWizardBottomBar";
 import {
   firstUnfinishedStep,
-  nextWalkStep,
-  stepLabel,
-  walkStepIds,
   type WizardStepId,
+  type WizardStepStatus,
 } from "@/lib/runs/wizardWalk";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
@@ -642,7 +642,6 @@ export function NewRunForm(props: {
   const [runDetailsTab, setRunDetailsTab] = useState<RunDetailsTab>("car");
 
   // ---- Log-run wizard chrome (only when props.wizard is set) ----
-  const wizardWalk = useMemo<readonly WizardStepId[]>(() => walkStepIds(), []);
   // v4: the walk starts ON the Session step — the host pre-derived the context
   // (continue pre-applied when recent), so nothing is locked and every tab is
   // live from the first render. Hosting an EXISTING run (draft resume / edit,
@@ -717,13 +716,64 @@ export function NewRunForm(props: {
    */
   const [wizardPrefillApplied, setWizardPrefillApplied] = useState(false);
   const wizardAppliedPlanRef = useRef<NewRunWizardEntry | null>(null);
-  // Live summary starts EXPANDED (founder 2026-07-17: "always visible" —
-  // collapsible, but the run state should never start hidden).
-  const [wizardSummaryOpen, setWizardSummaryOpen] = useState(true);
+  // F2 (founder 2026-07-18, docs/design/log-run-navigation.md): the exit
+  // prompt is owned here — the bar's "← Exit" opens it, and so does system
+  // back from the Session step (same prompt, one behavior).
+  const [wizardExitPromptOpen, setWizardExitPromptOpen] = useState(false);
+  /** Set while an exit action is navigating away, so the popstate guard
+   *  doesn't fight the departure. */
+  const wizardExitingRef = useRef(false);
+  const wizardStepRef = useRef<WizardStepId>(wizardStep);
+  wizardStepRef.current = wizardStep;
   const goToWizardStep = (id: WizardStepId) => {
+    // Step changes are history entries (F2): system back / edge-swipe walks
+    // backward through the steps instead of silently abandoning the flow.
+    // Same-URL pushState is officially supported by the App Router; wrapped
+    // in try/catch so any history quirk degrades to tap-nav, never a wedge.
+    if (wizardActive && id !== wizardStepRef.current && typeof window !== "undefined") {
+      try {
+        window.history.pushState({ lrWizardStep: id }, "");
+      } catch {
+        /* history unavailable — ticks still navigate */
+      }
+    }
     setWizardStep(id);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "instant" });
   };
+  // History spine: mark the entry we mounted on as the wizard's base and push
+  // the landing step above it. Backing onto the base means "leaving from
+  // Session" — hold the line (re-push the current step) and open the exit
+  // prompt instead of silently dropping the run.
+  useEffect(() => {
+    if (!wizardActive || typeof window === "undefined") return;
+    try {
+      window.history.replaceState(
+        { ...(window.history.state ?? {}), lrWizardBase: true },
+        ""
+      );
+      window.history.pushState({ lrWizardStep: wizardStepRef.current }, "");
+    } catch {
+      return; // no history API — plain tap-nav only
+    }
+    const onPop = (e: PopStateEvent) => {
+      if (wizardExitingRef.current) return;
+      const st = e.state as { lrWizardStep?: WizardStepId; lrWizardBase?: boolean } | null;
+      if (st?.lrWizardStep) {
+        setWizardStep(st.lrWizardStep);
+        window.scrollTo({ top: 0, behavior: "instant" });
+      } else if (st?.lrWizardBase) {
+        try {
+          window.history.pushState({ lrWizardStep: wizardStepRef.current }, "");
+        } catch {
+          /* fall through — prompt still opens */
+        }
+        setWizardExitPromptOpen(true);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardActive]);
   const [trackSaveWarning, setTrackSaveWarning] = useState(false);
 
   const [shareWithTeam, setShareWithTeam] = useState(true);
@@ -3439,7 +3489,21 @@ export function NewRunForm(props: {
       attention: completeValidation.carRating,
     },
   };
-  const wizardNextStepId = wizardActive ? nextWalkStep(wizardStep, wizardWalk) : null;
+  /** Anything worth saving? Gates the exit prompt (F2): an untouched run
+   *  leaves without ceremony; editing an existing run always asks. */
+  const wizardHasContent =
+    isEditing ||
+    Boolean(
+      trackId ||
+        tireSetId ||
+        newTireSetIntent ||
+        tirePrep.length > 0 ||
+        additiveTypeId ||
+        Object.keys(setupData).length > 0 ||
+        wizardLapsIn ||
+        carRating != null ||
+        notes.trim()
+    );
   /** v5: Save's intent follows the DECLARED state, never the data. */
   const wizardSaveCompletes = wizardMarkedComplete;
   // Rating is the completion gate — clearing it un-declares. An already-
@@ -3605,23 +3669,11 @@ export function NewRunForm(props: {
     setWizardPrefillApplied(true);
   };
 
-  // Wizard live-header summary rows (label, value, missing?, jump target).
-  // The meter is one sector per logged area, aligned with the wizard step bar
-  // (founder 2026-07-17: the old 6 counted tires/prep/laps/notes/handling/rating
-  // and ignored Session + Setup, so a fully-prepped draft read "2 of 6"). Now
-  // it mirrors the six steps — Session · Tires · Prep · Setup · Laps — with the
-  // Feedback step split into two sectors the founder tracks separately: the
-  // rating/notes quick take, then the detailed handling assessment.
-  const wizardSummaryParts: Array<{ key: string; filled: boolean }> = [
-    { key: "session", filled: Boolean(carId && trackId) },
-    { key: "tires", filled: Boolean(tireSetId || newTireSetIntent) },
-    { key: "prep", filled: wizardPrepIn },
-    { key: "setup", filled: setupBaselineData != null || Object.keys(setupData).length > 0 },
-    { key: "laps", filled: wizardLapsIn },
-    { key: "feedback", filled: carRating != null || notes.trim().length > 0 },
-    { key: "handling", filled: isHandlingAssessmentMeaningful(persistedFromUiState(handlingUi)) },
-  ];
-  const wizardSummaryLogged = wizardSummaryParts.filter((p) => p.filled).length;
+  // F2 (founder 2026-07-18, docs/design/log-run-navigation.md): ONE state
+  // vocabulary — 6 steps = 6 ticks = 6 track sectors = 6 map-sheet rows, all
+  // reading wizardStepStatus. The old 7-part meter (feedback split into
+  // rating/notes + handling) is retired; notes and the handling assessment
+  // are in-step enrichment, counted nowhere.
   // "Prefilled" chips (founder round 2): on a prefilled run, rows whose value
   // still equals what the tap carried in are marked; editing makes the value
   // this run's own and the chip drops. Value equality against the applied
@@ -3658,42 +3710,30 @@ export function NewRunForm(props: {
         Object.keys(setupData).length > 0,
     };
   })();
-  const wizardSummaryRows: Array<{
-    key: string;
-    label: string;
-    value: string;
-    state: "ok" | "chg" | "miss";
-    /** Value still equals what the continue-copy carried in → "prefilled" chip. */
-    prefilled?: boolean;
-    go: WizardStepId;
-  }> = wizardActive
+  /** Session identity pieces — shared by the map-sheet Session row and the
+   *  slim top recap line (F2: the recap is state-only, never nav). */
+  const wizardSessionKind =
+    sessionType === "RACE_MEETING"
+      ? sessionLabel ||
+        (meetingSessionType === "OTHER"
+          ? meetingSessionCustom.trim() || "Race meeting"
+          : meetingSessionType.charAt(0) + meetingSessionType.slice(1).toLowerCase())
+      : "Testing";
+  const wizardTrackName = tracksList.find((t) => t.id === trackId)?.name ?? null;
+  const wizardCarName = carsList.find((c) => c.id === carId)?.name ?? null;
+  const wizardSummaryRows: WizardSheetRow[] = wizardActive
     ? [
         {
           key: "session",
           label: "Session",
-          value: [
-            sessionType === "RACE_MEETING"
-              ? sessionLabel ||
-                (meetingSessionType === "OTHER"
-                  ? meetingSessionCustom.trim() || "Race meeting"
-                  : meetingSessionType.charAt(0) + meetingSessionType.slice(1).toLowerCase())
-              : "Testing",
-            // Track gates completing (never the walk) — surface it here so a
-            // trackless run reads as unfinished business, tap → Session step.
-            tracksList.find((t) => t.id === trackId)?.name ?? "track needed",
-          ]
+          // Car folds into the Session row (one row per step). Track gates
+          // completing (never the walk) — a trackless run reads as unfinished
+          // business here, tap → Session step.
+          value: [wizardSessionKind, wizardTrackName ?? "track needed", wizardCarName]
             .filter(Boolean)
             .join(" · "),
-          state: trackId ? "ok" : "miss",
-          prefilled: wizardPrefilled.session,
-          go: "session",
-        },
-        {
-          key: "car",
-          label: "Car",
-          value: carsList.find((c) => c.id === carId)?.name ?? "—",
-          state: carId ? "ok" : "miss",
-          prefilled: wizardPrefilled.car,
+          state: trackId && carId ? "ok" : "miss",
+          prefilled: Boolean(wizardPrefilled.session && wizardPrefilled.car),
           go: "session",
         },
         {
@@ -3748,9 +3788,14 @@ export function NewRunForm(props: {
           go: "laps",
         },
         {
-          key: "rating",
-          label: "Rating",
-          value: carRating != null ? `${carRating} / 10` : "not rated",
+          key: "feel",
+          label: "Feedback",
+          value:
+            carRating != null
+              ? `${carRating} / 10${notes.trim() ? " · notes" : ""}`
+              : notes.trim()
+                ? "notes only — not rated"
+                : "not rated",
           state: carRating != null ? "ok" : "miss",
           go: "feel",
         },
@@ -3906,18 +3951,12 @@ export function NewRunForm(props: {
                 </Link>
               </div>
               {trackLockedToEvent ? (
-                <div className="space-y-1">
-                  <div className="inset-panel-deep px-3 py-2 text-sm text-foreground">
-                    {(() => {
-                      const t = tracksList.find((x) => x.id === trackId);
-                      if (!t) return "—";
-                      return `${t.name}${t.location ? ` (${t.location})` : ""}`;
-                    })()}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Track is set by the selected event. Change the event (or its track in Events) to use a
-                    different venue.
-                  </p>
+                <div className="inset-panel-deep px-3 py-2 text-sm text-foreground">
+                  {(() => {
+                    const t = tracksList.find((x) => x.id === trackId);
+                    if (!t) return "—";
+                    return `${t.name}${t.location ? ` (${t.location})` : ""}`;
+                  })()}
                 </div>
               ) : (
                 <div className={prefillFieldClass(Boolean(prefillHighlights?.track))}>
@@ -4029,132 +4068,35 @@ export function NewRunForm(props: {
     <form
       className={cn(
         "max-w-3xl space-y-3",
-        // Wizard mobile: clear the fixed bottom chrome (action row + step bar).
-        wizardActive ? "pb-40 md:pb-20" : "pb-16 md:pb-20"
+        // Wizard: clear the fixed F2 bottom bar (all breakpoints — it serves
+        // desktop too now).
+        wizardActive ? "pb-40" : "pb-16 md:pb-20"
       )}
       onSubmit={(e) => e.preventDefault()}
       noValidate
     >
       {wizardActive ? (
-        <div className="space-y-1.5">
-          {/* Step rail stays the desktop nav (founder v5); on mobile the
-              bottom bar (dock takeover) owns step switching. */}
-          <div className="hidden md:block">
-            <LogRunWizardRail
-              current={wizardStep}
-              statusById={wizardStepStatus}
-              onSelect={goToWizardStep}
-            />
-          </div>
-
-          {/* Live-header summary: the whole run at a glance, rows jump to steps.
-              Founder redesign 2026-07-17 (artifact rounds 1+2): type a notch up,
-              the 3px hairline meter replaced by step-aligned −21° sectors
-              (page-title timing-line DNA, one per logged area), "prefilled" chips on rows a
-              continued run carried in — the chips replace the old standalone
-              "✓ Carried over from last run" line. */}
-          <div className="overflow-hidden rounded-xl border border-border bg-card/70">
-            <div className="flex w-full items-center gap-2 px-3 py-2.5">
-              {/* Completion is no longer a header control (founder 2026-07-17):
-                  the tappable Draft/Complete badge is retired — "Mark run
-                  complete" lives in the pinned Feedback action bar. An
-                  already-completed run keeps a static 🏁 status tag. */}
-              {wizardMarkedComplete ? (
-                <span
-                  className="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.09em] text-emerald-600 dark:text-emerald-300"
-                  title="This run is marked complete."
-                >
-                  Complete 🏁
-                </span>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setWizardSummaryOpen((v) => !v)}
-                className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                aria-expanded={wizardSummaryOpen}
-              >
-                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-tight text-foreground">
-                  {wizardSummaryRows.find((r) => r.key === "session")?.value || "This run"}
-                </span>
-                <span
-                  className={cn(
-                    "text-[11px] text-faint transition-transform",
-                    wizardSummaryOpen && "rotate-180"
-                  )}
-                  aria-hidden
-                >
-                  ▾
-                </span>
-              </button>
-            </div>
-            {wizardSummaryOpen ? (
-              <div className="flex items-baseline justify-between gap-3 px-3 pt-0.5">
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  <span className="font-bold text-foreground">
-                    {wizardSummaryLogged} of {wizardSummaryParts.length}
-                  </span>{" "}
-                  logged
-                </span>
-                <span className="text-[10.5px] text-faint">
-                  {wizardMarkedComplete
-                    ? "marked complete 🏁"
-                    : carRating != null
-                      ? "rating in ✓ — mark complete on Feedback"
-                      : "add a rating to finish"}
-                </span>
-              </div>
-            ) : null}
-            <div
-              className="flex gap-1 px-3 pb-2.5 pt-1.5"
-              role="img"
-              aria-label={`${wizardSummaryLogged} of ${wizardSummaryParts.length} logged`}
+        /* F2 slim recap (founder 2026-07-18): the run's identity in one
+           non-interactive line — state, never nav. The old summary card's
+           meter/rows/jumps live in the bottom bar + map sheet now; the rail
+           is gone on desktop too (the bar serves both). */
+        <div className="flex items-center gap-2 px-0.5">
+          {wizardMarkedComplete ? (
+            <span
+              className="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.09em] text-emerald-600 dark:text-emerald-300"
+              title="This run is marked complete."
             >
-              {wizardSummaryParts.map((p) => (
-                <span
-                  key={p.key}
-                  aria-hidden
-                  style={{ transform: "skewX(-21deg)" }}
-                  className={cn(
-                    "h-[7px] flex-1 rounded-[2px] transition-colors duration-300",
-                    p.filled ? "bg-primary" : "bg-muted shadow-[inset_0_0_0_1px_#34322f]"
-                  )}
-                />
-              ))}
-            </div>
-            {wizardSummaryOpen ? (
-              <div className="px-1.5 pb-2">
-                {wizardSummaryRows.map((r) => (
-                  <button
-                    key={r.key}
-                    type="button"
-                    onClick={() => goToWizardStep(r.go)}
-                    className="flex w-full items-baseline justify-between gap-3 rounded-lg px-1.5 py-[5px] text-left hover:bg-muted"
-                  >
-                    <span className="text-[12px] text-muted-foreground">{r.label}</span>
-                    <span className="flex min-w-0 items-baseline gap-1.5">
-                      <span
-                        className={cn(
-                          "min-w-0 truncate text-[12px] font-medium",
-                          r.state === "miss"
-                            ? "text-amber-600 dark:text-amber-300"
-                            : r.state === "chg"
-                              ? "text-primary"
-                              : "text-foreground"
-                        )}
-                      >
-                        {r.value}
-                      </span>
-                      {r.prefilled && r.state !== "miss" ? (
-                        <span className="shrink-0 rounded-[5px] border border-border px-1.5 py-px text-[9.5px] font-semibold uppercase leading-none tracking-[0.07em] text-faint">
-                          prefilled
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
+              Complete 🏁
+            </span>
+          ) : null}
+          <span className="min-w-0 truncate font-sans text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {wizardSessionKind}
+            {" · "}
+            {wizardTrackName ?? (
+              <span className="text-amber-600 dark:text-amber-300">track needed</span>
+            )}
+            {wizardCarName ? ` · ${wizardCarName}` : null}
+          </span>
         </div>
       ) : null}
       {carsList.length === 0 ? (
@@ -4440,11 +4382,7 @@ export function NewRunForm(props: {
 
           {eventId ? (
             <div className="mt-2 space-y-2 text-sm">
-              {!selectedEventForRun?.trackId ? null : selectedEventTrackLiveRc ? (
-                <p className="text-[11px] text-muted-foreground">
-                  Lap times are pulled from this track&apos;s LiveRC link automatically.
-                </p>
-              ) : (
+              {!selectedEventForRun?.trackId ? null : selectedEventTrackLiveRc ? null : (
                 <>
                   <div className="space-y-1">
                     <label
@@ -4588,11 +4526,7 @@ export function NewRunForm(props: {
               </div>
               {/* Timing URLs are only relevant once a track without a LiveRC link
                   is chosen — otherwise laps auto-pull (or the track is unknown). */}
-              {!newEventTrackId ? null : newEventTrackLiveRc ? (
-                <p className="text-[11px] text-muted-foreground">
-                  Lap times are pulled from this track&apos;s LiveRC link automatically.
-                </p>
-              ) : (
+              {!newEventTrackId ? null : newEventTrackLiveRc ? null : (
                 <>
                   <div className="space-y-1">
                     <label className="block ui-label-meta">Practice timing URL (optional)</label>
@@ -5334,35 +5268,47 @@ export function NewRunForm(props: {
         </p>
       ) : null}
 
-      {/* v5.1: forward motion moved to the pinned action row (bottom chrome /
-          desktop pills) — the only in-content row left is Feedback's
-          completion declaration, beside the rating that gates it. */}
-
-      {/* v5.1 wizard chrome (mobile): step tabs replace the app dock, the
-          persistent action row rides above them, and the "← Save & exit"
-          escape takes the brand pill's corner. Portals itself to <body> and
-          stamps the chrome attribute — see LogRunWizardBottomBar. */}
+      {/* F2 wizard chrome (founder 2026-07-18, docs/design/log-run-navigation.md):
+          ONE bottom surface — ‹/step-name/primary row, one-tap ticks, in-place
+          progression track — plus the map sheet (rows + saves) and the
+          "← Exit" prompt. Serves mobile AND desktop (the rail + pill mirror
+          are gone). Portals itself to <body> and stamps the chrome attribute. */}
       {wizardActive ? (
         <LogRunWizardBottomBar
           current={wizardStep}
           statusById={wizardStepStatus}
           onSelect={goToWizardStep}
+          rows={wizardSummaryRows}
           editingCompleted={editingCompletedRun}
           canSave={canSave}
           saving={saving}
           saveSuccess={saveSuccess}
-          onSave={() => saveRun(undefined, wizardSaveCompletes ? "completed" : "draft")}
+          hasContent={wizardHasContent}
+          exitOpen={wizardExitPromptOpen}
+          onExitOpenChange={setWizardExitPromptOpen}
           onSaveDraft={() => saveRun(undefined, "draft")}
           onComplete={() => saveRun(undefined, "completed")}
-          onExit={() => {
-            // The escape banks whatever is here and leaves (saveRun navigates
-            // after saving; exitAfter covers edit-mode draft saves, which
-            // otherwise stay in place); with nothing saveable it's a plain exit.
-            if (canSave && !saving) {
-              void saveRun(undefined, wizardSaveCompletes ? "completed" : "draft", {
+          onExitSave={() => {
+            // Banks the run (draft, or preserving completion) and leaves —
+            // saveRun navigates after saving; exitAfter covers edit-mode
+            // draft saves, which otherwise stay in place. The exiting ref
+            // stops the popstate guard from re-arming mid-departure; a failed
+            // save re-arms it so back-guarding keeps working.
+            if (!canSave || saving) return;
+            wizardExitingRef.current = true;
+            setWizardExitPromptOpen(false);
+            void Promise.resolve(
+              saveRun(undefined, wizardSaveCompletes ? "completed" : "draft", {
                 exitAfter: true,
-              });
-            } else router.push("/");
+              })
+            ).finally(() => {
+              wizardExitingRef.current = false;
+            });
+          }}
+          onExitDiscard={() => {
+            wizardExitingRef.current = true;
+            setWizardExitPromptOpen(false);
+            router.push("/");
           }}
         />
       ) : null}
@@ -5374,7 +5320,10 @@ export function NewRunForm(props: {
           bar (the Log-run circle is suppressed on run create/edit routes, so
           no collision): dock pad + 3.5rem bar + gap. Desktop floats at the
           viewport corner. */}
+      {/* Wizard mode: the F2 bottom bar above is the only chrome — no pill
+          mirror on any breakpoint. */}
       {saveBarMounted &&
+        !wizardActive &&
         createPortal(
           <div
             className={cn(
@@ -5384,109 +5333,7 @@ export function NewRunForm(props: {
             )}
           >
             <div className="mx-auto flex max-w-md flex-wrap justify-end gap-2 md:mx-0 md:max-w-none">
-          {wizardActive ? (
-            /* Desktop only — mobile's actions live in the wizard bottom
-               chrome. Mirrors its step logic: "Next: <step>" through Prep, the
-               seam pair on Setup, "Next: Feedback" on Laps, and on Feedback the
-               same Save-draft / Mark-complete pair (founder 2026-07-17 — the
-               declared Draft badge was retired; complete is an explicit
-               action). Editing a complete run → single "Save edits". */
-            <div className="hidden gap-2 md:flex">
-              {wizardStep === "setup" ? (
-                <>
-                  <button
-                    type="button"
-                    className={cn(
-                      fabPillOutlineClass,
-                      (!canSave || saving) && "opacity-70 pointer-events-none"
-                    )}
-                    onClick={(e) => saveRun(e, "draft")}
-                    disabled={!canSave || saving}
-                    aria-busy={saving && !saveSuccess}
-                  >
-                    {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Not run yet — save draft 💾"}
-                  </button>
-                  <button
-                    type="button"
-                    className={fabPillPrimaryClass}
-                    onClick={() => goToWizardStep("laps")}
-                  >
-                    Run done — laptimes →
-                  </button>
-                </>
-              ) : wizardStep === "feel" ? (
-                editingCompletedRun ? (
-                  <button
-                    type="button"
-                    className={cn(
-                      fabPillPrimaryClass,
-                      (!canSave || saving) && "opacity-70 pointer-events-none"
-                    )}
-                    onClick={(e) => saveRun(e, "completed")}
-                    disabled={!canSave || saving}
-                    aria-busy={saving && !saveSuccess}
-                    title="Save changes — the run stays complete."
-                  >
-                    {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save edits"}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className={cn(
-                        fabPillOutlineClass,
-                        (!canSave || saving) && "opacity-70 pointer-events-none"
-                      )}
-                      onClick={(e) => saveRun(e, "draft")}
-                      disabled={!canSave || saving}
-                      aria-busy={saving && !saveSuccess}
-                      title="Save what you have — finish the run any time."
-                    >
-                      {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save draft 💾"}
-                    </button>
-                    <button
-                      type="button"
-                      className={cn(
-                        fabPillPrimaryClass,
-                        (!canSave || saving) && "opacity-70 pointer-events-none"
-                      )}
-                      onClick={(e) => saveRun(e, "completed")}
-                      disabled={!canSave || saving}
-                      aria-busy={saving && !saveSuccess}
-                      title="Mark this run finished and save."
-                    >
-                      {saving ? "Saving…" : "Mark run complete 🏁"}
-                    </button>
-                  </>
-                )
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={cn(
-                      fabPillOutlineClass,
-                      (!canSave || saving) && "opacity-70 pointer-events-none"
-                    )}
-                    onClick={(e) => saveRun(e, wizardSaveCompletes ? "completed" : "draft")}
-                    disabled={!canSave || saving}
-                    aria-busy={saving && !saveSuccess}
-                    title="Saves what you have — finish the log any time."
-                  >
-                    {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save"}
-                  </button>
-                  {wizardNextStepId ? (
-                    <button
-                      type="button"
-                      className={fabPillPrimaryClass}
-                      onClick={() => goToWizardStep(wizardNextStepId)}
-                    >
-                      Next: {stepLabel(wizardNextStepId)} →
-                    </button>
-                  ) : null}
-                </>
-              )}
-            </div>
-          ) : editingCompletedRun ? (
+          {editingCompletedRun ? (
             <button
               type="button"
               className={cn(

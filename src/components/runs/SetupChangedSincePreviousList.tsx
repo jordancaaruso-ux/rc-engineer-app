@@ -5,7 +5,7 @@ import type { SetupChangedRow } from "@/lib/setupCompare/changedSincePrevious";
 import { cn } from "@/lib/utils";
 
 const HEAD_CELL =
-  "sticky top-0 z-10 border-b border-border bg-secondary/95 py-2 font-mono text-[9px] uppercase tracking-[0.2em] text-faint backdrop-blur-sm";
+  "sticky top-0 z-10 border-b border-border bg-secondary/95 py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-faint backdrop-blur-sm";
 
 /**
  * "Setup vs previous run" changed-field list — shared by the Sessions expanded
@@ -53,10 +53,10 @@ export function SetupChangedSincePreviousList({
               <div className={cn("min-w-0 truncate pl-3.5 pr-2 py-[7px] text-[13px] leading-tight text-muted-foreground", divider)}>
                 {row.label}
               </div>
-              <div className={cn("px-2 py-[7px] text-right font-mono text-[13px] tabular-nums leading-tight text-foreground", divider)}>
+              <div className={cn("px-2 py-[7px] text-right text-[13px] tabular-nums leading-tight text-foreground", divider)}>
                 {row.value}
               </div>
-              <div className={cn("pl-2 pr-3.5 py-[7px] text-right font-mono text-[12px] tabular-nums leading-tight text-faint line-through", divider)}>
+              <div className={cn("pl-2 pr-3.5 py-[7px] text-right text-[12px] tabular-nums leading-tight text-faint line-through", divider)}>
                 {row.previousValue}
               </div>
             </Fragment>

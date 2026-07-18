@@ -14,6 +14,14 @@
 
 export type WizardStepId = "session" | "equipment" | "prep" | "setup" | "laps" | "feel";
 
+/** Per-step status rendered by the wizard chrome (ticks + track sectors). */
+export type WizardStepStatus = {
+  /** The step's key data is in — its track sector fills. */
+  done?: boolean;
+  /** Required data still missing at Run complete — amber dot on the tick. */
+  attention?: boolean;
+};
+
 export type WizardStepDef = {
   id: WizardStepId;
   label: string;

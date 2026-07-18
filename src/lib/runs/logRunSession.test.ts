@@ -5,7 +5,7 @@ import type { EntryCandidate } from "./entryCandidate";
 
 const cand = (over: Partial<EntryCandidate>): EntryCandidate => ({
   runId: "r1", carId: "c1", carName: "A800", trackId: "t1", trackName: "Boronia",
-  eventId: null, eventName: null, eventEndIso: null, meetingSessionType: null, sessionLabel: null,
+  eventId: null, eventName: null, eventEndIso: null, sessionType: null, meetingSessionType: null, sessionLabel: null,
   whenIso: new Date(0).toISOString(), ...over,
 });
 

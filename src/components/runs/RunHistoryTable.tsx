@@ -43,6 +43,7 @@ import { RunRaceFieldSwitcher, RACE_IDENTITY } from "@/components/runs/RunRaceFi
 import Link from "next/link";
 import { SquarePen, Timer, Trash2, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTodayDraftRunOptional } from "@/components/layout/TodayDraftRunProvider";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
@@ -769,6 +770,7 @@ function RunDetail({
   allowRunMutations?: boolean;
 }) {
   const router = useRouter();
+  const todayDraft = useTodayDraftRunOptional();
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [setupDataByRunId, setSetupDataByRunId] = useState<Record<string, unknown>>({});
@@ -803,6 +805,13 @@ function RunDetail({
         const payload = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(payload.error || `Delete failed (${res.status})`);
       }
+      // If we just deleted today's draft, the persistent Log-run FAB and the
+      // dashboard Start-run CTA read the draft from TodayDraftRunProvider's own
+      // fetched state — which `router.refresh()` (server components only) does
+      // not touch. Without this the FAB keeps its flag+green-dot and both point
+      // at the now-deleted run's edit page (a dead 404). Re-fetch so the draft
+      // indicator clears instantly.
+      todayDraft?.refreshDraft();
       router.refresh();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete run");
@@ -1007,6 +1016,7 @@ function RunDetail({
           title="Sum of included lap times"
           value={lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"}
           alignValue
+          mono
         />
         <StatWellCell
           label="Best lap"
@@ -1015,6 +1025,7 @@ function RunDetail({
           expanded={expandedLapStat === "best"}
           onToggle={() => toggleLapStat("best")}
           alignValue
+          mono
         />
         <StatWellCell
           label="Avg top 5"
@@ -1023,6 +1034,7 @@ function RunDetail({
           expanded={expandedLapStat === "avg5"}
           onToggle={() => toggleLapStat("avg5")}
           alignValue
+          mono
         />
         <StatWellCell
           label="Avg top 10"
@@ -1031,8 +1043,9 @@ function RunDetail({
           expanded={expandedLapStat === "avg10"}
           onToggle={() => toggleLapStat("avg10")}
           alignValue
+          mono
         />
-        <StatWellCell label="Median" value={formatLap(lapDash.median)} alignValue />
+        <StatWellCell label="Median" value={formatLap(lapDash.median)} alignValue mono />
         {conditionsChip ? (
           <StatWellCell
             label="Cond."
@@ -1050,6 +1063,7 @@ function RunDetail({
               : "—"
           }
           alignValue
+          mono
         />
         <StatWellCell
           label="Mistakes"
@@ -1222,6 +1236,7 @@ function RunDetail({
             value={handlingDetailsText}
             multiline
             emptyAsDash
+            prose
           />
         ) : null}
       </div>
