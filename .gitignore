@@ -32,3 +32,4 @@ hardware/rc-pwm-logger/.history/
 
 # Setup extraction eval — raw model outputs (regenerated each run)
 scripts/setup-extract-eval/results/
+perf-lighthouse-*.json
