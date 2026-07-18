@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense, useEffect, useState } from "react";
 import { JrcMark } from "@/components/brand/JrcMark";
+import { TelemetryBackground } from "@/components/brand/TelemetryBackground";
 import { primaryButtonClassName } from "@/components/ui/ButtonLink";
 
 /** Official Google "G" mark — multicolor, reads cleanly on the dark surface button. */
@@ -109,25 +110,9 @@ function LoginForm() {
 
   return (
     <div className="relative flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center overflow-hidden bg-background px-5 py-12">
-      {/* Cinematic blurred track backdrop — slow Ken Burns drift (login only). */}
+      {/* Animated telemetry backdrop — traces + oscilloscope grid (login only). */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="login-bg-photo absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/brand/track-hero.jpg')",
-            filter: "blur(24px) saturate(0.9) brightness(0.6)",
-          }}
-        />
-        {/* Charcoal scrim so type stays legible over the photo. */}
-        <div className="absolute inset-0 bg-background/60" />
-        {/* Vignette — frames the card, darkens the edges. */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(120% 120% at 50% 32%, transparent 38%, rgba(0,0,0,0.62) 100%)",
-          }}
-        />
+        <TelemetryBackground />
       </div>
 
       {/* Yellow hero whisper (brand, sanctioned on login). */}
