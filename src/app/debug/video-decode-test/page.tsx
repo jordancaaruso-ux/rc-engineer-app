@@ -16,12 +16,47 @@ const SPOTS = 8;
 type WindowResult = {
   t0: number;
   seekMs: number;
+  seekTimedOut: boolean;
   rate: number;
   framesPresented: number;
   framesExpected: number;
   wallMs: number;
   sampleMsAvg: number;
 };
+
+const SEEK_TIMEOUT_MS = 25000;
+
+/**
+ * Seek with an iOS-safe completion check: resolves on `seeked`, but also polls
+ * readyState/currentTime (Safari sometimes lands the seek without firing the
+ * event on a never-played element), and gives up after SEEK_TIMEOUT_MS instead
+ * of hanging the test forever.
+ */
+function seekWithTimeout(video: HTMLVideoElement, t: number): Promise<{ ms: number; timedOut: boolean }> {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    let settled = false;
+    let poll = 0;
+    let timer = 0;
+    const finish = (timedOut: boolean) => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener("seeked", onSeeked);
+      window.clearInterval(poll);
+      window.clearTimeout(timer);
+      resolve({ ms: performance.now() - start, timedOut });
+    };
+    const onSeeked = () => finish(false);
+    video.addEventListener("seeked", onSeeked);
+    poll = window.setInterval(() => {
+      if (!video.seeking && Math.abs(video.currentTime - t) < 0.5 && video.readyState >= 2) {
+        finish(false);
+      }
+    }, 250);
+    timer = window.setTimeout(() => finish(true), SEEK_TIMEOUT_MS);
+    video.currentTime = t;
+  });
+}
 
 type TestReport = {
   fileName: string;
@@ -73,6 +108,17 @@ export default function VideoDecodeTestPage() {
       log(`Video: ${width}x${height}, ${Math.round(duration)}s, ${Math.round(file.size / 1e6)}MB`);
       log(`Frame callback API: ${rvfcSupported ? "available" : "MISSING (older iOS?)"}`);
 
+      // iOS pipeline kick: a never-played element can swallow seeks (no
+      // `seeked` event). One muted play/pause wakes the decoder up.
+      setStatus("Waking up the decoder…");
+      try {
+        await video.play();
+        await new Promise((r) => setTimeout(r, 300));
+        video.pause();
+      } catch {
+        log("Autoplay kick blocked — continuing anyway.");
+      }
+
       // Sampling canvas ≈ the watch-band readback the detector does.
       const canvas = canvasRef.current!;
       canvas.width = 640;
@@ -93,16 +139,32 @@ export default function VideoDecodeTestPage() {
         setStatus(`Window ${i + 1}/${SPOTS} — seeking to ${Math.round(t0)}s…`);
 
         video.pause();
-        const seekStart = performance.now();
-        video.currentTime = t0;
-        await new Promise<void>((res) => {
-          const done = () => {
-            video.removeEventListener("seeked", done);
-            res();
-          };
-          video.addEventListener("seeked", done);
-        });
-        const seekMs = performance.now() - seekStart;
+        const tick = window.setInterval(() => {
+          setStatus(
+            `Window ${i + 1}/${SPOTS} — seeking to ${Math.round(t0)}s… (readyState ${video.readyState})`
+          );
+        }, 1000);
+        const seek = await seekWithTimeout(video, t0);
+        window.clearInterval(tick);
+        const seekMs = seek.ms;
+        if (seek.timedOut) {
+          log(`#${i + 1} @${Math.round(t0)}s: SEEK TIMED OUT after ${fmtMs(seekMs)} — skipping window`);
+          windows.push({
+            t0,
+            seekMs,
+            seekTimedOut: true,
+            rate,
+            framesPresented: 0,
+            framesExpected: Math.round(assumedFps * WINDOW_SEC),
+            wallMs: 0,
+            sampleMsAvg: 0,
+          });
+          if (windows.filter((w) => w.seekTimedOut).length >= 3) {
+            log("3 seeks timed out — stopping early.");
+            break;
+          }
+          continue;
+        }
 
         setStatus(`Window ${i + 1}/${SPOTS} — reading ${WINDOW_SEC}s at ${rate}x…`);
         let frames = 0;
@@ -155,34 +217,47 @@ export default function VideoDecodeTestPage() {
         const wallMs = performance.now() - wallStart;
         const framesExpected = Math.round(assumedFps * WINDOW_SEC);
         const sampleMsAvg = sampleCount ? sampleMsTotal / sampleCount : 0;
-        windows.push({ t0, seekMs, rate, framesPresented: frames, framesExpected, wallMs, sampleMsAvg });
+        windows.push({
+          t0,
+          seekMs,
+          seekTimedOut: false,
+          rate,
+          framesPresented: frames,
+          framesExpected,
+          wallMs,
+          sampleMsAvg,
+        });
         log(
           `#${i + 1} @${Math.round(t0)}s: seek ${fmtMs(seekMs)} · ${rate}x · ` +
             `${frames}/${framesExpected} frames in ${fmtMs(wallMs)} · sample ${fmtMs(sampleMsAvg)}/frame`
         );
       }
 
-      const seekAvg = windows.reduce((a, w) => a + w.seekMs, 0) / windows.length;
-      const oneX = windows.filter((w) => w.rate === 1);
-      const twoX = windows.filter((w) => w.rate === 2);
+      const okWindows = windows.filter((w) => !w.seekTimedOut);
+      const seekTimeouts = windows.length - okWindows.length;
+      if (!okWindows.length) throw new Error("Every seek timed out — this phone can't seek this file.");
+      const seekAvg = okWindows.reduce((a, w) => a + w.seekMs, 0) / okWindows.length;
+      const oneX = okWindows.filter((w) => w.rate === 1);
+      const twoX = okWindows.filter((w) => w.rate === 2);
       const covOneX = oneX.length
         ? oneX.reduce((a, w) => a + w.framesPresented / w.framesExpected, 0) / oneX.length
         : 0;
       const covTwoX = twoX.length
         ? twoX.reduce((a, w) => a + w.framesPresented / w.framesExpected, 0) / twoX.length
         : 0;
-      const sampleAvg = windows.reduce((a, w) => a + w.sampleMsAvg, 0) / windows.length;
+      const sampleAvg = okWindows.reduce((a, w) => a + w.sampleMsAvg, 0) / okWindows.length;
 
       // 18 windows ≈ 6 lines × 3 laps.
       const estFullJobSec = (18 * (seekAvg + (covTwoX >= 0.85 ? WINDOW_SEC / 2 : WINDOW_SEC) * 1000)) / 1000;
 
       let verdict: TestReport["verdict"];
-      if (rvfcSupported && seekAvg < 2500 && covOneX >= 0.85) verdict = "pass";
-      else if (rvfcSupported && seekAvg < 5000 && covOneX >= 0.6) verdict = "marginal";
+      if (rvfcSupported && seekTimeouts === 0 && seekAvg < 2500 && covOneX >= 0.85) verdict = "pass";
+      else if (rvfcSupported && seekTimeouts <= 2 && seekAvg < 5000 && covOneX >= 0.6) verdict = "marginal";
       else verdict = "fail";
 
       const summary =
-        `seek avg ${fmtMs(seekAvg)} · frames delivered ${(covOneX * 100).toFixed(0)}% @1x` +
+        `seek avg ${fmtMs(seekAvg)}${seekTimeouts ? ` (${seekTimeouts} timed out)` : ""} · ` +
+        `frames delivered ${(covOneX * 100).toFixed(0)}% @1x` +
         (twoX.length ? ` / ${(covTwoX * 100).toFixed(0)}% @2x` : "") +
         ` · band sample ${fmtMs(sampleAvg)}/frame · est. full auto-mark ~${Math.round(estFullJobSec)}s`;
 
