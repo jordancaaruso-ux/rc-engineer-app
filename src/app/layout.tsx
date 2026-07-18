@@ -40,14 +40,16 @@ const sora = Sora({
 
   variable: "--font-ui",
 
-  weight: ["400", "500", "600", "700", "800"],
+  // No font-extrabold / 800 in the app — omit to shrink the font payload.
+  weight: ["400", "500", "600", "700"],
 
 });
 
 /** Display — Space Grotesk; page-title voice only (technical instrument register). */
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
-  weight: ["500", "700"],
+  // Titles use weight 700 only (`.page-title`, `.page-title-condensed`).
+  weight: ["700"],
   variable: "--font-display",
 });
 

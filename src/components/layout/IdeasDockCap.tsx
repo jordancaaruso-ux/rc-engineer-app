@@ -2,12 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { Lightbulb } from "@phosphor-icons/react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
-import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
 import { useEnterExit } from "@/components/ui/Collapse";
+
+const ActionItemListPanel = dynamic(
+  () =>
+    import("@/components/dashboard/ActionItemListPanel").then((m) => ({
+      default: m.ActionItemListPanel,
+    })),
+  { loading: () => <p className="px-1 py-2 text-[12px] text-muted-foreground">Loading…</p> }
+);
 
 type Lists = {
   try: DashboardActionItemRow[];

@@ -19,17 +19,8 @@ type PrimaryNavContextValue = {
 
 const PrimaryNavContext = createContext<PrimaryNavContextValue | null>(null);
 
-const PREFETCH_ROUTES = [
-  "/",
-  "/analysis",
-  "/assets",
-  "/engineer",
-  "/settings",
-  "/cars",
-  "/tracks",
-  "/tires",
-  "/runs/history",
-] as const;
+/** Light shells only — Engineer / Sessions / garage hubs warm via Link hover. */
+const PREFETCH_ROUTES = ["/", "/analysis", "/assets", "/settings"] as const;
 
 /** Sets `data-nav-pending` on `<html>` during optimistic tab switches (no React re-render of page). */
 function NavPendingMarker() {

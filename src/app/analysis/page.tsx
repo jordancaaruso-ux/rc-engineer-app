@@ -3,7 +3,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { getCachedAnalysisHomeModel } from "@/lib/cachedReads";
-import { SessionTrendCard } from "@/components/analysis/SessionTrendCard";
+import { SessionTrendCard } from "@/components/analysis/SessionTrendCardLazy";
 import { RecentRunsCard } from "@/components/analysis/RecentRunsCard";
 import { AnalysisVideoCard } from "@/components/analysis/AnalysisVideoCard";
 import { HubNavLink } from "@/components/layout/HubNavLink";

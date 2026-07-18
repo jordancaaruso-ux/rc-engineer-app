@@ -48,8 +48,16 @@ import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
-import { LapComparePanel } from "@/components/videoAnalysis/LapComparePanel";
+import dynamic from "next/dynamic";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
+
+const LapComparePanel = dynamic(
+  () =>
+    import("@/components/videoAnalysis/LapComparePanel").then((m) => ({
+      default: m.LapComparePanel,
+    })),
+  { loading: () => null }
+);
 import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import {
   computeRunHistoryColSpan,

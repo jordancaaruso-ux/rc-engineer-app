@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { EngineerPageClient } from "@/components/engineer/EngineerPageClient";
+import { EngineerPageClient } from "@/components/engineer/EngineerPageClientLazy";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 

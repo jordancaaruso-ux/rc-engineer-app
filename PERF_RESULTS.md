@@ -57,4 +57,19 @@
 
 ### After
 
-_Pending prod deploy re-measure._
+Browser re-measure skipped (founder request). Shipped on confidence + static proof that idle form warm paths are removed; hover/touch warm retained.
+
+---
+
+## Fix C — Idle prefetch trim + more code-splits (no browser re-measure)
+
+**Changes (invisible except speed):**
+1. Stop `TodayDraftRunProvider` idle prefetch of draft edit route.
+2. Idle `PREFETCH_ROUTES` trimmed to `/`, `/analysis`, `/assets`, `/settings` (drop Engineer, Sessions, garage hubs — still warm on Link hover).
+3. Drop unused font weights: Sora 800, Space Grotesk 500.
+4. `LapComparePanel` dynamic inside Sessions expand.
+5. `EngineerPageClient` via lazy wrapper (same skeleton).
+6. `ActionItemListPanel` dynamic in Ideas dock sheet only.
+7. `SessionTrendCard` dynamic on Analysis hub.
+
+**Declined:** unifying Lucide/Phosphor glyphs; AppShell server rewrite.

@@ -62,10 +62,8 @@ export function TodayDraftRunProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(id);
   }, [pathname, router]);
 
-  useEffect(() => {
-    if (!draftRunId) return;
-    router.prefetch(`/runs/${encodeURIComponent(draftRunId)}/edit`);
-  }, [draftRunId, router]);
+  // Do not idle-prefetch `/runs/[id]/edit` — that pulls the Log Run route on every
+  // shelled page whenever a draft exists. FAB / dashboard CTA warm on intent.
 
   const value = useMemo(
     (): TodayDraftContextValue => ({
