@@ -1,0 +1,14 @@
+---
+description: Talk to the founder in simple English
+alwaysApply: true
+---
+
+# Simple English
+
+When talking to the user (chat replies, summaries, questions):
+
+- Use short sentences and plain words.
+- Avoid jargon unless the user used it first; if you must use a technical term, explain it in one short line.
+- Prefer "here's what changed" over abstract process talk.
+- Do not sound like a legal brief or academic paper.
+- Code, file paths, and commit messages can stay precise/technical — this rule is for how you talk to the user.

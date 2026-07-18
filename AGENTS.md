@@ -2,6 +2,10 @@
 
 Guidance for any AI agent working in this repository (Cursor, Claude Code, Codex, etc.). Read this before making edits.
 
+## Talk to the founder in simple English
+
+Use short sentences and plain words in chat. Avoid jargon unless the user used it first; if you must use a technical term, explain it in one short line. Prefer "here's what changed" over abstract process talk. Do not sound like a legal brief or academic paper. Code, file paths, and commit messages can stay precise — this rule is for how you talk to the user.
+
 For **product direction and prioritization** (core loop, pillar rank, horizons), read `docs/PRODUCT_NORTH_STAR.md`.
 
 For **Engineer behavior** (the two moments, confidence ladder, failure-mode ranking, modes, suggestion lifecycle, KB doctrine), read `docs/ENGINEER_NORTH_STAR.md` **before** any Engineer prompt, suggestion-surface, or chat UX change.
