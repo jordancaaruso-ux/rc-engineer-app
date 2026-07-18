@@ -20,12 +20,16 @@
 | Engineer first open long task | ~1463 ms (separate; may need Fix B / route split) |
 | Wizard step click | 128 ms |
 
-### After
+### After (local `next dev`, same founder session, 2026-07-18)
 
-_Pending deploy + re-measure on same machine._
+| Signal | Value |
+|---|---|
+| Idle 5s on Dashboard | **0** resource URLs matching `NewRunForm` / `components_runs` / `LogRunWizard` |
+| Open `/runs/new` | Form renders (`Log your run`, Exit chrome present) — behavior unchanged |
+| Engineer soft-nav (warm) | No longtask ≥40 ms recorded in observer window |
 
-Local `next build` blocked here by Google Fonts fetch failure; measuring after Vercel deploy of this branch.
+Prod before/after for Engineer cold **1463 ms** longtask is a separate cost (route JS); Fix A removes idle contention, not Engineer first-load weight. Will confirm on Vercel after push.
 
 ### Decision
 
-_Pending after numbers._
+**Keep.** Measurable: Log Run module no longer idle-loads; on-demand open still works.
