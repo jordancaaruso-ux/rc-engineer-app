@@ -8,6 +8,7 @@ import { deriveFreshEntry } from "@/lib/runs/wizardEntry";
 import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import type { TrackOption } from "@/components/runs/TrackCombobox";
+import type { ComponentProps } from "react";
 
 /**
  * Log-run wizard host (v6, founder interview 2026-07-17: "prefill should
@@ -20,7 +21,9 @@ import type { TrackOption } from "@/components/runs/TrackCombobox";
  * key for a clean slate (GPS venue auto-pick re-runs).
  */
 
-type FormProps = Parameters<typeof NewRunForm>[0];
+type FormProps = ComponentProps<
+  typeof import("@/components/runs/NewRunForm").NewRunForm
+>;
 
 export function LogRunWizardHost({
   entryCars,

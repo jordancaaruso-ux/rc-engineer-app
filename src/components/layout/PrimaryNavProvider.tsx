@@ -58,9 +58,9 @@ export function PrimaryNavProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const prefetchRoutes = () => {
+      // Warm primary tabs only. Log Run is warmed on FAB / nav hover
+      // (LogRunFab, PrimaryNavLink) so the heavy form chunk is not pulled idle.
       for (const route of PREFETCH_ROUTES) router.prefetch(route);
-      // Route shell only — idle-importing NewRunForm competed with interactions.
-      router.prefetch("/runs/new");
     };
 
     if (typeof requestIdleCallback === "function") {

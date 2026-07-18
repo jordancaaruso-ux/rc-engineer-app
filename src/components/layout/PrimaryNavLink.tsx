@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import type { PrimaryNavItem } from "@/components/layout/navConfig";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
 import { haptic } from "@/lib/haptics";
+import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 
 type PrimaryNavLinkProps = {
   item: PrimaryNavItem;
@@ -40,7 +41,11 @@ export function PrimaryNavLink({
   const healTimerRef = useRef<number | null>(null);
 
   function warmRoute() {
-    if (!prefetch) router.prefetch(href);
+    if (!prefetch) {
+      router.prefetch(href);
+      // Add-run uses prefetch:false; warm the form chunk on intent only.
+      if (item.id === "add-run") warmNewRunForm();
+    }
   }
 
   /**

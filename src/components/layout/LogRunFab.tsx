@@ -7,6 +7,7 @@ import { Flag, Plus } from "@phosphor-icons/react";
 import { shouldShowLogRunFab } from "@/components/layout/navConfig";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
 import { haptic } from "@/lib/haptics";
+import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 
 /**
  * The "Log run" action — the app's #1 action, an icon-only yellow circle
@@ -40,7 +41,10 @@ export const LogRunFab = memo(function LogRunFab() {
   // On the dashboard: quiet black/outline "+", always a fresh run (the bar above
   // handles finishing today's draft). Elsewhere: draft-aware yellow circle.
   if (isDashboard) {
-    const warmNew = () => router.prefetch("/runs/new");
+    const warmNew = () => {
+      router.prefetch("/runs/new");
+      warmNewRunForm();
+    };
     return (
       <Link
         href="/runs/new"
@@ -60,7 +64,10 @@ export const LogRunFab = memo(function LogRunFab() {
   // Draft-aware, matching the dashboard Start-run CTA: resume an unfinished run
   // vs start fresh.
   const label = draftRunId ? "Finish run" : "Log run";
-  const warm = () => router.prefetch(href);
+  const warm = () => {
+    router.prefetch(href);
+    warmNewRunForm();
+  };
 
   return (
     <Link

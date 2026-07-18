@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Plus } from "lucide-react";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
+import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 
 /**
  * The dashboard's primary action, pinned to the very top of the page body — the
@@ -32,6 +34,7 @@ export function DashboardStartRunCta({
   serverDraftRunId: string | null;
   serverDraftSavedAt: string | null;
 }) {
+  const router = useRouter();
   const { draftRunId, draftSavedAt } = useTodayDraftRun();
   const todayDraftRunId = draftRunId ?? serverDraftRunId;
   const todayDraftSavedAt = draftSavedAt ?? serverDraftSavedAt;
@@ -40,6 +43,11 @@ export function DashboardStartRunCta({
   const primaryHref = hasDraft
     ? `/runs/${encodeURIComponent(todayDraftRunId as string)}/edit`
     : "/runs/new";
+
+  const warmLogRun = (href: string) => {
+    router.prefetch(href);
+    warmNewRunForm();
+  };
 
   // Device-local "WEDNESDAY · JULY 16" for the micro label. Computed once per
   // mount; SSR may render the server's date, so hydration warnings are
@@ -55,7 +63,9 @@ export function DashboardStartRunCta({
     <div>
       <Link
         href={primaryHref}
-        prefetch
+        prefetch={false}
+        onPointerEnter={() => warmLogRun(primaryHref)}
+        onTouchStart={() => warmLogRun(primaryHref)}
         aria-label={hasDraft ? "Finish today's run" : "Start a new run"}
         className="tap-active logrun-glow relative isolate flex w-full items-center gap-3.5 overflow-visible rounded-2xl bg-primary px-[18px] pb-4 pt-[15px] text-left text-primary-foreground shadow-[0_10px_26px_-12px_rgba(255,214,10,0.55),inset_0_1px_0_rgba(255,255,255,0.35)] transition hover:brightness-105 active:brightness-95"
       >
@@ -98,7 +108,9 @@ export function DashboardStartRunCta({
       {hasDraft ? (
         <Link
           href="/runs/new"
-          prefetch
+          prefetch={false}
+          onPointerEnter={() => warmLogRun("/runs/new")}
+          onTouchStart={() => warmLogRun("/runs/new")}
           className="tap-active mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 py-3 text-[13.5px] font-semibold text-muted-foreground transition hover:border-foreground/30 hover:text-foreground"
         >
           <Plus aria-hidden className="size-[15px]" strokeWidth={2.2} />
