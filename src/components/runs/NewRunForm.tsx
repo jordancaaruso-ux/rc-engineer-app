@@ -3017,12 +3017,7 @@ export function NewRunForm(props: {
 
   async function saveRun(
     e?: React.MouseEvent,
-    intent: "draft" | "completed" = "completed",
-    opts?: {
-      /** Wizard "← Save & exit" on an EDITED run: draft saves normally stay
-       *  in place while editing, but the escape must still leave the page. */
-      exitAfter?: boolean;
-    }
+    intent: "draft" | "completed" = "completed"
   ) {
     e?.preventDefault();
     if (pendingCompleteNavigationRef.current || pendingDraftNavigationRef.current) return;
@@ -3326,35 +3321,17 @@ export function NewRunForm(props: {
         /* ignore */
       }
 
-      // Completing a run sends the driver to the dashboard with a one-time
-      // prompt to generate Engineer suggestions for the session they just saved.
+      // Every successful save leaves the log-run flow for the dashboard.
+      // Completing also carries ?suggestRun so the dashboard can offer
+      // Engineer suggestions for the session they just saved. Draft saves
+      // (new or edit) go to `/` — navigating away discards local tire
+      // counters so the double-increment-on-return bug can't recur. The
+      // run is already persisted here, so refresh the today-draft banner
+      // in the background (never await it — a slow /api/runs/today-draft
+      // must not gate nav).
       if (intent === "completed") {
         navigateAfterRunComplete(run.id);
-      } else if (isEditing) {
-        if (opts?.exitAfter) {
-          // Wizard escape on an edited run: the save landed — leave like the
-          // new-run draft path does instead of silently staying put.
-          pendingDraftNavigationRef.current = true;
-          void todayDraftCtx?.refreshDraft();
-          navigateAway("/");
-        } else {
-          await todayDraftCtx?.refreshDraft();
-          const { lastRun: refreshed } = await jsonFetch<{ lastRun: LastRun | null }>(
-            `/api/runs/last?carId=${carId}`
-          ).catch(() => ({ lastRun: null }));
-          setLastRun(refreshed);
-          if (replicateLast && refreshed) {
-            setRunsCompleted(refreshed.tireRunNumber ?? 0);
-          }
-        }
       } else {
-        // New run saved as draft: send the driver back to the dashboard.
-        // Navigating away discards the local tire counters, so the
-        // double-increment-on-return bug can't recur. The run is ALREADY
-        // persisted here, so refresh the today-draft banner in the background
-        // (never await it — a slow /api/runs/today-draft must not gate nav)
-        // and hand off to navigateAway, which falls back to a hard navigation
-        // if the client-side push is ever swallowed.
         pendingDraftNavigationRef.current = true;
         void todayDraftCtx?.refreshDraft();
         navigateAway("/");
@@ -5290,17 +5267,15 @@ export function NewRunForm(props: {
           onComplete={() => saveRun(undefined, "completed")}
           onExitSave={() => {
             // Banks the run (draft, or preserving completion) and leaves —
-            // saveRun navigates after saving; exitAfter covers edit-mode
-            // draft saves, which otherwise stay in place. The exiting ref
-            // stops the popstate guard from re-arming mid-departure; a failed
-            // save re-arms it so back-guarding keeps working.
+            // saveRun always navigates to the dashboard after a successful
+            // save. The exiting ref stops the popstate guard from re-arming
+            // mid-departure; a failed save re-arms it so back-guarding
+            // keeps working.
             if (!canSave || saving) return;
             wizardExitingRef.current = true;
             setWizardExitPromptOpen(false);
             void Promise.resolve(
-              saveRun(undefined, wizardSaveCompletes ? "completed" : "draft", {
-                exitAfter: true,
-              })
+              saveRun(undefined, wizardSaveCompletes ? "completed" : "draft")
             ).finally(() => {
               wizardExitingRef.current = false;
             });
