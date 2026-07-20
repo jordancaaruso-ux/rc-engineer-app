@@ -633,6 +633,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   /* ── Setups card (slot chips + picker) ── */
   const setupsCard = (
     <CardPanel contentClassName="space-y-2">
+      <Eyebrow>Setups</Eyebrow>
       <div className="flex items-center gap-2">
         <SlotChip id="a" slot={slots.a} selected={activeId === "a"} onSelect={() => setSel("a")} />
         {slots.b ? (
@@ -714,7 +715,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           </ul>
           <button
             type="button"
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-foreground"
+            className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
             onClick={() => {
               setPickerOpen(false);
               setPickerQuery("");
@@ -772,6 +773,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
 
       {/* ── The instrument ─────────────────────────────────────────── */}
       <CardPanel contentClassName="space-y-3">
+        <Eyebrow>Roll centre</Eyebrow>
         <div className="flex items-center gap-2">
           <SegmentedControl
             size="sm"
@@ -863,7 +865,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           </Eyebrow>
           <button
             type="button"
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition"
+            className="text-xs font-medium text-muted-foreground hover:text-foreground transition"
             onClick={() =>
               updateActiveSlot((slot) => ({
                 ...slot,

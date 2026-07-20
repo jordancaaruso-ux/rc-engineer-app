@@ -81,7 +81,7 @@ export default async function NewRunPage({
     importedLapTimeSessionIdRaw.length > 0
       ? loadIncompleteRunsForImportChooser(user.id, initialEventId)
       : Promise.resolve([]),
-    resumeDraft ? loadTodaysIncompleteRuns(user.id) : Promise.resolve([]),
+    resumeDraft ? loadTodaysIncompleteRuns(user.id, displayTimeZone) : Promise.resolve([]),
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -151,7 +151,7 @@ export default async function NewRunPage({
     importFailed;
   const wizardEnabled = !wizardDisabled && (wizardForced || !classicOnlyContext);
   if (wizardEnabled) {
-    const wizardDrafts = await loadTodaysIncompleteRuns(user.id);
+    const wizardDrafts = await loadTodaysIncompleteRuns(user.id, displayTimeZone);
     return (
       <>
         <header className="page-header">

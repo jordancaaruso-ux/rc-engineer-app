@@ -53,10 +53,41 @@ function trackKey(run: RunForHistoryGroup): string {
   return name ? `name:${name}` : "no-track";
 }
 
-export function runSessionSortInstant(run: RunForHistoryGroup): Date {
+export function runSessionSortInstant(
+  run: Pick<RunForHistoryGroup, "createdAt" | "sortAt">
+): Date {
   const s = run.sortAt ?? run.createdAt;
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? new Date(run.createdAt) : d;
+}
+
+/**
+ * 1-based position of each run within its (user, local calendar day), in
+ * time-logged order (`sortAt`, matching group display order). Names unlabeled
+ * testing runs — `formatRunSessionDisplay(run, { dayRunNumber })` → "Run 2" —
+ * instead of the bare "—" fallback. Plain object so it can cross the
+ * server → client component boundary.
+ */
+export function buildDayRunNumberMap(
+  runs: Array<Pick<RunForHistoryGroup, "id" | "createdAt" | "sortAt"> & { userId?: string | null }>,
+  timeZone?: string | null
+): Record<string, number> {
+  const byDay = new Map<string, Array<{ id: string; t: number }>>();
+  for (const run of runs) {
+    const instant = runSessionSortInstant(run);
+    const key = `${run.userId ?? ""}|${dateKey(instant, timeZone)}`;
+    const list = byDay.get(key) ?? [];
+    list.push({ id: run.id, t: instant.getTime() });
+    byDay.set(key, list);
+  }
+  const map: Record<string, number> = {};
+  for (const list of byDay.values()) {
+    list.sort((a, b) => a.t - b.t);
+    list.forEach((r, i) => {
+      map[r.id] = i + 1;
+    });
+  }
+  return map;
 }
 
 export function buildRunHistoryGroups<T extends RunForHistoryGroup>(

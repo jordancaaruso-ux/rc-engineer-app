@@ -1,12 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { startOfLocalDay } from "@/lib/eventActive";
-
-function localTodayBounds(): { start: Date; end: Date } {
-  const start = startOfLocalDay(new Date());
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { start, end };
-}
+import { todayBoundsInTimeZone } from "@/lib/eventActive";
 
 export type TodayDraftRun = {
   id: string;
@@ -14,9 +7,17 @@ export type TodayDraftRun = {
   savedAt: string;
 };
 
-/** Latest incomplete run logged today (local calendar day), if any. */
-export async function getTodayDraftRun(userId: string): Promise<TodayDraftRun | null> {
-  const { start, end } = localTodayBounds();
+/**
+ * Latest incomplete run logged today, if any. "Today" is the calendar day in
+ * the USER's IANA `timeZone` (from the `rc_tz` cookie) — never the server's:
+ * Vercel runs in UTC, so server-local bounds would roll the day at 10am AEST
+ * and silently drop a morning draft from the Finish-run CTA/FAB.
+ */
+export async function getTodayDraftRun(
+  userId: string,
+  timeZone: string
+): Promise<TodayDraftRun | null> {
+  const { start, end } = todayBoundsInTimeZone(timeZone);
   const runs = await prisma.run.findMany({
     where: {
       userId,
@@ -28,10 +29,4 @@ export async function getTodayDraftRun(userId: string): Promise<TodayDraftRun | 
   const draft = [...runs].reverse().find((r) => r.loggingComplete === false);
   if (!draft) return null;
   return { id: draft.id, savedAt: draft.createdAt.toISOString() };
-}
-
-/** @deprecated Prefer {@link getTodayDraftRun}. */
-export async function getTodayDraftRunId(userId: string): Promise<string | null> {
-  const draft = await getTodayDraftRun(userId);
-  return draft?.id ?? null;
 }

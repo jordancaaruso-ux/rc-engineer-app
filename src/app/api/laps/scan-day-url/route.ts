@@ -16,6 +16,8 @@ import {
 } from "@/lib/lapWatch/liveRcNameNormalize";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
+import { discoverMyRcmDaySessions } from "@/lib/lapWatch/discoverMyRcmDaySessions";
+import { isMyRcmDiscoveryUrl } from "@/lib/lapUrlParsers/myRcmReport";
 import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import { hasSpeedhiveIdentityForUser } from "@/lib/speedhive/speedhiveDriverSettings";
@@ -45,16 +47,17 @@ export type ScanDayUrlCandidateRow = {
   /** When already imported, set to the linkedRunId if the ImportedLapTimeSession
    *  is already attached to a run (so the user knows it's been saved). */
   linkedRunId: string | null;
-  timingSource?: "liverc" | "speedhive";
+  timingSource?: "liverc" | "speedhive" | "myrcm";
   bestLapSeconds?: number | null;
 };
 
 const RESULTS_SCAN_ROW_CAP = 80;
 
-function timingSourceFromParserId(parserId: string): "liverc" | "speedhive" | undefined {
+function timingSourceFromParserId(parserId: string): "liverc" | "speedhive" | "myrcm" | undefined {
   const id = parserId.toLowerCase();
   if (id.includes("speedhive")) return "speedhive";
   if (id.includes("liverc")) return "liverc";
+  if (id.includes("myrcm")) return "myrcm";
   return undefined;
 }
 
@@ -221,13 +224,60 @@ export async function POST(request: Request) {
   if (!dayUrl) {
     return NextResponse.json({ error: "dayUrl or trackId is required" }, { status: 400 });
   }
+
+  // MyRCM event / class URL: enumerate its result sessions for the picker (paste-per-event flow).
+  if (isMyRcmDiscoveryUrl(dayUrl)) {
+    let eventRaceClass: string | null = null;
+    if (eventId) {
+      const ev = await prisma.event.findFirst({
+        where: { id: eventId },
+        select: { raceClass: true },
+      });
+      eventRaceClass = ev?.raceClass?.trim() || null;
+    }
+    const discovered = await discoverMyRcmDaySessions({
+      userId: user.id,
+      url: dayUrl,
+      eventRaceClass,
+    });
+    const candidates: ScanDayUrlCandidateRow[] = discovered.candidates.map((c) => ({
+      sessionId: c.sessionId,
+      sessionUrl: c.sessionUrl,
+      driverName: c.label,
+      sessionTime: null,
+      sessionCompletedAtIso: null,
+      matchesDriver: null,
+      alreadyImported: c.alreadyImported,
+      linkedRunId: c.linkedRunId,
+      timingSource: "myrcm",
+    }));
+    let scanMessage = discovered.scanMessage;
+    if (!scanMessage && candidates.length > 0) {
+      scanMessage = discovered.classFilterApplied
+        ? `MyRCM sessions for your class — pick the one you raced.`
+        : "MyRCM lists sessions by class and round — pick the one you raced.";
+    }
+    return NextResponse.json({
+      ok: true,
+      dayUrl,
+      indexKind: "results" as ScanDayUrlIndexKind,
+      liveRcDriverName: null,
+      candidates,
+      totalCandidates: discovered.totalSessions,
+      matchedCount: null,
+      hasDriverNameSetting: false,
+      driverFilterApplied: false,
+      scanMessage,
+    });
+  }
+
   const isPractice = isLiveRcPracticeListUrl(dayUrl);
   const isResults = isLiveRcResultsDiscoveryUrl(dayUrl);
   if (!isPractice && !isResults) {
     return NextResponse.json(
       {
         error:
-          "Unsupported LiveRC URL. Use a practice session list (/practice/?p=session_list&d=YYYY-MM-DD) or a results page (/results/…) that lists timing sessions.",
+          "Unsupported timing URL. Use a LiveRC practice list or results page, or a MyRCM event/results URL (myrcm.ch).",
       },
       { status: 400 }
     );

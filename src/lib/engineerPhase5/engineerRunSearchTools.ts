@@ -127,7 +127,8 @@ export type SearchRunsForEngineerResultRow = {
 
 export async function searchRunsForEngineerTool(
   viewingUserId: string,
-  raw: SearchRunsForEngineerArgs
+  raw: SearchRunsForEngineerArgs,
+  timeZone?: string | null
 ): Promise<{ ok: true; runs: SearchRunsForEngineerResultRow[]; truncated: boolean } | { ok: false; error: string }> {
   const maxResults = Math.min(40, Math.max(1, raw.max_results ?? 25));
   let runOwnerId = viewingUserId;
@@ -245,7 +246,7 @@ export async function searchRunsForEngineerTool(
     const dash = getIncludedLapDashboardMetrics(primaryLapRowsFromRun(run));
     return {
       runId: run.id,
-      whenLabel: formatRunCreatedAtDateTime(when),
+      whenLabel: formatRunCreatedAtDateTime(when, timeZone),
       sortIso: when.toISOString(),
       carName: run.car?.name ?? run.carNameSnapshot ?? "—",
       trackName: run.track?.name ?? "—",
@@ -269,7 +270,8 @@ export async function searchRunsForEngineerTool(
 export async function applyEngineerFocusTool(
   viewingUserId: string,
   primaryRunId: string,
-  compareRunId: string | null | undefined
+  compareRunId: string | null | undefined,
+  timeZone?: string | null
 ): Promise<
   | { ok: true; focusedRunPair: NonNullable<Awaited<ReturnType<typeof buildFocusedRunPairContext>>> }
   | { ok: false; error: string }
@@ -290,7 +292,7 @@ export async function applyEngineerFocusTool(
   }
 
   const cid = compareRunId?.trim() || null;
-  const focused = await buildFocusedRunPairContext(viewingUserId, primary, cid);
+  const focused = await buildFocusedRunPairContext(viewingUserId, primary, cid, timeZone);
   if (!focused) return { ok: false, error: "Could not load focused runs." };
 
   if (cid && focused.compareRunId == null) {

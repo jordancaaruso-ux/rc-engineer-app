@@ -1,0 +1,7 @@
+# 8MB flash (ESP32-S3-WROOM-1 N8), no OTA: big LittleFS for PWM session logs.
+# 2MB app + ~5.9MB data ≈ 55 minutes at 200 Hz x 9 bytes.
+# Name,   Type, SubType, Offset,   Size
+nvs,      data, nvs,     0x9000,   0x5000
+phy_init, data, phy,     0xe000,   0x1000
+factory,  app,  factory, 0x10000,  0x200000
+littlefs, data, spiffs,  0x210000, 0x5F0000

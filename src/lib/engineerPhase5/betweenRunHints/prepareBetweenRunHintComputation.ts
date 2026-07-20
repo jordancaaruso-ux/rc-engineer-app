@@ -98,13 +98,16 @@ export type PreparedBetweenRunHintComputation = {
 export async function prepareBetweenRunHintComputation(
   userId: string,
   primaryRunId: string,
-  opts?: { forceEngineerSummary?: boolean }
+  opts?: { forceEngineerSummary?: boolean; timeZone?: string | null }
 ): Promise<PreparedBetweenRunHintComputation | null> {
   const scope = await loadScopeForPrimaryRun(userId, primaryRunId);
   if (!scope) return null;
 
+  const timeZone = opts?.timeZone;
+
   const summaryResult = await getOrComputeEngineerSummaryForRun(userId, primaryRunId, {
     force: Boolean(opts?.forceEngineerSummary),
+    timeZone,
   });
   if (!summaryResult?.summary) return null;
 
@@ -153,13 +156,19 @@ export async function prepareBetweenRunHintComputation(
       sessionCompletedAt: runMeta.sessionCompletedAt,
       sortAt: runMeta.sortAt,
     },
-    engineerRef
+    engineerRef,
+    timeZone
   );
 
   let hintSummary = engineerSummary;
   let provenance = pick.provenance;
   if (pick.referenceRunId && pick.referenceRunId !== engineerRef) {
-    const pair = await getOrComputeEngineerSummaryForRunPair(userId, primaryRunId, pick.referenceRunId);
+    const pair = await getOrComputeEngineerSummaryForRunPair(
+      userId,
+      primaryRunId,
+      pick.referenceRunId,
+      { timeZone }
+    );
     if (pair?.summary) {
       hintSummary = pair.summary;
     } else {
@@ -183,6 +192,7 @@ export async function prepareBetweenRunHintComputation(
       primaryRunId,
       primaryPairwiseSummary: hintSummary,
       hintFingerprintExtras,
+      timeZone,
     });
 
   const chronoCount = fingerprintMaterial.contextExtras?.chronologicalChangeCount ?? 0;
@@ -217,6 +227,7 @@ export async function prepareBetweenRunHintComputation(
     carId: runMeta.carId,
     anchorRunId: primaryRunId,
     referenceRunId: provenance?.hintReferenceRunId ?? engineerRef ?? null,
+    timeZone,
   }).catch(() => null);
 
   const driverContextPack: BetweenRunHintPayloadV2["driverContextPack"] = {

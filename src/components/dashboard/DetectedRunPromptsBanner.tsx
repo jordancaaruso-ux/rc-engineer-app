@@ -68,7 +68,13 @@ export function DetectedRunPromptsBanner({
             p.promptKind === "finish" ? "Finish logging this run" : "Log this run";
           const timeLabel = formatLap(p.bestLapSeconds);
           const lapsLabel = p.lapCount != null ? `${p.lapCount} lap${p.lapCount === 1 ? "" : "s"}` : "—";
-          const whenFallback = formatRunDateTime(p.sessionCompletedAtIso, displayTimeZone);
+          // Event detection is LiveRC: on-track session times are track wall clock
+          // stored as-if-UTC, so they render frozen in UTC to match the timing screen.
+          // Only the "Imported" fallback (import-row createdAt) is a true instant.
+          const whenFallback = formatRunDateTime(
+            p.sessionCompletedAtIso,
+            p.sessionTimeIsImportFallback ? displayTimeZone : "UTC"
+          );
           const kindLabel = p.sourceType === "practice" ? "Practice" : "Race / qualifying";
           const sessionTitle =
             p.sessionListLabel?.trim() ||
@@ -94,11 +100,17 @@ export function DetectedRunPromptsBanner({
                       {p.sessionTimeIsImportFallback ? "Imported" : "Session time"}
                     </span>
                     <span className="ml-1.5">
-                      <RelativeTime
-                        iso={p.sessionCompletedAtIso}
-                        fallback={whenFallback}
-                        display="combo"
-                      />
+                      {p.sessionTimeIsImportFallback ? (
+                        <RelativeTime
+                          iso={p.sessionCompletedAtIso}
+                          fallback={whenFallback}
+                          display="combo"
+                        />
+                      ) : (
+                        // Wall-clock-as-UTC instant: relative/device-zone rendering
+                        // would shift it, so show the frozen label directly.
+                        <span className="type-timestamp">{whenFallback}</span>
+                      )}
                     </span>
                   </div>
                   {p.sourceType === "practice" ? (

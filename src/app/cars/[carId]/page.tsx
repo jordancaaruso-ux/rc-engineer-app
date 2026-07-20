@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import Link from "next/link";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -41,6 +42,7 @@ export default async function CarDetailPage(props: {
 
   const user = await requireCurrentUser();
   const { carId } = await props.params;
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
 
   const car = await prisma.car.findFirst({
     where: { id: carId, userId: user.id },
@@ -144,7 +146,7 @@ export default async function CarDetailPage(props: {
         <div className="max-w-2xl space-y-4">
           <CardPanel contentClassName="text-sm">
             <div className="grid gap-2">
-              <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(car.createdAt)}</span></div>
+              <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(car.createdAt, displayTimeZone)}</span></div>
               <div><span className="text-sm font-medium text-muted-foreground">Runs</span> <span className="ml-2">{runCount}</span></div>
               {car.chassis ? (
                 <div><span className="text-sm font-medium text-muted-foreground">Chassis</span> <span className="ml-2">{car.chassis}</span></div>

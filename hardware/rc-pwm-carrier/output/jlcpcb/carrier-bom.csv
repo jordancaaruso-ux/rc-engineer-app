@@ -1,0 +1,12 @@
+Comment,Designator,Footprint,LCSC
+10k 0603 1%,"R1,R3",0603,C25804
+15k 0603 1%,"R2,R4",0603,
+10uF 25V X5R,C1,0805,C15850
+100nF 50V X7R,C2,0603,C14663
+22uF 25V X5R,"C3,C4",0805,C45783
+SS34 Schottky 3A 40V,"D1,D2",SMA,C8678
+AP63205WU-7 buck 5V 2A,U2,TSOT-23-6,C2071056
+6.8uH 4x4mm power inductor >=1.5A,L1,SWPA4030S,C177241
+PTC resettable fuse 1.1A hold 1812,F1,1812,
+Pin header 1x3 P2.54 vertical THT,"J1,J2",PinHeader_1x03,
+Socket female 1x22 P2.54 THT,U1,2x 1x22 socket,

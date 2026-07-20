@@ -16,6 +16,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import { normalizeSetupData, DEFAULT_SETUP_FIELDS } from "@/lib/runSetup";
 import { listSetupKeysChangedBetweenSnapshots } from "@/lib/setupCompare/listSetupKeysChangedBetweenSnapshots";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
@@ -119,15 +120,33 @@ function buildChangedKeys(
   return rows;
 }
 
-function rateToKnownGoodSummary(row: HistoryRow, sameTrack: boolean, changes: number): string {
+/**
+ * Calendar day of a run in the driver's zone. UTC-sliced ISO put a 9am AEST run
+ * on the previous day for every driver east of Greenwich, and the Engineer
+ * quotes these summaries verbatim.
+ */
+function summaryDay(sortAt: Date, timeZone: string | null | undefined): string {
+  return calendarYmdInTimeZone(sortAt, timeZone?.trim() || "UTC");
+}
+
+function rateToKnownGoodSummary(
+  row: HistoryRow,
+  sameTrack: boolean,
+  changes: number,
+  timeZone: string | null | undefined
+): string {
   const where = sameTrack ? "this track" : "a different track";
-  const lookback = `at ${where} on ${row.sortAt.toISOString().slice(0, 10)}`;
+  const lookback = `at ${where} on ${summaryDay(row.sortAt, timeZone)}`;
   if (changes === 0) return `Car was rated ${row.carRating}/10 ${lookback}; current setup matches that reference exactly.`;
   return `Car was rated ${row.carRating}/10 ${lookback}; ${changes} chassis key${changes === 1 ? " has" : "s have"} moved since.`;
 }
 
-function rateToKnownBadSummary(row: HistoryRow, changes: number): string {
-  const lookback = row.sortAt.toISOString().slice(0, 10);
+function rateToKnownBadSummary(
+  row: HistoryRow,
+  changes: number,
+  timeZone: string | null | undefined
+): string {
+  const lookback = summaryDay(row.sortAt, timeZone);
   if (changes === 0) return `Car was rated ${row.carRating}/10 on ${lookback}; setup looked similar to the prior run (no chassis changes).`;
   return `Car was rated ${row.carRating}/10 on ${lookback}; ${changes} chassis key${changes === 1 ? "" : "s"} had changed vs the prior run.`;
 }
@@ -136,6 +155,8 @@ export async function buildKnownGoodMemoryV1(params: {
   userId: string;
   carId: string;
   anchorRunId: string;
+  /** Driver's IANA zone for the day labels quoted in summaries; UTC when omitted. */
+  timeZone?: string | null;
 }): Promise<KnownGoodMemoryV1 | null> {
   const anchor = await prisma.run.findFirst({
     where: { id: params.anchorRunId, userId: params.userId, carId: params.carId },
@@ -193,7 +214,7 @@ export async function buildKnownGoodMemoryV1(params: {
       trackLabel: row.track?.name ?? null,
       sameTrack,
       changedSinceKeys: changes,
-      summary: rateToKnownGoodSummary(row, sameTrack, changes.length),
+      summary: rateToKnownGoodSummary(row, sameTrack, changes.length, params.timeZone),
     };
   });
 
@@ -226,7 +247,7 @@ export async function buildKnownGoodMemoryV1(params: {
       trackId: row.trackId,
       trackLabel: row.track?.name ?? null,
       contributingKeys,
-      summary: rateToKnownBadSummary(row, contributingKeys.length),
+      summary: rateToKnownBadSummary(row, contributingKeys.length, params.timeZone),
     });
   }
 

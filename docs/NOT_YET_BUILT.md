@@ -17,6 +17,7 @@ _Last reviewed: 2026-07-08._
 | Feature | State | Spec / reference | Notes on what exists vs not |
 |---|---|---|---|
 | **Results & Trophies** | Spec + visual prototype only — **no code** | `docs/RESULTS_TROPHIES_NORTH_STAR.md`; prototype: https://claude.ai/code/artifact/346e8f24-a562-4e67-b01a-dcb7e1b798d0 | Nothing persisted today: no `EventResult` model, no `Event.level`, no `view_multi_main_result` parser, no trophy case / dashboard results strip. `EventParticipation` stores notes/spec-tire/pin only. LiveRC result *pages* are parsed for laps, not for finishing position. Phase 1 = parser + schema migration + class-confirm UI. |
+| **Next outing plan** | Founder idea, outlined in chat 2026-07-19 — **no spec doc, no code** | Outline in agent memory (`next-outing-plan-idea`); grew out of the dashboard-v2 off-day "plan the next outing" card | Per-event plan built at home with the Engineer: starting-setup diff (from known-good), ordered test plan with predictions, and scenario branches (grip/heat/rain → first move). On-demand deep-mode generation only, tap-to-answer interview first, driver-editable. Nothing exists: no plan model, no event-page plan surface, no scenario picker. Pairs with Engineer Phase 3 lifecycle + weekend model (blueprint A). |
 
 ### Related workstreams tracked in their own docs (not built either)
 

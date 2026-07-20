@@ -18,6 +18,7 @@ import { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { Eyebrow } from "@/components/ui/panel";
 import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
 import {
   computeRollCenterFromSnapshot,
@@ -256,16 +257,14 @@ export function RollCenterCompareStrip({ a, b, rightLabel, className }: {
 
   return (
     <div className={cn("rounded-md border border-border bg-secondary/60 p-3 space-y-1.5", className)}>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="type-data-label">Computed geometry · this run vs {rightLabel}</span>
-      </div>
+      <Eyebrow>Computed geometry · this run vs {rightLabel}</Eyebrow>
       {row("Roll center front", ca.front.rcHeightMm, cb.front.rcHeightMm)}
       {row("Roll center rear", ca.rear.rcHeightMm, cb.rear.rcHeightMm)}
       {row("Roll axis rake", ca.rakeMm, cb.rakeMm)}
       <div className="pt-1">
         <Link
           href={labHref(a, b, { s: "This run", g: rightLabel })}
-          className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition"
+          className="text-xs font-medium text-muted-foreground hover:text-foreground transition"
         >
           Compare in Lab →
         </Link>

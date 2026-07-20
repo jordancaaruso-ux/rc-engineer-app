@@ -42,7 +42,8 @@ function rowToOption(
     track: { name: string } | null;
   },
   owner: "me" | "teammate",
-  teammateLabel: string | null
+  teammateLabel: string | null,
+  timeZone?: string | null
 ): EngineerCompareOptionRow {
   const when = resolveRunDisplayInstant({
     createdAt: run.createdAt,
@@ -57,7 +58,7 @@ function rowToOption(
   const carName = run.car?.name ?? run.carNameSnapshot ?? "—";
   const trackName = run.track?.name ?? "—";
   const dash = getIncludedLapDashboardMetrics(primaryLapRowsFromRun(run));
-  const label = `${session} · ${carName} · ${trackName} · ${formatRunCreatedAtDateTime(when)}${
+  const label = `${session} · ${carName} · ${trackName} · ${formatRunCreatedAtDateTime(when, timeZone)}${
     dash.bestLap != null ? ` · best ${dash.bestLap.toFixed(3)} s` : ""
   }`;
   return {
@@ -90,7 +91,10 @@ const runSelect = {
 /**
  * All runs the viewer may select for Engineer compare (mine + linked teammates + mutual team peers).
  */
-export async function buildEngineerCompareOptions(viewerUserId: string): Promise<EngineerCompareOptionsPayload> {
+export async function buildEngineerCompareOptions(
+  viewerUserId: string,
+  timeZone?: string | null
+): Promise<EngineerCompareOptionsPayload> {
   const mineRaw = await prisma.run.findMany({
     where: { userId: viewerUserId },
     orderBy: { sortAt: "desc" },
@@ -99,7 +103,7 @@ export async function buildEngineerCompareOptions(viewerUserId: string): Promise
   });
   const mine = [...mineRaw]
     .sort((a, b) => sortInstantMs(b) - sortInstantMs(a))
-    .map((r) => rowToOption(r, "me", null));
+    .map((r) => rowToOption(r, "me", null, timeZone));
 
   const links = await prisma.teammateLink.findMany({
     where: { userId: viewerUserId },
@@ -121,7 +125,7 @@ export async function buildEngineerCompareOptions(viewerUserId: string): Promise
     });
     const runs = [...peerRuns]
       .sort((a, b) => sortInstantMs(b) - sortInstantMs(a))
-      .map((r) => rowToOption(r, "teammate", displayName));
+      .map((r) => rowToOption(r, "teammate", displayName, timeZone));
     teammates.push({ peerUserId: l.peerUserId, displayName, runs });
     seenPeer.add(l.peerUserId);
   }
@@ -144,7 +148,7 @@ export async function buildEngineerCompareOptions(viewerUserId: string): Promise
       });
       const runs = [...peerRuns]
         .sort((a, b) => sortInstantMs(b) - sortInstantMs(a))
-        .map((r) => rowToOption(r, "teammate", displayName));
+        .map((r) => rowToOption(r, "teammate", displayName, timeZone));
       teammates.push({ peerUserId: u.id, displayName, runs });
     }
   }

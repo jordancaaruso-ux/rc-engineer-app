@@ -24,6 +24,7 @@ import {
   formatDriverSessionLabel,
   formatDriverSessionLabelWithContext,
   resolveImportedSessionDisplayTimeIso,
+  timingSourceFromSourceUrl,
 } from "@/lib/lapImport/labels";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 
@@ -31,6 +32,8 @@ type ImportedSet = {
   id: string;
   createdAt?: Date | string;
   sessionCompletedAt?: Date | string | null;
+  /** Timing-source URL; when present, LiveRC/MyRCM session times render frozen (wall clock). */
+  sourceUrl?: string | null;
   isPrimaryUser?: boolean;
   driverName: string;
   displayName?: string | null;
@@ -280,7 +283,10 @@ export function LapComparisonColumnGrid({
     metaById.set(primarySeries.id, {
       metaLine: formatCompareRunMetaLine(compareAnchorRun),
       setupRun: compareAnchorRun,
-      selectLabel: formatDriverSessionLabel(primaryRunLabel, meSortIso),
+      selectLabel: formatDriverSessionLabel(primaryRunLabel, meSortIso, {
+        timingSource: timingSourceFromSourceUrl(primaryImport?.sourceUrl),
+        isWallClockTime: primaryImport?.sessionCompletedAt != null,
+      }),
       sortIso: meSortIso,
     });
 
@@ -304,7 +310,10 @@ export function LapComparisonColumnGrid({
       metaById.set(ser.id, {
         metaLine: null,
         setupRun: null,
-        selectLabel: formatDriverSessionLabel(label, whenIso),
+        selectLabel: formatDriverSessionLabel(label, whenIso, {
+          timingSource: timingSourceFromSourceUrl(s.sourceUrl),
+          isWallClockTime: s.sessionCompletedAt != null,
+        }),
         sortIso: whenIso,
       });
     }

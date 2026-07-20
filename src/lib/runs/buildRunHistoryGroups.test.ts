@@ -3,7 +3,8 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildRunHistoryGroups } from "@/lib/runs/buildRunHistoryGroups";
+import { buildDayRunNumberMap, buildRunHistoryGroups } from "@/lib/runs/buildRunHistoryGroups";
+import { formatRunSessionDisplay } from "@/lib/runSession";
 
 test("buildRunHistoryGroups groups by event and orders newest first", () => {
   const runs = [
@@ -110,4 +111,44 @@ test("buildRunHistoryGroups groups by local day, not UTC, when a zone is given",
   const local = buildRunHistoryGroups(runs, "Australia/Melbourne");
   assert.equal(local.length, 1);
   assert.equal(local[0]!.runs.length, 2);
+});
+
+test("buildDayRunNumberMap numbers runs per user per local day, in sortAt order", () => {
+  const runs = [
+    // Jordan, day 1 — logged out of array order; sortAt decides.
+    { id: "j-2", createdAt: new Date("2025-07-01T02:00:00Z"), sortAt: new Date("2025-07-01T02:00:00Z"), userId: "jordan" },
+    { id: "j-1", createdAt: new Date("2025-07-01T00:30:00Z"), sortAt: new Date("2025-07-01T00:30:00Z"), userId: "jordan" },
+    // Jordan, day 2 — numbering restarts.
+    { id: "j-3", createdAt: new Date("2025-07-02T01:00:00Z"), sortAt: new Date("2025-07-02T01:00:00Z"), userId: "jordan" },
+    // Teammate, same day 1 — independent numbering.
+    { id: "t-1", createdAt: new Date("2025-07-01T01:00:00Z"), sortAt: new Date("2025-07-01T01:00:00Z"), userId: "teammate" },
+  ];
+  const map = buildDayRunNumberMap(runs);
+  assert.equal(map["j-1"], 1);
+  assert.equal(map["j-2"], 2);
+  assert.equal(map["j-3"], 1);
+  assert.equal(map["t-1"], 1);
+});
+
+test("formatRunSessionDisplay names unlabeled testing runs from dayRunNumber, label still wins", () => {
+  const unlabeled = { sessionType: "TESTING", sessionLabel: null };
+  assert.equal(formatRunSessionDisplay(unlabeled), "—");
+  assert.equal(formatRunSessionDisplay(unlabeled, { dayRunNumber: 2 }), "Run 2");
+  assert.equal(formatRunSessionDisplay(unlabeled, { fallback: "Run" }), "Run");
+  // A typed label always beats the fallback name.
+  assert.equal(
+    formatRunSessionDisplay(
+      { sessionType: "TESTING", sessionLabel: "Rears softer" },
+      { dayRunNumber: 2 }
+    ),
+    "Rears softer"
+  );
+  // Meeting runs keep their session naming untouched.
+  assert.equal(
+    formatRunSessionDisplay(
+      { sessionType: "RACE_MEETING", meetingSessionType: "QUALIFYING", sessionLabel: null },
+      { dayRunNumber: 4 }
+    ),
+    "Qualifying"
+  );
 });

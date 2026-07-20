@@ -1,27 +1,29 @@
-import Link from "next/link";
-import { CalendarPlus } from "lucide-react";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
-import { DashboardLastSessionDigestCard } from "@/components/dashboard/DashboardLastSessionDigestCard";
-import { DashboardNextEventPrepCard } from "@/components/dashboard/DashboardNextEventPrepCard";
+import { DashboardDayVerdictCard } from "@/components/dashboard/DashboardDayVerdictCard";
+import { DashboardNextOutingCard } from "@/components/dashboard/DashboardNextOutingCard";
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
-import { DashboardTodaySoFarCard } from "@/components/dashboard/DashboardTodaySoFarCard";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Reveal } from "@/components/ui/Reveal";
 
 /**
- * Adaptive dashboard — two modes, auto-switched (docs/DASHBOARD_NORTH_STAR.md,
- * founder-locked 2026-07-16). The boundary rule: "now & next" — today plus the
- * next action, verdicts not evidence; depth lives in Analysis / Sessions.
+ * Adaptive dashboard — two modes, auto-switched (docs/DASHBOARD_NORTH_STAR.md;
+ * v2 founder-locked 2026-07-19). The boundary rule: "now & next" — today plus
+ * the next action, verdicts not evidence; depth lives in Analysis / Sessions.
  *
  *   Track day (run/draft today, or an active event):
- *     CTA → Today so far → Things to try → 30-day summary
+ *     CTA → Day verdict (computed instruments; Engineer on demand in the
+ *     footer) → Things to try → 30-day summary
  *   Off day:
- *     CTA → Next event prep → Last-session digest → Try/Do lists → 30-day summary
+ *     CTA → Next outing (event countdown + test plan; plan-only without an
+ *     event) → Things to do → 30-day summary
  *
- * Retired here (2026-07-16): the launchpad doors, the previous-run card, and the
- * race-meeting card — absorbed by the mode cards above.
+ * Retired in v2 (2026-07-19): the Today-so-far run strip (the run list lives in
+ * Sessions — the verdict card is its door), the last-session digest card (one
+ * "last visit" line in the outing card carries the story), the next-event-prep
+ * card (absorbed by the outing card), and the auto Engineer read (on-demand
+ * only, via the verdict-card footer).
  */
 export function DashboardHome({
   model,
@@ -32,7 +34,6 @@ export function DashboardHome({
 }) {
   const {
     featuredEvent,
-    recentRun,
     thingsToTry,
     thingsToDo,
     summary,
@@ -41,9 +42,8 @@ export function DashboardHome({
     hasRunToday,
     todayDraftRunId,
     todayDraftSavedAt,
-    todayStrip,
     todayContext,
-    lastSessionDigest,
+    todayVerdict,
   } = model;
 
   // Server-resolved mode. The client draft provider can only add a draft the
@@ -72,9 +72,11 @@ export function DashboardHome({
 
         {isTrackDay ? (
           <>
-            <Reveal index={1}>
-              <DashboardTodaySoFarCard strip={todayStrip} context={todayContext} />
-            </Reveal>
+            {todayVerdict ? (
+              <Reveal index={1}>
+                <DashboardDayVerdictCard verdict={todayVerdict} context={todayContext} />
+              </Reveal>
+            ) : null}
 
             {/* The driver's own experiment list, live during a session. */}
             <Reveal index={2}>
@@ -91,53 +93,23 @@ export function DashboardHome({
           </>
         ) : (
           <>
-            {nextEvent ? (
-              <Reveal index={1}>
-                <DashboardNextEventPrepCard event={nextEvent} />
-              </Reveal>
-            ) : null}
+            <Reveal index={1}>
+              <DashboardNextOutingCard
+                event={nextEvent}
+                thingsToTry={thingsToTry}
+                openTodoCount={thingsToDo.length}
+              />
+            </Reveal>
 
-            {lastSessionDigest ? (
-              <Reveal index={2}>
-                <DashboardLastSessionDigestCard
-                  digest={lastSessionDigest}
-                  recentRun={recentRun}
+            <Reveal index={2}>
+              <CardPanel>
+                <ActionItemListPanel
+                  list="do"
+                  title="Things to do"
+                  addPlaceholder="Add a reminder…"
+                  initialItems={thingsToDo}
+                  embedded
                 />
-              </Reveal>
-            ) : null}
-
-            {/* No event on the calendar: keep the prep habit visible, quietly. */}
-            {!nextEvent ? (
-              <Reveal index={3}>
-                <Link
-                  href="/events"
-                  prefetch
-                  className="tap-active flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 py-3 text-[13px] font-semibold text-muted-foreground transition hover:border-foreground/30 hover:text-foreground"
-                >
-                  <CalendarPlus aria-hidden className="size-[15px]" strokeWidth={2.2} />
-                  Add your next event
-                </Link>
-              </Reveal>
-            ) : null}
-
-            <Reveal index={4}>
-              <CardPanel contentClassName="space-y-3">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <ActionItemListPanel
-                    list="try"
-                    title="Things to try"
-                    addPlaceholder="Add an idea…"
-                    initialItems={thingsToTry}
-                    embedded
-                  />
-                  <ActionItemListPanel
-                    list="do"
-                    title="Things to do"
-                    addPlaceholder="Add a reminder…"
-                    initialItems={thingsToDo}
-                    embedded
-                  />
-                </div>
               </CardPanel>
             </Reveal>
           </>

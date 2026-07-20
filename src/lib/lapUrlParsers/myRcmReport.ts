@@ -92,6 +92,63 @@ export function buildMyRcmSessionUrl(ref: MyRcmReportRef, reportKey: string): st
   return `https://www.myrcm.ch/myrcm/report/${ref.lang}/${ref.eventId}/${ref.categoryId}?reportKey=${reportKey}`;
 }
 
+export function buildMyRcmCategoryUrl(eventId: string, categoryId: string, lang = "en"): string {
+  return `https://www.myrcm.ch/myrcm/report/${lang}/${eventId}/${categoryId}`;
+}
+
+/** Event or category URL — a page we can enumerate sessions from (vs a single `reportKey` session). */
+export function isMyRcmDiscoveryUrl(urlStr: string): boolean {
+  return isMyRcmCategoryUrl(urlStr) || isMyRcmEventUrl(urlStr);
+}
+
+// ---------------------------------------------------------------------------
+// Event page — list the event's classes (categories).
+// ---------------------------------------------------------------------------
+
+export type MyRcmEventClass = {
+  eventId: string;
+  categoryId: string;
+  className: string;
+  categoryUrl: string;
+};
+
+/** Class links on an event page: `<a … onclick="javascript:openNewWindows(97370, 388960)">E10 TC SPEC</a>` */
+const OPEN_REPORT_RE = /openNewWindows\((\d+)\s*,\s*(\d+)\)[^>]*>([^<]*)/g;
+
+/** Parse the classes (categories) listed on a MyRCM event page (`main?…dId[E]=…`). */
+export function parseMyRcmEventClasses(eventPageHtml: string): MyRcmEventClass[] {
+  const seen = new Set<string>();
+  const out: MyRcmEventClass[] = [];
+  let m: RegExpExecArray | null;
+  OPEN_REPORT_RE.lastIndex = 0;
+  while ((m = OPEN_REPORT_RE.exec(eventPageHtml)) !== null) {
+    const eventId = m[1]!;
+    const categoryId = m[2]!;
+    const className = decodeMenuText(m[3] ?? "");
+    if (!className || seen.has(categoryId)) continue;
+    seen.add(categoryId);
+    out.push({
+      eventId,
+      categoryId,
+      className,
+      categoryUrl: buildMyRcmCategoryUrl(eventId, categoryId),
+    });
+  }
+  return out;
+}
+
+/**
+ * Loose class-name match against the app event's configured race class text
+ * (either direction contains, case/space-insensitive — "EC10 TC SPEC" ~ "TC Spec").
+ */
+export function myRcmClassMatchesConfigured(className: string, configured: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/\[[^\]]*\]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const a = norm(className);
+  const b = norm(configured);
+  if (!a || !b) return false;
+  return a.includes(b) || b.includes(a);
+}
+
 // ---------------------------------------------------------------------------
 // Shell enumeration — list a category's result sessions from its menu.
 // ---------------------------------------------------------------------------

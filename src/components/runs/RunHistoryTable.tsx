@@ -269,6 +269,7 @@ export function RunHistoryTable({
   memberDisplayByUserId,
   showMemberColumn = false,
   showSessionColumn = true,
+  dayRunNumberByRunId,
   matchReasonsById,
 }: {
   runs: Run[];
@@ -296,6 +297,8 @@ export function RunHistoryTable({
   memberDisplayByUserId?: Record<string, string>;
   showMemberColumn?: boolean;
   showSessionColumn?: boolean;
+  /** runId → position within its day (1-based); names unlabeled testing runs "Run N". */
+  dayRunNumberByRunId?: Record<string, number>;
   /** runId → why the run matched the active search/setup filters (search only). */
   matchReasonsById?: Record<string, MatchReason[]>;
 }) {
@@ -461,7 +464,9 @@ export function RunHistoryTable({
         const avg5Display = formatLap(run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRows, 5));
         const avg10Display = formatLap(getAverageTopN(primaryLapRows, 10));
         const medianLapDisplay = formatLap(listLapDash.median);
-        const sessionDisplay = formatRunSessionDisplay(run);
+        const sessionDisplay = formatRunSessionDisplay(run, {
+          dayRunNumber: dayRunNumberByRunId?.[run.id],
+        });
         const runInstant = resolveRunDisplayInstant(run);
         const isDragging = draggingId === run.id;
         const showDropAbove = dropTarget?.runId === run.id && dropTarget.edge === "above";

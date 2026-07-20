@@ -23,6 +23,7 @@ import {
 } from "@/lib/lapAnalysis";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { LapTimeGraph, type LapGraphRow } from "@/components/runs/LapTimeGraph";
+import { LapGapGraph } from "@/components/runs/LapGapGraph";
 import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
 import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
 
@@ -310,6 +311,9 @@ function RaceFieldDriverPanel({
   /** The shared notebook-tab strip, dropped in above this driver's lap card. */
   tabs: ReactNode;
 }) {
+  // Graph mode: overlaid lap traces vs the running gap chart (design locked
+  // 2026-07-19 — bars + sign-coloured cumulative line, raw gap math).
+  const [graphMode, setGraphMode] = useState<"laps" | "gap">("laps");
   // Clean the raw timing-provider laps with the SAME median-band rule the app
   // applies to the user's own imported runs, so a competitor's grid/stats/graph
   // aren't polluted by start-line / transponder artifacts (e.g. an impossible
@@ -412,35 +416,83 @@ function RaceFieldDriverPanel({
 
       {rows.length >= 3 ? (
         <div className="space-y-1">
-          <LapTimeGraph
-            rows={rows}
-            bestLapNumbers={bestLapNumbers}
-            mistakeLapNumbers={mistakeLapNumbers}
-            mistakeDetailByLapNumber={mistakeDetailByLapNumber}
-            medianSeconds={null}
-            lineColor={RACE_IDENTITY.competitor}
-            baseline={userLapRows.length >= 2 ? userLapRows : null}
-            baselineColor={RACE_IDENTITY.you}
-            baselineLabel="Your run"
-          />
           {userLapRows.length >= 2 ? (
-            <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <span
-                  className="inline-block h-0.5 w-3 rounded"
-                  style={{ backgroundColor: RACE_IDENTITY.competitor }}
-                />
-                {driver.name}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span
-                  className="inline-block h-0.5 w-3 rounded"
-                  style={{ backgroundColor: RACE_IDENTITY.you }}
-                />
-                your run
-              </span>
-            </p>
+            <div
+              className="flex gap-1"
+              role="tablist"
+              aria-label="Graph mode"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {(
+                [
+                  { mode: "laps", label: "Laps" },
+                  { mode: "gap", label: "Gap" },
+                ] as const
+              ).map(({ mode, label }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="tab"
+                  aria-selected={graphMode === mode}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGraphMode(mode);
+                  }}
+                  className={cn(chipToggleClass(graphMode === mode), "px-2.5 py-1 text-[11px]")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           ) : null}
+          {graphMode === "gap" && userLapRows.length >= 2 ? (
+            <>
+              <LapGapGraph userRows={userLapRows} competitorRows={rows} />
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-0.5 w-3 rounded bg-[#4FD089]" />
+                  you ahead
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-0.5 w-3 rounded bg-[#E5644E]" />
+                  behind {driver.name}
+                </span>
+                <span>bars = each lap&apos;s gain/loss</span>
+              </p>
+            </>
+          ) : (
+            <>
+              <LapTimeGraph
+                rows={rows}
+                bestLapNumbers={bestLapNumbers}
+                mistakeLapNumbers={mistakeLapNumbers}
+                mistakeDetailByLapNumber={mistakeDetailByLapNumber}
+                medianSeconds={null}
+                lineColor={RACE_IDENTITY.competitor}
+                baseline={userLapRows.length >= 2 ? userLapRows : null}
+                baselineColor={RACE_IDENTITY.you}
+                baselineLabel="Your run"
+              />
+              {userLapRows.length >= 2 ? (
+                <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <span
+                      className="inline-block h-0.5 w-3 rounded"
+                      style={{ backgroundColor: RACE_IDENTITY.competitor }}
+                    />
+                    {driver.name}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span
+                      className="inline-block h-0.5 w-3 rounded"
+                      style={{ backgroundColor: RACE_IDENTITY.you }}
+                    />
+                    your run
+                  </span>
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
     </div>

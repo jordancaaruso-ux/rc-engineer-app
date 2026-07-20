@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { isTrackFavourite } from "@/lib/track-favourites";
 import { hasDatabaseUrl } from "@/lib/env";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -47,6 +48,7 @@ export default async function TrackDetailPage(props: {
 
   const { trackId } = await props.params;
   const user = await requireCurrentUser();
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
   const track = await prisma.track.findFirst({
     where: { id: trackId },
     select: {
@@ -121,7 +123,7 @@ export default async function TrackDetailPage(props: {
         <div className="max-w-2xl space-y-4">
           <CardPanel contentClassName="text-sm">
             <div className="grid gap-2">
-              <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(track.createdAt)}</span></div>
+              <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(track.createdAt, displayTimeZone)}</span></div>
               <div><span className="text-sm font-medium text-muted-foreground">Runs</span> <span className="ml-2">{runCount}</span></div>
               {track.location ? (
                 <div><span className="text-sm font-medium text-muted-foreground">Location</span> <span className="ml-2">{track.location}</span></div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { parseManualLapText } from "@/lib/lapSession/parseManual";
 import type { LapSourceKind } from "@/lib/lapSession/types";
@@ -8,10 +8,17 @@ import type { LapImportLapRow, LapUrlSessionDriver } from "@/lib/lapUrlParsers/t
 import { formatLap } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { getAverageTopN, getBestLap } from "@/lib/lapAnalysis";
-import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
+import {
+  formatDriverSessionLabel,
+  formatImportedSessionTime,
+  resolveImportedSessionDisplayTimeIso,
+  resolveImportedSessionHasWallClockTime,
+  timingSourceFromParserId,
+  type ImportedSessionTimeFormatOptions,
+  type LapTimingSource,
+} from "@/lib/lapImport/labels";
 import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { PagedCard } from "@/components/ui/PagedCard";
@@ -111,6 +118,20 @@ function blockLabelTimeIso(block: UrlImportBlock): string {
   });
 }
 
+/** Display options for {@link blockLabelTimeIso} — freezes LiveRC/MyRCM wall clock, viewer zone otherwise. */
+function blockTimeFormatOpts(block: UrlImportBlock): ImportedSessionTimeFormatOptions {
+  return {
+    timingSource: timingSourceFromParserId(block.parserId),
+    isWallClockTime: resolveImportedSessionHasWallClockTime({
+      sessionCompletedAt: block.sessionCompletedAtDbIso ?? null,
+      parsedPayload:
+        block.sessionCompletedAtIso != null && block.sessionCompletedAtIso.trim()
+          ? { sessionCompletedAtIso: block.sessionCompletedAtIso.trim() }
+          : undefined,
+    }),
+  };
+}
+
 function sortSessionsNewestFirst<T>(items: T[], getIso: (item: T) => string | null): T[] {
   return [...items].sort((a, b) => {
     const ta = getIso(a) ? new Date(getIso(a)!).getTime() : 0;
@@ -119,8 +140,12 @@ function sortSessionsNewestFirst<T>(items: T[], getIso: (item: T) => string | nu
   });
 }
 
-function formatSessionWhen(iso: string | null, sessionTime: string | null): string | null {
-  if (iso?.trim()) return formatRunCreatedAtDateTime(iso.trim());
+function formatSessionWhen(
+  iso: string | null,
+  sessionTime: string | null,
+  timingSource?: LapTimingSource | null
+): string | null {
+  if (iso?.trim()) return formatImportedSessionTime(iso.trim(), { timingSource });
   if (sessionTime?.trim()) return sessionTime.trim();
   return null;
 }
@@ -148,9 +173,18 @@ type ScanDayCandidate = {
   matchesDriver: boolean | null;
   alreadyImported: boolean;
   linkedRunId: string | null;
-  timingSource?: "liverc" | "speedhive";
+  timingSource?: "liverc" | "speedhive" | "myrcm";
   bestLapSeconds?: number | null;
 };
+
+/** MyRCM event page (`main?…dId[E]=…`) or class report URL without a reportKey — scannable, not directly importable. */
+function isMyRcmDiscoveryPaste(raw: string): boolean {
+  const url = raw.trim();
+  if (!/^https?:\/\/(www\.)?myrcm\.ch\//i.test(url)) return false;
+  if (/\/myrcm\/report\/[a-z]{2}\/\d+\/\d+/i.test(url) && !/[?&]reportKey=\d+/i.test(url)) return true;
+  if (/\/myrcm\/main\/?\?/i.test(url) && /dId(%5B|\[)E(%5D|\])=/i.test(url)) return true;
+  return false;
+}
 
 const RECENT_RUNS_COLLAPSED = 3;
 const RECENT_RUNS_MAX = 10;
@@ -162,7 +196,7 @@ type ImportPickerCandidate = {
   title: string;
   when: string | null;
   bestLapSeconds: number | null;
-  timingSource?: "liverc" | "speedhive";
+  timingSource?: "liverc" | "speedhive" | "myrcm";
   alreadyImported: boolean;
   sortIso: string | null;
 };
@@ -183,14 +217,20 @@ function SessionImportListRow({
   title: string;
   when: string | null;
   bestLapSeconds: number | null;
-  timingSource?: "liverc" | "speedhive";
+  timingSource?: "liverc" | "speedhive" | "myrcm";
   isActive: boolean;
   actionLabel: string;
   disabled?: boolean;
   onClick: () => void;
 }) {
   const sourceLabel =
-    timingSource === "speedhive" ? "Speedhive" : timingSource === "liverc" ? "LiveRC" : null;
+    timingSource === "speedhive"
+      ? "Speedhive"
+      : timingSource === "liverc"
+        ? "LiveRC"
+        : timingSource === "myrcm"
+          ? "MyRCM"
+          : null;
   const meta = [sourceLabel, when].filter(Boolean).join(" · ");
   return (
     <button
@@ -311,6 +351,8 @@ export function LapTimesIngestPanel({
   const [photoConfidence, setPhotoConfidence] = useState<string | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  /** Last manually scanned discovery URL (e.g. MyRCM event) — lets Refresh re-scan it. */
+  const manualScanUrlRef = useRef<string | null>(null);
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
   const [dayScanBusy, setDayScanBusy] = useState(false);
   const [dayScanStatus, setDayScanStatus] = useState<ScanStatus | null>(null);
@@ -435,7 +477,7 @@ export function LapTimesIngestPanel({
         key: `event:${url}`,
         sessionUrl: c.sessionUrl,
         title: c.listLinkText?.trim() || "Race session",
-        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime),
+        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, "liverc"),
         bestLapSeconds: null,
         timingSource: "liverc",
         alreadyImported: c.alreadyImported,
@@ -449,7 +491,7 @@ export function LapTimesIngestPanel({
         key: `track:${c.sessionId}`,
         sessionUrl: c.sessionUrl,
         title: c.driverName?.trim() || "Run",
-        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime),
+        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource),
         bestLapSeconds: c.bestLapSeconds ?? null,
         timingSource: c.timingSource,
         alreadyImported: c.alreadyImported,
@@ -470,7 +512,7 @@ export function LapTimesIngestPanel({
       key: `older:${c.sessionId}`,
       sessionUrl: c.sessionUrl,
       title: c.driverName?.trim() || "Run",
-      when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime),
+      when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource),
       bestLapSeconds: c.bestLapSeconds ?? null,
       timingSource: c.timingSource,
       alreadyImported: c.alreadyImported,
@@ -539,10 +581,10 @@ export function LapTimesIngestPanel({
     }
   }
 
-  async function scanDayUrl() {
-    const url = (practiceDayUrl ?? "").trim();
+  async function scanDayUrl(overrideDayUrl?: string) {
+    const url = (overrideDayUrl ?? practiceDayUrl ?? "").trim();
     const tid = trackId?.trim() ?? "";
-    const useTrack = hasTrackDiscovery;
+    const useTrack = overrideDayUrl ? false : hasTrackDiscovery;
     if (!useTrack && !url) {
       setDayScanStatus({
         title: "No timing source for this track",
@@ -558,6 +600,9 @@ export function LapTimesIngestPanel({
     setDayScanOlderCandidates(null);
     setDayScanOlderTotal(0);
     setShowOlderSessions(false);
+    // Manual (pasted URL) scan: render the picker area immediately so busy/error states are visible
+    // even when the run has no track discovery or linked event.
+    if (overrideDayUrl) setDayScanCandidates([]);
     try {
       // Local start-of-day: the picker defaults to today's sessions; older unimported
       // sessions (e.g. a new user's Speedhive history) come back collapsed separately.
@@ -579,7 +624,7 @@ export function LapTimesIngestPanel({
           title: "Scan failed",
           detail: (data as { error?: string })?.error || null,
         });
-        setDayScanCandidates(null);
+        setDayScanCandidates(overrideDayUrl ? [] : null);
         return;
       }
       const candidates = Array.isArray((data as { candidates?: unknown }).candidates)
@@ -663,6 +708,7 @@ export function LapTimesIngestPanel({
   function refreshImportSources() {
     void loadEventRaceSessions();
     if (hasTrackDiscovery) void scanDayUrl();
+    else if (manualScanUrlRef.current) void scanDayUrl(manualScanUrlRef.current);
   }
 
   async function fetchUrlPreviewWithUrl(explicit: string) {
@@ -678,6 +724,15 @@ export function LapTimesIngestPanel({
     const url = urlInput.trim();
     if (!url) {
       setUrlMessage("Paste a timing/results URL first.");
+      return;
+    }
+    // MyRCM event / class URL: it lists many sessions, so scan it into the picker
+    // instead of importing (a direct MyRCM session URL with ?reportKey= imports normally).
+    if (isMyRcmDiscoveryPaste(url)) {
+      manualScanUrlRef.current = url;
+      setUrlMessage(null);
+      setTab("url-auto");
+      await scanDayUrl(url);
       return;
     }
     if (!confirmReplaceIfNeeded(url)) return;
@@ -850,16 +905,12 @@ export function LapTimesIngestPanel({
     const driver = primaryId ? block.sessionDrivers.find((d) => d.driverId === primaryId) ?? null : null;
     const stats = driver ? statsForDriver(block, driver) : null;
     const title = driver
-      ? formatDriverSessionLabel(driver.driverName, blockLabelTimeIso(block))
+      ? formatDriverSessionLabel(driver.driverName, blockLabelTimeIso(block), blockTimeFormatOpts(block))
       : block.sourceUrl;
-    const timingSource = block.parserId.toLowerCase().includes("speedhive")
-      ? ("speedhive" as const)
-      : block.parserId.toLowerCase().includes("liverc")
-        ? ("liverc" as const)
-        : undefined;
+    const timingSource = timingSourceFromParserId(block.parserId) ?? undefined;
     return {
       title,
-      when: formatRunCreatedAtDateTime(blockLabelTimeIso(block)),
+      when: formatImportedSessionTime(blockLabelTimeIso(block), blockTimeFormatOpts(block)),
       bestLapSeconds: stats?.bestLap ?? null,
       timingSource,
     };
@@ -873,7 +924,7 @@ export function LapTimesIngestPanel({
       title: string;
       when: string | null;
       bestLapSeconds: number | null;
-      timingSource?: "liverc" | "speedhive";
+      timingSource?: "liverc" | "speedhive" | "myrcm";
       alreadyImported: boolean;
       isActive: boolean;
     };
@@ -967,7 +1018,7 @@ export function LapTimesIngestPanel({
             label: "URL Auto",
             content: (
         <div className="space-y-2 text-sm">
-          {hasTrackDiscovery || lapImportEventId?.trim() ? (
+          {hasTrackDiscovery || lapImportEventId?.trim() || dayScanCandidates != null ? (
             <div
               className="space-y-2 rounded-md border border-border bg-surface-runna p-2"
             >
@@ -1113,7 +1164,8 @@ export function LapTimesIngestPanel({
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <p className="ui-label-meta">
                 Add a LiveRC or Speedhive URL on the Tracks page for this venue, or use{" "}
-                <span className="text-foreground/90">URL Manual</span> to paste a session URL.
+                <span className="text-foreground/90">URL Manual</span> to paste a session URL or a
+                MyRCM event URL.
               </p>
             </div>
           ) : (
@@ -1130,7 +1182,8 @@ export function LapTimesIngestPanel({
             content: (
         <div className="space-y-2 text-sm">
           <p className="ui-label-meta">
-            Paste a LiveRC, Speedhive, or other timing/results page URL to import laps.
+            Paste a LiveRC, Speedhive, MyRCM, or other timing/results page URL to import laps.
+            A MyRCM event or class URL lists its sessions to pick from.
           </p>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
@@ -1169,7 +1222,7 @@ export function LapTimesIngestPanel({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <Eyebrow>
-                    Imported · {formatRunCreatedAtDateTime(blockLabelTimeIso(activeImportBlock))}
+                    Imported · {formatImportedSessionTime(blockLabelTimeIso(activeImportBlock), blockTimeFormatOpts(activeImportBlock))}
                   </Eyebrow>
                   <div className="text-[11px] text-muted-foreground break-all">{activeImportBlock.sourceUrl}</div>
                 </div>
@@ -1187,7 +1240,11 @@ export function LapTimesIngestPanel({
                       const isPreview = activePreviewKey === key;
                       const isPrimaryForRun = activeImportBlock.selectedDriverIds?.[0] === d.driverId;
                       const stats = statsForDriver(activeImportBlock, d);
-                      const primaryLabel = formatDriverSessionLabel(d.driverName, blockLabelTimeIso(activeImportBlock));
+                      const primaryLabel = formatDriverSessionLabel(
+                        d.driverName,
+                        blockLabelTimeIso(activeImportBlock),
+                        blockTimeFormatOpts(activeImportBlock)
+                      );
                       return (
                         <div
                           key={d.driverId}

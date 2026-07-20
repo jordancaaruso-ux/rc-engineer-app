@@ -13,8 +13,11 @@ import { dirname, join } from "node:path";
 import {
   enumerateMyRcmSessions,
   isMyRcmCategoryUrl,
+  isMyRcmDiscoveryUrl,
   isMyRcmEventUrl,
   isMyRcmSessionUrl,
+  myRcmClassMatchesConfigured,
+  parseMyRcmEventClasses,
   parseMyRcmLapTime,
   parseMyRcmReportUrl,
   parseMyRcmSessionHtml,
@@ -112,6 +115,34 @@ test("category shell → labeled result sessions only, meaningful-first", () => 
   assert.ok(s4709, "session 4709 enumerated");
   assert.equal(s4709!.group, "Qualy");
   assert.match(s4709!.url, /reportKey=4709$/);
+});
+
+test("discovery URL classification (event + category yes; session no)", () => {
+  assert.equal(isMyRcmDiscoveryUrl(EVENT_URL), true);
+  assert.equal(isMyRcmDiscoveryUrl(CATEGORY_URL), true);
+  assert.equal(isMyRcmDiscoveryUrl(SESSION_URL), false);
+  assert.equal(isMyRcmDiscoveryUrl("https://liverc.com/results/"), false);
+});
+
+test("event page → class list (fixture: EC Warm-Up, 3 classes)", () => {
+  const classes = parseMyRcmEventClasses(fixture("myrcm-event-page.html"));
+  assert.equal(classes.length, 3);
+  const spec = classes.find((c) => c.className === "E10 TC SPEC");
+  assert.ok(spec, "E10 TC SPEC listed");
+  assert.equal(spec!.eventId, "97370");
+  assert.equal(spec!.categoryId, "388960");
+  assert.equal(spec!.categoryUrl, "https://www.myrcm.ch/myrcm/report/en/97370/388960");
+  assert.deepEqual(
+    classes.map((c) => c.className),
+    ["E10 FWD", "E10 TC SPEC", "E10 TC Modified"]
+  );
+});
+
+test("loose class matching for the event race-class filter", () => {
+  assert.equal(myRcmClassMatchesConfigured("E10 TC SPEC", "tc spec"), true);
+  assert.equal(myRcmClassMatchesConfigured("EC10 TC SPEC  [EC10-SPEC]", "EC10 TC Spec"), true);
+  assert.equal(myRcmClassMatchesConfigured("E10 TC Modified", "TC SPEC"), false);
+  assert.equal(myRcmClassMatchesConfigured("E10 FWD", ""), false);
 });
 
 console.log("myRcmReport.test.ts OK");

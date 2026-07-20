@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { LapUrlParseResult, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { fetchPracticeTrainingSessions } from "@/lib/speedhive/speedhivePracticeClient";
 import {
   parseSpeedhivePracticeActivityRef,
@@ -19,6 +20,23 @@ function parseLapDurationSeconds(duration: string | undefined): number | null {
   if (!t || t === "-") return null;
   const n = Number(t.replace(",", "."));
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Track-local wall clock from the API's `dateTimeStart` (ISO, usually with an
+ * offset). Formats the literal date-time portion as written — no zone conversion —
+ * so the run label matches the clock at the track. This code runs on the server
+ * (UTC) with no viewer timezone available, and the label is persisted into the
+ * imported payload, so converting via `new Date(...).toLocaleString()` would bake
+ * in the server zone instead.
+ */
+function practiceRunWallClockLabel(raw: string): string | null {
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, y, mo, d, h, min] = m;
+  const dt = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(min)));
+  if (Number.isNaN(dt.getTime())) return null;
+  return formatRunCreatedAtDateTime(dt, "UTC");
 }
 
 export async function importSpeedhivePracticeActivity(
@@ -76,10 +94,7 @@ export async function importSpeedhivePracticeActivity(
 
       const driverId = `sh-practice-${ref.activityId}-${block.id}`;
       const when = block.dateTimeStart?.trim();
-      const whenLabel =
-        when && !Number.isNaN(new Date(when).getTime())
-          ? new Date(when).toLocaleString()
-          : `Run ${block.id}`;
+      const whenLabel = (when ? practiceRunWallClockLabel(when) : null) ?? `Run ${block.id}`;
       sessionDrivers.push({
         id: driverId,
         driverId,

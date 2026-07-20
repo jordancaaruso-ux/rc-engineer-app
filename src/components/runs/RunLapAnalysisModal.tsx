@@ -9,6 +9,9 @@ import type { LapRow } from "@/lib/lapAnalysis";
 import {
   formatDriverSessionLabel,
   resolveImportedSessionDisplayTimeIso,
+  resolveImportedSessionHasWallClockTime,
+  timingSourceFromParserId,
+  timingSourceFromSourceUrl,
 } from "@/lib/lapImport/labels";
 import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
 
@@ -119,6 +122,8 @@ export function RunLapAnalysisModal({
             id: string;
             createdAt: string;
             sessionCompletedAt?: string | null;
+            sourceUrl?: string | null;
+            parserId?: string | null;
             parsedPayload: unknown;
           }>;
         } | null) => {
@@ -134,7 +139,14 @@ export function RunLapAnalysisModal({
             });
             mapped.push({
               id: s.id,
-              selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso),
+              selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso, {
+                timingSource:
+                  timingSourceFromParserId(s.parserId) ?? timingSourceFromSourceUrl(s.sourceUrl),
+                isWallClockTime: resolveImportedSessionHasWallClockTime({
+                  sessionCompletedAt: s.sessionCompletedAt ?? null,
+                  parsedPayload: s.parsedPayload,
+                }),
+              }),
               laps: parsed.rows,
               sortTimeIso: whenIso,
             });

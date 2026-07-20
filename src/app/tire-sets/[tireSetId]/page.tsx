@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { loadUserTireSetDetail } from "@/lib/assets/loadUserAssets";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow, StatStrip, StatTile } from "@/components/ui/panel";
@@ -35,6 +36,7 @@ export default async function TireSetDetailPage(props: {
 
   const user = await requireCurrentUser();
   const { tireSetId } = await props.params;
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
   const detail = await loadUserTireSetDetail(user.id, tireSetId);
 
   if (!detail) {
@@ -134,7 +136,7 @@ export default async function TireSetDetailPage(props: {
               ) : null}
               <div>
                 <span className="ui-label-meta">Created</span>
-                <span className="ml-2">{formatRunCreatedAtDateTime(tireSet.createdAt)}</span>
+                <span className="ml-2">{formatRunCreatedAtDateTime(tireSet.createdAt, displayTimeZone)}</span>
               </div>
               {tireSet.notes ? (
                 <div>
@@ -171,7 +173,7 @@ export default async function TireSetDetailPage(props: {
                       {run.track?.name ? ` · ${run.track.name}` : ""}
                     </Link>
                     <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                      Set run {run.tireRunNumber} · {formatRunCreatedAtDateTime(run.createdAt)}
+                      Set run {run.tireRunNumber} · {formatRunCreatedAtDateTime(run.createdAt, displayTimeZone)}
                     </span>
                   </li>
                 ))}

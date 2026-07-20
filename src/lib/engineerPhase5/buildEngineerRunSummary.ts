@@ -31,14 +31,14 @@ export type RunShapeForEngineer = {
   setupSnapshot: { data: unknown } | null;
 };
 
-function referenceLabelFromRun(run: RunShapeForEngineer): string {
+function referenceLabelFromRun(run: RunShapeForEngineer, timeZone?: string | null): string {
   const session = formatRunSessionDisplay({
     sessionType: run.sessionType ?? "TESTING",
     meetingSessionType: run.meetingSessionType ?? null,
     meetingSessionCode: run.meetingSessionCode ?? null,
     sessionLabel: run.sessionLabel ?? null,
   });
-  return `${formatRunCreatedAtDateTime(run.createdAt)} · ${session}`;
+  return `${formatRunCreatedAtDateTime(run.createdAt, timeZone)} · ${session}`;
 }
 
 function importedProvenanceLine(input: {
@@ -67,6 +67,8 @@ export async function buildEngineerRunSummary(params: {
   fieldImportSession: FieldImportSession | null;
   importedSessionFieldStats: EngineerRunSummaryV2["importedSessionFieldStats"];
   fieldFingerprint: string;
+  /** IANA zone for the human reference label; server zone when omitted (legacy). */
+  timeZone?: string | null;
 }): Promise<EngineerRunSummaryV2> {
   const { lapOutcome, lapCountIncluded } = computeLapOutcomesForEngineer(
     params.current,
@@ -100,7 +102,7 @@ export async function buildEngineerRunSummary(params: {
     version: 2,
     currentRunId: params.current.id,
     referenceRunId: params.reference?.id ?? null,
-    referenceLabel: params.reference ? referenceLabelFromRun(params.reference) : null,
+    referenceLabel: params.reference ? referenceLabelFromRun(params.reference, params.timeZone) : null,
     lapOutcome,
     lapCountIncluded,
     setupChanges,

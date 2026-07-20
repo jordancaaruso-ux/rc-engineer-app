@@ -11,7 +11,12 @@
 namespace {
 
 static constexpr char LOG_PATH[] = "/run.bin";
-static constexpr size_t BLE_CHUNK_BYTES = 20;
+// Max payload per notification. Actual chunk adapts to the negotiated MTU
+// (payload = MTU - 3); 244 fits the ESP32 default max MTU request of 517
+// while staying inside a single link-layer friendly DLE packet.
+static constexpr size_t BLE_CHUNK_MAX_BYTES = 244;
+static constexpr size_t BLE_CHUNK_MIN_BYTES = 20;
+static constexpr uint32_t BLE_CHUNK_GAP_MS = 3;
 static constexpr uint32_t STATUS_PERIOD_MS = 1000;
 static constexpr uint32_t LOG_FLUSH_PERIOD_MS = 1000;
 
@@ -32,6 +37,7 @@ PulseCapture throttle;
 
 File log_file;
 File upload_file;
+BLEServer* ble_server = nullptr;
 BLECharacteristic* status_characteristic = nullptr;
 BLECharacteristic* data_characteristic = nullptr;
 
@@ -237,13 +243,28 @@ void beginUpload() {
   Serial.println("upload started");
 }
 
+size_t bleChunkBytes() {
+  // Adapt to the MTU the client negotiated; payload = MTU - 3 (ATT header).
+  size_t chunk = BLE_CHUNK_MIN_BYTES;
+  if (ble_server != nullptr) {
+    const uint16_t mtu = ble_server->getPeerMTU(ble_server->getConnId());
+    if (mtu > 23) {
+      chunk = static_cast<size_t>(mtu) - 3;
+    }
+  }
+  if (chunk > BLE_CHUNK_MAX_BYTES) {
+    chunk = BLE_CHUNK_MAX_BYTES;
+  }
+  return chunk;
+}
+
 void sendUploadChunk() {
   if (!upload_active || !ble_connected || data_characteristic == nullptr) {
     return;
   }
 
-  uint8_t buffer[BLE_CHUNK_BYTES];
-  const size_t count = upload_file.read(buffer, sizeof(buffer));
+  uint8_t buffer[BLE_CHUNK_MAX_BYTES];
+  const size_t count = upload_file.read(buffer, bleChunkBytes());
   if (count == 0) {
     upload_file.close();
     upload_active = false;
@@ -254,7 +275,7 @@ void sendUploadChunk() {
 
   data_characteristic->setValue(buffer, count);
   data_characteristic->notify();
-  delay(8);
+  delay(BLE_CHUNK_GAP_MS);
 }
 
 void handleCommand(const String& command) {
@@ -304,7 +325,9 @@ class CommandCallbacks final : public BLECharacteristicCallbacks {
 
 void setupBle() {
   BLEDevice::init(board::BLE_DEVICE_NAME);
+  BLEDevice::setMTU(517);  // allow clients to negotiate large MTU for fast DUMP
   BLEServer* server = BLEDevice::createServer();
+  ble_server = server;
   server->setCallbacks(new ServerCallbacks());
 
   BLEService* service = server->createService(SERVICE_UUID);

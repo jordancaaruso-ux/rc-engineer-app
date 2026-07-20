@@ -5,6 +5,11 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import {
+  formatImportedSessionTime,
+  timingSourceFromParserId,
+  timingSourceFromSourceUrl,
+} from "@/lib/lapImport/labels";
 
 type SourceRow = {
   id: string;
@@ -281,7 +286,11 @@ export function WatchedLapSourcesCard() {
               <li key={r.importedSessionId} className="flex flex-wrap items-center gap-2">
                 <span className="text-foreground font-medium min-w-0">
                   {r.displayDriverName} ·{" "}
-                  {r.sessionCompletedAtIso ? formatRunCreatedAtDateTime(r.sessionCompletedAtIso) : "—"}
+                  {r.sessionCompletedAtIso
+                    ? formatImportedSessionTime(r.sessionCompletedAtIso, {
+                        timingSource: timingSourceFromParserId(r.parserId) ?? timingSourceFromSourceUrl(r.sourceUrl),
+                      })
+                    : "—"}
                   {r.lapCount != null ? (
                     <span className="text-muted-foreground font-normal"> · {r.lapCount} laps</span>
                   ) : null}
@@ -385,7 +394,12 @@ export function WatchedLapSourcesCard() {
                       {s.targetMode === "driver" ? `Practice (uses LiveRC identity) · ` : ""}
                       {s.driverName ? `Legacy driver: ${s.driverName} · ` : ""}
                       Last seen:{" "}
-                      {s.lastSeenSessionCompletedAt ? formatRunCreatedAtDateTime(s.lastSeenSessionCompletedAt) : "—"} · Last checked:{" "}
+                      {s.lastSeenSessionCompletedAt
+                        ? formatImportedSessionTime(s.lastSeenSessionCompletedAt, {
+                            timingSource: timingSourceFromSourceUrl(s.sourceUrl),
+                          })
+                        : "—"}{" "}
+                      · Last checked:{" "}
                       {s.lastCheckedAt ? formatRunCreatedAtDateTime(s.lastCheckedAt) : "—"}
                     </div>
                   </div>

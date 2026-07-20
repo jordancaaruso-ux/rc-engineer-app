@@ -309,6 +309,7 @@ export async function POST(request: Request) {
               runId,
               compareRunId,
               mode: chatMode,
+              timeZone,
             });
             if ("error" in built) {
               send("error", { message: built.error ?? "Run not found" });
@@ -319,6 +320,7 @@ export async function POST(request: Request) {
               userId: user.id,
               baseForMerge,
               lastUser,
+              timeZone,
             });
             send("status", { phase: "thinking" });
             const out = await generateEngineerChatReplyWithTools({
@@ -328,6 +330,7 @@ export async function POST(request: Request) {
               mergeContextWithFocusedPair,
               contextTier,
               mode: chatMode,
+              timeZone,
               onToken: (t) => send("token", { t }),
             });
             const feedback = await maybePersistEngineerReply({
@@ -371,6 +374,7 @@ export async function POST(request: Request) {
       runId,
       compareRunId,
       mode: chatMode,
+      timeZone,
     });
     if ("error" in built) {
       return jsonError(404, built.error ?? "Run not found");
@@ -380,6 +384,7 @@ export async function POST(request: Request) {
       userId: user.id,
       baseForMerge,
       lastUser,
+      timeZone,
     });
 
     const out = await generateEngineerChatReplyWithTools({
@@ -389,6 +394,7 @@ export async function POST(request: Request) {
       mergeContextWithFocusedPair,
       contextTier,
       mode: chatMode,
+      timeZone,
     });
 
     const feedback = await maybePersistEngineerReply({

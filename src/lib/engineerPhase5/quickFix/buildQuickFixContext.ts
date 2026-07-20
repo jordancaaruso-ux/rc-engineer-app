@@ -42,6 +42,8 @@ export async function buildQuickFixLlmContext(params: {
   contextUserId: string;
   run: QuickFixRunRow;
   scopeLine: string;
+  /** Driver's IANA zone for dated context lines; UTC when omitted. */
+  timeZone?: string | null;
 }): Promise<QuickFixLlmContext> {
   const { contextUserId, run, scopeLine } = params;
 
@@ -109,6 +111,7 @@ export async function buildQuickFixLlmContext(params: {
         userId: contextUserId,
         carId: run.carId,
         anchorRunId: run.id,
+        timeZone: params.timeZone,
       })
     : null;
 

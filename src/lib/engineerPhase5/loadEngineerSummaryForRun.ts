@@ -120,7 +120,7 @@ function normalizeCachedSummaryJson(raw: EngineerRunSummaryV2): EngineerRunSumma
 export async function getOrComputeEngineerSummaryForRun(
   userId: string,
   runId: string,
-  opts?: { force?: boolean }
+  opts?: { force?: boolean; timeZone?: string | null }
 ): Promise<{ summary: EngineerRunSummaryV2; cached: boolean } | null> {
   const run = await prisma.run.findFirst({
     where: { id: runId, userId },
@@ -205,6 +205,7 @@ export async function getOrComputeEngineerSummaryForRun(
     fieldImportSession,
     importedSessionFieldStats: importedSessionFieldCompact,
     fieldFingerprint: fp,
+    timeZone: opts?.timeZone,
   });
 
   await prisma.run.update({
@@ -232,7 +233,8 @@ const runSelectWithOwner = {
 export async function getOrComputeEngineerSummaryForRunPair(
   viewerUserId: string,
   primaryRunId: string,
-  compareRunId: string
+  compareRunId: string,
+  opts?: { timeZone?: string | null }
 ): Promise<{ summary: EngineerRunSummaryV2 } | null> {
   if (primaryRunId === compareRunId) return null;
 
@@ -305,6 +307,7 @@ export async function getOrComputeEngineerSummaryForRunPair(
     fieldImportSession,
     importedSessionFieldStats: importedSessionFieldCompact,
     fieldFingerprint: fp,
+    timeZone: opts?.timeZone,
   });
 
   return { summary };

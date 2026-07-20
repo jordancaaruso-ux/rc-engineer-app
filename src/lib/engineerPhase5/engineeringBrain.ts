@@ -192,6 +192,8 @@ export type BuildEngineeringBrainOptions = {
   anchorRunId: string;
   /** Optional explicit reference run (e.g. when comparing two runs in the Engineer UI). */
   referenceRunId?: string | null;
+  /** Driver's IANA zone for day labels in known-good/known-bad summaries; UTC when omitted. */
+  timeZone?: string | null;
 };
 
 export async function buildEngineeringBrainV1(
@@ -209,6 +211,7 @@ export async function buildEngineeringBrainV1(
     userId: opts.userId,
     carId: opts.carId,
     anchorRunId: opts.anchorRunId,
+    timeZone: opts.timeZone,
   }).catch(() => null);
 
   const recentChangeMechanisms = read.changeRead.chassisChangedKeys.map((c) =>

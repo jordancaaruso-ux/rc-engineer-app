@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { buildEngineerCompareOptions } from "@/lib/engineerPhase5/engineerCompareOptions";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export async function GET() {
   }
   const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const data = await buildEngineerCompareOptions(user.id);
+  const timeZone = await getExplicitTimeZoneForRunFormatting();
+  const data = await buildEngineerCompareOptions(user.id, timeZone);
   return NextResponse.json(data);
 }

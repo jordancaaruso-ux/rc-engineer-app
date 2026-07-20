@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import {
   findLatestPrimaryRunIdForHints,
   getOrComputeBetweenRunHint,
@@ -30,14 +31,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ hint: null });
   }
 
+  // Resolved up-front so the deferred recompute below doesn't read cookies
+  // after the response has been sent.
+  const timeZone = await getExplicitTimeZoneForRunFormatting();
+
   if (sync) {
-    const { hint } = await getOrComputeBetweenRunHint(user.id, primaryId);
+    const { hint } = await getOrComputeBetweenRunHint(user.id, primaryId, { timeZone });
     return NextResponse.json({ hint });
   }
 
-  const peeked = await peekBetweenRunHint(user.id, primaryId);
+  const peeked = await peekBetweenRunHint(user.id, primaryId, { timeZone });
   if (!peeked) {
-    void getOrComputeBetweenRunHint(user.id, primaryId).catch(() => {});
+    void getOrComputeBetweenRunHint(user.id, primaryId, { timeZone }).catch(() => {});
   }
   return NextResponse.json({ hint: peeked });
 }

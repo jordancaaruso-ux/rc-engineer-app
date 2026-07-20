@@ -17,15 +17,15 @@ import {
   parseHandlingAssessmentJson,
 } from "@/lib/runHandlingAssessment";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { pickFeaturedEvent } from "@/lib/eventActive";
-import { calendarYmdInTimeZone, formatFeaturedEventDateLabel } from "@/lib/formatDate";
+import { pickFeaturedEvent, todayBoundsInTimeZone } from "@/lib/eventActive";
+import { calendarYmdInTimeZone, formatFeaturedEventDateLabel, RUN_DATETIME_LOCALE } from "@/lib/formatDate";
 import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
 import { loadUserScopedEvents, userCanAccessEvent } from "@/lib/events/eventParticipation";
 import { resolveEventTrackLabel } from "@/lib/tracks/legacyTrackSnapshot";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
-import type { DashboardEngineerSuggestionPayloadV1 } from "@/lib/engineerPhase5/dashboardSuggestions/dashboardSuggestionTypes";
+import { computeTodayVerdict, type TodayVerdict, type VerdictRunInput } from "@/lib/dashboardVerdict";
 import { perfSpan } from "@/lib/perfLog";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
@@ -34,18 +34,10 @@ export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 /** @deprecated import from `@/lib/eventActive` */
 export { eventIsActiveOnLocalToday, eventIsActiveOnCalendarDay } from "@/lib/eventActive";
 
-function startOfLocalDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function localTodayBounds(): { start: Date; end: Date } {
-  const start = startOfLocalDay(new Date());
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { start, end };
-}
+// "Today" bounds are computed in the USER's timezone (rc_tz cookie), never the
+// server's — Vercel runs in UTC, so server-local midnight is 10am for an AEST
+// user and every today-scoped surface (draft CTA, Today strip, hasRunToday)
+// would roll over mid-morning. See `todayBoundsInTimeZone`.
 
 const runPrefillInclude = (userId: string) =>
   ({
@@ -309,6 +301,8 @@ export type DashboardHomeModel = {
   todayStrip: Array<{
     runId: string;
     when: string;
+    /** Clock time the run was logged, in the user's timezone (e.g. "2:41 pm"). */
+    timeLabel: string;
     runLabel: string;
     bestLap: number | null;
     avgTop5: number | null;
@@ -331,19 +325,10 @@ export type DashboardHomeModel = {
     carName: string | null;
   };
   /**
-   * Off-day "last time out" digest: the most recent completed session day —
-   * when/where, pace, pace vs the previous visit to the same track, plus how
-   * the car felt and what changed on the final run (from `recentRun`).
+   * Track-day computed verdict — pace trend / last-change effect / consistency
+   * (docs/DASHBOARD_NORTH_STAR.md v2, 2026-07-19). Pure math, no AI.
    */
-  lastSessionDigest: null | {
-    dateIso: string;
-    trackName: string | null;
-    runCount: number;
-    bestLap: number | null;
-    /** Day-best delta vs the previous completed day at the same track (negative = faster). */
-    bestDeltaVsPrevVisit: number | null;
-    prevVisitDateIso: string | null;
-  };
+  todayVerdict: TodayVerdict | null;
   recentRun: null | {
     id: string;
     carId: string | null;
@@ -381,10 +366,6 @@ export type DashboardHomeModel = {
   records: DashboardRecord[];
   /** Set when the most recent completed run beat an existing record — drives the celebration surfaces. */
   newPb: DashboardNewPb | null;
-  /** Cached dashboard Engineer suggestions for the latest run (peek on SSR). Client sync-fetches when null. */
-  engineerSuggestionsInitial: DashboardEngineerSuggestionPayloadV1 | null;
-  /** Latest run id eligible for dashboard Engineer suggestions (requires car + completed logging). */
-  engineerSuggestionsPrimaryRunId: string | null;
 };
 
 const recentRunSelect = {
@@ -445,12 +426,17 @@ function toDashboardIncompleteRunRow(
     carName: r.car?.name ?? "—",
     trackName: r.track?.name ?? null,
     eventName: r.event?.name ?? null,
-    sessionLabel: formatRunSessionDisplay({
-      sessionType: r.sessionType,
-      meetingSessionType: r.meetingSessionType,
-      meetingSessionCode: r.meetingSessionCode,
-      sessionLabel: r.sessionLabel,
-    }),
+    sessionLabel: formatRunSessionDisplay(
+      {
+        sessionType: r.sessionType,
+        meetingSessionType: r.meetingSessionType,
+        meetingSessionCode: r.meetingSessionCode,
+        sessionLabel: r.sessionLabel,
+      },
+      // Draft choosers list runs from arbitrary days — no day ordinal to hand
+      // out, so an unlabeled testing run reads "Run" rather than "—".
+      { fallback: "Run" }
+    ),
   };
 }
 
@@ -490,9 +476,10 @@ export async function loadIncompleteRunsForImportChooser(
  * get offered as the run they just completed.
  */
 export async function loadTodaysIncompleteRuns(
-  userId: string
+  userId: string,
+  timeZone: string
 ): Promise<DashboardIncompleteRunRow[]> {
-  const { start, end } = localTodayBounds();
+  const { start, end } = todayBoundsInTimeZone(timeZone);
   const rows = await prisma.run.findMany({
     where: {
       userId,
@@ -512,7 +499,7 @@ export async function loadDashboardHomeModel(
   timeZone: string
 ): Promise<DashboardHomeModel> {
   return perfSpan("loadDashboardHomeModel", async () => {
-  const { start: todayStart, end: todayEnd } = localTodayBounds();
+  const { start: todayStart, end: todayEnd } = todayBoundsInTimeZone(timeZone);
   // One completed-runs fetch feeds BOTH the rolling 30-day summary (it ignores
   // rows outside its window) AND the all-time records board (which genuinely
   // needs every run — a PB is forever). At current scale this is fine; if it
@@ -790,6 +777,12 @@ export async function loadDashboardHomeModel(
     }
   }
 
+  // Unlabeled testing runs get their position in today's chronological order as
+  // their name ("Run 2") instead of the bare "—" fallback.
+  const dayRunNumberByRunId = new Map(todaysRuns.map((r, i) => [r.id, i + 1]));
+  const todayRunLabel = (r: (typeof todaysRuns)[number]) =>
+    formatRunSessionDisplay(r, { dayRunNumber: dayRunNumberByRunId.get(r.id) });
+
   let todayBestLap: number | null = null;
   let todayBestAvgTop5: number | null = null;
   let todayBestRunId: string | null = null;
@@ -806,7 +799,7 @@ export async function loadDashboardHomeModel(
       todayBestLap = best;
       todayBestAvgTop5 = avg5;
       todayBestRunId = r.id;
-      todayBestRunLabel = formatRunSessionDisplay(r);
+      todayBestRunLabel = todayRunLabel(r);
     }
   }
 
@@ -828,7 +821,7 @@ export async function loadDashboardHomeModel(
               loggingCompletedAt: r.loggingCompletedAt,
               sortAt: r.sortAt,
             }).toISOString(),
-            runLabel: formatRunSessionDisplay(r),
+            runLabel: todayRunLabel(r),
             rows: diffRows.map((row) => ({
               key: row.key,
               label: row.label,
@@ -846,33 +839,62 @@ export async function loadDashboardHomeModel(
   // Track-day pit board rows — latest run first. Delta compares each run's best
   // against the run logged immediately before it today (first-of-day has none).
   const changesByRunId = new Map(todaysChanges.map((c) => [c.runId, c.rows]));
+  const stripTimeFormat = new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone,
+  });
   const todayStrip: DashboardHomeModel["todayStrip"] = [];
+  const verdictInputs: VerdictRunInput[] = [];
   {
     let prevBest: number | null = null;
     for (const r of todaysRuns) {
       const m = computeIncludedLapMetricsFromRun(r);
       const best = typeof r.bestLapSeconds === "number" ? r.bestLapSeconds : m.bestLap;
       const avg5 = typeof r.avgTop5LapSeconds === "number" ? r.avgTop5LapSeconds : m.averageTop5;
+      const instant = resolveRunDisplayInstant({
+        createdAt: r.createdAt,
+        sessionCompletedAt: r.sessionCompletedAt,
+        loggingCompletedAt: r.loggingCompletedAt,
+        sortAt: r.sortAt,
+      });
+      const changedRows = changesByRunId.get(r.id) ?? [];
       todayStrip.push({
         runId: r.id,
-        when: resolveRunDisplayInstant({
-          createdAt: r.createdAt,
-          sessionCompletedAt: r.sessionCompletedAt,
-          loggingCompletedAt: r.loggingCompletedAt,
-          sortAt: r.sortAt,
-        }).toISOString(),
-        runLabel: formatRunSessionDisplay(r),
+        when: instant.toISOString(),
+        timeLabel: stripTimeFormat.format(instant),
+        runLabel: todayRunLabel(r),
         bestLap: best,
         avgTop5: avg5,
         lapCount: m.lapCount,
         loggingComplete: r.loggingComplete === true || Boolean(r.loggingCompletedAt),
         bestDeltaVsPrev: best != null && prevBest != null ? best - prevBest : null,
-        changedRows: changesByRunId.get(r.id) ?? [],
+        changedRows,
       });
       if (best != null) prevBest = best;
+
+      // Verdict input: spread of the run's five best laps (needs the raw laps).
+      let top5SpreadSeconds: number | null = null;
+      const includedLaps = getIncludedLaps(primaryLapRowsFromRun(r));
+      if (includedLaps.length >= 5) {
+        const top5 = includedLaps
+          .map((l) => l.lapTimeSeconds)
+          .sort((a, b) => a - b)
+          .slice(0, 5);
+        top5SpreadSeconds = top5[4] - top5[0];
+      }
+      verdictInputs.push({
+        runLabel: todayRunLabel(r),
+        bestLap: best,
+        avgTop5: avg5,
+        top5SpreadSeconds,
+        changedRows,
+      });
     }
     todayStrip.reverse();
   }
+  const todayVerdict = computeTodayVerdict(verdictInputs);
   const lastTodayRun = todaysRuns.length > 0 ? todaysRuns[todaysRuns.length - 1] : null;
   const todayContext: DashboardHomeModel["todayContext"] = lastTodayRun
     ? {
@@ -881,35 +903,6 @@ export async function loadDashboardHomeModel(
         carName: lastTodayRun.car?.name ?? null,
       }
     : null;
-
-  // Off-day digest — the most recent completed session day, with the day-best
-  // compared against the previous completed day at the same track.
-  let lastSessionDigest: DashboardHomeModel["lastSessionDigest"] = null;
-  if (summaryInputs.length > 0) {
-    const lastInput = summaryInputs[summaryInputs.length - 1];
-    const lastYmd = calendarYmdInTimeZone(lastInput.effectiveAt, timeZone);
-    const dayRows = summaryInputs.filter(
-      (r) => calendarYmdInTimeZone(r.effectiveAt, timeZone) === lastYmd
-    );
-    const dayBest = dayRows.reduce<number | null>(
-      (acc, r) =>
-        r.bestLapSeconds != null && (acc == null || r.bestLapSeconds < acc)
-          ? r.bestLapSeconds
-          : acc,
-      null
-    );
-    const dayTrackId = lastInput.trackId;
-    const prevVisit = dayTrackId ? latestVisitAtTrack(dayTrackId, lastYmd) : null;
-    lastSessionDigest = {
-      dateIso: lastInput.effectiveAt.toISOString(),
-      trackName: lastInput.trackName,
-      runCount: dayRows.length,
-      bestLap: dayBest,
-      bestDeltaVsPrevVisit:
-        dayBest != null && prevVisit?.bestLap != null ? dayBest - prevVisit.bestLap : null,
-      prevVisitDateIso: prevVisit ? prevVisit.date.toISOString() : null,
-    };
-  }
 
   let recent: DashboardHomeModel["recentRun"] = null;
   if (recentRun) {
@@ -975,10 +968,6 @@ export async function loadDashboardHomeModel(
 
   const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
 
-  const runLoggingComplete = Boolean(recent?.loggingCompletedAt) || recent?.loggingComplete === true;
-  const engineerSuggestionsPrimaryRunId =
-    recent?.carId && runLoggingComplete ? recent.id : null;
-
   return {
     incompleteRuns,
     thingsToTry: thingsToTryRows.map((i) => ({
@@ -1013,13 +1002,11 @@ export async function loadDashboardHomeModel(
     todaysChanges,
     todayStrip,
     todayContext,
-    lastSessionDigest,
+    todayVerdict,
     recentRun: recent,
     summary,
     records,
     newPb,
-    engineerSuggestionsInitial: null,
-    engineerSuggestionsPrimaryRunId,
   };
   });
 }

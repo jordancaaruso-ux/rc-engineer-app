@@ -1,7 +1,6 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import {
   fetchPracticeLocation,
   fetchPracticeLocationActivities,
@@ -94,13 +93,15 @@ async function runsFromActivity(
     if (lapCount === 0) continue;
     const bestLapSeconds = bestLapSecondsFromBlock(block);
     const completedIso = trainingSessionCompletedIso(block) ?? activityCompletedIso;
-    const when = completedIso ? formatRunCreatedAtDateTime(completedIso) : null;
+    // No formatted time in the label: this runs on the server (UTC) with no viewer
+    // timezone, and the picker row already renders `sessionCompletedAtIso` (a true
+    // instant from the practice API) in the device zone next to the title.
     out.push({
       sessionUrl: buildSpeedhivePracticeRunUrl(locationId, activityId, block.id),
       sessionId: `${activityId}-${block.id}`,
       sessionCompletedAtIso: completedIso,
       sourceKind: "practice",
-      label: [locationLabel, when, `${lapCount} lap${lapCount === 1 ? "" : "s"}`]
+      label: [locationLabel, `${lapCount} lap${lapCount === 1 ? "" : "s"}`]
         .filter(Boolean)
         .join(" · "),
       bestLapSeconds,

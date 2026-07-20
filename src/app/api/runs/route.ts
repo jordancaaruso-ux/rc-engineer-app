@@ -22,6 +22,7 @@ import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysF
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
+import { getTimeZoneFromCookies } from "@/lib/requestTimeZone";
 import { coerceFeelVsLastRunForCompleteRun, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
@@ -101,6 +102,8 @@ type RunUpsertBody = {
     isPrimaryUser?: boolean;
     /** UTC ISO instant from timing page when known. */
     sessionCompletedAt?: string | null;
+    /** True when `sessionCompletedAt` is on-track wall clock (LiveRC/MyRCM store as-if-UTC) vs import-time fallback. */
+    sessionCompletedAtIsWallClock?: boolean;
     laps?: number[] | Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
   }>;
   /** Optional: link persisted ImportedLapTimeSession rows from URL import(s) to this run. */
@@ -196,7 +199,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     return NextResponse.json({ error: "carId is required" }, { status: 400 });
   }
 
-  const sessionCompletedAtResolved = await resolveRunSessionCompletedAtFromUpsertBody(params.userId, body);
+  const sessionCompletedAtResolved = await resolveRunSessionCompletedAtFromUpsertBody(params.userId, body, {
+    userTimeZone: await getTimeZoneFromCookies(),
+  });
 
   let existingUpdate: {
     id: string;

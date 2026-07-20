@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { hasOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { generateQuickFixPayload } from "@/lib/engineerPhase5/quickFix/quickFixEngineer";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
@@ -42,7 +43,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const quickFix = await generateQuickFixPayload(user.id, runId);
+    const timeZone = await getExplicitTimeZoneForRunFormatting();
+    const quickFix = await generateQuickFixPayload(user.id, runId, { timeZone });
     if (!quickFix) {
       return NextResponse.json(
         {

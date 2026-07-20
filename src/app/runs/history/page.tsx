@@ -9,7 +9,7 @@ import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
-import { buildRunHistoryGroups, type RunHistoryGroup } from "@/lib/runs/buildRunHistoryGroups";
+import { buildDayRunNumberMap, buildRunHistoryGroups, type RunHistoryGroup } from "@/lib/runs/buildRunHistoryGroups";
 import {
   applyRunHistoryPostFiltersWithReasons,
   buildRunHistoryPrismaWhere,
@@ -341,6 +341,9 @@ export default async function RunHistoryPage({
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const dbMatchedCount = runs.length;
+  // Day-position names for unlabeled testing runs ("Run 2"). Computed from the
+  // full fetched set (pre-search-filter) so filtering never renumbers a day.
+  const dayRunNumberByRunId = buildDayRunNumberMap(runs, displayTimeZone);
   // Changed-keys diffing is O(runs × setup keys) — only pay for it when the
   // "setup item changed" filter is actually in play.
   const changedKeysByRunId = filters.setupChangedField
@@ -391,7 +394,9 @@ export default async function RunHistoryPage({
     tableRuns: RunInGroup[],
     opts: { showMemberColumn: boolean; initialExpandedRunId: string | null }
   ) {
-    const showSessionColumn = tableRuns.some((r) => formatRunSessionDisplay(r) !== "—");
+    const showSessionColumn = tableRuns.some(
+      (r) => formatRunSessionDisplay(r, { dayRunNumber: dayRunNumberByRunId[r.id] }) !== "—"
+    );
     const columnLayout = {
       showReorderColumn: !teamMode,
       showMemberColumn: opts.showMemberColumn,
@@ -457,6 +462,7 @@ export default async function RunHistoryPage({
               memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
               showMemberColumn={columnLayout.showMemberColumn}
               showSessionColumn={showSessionColumn}
+              dayRunNumberByRunId={dayRunNumberByRunId}
               matchReasonsById={matchReasonsById}
               initialExpandedRunId={opts.initialExpandedRunId}
             />
@@ -617,7 +623,9 @@ export default async function RunHistoryPage({
   }
 
   function renderFlatRunList() {
-    const showSessionColumn = runs.some((r) => formatRunSessionDisplay(r) !== "—");
+    const showSessionColumn = runs.some(
+      (r) => formatRunSessionDisplay(r, { dayRunNumber: dayRunNumberByRunId[r.id] }) !== "—"
+    );
     const columnLayout = {
       showReorderColumn: !teamMode,
       showMemberColumn: teamMode,
@@ -681,6 +689,7 @@ export default async function RunHistoryPage({
                 memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
                 showMemberColumn={teamMode}
                 showSessionColumn={showSessionColumn}
+                dayRunNumberByRunId={dayRunNumberByRunId}
                 matchReasonsById={matchReasonsById}
                 initialExpandedRunId={focusRunId}
               />

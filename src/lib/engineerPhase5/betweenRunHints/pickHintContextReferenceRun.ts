@@ -58,15 +58,18 @@ export function hintBaselineAgeBucket(primaryMs: number, refMs: number): HintBas
   return "older";
 }
 
-function runDisplayLabel(run: {
-  track: { name: string } | null;
-  trackNameSnapshot: string | null;
-  createdAt: Date;
-  sessionCompletedAt: Date | null;
-  loggingCompletedAt: Date | null;
-}): string {
+function runDisplayLabel(
+  run: {
+    track: { name: string } | null;
+    trackNameSnapshot: string | null;
+    createdAt: Date;
+    sessionCompletedAt: Date | null;
+    loggingCompletedAt: Date | null;
+  },
+  timeZone?: string | null
+): string {
   const track = run.track?.name?.trim() || run.trackNameSnapshot?.trim() || "Track";
-  const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run));
+  const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run), timeZone);
   return `${track} · ${when}`;
 }
 
@@ -108,7 +111,13 @@ const carRunSelect = {
 export async function pickHintContextReferenceRun(
   userId: string,
   primary: PrimaryRunForHintReferencePick,
-  engineerReferenceRunId: string | null
+  engineerReferenceRunId: string | null,
+  /**
+   * Driver's IANA zone for the baseline display label only. NOTE: baseline
+   * *selection* (same_day / age buckets) still keys on UTC calendar days —
+   * changing that shifts which run is picked, not just how it reads.
+   */
+  timeZone?: string | null
 ): Promise<{ referenceRunId: string | null; provenance: HintBaselineProvenance | null }> {
   const tPrimary = sortMs(primary);
   const engineerRef = engineerReferenceRunId;
@@ -187,7 +196,7 @@ export async function pickHintContextReferenceRun(
     engineerReferenceRunId: engineerRef,
     selectionReason: reason,
     baselineAgeBucket: bucket,
-    baselineDisplayLabel: runDisplayLabel(picked),
+    baselineDisplayLabel: runDisplayLabel(picked, timeZone),
     baselineHandlingPreview: baselineHandlingPreview(picked.handlingProblems, picked.handlingAssessmentJson),
     baselineFeelVsLastRun: feelNum,
   };

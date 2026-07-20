@@ -75,9 +75,11 @@ export async function buildEngineerChatContext(params: {
   runId: string;
   compareRunId: string;
   mode?: EngineerChatMode;
+  /** IANA zone for human time labels in the context (rc_tz / device zone). */
+  timeZone?: string | null;
 }): Promise<BuiltEngineerChatContext> {
   return perfSpan("buildEngineerChatContext", async () => {
-    const { userId, body, messages, runId, compareRunId, mode } = params;
+    const { userId, body, messages, runId, compareRunId, mode, timeZone } = params;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const needsDeep = engineerChatNeedsDeepContext({
       lastUserMessage: lastUser?.content,
@@ -93,10 +95,10 @@ export async function buildEngineerChatContext(params: {
     });
 
     const [basePacket, focusedRunPair] = await Promise.all([
-      perfSpan("buildEngineerContextPacketV1", () => buildEngineerContextPacketV1(userId)),
+      perfSpan("buildEngineerContextPacketV1", () => buildEngineerContextPacketV1(userId, timeZone)),
       runId
         ? perfSpan("buildFocusedRunPairContext", () =>
-            buildFocusedRunPairContext(userId, runId, compareRunId || null)
+            buildFocusedRunPairContext(userId, runId, compareRunId || null, timeZone)
           )
         : Promise.resolve(null),
     ]);
@@ -143,11 +145,11 @@ export async function buildEngineerChatContext(params: {
         needsDeep
           ? !focusedRunPair
             ? perfSpan("getOrComputeEngineerSummaryForLatestRun", () =>
-                getOrComputeEngineerSummaryForLatestRun(userId)
+                getOrComputeEngineerSummaryForLatestRun(userId, { timeZone })
               )
             : !compareRunId
               ? perfSpan("getOrComputeEngineerSummaryForRun", () =>
-                  getOrComputeEngineerSummaryForRun(userId, focusedRunPair.primaryRunId)
+                  getOrComputeEngineerSummaryForRun(userId, focusedRunPair.primaryRunId, { timeZone })
                 )
               : Promise.resolve(null)
           : Promise.resolve(null),
@@ -176,6 +178,7 @@ export async function buildEngineerChatContext(params: {
                 carId: brainCarId,
                 anchorRunId: brainAnchor,
                 referenceRunId: focusedRunPair?.compare?.id ?? null,
+                timeZone,
               }).catch(() => null)
             )
           : Promise.resolve(null),
@@ -250,11 +253,14 @@ export function buildMergeContextWithFocusedPair(opts: {
   userId: string;
   baseForMerge: Record<string, unknown>;
   lastUser: EngineerChatMessage | undefined;
+  timeZone?: string | null;
 }) {
   return async (focused: NonNullable<Awaited<ReturnType<typeof buildFocusedRunPairContext>>>) => {
     const [summaryResult, rich, reTire, reSetupOutcomeMemory, reEngineeringBrain] = await Promise.all([
       !focused.compareRunId
-        ? getOrComputeEngineerSummaryForRun(opts.userId, focused.primaryRunId)
+        ? getOrComputeEngineerSummaryForRun(opts.userId, focused.primaryRunId, {
+            timeZone: opts.timeZone,
+          })
         : Promise.resolve(null),
       opts.lastUser && typeof opts.lastUser.content === "string"
         ? buildEngineerRichContextV1({
@@ -280,6 +286,7 @@ export function buildMergeContextWithFocusedPair(opts: {
             carId: focused.primary.carId,
             anchorRunId: focused.primaryRunId,
             referenceRunId: focused.compare?.id ?? null,
+            timeZone: opts.timeZone,
           }).catch(() => null)
         : Promise.resolve(null),
     ]);
@@ -315,6 +322,7 @@ export async function runEngineerChatTurn(params: {
   runId?: string;
   compareRunId?: string;
   mode?: EngineerChatMode;
+  timeZone?: string | null;
 }): Promise<{
   reply: string;
   contextJson: unknown;
@@ -332,6 +340,7 @@ export async function runEngineerChatTurn(params: {
     runId,
     compareRunId,
     mode: params.mode,
+    timeZone: params.timeZone,
   });
   if ("error" in built) {
     throw new Error(built.error);
@@ -341,6 +350,7 @@ export async function runEngineerChatTurn(params: {
     userId: params.userId,
     baseForMerge: built.baseForMerge,
     lastUser: built.lastUser,
+    timeZone: params.timeZone,
   });
 
   const out = await generateEngineerChatReplyWithTools({
@@ -350,6 +360,7 @@ export async function runEngineerChatTurn(params: {
     mergeContextWithFocusedPair,
     contextTier: built.contextTier,
     mode: params.mode,
+    timeZone: params.timeZone,
   });
 
   return {

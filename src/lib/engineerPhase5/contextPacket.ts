@@ -51,6 +51,8 @@ import {
 export type EngineerContextPacketV1 = {
   version: 1;
   generatedAtIso: string;
+  /** IANA zone every human `*Label` field is formatted in; null = server zone (legacy callers). */
+  driverTimeZone: string | null;
   user: { id: string };
   latestRun: null | {
     id: string;
@@ -152,7 +154,10 @@ function deltaDirection(delta: number | null): "improved" | "regressed" | "flat"
  * - deterministic, compact, user-scoped
  * - does not include raw lap-by-lap tables
  */
-export async function buildEngineerContextPacketV1(userId: string): Promise<EngineerContextPacketV1> {
+export async function buildEngineerContextPacketV1(
+  userId: string,
+  timeZone?: string | null
+): Promise<EngineerContextPacketV1> {
   const [thingsToTry, thingsToDo] = await Promise.all([
     prisma.actionItem.findMany({
       where: { userId, isArchived: false, listKind: "THINGS_TO_TRY" },
@@ -204,6 +209,7 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
     return {
       version: 1,
       generatedAtIso: new Date().toISOString(),
+      driverTimeZone: timeZone?.trim() || null,
       user: { id: userId },
       latestRun: null,
       previousRun: null,
@@ -302,11 +308,12 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
   return {
     version: 1,
     generatedAtIso: new Date().toISOString(),
+    driverTimeZone: timeZone?.trim() || null,
     user: { id: userId },
     latestRun: {
       id: latest.id,
       createdAtIso: latest.createdAt.toISOString(),
-      createdAtLabel: formatRunCreatedAtDateTime(latest.createdAt),
+      createdAtLabel: formatRunCreatedAtDateTime(latest.createdAt, timeZone),
       sessionTypeLabel: latestSession,
       carName: latestCarName,
       trackName: latestTrackName,
@@ -330,7 +337,7 @@ export async function buildEngineerContextPacketV1(userId: string): Promise<Engi
       ? {
           id: prev.id,
           createdAtIso: prev.createdAt.toISOString(),
-          createdAtLabel: formatRunCreatedAtDateTime(prev.createdAt),
+          createdAtLabel: formatRunCreatedAtDateTime(prev.createdAt, timeZone),
           sessionTypeLabel: prevSession,
           carName: prevCarName,
           trackName: prevTrackName,
@@ -584,6 +591,7 @@ const focusedRunSelect = {
 } as const;
 
 function runSliceFromRow(
+  timeZone: string | null | undefined,
   row: {
     id: string;
     createdAt: Date;
@@ -617,7 +625,7 @@ function runSliceFromRow(
   const lap = lapDashboardFromRun(row);
   return {
     id: row.id,
-    whenLabel: formatRunCreatedAtDateTime(when),
+    whenLabel: formatRunCreatedAtDateTime(when, timeZone),
     sessionTypeLabel: formatRunSessionDisplay({
       sessionType: row.sessionType,
       meetingSessionType: row.meetingSessionType,
@@ -692,7 +700,8 @@ async function loadCompareRunForFocusedContext(
 export async function buildFocusedRunPairContext(
   userId: string,
   primaryRunId: string,
-  compareRunId: string | null | undefined
+  compareRunId: string | null | undefined,
+  timeZone?: string | null
 ): Promise<EngineerFocusedRunPairContext | null> {
   const primary = await prisma.run.findFirst({
     where: { id: primaryRunId.trim(), userId },
@@ -707,8 +716,8 @@ export async function buildFocusedRunPairContext(
     compareRunId
   );
 
-  const primarySlice = runSliceFromRow(primary);
-  const compareSlice = compare ? runSliceFromRow(compare) : null;
+  const primarySlice = runSliceFromRow(timeZone, primary);
+  const compareSlice = compare ? runSliceFromRow(timeZone, compare) : null;
 
   const pairingParity: EngineerFocusedRunPairContext["pairingParity"] =
     compareSlice == null || !compare

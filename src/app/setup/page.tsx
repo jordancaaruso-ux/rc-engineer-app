@@ -5,6 +5,8 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { formatRunCreatedAtDateTime, formatRunDateOnly } from "@/lib/formatDate";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { NewSetupUploadButton } from "@/components/setup/NewSetupUploadButton";
 import { calibrationsVisibleToUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
@@ -107,6 +109,7 @@ export default async function SetupPage({
 
   const user = await requireCurrentUser();
   const isAdmin = isAuthAdminEmail(user.email);
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
   await ensureAuthorizedSetupSheetCatalog();
   const [documents, runs, calibrations, cars] = await Promise.all([
     prisma.setupDocument.findMany({
@@ -256,7 +259,7 @@ export default async function SetupPage({
                     <div className="min-w-0">
                       <div className="truncate text-sm text-foreground">{doc.originalFilename}</div>
                       <div className="text-[11px] text-muted-foreground">
-                        {new Date(doc.createdAt).toLocaleDateString()} · {doc.parseStatus}
+                        {formatRunDateOnly(doc.createdAt, displayTimeZone)} · {doc.parseStatus}
                         {doc.createdSetupId ? " · setup created" : ""}
                       </div>
                     </div>
@@ -306,7 +309,7 @@ export default async function SetupPage({
                         meetingSessionCode: run.meetingSessionCode,
                         sessionLabel: null,
                       })}{" "}
-                      · {new Date(run.createdAt).toLocaleString()}
+                      · {formatRunCreatedAtDateTime(run.createdAt, displayTimeZone)}
                     </div>
                   </li>
                 ))}
@@ -335,7 +338,7 @@ export default async function SetupPage({
                       <div className="min-w-0">
                         <div className="truncate text-xs text-foreground">{c.name}</div>
                         <div className="text-[10px] text-muted-foreground">
-                          {c.sourceType} · {new Date(c.createdAt).toLocaleDateString()}
+                          {c.sourceType} · {formatRunDateOnly(c.createdAt, displayTimeZone)}
                         </div>
                       </div>
                       <Link href={`/setup-calibrations/${c.id}`} className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted">

@@ -166,6 +166,8 @@ function chatSystemPromptForContext(
 const CHAT_SYSTEM = `You are an RC touring car race engineer assistant.
 Be conservative and grounded in the provided context JSON.
 
+TIMESTAMPS: Fields ending in "Iso" are UTC machine timestamps for ordering only — **never** read a clock time or a calendar date out of an "*Iso" field; the driver is usually not in UTC. When saying when a run happened, quote the pre-formatted label fields verbatim ("createdAtLabel", "whenLabel", "referenceLabel") — they are already in the driver's local time (see "defaultDashboardContext.driverTimeZone"). If only an ISO instant is available for a run, refer to it by order or label ("your latest run", "Run 3") without a clock time.
+
 REASONING STANCE (how to think and speak — does not replace KB citation rules below):
 Setup is **physics plus art**: mechanics in vehicleDynamicsKb are the **curated ground truth** when cited; **on-track results** are not guaranteed—the same change can be predictable in one class / track / tire / grip package and wrong in another. Sound **fundamentally correct** on mechanisms, stay **unbiased**, be **okay being wrong or challenged**, and **promote testing** to learn what a knob does in *their* conditions. Scale how definitive you sound with **confidence**: more predictable, well-conditioned moves → slightly firmer wording; theory-first or highly environment-sensitive moves → more hedge and "verify on track."
 **Driver level (infer from the message):** If they sound **high level** (precise corner phases, engineer vocabulary, clear test protocol), weight **feel** and **first-principles** explanations more strongly; use **lap** data when present. If they do **not** sound high level, treat **lap time** and **observable car behavior** as stronger than vague feel—even **good** drivers can misreport feel; ask **precise** questions when the answer depends on what the car is actually doing.
@@ -535,7 +537,8 @@ async function postChatCompletion(
 async function executeSearchOrListTool(
   name: string,
   argsJson: string,
-  userId: string
+  userId: string,
+  timeZone?: string | null
 ): Promise<string> {
   try {
     const args = argsJson ? (JSON.parse(argsJson) as Record<string, unknown>) : {};
@@ -567,7 +570,7 @@ async function executeSearchOrListTool(
         event_id: typeof sr.event_id === "string" ? sr.event_id : null,
         text_contains: typeof sr.text_contains === "string" ? sr.text_contains : null,
         max_results: typeof sr.max_results === "number" ? sr.max_results : undefined,
-      });
+      }, timeZone);
       if (!result.ok) return JSON.stringify({ error: result.error });
       return JSON.stringify({
         runs: result.runs,
@@ -674,6 +677,8 @@ export async function generateEngineerChatReplyWithTools(params: {
   onToken?: (delta: string) => void;
   contextTier?: EngineerChatContextTier;
   mode?: EngineerChatMode;
+  /** IANA zone for human time labels in tool results (rc_tz / device zone). */
+  timeZone?: string | null;
 }): Promise<{
   reply: string;
   contextJson: unknown;
@@ -830,7 +835,7 @@ export async function generateEngineerChatReplyWithTools(params: {
             typeof argsObj.compare_run_id === "string" && argsObj.compare_run_id.trim()
               ? argsObj.compare_run_id.trim()
               : null;
-          const applied = await applyEngineerFocusTool(params.userId, primary, compare);
+          const applied = await applyEngineerFocusTool(params.userId, primary, compare, params.timeZone);
           if (!applied.ok) {
             messagesApi.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: applied.error }) });
             continue;
@@ -856,7 +861,7 @@ export async function generateEngineerChatReplyWithTools(params: {
           continue;
         }
 
-        const toolContent = await executeSearchOrListTool(name, args, params.userId);
+        const toolContent = await executeSearchOrListTool(name, args, params.userId, params.timeZone);
         messagesApi.push({ role: "tool", tool_call_id: tc.id, content: toolContent });
       }
       continue;

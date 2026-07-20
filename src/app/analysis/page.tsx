@@ -65,9 +65,9 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
         </Reveal>
         {toolDoorLinks.length > 0 ? (
           <Reveal index={3}>
-            <ul className="flex flex-col gap-2.5">
+            <ul className="flex flex-col gap-3">
               {toolDoorLinks.map((link) => (
-                <HubNavLink key={link.href} link={link} />
+                <HubNavLink key={link.href} link={link} variant="door" />
               ))}
             </ul>
           </Reveal>

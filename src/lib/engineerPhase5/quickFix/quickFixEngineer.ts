@@ -225,14 +225,20 @@ ${JSON.stringify(ctx.spreadSlim).slice(0, 6000)}`;
 
 export async function generateQuickFixPayload(
   viewerId: string,
-  runId: string
+  runId: string,
+  opts?: { timeZone?: string | null }
 ): Promise<QuickFixPayloadV1 | null> {
   const loaded = await loadQuickFixRunForViewer(viewerId, runId);
   if (!loaded) return null;
 
   const { run, contextUserId } = loaded;
   const scopeLine = quickFixRunLabel(run);
-  const ctx = await buildQuickFixLlmContext({ contextUserId, run, scopeLine });
+  const ctx = await buildQuickFixLlmContext({
+    contextUserId,
+    run,
+    scopeLine,
+    timeZone: opts?.timeZone,
+  });
 
   const llm = await callQuickFixLlm(ctx);
 

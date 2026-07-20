@@ -79,7 +79,10 @@ import { primaryLapRowsFromImportedPayload, sessionCompletedAtIsoFromImportedPay
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
 import { buildLapIngestFromEditRun } from "@/lib/lapImport/buildLapIngestFromEditRun";
-import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
+import {
+  resolveImportedSessionDisplayTimeIso,
+  resolveImportedSessionHasWallClockTime,
+} from "@/lib/lapImport/labels";
 import {
   LapTimesIngestPanel,
   defaultLapIngestValue,
@@ -2879,6 +2882,7 @@ export function NewRunForm(props: {
     normalizedName: string;
     isPrimaryUser: boolean;
     sessionCompletedAt: string | null;
+    sessionCompletedAtIsWallClock: boolean;
     laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
   }> {
     if (current.sourceKind !== "url") return [];
@@ -2892,6 +2896,7 @@ export function NewRunForm(props: {
       normalizedName: string;
       isPrimaryUser: boolean;
       sessionCompletedAt: string | null;
+      sessionCompletedAtIsWallClock: boolean;
       laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
     }> = [];
 
@@ -2900,13 +2905,21 @@ export function NewRunForm(props: {
       const sessionDrivers = block.sessionDrivers ?? [];
       if (sessionDrivers.length === 0) continue;
       const sourceUrl = block.sourceUrl ?? null;
+      const blockPayloadForTime =
+        block.sessionCompletedAtIso != null && block.sessionCompletedAtIso.trim()
+          ? { sessionCompletedAtIso: block.sessionCompletedAtIso.trim() }
+          : undefined;
       const sessionCompletedAt = resolveImportedSessionDisplayTimeIso({
         sessionCompletedAt: block.sessionCompletedAtDbIso ?? null,
-        parsedPayload:
-          block.sessionCompletedAtIso != null && block.sessionCompletedAtIso.trim()
-            ? { sessionCompletedAtIso: block.sessionCompletedAtIso.trim() }
-            : undefined,
+        parsedPayload: blockPayloadForTime,
         createdAt: block.recordedAt,
+      });
+      // Tells the save API whether the time is an on-track wall clock (LiveRC/
+      // MyRCM store those as-if-UTC and the server reinterprets them in the
+      // user's zone) or the import-time fallback, which is already a real instant.
+      const sessionCompletedAtIsWallClock = resolveImportedSessionHasWallClockTime({
+        sessionCompletedAt: block.sessionCompletedAtDbIso ?? null,
+        parsedPayload: blockPayloadForTime,
       });
       const selected = new Set(block.selectedDriverIds ?? []);
       const selectedOrdered = sessionDrivers.filter((d) => selected.has(d.driverId));
@@ -2940,6 +2953,7 @@ export function NewRunForm(props: {
           normalizedName: d.normalizedName,
           isPrimaryUser: Boolean(primary && bi === 0 && d.driverId === primary.driverId),
           sessionCompletedAt,
+          sessionCompletedAtIsWallClock,
           laps,
         });
       }

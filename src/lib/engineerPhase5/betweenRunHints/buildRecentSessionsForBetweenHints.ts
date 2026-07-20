@@ -75,15 +75,18 @@ function clampText(s: string | null | undefined, max: number): string | null {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
-function runDisplayLabel(run: {
-  track: { name: string } | null;
-  trackNameSnapshot: string | null;
-  createdAt: Date;
-  sessionCompletedAt: Date | null;
-  loggingCompletedAt: Date | null;
-}): string {
+function runDisplayLabel(
+  run: {
+    track: { name: string } | null;
+    trackNameSnapshot: string | null;
+    createdAt: Date;
+    sessionCompletedAt: Date | null;
+    loggingCompletedAt: Date | null;
+  },
+  timeZone?: string | null
+): string {
   const track = run.track?.name?.trim() || run.trackNameSnapshot?.trim() || "Track";
-  const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run));
+  const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run), timeZone);
   return `${track} · ${when}`;
 }
 
@@ -218,6 +221,8 @@ export async function buildRecentSessionsForBetweenHints(params: {
     engineerReferenceRunId: string | null;
     hintDiffersFromEngineer: boolean;
   } | null;
+  /** Driver's IANA zone for run display labels; server zone when omitted. */
+  timeZone?: string | null;
 }): Promise<{
   recentSessions: BetweenRunRecentSessionSnapshotV1[];
   fingerprintMaterial: RecentSessionsFingerprintMaterial;
@@ -231,7 +236,9 @@ export async function buildRecentSessionsForBetweenHints(params: {
     if (id === params.primaryRunId && params.primaryPairwiseSummary) {
       summaries.push({ runId: id, summary: params.primaryPairwiseSummary });
     } else {
-      const res = await getOrComputeEngineerSummaryForRun(params.userId, id);
+      const res = await getOrComputeEngineerSummaryForRun(params.userId, id, {
+        timeZone: params.timeZone,
+      });
       summaries.push({ runId: id, summary: res?.summary ?? null });
     }
   }
@@ -249,7 +256,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
     const { runId, summary } = summaries[i]!;
     const meta = metaById.get(runId);
     const olderMeta = i + 1 < summaries.length ? metaById.get(summaries[i + 1]!.runId) : undefined;
-    const label = meta ? runDisplayLabel(meta) : runId;
+    const label = meta ? runDisplayLabel(meta, params.timeZone) : runId;
     const pace = summary ? paceVsFieldSummaryFromEngineerSummary(summary) : null;
     const paceMetrics = summary?.importedSessionFieldStats?.paceVsFieldMeanAnalysis ?? null;
     const paceMetricsSig =
@@ -376,7 +383,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
     if (bestRun) {
       bestPaceBaseline = {
         runId: bestRun.id,
-        displayLabel: runDisplayLabel(bestRun),
+        displayLabel: runDisplayLabel(bestRun, params.timeZone),
         setupLines: currentSetupLinesFromSnapshot(bestRun.setupSnapshot?.data),
       };
     }
@@ -398,7 +405,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
       if (!m) continue;
       if (!handlingShowsPushBias(m.handlingProblems, m.handlingAssessmentJson)) continue;
       const preview = handlingPreviewFromRun(m.handlingProblems, m.handlingAssessmentJson);
-      olderBits.push(`${runDisplayLabel(m)}${preview ? ` — ${preview}` : ""}`);
+      olderBits.push(`${runDisplayLabel(m, params.timeZone)}${preview ? ` — ${preview}` : ""}`);
       if (olderBits.length >= 2) break;
     }
     if (olderBits.length > 0) {

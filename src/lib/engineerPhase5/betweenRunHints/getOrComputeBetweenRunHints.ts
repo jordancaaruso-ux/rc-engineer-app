@@ -26,14 +26,17 @@ function parseHintPayload(raw: unknown): BetweenRunHintPayloadV2 | null {
  */
 export async function peekBetweenRunHint(
   userId: string,
-  primaryRunId: string
+  primaryRunId: string,
+  opts?: { timeZone?: string | null }
 ): Promise<BetweenRunHintPayloadV2 | null> {
   const row = await prisma.engineerBetweenRunHint.findUnique({
     where: { primaryRunId },
   });
   if (!row || row.userId !== userId) return null;
 
-  const prep = await prepareBetweenRunHintComputation(userId, primaryRunId);
+  const prep = await prepareBetweenRunHintComputation(userId, primaryRunId, {
+    timeZone: opts?.timeZone,
+  });
   if (!prep) return null;
 
   if (prep.fp !== row.inputFingerprint) return null;
@@ -44,10 +47,11 @@ export async function peekBetweenRunHint(
 export async function getOrComputeBetweenRunHint(
   userId: string,
   primaryRunId: string,
-  opts?: { force?: boolean }
+  opts?: { force?: boolean; timeZone?: string | null }
 ): Promise<{ hint: BetweenRunHintPayloadV2 | null; cached: boolean }> {
   const prep = await prepareBetweenRunHintComputation(userId, primaryRunId, {
     forceEngineerSummary: Boolean(opts?.force),
+    timeZone: opts?.timeZone,
   });
   if (!prep) return { hint: null, cached: false };
 

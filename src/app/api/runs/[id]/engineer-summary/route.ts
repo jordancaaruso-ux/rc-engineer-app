@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import {
   getOrComputeEngineerSummaryForRun,
   getOrComputeEngineerSummaryForRunPair,
@@ -20,9 +21,12 @@ export async function GET(req: Request, ctx: Ctx) {
   const sp = new URL(req.url).searchParams;
   const force = sp.get("force") === "1";
   const compareRunId = sp.get("compareRunId")?.trim() ?? "";
+  const timeZone = await getExplicitTimeZoneForRunFormatting();
 
   if (compareRunId) {
-    const pair = await getOrComputeEngineerSummaryForRunPair(user.id, id, compareRunId);
+    const pair = await getOrComputeEngineerSummaryForRunPair(user.id, id, compareRunId, {
+      timeZone,
+    });
     if (!pair) {
       return NextResponse.json(
         {
@@ -35,7 +39,7 @@ export async function GET(req: Request, ctx: Ctx) {
     return NextResponse.json({ summary: pair.summary, cached: false, compareMode: true as const });
   }
 
-  const result = await getOrComputeEngineerSummaryForRun(user.id, id, { force });
+  const result = await getOrComputeEngineerSummaryForRun(user.id, id, { force, timeZone });
   if (!result) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }

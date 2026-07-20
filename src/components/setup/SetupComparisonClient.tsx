@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eyebrow } from "@/components/ui/panel";
+import { CardPanel } from "@/components/ui/CardPanel";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
@@ -373,17 +374,16 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   return (
     <div className="space-y-4">
       {!dbReady ? (
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+        <CardPanel contentClassName="text-sm text-muted-foreground">
           Database not configured — only “Current setup” can be compared.
-        </div>
+        </CardPanel>
       ) : null}
 
       {err ? <div className="rounded-md border border-border bg-destructive/10 p-3 text-xs">{err}</div> : null}
 
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Eyebrow>Pick two setups</Eyebrow>
-          <div className="flex items-center gap-3">
+      <CardPanel contentClassName="space-y-3">
+        <Eyebrow>Pick two setups</Eyebrow>
+        <div className="flex flex-wrap items-center justify-end gap-3">
             <button
               type="button"
               onClick={openEngineerCompare}
@@ -412,7 +412,6 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             <Link href="/setup" className="text-xs text-muted-foreground hover:text-foreground">
               Back to Setup
             </Link>
-          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -516,7 +515,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
         ) : (
           <div className="text-[11px] text-muted-foreground">Select both setups to compare.</div>
         )}
-      </div>
+      </CardPanel>
 
       {compareDebug && canCompare && selectionA.data && selectionB.data ? (
         <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-xs space-y-3 font-mono">
@@ -590,7 +589,8 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
       ) : null}
 
       {canCompare && selectionA.data && selectionB.data ? (
-        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <CardPanel contentClassName="space-y-2">
+          <Eyebrow>Setup A vs B</Eyebrow>
           <div className="text-xs text-muted-foreground space-y-1">
             <div>
               <span className="font-medium text-foreground/90">Setup A</span>
@@ -617,7 +617,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             numericAggregationByKey={numericAggregationByKey}
             compareHighlightOnly
           />
-        </div>
+        </CardPanel>
       ) : null}
     </div>
   );

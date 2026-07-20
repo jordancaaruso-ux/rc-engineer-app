@@ -16,16 +16,25 @@ const MEETING_SESSION_TYPE_LABELS: Record<string, string> = {
 /**
  * Format run session for display (e.g. Run History).
  * Race Meeting: type label (or custom when Other) + optional sessionLabel.
- * Testing: sessionLabel or "—".
+ * Testing: sessionLabel, else `Run <dayRunNumber>` / `opts.fallback` / "—".
+ * Surfaces that know the run's position within its day should pass
+ * `dayRunNumber` so unlabeled testing runs get a real name instead of a dash.
  */
-export function formatRunSessionDisplay(run: {
-  sessionType: string;
-  meetingSessionType?: string | null;
-  meetingSessionCode?: string | null;
-  sessionLabel?: string | null;
-}): string {
+export function formatRunSessionDisplay(
+  run: {
+    sessionType: string;
+    meetingSessionType?: string | null;
+    meetingSessionCode?: string | null;
+    sessionLabel?: string | null;
+  },
+  opts?: { dayRunNumber?: number | null; fallback?: string }
+): string {
+  const unlabeled = () => {
+    if (opts?.dayRunNumber != null) return `Run ${opts.dayRunNumber}`;
+    return opts?.fallback ?? "—";
+  };
   if (run.sessionType !== "RACE_MEETING" && run.sessionType !== "PRACTICE") {
-    return run.sessionLabel?.trim() || "—";
+    return run.sessionLabel?.trim() || unlabeled();
   }
   const type = run.meetingSessionType;
   const custom = run.meetingSessionCode?.trim(); // when type is OTHER
@@ -40,5 +49,5 @@ export function formatRunSessionDisplay(run: {
     }
   }
   if (label) parts.push(label);
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  return parts.length > 0 ? parts.join(" · ") : unlabeled();
 }

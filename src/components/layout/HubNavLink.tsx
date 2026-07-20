@@ -43,7 +43,13 @@ const SCROLL_CANCEL_THRESHOLD_PX = 10;
  * `card` — the standalone glass tile used by the generic hubs (Analysis, etc.).
  * `row` — a flush row for a single-card hub (Assets), divided by hairlines and
  * carrying an optional live `count` in the right column (mono, like the sessions
- * one-card). Same tap / route-transition behavior in both variants.
+ * one-card).
+ * `door` — a header-only glass card: the tool's name IS the section header
+ * (accent stripe + hairline, same signpost as the cards it sits under), with a
+ * chevron on that row and nothing below it. Founder-picked 2026-07-18 so the
+ * Analysis tool doors stop reading as a different system from the data cards
+ * above them. No icon and no description by design.
+ * Same tap / route-transition behavior in every variant.
  */
 export function HubNavLink({
   link,
@@ -51,7 +57,7 @@ export function HubNavLink({
   count,
 }: {
   link: NavHubLink;
-  variant?: "card" | "row";
+  variant?: "card" | "row" | "door";
   count?: number;
 }) {
   const { beginTransition, cancelTransition } = useRouteTransition();
@@ -85,6 +91,26 @@ export function HubNavLink({
       pointerStartRef.current = null;
     },
   };
+
+  if (variant === "door") {
+    return (
+      <li>
+        <Link href={link.href} prefetch className="tap-active block" {...linkHandlers}>
+          <SurfaceCard variant="panel">
+            {/* `eyebrow-root` (hairline + pad) composed by hand rather than via
+                <Eyebrow> so the chevron can sit beside the label, not inside it. */}
+            <div className="eyebrow-root group flex items-center gap-2">
+              <span className="eyebrow-label min-w-0 flex-1">{link.label}</span>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                aria-hidden
+              />
+            </div>
+          </SurfaceCard>
+        </Link>
+      </li>
+    );
+  }
 
   if (variant === "row") {
     return (

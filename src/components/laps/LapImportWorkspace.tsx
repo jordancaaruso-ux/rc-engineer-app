@@ -6,7 +6,13 @@ import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { formatDriverSessionLabel, resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
+import {
+  formatDriverSessionLabel,
+  resolveImportedSessionDisplayTimeIso,
+  resolveImportedSessionHasWallClockTime,
+  timingSourceFromParserId,
+  timingSourceFromSourceUrl,
+} from "@/lib/lapImport/labels";
 import type { ImportedSessionFieldStatsPreviewV1 } from "@/lib/lapImport/computeImportedSessionFieldStats";
 import { formatLap } from "@/lib/runLaps";
 
@@ -352,7 +358,14 @@ export function LapImportWorkspace() {
                         parsedPayload: s.parsedPayload,
                         createdAt: s.createdAt,
                       });
-                      return formatDriverSessionLabel(name, whenIso);
+                      return formatDriverSessionLabel(name, whenIso, {
+                        timingSource:
+                          timingSourceFromParserId(s.parserId) ?? timingSourceFromSourceUrl(s.sourceUrl),
+                        isWallClockTime: resolveImportedSessionHasWallClockTime({
+                          sessionCompletedAt: s.sessionCompletedAt ?? null,
+                          parsedPayload: s.parsedPayload,
+                        }),
+                      });
                     })()}
                   </span>
                   <span className="break-all text-[11px] text-muted-foreground">{s.sourceUrl}</span>
