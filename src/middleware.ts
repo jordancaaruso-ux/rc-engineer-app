@@ -22,6 +22,12 @@ export default auth((req) => {
   if (pathname.startsWith("/api/health/")) {
     return NextResponse.next();
   }
+  // Build identity (env / branch / commit). Public because it exists to answer "which deployment
+  // am I actually on?", a question that usually comes up because auth sent you somewhere
+  // unexpected — gating it behind the very thing in doubt makes it useless. No secrets emitted.
+  if (pathname === "/api/_debug/version") {
+    return NextResponse.next();
+  }
 
   const authed = Boolean(req.auth);
 
