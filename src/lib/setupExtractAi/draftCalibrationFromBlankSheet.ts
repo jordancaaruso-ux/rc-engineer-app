@@ -372,16 +372,35 @@ export async function draftCalibrationFromBlankSheet(input: {
     warnings.push(`aspect_mismatch pdf=${pageAspect.toFixed(3)} image=${imageAspect.toFixed(3)}`);
   }
 
-  const imageDataUrls = [`data:${input.blankImageMime};base64,${input.blankImageBytes.toString("base64")}`];
+  // Downscale before upload. The OpenAI "high detail" path rescales an image's shortest side to
+  // ~768px, so the 2480px-wide blank we start from is discarded pixels we pay upload time for:
+  // the same 5 images ride along with EVERY batch, so on a 200-field sheet that was ~43 MB of
+  // egress. Tiles are still cropped from the full-resolution original, so fine print survives.
+  const forUpload = async (buf: Buffer): Promise<string> => {
+    try {
+      const jpeg = await sharp(buf).resize({ width: 1024, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
+    } catch {
+      return `data:${input.blankImageMime};base64,${buf.toString("base64")}`;
+    }
+  };
+
+  const imageDataUrls = [await forUpload(input.blankImageBytes)];
   try {
     for (const t of await buildImageTiles(input.blankImageBytes)) {
-      imageDataUrls.push(`data:image/png;base64,${t.toString("base64")}`);
+      imageDataUrls.push(await forUpload(t));
     }
   } catch {
     warnings.push("tiling_failed_full_image_only");
   }
 
-  const batchSize = input.batchSize && input.batchSize > 0 ? input.batchSize : 60;
+  // Measured on the real 201-field X4'26 AcroForm (gpt-5, reasoning_effort low):
+  //   60 fields/batch -> 85s  (4853 completion tokens, 2688 of them reasoning)
+  //   30 fields/batch -> 30s  (1799 completion tokens, 1024 reasoning)
+  // Strongly non-linear, because the call is generation-bound rather than image-bound. Smaller
+  // batches are both faster overall and parallelise better: 7 batches at 4-way concurrency is two
+  // waves (~90s incl. repair) against ~340s for the original sequential 60s.
+  const batchSize = input.batchSize && input.batchSize > 0 ? input.batchSize : 30;
   const batches: BlankFieldGeometry[][] = [];
   for (let i = 0; i < geometry.fields.length; i += batchSize) {
     batches.push(geometry.fields.slice(i, i + batchSize));
@@ -396,9 +415,9 @@ export async function draftCalibrationFromBlankSheet(input: {
   const remainingMs = () => budgetMs - (Date.now() - startedAt);
 
   const labeledByName = new Map<string, LabeledField>();
-  // Concurrency is capped rather than unbounded: each call ships 5 high-detail images, so firing
-  // every batch at once risks a token-per-minute 429 that would fail the whole draft.
-  const CONCURRENCY = 3;
+  // Capped rather than unbounded: each call ships 5 high-detail images (~7K tokens in, ~2K out),
+  // so firing all batches at once risks a token-per-minute 429 that would fail the whole draft.
+  const CONCURRENCY = 4;
   const results: LabeledField[][] = new Array(batches.length).fill(null).map(() => []);
   let cursor = 0;
   const workers = Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
