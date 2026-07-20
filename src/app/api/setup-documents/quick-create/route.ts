@@ -589,7 +589,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   if (parseStatus === "FAILED") {
     needsReview = true;
-    needsReviewReason = needsReviewReason ?? "Parse did not produce any fields.";
+    // A calibration matched but read nothing back: the template is wired to field names this PDF
+    // doesn't have. Naming it beats "parse did not produce any fields" — otherwise a broken
+    // template looks identical to an unsupported sheet and quietly returns a blank sheet forever.
+    needsReviewReason =
+      needsReviewReason
+      ?? (pickedCalibrationId
+        ? `Matched the “${outcome.pickedCalibrationName ?? "saved"}” template, but it read no values from this sheet — the template's field mapping doesn't fit this PDF. Nothing was imported.`
+        : "Parse did not produce any fields.");
   }
 
   let setupId: string | null = null;

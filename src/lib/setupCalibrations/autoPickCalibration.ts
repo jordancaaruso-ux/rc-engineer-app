@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { calibrationsAutoPickableByUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import {
@@ -82,14 +83,25 @@ export async function buildCalibrationFingerprints(input: {
       createdAt: true,
       setupSheetModelId: true,
       setupSheetModel: { select: { name: true } },
+      calibrationDataJson: true,
     },
     orderBy: { createdAt: "desc" },
   });
+  // Drop empty shells. The calibration editor's normal flow is "create the row, then map its
+  // fields", so a calibration with an example PDF but zero mappings of any kind is a half-finished
+  // template — yet it fingerprint-matches its own source sheet perfectly and would win the exact
+  // pick, silently importing every future copy of that sheet as blank. Filtered BEFORE the
+  // name-dedupe below so a newer empty shell cannot shadow an older working calibration.
+  const mapped = calibrations.filter((c) => {
+    const counts = calibrationMappingCounts(normalizeCalibrationData(c.calibrationDataJson));
+    return counts.formFields + counts.textFields + counts.regionFields + counts.imageFields > 0;
+  });
+
   // Collapse duplicates by name → keep the most recently created entry. Historical cleanup can leave
   // multiple rows with the same name pointing at the same example PDF; without this, the exact-match
   // picker would flag every PDF of that template as ambiguous.
   const bestByName = new Map<string, (typeof calibrations)[number]>();
-  for (const c of calibrations) {
+  for (const c of mapped) {
     if (!bestByName.has(c.name)) bestByName.set(c.name, c);
   }
   const deduped = [...bestByName.values()];
