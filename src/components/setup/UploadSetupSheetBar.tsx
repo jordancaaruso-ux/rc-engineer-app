@@ -395,8 +395,8 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
                           />
                           <DoorRow
                             icon={<ClipboardPaste className="size-4" strokeWidth={2} aria-hidden />}
-                            title="Paste image"
-                            hint="A screenshot you copied"
+                            title="Paste"
+                            hint="An image or PDF you copied"
                             onClick={() => void onPasteTap()}
                           />
                         </ul>

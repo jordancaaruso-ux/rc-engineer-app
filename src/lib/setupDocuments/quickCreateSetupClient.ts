@@ -180,7 +180,7 @@ export async function postQuickCreateSetup(
   }
 }
 
-/** First image/* file on the clipboard, if any. */
+/** First image/* or PDF file on the clipboard, if any. */
 export function clipboardEventToImageFile(ev: { clipboardData: DataTransfer | null }): File | null {
   const items = ev.clipboardData?.items;
   if (!items?.length) return null;
@@ -190,7 +190,7 @@ export function clipboardEventToImageFile(ev: { clipboardData: DataTransfer | nu
     const f = it.getAsFile();
     if (!f) continue;
     const t = (f.type || "").toLowerCase();
-    if (t.startsWith("image/")) return f;
+    if (t.startsWith("image/") || t === "application/pdf") return f;
   }
   return null;
 }
@@ -200,10 +200,15 @@ export type ReadClipboardImageResult =
   | { ok: false; reason: string };
 
 /**
- * Read the first image on the clipboard via the async Clipboard API. Unlike a `paste` event
- * (desktop-only — mobile browsers don't fire `paste` on non-editable elements and there's no
- * Ctrl+V), `navigator.clipboard.read()` works on a user gesture on mobile (iOS Safari 13.4+,
+ * Read the first image or PDF on the clipboard via the async Clipboard API. Unlike a `paste`
+ * event (desktop-only — mobile browsers don't fire `paste` on non-editable elements and there's
+ * no Ctrl+V), `navigator.clipboard.read()` works on a user gesture on mobile (iOS Safari 13.4+,
  * Android Chrome), behind a permission prompt. Must be called from a click/tap handler.
+ *
+ * iOS caveat: WebKit only exposes a sanitized subset of the pasteboard to `read()` — an image
+ * copied from a web page can surface as just its URL (`text/uri-list` / `text/html`) with the
+ * pixels withheld. When that happens we report exactly what the clipboard held, so the failure
+ * is diagnosable from the on-screen message instead of a false "nothing on the clipboard".
  */
 export async function readImageFromClipboard(): Promise<ReadClipboardImageResult> {
   const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
@@ -212,12 +217,30 @@ export async function readImageFromClipboard(): Promise<ReadClipboardImageResult
   }
   try {
     const items = await clip.read();
+    const seenTypes: string[] = [];
     for (const item of items) {
-      const type = item.types.find((t) => t.toLowerCase().startsWith("image/"));
+      seenTypes.push(...item.types);
+      const type = item.types.find(
+        (t) => t.toLowerCase().startsWith("image/") || t.toLowerCase() === "application/pdf"
+      );
       if (!type) continue;
       const blob = await item.getType(type);
-      const ext = (type.split("/")[1] || "png").split(";")[0] || "png";
+      const isPdf = type.toLowerCase() === "application/pdf";
+      const ext = isPdf ? "pdf" : (type.split("/")[1] || "png").split(";")[0] || "png";
       return { ok: true, file: new File([blob], `pasted-setup.${ext}`, { type }) };
+    }
+    if (seenTypes.length > 0) {
+      const summary = [...new Set(seenTypes)].join(", ");
+      const looksLikeLink = seenTypes.some((t) => {
+        const low = t.toLowerCase();
+        return low === "text/uri-list" || low === "text/html" || low === "text/plain";
+      });
+      return {
+        ok: false,
+        reason: looksLikeLink
+          ? `The clipboard has a link to the image (${summary}), not the image itself — Safari sometimes copies it that way. Save the image to Photos and use Upload file, or take a screenshot and copy that.`
+          : `The clipboard holds ${summary}, which can't be imported — copy an image or PDF instead.`,
+      };
     }
     return { ok: false, reason: "No image on the clipboard — copy a screenshot first." };
   } catch (e) {
