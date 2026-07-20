@@ -41,6 +41,8 @@
     "test:picker-models": "npx tsx src/lib/setupSheetModels/pickerModels.test.ts",
     "test:run-picker": "npx tsx src/lib/runPickerFormat.test.ts",
     "test:fingerprint-scope": "npx tsx src/lib/setupCalibrations/scopeCandidates.test.ts",
+    "test:blank-widget-order": "npx tsx --test src/lib/setupExtractAi/blankSheetWidgetOrder.test.ts",
+    "test:blank-cal-fit": "npx tsx --test src/lib/setupSheetModels/blankSheetCalibrationFit.test.ts",
     "test:cross-model-disambig": "node --conditions=react-server --import tsx src/lib/setupCalibrations/crossModelDisambiguation.test.ts",
     "test:engineer-ratings": "npx tsx src/lib/engineerFeedback/ratingValidation.test.ts && npx tsx src/lib/engineerFeedback/adminFeedbackAccess.test.ts",
     "test:engineer-export-feedback": "npx tsx src/lib/engineerFeedback/exportFeedbackInbox.test.ts && npx tsx src/lib/engineerFeedback/zipStore.test.ts",

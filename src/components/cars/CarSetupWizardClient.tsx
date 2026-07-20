@@ -63,6 +63,11 @@ export function SetupSheetModelWizardClient() {
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [model, setModel] = useState<{ id: string; name: string; slug: string } | null>(null);
   const [reused, setReused] = useState(false);
+  const [calibrated, setCalibrated] = useState(false);
+  const [calibrationNote, setCalibrationNote] = useState<string | null>(null);
+  /** Blank AcroForm stored by /draft-from-pdf + its read rules — become the model's calibration. */
+  const [exampleDocumentId, setExampleDocumentId] = useState<string | null>(null);
+  const [formFieldMappings, setFormFieldMappings] = useState<Record<string, unknown>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -98,6 +103,8 @@ export function SetupSheetModelWizardClient() {
           fields?: Omit<ReviewField, "include">[];
           warnings?: string[];
           error?: string;
+          exampleDocumentId?: string | null;
+          formFieldMappings?: Record<string, unknown>;
         };
         if (!res.ok) {
           setError(data.error?.trim() || `Field detection failed (${res.status}).`);
@@ -108,6 +115,8 @@ export function SetupSheetModelWizardClient() {
           setError("No fields were detected on this sheet.");
           return;
         }
+        setExampleDocumentId(data.exampleDocumentId ?? null);
+        setFormFieldMappings(data.formFieldMappings ?? {});
         setReviewFields(fields);
         setWarnings(data.warnings ?? []);
         setStep("review");
@@ -144,11 +153,14 @@ export function SetupSheetModelWizardClient() {
             ...(f.options ? { options: f.options } : {}),
             ...(f.universalParameterId ? { universalParameterId: f.universalParameterId } : {}),
           })),
+          ...(exampleDocumentId ? { exampleDocumentId, formFieldMappings } : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         model?: { id: string; name: string; slug: string };
         reused?: boolean;
+        calibrationId?: string | null;
+        calibrationNote?: string | null;
         error?: string;
       };
       if (!res.ok || !data.model) {
@@ -157,6 +169,8 @@ export function SetupSheetModelWizardClient() {
       }
       setModel(data.model);
       setReused(Boolean(data.reused));
+      setCalibrated(Boolean(data.calibrationId));
+      setCalibrationNote(data.calibrationNote?.trim() || null);
       setStep("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create the sheet model.");
@@ -164,7 +178,7 @@ export function SetupSheetModelWizardClient() {
       setBusy(false);
       setBusyLabel("");
     }
-  }, [name, reviewFields]);
+  }, [name, reviewFields, exampleDocumentId, formFieldMappings]);
 
   const activeField = reviewFields.find((f) => f.key === activeKey) ?? null;
 
@@ -372,13 +386,18 @@ export function SetupSheetModelWizardClient() {
           <p className="font-medium text-emerald-100">
             {reused ? `“${model.name}” already existed — using the shared model.` : `“${model.name}” is ready.`}
           </p>
+          <p className="text-xs text-muted-foreground">
+            {calibrationNote
+              ?? (calibrated
+                ? "Filled copies of this sheet will now import automatically — the AcroForm fields are mapped and the blank is stored as the match reference."
+                : "Heads up: no calibration was created, so uploads of this sheet will import blank until the AcroForm is mapped by hand.")}
+          </p>
           <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
             <li>
               <Link href={`/setup-sheet-models/${model.id}/schema`} className="text-accent hover:underline">
                 Refine parameters (types, options, layout)
               </Link>
             </li>
-            <li>Next: calibrate the AcroForm to map each field, then derive the image map.</li>
             <li>
               <Link href="/cars" className="text-accent hover:underline">
                 Add your car in Assets › Cars

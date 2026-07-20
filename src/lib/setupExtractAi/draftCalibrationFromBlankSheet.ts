@@ -11,6 +11,8 @@ import type {
   ImageCalibrationAnchor,
   ImageCalibrationField,
   ImageRegion,
+  PdfFormFieldMappingRule,
+  PdfFormWidgetInstanceRef,
 } from "@/lib/setupCalibrations/types";
 
 /**
@@ -42,12 +44,15 @@ export type BlankFieldGeometry = {
 export type BlankAcroFormGeometry = {
   pageWidthPt: number;
   pageHeightPt: number;
+  /** Total pages in the PDF. Geometry is page-1-only; >1 means widget indices may not be reliable. */
+  pageCount: number;
   fields: BlankFieldGeometry[];
 };
 
 export async function parseBlankAcroFormGeometry(pdfBytes: Buffer): Promise<BlankAcroFormGeometry> {
   const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const page = doc.getPage(0);
+  const pageCount = doc.getPageCount();
   const { width: pageWidthPt, height: pageHeightPt } = page.getSize();
   const fields: BlankFieldGeometry[] = [];
   for (const field of doc.getForm().getFields()) {
@@ -69,7 +74,28 @@ export async function parseBlankAcroFormGeometry(pdfBytes: Buffer): Promise<Blan
     if (widgets.length === 0) continue;
     fields.push({ name: field.getName(), kind, widgets });
   }
-  return { pageWidthPt, pageHeightPt, fields };
+  return { pageWidthPt, pageHeightPt, pageCount, fields };
+}
+
+/**
+ * Map a geometry `widgetIndex` (raw pdf-lib `getWidgets()` order) to the `widgetInstanceIndex` the
+ * PDF *reader* uses. `collectWidgetLayouts` (setupDocuments/pdfFormFields.ts) re-sorts a field's
+ * widgets by (page, y, x) — y measured top-down — and renumbers them 0..n-1, so the two orders
+ * differ whenever the PDF author added widgets out of visual order. Emitting raw indices would
+ * silently map every checkbox option to the wrong box.
+ *
+ * Geometry is page-1-only and its `yPct`/`xPct` are monotonic in the reader's `y`/`x`, so sorting
+ * on them reproduces the reader's ordering exactly.
+ */
+export function widgetInstanceIndexByGeometryIndex(widgets: readonly BlankWidgetGeometry[]): Map<number, number> {
+  const sorted = [...widgets].sort((a, b) => {
+    if (a.region.yPct !== b.region.yPct) return a.region.yPct - b.region.yPct;
+    if (a.region.xPct !== b.region.xPct) return a.region.xPct - b.region.xPct;
+    return a.widgetIndex - b.widgetIndex;
+  });
+  const byGeometryIndex = new Map<number, number>();
+  sorted.forEach((w, instanceIndex) => byGeometryIndex.set(w.widgetIndex, instanceIndex));
+  return byGeometryIndex;
 }
 
 type LabeledOption = { widgetIndex: number; label: string };
@@ -129,9 +155,12 @@ async function runLabelingBatch(input: {
   imageDataUrls: string[];
   carName: string;
   batch: BlankFieldGeometry[];
+  /** Hard cap for this call. Kept under the caller's remaining budget so the route can return
+   *  a real error instead of being killed mid-flight by the platform (504). */
+  timeoutMs?: number;
 }): Promise<LabeledField[]> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 240000);
+  const timeoutId = setTimeout(() => controller.abort(), input.timeoutMs ?? 240000);
   let raw: unknown;
   try {
     const modelParams = isReasoningModel(input.model)
@@ -297,6 +326,12 @@ async function buildAnchors(blankImage: Buffer, widthPx: number, heightPx: numbe
 export type BlankSheetDraftResult = {
   draftedSchema: DraftedSchema;
   imageCalibration: ImageCalibration;
+  /**
+   * AcroForm read rules (drafted field key → PDF field rule) for the *same* blank sheet. Lets the
+   * sheet-model wizard ship a working PDF calibration instead of leaving the model unreadable
+   * until someone hand-maps it. Deterministic — derived from geometry, not the LLM.
+   */
+  formFieldMappings: Record<string, PdfFormFieldMappingRule>;
   /** Raw geometry, kept for admin review UI / debugging. */
   geometry: BlankAcroFormGeometry;
   warnings: string[];
@@ -316,6 +351,8 @@ export async function draftCalibrationFromBlankSheet(input: {
   /** SetupDocument id of the stored blank, when one exists. */
   referenceDocumentId?: string;
   batchSize?: number;
+  /** Wall-clock budget for all vision calls. Keep below the caller's function timeout. */
+  budgetMs?: number;
 }): Promise<BlankSheetDraftResult> {
   const model = input.model?.trim() || DEFAULT_SETUP_EXTRACT_MODEL;
   const warnings: string[] = [];
@@ -349,15 +386,68 @@ export async function draftCalibrationFromBlankSheet(input: {
   for (let i = 0; i < geometry.fields.length; i += batchSize) {
     batches.push(geometry.fields.slice(i, i + batchSize));
   }
+
+  // Wall-clock budget. Batches used to run one after another with a 240s timeout EACH, so a
+  // 4-batch sheet could ask for ~16 minutes inside a 300s function — the platform killed it and
+  // the caller saw a bare 504 with no explanation. Now: run batches concurrently (they are
+  // independent — disjoint field sets) under one shared deadline.
+  const startedAt = Date.now();
+  const budgetMs = input.budgetMs && input.budgetMs > 0 ? input.budgetMs : 240000;
+  const remainingMs = () => budgetMs - (Date.now() - startedAt);
+
   const labeledByName = new Map<string, LabeledField>();
-  for (const batch of batches) {
-    const labeled = await runLabelingBatch({
-      apiKey: input.apiKey,
-      model,
-      imageDataUrls,
-      carName: input.carName,
-      batch,
-    });
+  // Concurrency is capped rather than unbounded: each call ships 5 high-detail images, so firing
+  // every batch at once risks a token-per-minute 429 that would fail the whole draft.
+  const CONCURRENCY = 3;
+  const results: LabeledField[][] = new Array(batches.length).fill(null).map(() => []);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
+    for (;;) {
+      const index = cursor++;
+      if (index >= batches.length) return;
+      const left = remainingMs();
+      if (left <= 5000) {
+        warnings.push(`labeling_batch_skipped_out_of_budget:${index}`);
+        continue;
+      }
+      try {
+        results[index] = await runLabelingBatch({
+          apiKey: input.apiKey,
+          model,
+          imageDataUrls,
+          carName: input.carName,
+          batch: batches[index]!,
+          timeoutMs: left,
+        });
+      } catch (e) {
+        // Running batches concurrently makes a transient rate-limit more likely, and a dropped
+        // batch costs real label quality (its fields fall back to raw AcroForm names). One retry
+        // if the budget still allows; otherwise degrade rather than lose the whole draft.
+        const firstError = e instanceof Error ? e.message : String(e);
+        const retryLeft = remainingMs();
+        if (retryLeft > 20000) {
+          try {
+            results[index] = await runLabelingBatch({
+              apiKey: input.apiKey,
+              model,
+              imageDataUrls,
+              carName: input.carName,
+              batch: batches[index]!,
+              timeoutMs: retryLeft,
+            });
+            continue;
+          } catch {
+            // fall through to the warning below
+          }
+        }
+        warnings.push(`labeling_batch_failed:${index}`);
+        console.warn(`[draftCalibrationFromBlankSheet] batch ${index} failed: ${firstError}`);
+      }
+    }
+  });
+  await Promise.all(workers);
+  // Merge in batch order so the result is deterministic regardless of completion order.
+  for (const labeled of results) {
     for (const f of labeled) {
       if (!labeledByName.has(f.name)) labeledByName.set(f.name, f);
     }
@@ -373,7 +463,11 @@ export async function draftCalibrationFromBlankSheet(input: {
     const covered = new Set((l.options ?? []).map((o) => o.widgetIndex));
     return !geo.widgets.every((w) => covered.has(w.widgetIndex));
   });
-  if (needsRepair.length > 0) {
+  if (needsRepair.length > 0 && remainingMs() <= 15000) {
+    // Skipping is cheap: these fields keep their raw AcroForm labels and are already warned about.
+    // Overrunning is not — it costs the entire draft.
+    warnings.push(`repair_pass_skipped_out_of_budget:${needsRepair.length}_fields`);
+  } else if (needsRepair.length > 0) {
     try {
       const repaired = await runLabelingBatch({
         apiKey: input.apiKey,
@@ -381,6 +475,7 @@ export async function draftCalibrationFromBlankSheet(input: {
         imageDataUrls,
         carName: input.carName,
         batch: needsRepair,
+        timeoutMs: remainingMs(),
       });
       for (const f of repaired) {
         const existing = labeledByName.get(f.name);
@@ -396,6 +491,12 @@ export async function draftCalibrationFromBlankSheet(input: {
   const seenKeys = new Set<string>();
   const draftedFields: DraftedField[] = [];
   const calibrationFields: ImageCalibrationField[] = [];
+  const formFieldMappings: Record<string, PdfFormFieldMappingRule> = {};
+  if (geometry.pageCount > 1) {
+    // Geometry only walks page 1, but the reader indexes widgets across every page, so a
+    // multi-page sheet can shift instance indices. Flag it rather than emit wrong option maps.
+    warnings.push(`multi_page_pdf:${geometry.pageCount}_pages_widget_indices_unverified`);
+  }
 
   for (const geo of geometry.fields) {
     const labeled = labeledByName.get(geo.name);
@@ -415,8 +516,11 @@ export async function draftCalibrationFromBlankSheet(input: {
         ...(universalParameterId ? { universalParameterId } : {}),
       });
       calibrationFields.push({ kind: "text", key, region: expandTextRegion(geo.widgets[0]!.region) });
+      formFieldMappings[key] = { mode: "acroField", pdfFieldName: geo.name };
       continue;
     }
+
+    const instanceIndexByGeometryIndex = widgetInstanceIndexByGeometryIndex(geo.widgets);
 
     // Checkbox field: enforce structure from geometry — exactly one option label per widget.
     const byWidget = new Map<number, string>();
@@ -450,6 +554,8 @@ export async function draftCalibrationFromBlankSheet(input: {
         checkedValue: optionLabels[0]!,
         uncheckedValue: "",
       });
+      // Lone checkbox: the simple rule reads the field's own on/off state.
+      formFieldMappings[key] = { mode: "acroField", pdfFieldName: geo.name };
       continue;
     }
 
@@ -461,6 +567,22 @@ export async function draftCalibrationFromBlankSheet(input: {
       options: optionLabels,
       ...(universalParameterId ? { universalParameterId } : {}),
     });
+    // Option label → the reader's widget instance index (NOT the raw geometry index).
+    const optionRefs: Record<string, PdfFormWidgetInstanceRef> = {};
+    geo.widgets.forEach((w, i) => {
+      const label = optionLabels[i]!;
+      const instanceIndex = instanceIndexByGeometryIndex.get(w.widgetIndex);
+      if (instanceIndex == null) return;
+      // Duplicate labels would collide in the options map and silently drop a box — the
+      // duplication is already warned about above; keep the first so the rule stays readable.
+      if (!(label in optionRefs)) optionRefs[label] = { widgetInstanceIndex: instanceIndex };
+    });
+    formFieldMappings[key] = {
+      mode: labeled?.fieldKind === "multi" ? "multiSelectWidgetGroup" : "singleChoiceWidgetGroup",
+      pdfFieldName: geo.name,
+      options: optionRefs,
+    };
+
     // Gates measured on a real filled X4'26 (2026-07-07): marked boxes read ~0.33–0.41 mean
     // darkness (red X + printed border), unmarked ~0.24–0.30, real-mark margins ≥ 0.05.
     // The legacy defaults (0.45 / 0.08) would reject every mark on that sheet.
@@ -507,5 +629,5 @@ export async function draftCalibrationFromBlankSheet(input: {
     warnings,
   };
 
-  return { draftedSchema, imageCalibration, geometry, warnings };
+  return { draftedSchema, imageCalibration, formFieldMappings, geometry, warnings };
 }

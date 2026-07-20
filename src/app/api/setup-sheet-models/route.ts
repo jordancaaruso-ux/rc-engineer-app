@@ -12,6 +12,10 @@ import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAu
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { draftedSchemaToModelSchema } from "@/lib/setupExtractAi/draftedSchemaToModelSchema";
 import type { DraftedField } from "@/lib/setupExtractAi/draftSetupSheetModelSchema";
+import { verifiedAtForNewCalibration } from "@/lib/setupCalibrations/calibrationAccess";
+import { assessBlankSheetCalibrationFit } from "@/lib/setupSheetModels/blankSheetCalibrationFit";
+import { isPdfFormFieldMappingRule, normalizePdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -73,6 +77,10 @@ export async function POST(request: Request) {
     schema?: unknown;
     /** AcroForm-anchored AI draft (from /draft-from-pdf), converted to a schema server-side. */
     draftedFields?: DraftedField[];
+    /** SetupDocument id of the blank AcroForm stored by /draft-from-pdf. */
+    exampleDocumentId?: string | null;
+    /** Drafted key → AcroForm read rule, from the same /draft-from-pdf response. */
+    formFieldMappings?: Record<string, unknown>;
   };
   const name = body.name?.trim();
   if (!name) {
@@ -88,9 +96,24 @@ export async function POST(request: Request) {
   });
   const existingByName = existingRows.find((m) => normalizeSetupSheetModelName(m.name) === norm);
   if (existingByName) {
+    // Repair path: models created before the wizard shipped calibrations (and any whose
+    // calibration was never authored) are unreadable — every upload of their sheet imports blank.
+    // Re-running the wizard with the same PDF attaches the missing calibration in place.
+    const repair = await repairMissingCalibration({
+      user,
+      modelId: existingByName.id,
+      modelName: existingByName.name,
+      exampleDocumentId: body.exampleDocumentId ?? null,
+      rawMappings: body.formFieldMappings,
+    });
     revalidatePath("/cars");
     revalidatePath("/setup-sheet-models");
-    return NextResponse.json({ model: existingByName, reused: true });
+    return NextResponse.json({
+      model: existingByName,
+      reused: true,
+      calibrationId: repair.calibrationId,
+      calibrationNote: repair.note,
+    });
   }
 
   // Creating a brand-new chassis type (a global, shared setup sheet) is admin-only — the catalog is
@@ -135,7 +158,146 @@ export async function POST(request: Request) {
     select: { id: true, name: true, slug: true },
   });
 
+  // Ship the model with a working AcroForm calibration. A sheet model on its own only names the
+  // fields — without a calibration (and an example PDF to fingerprint) auto-pick can never match
+  // an upload of this sheet, so every import of it came back blank.
+  const calibrationId = await createBlankSheetCalibration({
+    userId: user.id,
+    userEmail: user.email,
+    modelId: model.id,
+    modelName: name,
+    exampleDocumentId: body.exampleDocumentId ?? null,
+    rawMappings: body.formFieldMappings,
+    // Only map fields the driver kept in review.
+    keepKeys: new Set((body.draftedFields ?? []).map((f) => f.key)),
+  });
+
   revalidatePath("/cars");
   revalidatePath("/setup-sheet-models");
-  return NextResponse.json({ model }, { status: 201 });
+  return NextResponse.json({ model, calibrationId }, { status: 201 });
+}
+
+/**
+ * Attach a calibration to an EXISTING sheet model that has none. Deliberately conservative — this
+ * mutates a globally shared row, so it is admin-only, refuses when any calibration already exists
+ * (never competes with authored work), and refuses when the uploaded PDF doesn't actually look
+ * like this model's sheet. Returns a note explaining every refusal rather than failing silently.
+ */
+async function repairMissingCalibration(input: {
+  user: { id: string; email: string | null };
+  modelId: string;
+  modelName: string;
+  exampleDocumentId: string | null;
+  rawMappings: Record<string, unknown> | undefined;
+}): Promise<{ calibrationId: string | null; note: string | null }> {
+  if (!input.exampleDocumentId?.trim() || !input.rawMappings) {
+    return { calibrationId: null, note: null };
+  }
+  const model = await prisma.setupSheetModel.findUnique({
+    where: { id: input.modelId },
+    select: { schemaJson: true, defaultCalibrationId: true, _count: { select: { calibrations: true } } },
+  });
+  if (!model) return { calibrationId: null, note: null };
+
+  // Healthy-model check first: nothing needs repairing, so don't talk about permissions.
+  if (model._count.calibrations > 0 || model.defaultCalibrationId) {
+    return {
+      calibrationId: null,
+      note: "This chassis type already exists and already has a calibration — it was left untouched.",
+    };
+  }
+  if (!isAuthAdminEmail(input.user.email)) {
+    return {
+      calibrationId: null,
+      note: "This chassis type already exists but has no calibration, so its sheets can't import automatically yet. Only an admin can attach one.",
+    };
+  }
+
+  const schema = parseSetupSheetModelSchema(model.schemaJson);
+  const schemaKeys = (schema?.fields ?? []).map((f) => f.key);
+  const fit = assessBlankSheetCalibrationFit(Object.keys(input.rawMappings), schemaKeys);
+  if (!fit.ok) {
+    return { calibrationId: null, note: `No calibration was attached. ${fit.reason}` };
+  }
+
+  const calibrationId = await createBlankSheetCalibration({
+    userId: input.user.id,
+    userEmail: input.user.email,
+    modelId: input.modelId,
+    modelName: input.modelName,
+    exampleDocumentId: input.exampleDocumentId,
+    rawMappings: input.rawMappings,
+    // Only map fields this model actually defines — extra PDF fields would import values the
+    // model can't display.
+    keepKeys: new Set(fit.matchedKeys),
+  });
+  return {
+    calibrationId,
+    note: calibrationId
+      ? `Calibration attached to the existing “${input.modelName}”. ${fit.reason}`
+      : "No calibration was attached — the uploaded PDF produced no usable field mappings.",
+  };
+}
+
+/**
+ * Create the PDF calibration for a freshly drafted sheet model. Returns null (never throws) when
+ * there is nothing usable to build from — the model is already created and is still useful, so a
+ * missing calibration degrades to the previous "map it by hand later" behaviour.
+ */
+async function createBlankSheetCalibration(input: {
+  userId: string;
+  userEmail: string | null;
+  modelId: string;
+  modelName: string;
+  exampleDocumentId: string | null;
+  rawMappings: Record<string, unknown> | undefined;
+  keepKeys: Set<string>;
+}): Promise<string | null> {
+  const exampleDocumentId = input.exampleDocumentId?.trim() || null;
+  if (!exampleDocumentId || !input.rawMappings) return null;
+
+  // The example must be a document this user just uploaded — never trust a client-supplied id
+  // pointing at someone else's sheet.
+  const doc = await prisma.setupDocument.findFirst({
+    where: { id: exampleDocumentId, userId: input.userId },
+    select: { id: true },
+  });
+  if (!doc) return null;
+
+  const formFieldMappings: Record<string, PdfFormFieldMappingRule> = {};
+  for (const [key, rule] of Object.entries(input.rawMappings)) {
+    if (input.keepKeys.size > 0 && !input.keepKeys.has(key)) continue;
+    if (!isPdfFormFieldMappingRule(rule)) continue;
+    formFieldMappings[key] = normalizePdfFormFieldMappingRule(rule as PdfFormFieldMappingRule);
+  }
+  if (Object.keys(formFieldMappings).length === 0) return null;
+
+  const calibration = await prisma.setupSheetCalibration.create({
+    data: {
+      userId: input.userId,
+      name: `${input.modelName} (AcroForm)`,
+      sourceType: "awesomatix_pdf",
+      calibrationDataJson: {
+        templateType: "pdf_form_fields",
+        documentMeta: { lineGroupingEpsilon: 2.5 },
+        formFieldMappings,
+        fieldMappings: {},
+        fields: {},
+      } as object,
+      exampleDocumentId,
+      setupSheetModelId: input.modelId,
+      verifiedAt: verifiedAtForNewCalibration({ id: input.userId, email: input.userEmail }),
+    },
+    select: { id: true },
+  });
+
+  await prisma.setupSheetModel.update({
+    where: { id: input.modelId },
+    data: { defaultCalibrationId: calibration.id },
+  });
+  await prisma.setupDocument.update({
+    where: { id: exampleDocumentId },
+    data: { setupSheetModelId: input.modelId, calibrationProfileId: calibration.id },
+  });
+  return calibration.id;
 }
