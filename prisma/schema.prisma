@@ -194,11 +194,6 @@ model SetupSheetModel {
   schemaJson Json
   /// Confirmed/curated catalog entry (admin-managed). User-created models stay false until reviewed.
   isAuthorized Boolean @default(false)
-  /**
-   * Manufacturer kit setup for this chassis, same shape as `SetupSnapshot.data`. Admin-entered on
-   * catalog models only; drivers may start their first setup from it instead of an empty sheet.
-   */
-  kitSetupJson Json?
 
   /// Creator (attribution only; models are shared globally). Null for seeded catalog entries.
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -530,18 +525,6 @@ model SetupSnapshot {
   // Flexible JSON blob with setup parameters (geometry, shocks, diff, etc.)
   data Json
 
-  /**
-   * Named, reusable setup in the car's library ("X4 — high grip carpet"). Null for the per-run
-   * snapshots every logged run creates — those stay anonymous history.
-   */
-  name String?
-
-  /**
-   * True only for library setups (created from the car page, never attached to a run directly).
-   * Aggregations read snapshots *through runs*, so library rows can never enter the community pool.
-   */
-  isLibrary Boolean @default(false)
-
   /** Optional baseline snapshot this row was merged from (audit only; data is always full resolved). */
   baseSetupSnapshotId String?
   baseSetupSnapshot   SetupSnapshot?  @relation("SetupSnapshotBaseline", fields: [baseSetupSnapshotId], references: [id], onDelete: SetNull)
@@ -561,7 +544,6 @@ model SetupSnapshot {
   @@index([userId])
   @@index([carId])
   @@index([baseSetupSnapshotId])
-  @@index([carId, isLibrary])
 }
 
 enum SetupDocumentSourceType {
