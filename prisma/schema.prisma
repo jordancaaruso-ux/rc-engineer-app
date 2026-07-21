@@ -45,6 +45,7 @@ model User {
   importedLapTimeSessions ImportedLapTimeSession[]
   watchedLapSources WatchedLapSource[]
   pushSubscriptions PushSubscription[]
+  nativePushDevices NativePushDevice[]
   videoAssets     VideoAsset[]
   trackCameraProfiles TrackCameraProfile[]
   videoAnalysisJobs   VideoAnalysisJob[]
@@ -193,6 +194,11 @@ model SetupSheetModel {
   schemaJson Json
   /// Confirmed/curated catalog entry (admin-managed). User-created models stay false until reviewed.
   isAuthorized Boolean @default(false)
+  /**
+   * Manufacturer kit setup for this chassis, same shape as `SetupSnapshot.data`. Admin-entered on
+   * catalog models only; drivers may start their first setup from it instead of an empty sheet.
+   */
+  kitSetupJson Json?
 
   /// Creator (attribution only; models are shared globally). Null for seeded catalog entries.
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -240,6 +246,7 @@ model Car {
   setupParameterAggregations SetupParameterAggregation[]
 
   @@index([setupSheetModelId])
+  @@index([userId])
 }
 
 model Track {
@@ -279,6 +286,8 @@ model Track {
   videoAssets     VideoAsset[]
   videoAnalysisJobs VideoAnalysisJob[]
   locationRunPromptDismissals TrackLocationRunPromptDismissal[]
+
+  @@index([userId])
 }
 
 /**
@@ -382,6 +391,8 @@ model Event {
   // LATER migration after scripts/dedupe-events.ts collapses duplicate meeting rows.
   @@index([trackId, startDate])
   @@index([trackId, endDate])
+  @@index([userId])
+  @@index([trackLayoutId])
 }
 
 /// Per-user link to a global event (spec tire, notes, dashboard pin).
@@ -409,6 +420,8 @@ model EventParticipation {
 
   @@unique([userId, eventId])
   @@index([eventId])
+  @@index([controlledTireTypeId])
+  @@index([controlledAdditiveTypeId])
 }
 
 /** Global tire additive catalog (shared across all users). */
@@ -431,6 +444,7 @@ model AdditiveType {
   eventParticipations  EventParticipation[]
 
   @@index([displayName])
+  @@index([createdByUserId])
 }
 
 /** Global tire product catalog (shared across all users). */
@@ -453,6 +467,7 @@ model TireType {
   eventParticipations EventParticipation[]
 
   @@index([displayName])
+  @@index([createdByUserId])
 }
 
 model TireSet {
@@ -515,6 +530,18 @@ model SetupSnapshot {
   // Flexible JSON blob with setup parameters (geometry, shocks, diff, etc.)
   data Json
 
+  /**
+   * Named, reusable setup in the car's library ("X4 — high grip carpet"). Null for the per-run
+   * snapshots every logged run creates — those stay anonymous history.
+   */
+  name String?
+
+  /**
+   * True only for library setups (created from the car page, never attached to a run directly).
+   * Aggregations read snapshots *through runs*, so library rows can never enter the community pool.
+   */
+  isLibrary Boolean @default(false)
+
   /** Optional baseline snapshot this row was merged from (audit only; data is always full resolved). */
   baseSetupSnapshotId String?
   baseSetupSnapshot   SetupSnapshot?  @relation("SetupSnapshotBaseline", fields: [baseSetupSnapshotId], references: [id], onDelete: SetNull)
@@ -530,6 +557,11 @@ model SetupSnapshot {
 
   runs Run[]
   sourceDocuments SetupDocument[] @relation("CreatedSetup")
+
+  @@index([userId])
+  @@index([carId])
+  @@index([baseSetupSnapshotId])
+  @@index([carId, isLibrary])
 }
 
 enum SetupDocumentSourceType {
@@ -674,6 +706,7 @@ model SetupImportBatch {
   documents          SetupDocument[]
 
   @@index([userId, createdAt])
+  @@index([calibrationProfileId])
 }
 
 model SetupDocument {
@@ -746,6 +779,8 @@ model SetupDocument {
   @@index([setupSheetModelId])
   @@index([setupImportBatchId])
   @@index([carId])
+  @@index([createdSetupId])
+  @@index([calibrationProfileId])
   @@unique([userId, sourceUrl])
   @@unique([userId, sourceContentSha256])
 }
@@ -784,6 +819,7 @@ model SetupSheetCalibration {
   @@index([userId, setupSheetModelId])
   @@index([setupSheetModelId])
   @@index([communityShared, createdAt])
+  @@index([exampleDocumentId])
 }
 
 enum SessionType {
@@ -1002,6 +1038,16 @@ model Run {
 
   @@index([userId, sortAt])
   @@index([userId, carId, carRating])
+  @@index([carId])
+  @@index([trackId])
+  @@index([trackLayoutId])
+  @@index([eventId])
+  @@index([tireSetId])
+  @@index([additiveTypeId])
+  @@index([batteryId])
+  @@index([setupSnapshotId])
+  @@index([sourceSetupDocumentId])
+  @@index([sourceSetupCalibrationId])
 }
 
 /** Cached proactive â€œnext sessionâ€ hints for Dashboard / Engineer (LLM + fingerprint invalidation). */
@@ -1195,6 +1241,7 @@ model ImportedLapTimeSession {
   @@index([userId, createdAt])
   @@index([userId, sourceUrl])
   @@index([linkedEventId])
+  @@index([linkedRunId])
 }
 
 model WatchedLapSource {
@@ -1266,6 +1313,8 @@ model RunImportedLapSet {
   runId String
 
   laps RunImportedLap[]
+
+  @@index([runId])
 }
 
 model RunImportedLap {
@@ -1408,6 +1457,8 @@ model VideoAnalysisJob {
   @@index([userId, createdAt])
   @@index([trackId])
   @@index([runId])
+  @@index([profileId])
+  @@index([videoAssetId])
 }
 
 
@@ -1429,6 +1480,29 @@ model PushSubscription {
   /// Best-effort device label for the user's own reference.
   userAgent String?
   /// Housekeeping: last time a push was delivered to this endpoint.
+  lastNotifiedAt DateTime?
+
+  @@index([userId])
+}
+
+/// Native push device (Capacitor shell). Separate from `PushSubscription` because an
+/// APNs/FCM token is a single opaque string — there is no endpoint URL or key pair to
+/// store, and the send path is a different transport.
+model NativePushDevice {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// APNs device token (hex) / FCM registration token — unique per install.
+  token String @unique
+  /// "ios" today; "android" when the shell ships there.
+  platform String
+  /// Best-effort label for the user's own reference in settings.
+  deviceLabel String?
+  /// Housekeeping: last time a push was delivered to this token.
   lastNotifiedAt DateTime?
 
   @@index([userId])
