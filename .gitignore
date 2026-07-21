@@ -33,3 +33,9 @@ hardware/rc-pwm-logger/.history/
 # Setup extraction eval — raw model outputs (regenerated each run)
 scripts/setup-extract-eval/results/
 perf-lighthouse-*.json
+
+# Throwaway one-off scripts + data dumps at repo root (never part of the app)
+/scratch-*
+
+# Python bytecode from the hardware carrier-board scripts
+hardware/**/__pycache__/

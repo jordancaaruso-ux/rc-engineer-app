@@ -1,118 +1,92 @@
-# Agent working notes
+# RC Engineer — agent guide
 
-Guidance for any AI agent working in this repository (Cursor, Claude Code, Codex, etc.). Read this before making edits.
+Source of truth for every AI agent in this repo (Claude Code, Cursor, Codex). `CLAUDE.md`
+just imports this file. Next.js PWA + iOS shell for RC car race engineering: run logging,
+setup-sheet OCR, an LLM "Engineer", video/lap analysis. Solo-founder app; Jordan tests it himself.
 
-## Talk to the founder in simple English
+## Commands (Windows / PowerShell)
 
-Use short sentences and plain words in chat. Avoid jargon unless the user used it first; if you must use a technical term, explain it in one short line. Prefer "here's what changed" over abstract process talk. Do not sound like a legal brief or academic paper. Code, file paths, and commit messages can stay precise — this rule is for how you talk to the user.
+- Typecheck: `npx tsc --noEmit`   ·   Lint: `npm run lint`   ·   Dev: `npm run dev`
+- Local prod build: `npx next build`
+- ⚠️ `npm run build` is the **Vercel** pipeline — it runs `prisma migrate deploy` first. Never use it locally.
+- Tests: no global runner — ~45 granular `test:*` scripts, one per area (`npm run test:nav`,
+  `test:roll-center`, `test:video-analysis`, …). Run the one matching what you changed; add a
+  test if logic changed and nothing covered it.
+- DB drift repair: `npm run db:migrate:reconcile`.   iOS: `npm run cap:sync` / `npm run cap:open`.
+- Slow/costly, only when asked: `npm run engineer:eval`, `engineer:bench`, `setup-extract:eval`.
 
-For **product direction and prioritization** (core loop, pillar rank, horizons), read `docs/PRODUCT_NORTH_STAR.md`.
+## Stack (facts you can't infer)
 
-For **Engineer behavior** (the two moments, confidence ladder, failure-mode ranking, modes, suggestion lifecycle, KB doctrine), read `docs/ENGINEER_NORTH_STAR.md` **before** any Engineer prompt, suggestion-surface, or chat UX change.
+Next **16.2** App Router · React **19** · TypeScript strict (`@/*` → `src/*`) · Prisma **6** ·
+NextAuth **5 beta** · Tailwind **v4** (`@tailwindcss/postcss`) · Capacitor **8** (iOS shell) ·
+Vercel Blob storage · onnxruntime-node (local PP-OCR) · Phosphor + Lucide icons.
 
-For **Engineer quality iteration** (eval failures, prompt/context/retrieval fixes, gold-set hygiene), use `.cursor/skills/engineer-improver/SKILL.md` — invoke only when the founder says "improve engineer" or similar. Session logs: `docs/ENGINEER_CHANGELOG.md`.
+## Structure
 
-For **features that are spec'd but NOT implemented**, check `docs/NOT_YET_BUILT.md` before claiming a feature exists or "fixing" it — a north-star doc or prototype is intent, not shipped code.
+`src/app` routes + `api/` · `src/components` · `src/lib` (42 domain folders — the real logic) ·
+`prisma/` · `docs/` north-star specs · `content/vehicle-dynamics/` locked Engineer KB · `scripts/` ·
+`ios/`, `hardware/`. Auth = allowlist magic-link + optional Google (`src/auth.ts`, allowlist in
+`AuthAllowedEmail` + `AUTH_ALLOWED_EMAILS`; admins `src/lib/authAdmin.ts`). `src/middleware.ts`
+gates everything except `/login`, `/privacy`, `/api/health/*`, `/api/_debug/version`.
 
-## UI / visual design (Technical v2)
+## Hard rules
 
-**Before any UI, styling, layout, or visual rework** — read `docs/VISUAL_NORTH_STAR.md` and follow it. That doc is the locked north star: palette, typography, component vocabulary, journey-map rollout order, and per-screen checklist.
+1. **IMPORTANT — never edit the Engineer KB without typed approval.** `content/vehicle-dynamics/*.md`
+   (top level) **and** every entry in `src/lib/engineerPhase5/parameterEffects/catalog.ts` are
+   quoted to drivers as ground truth. Do not modify/rewrite/"clean up" them unless the user's most
+   recent message names the file or asks for KB edits — propose a diff in chat and wait. Drafts
+   under `content/vehicle-dynamics/drafts/` are open (protocol in `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md`).
+   For Engineer *behavior* changes, fix the prompt first: `openaiEngineer.ts`,
+   `engineerRichContext.ts`, `vehicleDynamicsKb.ts` — surrounding code is normal, edit freely.
+2. **IMPORTANT — never `prisma db push` against production.** It skips `_prisma_migrations` and
+   breaks Vercel's `migrate deploy` (P3009 loop). Prod schema = committed migration + `migrate
+   deploy` only; use a separate Neon branch for local dev. Repair drift with `db:migrate:reconcile`.
+3. **No scope creep.** Change only what was asked; a visual pass is restyle-only (no behaviour,
+   routing, or API changes). Flag a better approach in chat instead of quietly doing it.
 
-### Hard rule
+## Talk to the founder: short, actionable, plain
 
-- **Visual changes only** unless the user explicitly asks for behavior, routing, or API changes. Restyle; do not refactor flows while "fixing" the look.
-- **Use existing primitives** (`SurfaceCard`, `CardPanel`, `panel.tsx` — `Eyebrow`, `StatStrip`, `StatTile`, `Button` / `ButtonLink`) instead of inventing parallel card/stat/label patterns.
-- **Semantic tokens** from `globals.css` / Tailwind (`bg-background`, `text-primary`, `border-border`, `font-mono` for data) — no new raw legacy hex (`#c92a2a`, `#2563eb`) or cool greys off-palette.
-- **Yellow = actions only**; green/red = data deltas. See the doc for full semantics.
+Lead with what changed or what to do next. Short messages — don't narrate options you won't take
+or pad with process talk. Plain words; minimal jargon (explain it in one line if unavoidable).
+Code, paths, and commit messages stay precise.
 
-### When in doubt
+## Where to read before you start
 
-Match the nearest **Tier A** screen that is already done (login, dashboard) or the shared components listed in the doc. Update the rollout status table in `docs/VISUAL_NORTH_STAR.md` when a screen tier is completed.
+Find your task; read that doc first. If nothing matches, you don't need one.
 
-## Engineer KB — two tiers: founder ground truth + AI drafts
+| If the task touches… | Read first |
+|---|---|
+| Any `.tsx` under `src/app` or `src/components` — styling, layout, visual rework | `docs/VISUAL_NORTH_STAR.md` |
+| Engineer prompts, context, retrieval, suggestion surfaces, chat UX | `docs/ENGINEER_NORTH_STAR.md` |
+| Engineer answer *quality* (evals, gold set, judge, benchmarks) | `docs/ENGINEER_SUGGESTION_QUALITY_PLAN.md`, `docs/ENGINEER_ITERATION.md` |
+| What to build next / prioritization / "is this in scope" | `docs/PRODUCT_NORTH_STAR.md` |
+| Dashboard content or layout | `docs/DASHBOARD_NORTH_STAR.md` |
+| Setup sheet upload, import, OCR, calibration editor | `docs/SETUP_UPLOAD_NORTH_STAR.md` |
+| Roll centre calculator | `docs/ROLL_CENTER_NORTH_STAR.md` |
+| Video analysis or speed/steering traces | `docs/VIDEO_ANALYSIS_REWORK_NORTH_STAR.md`, `docs/VIDEO_TRACE_NORTH_STAR.md` |
+| Driver-vs-driver sector compare, sector clips, driven-line overlay | `docs/SECTOR_COMPARE_NORTH_STAR.md` |
+| PWA install, service worker, web push, notifications | `docs/PWA_NORTH_STAR.md` |
+| iOS shell, Capacitor, TestFlight, native push | `docs/TESTFLIGHT.md` |
+| Who can see or create what (access tiers, IDOR, global catalogs) | `docs/ASSET_ACCESS_NORTH_STAR.md` + `.cursor/skills/security-architect/SKILL.md` |
+| Handling / rating capture on the run form | `docs/HANDLING_CAPTURE_NORTH_STAR.md` |
+| Race results, trophies | `docs/RESULTS_TROPHIES_NORTH_STAR.md` |
+| Writing vehicle-dynamics KB drafts | `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md` |
+| Claiming a feature exists, or "fixing" something that looks broken | `docs/NOT_YET_BUILT.md` — a spec is intent, not shipped code |
 
-The "Engineer" feature carries prose from `content/vehicle-dynamics/` (see `src/lib/engineerPhase5/vehicleDynamicsKb.ts` / `fullKbInContext.ts`) and quotes it back to end users as authoritative RC car setup advice. **Any language in those files is presented to drivers as expert knowledge**, regardless of who wrote it. Since 2026-07-07 the KB has two tiers with different rules:
+**Current state of in-flight work lives in `MEMORY.md`, not these specs.** If a memory says
+"BUILT uncommitted" / "READ FIRST", trust it over a spec's status table — but verify the named
+file still exists before acting.
 
-| Tier | Location | Who writes | Authority |
-|---|---|---|---|
-| **Founder-approved** | `content/vehicle-dynamics/*.md` (top level) | Jordan (agents only with explicit approval) | Ground truth — cited without provenance hedging |
-| **AI-drafted baseline** | `content/vehicle-dynamics/drafts/*.md` | Agents, freely | Reference theory — always marked, cited hedged, never overrides top-level files |
+## Things that will bite you
 
-The structured parameter-effect catalog at `src/lib/engineerPhase5/parameterEffects/catalog.ts` is an extension of the **founder-approved** tier — every entry declares a direction + hedge flag + strength that the Engineer quotes back as ground truth. The approval gate applies in full.
+- **Setup aggregations are materialized** (`src/lib/setupAggregations/`) — after a change that
+  affects stats, rebuild via `POST /api/setup-aggregations/rebuild` or numbers go stale silently.
+- **Dev origins are pinned** in `next.config.mjs` (`allowedDevOrigins`) — an unlisted LAN IP
+  serves pages that render but aren't clickable (hydration silently dies).
+- **Commits:** work on a branch off `main`; don't commit or push unless asked. `Made-with:` trailers welcome.
 
-### Hard rule — founder-approved tier (top-level files + catalog)
+## Verify your work
 
-Do NOT modify, rewrite, expand, or "clean up" any **top-level** file under `content/vehicle-dynamics/` **or any entry in `src/lib/engineerPhase5/parameterEffects/catalog.ts`** unless the user's most recent message either:
-
-- explicitly names the file, or
-- explicitly asks for KB content edits.
-
-"Improving clarity", "tightening grammar", or "adding a missing concept" are NOT sufficient justification. Propose the change in chat with a diff and wait for the user to type explicit approval before writing.
-
-### Drafts tier — agents may write (rules)
-
-Agents MAY create and edit files under `content/vehicle-dynamics/drafts/` without per-file approval (founder-granted 2026-07-07), to build baseline physics coverage for setup parameters the approved KB doesn't cover yet. Non-negotiable rules:
-
-1. **Provenance banner first.** Every draft file starts with this blockquote (update the date):
-
-   > **AI-drafted baseline (unverified).** Researched and written by the coding agent from general vehicle-dynamics knowledge on YYYY-MM-DD. Not yet edited or approved by Jordan — reference theory, not founder ground truth.
-
-2. **Never contradict or duplicate the approved tier.** If a draft topic touches an approved file's territory, align with it and cross-reference; if general knowledge genuinely disagrees with an approved file, flag the conflict to the founder in chat — never "correct" the approved file and never write the disagreement into the draft.
-3. **Same style rules as the KB:** terse, bold technical terms, physics-first (mechanism → documented tendency), hedges preserved where physics is genuinely situational, `##` sections (the chunker splits on them), `**Keys:**` lines with canonical parameter keys, ≤ ~90 lines per file. **Physics/Handling split (adopted 2026-07-08):** each knob gets a `**Physics.**` block (mechanism — geometry/loads/kinematics, stated flat, no hedging) then a `**Handling.**` block (situational effects — openly hedged, framed as a test). See `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md` and `drafts/shock-geometry.md`.
-4. **No coaching, no invented numbers.** Mechanisms and directional tendencies only — no "always run X", no fabricated setup values or fake community norms.
-5. **Promotion ritual:** Jordan edits a draft (or is interviewed through it), then it moves up to `content/vehicle-dynamics/` with the banner removed — from that moment the hard rule above covers it. Only Jordan (or an agent on his explicit instruction naming the file) performs promotion.
-
-Runtime handling: loaders label draft content distinctly and the Engineer is instructed to cite drafts as hedged general theory ("per draft `x.md`"), never with founder-tier authority.
-
-The surrounding files (`types.ts`, `intentFromMessage.ts`, `query.ts`) are normal code — modify them freely when iterating on intent detection or join logic. Only `catalog.ts` entries are locked.
-
-### If a KB edit is approved
-
-- Match the existing terse, bold-for-technical-terms prose style. Avoid evocative / metaphorical language ("breathe", "platforms", "dances", "comes alive", "settles") unless the user dictated the exact wording.
-- Preserve `##` heading levels — `searchVehicleDynamicsKb` splits sections on them.
-- Keep each file under ~90 lines; propose a new file for genuinely new concepts.
-
-### If a catalog entry is approved
-
-- Every `effects.<outcome>` direction, hedge flag, and strength MUST trace to KB prose at the cited `kbSource` + `kbSection` anchor — quote the supporting line in the proposal message.
-- `kbSection` must match a real `## Heading` in the file (slugified, lowercase, spaces → `-`).
-- Prefer `hedge: true` whenever the KB uses "sometimes", "not always predictable", "depending on balance", "test", or lists opposing outcomes for the same move.
-- Never add an outcome to an entry that the KB doesn't explicitly discuss for that parameter — leave the outcome key absent instead of guessing.
-
-### When in doubt, fix the prompt instead
-
-If the user asks for "the Engineer to answer X better", the fix usually belongs in:
-
-- `src/lib/engineerPhase5/openaiEngineer.ts` — system prompt.
-- `src/lib/engineerPhase5/engineerRichContext.ts` — structured context the Engineer sees.
-- `src/lib/engineerPhase5/vehicleDynamicsKb.ts` — retrieval / ranking.
-
-Try those before proposing a KB edit.
-
-For a **physics-first KB expansion checklist** (draft topics only—not retrieved KB), see `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md`.
-
-## Commits
-
-Commit trailers like `Made-with: Cursor` are welcome — they make it easy to audit which commits were agent-authored later.
-
-## Production PostgreSQL (Prisma)
-
-- **Never run `prisma db push`** (or `npm run db:push`) against **production** `DATABASE_URL`. That updates the schema without updating `_prisma_migrations` and causes Vercel `prisma migrate deploy` to fail in a loop (`already exists`, `P3009`, etc.). **Production schema changes = committed migrations + `migrate deploy` only.**
-- **Prefer a separate Neon branch / database for local dev** so `.env.local` does not point at prod during experimentation.
-- **Repair drift** (prod URL in `.env.local`): `npm run db:migrate:reconcile` — runs `scripts/reconcile-prisma-migrations.cjs`, which applies `prisma/manual-recovery/<migration_name>.sql` via `prisma db execute` when a matching file exists, then `migrate resolve --applied` and retries `migrate deploy` until clean.
-
-## Auth
-
-- **Magic link + optional Google OAuth** via Auth.js (`src/auth.ts`): allowlist in `AuthAllowedEmail` + env `AUTH_ALLOWED_EMAILS` (see `src/lib/authAllowlist.ts`). Google: `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, callback `{AUTH_URL}/api/auth/callback/google`. Admins: `AUTH_ADMIN_EMAILS`, `src/lib/authAdmin.ts`. Session bridge: `src/lib/currentUser.ts` (`requireCurrentUser`, `getAuthenticatedApiUser`).
-- **Teams / teammates**: mutual team visibility via `src/lib/teamAccess.ts`; one-way `TeammateLink` + per-run `shareWithTeam` via `src/lib/teammateRunAccess.ts`.
-- **Security reviews**: use project skill `.cursor/skills/security-architect/SKILL.md` (access tiers T0–T6, IDOR, scale). Update `ACCESS_TIERS.md` when auth rules change.
-- **iOS shell**: Capacitor (`capacitor.config.ts`, `ios/`), checklist in `docs/TESTFLIGHT.md`.
-
-## Other areas worth knowing
-
-- **Setup comparison logic**: `src/lib/setupCompare/` (IQR gradient scaling, community aggregation lookups).
-- **Community aggregations**: `src/lib/setupAggregations/` (rebuild script, numeric stats including Phase 1 value histograms / Cliff's delta support).
-- **Grip trend scoring**: `src/lib/engineerPhase5/setupSpreadForEngineer.ts` (`computeGripTrendSignal`, Cliff's delta, quartile-disjoint, per-parameter minimum meaningful delta).
-- **Calibration auto-detection**: `src/lib/setupCalibrations/autoPickCalibration.ts`.
-
-When changes affect community aggregation stats, remember to rebuild via `POST /api/setup-aggregations/rebuild` — stored rows are materialized and don't update automatically.
+`npx tsc --noEmit` → the matching `test:*` → `npx next build` before shipping. Report honestly:
+what changed, what you verified, what still needs eyes. Never call something working you haven't
+seen work. Don't spin up `npm run dev` unless asked (offer if it would settle a real question).

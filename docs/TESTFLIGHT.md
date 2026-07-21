@@ -52,14 +52,47 @@ Mitigations:
 4. **Privacy Policy URL** — required. This repo exposes a minimal page at **`/privacy`** on your deployment (e.g. `https://YOUR_VERCEL_URL/privacy`). Replace copy or host your own policy if you need legal review.
 5. Add **Internal testers** (up to 100, no review).
 
-## 6. Icons and splash
+## 6. Icons and splash — done
 
-Replace default Xcode / Capacitor assets:
+Both native asset sets are generated from the brand sources and committed:
 
-- App icon: Xcode **Assets.xcassets** → AppIcon.
-- Splash: use Capacitor Splash Screen plugin config or Xcode storyboard (`LaunchScreen`).
+- **App icon** — `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`, from `public/icons/icon-1024.png`.
+- **Splash** — `Splash.imageset`, JRC mark on `#121110` (matches `ios.backgroundColor` so overscroll doesn't flash).
 
-## 7. WKWebView session smoke test
+> **Alpha channel:** App Store Connect rejects an app icon that carries an alpha channel, *even a fully opaque one* — the PWA source PNG has one, so the generated icon is flattened and `removeAlpha()`'d. If you ever regenerate the icon, keep that step or the first upload fails after the archive.
+
+## 7. Push notifications (APNs)
+
+The web-push path (`VAPID_*`, service worker) **cannot reach the shell** — WKWebView has no Push API. The native app uses APNs. The web/PWA path is unchanged and still used in browsers.
+
+Already wired in this repo:
+
+- `@capacitor/push-notifications` + the two `AppDelegate` callbacks that deliver the token.
+- `CapacitorPushBridge` — routes a notification tap to `data.url` (same payload contract as the service worker) and re-registers the token on launch, since APNs tokens rotate.
+- Settings → Notifications detects the shell and uses the native enable/disable flow.
+- `NativePushDevice` model + `/api/push/native/register|unregister`.
+- `sendPushToUser` fans out to **both** transports, so the existing triggers (Speedhive result watch, log reminder, test push) reach the app with no caller changes.
+
+### Steps that need the Mac / Apple portal
+
+1. **Xcode → Signing & Capabilities → + Capability → Push Notifications.** This writes the `aps-environment` entitlement; without it registration fails at runtime. (Not committed here — it edits the Xcode project.)
+2. **Apple Developer → Keys → new key with APNs enabled.** Download the `.p8` **once** — it can't be re-downloaded.
+3. Set on Vercel:
+
+   ```
+   APNS_KEY_ID=<10-char key id>
+   APNS_TEAM_ID=<10-char team id>
+   APNS_PRIVATE_KEY=<contents of the .p8>   # literal \n escapes are handled
+   APNS_BUNDLE_ID=com.rcengineer.app
+   APNS_PRODUCTION=1                        # see below
+   ```
+
+4. Apply the migration: `prisma/migrations/20260720120000_add_native_push_device/` (via `migrate deploy` — never `db push` against prod).
+5. Verify: Settings → **Enable notifications** (accept the iOS prompt) → **Send test**.
+
+> **Environment gotcha:** `APNS_PRODUCTION=1` targets `api.push.apple.com`, used by **TestFlight and App Store builds**. Only a build run directly from Xcode onto a device uses the sandbox host. A token minted in one environment is rejected by the other with `BadDeviceToken` — if test pushes silently do nothing, check this first.
+
+## 8. WKWebView session smoke test
 
 After sign-in:
 

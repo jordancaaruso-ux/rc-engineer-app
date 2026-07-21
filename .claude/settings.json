@@ -9,5 +9,31 @@
     "additionalDirectories": [
       "C:\\Users\\Jordan\\.claude"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/db-push-guard.cjs"],
+            "statusMessage": "Checking for prisma db push"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/kb-guard.cjs"],
+            "statusMessage": "Checking Engineer KB lock"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -187,7 +187,7 @@ Fix, and it ships **first** (build sequence step 1):
 
 ## Build sequence
 
-Each step measurable before the next (per `HOW_WE_BUILD.md`).
+Each step measurable before the next (per the done-checklist in `AGENTS.md`).
 
 | # | Step | Status | Proves it |
 |:--:|---|:--:|---|

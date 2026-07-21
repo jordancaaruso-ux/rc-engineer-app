@@ -1,11 +1,5 @@
-# CLAUDE.md
-
-Claude Code auto-loads this file into every session. The real rules live in the files
-imported below — keep editing *those* (they're shared with Cursor/Codex); this file
-just guarantees they're always in context.
-
 @AGENTS.md
-@docs/HOW_WE_BUILD.md
-@docs/PRODUCT_NORTH_STAR.md
-@docs/VISUAL_NORTH_STAR.md
-@docs/ENGINEER_NORTH_STAR.md
+
+<!-- AGENTS.md is the single source of truth (shared with Cursor/Codex). Edit THAT, not this
+     file. The @import above loads it in full at launch. Path-scoped conventions live in
+     .claude/rules/ (visual, engineer-kb); they load only when matching files are touched. -->
