@@ -37,12 +37,6 @@ export function RunVideoAnalysisSection({
     <div className="space-y-2 text-sm">
       <div className="flex flex-wrap gap-2">
         <Link
-          href={`/videos/analysis/tracks/${trackId}`}
-          className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
-        >
-          Camera profile
-        </Link>
-        <Link
           href={`/videos/analysis/manual/new?trackId=${trackId}&runId=${runId}`}
           className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
         >

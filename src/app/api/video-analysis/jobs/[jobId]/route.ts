@@ -131,6 +131,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const body = (await request.json().catch(() => null)) as {
     runId?: string | null;
     videoAssetId?: string | null;
+    profileId?: string;
     alignmentJson?: unknown;
     idCorrectionsJson?: MotIdCorrection[];
     status?: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
@@ -139,9 +140,19 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const existing = await prisma.videoAnalysisJob.findFirst({
     where: { id: jobId, userId: user.id },
-    select: { id: true },
+    select: { id: true, trackId: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Switching line sets: the profile must be the user's own and on this job's track,
+  // otherwise marks would be scored against another track's geometry.
+  if (typeof body?.profileId === "string") {
+    const profile = await prisma.trackCameraProfile.findFirst({
+      where: { id: body.profileId, userId: user.id, trackId: existing.trackId },
+      select: { id: true },
+    });
+    if (!profile) return NextResponse.json({ error: "Line set not found" }, { status: 404 });
+  }
 
   if (typeof body?.videoAssetId === "string") {
     const asset = await prisma.videoAsset.findFirst({
@@ -165,6 +176,7 @@ export async function PATCH(request: Request, { params }: Params) {
     data: {
       ...(body?.runId !== undefined ? { runId: body.runId } : {}),
       ...(body?.videoAssetId !== undefined ? { videoAssetId: body.videoAssetId } : {}),
+      ...(body?.profileId ? { profileId: body.profileId } : {}),
       ...(body?.alignmentJson !== undefined
         ? { alignmentJson: body.alignmentJson as object }
         : {}),

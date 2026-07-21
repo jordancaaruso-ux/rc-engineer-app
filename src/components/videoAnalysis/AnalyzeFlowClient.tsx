@@ -75,8 +75,23 @@ type JobData = {
 
 type LibraryVideo = { id: string; label: string | null; originalFilename: string; bytes: number };
 
-type Step = 1 | 2 | 3 | 4 | 5;
-const STEP_LABELS: Record<Step, string> = { 1: "Video", 2: "Timing", 3: "Sync", 4: "Mark", 5: "Done" };
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
+const STEP_LABELS: Record<Step, string> = {
+  1: "Video",
+  2: "Timing",
+  3: "Lines",
+  4: "Sync",
+  5: "Mark",
+  6: "Done",
+};
+
+/** A saved set of sector lines for this track (one camera angle / one way of splitting it). */
+type LineSet = {
+  id: string;
+  name: string;
+  sectorLines: Array<{ lineKey: string }>;
+  updatedAt: string;
+};
 
 type MarkTarget = { role: DriverRole; lapNumber: number; lineKey: string; label: string };
 
@@ -129,6 +144,8 @@ export function AnalyzeFlowClient({
   // on the (fixed-camera) video frame in normalized 0..1 coords.
   const [draftLines, setDraftLines] = useState<DraftLine[] | null>(null);
   const [savingLines, setSavingLines] = useState(false);
+  const [lineSets, setLineSets] = useState<LineSet[]>([]);
+  const [switchingSet, setSwitchingSet] = useState(false);
   const [videoDims, setVideoDims] = useState<{ w: number; h: number } | null>(null);
   const lineDragRef = useRef<{ idx: number; end: 1 | 2 } | null>(null);
   const overlayElRef = useRef<HTMLDivElement | null>(null);
@@ -148,15 +165,28 @@ export function AnalyzeFlowClient({
     if (json.job.videoAssetId) {
       setVideoSrc(videoUrlForAsset(json.job.videoAssetId));
     }
-    // Resume at the furthest sensible step.
+    // Resume at the furthest sensible step. Geometry (Lines) comes before the
+    // temporal steps now: not yet anchored → Lines; anchored → Mark (its no-lines
+    // fallback routes back to Lines if a resumed session somehow has no corners).
     const anchored = s ? Boolean(referenceAnchoredSession(s)) : false;
     if (json.job.videoAssetId && s && s.timingSessions.length > 0) {
-      setStep(anchored ? 4 : 3);
+      setStep(anchored ? 5 : 3);
     } else if (json.job.videoAssetId) {
       setStep(2);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
+
+  const loadLineSets = useCallback(async (trackId: string) => {
+    const res = await fetch(`/api/tracks/${trackId}/camera-profiles`);
+    if (!res.ok) return;
+    const json = (await res.json()) as { profiles?: LineSet[] };
+    setLineSets(json.profiles ?? []);
+  }, []);
+
+  useEffect(() => {
+    if (data?.job.track.id) void loadLineSets(data.job.track.id);
+  }, [data?.job.track.id, loadLineSets]);
 
   useEffect(() => {
     void load();
@@ -549,7 +579,7 @@ export function AnalyzeFlowClient({
   );
 
   useEffect(() => {
-    if (step !== 4 || !markQueue.length || draftLines) return;
+    if (step !== 5 || !markQueue.length || draftLines) return;
     // Start at the first unmarked target — also fires when lines are first
     // saved from the in-flow editor and the queue materializes.
     const firstOpen = markQueue.findIndex((t) => markFor(t) == null);
@@ -562,7 +592,7 @@ export function AnalyzeFlowClient({
   function advanceCursor(from: number) {
     const nextIdx = from + 1;
     if (nextIdx >= markQueue.length) {
-      setStep(5);
+      setStep(6);
       return;
     }
     setMarkCursor(nextIdx);
@@ -573,7 +603,7 @@ export function AnalyzeFlowClient({
     if (!session || !primary) return;
     const t = markQueue[markCursor];
     if (!t) {
-      setStep(5);
+      setStep(6);
       return;
     }
     const videoTimeSec = playheadTime();
@@ -597,14 +627,112 @@ export function AnalyzeFlowClient({
     advanceCursor(markCursor);
   }
 
+  /* ---------- line sets ---------- */
+
+  /** Point this session at a different saved split. Marks stay keyed by lineKey,
+   * so switching sets can orphan them — the picker warns before you do it. */
+  async function useLineSet(profileId: string) {
+    if (!data || profileId === data.job.profile.id) return;
+    setSwitchingSet(true);
+    try {
+      const res = await fetch(`/api/video-analysis/jobs/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId }),
+      });
+      if (!res.ok) throw new Error("Could not switch line set");
+      await load();
+      setMsg(null);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Could not switch line set");
+    } finally {
+      setSwitchingSet(false);
+    }
+  }
+
+  async function createLineSet() {
+    if (!data) return;
+    const name = window.prompt(
+      `Name this set of lines for ${data.job.track.name}\n(e.g. "Drivers stand" or "Far bank")`,
+      ""
+    );
+    if (name == null) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setMsg("Give the line set a name so you can tell it apart later.");
+      return;
+    }
+    setSwitchingSet(true);
+    try {
+      const res = await fetch(`/api/tracks/${data.job.track.id}/camera-profiles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) throw new Error("Could not create line set");
+      const { profile } = (await res.json()) as { profile: { id: string } };
+      await fetch(`/api/video-analysis/jobs/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: profile.id }),
+      });
+      await load();
+      await loadLineSets(data.job.track.id);
+      openLineEditor([]);
+      setMsg(null);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Could not create line set");
+    } finally {
+      setSwitchingSet(false);
+    }
+  }
+
+  async function renameLineSet(set: LineSet) {
+    const name = window.prompt("Rename this line set", set.name);
+    if (name == null) return;
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === set.name) return;
+    const res = await fetch(`/api/video-analysis/profiles/${set.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmed }),
+    });
+    if (!res.ok) {
+      setMsg("Rename failed");
+      return;
+    }
+    if (data) await loadLineSets(data.job.track.id);
+    if (set.id === data?.job.profile.id) await load();
+  }
+
+  async function deleteLineSet(set: LineSet) {
+    if (!data) return;
+    if (set.id === data.job.profile.id) {
+      setMsg("That's the set this session is using — switch to another one first.");
+      return;
+    }
+    const ok = window.confirm(
+      `Delete "${set.name}"?\n\nIts lines and any other sessions using it are removed for good.`
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/video-analysis/profiles/${set.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setMsg("Delete failed");
+      return;
+    }
+    await loadLineSets(data.job.track.id);
+  }
+
   /* ---------- sector line editor ---------- */
 
   function clamp01(n: number): number {
     return Math.max(0, Math.min(1, n));
   }
 
-  function openLineEditor() {
-    const existing = (data?.sectorLines ?? [])
+  /** `from` is passed explicitly right after creating a set, when `data` in this
+   * closure is still the previous profile's. */
+  function openLineEditor(from?: SectorLineApi[]) {
+    const existing = (from ?? data?.sectorLines ?? [])
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((l) => ({
@@ -697,9 +825,10 @@ export function AnalyzeFlowClient({
       }));
       setData((d) => (d ? { ...d, sectorLines: lines } : d));
       setDraftLines(null);
+      void loadLineSets(data.job.track.id);
       setMsg(
         lines.length > 1
-          ? "Sector lines saved to this track's camera — mark each crossing now."
+          ? `Saved to ${data.job.profile.name} — mark each crossing now.`
           : "Saved. Add at least one corner line to unlock sector deltas."
       );
     } catch (err) {
@@ -723,7 +852,7 @@ export function AnalyzeFlowClient({
       pair.b,
       data.sectorLines.map((l) => ({ id: l.lineKey, label: l.label }))
     );
-  }, [session, data, step === 5 ? session?.marks.length : 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, data, step === 6 ? session?.marks.length : 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveToLibrary() {
     if (!pickedFile) return;
@@ -762,8 +891,9 @@ export function AnalyzeFlowClient({
   const stepDone = (s: Step): boolean => {
     if (s === 1) return Boolean(videoSrc);
     if (s === 2) return Boolean(session && session.timingSessions.length > 0);
-    if (s === 3) return anchored;
-    if (s === 4) return markQueue.length > 0 && markQueue.every((t) => markFor(t) != null);
+    if (s === 3) return nonSfLines.length > 0;
+    if (s === 4) return anchored;
+    if (s === 5) return markQueue.length > 0 && markQueue.every((t) => markFor(t) != null);
     return false;
   };
 
@@ -771,11 +901,16 @@ export function AnalyzeFlowClient({
     if (s === 1) return true;
     if (s === 2) return Boolean(videoSrc);
     if (s === 3) return stepDone(2) && Boolean(videoSrc);
-    if (s === 4) return anchored;
+    if (s === 4) return stepDone(2) && Boolean(videoSrc);
     return anchored;
   };
 
   const backHref = data.job.runId ? "/runs/history" : "/videos";
+
+  // Video-bearing steps go two-pane (big video + controls rail) on desktop; the
+  // rest stay a single narrow column.
+  const isVideoStep =
+    step === 3 || step === 4 || (step === 5 && nonSfLines.length > 0) || Boolean(draftLines);
 
   // The video sits object-contain in a 16:9 box — the overlay must cover the
   // painted frame (line coords are normalized to it), not the letterbox.
@@ -801,10 +936,14 @@ export function AnalyzeFlowClient({
         ? { lineKey: l.lineKey, label: l.label, x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 }
         : null;
     if (step === 3) {
+      // Previewing a set: show every line it holds.
+      return data.sectorLines.map(withGeom).filter((l): l is DraftLine => l != null);
+    }
+    if (step === 4) {
       const sf = withGeom(data.sectorLines.find((l) => l.lineKey === "sf"));
       return sf ? [sf] : [];
     }
-    if (step === 4) {
+    if (step === 5) {
       const target = markQueue[markCursor];
       const line = withGeom(data.sectorLines.find((l) => l.lineKey === target?.lineKey));
       return line ? [line] : [];
@@ -945,7 +1084,12 @@ export function AnalyzeFlowClient({
   );
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-4 pb-10">
+    <div
+      className={cn(
+        "mx-auto flex w-full flex-col gap-4 pb-10",
+        isVideoStep ? "max-w-md lg:max-w-6xl" : "max-w-md"
+      )}
+    >
       {/* header */}
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.22em] text-faint">
@@ -966,7 +1110,7 @@ export function AnalyzeFlowClient({
 
       {/* step rail */}
       <div className="flex gap-1.5">
-        {([1, 2, 3, 4, 5] as Step[]).map((s) => (
+        {([1, 2, 3, 4, 5, 6] as Step[]).map((s) => (
           <button
             key={s}
             type="button"
@@ -1157,80 +1301,102 @@ export function AnalyzeFlowClient({
         </div>
       ) : null}
 
-      {/* ---------- STEP 3: sync ---------- */}
-      {step === 3 && session ? (
-        <div className="space-y-3">
+      {/* ---------- STEP 4: sync ---------- */}
+      {step === 4 && session ? (
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-5 lg:items-start">
+          <div className="lg:sticky lg:top-4">{transport}</div>
+          <div className="mt-4 space-y-3 lg:mt-0">
           <div>
-            <h2 className="text-[16px] font-bold tracking-tight">
-              Find L{anchorLap ?? "?"}&apos;s lap start
-            </h2>
+            <h2 className="text-[16px] font-bold tracking-tight">Sync the laps</h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Scrub until the car crosses the start/finish line, then set it. One anchor syncs
-              every lap.
+              Scrub to where the car crosses start/finish on{" "}
+              <span className="font-semibold text-foreground">any one lap</span>, pick that lap
+              below, and set it. Every other lap syncs from the timing — you only do this once.
             </p>
           </div>
-          {transport}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-            {selectedMeLaps.map((l, i) => (
-              <button
-                key={l.lapNumber}
-                type="button"
-                onClick={() => {
-                  setAnchorLap(l.lapNumber);
-                  const t = lapStartVideoTime("me", l.lapNumber);
-                  if (t != null) seekTo(t);
-                }}
-                className={cn(
-                  chipToggleClass(anchorLap === l.lapNumber),
-                  "shrink-0 px-3 py-2 font-mono text-[11px] tabular-nums"
-                )}
-              >
-                L{l.lapNumber} · {l.lapTimeSec.toFixed(3)}
-                {i === 0 ? <span className="ml-1 text-[8px] tracking-[0.12em] text-[#4FD089]">BEST</span> : null}
-              </button>
-            ))}
+          <div className="space-y-1.5">
+            <span className="type-data-label">Which lap are you watching?</span>
+            <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+              {selectedMeLaps.map((l, i) => (
+                <button
+                  key={l.lapNumber}
+                  type="button"
+                  onClick={() => {
+                    setAnchorLap(l.lapNumber);
+                    const t = lapStartVideoTime("me", l.lapNumber);
+                    if (t != null) seekTo(t);
+                  }}
+                  className={cn(
+                    chipToggleClass(anchorLap === l.lapNumber),
+                    "shrink-0 px-3 py-2 font-mono text-[11px] tabular-nums"
+                  )}
+                >
+                  L{l.lapNumber} · {l.lapTimeSec.toFixed(3)}
+                  {i === 0 ? <span className="ml-1 text-[8px] tracking-[0.12em] text-[#4FD089]">BEST</span> : null}
+                </button>
+              ))}
+            </div>
           </div>
           <button
             type="button"
             disabled={anchorLap == null || !videoSrc}
             onClick={setAnchorAtPlayhead}
-            className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+            className={cn(
+              "w-full rounded-xl py-3.5 text-[13px] font-bold disabled:opacity-50",
+              anchored
+                ? "border border-border bg-secondary text-foreground"
+                : "bg-primary text-primary-foreground"
+            )}
           >
-            Set L{anchorLap ?? "?"} start here
+            {anchored
+              ? `Move the anchor to this frame (L${anchorLap ?? "?"})`
+              : `Set L${anchorLap ?? "?"} start here`}
           </button>
           {anchored ? (
-            <div className="flex gap-2">
+            <>
               <button
                 type="button"
-                onClick={pinSelectedLapHere}
-                className="flex-1 rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-foreground"
-              >
-                Pin L{anchorLap ?? "?"} here
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(4)}
-                className="flex-1 rounded-lg bg-primary py-2.5 text-[12px] font-bold text-primary-foreground"
+                onClick={() => setStep(5)}
+                className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
               >
                 Continue to marking
               </button>
-            </div>
+              <details className="rounded-lg border border-border bg-secondary/40 px-3 py-2">
+                <summary className="cursor-pointer text-[11.5px] font-semibold text-muted-foreground">
+                  Fine-tune a single lap
+                </summary>
+                <button
+                  type="button"
+                  onClick={pinSelectedLapHere}
+                  className="mt-2 w-full rounded-lg border border-border bg-secondary py-2 text-[12px] font-semibold text-foreground"
+                >
+                  Pin L{anchorLap ?? "?"} to the current frame
+                </button>
+                <p className="mt-1.5 text-[10.5px] leading-relaxed text-faint">
+                  Optional — the anchor already maps every lap from the timing. Use this only if one
+                  lap&apos;s computed start looks off; it overrides just that lap.
+                </p>
+              </details>
+            </>
           ) : null}
+          </div>
         </div>
       ) : null}
 
-      {/* ---------- STEP 4: mark ---------- */}
-      {step === 4 && session && draftLines ? (
-        <div className="space-y-3">
+      {/* ---------- line editor (opens from Lines / Mark) ---------- */}
+      {session && draftLines ? (
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-5 lg:items-start">
+          <div className="lg:sticky lg:top-4">{transport}</div>
+          <div className="mt-4 space-y-3 lg:mt-0">
           <div>
             <h2 className="text-[16px] font-bold tracking-tight">Draw sector lines</h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
               Scrub to a clear frame, then drag each line&apos;s ends onto the track where you want
               a split. Add corners in the order the car meets them after start/finish. Saved to{" "}
-              {data.job.track.name}&apos;s camera — every future video reuses them.
+              <span className="font-semibold text-foreground">{data.job.profile.name}</span> — every
+              future video using this set reuses them.
             </p>
           </div>
-          {transport}
           <div className="space-y-1.5">
             {draftLines.map((l, idx) => (
               <div key={l.lineKey} className="flex items-center gap-1.5">
@@ -1312,29 +1478,143 @@ export function AnalyzeFlowClient({
               {savingLines ? "Saving…" : "Save lines"}
             </button>
           </div>
+          </div>
         </div>
       ) : null}
 
-      {step === 4 && session && !draftLines && nonSfLines.length === 0 ? (
+      {/* ---------- STEP 3: line sets ---------- */}
+      {step === 3 && session && !draftLines ? (
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-5 lg:items-start">
+          <div className="lg:sticky lg:top-4">{transport}</div>
+          <div className="mt-4 space-y-3 lg:mt-0">
+          <div>
+            <h2 className="text-[16px] font-bold tracking-tight">Which sector lines?</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              A line set is one way of splitting {data.job.track.name} — tied to where you filmed
+              from. Reuse one when the camera is in the same spot; make a new one when it moved or
+              you want different corners.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            {lineSets.map((s) => {
+              const corners = s.sectorLines.filter((l) => l.lineKey !== "sf").length;
+              const inUse = s.id === data.job.profile.id;
+              return (
+                <div
+                  key={s.id}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg border px-3 py-2.5",
+                    inUse ? "border-primary/60 bg-primary/5" : "border-border bg-secondary/60"
+                  )}
+                >
+                  <button
+                    type="button"
+                    disabled={switchingSet}
+                    onClick={() => void useLineSet(s.id)}
+                    className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left disabled:opacity-60"
+                  >
+                    <span className="w-full truncate text-[12.5px] font-semibold text-foreground">
+                      {s.name}
+                    </span>
+                    <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-faint">
+                      {corners === 0 ? "no corner lines" : `${corners} corner${corners === 1 ? "" : "s"}`}
+                      {inUse ? " · in use" : ""}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void renameLineSet(s)}
+                    aria-label={`Rename ${s.name}`}
+                    className="h-9 shrink-0 rounded-lg border border-border bg-secondary px-2.5 text-[11px] font-semibold text-muted-foreground"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void deleteLineSet(s)}
+                    aria-label={`Delete ${s.name}`}
+                    className="h-9 w-9 shrink-0 rounded-lg border border-border bg-secondary text-[13px] text-destructive disabled:opacity-40"
+                    disabled={inUse}
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            disabled={switchingSet}
+            onClick={() => void createLineSet()}
+            className="w-full rounded-xl border-[1.5px] border-dashed border-foreground/20 bg-secondary py-2.5 text-[12.5px] font-semibold text-foreground disabled:opacity-60"
+          >
+            + New line set
+          </button>
+
+          {nonSfLines.length === 0 ? (
+            <>
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                <span className="font-semibold text-foreground">{data.job.profile.name}</span> has no
+                corner lines yet. Draw them once and every future video on this set reuses them.
+              </p>
+              <button
+                type="button"
+                onClick={() => openLineEditor()}
+                className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
+              >
+                Draw sector lines
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(anchored ? 6 : 4)}
+                className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
+              >
+                Skip — whole-lap compare only
+              </button>
+            </>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => openLineEditor()}
+                className="rounded-xl border border-border bg-secondary px-4 py-3 text-[12.5px] font-semibold text-muted-foreground"
+              >
+                Edit lines
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(anchored ? 5 : 4)}
+                className="flex-1 rounded-xl bg-primary py-3 text-[13px] font-bold text-primary-foreground"
+              >
+                {anchored ? "Continue to marking" : "Continue to sync"}
+              </button>
+            </div>
+          )}
+          </div>
+        </div>
+      ) : null}
+
+      {step === 5 && session && !draftLines && nonSfLines.length === 0 ? (
         <div className="space-y-3">
           <div>
             <h2 className="text-[16px] font-bold tracking-tight">No sector lines here yet</h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Start/finish is already synced from timing — nothing to re-mark. To get
-              corner-by-corner deltas, draw the crossings once for {data.job.track.name}; they
-              stick to the track for every future video.
+              Start/finish is already synced from timing — nothing to re-mark. Pick or draw a set of
+              corner lines to get corner-by-corner deltas.
             </p>
           </div>
           <button
             type="button"
-            onClick={openLineEditor}
+            onClick={() => setStep(3)}
             className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
           >
-            Draw sector lines
+            Back to line sets
           </button>
           <button
             type="button"
-            onClick={() => setStep(5)}
+            onClick={() => setStep(6)}
             className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
           >
             Skip — whole-lap compare only
@@ -1342,8 +1622,18 @@ export function AnalyzeFlowClient({
         </div>
       ) : null}
 
-      {step === 4 && session && !draftLines && nonSfLines.length > 0 ? (
-        <div className="space-y-3">
+      {step === 5 && session && !draftLines && nonSfLines.length > 0 ? (
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-5 lg:items-start">
+          <div className="space-y-2.5 lg:sticky lg:top-4">
+            {markQueue[markCursor] ? (
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary">
+                {markQueue[markCursor]!.role === "competitor" ? `${compDriver?.driverName ?? "Rival"} · ` : ""}
+                L{markQueue[markCursor]!.lapNumber} · {markQueue[markCursor]!.label} line
+              </p>
+            ) : null}
+            {transport}
+          </div>
+          <div className="mt-4 space-y-3 lg:mt-0">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="text-[16px] font-bold tracking-tight">Mark sector crossings</h2>
@@ -1354,19 +1644,12 @@ export function AnalyzeFlowClient({
             </div>
             <button
               type="button"
-              onClick={openLineEditor}
+              onClick={() => setStep(3)}
               className="shrink-0 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground"
             >
-              Edit lines
+              Lines
             </button>
           </div>
-          {markQueue[markCursor] ? (
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary">
-              {markQueue[markCursor]!.role === "competitor" ? `${compDriver?.driverName ?? "Rival"} · ` : ""}
-              L{markQueue[markCursor]!.lapNumber} · {markQueue[markCursor]!.label} line
-            </p>
-          ) : null}
-          {transport}
           <div className="flex gap-2">
             <button
               type="button"
@@ -1444,16 +1727,17 @@ export function AnalyzeFlowClient({
           </div>
           <button
             type="button"
-            onClick={() => setStep(5)}
+            onClick={() => setStep(6)}
             className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
           >
             Done marking
           </button>
+          </div>
         </div>
       ) : null}
 
-      {/* ---------- STEP 5: done ---------- */}
-      {step === 5 && session ? (
+      {/* ---------- STEP 6: done ---------- */}
+      {step === 6 && session && !draftLines ? (
         <div className="space-y-3">
           <div>
             <h2 className="flex items-center gap-2 text-[16px] font-bold tracking-tight">
