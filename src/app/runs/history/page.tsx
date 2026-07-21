@@ -48,7 +48,66 @@ export const RUN_HISTORY_VIEW_ALL_TAKE = 2000;
 
 export const revalidate = 30;
 
-const runHistoryInclude = {
+// Explicit scalar list — NOT `include`. Prisma's `include` returns every scalar
+// on the row, which dragged `engineerSummaryJson` + `engineerDeepDiveJson` (large
+// cached LLM payloads, unread on this page) across the wire for up to 2000 rows
+// on every Sessions load. That was the single biggest source of Neon egress.
+// Anything a child component reads must be listed here: rows are handed to the
+// client `<RunHistoryTable>` unmapped, so a missing field is a runtime hole that
+// only the prop types catch. Verified-unread and deliberately omitted:
+// trackId, trackLayoutId, trackLayoutNameSnapshot, trackDirection, tireSetId,
+// additiveTypeId, batteryId, batteryRunNumber, sourceSetupDocumentId,
+// sourceSetupCalibrationId, renderedSetupPdfPath, renderedSetupPdfGeneratedAt,
+// setupPdfRenderVersion, suggestedChanges, suggestedPreRun, appliedChanges,
+// importedLapTimeSessionId, incompleteLoggingPromptDismissedAt, shareWithTeam,
+// practiceDayUrl, engineerSummaryJson, engineerSummaryRefRunId,
+// engineerSummaryComputedAt, engineerDeepDiveJson.
+const runHistorySelect = {
+  id: true,
+  userId: true,
+  createdAt: true,
+  sortAt: true,
+  sessionCompletedAt: true,
+  loggingCompletedAt: true,
+  loggingComplete: true,
+  sessionType: true,
+  meetingSessionType: true,
+  meetingSessionCode: true,
+  sessionLabel: true,
+  carId: true,
+  carNameSnapshot: true,
+  trackNameSnapshot: true,
+  eventId: true,
+  raceClass: true,
+  tireRunNumber: true,
+  warmerTimingMinutes: true,
+  tirePrep: true,
+  // Read at page.tsx setup-snapshot join — easy to lose in an include→select move.
+  setupSnapshotId: true,
+  lapTimes: true,
+  lapSession: true,
+  bestLapSeconds: true,
+  avgTop5LapSeconds: true,
+  notes: true,
+  driverNotes: true,
+  handlingProblems: true,
+  handlingAssessmentJson: true,
+  carRating: true,
+  conditionsAirTempC: true,
+  conditionsTrackTempC: true,
+  conditionsCloudCoverPct: true,
+  conditionsWeatherCode: true,
+  conditionsHumidityPct: true,
+  conditionsWindKph: true,
+  // Read by runConditionsFromRecord() into the RunConditions object. No current
+  // consumer renders them, but they are real property accesses — kept so this
+  // stays a pure egress change and not a coupling to formatConditionsChip's
+  // present-day field set.
+  conditionsWindDirDeg: true,
+  conditionsSource: true,
+  conditionsLatitude: true,
+  conditionsLongitude: true,
+  conditionsObservedAt: true,
   car: { select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true } },
   track: { select: { id: true, name: true } },
   tireSet: {
@@ -85,9 +144,9 @@ const runHistoryInclude = {
       isPrimaryUser: true,
     },
   },
-} satisfies Prisma.RunInclude;
+} satisfies Prisma.RunSelect;
 
-type RunInGroup = Prisma.RunGetPayload<{ include: typeof runHistoryInclude }>;
+type RunInGroup = Prisma.RunGetPayload<{ select: typeof runHistorySelect }>;
 
 async function fetchRunHistoryRows(where: Prisma.RunWhereInput, take: number): Promise<RunInGroup[]> {
   return perfSpan(`fetchRunHistoryRows(take=${take})`, () =>
@@ -95,7 +154,7 @@ async function fetchRunHistoryRows(where: Prisma.RunWhereInput, take: number): P
       where,
       orderBy: { sortAt: "desc" },
       take,
-      include: runHistoryInclude,
+      select: runHistorySelect,
     })
   );
 }
