@@ -15,6 +15,7 @@ import { auth } from "@/auth";
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
 
 import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLinkBridge";
+import { CapacitorPushBridge } from "@/components/capacitor/CapacitorPushBridge";
 
 import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
 
@@ -242,6 +243,8 @@ export default async function RootLayout({
             <TimeZoneCookieSync />
 
             <CapacitorDeepLinkBridge />
+
+            <CapacitorPushBridge />
 
             <AppShell>{children}</AppShell>
 

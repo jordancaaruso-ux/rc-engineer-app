@@ -9,6 +9,12 @@ import {
   serializeSubscription,
   subscribeToPush,
 } from "@/lib/webPush/pushClient";
+import {
+  disableNativePush,
+  enableNativePush,
+  hasRegisteredNativePush,
+  isNativePlatform,
+} from "@/lib/nativePush/nativePushClient";
 
 const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
@@ -21,6 +27,8 @@ export function NotificationsSection() {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [iosNeedsInstall, setIosNeedsInstall] = useState(false);
+  /** Capacitor shell — uses APNs instead of the service-worker push flow. */
+  const [isNative, setIsNative] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [testUrl, setTestUrl] = useState("");
@@ -28,6 +36,16 @@ export function NotificationsSection() {
   const [testReport, setTestReport] = useState<string | null>(null);
 
   useEffect(() => {
+    // In the shell the Push API is absent, so the web checks below would wrongly
+    // report "unsupported" and offer the Add-to-Home-Screen advice.
+    if (isNativePlatform()) {
+      setIsNative(true);
+      setSupported(true);
+      setIosNeedsInstall(false);
+      setSubscribed(hasRegisteredNativePush());
+      return;
+    }
+
     const ok = pushSupported();
     setSupported(ok);
 
@@ -48,6 +66,17 @@ export function NotificationsSection() {
     setBusy(true);
     setStatus(null);
     try {
+      if (isNative) {
+        const granted = await enableNativePush();
+        setSubscribed(granted);
+        setStatus(
+          granted
+            ? "Notifications enabled on this device."
+            : "Notifications weren't allowed. Enable them in iOS Settings → JRC Race Engineer.",
+        );
+        return;
+      }
+
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setStatus("Notifications weren't allowed. Enable them in your browser settings.");
@@ -76,12 +105,19 @@ export function NotificationsSection() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [isNative]);
 
   const disable = useCallback(async () => {
     setBusy(true);
     setStatus(null);
     try {
+      if (isNative) {
+        await disableNativePush();
+        setSubscribed(false);
+        setStatus("Notifications turned off on this device.");
+        return;
+      }
+
       const sub = await getExistingSubscription();
       const endpoint = sub?.endpoint;
       if (sub) await sub.unsubscribe().catch(() => {});
@@ -99,7 +135,7 @@ export function NotificationsSection() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [isNative]);
 
   const runWatchTest = useCallback(
     async (force: boolean) => {
@@ -126,15 +162,19 @@ export function NotificationsSection() {
     setBusy(true);
     setStatus(null);
     try {
-      const sub = await getExistingSubscription();
-      if (!sub) {
-        setStatus("Enable notifications first.");
-        return;
+      // The route sends to every device registered to the user and ignores the body;
+      // the web branch only checks the subscription to give a clearer message first.
+      if (!isNative) {
+        const sub = await getExistingSubscription();
+        if (!sub) {
+          setStatus("Enable notifications first.");
+          return;
+        }
       }
       const res = await fetch("/api/push/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: sub }),
+        body: JSON.stringify({}),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -146,7 +186,7 @@ export function NotificationsSection() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [isNative]);
 
   return (
     <CardPanel className="mt-10">
@@ -171,7 +211,7 @@ export function NotificationsSection() {
           {!subscribed ? (
             <button
               type="button"
-              disabled={busy || !VAPID}
+              disabled={busy || (!isNative && !VAPID)}
               onClick={() => void enable()}
               className="rounded-md border border-primary bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
             >
@@ -200,7 +240,7 @@ export function NotificationsSection() {
         </div>
       )}
 
-      {!VAPID ? (
+      {!isNative && !VAPID ? (
         <p className="mt-2 text-xs text-destructive">
           Push key missing (NEXT_PUBLIC_VAPID_PUBLIC_KEY).
         </p>

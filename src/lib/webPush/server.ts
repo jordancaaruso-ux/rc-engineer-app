@@ -3,6 +3,7 @@ import "server-only";
 import webpush, { type PushSubscription as WebPushSubscription } from "web-push";
 
 import { prisma } from "@/lib/prisma";
+import { isApnsConfigured, sendApnsToUser } from "@/lib/nativePush/apnsServer";
 
 /**
  * Server-side web-push send path. VAPID keys come from env (see .env.local /
@@ -50,16 +51,33 @@ export async function sendPush(
 /**
  * Send a push to every device a user has registered (the real send path used by
  * the cron + triggers). Prunes endpoints that return 404/410 (expired/unsubscribed).
+ *
+ * Fans out across **both** transports: web-push for browsers and home-screen PWAs,
+ * APNs for the Capacitor shell (WKWebView has no Push API, so a native token is the
+ * only way to reach the installed app). Callers stay transport-agnostic; the returned
+ * counts are the combined totals. Either transport being unconfigured is fine — only
+ * a total absence of configuration throws.
  */
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
 ): Promise<{ sent: number; pruned: number; devices: number }> {
+  const webConfigured = isWebPushConfigured();
+  if (!webConfigured && !isApnsConfigured()) {
+    ensureConfigured(); // throws with the actionable "set VAPID_*" message
+  }
+
+  const native = await sendApnsToUser(userId, payload);
+
+  if (!webConfigured) return native;
+
   ensureConfigured();
   const subs = await prisma.pushSubscription.findMany({ where: { userId } });
 
-  let sent = 0;
-  let pruned = 0;
+  // Counted separately from the native totals so the `lastNotifiedAt` stamp below
+  // only fires when a *web* subscription actually received something.
+  let webSent = 0;
+  let webPruned = 0;
 
   await Promise.all(
     subs.map(async (s) => {
@@ -68,22 +86,26 @@ export async function sendPushToUser(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           JSON.stringify(payload),
         );
-        sent += 1;
+        webSent += 1;
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) {
           await prisma.pushSubscription.delete({ where: { id: s.id } }).catch(() => {});
-          pruned += 1;
+          webPruned += 1;
         }
       }
     }),
   );
 
-  if (sent > 0) {
+  if (webSent > 0) {
     await prisma.pushSubscription
       .updateMany({ where: { userId }, data: { lastNotifiedAt: new Date() } })
       .catch(() => {});
   }
 
-  return { sent, pruned, devices: subs.length };
+  return {
+    sent: webSent + native.sent,
+    pruned: webPruned + native.pruned,
+    devices: subs.length + native.devices,
+  };
 }
