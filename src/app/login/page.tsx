@@ -118,12 +118,16 @@ function LoginForm() {
         redirect: false,
       });
       if (res?.error) {
-        // AccessDenied means the allowlist rejected the address, not that SMTP is broken —
-        // reporting the latter sends you debugging mail config for an auth problem.
+        // AccessDenied means the allowlist rejected the address, not that mail is broken —
+        // reporting the latter sends you debugging SMTP for an auth problem. Anything else is a
+        // real send failure, which is ours to fix and not something to hand a driver server-log
+        // instructions about; point them at Google, which doesn't depend on mail delivery.
         setError(
           res.error === "AccessDenied"
             ? "That email isn't allowed yet. Check your access code, or ask for an invite."
-            : "Could not send sign-in email. Check server logs and SMTP configuration."
+            : googleOAuthConfigured
+              ? "We couldn't send the sign-in email. Try “Continue with Google” instead."
+              : "We couldn't send the sign-in email just now. Please try again shortly."
         );
         return;
       }
