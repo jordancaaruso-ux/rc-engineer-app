@@ -5,10 +5,17 @@ import type {
   GroupedFieldBehaviorType,
 } from "@/lib/setupCalibrations/types";
 
-export type LayoutGroupKind = "pair" | "corner4";
+/**
+ * `slots` is the shape the editor works in: 2–6 free-labelled cells. `pair` / `corner4` are the
+ * legacy kinds — still parsed and still emitted by auto-inference, never created by hand.
+ */
+export type LayoutGroupKind = "pair" | "corner4" | "slots";
 export type LayoutGroupRole = "front" | "rear" | "ff" | "fr" | "rf" | "rr";
 
-/** Manual layout grouping metadata (pair / corner4 rows). */
+export const MIN_LAYOUT_SLOTS = 2;
+export const MAX_LAYOUT_SLOTS = 6;
+
+/** Manual layout grouping metadata (pair / corner4 / slots rows). */
 export type SetupSheetLayoutGroup = {
   id: string;
   kind: LayoutGroupKind;
@@ -16,6 +23,8 @@ export type SetupSheetLayoutGroup = {
   /** When true, auto-group / rebuild keeps this group intact. */
   manual: boolean;
   sectionId: string;
+  /** `slots` only: ordered slot labels, length 2–6. Member fields index into this by layoutSlotIndex. */
+  slotLabels?: string[];
 };
 
 /** One parameter on a setup sheet model (schema-first). */
@@ -42,9 +51,12 @@ export type SetupSheetModelFieldDef = {
    * (e.g. `droop_front` even if this sheet labels the row "Downstop").
    */
   universalParameterId?: string;
-  /** Links field to a manual pair / corner4 layout group. */
+  /** Links field to a manual pair / corner4 / slots layout group. */
   layoutGroupId?: string;
+  /** Legacy pair / corner4 groups only. */
   layoutGroupRole?: LayoutGroupRole;
+  /** `slots` groups: which cell of the group this field occupies. */
+  layoutSlotIndex?: number;
 };
 
 export type SetupSheetModelLayoutRow =
@@ -65,6 +77,13 @@ export type SetupSheetModelLayoutRow =
       rr: string;
       label: string;
       unit?: string;
+      layoutGroupId?: string;
+    }
+  | {
+      type: "slots";
+      label: string;
+      unit?: string;
+      slots: { label: string; key: string }[];
       layoutGroupId?: string;
     }
   | {
@@ -131,10 +150,18 @@ function parseLayoutGroups(raw: unknown): Record<string, SetupSheetLayoutGroup> 
   for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!value || typeof value !== "object") continue;
     const g = value as Record<string, unknown>;
-    const kind = g.kind === "pair" || g.kind === "corner4" ? g.kind : null;
+    const kind =
+      g.kind === "pair" || g.kind === "corner4" || g.kind === "slots" ? g.kind : null;
     const label = typeof g.label === "string" ? g.label.trim() : "";
     const sectionId = typeof g.sectionId === "string" ? g.sectionId.trim() : "";
     if (!kind || !label || !sectionId) continue;
+    if (kind === "slots") {
+      const slotLabels = parseSlotLabels(g.slotLabels);
+      // A slots group without usable labels can't be rendered — drop it rather than half-build it.
+      if (!slotLabels) continue;
+      out[id] = { id, kind, label, sectionId, manual: g.manual !== false, slotLabels };
+      continue;
+    }
     out[id] = {
       id,
       kind,
@@ -144,6 +171,14 @@ function parseLayoutGroups(raw: unknown): Record<string, SetupSheetLayoutGroup> 
     };
   }
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Slot labels are blank-tolerant (an unnamed cell is legal) but the count must be 2–6. */
+function parseSlotLabels(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const labels = raw.map((x) => (typeof x === "string" ? x.trim() : ""));
+  if (labels.length < MIN_LAYOUT_SLOTS || labels.length > MAX_LAYOUT_SLOTS) return null;
+  return labels;
 }
 
 function parseFieldDef(raw: unknown): SetupSheetModelFieldDef | null {
@@ -194,6 +229,13 @@ function parseFieldDef(raw: unknown): SetupSheetModelFieldDef | null {
     layoutGroupId:
       typeof r.layoutGroupId === "string" && r.layoutGroupId.trim() ? r.layoutGroupId.trim() : undefined,
     layoutGroupRole: parseLayoutGroupRole(r.layoutGroupRole),
+    layoutSlotIndex:
+      typeof r.layoutSlotIndex === "number"
+        && Number.isInteger(r.layoutSlotIndex)
+        && r.layoutSlotIndex >= 0
+        && r.layoutSlotIndex < MAX_LAYOUT_SLOTS
+        ? r.layoutSlotIndex
+        : undefined,
   };
 }
 
@@ -254,6 +296,27 @@ function parseLayoutRow(raw: unknown): SetupSheetModelLayoutRow | null {
         typeof r.layoutGroupId === "string" && r.layoutGroupId.trim() ? r.layoutGroupId.trim() : undefined,
     };
   }
+  if (type === "slots") {
+    const label = typeof r.label === "string" ? r.label.trim() : "";
+    const slotsRaw = Array.isArray(r.slots) ? r.slots : [];
+    const slots: { label: string; key: string }[] = [];
+    for (const slot of slotsRaw) {
+      if (!slot || typeof slot !== "object") continue;
+      const s = slot as Record<string, unknown>;
+      const key = typeof s.key === "string" ? s.key.trim() : "";
+      if (!key) continue;
+      slots.push({ key, label: typeof s.label === "string" ? s.label.trim() : "" });
+    }
+    if (slots.length < MIN_LAYOUT_SLOTS || slots.length > MAX_LAYOUT_SLOTS) return null;
+    return {
+      type: "slots",
+      label: label || slots[0]!.key,
+      unit: typeof r.unit === "string" ? r.unit.trim() || undefined : undefined,
+      slots,
+      layoutGroupId:
+        typeof r.layoutGroupId === "string" && r.layoutGroupId.trim() ? r.layoutGroupId.trim() : undefined,
+    };
+  }
   if (type === "screw_strip") {
     const key = r.key;
     const label = typeof r.label === "string" ? r.label.trim() : "";
@@ -297,6 +360,9 @@ export function modelLayoutToStructuredSections(
           unit: row.unit,
         };
       }
+      if (row.type === "slots") {
+        return slotsRowToStructuredRow(row, schema.fields);
+      }
       if (row.type === "screw_strip") {
         return { type: "screw_strip", key: row.key, label: row.label };
       }
@@ -317,6 +383,60 @@ export function modelLayoutToStructuredSections(
       };
     }),
   }));
+}
+
+const CLASSIC_CORNER_SLOT_LABELS = ["ff", "fr", "rf", "rr"];
+const CLASSIC_PAIR_SLOT_LABELS = ["front", "rear"];
+
+function slotLabelsMatch(slots: { label: string }[], expected: string[]): boolean {
+  if (slots.length !== expected.length) return false;
+  return slots.every((s, i) => s.label.trim().toLowerCase() === expected[i]);
+}
+
+/**
+ * Display boundary for `slots` rows. A group that is genuinely FF/FR/RF/RR (or Front/Rear) renders
+ * through the long-standing corner4 / pair components so existing sheets stay pixel-identical;
+ * only genuinely custom shapes reach the flat N-across renderer.
+ */
+function slotsRowToStructuredRow(
+  row: Extract<SetupSheetModelLayoutRow, { type: "slots" }>,
+  fields: SetupSheetModelFieldDef[]
+): StructuredRow {
+  const members = row.slots.map((s) => fields.find((f) => f.key === s.key));
+  const kind = members.some((f) => f?.uiType === "checkbox") ? ("bool" as const) : undefined;
+  // Spread conditionally: an explicit `fieldKind: undefined` would make an adopted classic row
+  // structurally different from the same row before adoption.
+  const fieldKind = kind ? { fieldKind: kind } : {};
+
+  if (slotLabelsMatch(row.slots, CLASSIC_CORNER_SLOT_LABELS)) {
+    return {
+      type: "corner4",
+      ff: row.slots[0]!.key,
+      fr: row.slots[1]!.key,
+      rf: row.slots[2]!.key,
+      rr: row.slots[3]!.key,
+      label: row.label,
+      unit: row.unit,
+      ...fieldKind,
+    };
+  }
+  if (slotLabelsMatch(row.slots, CLASSIC_PAIR_SLOT_LABELS)) {
+    return {
+      type: "pair",
+      leftKey: row.slots[0]!.key,
+      rightKey: row.slots[1]!.key,
+      label: row.label,
+      unit: row.unit,
+      ...fieldKind,
+    };
+  }
+  return {
+    type: "slots",
+    label: row.label,
+    unit: row.unit,
+    slots: row.slots.map((s) => ({ label: s.label, key: s.key })),
+    ...fieldKind,
+  };
 }
 
 function fieldKindFromModelField(

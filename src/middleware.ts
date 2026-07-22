@@ -16,7 +16,8 @@ export default auth((req) => {
   if (pathname === "/login" || pathname.startsWith("/login/")) {
     return NextResponse.next();
   }
-  if (pathname === "/privacy") {
+  // Legal pages must be readable before sign-in — /login links to both.
+  if (pathname === "/privacy" || pathname === "/terms") {
     return NextResponse.next();
   }
   if (pathname.startsWith("/api/health/")) {

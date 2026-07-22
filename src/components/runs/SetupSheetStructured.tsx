@@ -144,6 +144,10 @@ function collectFieldSearchEntries(sections: StructuredSection[]): { key: string
         for (const { k, lab } of corners) {
           out.push({ key: k, label: `${row.label} · ${lab}` });
         }
+      } else if (row.type === "slots") {
+        for (const slot of row.slots) {
+          out.push({ key: slot.key, label: slot.label ? `${row.label} · ${slot.label}` : row.label });
+        }
       } else if (row.type === "top_deck_block") {
         out.push({ key: "top_deck_front", label: "Top deck · Front" });
         out.push({ key: "top_deck_rear", label: "Top deck · Rear" });
@@ -161,6 +165,7 @@ function structuredRowKeys(row: StructuredRow): string[] {
   if (row.type === "single") return [row.key];
   if (row.type === "pair") return [row.leftKey, row.rightKey];
   if (row.type === "corner4") return [row.ff, row.fr, row.rf, row.rr];
+  if (row.type === "slots") return row.slots.map((s) => s.key);
   if (row.type === "top_deck_block") {
     return ["top_deck_front", "top_deck_rear", "top_deck_cuts", "top_deck_single", "motor_mount_screws", "top_deck_screws"];
   }
@@ -1756,6 +1761,90 @@ function Corner4Row({
   );
 }
 
+/**
+ * Free-labelled 2–6 cell row. Corner4Row keeps its nested Front | Rear halves for the classic
+ * FF/FR/RF/RR shape; anything with custom slot labels lands here and renders flat across.
+ */
+function SlotsRow({
+  row,
+  value,
+  baseline,
+  hasBaseline,
+  readOnly,
+  onCommit,
+  highlightChangedKeys,
+  numericAggregationByKey,
+  compareValueColumnRole,
+}: {
+  row: Extract<StructuredRow, { type: "slots" }>;
+} & Pick<Props, "value" | "readOnly" | "highlightChangedKeys" | "numericAggregationByKey" | "compareValueColumnRole"> & {
+  baseline: SetupSnapshotData | null;
+  hasBaseline: boolean;
+  onCommit: (key: string, raw: SetupSnapshotValue) => void;
+}) {
+  const role = compareValueColumnRole ?? undefined;
+  return (
+    <div className={cn("flex flex-col border-b border-border/80 last:border-b-0 md:flex-row md:items-stretch")}>
+      <div className="flex w-full shrink-0 items-center border-b border-border/80 px-2 py-1 text-[10px] ui-title text-muted-foreground md:w-[38%] md:border-b-0 md:border-r md:border-border/80">
+        {row.label}
+        {row.unit ? <span className="ml-0.5 text-[9px] normal-case opacity-70">({row.unit})</span> : null}
+      </div>
+      <div
+        className="grid flex-1 divide-x divide-border/60"
+        style={{ gridTemplateColumns: `repeat(${row.slots.length}, minmax(0, 1fr))` }}
+      >
+        {row.slots.map((slot) => {
+          const v = fieldValue(value, slot.key);
+          const b = baseline ? fieldValue(baseline, slot.key) : "";
+          const cmp = keyFieldCompareResult(
+            slot.key,
+            value,
+            baseline,
+            highlightChangedKeys,
+            numericAggregationByKey
+          );
+          const hl = compareResultToHighlight(cmp, role);
+          const changed = !cmp.areEqual;
+          return (
+            <div
+              key={slot.key}
+              data-setup-field-key={slot.key}
+              className="flex min-h-[1.9rem] min-w-0 items-center gap-1 px-2 py-0.5"
+            >
+              {slot.label ? (
+                <span className="shrink-0 text-[9px] ui-title text-muted-foreground">{slot.label}</span>
+              ) : null}
+              <div
+                className={cn("min-w-0 flex-1 rounded-sm", changed && hl.className)}
+                style={changed && hl.style ? hl.style : undefined}
+              >
+                {readOnly ? (
+                  <InlineValueCompare
+                    value={v}
+                    baseline={b}
+                    hasBaseline={hasBaseline}
+                    fieldKind="text"
+                    title={springRateFieldTooltip(value, slot.key)}
+                  />
+                ) : (
+                  <CornerCell
+                    fieldKey={slot.key}
+                    value={v}
+                    baseline={b}
+                    hasBaseline={hasBaseline}
+                    onCommit={onCommit}
+                    setupSnapshot={value}
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CornerCell({
   fieldKey,
   value,
@@ -1976,7 +2065,12 @@ function TopDeckBlock({
 /** Section has at least one Front/Rear pair-style row → render a column header. */
 function sectionHasPairs(rows: readonly StructuredRow[]): boolean {
   return rows.some(
-    (r) => r.type === "pair" || r.type === "corner4" || r.type === "top_deck_block" || r.type === "screw_strip"
+    (r) =>
+      r.type === "pair"
+      || r.type === "corner4"
+      || r.type === "slots"
+      || r.type === "top_deck_block"
+      || r.type === "screw_strip"
   );
 }
 
@@ -2116,6 +2210,22 @@ export function SetupSheetStructured({
       return (
         <Corner4Row
           key={`${row.ff}-${row.rr}`}
+          row={row}
+          value={value}
+          baseline={baseline}
+          hasBaseline={hasBaseline}
+          readOnly={readOnly}
+          onCommit={commit}
+          highlightChangedKeys={highlightChangedKeys}
+          numericAggregationByKey={numericAggregationByKey}
+          compareValueColumnRole={compareRole}
+        />
+      );
+    }
+    if (row.type === "slots") {
+      return (
+        <SlotsRow
+          key={row.slots.map((s) => s.key).join("-")}
           row={row}
           value={value}
           baseline={baseline}

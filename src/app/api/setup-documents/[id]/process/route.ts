@@ -8,6 +8,11 @@ import { prisma } from "@/lib/prisma";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
 import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
+import {
+  checkAiBudget,
+  recordEstimatedAiUsage,
+  SETUP_EXTRACT_ESTIMATED_COST_USD,
+} from "@/lib/aiUsage/ledger";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -71,9 +76,25 @@ export async function POST(_: Request, ctx: Ctx) {
     );
   }
 
+  // Processing fans out into OCR consensus + two extract models — the most expensive thing a
+  // single request can trigger. Gate it before any of that starts.
+  const budget = await checkAiBudget({
+    userId: user.id,
+    userEmail: user.email,
+    feature: "setup-extract",
+  });
+  if (!budget.ok) {
+    return NextResponse.json({ error: budget.message }, { status: 429 });
+  }
+
   const dbg = process.env.DEBUG_SETUP_PROCESS_TIMING === "1";
   const t0 = dbg ? performance.now() : 0;
   try {
+    await recordEstimatedAiUsage({
+      userId: user.id,
+      feature: "setup-extract",
+      estimatedCostUsd: SETUP_EXTRACT_ESTIMATED_COST_USD,
+    });
     await processSetupDocumentImport({ docId: doc.id, userId: user.id });
     const auto = await tryCreateSetupFromParsedDocument({ docId: doc.id, userId: user.id });
     if (dbg) console.log(`[setup-process-timing] POST /process handler total ${(performance.now() - t0).toFixed(1)}ms doc=${doc.id}`);

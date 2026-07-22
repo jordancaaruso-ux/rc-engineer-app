@@ -15,6 +15,7 @@ import {
   tryAnswerPlanningQuery,
 } from "@/lib/engineerPhase5/reasoningSpine/deterministicRoutes";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
+import { checkAiBudget, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { persistEngineerChatExchange } from "@/lib/engineerFeedback/persistExchange";
 import { captureFounderGoldSetCandidate } from "@/lib/engineerFeedback/goldSetCandidate";
 import type { EngineerMessageContextSnapshot } from "@/lib/engineerFeedback/types";
@@ -293,6 +294,36 @@ export async function POST(request: Request) {
       return NextResponse.json(payload);
     }
 
+    // Budget check sits AFTER the deterministic routes above — those answer from the DB and cost
+    // nothing, so they must never burn a user's AI allowance.
+    const budget = await checkAiBudget({
+      userId: user.id,
+      userEmail: user.email,
+      feature: "engineer-chat",
+    });
+    if (!budget.ok) {
+      if (useStream) {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(`event: error\ndata: ${JSON.stringify({ message: budget.message })}\n\n`)
+            );
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        });
+      }
+      return NextResponse.json({ error: budget.message }, { status: 429 });
+    }
+
     if (useStream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -332,6 +363,13 @@ export async function POST(request: Request) {
               mode: chatMode,
               timeZone,
               onToken: (t) => send("token", { t }),
+            });
+            await recordAiUsage({
+              userId: user.id,
+              feature: "engineer-chat",
+              model: out.model,
+              promptTokens: out.usage?.promptTokens ?? 0,
+              completionTokens: out.usage?.completionTokens ?? 0,
             });
             const feedback = await maybePersistEngineerReply({
               userId: user.id,
@@ -395,6 +433,14 @@ export async function POST(request: Request) {
       contextTier,
       mode: chatMode,
       timeZone,
+    });
+
+    await recordAiUsage({
+      userId: user.id,
+      feature: "engineer-chat",
+      model: out.model,
+      promptTokens: out.usage?.promptTokens ?? 0,
+      completionTokens: out.usage?.completionTokens ?? 0,
     });
 
     const feedback = await maybePersistEngineerReply({

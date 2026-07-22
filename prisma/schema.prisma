@@ -59,6 +59,61 @@ model User {
 
   teamMemberships TeamMembership[]
   teamsCreated    Team[]           @relation("TeamsCreated")
+  aiUsageDaily    AiUsageDaily[]
+  chassisTypeRequests ChassisTypeRequest[]
+}
+
+/**
+ * Per-user AI spend ledger, rolled up by day and feature.
+ *
+ * Exists because `checkApiRateLimit` is in-memory per serverless instance — on Vercel its real
+ * ceiling is limit x instance count, i.e. none. This table is the durable cap: one atomic
+ * increment per AI call, one indexed read to enforce.
+ *
+ * Rollup, not per-call rows, so the table stays small; per-call forensics live in the OpenAI
+ * dashboard. `day` is the calendar day in the app time zone, not UTC midnight.
+ */
+model AiUsageDaily {
+  id      String   @id @default(cuid())
+  userId  String
+  day     DateTime @db.Date
+  /** `engineer-chat` \| `engineer-quick-fix` \| `setup-extract` */
+  feature String
+
+  calls            Int   @default(0)
+  promptTokens     Int   @default(0)
+  completionTokens Int   @default(0)
+  costUsd          Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day, feature])
+  @@index([userId, day])
+}
+
+/**
+ * A driver asked for a chassis type that isn't in the catalog. Chassis creation is admin-only
+ * (curated ground truth), so without this the request evaporated into a 403 and the founder never
+ * heard about it — the loop `ASSET_ACCESS_NORTH_STAR.md` calls for.
+ */
+model ChassisTypeRequest {
+  id            String    @id @default(cuid())
+  userId        String
+  requestedName String
+  /** Normalized name — dedupes repeat asks for the same chassis. */
+  normalizedName String
+  requestCount  Int       @default(1)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  resolvedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, normalizedName])
+  @@index([resolvedAt, createdAt])
 }
 
 /** Named group for mutual visibility pilot (members share runs in Engineer + team Sessions view). */

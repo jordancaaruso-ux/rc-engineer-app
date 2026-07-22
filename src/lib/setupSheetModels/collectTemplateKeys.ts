@@ -16,6 +16,9 @@ function collectRowKeys(row: StructuredRow, keys: Set<string>) {
       keys.add(row.rf);
       keys.add(row.rr);
       break;
+    case "slots":
+      for (const slot of row.slots) keys.add(slot.key);
+      break;
     case "screw_strip":
       keys.add(row.key);
       break;

@@ -12,6 +12,8 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
+import { listPendingChassisTypeRequests } from "@/lib/setupSheetModels/chassisTypeRequests";
+import { topAiSpenders } from "@/lib/aiUsage/ledger";
 
 /** Setup workbench — calibrations and dataset tooling, off the driver-facing "My setups" page. */
 export default async function SetupAdminPage(): Promise<ReactNode> {
@@ -40,12 +42,17 @@ export default async function SetupAdminPage(): Promise<ReactNode> {
   if (!isAuthAdminEmail(user.email)) notFound();
 
   const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
-  const calibrations = await prisma.setupSheetCalibration.findMany({
-    where: calibrationsVisibleToUserWhere(user.id),
-    orderBy: { createdAt: "desc" },
-    take: 20,
-    select: { id: true, name: true, sourceType: true, createdAt: true },
-  });
+  const [calibrations, chassisRequests, spenders] = await Promise.all([
+    prisma.setupSheetCalibration.findMany({
+      where: calibrationsVisibleToUserWhere(user.id),
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { id: true, name: true, sourceType: true, createdAt: true },
+    }),
+    listPendingChassisTypeRequests(20),
+    topAiSpenders(30, 10),
+  ]);
+  const totalAiCostUsd = spenders.reduce((sum, s) => sum + s.costUsd, 0);
 
   return (
     <>
@@ -91,6 +98,70 @@ export default async function SetupAdminPage(): Promise<ReactNode> {
                     >
                       Open
                     </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SurfaceCard>
+        </div>
+
+        {/* Open signup makes these two the things that bite silently: an unheard chassis request,
+            and an AI bill forming before Vercel tells you. */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <Eyebrow>Chassis type requests</Eyebrow>
+            <Link
+              href="/setup-sheet-models"
+              className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted"
+            >
+              Add one
+            </Link>
+          </div>
+          <SurfaceCard variant="panel" contentClassName="p-0">
+            {chassisRequests.length === 0 ? (
+              <div className="px-4 py-3 text-xs text-muted-foreground">No open requests.</div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {chassisRequests.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-2 px-4 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs text-foreground">{r.requestedName}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {r.requesterEmail ?? "unknown"} ·{" "}
+                        {formatRunDateOnly(r.createdAt, displayTimeZone)}
+                        {r.requestCount > 1 ? ` · asked ${r.requestCount}x` : ""}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SurfaceCard>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <Eyebrow>AI spend — last 30 days</Eyebrow>
+            <span className="text-xs text-muted-foreground">
+              ${totalAiCostUsd.toFixed(2)} est.
+            </span>
+          </div>
+          <SurfaceCard variant="panel" contentClassName="p-0">
+            {spenders.length === 0 ? (
+              <div className="px-4 py-3 text-xs text-muted-foreground">No AI usage recorded.</div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {spenders.map((s) => (
+                  <li key={s.userId} className="flex items-center justify-between gap-2 px-4 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs text-foreground">
+                        {s.email ?? s.userId}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">{s.calls} calls</div>
+                    </div>
+                    <div className="font-mono text-xs text-foreground">
+                      ${s.costUsd.toFixed(2)}
+                    </div>
                   </li>
                 ))}
               </ul>

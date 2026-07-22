@@ -46,6 +46,25 @@ The "AI drafts the schema from an unknown sheet" decision above splits into **tw
 
 Full design (upload-first wizard, manual mapping with auto type/group detect, car decoupling, draw-fields removal): interview 2026-07-08 + memory `setup-template-creation-rework`.
 
+### Supersedes the above — template creation is hand-built, box-first (2026-07-22)
+
+The AI **naming** pass never survived review: the founder renamed every drafted parameter, so the
+draft cost more than it saved. The in-app AI template wizard (`/setup-sheet-models/new/setup`,
+`CarSetupWizardClient`, `POST /api/setup-sheet-models/draft-from-pdf`) is **deleted**.
+
+- **Template creation is the mapping editor.** `/setup-sheet-models/new` takes a name + the blank
+  PDF, creates the chassis type with an **empty** schema and an empty AcroForm calibration, and
+  lands in `/setup-calibrations/<id>`. Every parameter is created by clicking its box on the sheet
+  and naming it there (free-text group, optional universal parameter, one-of-many/many-of-many built
+  by clicking several boxes). Arranging the rendered sheet is the *next* step, in the schema editor.
+- **The AcroForm geometry is still the anchor** — the boxes come from the PDF's own form fields
+  (`/api/setup-documents/[id]/pdf-form-fields`), not from a model. Nothing about the reading engine
+  changed; only who names the fields.
+- **`draftCalibrationFromBlankSheet` survives as offline tooling** —
+  `scripts/setup-extract-eval/blank-calibration-pilot.ts` + the self-verify loop still use it, and
+  `draftSetupSheetModelSchema` remains the uncalibrated-upload fallback below. Neither is reachable
+  from the app UI.
+
 ---
 
 ## Stages
@@ -362,9 +381,9 @@ that **most top brands publish one**. Everything else degrades honestly (below).
 **Code-audit inventory (2026-07-20) — the workbench is assembly, not invention.**
 Already built and refined: the PDF calibration editor (click-widget-to-map, quick-add
 with inferred key/type/section, group creation with one-of-many/many-of-many
-inference, widget-ownership guards); the blank-sheet AI drafter wired in-app
-(`draft-from-pdf`, geometry + batched coordinate-guided labels + universal params);
-the image editor with seeded boxes + detect-boxes click-to-assign; in-app green-light
+inference, widget-ownership guards); the blank-sheet AI drafter (offline scripts only
+since 2026-07-22 — the in-app `draft-from-pdf` wizard is deleted, see the refinement
+above); the image editor with seeded boxes + detect-boxes click-to-assign; in-app green-light
 with `fieldsNeedingRecheck`; fingerprint auto-pick with empty-shell + cross-model
 guards; silent region-detection import; ~14 hard-won image-pipeline refinements
 (redness marks, center measurement, Otsu, content-box alignment, consensus OCR…) —

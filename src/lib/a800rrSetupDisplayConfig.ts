@@ -32,6 +32,14 @@ export type StructuredRow =
       unit?: string;
       fieldKind?: SetupFieldKind;
     }
+  | {
+      /** Free-labelled 2–6 cell row. corner4 / pair stay for the classic FF-FR-RF-RR and F/R shapes. */
+      type: "slots";
+      label: string;
+      unit?: string;
+      slots: { label: string; key: string }[];
+      fieldKind?: SetupFieldKind;
+    }
   | { type: "top_deck_block" }
   | {
       type: "screw_strip";
@@ -276,6 +284,8 @@ export function collectStructuredFieldKeys(sections: StructuredSection[]): strin
         add(row.fr);
         add(row.rf);
         add(row.rr);
+      } else if (row.type === "slots") {
+        for (const slot of row.slots) add(slot.key);
       } else if (row.type === "top_deck_block") {
         add("top_deck_front");
         add("top_deck_rear");

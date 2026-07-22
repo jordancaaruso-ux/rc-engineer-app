@@ -120,13 +120,13 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
       <section className="page-body">
         {isAdmin ? (
           <CardPanel className="max-w-2xl">
-            <Eyebrow>New car with custom setup sheet</Eyebrow>
+            <Eyebrow>Add a chassis type</Eyebrow>
             <p className="ui-caption mt-1">
-              Define parameters for a car model (e.g. Mugen MTC3), upload a PDF, and calibrate — without inheriting the
-              Awesomatix A800 sheet.
+              Name the chassis and upload its blank setup sheet — then build the parameter list by
+              clicking each box on the sheet and naming it yourself.
             </p>
-            <ButtonLink href="/setup-sheet-models/new/setup" className="mt-3 inline-flex text-sm">
-              Start setup wizard
+            <ButtonLink href="/setup-sheet-models/new" className="mt-3 inline-flex text-sm">
+              New chassis type
             </ButtonLink>
           </CardPanel>
         ) : null}

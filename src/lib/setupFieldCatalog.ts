@@ -36,6 +36,11 @@ function flattenStructuredSection(sec: StructuredSection, out: SetupFieldMeta[],
       pushMeta(out, seen, row.fr, `${row.label} · FR`, row.unit, sec.id, sec.title);
       pushMeta(out, seen, row.rf, `${row.label} · RF`, row.unit, sec.id, sec.title);
       pushMeta(out, seen, row.rr, `${row.label} · RR`, row.unit, sec.id, sec.title);
+    } else if (row.type === "slots") {
+      for (const slot of row.slots) {
+        const label = slot.label ? `${row.label} · ${slot.label}` : row.label;
+        pushMeta(out, seen, slot.key, label, row.unit, sec.id, sec.title);
+      }
     } else if (row.type === "top_deck_block") {
       pushMeta(out, seen, "top_deck_front", "Top deck · Front", undefined, sec.id, sec.title);
       pushMeta(out, seen, "top_deck_rear", "Top deck · Rear", undefined, sec.id, sec.title);

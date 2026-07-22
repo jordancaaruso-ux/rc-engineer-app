@@ -1,0 +1,88 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { hasDatabaseUrl } from "@/lib/env";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
+import { isEmailAuthAllowed } from "@/lib/authAllowlist";
+import {
+  isSignupAccessCodeConfigured,
+  verifySignupAccessCode,
+} from "@/lib/auth/signupAccessCode";
+
+/**
+ * Self-serve signup: a valid shared access code adds the email to `AuthAllowedEmail`, after which
+ * the normal magic-link / Google flow in `src/auth.ts` runs unchanged. Nothing about the auth
+ * config itself opens up — the allowlist stays the single source of truth.
+ *
+ * Public by construction: the middleware matcher excludes `api/auth` entirely, and this static
+ * segment takes priority over the `[...nextauth]` catch-all.
+ */
+
+function normalizeEmail(raw: string): string | null {
+  const t = raw.trim().toLowerCase();
+  if (!t || !t.includes("@") || /\s/.test(t)) return null;
+  return t;
+}
+
+/** Best-effort client IP for the burst brake (Vercel sets x-forwarded-for). */
+function clientIpKey(request: Request): string {
+  const fwd = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return fwd || request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  if (!hasDatabaseUrl()) {
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+  }
+
+  // Best-effort only — it's per serverless instance, so code entropy is the real defence.
+  const rl = checkApiRateLimit({
+    key: `redeem-access-code:${clientIpKey(request)}`,
+    limit: 20,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!rl.ok) return rateLimitResponse(rl.retryAfterSec);
+
+  const body = (await request.json().catch(() => null)) as
+    | { email?: string; code?: string }
+    | null;
+  const email = typeof body?.email === "string" ? normalizeEmail(body.email) : null;
+  if (!email) {
+    return NextResponse.json({ ok: false, error: "Enter a valid email address." }, { status: 400 });
+  }
+
+  const codeValid = isSignupAccessCodeConfigured() && verifySignupAccessCode(body?.code);
+
+  // A valid code always writes the row, even for an address that already passes the allowlist.
+  // In dev `AUTH_DEV_ALLOW_ANY_EMAIL=1` makes `isEmailAuthAllowed` true for everything, so an
+  // early return would leave NO row — redemption would look like it worked while the durable
+  // grant never happened, and the account would stop working the moment the flag is turned off.
+  if (codeValid) {
+    await prisma.authAllowedEmail.upsert({
+      where: { email },
+      create: { email },
+      update: {},
+      select: { id: true },
+    });
+    return NextResponse.json({ ok: true, redeemed: true });
+  }
+
+  // No code, but already allowlisted (founder-invited or env list) — let them straight through.
+  // Returning ok here is a mild membership oracle for someone holding no valid code; the trade is
+  // deliberate. Otherwise a stranger who typo'd the code waits forever on /login/verify-request
+  // for an email `sendVerificationRequest` silently declined to send.
+  if (await isEmailAuthAllowed(email)) {
+    return NextResponse.json({ ok: true, redeemed: false });
+  }
+
+  if (!isSignupAccessCodeConfigured()) {
+    return NextResponse.json(
+      { ok: false, error: "Sign-up is invite-only right now." },
+      { status: 403 }
+    );
+  }
+
+  return NextResponse.json(
+    { ok: false, error: "That access code isn't valid." },
+    { status: 403 }
+  );
+}

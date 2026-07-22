@@ -52,6 +52,15 @@ import {
   SetupCalibrationModelSidebar,
   type NewParameterInput,
 } from "@/components/setup-documents/SetupCalibrationModelSidebar";
+import {
+  NewParameterFromBoxesPanel,
+  type PendingBox,
+} from "@/components/setup-documents/NewParameterFromBoxesPanel";
+import {
+  buildNewParameterField,
+  existingGroupTitles,
+  type NewParameterInput as BoxParameterInput,
+} from "@/lib/setupSheetModels/newParameterDef";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -463,6 +472,15 @@ export function SetupCalibrationEditorClient({
   /** Parameter-first mapping: the armed parameter and its options assigned so far. */
   const [armedKey, setArmedKey] = useState<string | null>(null);
   const [armedAssignments, setArmedAssignments] = useState<ModelOptionAssignment[]>([]);
+  /**
+   * Box-first mapping: boxes clicked on the sheet with no parameter armed, in click order. The
+   * name panel stays open while more are added, so a row of checkboxes becomes one grouped param.
+   */
+  const [pendingBoxKeys, setPendingBoxKeys] = useState<string[]>([]);
+  const [newParamBusy, setNewParamBusy] = useState(false);
+  const [newParamError, setNewParamError] = useState<string | null>(null);
+  /** Parameter row under the cursor in the sidebar — previews its boxes on the sheet. */
+  const [hoveredParameterKey, setHoveredParameterKey] = useState<string | null>(null);
   const [acroSelection, setAcroSelection] = useState<{ keys: string[]; activeKey: string | null }>({
     keys: [],
     activeKey: null,
@@ -910,6 +928,59 @@ export function SetupCalibrationEditorClient({
     }
     return s;
   }, [formFieldMappings, pdfRowByName]);
+
+  /** Every widget one parameter's rule reads — drives the highlight when it is selected/hovered. */
+  const widgetKeysForParameter = useCallback(
+    (parameterKey: string | null): string[] => {
+      if (!parameterKey) return [];
+      const rule = formFieldMappings[parameterKey];
+      if (!rule) return [];
+      const grouped = extractAssignmentsFromGroupedRule(rule);
+      if (grouped.length > 0) return grouped.map((a) => a.sourceKey);
+      const simple = rule as { pdfFieldName?: string; widgetInstanceIndex?: number };
+      if (!simple.pdfFieldName) return [];
+      if (simple.widgetInstanceIndex != null) {
+        return [`${simple.pdfFieldName}#${simple.widgetInstanceIndex}`];
+      }
+      const row = pdfRowByName.get(simple.pdfFieldName);
+      const n = row?.widgets?.length ?? 0;
+      if (n <= 1) return [`${simple.pdfFieldName}#0`];
+      return Array.from({ length: n }, (_, i) => `${simple.pdfFieldName}#${i}`);
+    },
+    [formFieldMappings, pdfRowByName]
+  );
+
+  /** Boxes drawn amber: the ones being named right now, plus the selected/hovered parameter's. */
+  const highlightedWidgetKeys = useMemo(() => {
+    const s = new Set<string>(pendingBoxKeys);
+    for (const k of widgetKeysForParameter(armedKey)) s.add(k);
+    for (const k of widgetKeysForParameter(hoveredParameterKey)) s.add(k);
+    for (const a of armedAssignments) s.add(a.sourceKey);
+    return s;
+  }, [pendingBoxKeys, armedKey, hoveredParameterKey, armedAssignments, widgetKeysForParameter]);
+
+  /** The clicked-but-unnamed boxes, with any parameter that currently owns them. */
+  const pendingBoxes = useMemo((): PendingBox[] => {
+    const labelByKey = new Map(
+      (setupSheetModelSchema?.fields ?? []).map((f) => [f.key, f.displayLabel] as const)
+    );
+    return pendingBoxKeys.map((sourceKey) => {
+      const ref = parseAcroKey(sourceKey);
+      const row = pdfRowByName.get(ref.pdfFieldName);
+      const owners = findAppKeysForWidget(
+        formFieldMappings,
+        ref.pdfFieldName,
+        ref.instanceIndex,
+        row
+      );
+      return {
+        sourceKey,
+        pdfFieldName: ref.pdfFieldName,
+        instanceIndex: ref.instanceIndex,
+        conflictLabels: owners.map((k) => labelByKey.get(k) ?? k),
+      };
+    });
+  }, [pendingBoxKeys, pdfRowByName, formFieldMappings, setupSheetModelSchema]);
 
   const catalogByGroup = useMemo(() => {
     const order: string[] = [];
@@ -1579,6 +1650,18 @@ export function SetupCalibrationEditorClient({
   function commitModelGroupedLink(parameterKey: string, assignments: ModelOptionAssignment[]) {
     const field = setupSheetModelSchema?.fields.find((f) => f.key === parameterKey);
     if (!field) return;
+    commitModelGroupedLinkForField(field, assignments);
+  }
+
+  /**
+   * Takes the field def rather than looking it up, so a freshly created parameter can be mapped in
+   * the same tick — `setSetupSheetModelSchema` has not re-rendered yet at that point.
+   */
+  function commitModelGroupedLinkForField(
+    field: SetupSheetModelFieldDef,
+    assignments: ModelOptionAssignment[]
+  ) {
+    const parameterKey = field.key;
     const behavior = groupedBehaviorForAssignments(field, assignments);
     const rule = buildGroupedRuleFromAssignments(behavior, assignments);
     if (!rule) {
@@ -1609,13 +1692,31 @@ export function SetupCalibrationEditorClient({
     setArmedKey(parameterKey);
     setArmedAssignments([]);
     setAcroSelection({ keys: [], activeKey: null });
+    cancelNewParameter();
     setStatus(null);
+    jumpToParameterPage(parameterKey);
   }
 
   function disarmParameter() {
     setArmedKey(null);
     setArmedAssignments([]);
     setStatus(null);
+  }
+
+  function cancelNewParameter() {
+    setPendingBoxKeys([]);
+    setNewParamError(null);
+  }
+
+  /** Follow a parameter's mapping to the page its box lives on, so selecting it always shows it. */
+  function jumpToParameterPage(parameterKey: string) {
+    const ref = resolveAcroFromCanonicalKey(parameterKey, formFieldMappings[parameterKey]);
+    if (!ref) return;
+    const row = pdfRowByName.get(ref.pdfFieldName);
+    const widget =
+      row?.widgets?.find((w, i) => (w.instanceIndex ?? i) === ref.instanceIndex) ?? row?.widgets?.[0];
+    const page = widget?.pageNumber;
+    if (page && page !== currentPage) setCurrentPage(page);
   }
 
   /** After a parameter completes, arm the next unmapped one (wrapping). */
@@ -1646,8 +1747,13 @@ export function SetupCalibrationEditorClient({
       ? setupSheetModelSchema?.fields.find((f) => f.key === armedKey) ?? null
       : null;
 
+    // Box-first: nothing armed → the click starts (or extends) a new parameter named right here.
     if (!armedField) {
-      setStatus("Pick a parameter on the right, then click its box on the sheet.");
+      setNewParamError(null);
+      setPendingBoxKeys((prev) =>
+        prev.includes(sourceKey) ? prev.filter((k) => k !== sourceKey) : [...prev, sourceKey]
+      );
+      setStatus(null);
       return;
     }
 
@@ -1681,45 +1787,9 @@ export function SetupCalibrationEditorClient({
     }
   }
 
-  /** Adds a parameter to the car's sheet model schema, then arms it. */
-  async function createSchemaParameter(input: NewParameterInput): Promise<boolean> {
-    if (!setupSheetModelSchema || !initialSetupSheetModelId) return false;
-    const base = input.displayLabel
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "parameter";
-    const existingKeys = new Set(setupSheetModelSchema.fields.map((f) => f.key));
-    let key = base;
-    let n = 2;
-    while (existingKeys.has(key)) key = `${base}_${n++}`;
-
-    const grouped = input.kind !== "value";
-    const maxSort = setupSheetModelSchema.fields.reduce((m, f) => Math.max(m, f.sortOrder ?? 0), 0);
-    const field: SetupSheetModelFieldDef = {
-      key,
-      displayLabel: input.displayLabel,
-      sectionId: input.sectionId,
-      sectionTitle: input.sectionTitle,
-      valueType: grouped ? (input.kind === "one_of_many" ? "enum" : "multi") : "string",
-      uiType: grouped ? (input.kind === "one_of_many" ? "select" : "multiSelect") : "text",
-      showInSetupSheet: true,
-      showInAnalysis: true,
-      showInLogRun: true,
-      sortOrder: maxSort + 1,
-      ...(grouped
-        ? {
-            groupBehaviorType: (input.kind === "one_of_many"
-              ? "singleSelect"
-              : "multiChoiceGroup") as GroupedFieldBehaviorType,
-            groupedOptionLabels: input.optionLabels,
-            groupedOptionValues: input.optionLabels.map((l) =>
-              l.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "opt"
-            ),
-          }
-        : {}),
-    };
-
-    const nextSchema = { ...setupSheetModelSchema, fields: [...setupSheetModelSchema.fields, field] };
+  /** Persist a schema change to the sheet model. Returns the error message, or null on success. */
+  async function persistModelSchema(nextSchema: SetupSheetModelSchema): Promise<string | null> {
+    if (!initialSetupSheetModelId) return "This calibration is not linked to a chassis type.";
     try {
       const res = await fetch(`/api/setup-sheet-models/${initialSetupSheetModelId}`, {
         method: "PATCH",
@@ -1727,17 +1797,145 @@ export function SetupCalibrationEditorClient({
         body: JSON.stringify({ schema: nextSchema }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setStatus(data.error || "Could not add the parameter.");
-        return false;
-      }
+      if (!res.ok) return data.error || "Could not save the parameter list.";
       setSetupSheetModelSchema(nextSchema);
-      armParameter(key);
-      setStatus(`Added “${input.displayLabel}”.`);
-      return true;
+      return null;
     } catch {
-      setStatus("Could not add the parameter.");
+      return "Could not save the parameter list.";
+    }
+  }
+
+  /** Adds a parameter to the car's sheet model schema, then arms it. */
+  async function createSchemaParameter(input: NewParameterInput): Promise<boolean> {
+    if (!setupSheetModelSchema || !initialSetupSheetModelId) return false;
+    const built = buildNewParameterField(
+      {
+        displayLabel: input.displayLabel,
+        groupTitle: input.sectionTitle || input.sectionId,
+        kind: input.kind === "value" ? "text" : input.kind,
+        optionLabels: input.optionLabels,
+      },
+      setupSheetModelSchema
+    );
+    if (!built.ok) {
+      setStatus(built.error);
       return false;
+    }
+    const nextSchema = {
+      ...setupSheetModelSchema,
+      fields: [...setupSheetModelSchema.fields, built.field],
+    };
+    const error = await persistModelSchema(nextSchema);
+    if (error) {
+      setStatus(error);
+      return false;
+    }
+    armParameter(built.field.key);
+    setStatus(`Added “${built.field.displayLabel}”.`);
+    return true;
+  }
+
+  /**
+   * Box-first: create the parameter the driver just named and map it to the box(es) he clicked.
+   * The field def is passed straight to the mapping helpers — the schema state has not re-rendered
+   * yet, so looking the key back up would miss it.
+   */
+  async function createParameterFromBoxes(input: BoxParameterInput): Promise<void> {
+    if (!setupSheetModelSchema || newParamBusy) return;
+    const boxKeys = [...pendingBoxKeys];
+    if (boxKeys.length === 0) return;
+
+    const built = buildNewParameterField(input, setupSheetModelSchema);
+    if (!built.ok) {
+      setNewParamError(built.error);
+      return;
+    }
+    const field = built.field;
+
+    setNewParamBusy(true);
+    setNewParamError(null);
+    const error = await persistModelSchema({
+      ...setupSheetModelSchema,
+      fields: [...setupSheetModelSchema.fields, field],
+    });
+    setNewParamBusy(false);
+    if (error) {
+      setNewParamError(error);
+      return;
+    }
+
+    setPendingBoxKeys([]);
+    if (boxKeys.length === 1) {
+      const ref = parseAcroKey(boxKeys[0]!);
+      // Routes through the cross-field conflict modal when the box already belongs to something.
+      applyWidgetToCanonicalKey(field.key, ref.pdfFieldName, ref.instanceIndex);
+      setStatus(`Added “${field.displayLabel}”.`);
+      return;
+    }
+
+    const labels = field.groupedOptionLabels ?? [];
+    const values = field.groupedOptionValues ?? [];
+    const assignments: ModelOptionAssignment[] = boxKeys.map((sourceKey, i) => ({
+      optionValue: values[i] ?? `opt_${i + 1}`,
+      optionLabel: labels[i] ?? `Option ${i + 1}`,
+      sourceKey,
+    }));
+    commitModelGroupedLinkForField(field, assignments);
+    setStatus(`Added “${field.displayLabel}” across ${boxKeys.length} boxes.`);
+  }
+
+  /** Clear a parameter's box(es) but keep the parameter — its boxes go back to unmapped. */
+  function unmapParameter(parameterKey: string) {
+    const label =
+      setupSheetModelSchema?.fields.find((f) => f.key === parameterKey)?.displayLabel ?? parameterKey;
+    setFormFieldMappings((prev) => {
+      if (!(parameterKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[parameterKey];
+      return next;
+    });
+    if (armedKey === parameterKey) setArmedAssignments([]);
+    setStatus(`Unmapped “${label}”.`);
+  }
+
+  /** Remove a parameter from the chassis' sheet model, and drop the mapping that pointed at it. */
+  async function deleteParameter(parameterKey: string): Promise<boolean> {
+    if (!setupSheetModelSchema) return false;
+    const field = setupSheetModelSchema.fields.find((f) => f.key === parameterKey);
+    if (!field) return false;
+    const error = await persistModelSchema({
+      ...setupSheetModelSchema,
+      fields: setupSheetModelSchema.fields.filter((f) => f.key !== parameterKey),
+    });
+    if (error) {
+      setStatus(error);
+      return false;
+    }
+    setFormFieldMappings((prev) => {
+      if (!(parameterKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[parameterKey];
+      return next;
+    });
+    if (armedKey === parameterKey) disarmParameter();
+    if (hoveredParameterKey === parameterKey) setHoveredParameterKey(null);
+    setStatus(`Deleted “${field.displayLabel}”.`);
+    return true;
+  }
+
+  /** How many saved setups already hold a value for this parameter (null when it can't be counted). */
+  async function fetchParameterUsageCount(parameterKey: string): Promise<number | null> {
+    if (!initialSetupSheetModelId) return null;
+    try {
+      const res = await fetch(
+        `/api/setup-sheet-models/${initialSetupSheetModelId}/parameter-usage?key=${encodeURIComponent(parameterKey)}`,
+        { cache: "no-store" }
+      );
+      const data = (await res.json().catch(() => ({}))) as { count?: number };
+      if (!res.ok || typeof data.count !== "number") return null;
+      return data.count;
+    } catch {
+      return null;
     }
   }
 
@@ -2467,7 +2665,9 @@ export function SetupCalibrationEditorClient({
                         const instanceIndex = w.instanceIndex ?? wi;
                         const overlayKey = `${row.name}#${instanceIndex}`;
                         const isMapped = mappedWidgetKeys.has(overlayKey);
-                        const isInstanceSelected = acroSelection.keys.includes(overlayKey);
+                        const isInstanceSelected =
+                          acroSelection.keys.includes(overlayKey)
+                          || highlightedWidgetKeys.has(overlayKey);
                         const isHovered = hoveredFormOverlayKey === overlayKey;
                         const left = (w.x / pdfPageSize.width) * renderedPageSize.width;
                         const top = (w.y / pdfPageSize.height) * renderedPageSize.height;
@@ -2601,19 +2801,39 @@ export function SetupCalibrationEditorClient({
             )}
           </div>
 
-        <CardPanel contentClassName="p-3">
+        <CardPanel contentClassName="space-y-3 p-3">
           {modelLinkedMode && setupSheetModelSchema && initialSetupSheetModelId ? (
-            <SetupCalibrationModelSidebar
-              schema={setupSheetModelSchema}
-              modelId={initialSetupSheetModelId}
-              calibrationId={calibrationId}
-              formFieldMappings={formFieldMappings}
-              armedKey={armedKey}
-              armedAssignments={armedAssignments}
-              onArm={armParameter}
-              onDisarm={disarmParameter}
-              onCreateParameter={createSchemaParameter}
-            />
+            <>
+              {pendingBoxes.length > 0 ? (
+                <NewParameterFromBoxesPanel
+                  boxes={pendingBoxes}
+                  groupTitles={existingGroupTitles(setupSheetModelSchema)}
+                  busy={newParamBusy}
+                  error={newParamError}
+                  onRemoveBox={(sourceKey) =>
+                    setPendingBoxKeys((prev) => prev.filter((k) => k !== sourceKey))
+                  }
+                  onHoverBox={setHoveredFormOverlayKey}
+                  onCancel={cancelNewParameter}
+                  onSubmit={(input) => void createParameterFromBoxes(input)}
+                />
+              ) : null}
+              <SetupCalibrationModelSidebar
+                schema={setupSheetModelSchema}
+                modelId={initialSetupSheetModelId}
+                calibrationId={calibrationId}
+                formFieldMappings={formFieldMappings}
+                armedKey={armedKey}
+                armedAssignments={armedAssignments}
+                onArm={armParameter}
+                onDisarm={disarmParameter}
+                onCreateParameter={createSchemaParameter}
+                onHoverParameter={setHoveredParameterKey}
+                onUnmapParameter={unmapParameter}
+                onDeleteParameter={deleteParameter}
+                parameterUsageCount={fetchParameterUsageCount}
+              />
+            </>
           ) : null}
         </CardPanel>
       </div>

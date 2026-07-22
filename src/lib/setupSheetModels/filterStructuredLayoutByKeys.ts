@@ -5,6 +5,7 @@ export function modelLayoutRowKeys(row: SetupSheetModelLayoutRow): string[] {
   if (row.type === "single") return [row.key];
   if (row.type === "pair") return [row.leftKey, row.rightKey];
   if (row.type === "corner4") return [row.ff, row.fr, row.rf, row.rr];
+  if (row.type === "slots") return row.slots.map((s) => s.key);
   if (row.type === "screw_strip") return [row.key];
   if (row.type === "top_deck_block") {
     return [

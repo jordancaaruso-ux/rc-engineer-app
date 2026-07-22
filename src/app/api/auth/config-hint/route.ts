@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
+import { isSignupAccessCodeConfigured } from "@/lib/auth/signupAccessCode";
 
 /** Tells the login UI which sign-in methods are configured. */
 export async function GET() {
@@ -8,5 +9,7 @@ export async function GET() {
   return NextResponse.json({
     smtpConfigured: isMagicLinkSmtpConfigured(),
     googleOAuthConfigured: Boolean(gid && gsecret),
+    // Drives the optional "Access code" field on /login. False = invite-only (founder adds you).
+    accessCodeEnabled: isSignupAccessCodeConfigured(),
   });
 }

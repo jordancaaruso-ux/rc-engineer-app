@@ -1,12 +1,13 @@
 import { inferSectionLayoutRows } from "@/lib/setupSheetModels/inferStructuredLayout";
 import { collectModelLayoutKeys, modelLayoutRowKeys } from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
-import type {
-  LayoutGroupKind,
-  LayoutGroupRole,
-  SetupSheetLayoutGroup,
-  SetupSheetModelFieldDef,
-  SetupSheetModelLayoutRow,
-  SetupSheetModelSchema,
+import {
+  MIN_LAYOUT_SLOTS,
+  type LayoutGroupKind,
+  type LayoutGroupRole,
+  type SetupSheetLayoutGroup,
+  type SetupSheetModelFieldDef,
+  type SetupSheetModelLayoutRow,
+  type SetupSheetModelSchema,
 } from "@/lib/setupSheetModels/types";
 
 const PAIR_ROLES: LayoutGroupRole[] = ["front", "rear"];
@@ -127,6 +128,10 @@ function layoutRowFromGroup(
   group: SetupSheetLayoutGroup,
   fields: SetupSheetModelFieldDef[]
 ): SetupSheetModelLayoutRow | { error: string } {
+  // `slots` groups carry their own ordering (layoutSlotIndex) and never go through role inference —
+  // that's what lets a group like "Under lower arm shims · inner/outer" exist at all.
+  if (group.kind === "slots") return slotsRowFromGroup(group, fields);
+
   const roles = rolesForKind(group.kind);
   const mapped = fieldByRole(fields, roles);
   if ("error" in mapped) return mapped;
@@ -150,6 +155,45 @@ function layoutRowFromGroup(
     rf: mapped.get("rf")!.key,
     rr: mapped.get("rr")!.key,
     unit,
+    layoutGroupId: group.id,
+  };
+}
+
+function slotsRowFromGroup(
+  group: SetupSheetLayoutGroup,
+  fields: SetupSheetModelFieldDef[]
+): SetupSheetModelLayoutRow | { error: string } {
+  const slotLabels = group.slotLabels ?? [];
+  if (slotLabels.length < MIN_LAYOUT_SLOTS) {
+    return { error: `"${group.label}" needs at least ${MIN_LAYOUT_SLOTS} slots.` };
+  }
+
+  const byIndex = new Map<number, SetupSheetModelFieldDef>();
+  for (const field of fields) {
+    const idx = field.layoutSlotIndex;
+    if (idx == null || idx < 0 || idx >= slotLabels.length) {
+      return { error: `"${field.displayLabel}" has no slot in "${group.label}".` };
+    }
+    if (byIndex.has(idx)) return { error: `Two parameters share slot ${idx + 1} of "${group.label}".` };
+    byIndex.set(idx, field);
+  }
+
+  const slots: { label: string; key: string }[] = [];
+  for (let i = 0; i < slotLabels.length; i++) {
+    const field = byIndex.get(i);
+    // An empty slot is a legal editing state but can't render — drop it from the row.
+    if (!field) continue;
+    slots.push({ label: slotLabels[i]!, key: field.key });
+  }
+  if (slots.length < MIN_LAYOUT_SLOTS) {
+    return { error: `"${group.label}" needs at least ${MIN_LAYOUT_SLOTS} filled slots.` };
+  }
+
+  return {
+    type: "slots",
+    label: group.label,
+    unit: pickSharedUnit([...byIndex.values()]),
+    slots,
     layoutGroupId: group.id,
   };
 }
@@ -228,7 +272,7 @@ export function ungroupLayoutGroup(
 
   const nextFields = schema.fields.map((f) =>
     f.layoutGroupId === groupId
-      ? { ...f, layoutGroupId: undefined, layoutGroupRole: undefined }
+      ? { ...f, layoutGroupId: undefined, layoutGroupRole: undefined, layoutSlotIndex: undefined }
       : f
   );
 
@@ -236,12 +280,7 @@ export function ungroupLayoutGroup(
     ...sec,
     rows: sec.rows.flatMap((row): SetupSheetModelLayoutRow[] => {
       if (layoutGroupIdForRow(row) !== groupId) return [row];
-      const keys =
-        row.type === "pair"
-          ? [row.leftKey, row.rightKey]
-          : row.type === "corner4"
-            ? [row.ff, row.fr, row.rf, row.rr]
-            : [];
+      const keys = layoutRowFieldKeys(row);
       return keys.map((key) => {
         const field = nextFields.find((f) => f.key === key);
         return {
@@ -272,8 +311,8 @@ export function ungroupLayoutRow(
   if (!sec) return { error: "Section not found." };
   const row = sec.rows[rowIndex];
   if (!row) return { error: "Row not found." };
-  if (row.type !== "pair" && row.type !== "corner4") {
-    return { error: "Only pair and corner4 rows can be ungrouped." };
+  if (row.type !== "pair" && row.type !== "corner4" && row.type !== "slots") {
+    return { error: "Only grouped rows can be ungrouped." };
   }
   if (!row.layoutGroupId) {
     return { error: "This row is not a manual layout group." };
@@ -299,7 +338,10 @@ export function updateLayoutGroupLabel(
   const nextSections = schema.structuredSections.map((sec) => ({
     ...sec,
     rows: sec.rows.map((row) => {
-      if ((row.type === "pair" || row.type === "corner4") && row.layoutGroupId === groupId) {
+      if (
+        (row.type === "pair" || row.type === "corner4" || row.type === "slots")
+        && row.layoutGroupId === groupId
+      ) {
         return { ...row, label: trimmed };
       }
       return row;
@@ -385,11 +427,12 @@ function layoutRowFieldKeys(row: SetupSheetModelLayoutRow): string[] {
   if (row.type === "single") return [row.key];
   if (row.type === "pair") return [row.leftKey, row.rightKey];
   if (row.type === "corner4") return [row.ff, row.fr, row.rf, row.rr];
+  if (row.type === "slots") return row.slots.map((s) => s.key);
   return [];
 }
 
 function layoutGroupIdForRow(row: SetupSheetModelLayoutRow): string | undefined {
-  if (row.type === "pair" || row.type === "corner4") return row.layoutGroupId;
+  if (row.type === "pair" || row.type === "corner4" || row.type === "slots") return row.layoutGroupId;
   return undefined;
 }
 

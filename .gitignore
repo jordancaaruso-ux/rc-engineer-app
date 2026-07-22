@@ -39,3 +39,6 @@ perf-lighthouse-*.json
 
 # Python bytecode from the hardware carrier-board scripts
 hardware/**/__pycache__/
+
+.vercel
+.env*

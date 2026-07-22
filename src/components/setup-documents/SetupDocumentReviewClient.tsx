@@ -948,8 +948,8 @@ export function SetupDocumentReviewClient({
           <div className="mt-2 rounded border border-accent/35 bg-accent/10 px-3 py-2 text-sm text-accent-foreground space-y-2">
             <p>{autoPickUserNote}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <Link href="/setup-sheet-models/new/setup" className="underline text-accent-foreground hover:text-foreground">
-                Add car &amp; setup sheet
+              <Link href="/setup-sheet-models/new" className="underline text-accent-foreground hover:text-foreground">
+                Add this chassis type
               </Link>
               <a
                 href={previewUrl}
@@ -981,8 +981,8 @@ export function SetupDocumentReviewClient({
             {calibrationPicker.totalCount === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No calibrations yet.{" "}
-                <Link href="/setup-sheet-models/new/setup" className="underline hover:text-foreground">
-                  Run the car wizard
+                <Link href="/setup-sheet-models/new" className="underline hover:text-foreground">
+                  Add the chassis type
                 </Link>{" "}
                 or{" "}
                 <Link href="/setup-calibrations" className="underline hover:text-foreground">

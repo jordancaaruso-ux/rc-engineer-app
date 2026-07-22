@@ -45,6 +45,14 @@ function structuredRowToModelLayout(row: (typeof A800RR_STRUCTURED_SECTIONS)[0][
       unit: row.unit,
     };
   }
+  if (row.type === "slots") {
+    return {
+      type: "slots",
+      label: row.label,
+      unit: row.unit,
+      slots: row.slots.map((s) => ({ label: s.label, key: s.key })),
+    };
+  }
   if (row.type === "screw_strip") {
     return { type: "screw_strip", key: row.key, label: row.label };
   }

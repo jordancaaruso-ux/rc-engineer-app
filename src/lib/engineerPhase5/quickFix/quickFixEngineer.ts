@@ -100,7 +100,17 @@ function buildFallbackSuggestions(ctx: Awaited<ReturnType<typeof buildQuickFixLl
   }));
 }
 
-async function callQuickFixLlm(ctx: Awaited<ReturnType<typeof buildQuickFixLlmContext>>): Promise<{
+/** Reported once per successful completion so the caller can bill it against the AI spend cap. */
+export type QuickFixUsage = {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+};
+
+async function callQuickFixLlm(
+  ctx: Awaited<ReturnType<typeof buildQuickFixLlmContext>>,
+  onUsage?: (usage: QuickFixUsage) => void
+): Promise<{
   inferredIssue?: string;
   suggestions?: Array<Record<string, unknown>>;
   thinContextNote?: string;
@@ -208,6 +218,14 @@ ${JSON.stringify(ctx.spreadSlim).slice(0, 6000)}`;
       );
       throw new Error(msg);
     }
+    const u = data.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+    if (onUsage) {
+      onUsage({
+        model,
+        promptTokens: typeof u?.prompt_tokens === "number" ? u.prompt_tokens : 0,
+        completionTokens: typeof u?.completion_tokens === "number" ? u.completion_tokens : 0,
+      });
+    }
     const text = (data.choices as Array<{ message?: { content?: string } }> | undefined)?.[0]?.message?.content?.trim();
     if (!text) return null;
     try {
@@ -226,7 +244,7 @@ ${JSON.stringify(ctx.spreadSlim).slice(0, 6000)}`;
 export async function generateQuickFixPayload(
   viewerId: string,
   runId: string,
-  opts?: { timeZone?: string | null }
+  opts?: { timeZone?: string | null; onUsage?: (usage: QuickFixUsage) => void }
 ): Promise<QuickFixPayloadV1 | null> {
   const loaded = await loadQuickFixRunForViewer(viewerId, runId);
   if (!loaded) return null;
@@ -240,7 +258,7 @@ export async function generateQuickFixPayload(
     timeZone: opts?.timeZone,
   });
 
-  const llm = await callQuickFixLlm(ctx);
+  const llm = await callQuickFixLlm(ctx, opts?.onUsage);
 
   let suggestions = llm ? parseQuickFixLlmShape(llm) : [];
   if (suggestions.length === 0) suggestions = buildFallbackSuggestions(ctx);

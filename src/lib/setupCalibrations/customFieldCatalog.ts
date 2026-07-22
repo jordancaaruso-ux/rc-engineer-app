@@ -198,6 +198,7 @@ function structuredRowKeys(row: StructuredRow): string[] {
   if (row.type === "single") return [row.key];
   if (row.type === "pair") return [row.leftKey, row.rightKey];
   if (row.type === "corner4") return [row.ff, row.fr, row.rf, row.rr];
+  if (row.type === "slots") return row.slots.map((s) => s.key);
   if (row.type === "top_deck_block") return ["top_deck_front", "top_deck_rear", "top_deck_cuts", "top_deck_single"];
   if (row.type === "screw_strip") return [row.key];
   return [];

@@ -137,7 +137,7 @@ function mustGetKey(): string {
 
 export type EngineerChatMessage = { role: "user" | "assistant"; content: string };
 
-/** Token usage summed across the tool-loop completions. Null when streaming (usage not captured on SSE). */
+/** Token usage summed across the tool-loop completions (stream and non-stream both report it). */
 export type EngineerChatUsage = {
   promptTokens: number;
   completionTokens: number;
@@ -402,9 +402,13 @@ type ChatCompletionMessage =
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
+type OpenAiUsagePayload = { prompt_tokens?: number; completion_tokens?: number };
+
 type ChatCompletionStreamResult = {
   content: string | null;
   toolCalls: ToolCall[] | null;
+  /** Present only when the request asked for stream_options.include_usage. */
+  usage?: OpenAiUsagePayload;
 };
 
 async function readOpenAiChatStream(
@@ -420,6 +424,7 @@ async function readOpenAiChatStream(
   let content = "";
   const toolCallsByIndex = new Map<number, ToolCall>();
   let sawToolCalls = false;
+  let usage: OpenAiUsagePayload | undefined;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -437,6 +442,13 @@ async function readOpenAiChatStream(
         parsed = JSON.parse(payload) as Record<string, unknown>;
       } catch {
         continue;
+      }
+      // With stream_options.include_usage the final chunk carries usage and an empty `choices`,
+      // so read it before the delta guard below skips the chunk. This is what makes the streamed
+      // (i.e. real user-facing) path countable against the AI spend cap.
+      const chunkUsage = parsed.usage as OpenAiUsagePayload | undefined;
+      if (chunkUsage && typeof chunkUsage.prompt_tokens === "number") {
+        usage = chunkUsage;
       }
       const choice = (parsed.choices as Array<{ delta?: Record<string, unknown> }> | undefined)?.[0];
       const delta = choice?.delta;
@@ -478,6 +490,7 @@ async function readOpenAiChatStream(
   return {
     content: content.length > 0 ? content : null,
     toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : null,
+    usage,
   };
 }
 
@@ -496,7 +509,13 @@ async function postChatCompletion(
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ ...body, stream: useStream }),
+      body: JSON.stringify({
+        ...body,
+        stream: useStream,
+        // Ask for the trailing usage chunk so streamed replies are countable against the
+        // per-user AI spend cap — otherwise the main user-facing path records nothing.
+        ...(useStream ? { stream_options: { include_usage: true } } : {}),
+      }),
     });
     if (useStream) {
       if (!res.ok) {
@@ -513,7 +532,14 @@ async function postChatCompletion(
         return { ok: false, status: res.status, data };
       }
       const streamResult = await readOpenAiChatStream(res, onToken);
-      return { ok: true, status: res.status, streamResult };
+      // Shape the streamed usage like a non-stream body so the shared `addUsage(res.data)`
+      // call site accumulates both paths without branching.
+      return {
+        ok: true,
+        status: res.status,
+        streamResult,
+        data: streamResult.usage ? { usage: streamResult.usage } : undefined,
+      };
     }
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (res.ok) return { ok: true, status: res.status, data };
@@ -684,6 +710,8 @@ export async function generateEngineerChatReplyWithTools(params: {
   contextJson: unknown;
   resolvedFocus: { runId: string; compareRunId: string | null } | null;
   usage: EngineerChatUsage | null;
+  /** Model that actually served the last completion — the AI spend cap prices against it. */
+  model: string;
 }> {
   const apiKey = mustGetKey();
   const safeMsgs = params.messages
@@ -696,8 +724,8 @@ export async function generateEngineerChatReplyWithTools(params: {
   const mode: EngineerChatMode = params.mode ?? "normal";
   let contextBudgetChars = contextBudgetCharsForTier(tier);
   let systemPrompt = chatSystemPromptForContext(tier, workingContext, mode);
-  // Usage accumulates across tool-loop completions on the non-stream path only
-  // (SSE deltas don't carry usage without stream_options; bench runs non-streamed).
+  // Usage accumulates across every tool-loop completion. The streamed path reports it via the
+  // trailing stream_options.include_usage chunk, so the AI spend cap sees real user traffic.
   let usage: EngineerChatUsage | null = null;
   const addUsage = (data: Record<string, unknown> | undefined) => {
     const u = data?.usage as
@@ -753,8 +781,10 @@ export async function generateEngineerChatReplyWithTools(params: {
   ];
 
   const MAX_ITERS = 10;
+  let lastModel = getEngineerChatModelAndTemperature(tier, mode).model;
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const opts = getEngineerChatModelAndTemperature(tier, mode);
+    lastModel = opts.model;
     systemPrompt = chatSystemPromptForContext(tier, workingContext, mode);
     messagesApi[sysIdx()] = {
       role: "system",
@@ -874,6 +904,7 @@ export async function generateEngineerChatReplyWithTools(params: {
       contextJson: workingContext,
       resolvedFocus,
       usage,
+      model: lastModel,
     };
   }
 
@@ -882,5 +913,6 @@ export async function generateEngineerChatReplyWithTools(params: {
     contextJson: workingContext,
     resolvedFocus,
     usage,
+    model: lastModel,
   };
 }

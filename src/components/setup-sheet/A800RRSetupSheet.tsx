@@ -173,6 +173,43 @@ function PrintCornerRow({
   );
 }
 
+/** Free-labelled 2–6 cell row: label on its own line, cells flat across. */
+function PrintSlotsRow({
+  label,
+  unit,
+  slots,
+  data,
+  fieldKind,
+}: {
+  label: string;
+  unit?: string;
+  slots: { label: string; key: string }[];
+  data: SetupSnapshotData;
+  fieldKind?: SetupFieldKind;
+}) {
+  return (
+    <div className="border-b border-black/15 last:border-b-0">
+      <div className="border-b border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
+        {label}
+        {unit ? (
+          <span className="normal-case ml-0.5 text-[9px] opacity-70">({unit})</span>
+        ) : null}
+      </div>
+      <div
+        className="grid gap-px bg-black/15"
+        style={{ gridTemplateColumns: `repeat(${slots.length}, minmax(0, 1fr))` }}
+      >
+        {slots.map((slot) => (
+          <div key={slot.key} className="bg-white p-1.5">
+            <div className="text-[9px] font-medium text-black/60">{slot.label || " "}</div>
+            <div className="text-[11px] font-mono">{printCell(data, slot.key, fieldKind)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PrintTopDeckBlock({ data }: { data: SetupSnapshotData }) {
   const cutsSel = readSetupScrewSelection(data, "top_deck_cuts");
   return (
@@ -227,6 +264,17 @@ function StructuredRowView({ row, data }: { row: StructuredRow; data: SetupSnaps
         fr={row.fr}
         rf={row.rf}
         rr={row.rr}
+        data={data}
+        fieldKind={row.fieldKind}
+      />
+    );
+  }
+  if (row.type === "slots") {
+    return (
+      <PrintSlotsRow
+        label={row.label}
+        unit={row.unit}
+        slots={row.slots}
         data={data}
         fieldKind={row.fieldKind}
       />

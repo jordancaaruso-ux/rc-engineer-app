@@ -6,6 +6,7 @@ import { hasOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { generateQuickFixPayload } from "@/lib/engineerPhase5/quickFix/quickFixEngineer";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
+import { checkAiBudget, recordAiUsage } from "@/lib/aiUsage/ledger";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -42,9 +43,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "runId required" }, { status: 400 });
   }
 
+  const budget = await checkAiBudget({
+    userId: user.id,
+    userEmail: user.email,
+    feature: "engineer-quick-fix",
+  });
+  if (!budget.ok) {
+    return NextResponse.json({ error: budget.message }, { status: 429 });
+  }
+
   try {
     const timeZone = await getExplicitTimeZoneForRunFormatting();
-    const quickFix = await generateQuickFixPayload(user.id, runId, { timeZone });
+    const quickFix = await generateQuickFixPayload(user.id, runId, {
+      timeZone,
+      // Fires per completion — the payload itself falls back to deterministic suggestions when
+      // the LLM is skipped, and those cost nothing, so only real calls land in the ledger.
+      onUsage: (usage) =>
+        void recordAiUsage({
+          userId: user.id,
+          feature: "engineer-quick-fix",
+          model: usage.model,
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+        }),
+    });
     if (!quickFix) {
       return NextResponse.json(
         {

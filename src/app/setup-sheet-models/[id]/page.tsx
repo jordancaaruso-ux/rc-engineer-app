@@ -186,7 +186,7 @@ export default async function SetupSheetModelWorkbenchPage({
               </ButtonLink>
             ) : null}
             <ButtonLink href={`/setup-sheet-models/${model.id}/schema`} variant="outline">
-              Edit labels &amp; universal params
+              Arrange the setup sheet
             </ButtonLink>
             {isAdmin ? (
               <ButtonLink href={`/setup-sheet-models/${model.id}/kit-setup`} variant="outline">

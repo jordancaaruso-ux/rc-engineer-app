@@ -8,7 +8,10 @@ import {
   type ModelOptionAssignment,
   type ModelParameterRow,
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
-import { listModelParameters } from "@/lib/setupSheetModels/modelCalibrationMapping";
+import {
+  listModelParameters,
+  modelMappingProgress,
+} from "@/lib/setupSheetModels/modelCalibrationMapping";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -33,6 +36,14 @@ export function SetupCalibrationModelSidebar(props: {
   onArm: (parameterKey: string) => void;
   onDisarm: () => void;
   onCreateParameter: (input: NewParameterInput) => Promise<boolean>;
+  /** Preview a parameter's boxes on the sheet without arming it. */
+  onHoverParameter: (parameterKey: string | null) => void;
+  /** Clear a parameter's boxes, keeping the parameter. */
+  onUnmapParameter: (parameterKey: string) => void;
+  /** Remove the parameter from the chassis' sheet model. */
+  onDeleteParameter: (parameterKey: string) => Promise<boolean>;
+  /** Saved setups already holding a value for this parameter — shown before deleting. */
+  parameterUsageCount: (parameterKey: string) => Promise<number | null>;
 }) {
   const {
     schema,
@@ -44,9 +55,16 @@ export function SetupCalibrationModelSidebar(props: {
     onArm,
     onDisarm,
     onCreateParameter,
+    onHoverParameter,
+    onUnmapParameter,
+    onDeleteParameter,
+    parameterUsageCount,
   } = props;
 
   const [filter, setFilter] = useState<"unmapped" | "all">("unmapped");
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
+  const [confirmUsage, setConfirmUsage] = useState<number | null | "loading">("loading");
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
@@ -91,6 +109,12 @@ export function SetupCalibrationModelSidebar(props: {
     return [...m.entries()].map(([id, title]) => ({ id, title }));
   }, [schema]);
 
+  const progress = useMemo(
+    () => modelMappingProgress(schema, formFieldMappings),
+    [schema, formFieldMappings]
+  );
+  const allMapped = progress.total > 0 && progress.mapped === progress.total;
+
   const armedField = useMemo(
     () => (armedKey ? schema.fields.find((f) => f.key === armedKey) ?? null : null),
     [schema, armedKey]
@@ -100,6 +124,21 @@ export function SetupCalibrationModelSidebar(props: {
     [armedField]
   );
   const nextOption = armedOptions[armedAssignments.length] ?? null;
+
+  async function startDelete(parameterKey: string) {
+    setConfirmDeleteKey(parameterKey);
+    setConfirmUsage("loading");
+    const count = await parameterUsageCount(parameterKey);
+    setConfirmUsage(count);
+  }
+
+  async function confirmDelete() {
+    if (!confirmDeleteKey || deleteBusy) return;
+    setDeleteBusy(true);
+    const ok = await onDeleteParameter(confirmDeleteKey);
+    setDeleteBusy(false);
+    if (ok) setConfirmDeleteKey(null);
+  }
 
   async function submitNewParameter() {
     const label = addLabel.trim();
@@ -181,7 +220,9 @@ export function SetupCalibrationModelSidebar(props: {
         </CardPanel>
       ) : (
         <p className="text-[11px] text-muted-foreground">
-          Pick a parameter below, then click its box on the sheet.
+          {schema.fields.length === 0
+            ? "Click any box on the sheet to name your first parameter."
+            : "Click a box on the sheet to add a parameter, or pick one below to map it."}
         </p>
       )}
 
@@ -212,7 +253,11 @@ export function SetupCalibrationModelSidebar(props: {
         <div className="mt-2 max-h-[52vh] space-y-3 overflow-y-auto">
           {bySection.length === 0 ? (
             <p className="text-muted-foreground">
-              {filter === "unmapped" ? "Every parameter is mapped." : "No parameters match."}
+              {schema.fields.length === 0
+                ? "No parameters yet — click a box on the sheet."
+                : filter === "unmapped"
+                  ? "Every parameter is mapped."
+                  : "No parameters match."}
             </p>
           ) : (
             bySection.map(([title, sectionRows]) => (
@@ -221,36 +266,95 @@ export function SetupCalibrationModelSidebar(props: {
                 <div className="mt-1 flex flex-col gap-1">
                   {sectionRows.map((row: ModelParameterRow & { mapped: boolean }) => {
                     const isArmed = row.field.key === armedKey;
+                    const isConfirming = confirmDeleteKey === row.field.key;
                     return (
-                      <button
+                      <div
                         key={row.field.key}
-                        type="button"
-                        onClick={() => onArm(row.field.key)}
+                        onMouseEnter={() => onHoverParameter(row.field.key)}
+                        onMouseLeave={() => onHoverParameter(null)}
                         className={cn(
-                          "flex items-center justify-between gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors",
+                          "rounded-lg border transition-colors",
                           isArmed
                             ? "border-accent/70 bg-accent/15"
                             : row.mapped
-                              ? "border-emerald-500/25 hover:bg-muted"
-                              : "border-border/60 hover:bg-muted"
+                              ? "border-emerald-500/25"
+                              : "border-border/60"
                         )}
                       >
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-foreground">
-                            {row.field.displayLabel}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {row.kind.replace(/_/g, " ")}
-                          </div>
+                        <div className="flex items-center gap-1 px-1">
+                          <button
+                            type="button"
+                            onClick={() => onArm(row.field.key)}
+                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded px-1 py-1.5 text-left hover:bg-muted"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-foreground">
+                                {row.field.displayLabel}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {row.kind.replace(/_/g, " ")}
+                              </div>
+                            </div>
+                            <span
+                              className={`shrink-0 text-[10px] ${
+                                row.mapped ? "text-emerald-300" : "text-muted-foreground"
+                              }`}
+                            >
+                              {row.mapped ? "✓" : "—"}
+                            </span>
+                          </button>
+                          {row.mapped ? (
+                            <button
+                              type="button"
+                              title="Clear this parameter's boxes"
+                              className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
+                              onClick={() => onUnmapParameter(row.field.key)}
+                            >
+                              Unmap
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            title="Delete this parameter"
+                            aria-label={`Delete ${row.field.displayLabel}`}
+                            className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => void startDelete(row.field.key)}
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <span
-                          className={`shrink-0 text-[10px] ${
-                            row.mapped ? "text-emerald-300" : "text-muted-foreground"
-                          }`}
-                        >
-                          {row.mapped ? "✓" : "—"}
-                        </span>
-                      </button>
+                        {isConfirming ? (
+                          <div className="space-y-1.5 border-t border-border/60 px-2 py-1.5">
+                            <p className="text-[10px] text-muted-foreground">
+                              {confirmUsage === "loading"
+                                ? "Checking saved setups…"
+                                : confirmUsage == null
+                                  ? "Delete this parameter from the chassis sheet?"
+                                  : confirmUsage === 0
+                                    ? "No saved setups use it. Delete it?"
+                                    : `${confirmUsage} saved setup${confirmUsage === 1 ? "" : "s"} use it — those values stop showing. Delete anyway?`}
+                            </p>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                className="rounded border border-destructive/50 bg-destructive/10 px-2 py-0.5 text-[10px] text-destructive disabled:opacity-50"
+                                onClick={() => void confirmDelete()}
+                                disabled={deleteBusy}
+                              >
+                                {deleteBusy ? "Deleting…" : "Delete"}
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
+                                onClick={() => setConfirmDeleteKey(null)}
+                                disabled={deleteBusy}
+                              >
+                                Keep
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>
@@ -330,19 +434,30 @@ export function SetupCalibrationModelSidebar(props: {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              className="rounded border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
-              onClick={() => setAddOpen(true)}
-            >
-              New parameter…
-            </button>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                className="rounded border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                onClick={() => setAddOpen(true)}
+              >
+                New parameter…
+              </button>
+              <span className="text-[10px] text-muted-foreground">
+                {progress.mapped}/{progress.total} mapped
+              </span>
+            </div>
+            {/* Mapping first, then arrange the sheet — the layout pass comes after the boxes are read. */}
             <Link
               href={`/setup-sheet-models/${modelId}/schema?returnTo=${encodeURIComponent(`/setup-calibrations/${calibrationId}`)}`}
-              className="text-[10px] text-accent hover:underline"
+              className={cn(
+                "block rounded border px-3 py-1.5 text-center text-xs font-medium",
+                allMapped
+                  ? "border-accent/60 bg-accent/15 text-foreground"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              )}
             >
-              Schema editor
+              Arrange the setup sheet →
             </Link>
           </div>
         )}

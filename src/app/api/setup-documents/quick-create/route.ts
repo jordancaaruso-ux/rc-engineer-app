@@ -31,6 +31,11 @@ import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { extractPdfFormFields } from "@/lib/setupDocuments/pdfFormFields";
 import { renderPdfFirstPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
 import { calibrationsAutoPickableByUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import {
+  checkAiBudget,
+  recordEstimatedAiUsage,
+  SETUP_EXTRACT_ESTIMATED_COST_USD,
+} from "@/lib/aiUsage/ledger";
 
 /**
  * The image-map calibration for a car's setup-sheet model, if one exists — the model's default
@@ -568,6 +573,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     needsReviewReason = imageBlockReason ?? "Pick which of your cars this screenshot is for.";
   } else {
     try {
+      // Only the branch that actually runs the extract pipeline bills the AI allowance — the
+      // needs-review branch above never calls a model.
+      const budget = await checkAiBudget({
+        userId: user.id,
+        userEmail: user.email,
+        feature: "setup-extract",
+      });
+      if (!budget.ok) {
+        throw new Error(budget.message);
+      }
+      await recordEstimatedAiUsage({
+        userId: user.id,
+        feature: "setup-extract",
+        estimatedCostUsd: SETUP_EXTRACT_ESTIMATED_COST_USD,
+      });
       await processSetupDocumentImport({ docId: created.id, userId: user.id });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
