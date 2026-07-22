@@ -204,7 +204,7 @@ function aspectError(aspect: number, expected?: number): number {
  * Handles moderate letterboxing and sheets that only fill ~1/3 of a desktop screenshot.
  * Keep in sync with scripts/setup-extract-eval/mtc3-loop/mtc3-common.ts.
  */
-async function detectContentBox(
+export async function detectContentBox(
   image: Buffer,
   opts?: DetectContentBoxOpts
 ): Promise<ImageRegion | null> {
@@ -791,36 +791,85 @@ async function regionInk(
 }
 
 /**
- * Erase printed fill-in lines from a text crop: a pixel row dark across >=70% of the crop
- * width is form furniture (the value line), not the value — left in place, OCR reads it as
- * a minus sign or underscore. Whitening the row is deterministic and model-free.
+ * Erase printed form furniture from a text crop so OCR reads only the value:
+ *  - a pixel ROW dark across >=70% of the width is the fill-in line (OCR reads it as a minus/
+ *    underscore) — whiten it,
+ *  - a COLUMN dark across >=70% of the height that runs contiguously in from the left or right
+ *    edge is a cell BORDER (OCR reads it as a leading/trailing "I"/"|") — whiten it. Edge-contiguous
+ *    only, so a centered "1"/"I" in the value is never erased.
+ * Deterministic and model-free.
  */
-async function removeFillInLines(cropPng: Buffer): Promise<Buffer> {
+export async function removeFillInLines(cropPng: Buffer): Promise<Buffer> {
   try {
     const { data, info } = await sharp(cropPng).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     const { width, height, channels } = info;
+    const lumAt = (x: number, y: number) => {
+      const i = (y * width + x) * channels;
+      return ((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0)) / 3;
+    };
+    const whitenCol = (x: number) => {
+      for (let y = 0; y < height; y++) {
+        const i = (y * width + x) * channels;
+        data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
+      }
+    };
+
     const rowsToClear: number[] = [];
     for (let y = 0; y < height; y++) {
       let dark = 0;
-      for (let x = 0; x < width; x++) {
-        const i = (y * width + x) * channels;
-        const lum = ((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0)) / 3;
-        if (lum < 140) dark++;
-      }
+      for (let x = 0; x < width; x++) if (lumAt(x, y) < 140) dark++;
       if (dark / width >= 0.7) rowsToClear.push(y);
     }
-    if (rowsToClear.length === 0) return cropPng;
+
+    // Vertical borders: the AcroForm widget rect sits a pixel or two OUTSIDE the drawn cell border,
+    // so the border is usually NOT edge-contiguous — measured on the X4 sheet it starts at column
+    // 1-2 behind a light margin, which made a strict walk-from-column-0 strip nothing and leave an
+    // "I"/"|" that OCR reads as a leading "1" ("1.71" -> "11.71"). Skip a small light margin, then
+    // clear the border run inward. Cap the reach at 15% of the width so a value that starts near
+    // the edge can't be eaten whole.
+    // Threshold 0.9 (was 0.7): a printed border spans the FULL cell height (measures 1.00) while
+    // the tallest glyph stems measure <= ~0.5, so this cannot erase a value digit.
+    const colDarkFrac = (x: number) => {
+      let dark = 0;
+      for (let y = 0; y < height; y++) if (lumAt(x, y) < 140) dark++;
+      return dark / height;
+    };
+    const maxReach = Math.max(1, Math.floor(width * 0.15));
+    const edgeGap = Math.min(maxReach, 4);
+    const colsToClear: number[] = [];
+    const clearBorderFromEdge = (fromLeft: boolean) => {
+      for (let i = 0; i < maxReach; i++) {
+        const x = fromLeft ? i : width - 1 - i;
+        if (colDarkFrac(x) >= 0.9) {
+          // Found the border: clear it and any antialiased continuation inward.
+          for (let j = i; j < maxReach; j++) {
+            const xx = fromLeft ? j : width - 1 - j;
+            if (colDarkFrac(xx) < 0.5) break;
+            colsToClear.push(xx);
+          }
+          return;
+        }
+        if (i >= edgeGap) return; // no border within the margin — leave this edge alone
+      }
+    };
+    clearBorderFromEdge(true);
+    clearBorderFromEdge(false);
+
+    if (rowsToClear.length === 0 && colsToClear.length === 0) return cropPng;
     for (const y of rowsToClear) {
       for (let dy = -1; dy <= 1; dy++) {
         const yy = y + dy;
         if (yy < 0 || yy >= height) continue;
         for (let x = 0; x < width; x++) {
           const i = (yy * width + x) * channels;
-          data[i] = 255;
-          data[i + 1] = 255;
-          data[i + 2] = 255;
+          data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
         }
       }
+    }
+    for (const x of colsToClear) {
+      whitenCol(x);
+      if (x + 1 < width) whitenCol(x + 1);
+      if (x - 1 >= 0) whitenCol(x - 1);
     }
     return await sharp(data, { raw: { width, height, channels } }).png().toBuffer();
   } catch {
@@ -1041,6 +1090,13 @@ export async function mapExtractedImageWithCalibration(input: {
   calibrationDataJson: unknown;
   calibrationProfileId?: string;
   onStage?: StageHook;
+  /**
+   * Value post-processing applied to the read. "awesomatix" (default, current behaviour) runs the
+   * app's canonical sign/format conventions (front toe/camber negative, damper-oil/spring/PSS). Not
+   * every model shares those conventions — the self-verify loop passes "none" to measure pure
+   * image-read accuracy against the filled AcroForm gold before any convention rewrite.
+   */
+  postProcess?: "awesomatix" | "none";
 }): Promise<{
   parsedData: SetupSnapshotData;
   importedKeys: string[];
@@ -1266,7 +1322,8 @@ export async function mapExtractedImageWithCalibration(input: {
     }
   }
 
-  const interpreted = interpretAwesomatixSetupSnapshot(parsedData);
+  const interpreted =
+    input.postProcess === "none" ? parsedData : interpretAwesomatixSetupSnapshot(parsedData);
 
   const diagnostic: ImageMappingDiagnostic = {
     calibrationProfileId: input.calibrationProfileId,

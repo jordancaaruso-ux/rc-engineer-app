@@ -100,6 +100,13 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const prior = normalizeCalibrationData(existing.calibrationDataJson);
     const incoming = normalizeCalibrationData(body.calibrationDataJson ?? {});
     incoming.verification = prior.verification;
+    // The PDF mapping editor rebuilds calibrationDataJson without imageCalibration (it only edits
+    // the AcroForm lanes) and autosaves — so an omitted map would be wiped. Carry it forward like
+    // verification. The image map is written only by derive-image-map / image-from-document; no
+    // PATCH caller intends to clear it through this route.
+    if (!incoming.imageCalibration && prior.imageCalibration) {
+      incoming.imageCalibration = prior.imageCalibration;
+    }
     if (incoming.verification?.greenLitAt) {
       const changedKeys = diffImageCalibrationFieldKeys(prior.imageCalibration, incoming.imageCalibration);
       if (changedKeys.length) {

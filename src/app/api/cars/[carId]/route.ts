@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
-import { CAR_CLASSES } from "@/lib/cars/carClasses";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -24,7 +23,7 @@ export async function GET(
 
   const car = await prisma.car.findFirst({
     where: { id: carId, userId: user.id },
-    select: { id: true, name: true, chassis: true, carClass: true, notes: true, setupSheetTemplate: true, createdAt: true },
+    select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, createdAt: true },
   });
 
   if (!car) {
@@ -91,7 +90,6 @@ export async function PATCH(
   const body = (await request.json()) as {
     name?: string;
     chassis?: string | null;
-    carClass?: string | null;
     notes?: string | null;
     setupSheetTemplate?: string | null;
     setupSheetModelId?: string | null;
@@ -100,7 +98,6 @@ export async function PATCH(
   const data: {
     name?: string;
     chassis?: string | null;
-    carClass?: string | null;
     notes?: string | null;
     setupSheetTemplate?: string | null;
     setupSheetModelId?: string | null;
@@ -110,13 +107,8 @@ export async function PATCH(
     if (v) data.name = v;
   }
   if (body.chassis !== undefined) data.chassis = body.chassis?.trim() || null;
-  if (body.carClass !== undefined) {
-    const v = body.carClass?.trim() || null;
-    if (v && !CAR_CLASSES.some((c) => c.id === v)) {
-      return NextResponse.json({ error: "Invalid car class" }, { status: 400 });
-    }
-    data.carClass = v;
-  }
+  // `carClass` is no longer settable — the picker was dropped 2026-07-22 and the car-swap rule
+  // now infers the platform from the chassis. The column stays in the DB, dormant.
   if (body.notes !== undefined) data.notes = body.notes?.trim() || null;
   if (body.setupSheetTemplate !== undefined) {
     data.setupSheetTemplate = canonicalSetupSheetTemplateId(body.setupSheetTemplate);
@@ -141,7 +133,7 @@ export async function PATCH(
   if (Object.keys(data).length === 0) {
     const car = await prisma.car.findFirst({
       where: { id: carId, userId: user.id },
-      select: { id: true, name: true, chassis: true, carClass: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
+      select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
     });
     return NextResponse.json({ car });
   }
@@ -149,7 +141,7 @@ export async function PATCH(
   const car = await prisma.car.update({
     where: { id: carId },
     data,
-    select: { id: true, name: true, chassis: true, carClass: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
+    select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
   });
   revalidateAfterCarMutation(user.id);
   return NextResponse.json({ car });

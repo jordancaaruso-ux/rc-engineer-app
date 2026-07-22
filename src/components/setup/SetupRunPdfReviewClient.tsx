@@ -164,7 +164,7 @@ export function SetupRunPdfReviewClient({ runId }: { runId: string }) {
       <header className="page-header">
         <div>
           <Link
-            href="/setup"
+            href="/setup/admin"
             className="text-xs text-muted-foreground hover:text-foreground transition"
           >
             ← Back to Setup tools

@@ -199,6 +199,13 @@ export async function mapExtractedPdfWithCalibration(input: {
   calibrationDataJson: unknown;
   calibrationProfileId?: string;
   onStage?: StageHook;
+  /**
+   * Value post-processing applied to the read. Mirrors the image path's option of the same name.
+   * "awesomatix" (default, current behaviour) runs the app's canonical sign/format conventions;
+   * "none" returns the raw AcroForm values, which is what the self-verify loop scores against the
+   * filled gold — otherwise the convention rewrite (front toe/camber negative) reads as a miss.
+   */
+  postProcess?: "awesomatix" | "none";
 }): Promise<{
   parsedData: SetupSnapshotData;
   importedKeys: string[];
@@ -294,12 +301,15 @@ export async function mapExtractedPdfWithCalibration(input: {
     }
   }
 
-  const interpreted = await withStageTimeout(
-    "build_structured_setup_snapshot",
-    1500,
-    async () => interpretAwesomatixSetupSnapshot(parsedData),
-    input.onStage
-  );
+  const interpreted =
+    input.postProcess === "none"
+      ? parsedData
+      : await withStageTimeout(
+          "build_structured_setup_snapshot",
+          1500,
+          async () => interpretAwesomatixSetupSnapshot(parsedData),
+          input.onStage
+        );
 
   const presentPdfFieldNamesSample = input.extracted.formFields.fields
     .map((f) => f.name)

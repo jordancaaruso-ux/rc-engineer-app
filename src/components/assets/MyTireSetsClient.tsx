@@ -71,6 +71,7 @@ export function MyTireSetsClient({ initialTireSets }: { initialTireSets: TireSet
         <ul className="divide-y divide-border">
           <CollapsibleAddRow
             label="Add tire set"
+            guideAnchor="add-tire-set"
             open={showAdd}
             onOpenChange={(next) => {
               setShowAdd(next);

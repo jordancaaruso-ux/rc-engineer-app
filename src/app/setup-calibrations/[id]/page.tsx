@@ -14,6 +14,7 @@ import { calibrationMappingCounts, normalizeCalibrationData } from "@/lib/setupC
 import { SetupCalibrationEditorClient } from "@/components/setup-documents/SetupCalibrationEditorLazy";
 import { DeriveImageMapButton } from "@/components/setup-documents/DeriveImageMapButton";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 
 export default async function SetupCalibrationDetailPage({
   params,
@@ -84,60 +85,71 @@ export default async function SetupCalibrationDetailPage({
       </>
     );
   }
-  return (
-    <>
-      <header className="page-header">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+  // Mapping is parameter-first against a chassis' schema, so an unlinked calibration has no
+  // parameter list to map against. Its stored mappings still work at import — it's just not
+  // editable here. Link it to a chassis to edit.
+  if (!calibration.setupSheetModelId) {
+    return (
+      <>
+        <header className="page-header">
           <div>
-            <h1 className="page-title">{canManage ? "Edit calibration" : "View calibration"}</h1>
-            <p className="page-subtitle">
-              {calibration.name}
-              {calibration.setupSheetModel ? (
-                <>
-                  {" "}
-                  · Car type:{" "}
-                  <Link
-                    href={`/setup-sheet-models/${calibration.setupSheetModel.id}/schema`}
-                    className="text-accent hover:underline"
-                  >
-                    {calibration.setupSheetModel.name}
-                  </Link>
-                </>
-              ) : (
-                <> · Unlinked — assign this calibration to a car type (e.g. Mugen MTC3) from setup review.</>
-              )}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-              {canManage
-                ? "Uploads auto-select this profile when the PDF form layout matches the linked example PDF."
-                : "This calibration is read-only for you. Only the creator or an admin can change mappings or delete it."}
-            </p>
+            <h1 className="page-title">Calibration</h1>
+            <p className="page-subtitle">{calibration.name} · not linked to a chassis</p>
           </div>
-          {canManage ? (
-            <CalibrationDeleteButton
-              calibrationId={calibration.id}
-              calibrationName={calibration.name}
-              redirectTo="/setup-calibrations"
-            />
-          ) : null}
-        </div>
-      </header>
-      <section className="page-body pb-6">
-        {canManage ? (
-          <>
+        </header>
+        <section className="page-body pb-6">
+          <CardPanel contentClassName="space-y-3 text-sm">
+            <Eyebrow>Read-only</Eyebrow>
+            <p className="text-muted-foreground">
+              This calibration isn&apos;t linked to a chassis type, so there are no parameters to
+              map against. Its {mappingCounts.formFields} stored mappings still work when a
+              matching sheet is uploaded.
+            </p>
+            <p className="text-muted-foreground">
+              To edit it, link it to a chassis below, then reopen.
+            </p>
             <CalibrationChassisDefaultPanel
               calibrationId={calibration.id}
               calibrationName={calibration.name}
               currentModelId={calibration.setupSheetModelId}
               currentModelName={calibration.setupSheetModel?.name ?? null}
             />
-            {exampleIsPdf && calibration.exampleDocumentId && mappingCounts.formFields > 0 ? (
-              <DeriveImageMapButton
-                calibrationId={calibration.id}
-                previewUrl={`/api/setup-documents/${calibration.exampleDocumentId}/file`}
-                hasImageMap={mappingCounts.imageFields > 0}
-              />
-            ) : null}
+            <Link href="/setup-calibrations" className="inline-block text-xs text-accent hover:underline">
+              Back to calibrations
+            </Link>
+          </CardPanel>
+        </section>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">{canManage ? "Calibration" : "View calibration"}</h1>
+          <p className="page-subtitle">
+            {calibration.name}
+            {calibration.setupSheetModel ? (
+              <>
+                {" "}
+                ·{" "}
+                <Link
+                  href={`/setup-sheet-models/${calibration.setupSheetModel.id}`}
+                  className="text-accent hover:underline"
+                >
+                  {calibration.setupSheetModel.name}
+                </Link>
+              </>
+            ) : (
+              <> · Unlinked</>
+            )}
+          </p>
+        </div>
+      </header>
+      <section className="page-body pb-6">
+        {canManage ? (
+          <>
             <SetupCalibrationEditorClient
               calibrationId={calibration.id}
               documentId={calibration.exampleDocumentId ?? ""}
@@ -152,6 +164,31 @@ export default async function SetupCalibrationDetailPage({
               initialCalibrationData={calibration.calibrationDataJson}
               setupSheetModelId={calibration.setupSheetModelId}
             />
+            <details className="mt-4 rounded-xl border border-border bg-card px-4 py-3">
+              <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground hover:text-foreground">
+                Advanced — chassis default, image map, delete
+              </summary>
+              <div className="mt-3 space-y-3">
+                <CalibrationChassisDefaultPanel
+                  calibrationId={calibration.id}
+                  calibrationName={calibration.name}
+                  currentModelId={calibration.setupSheetModelId}
+                  currentModelName={calibration.setupSheetModel?.name ?? null}
+                />
+                {exampleIsPdf && calibration.exampleDocumentId && mappingCounts.formFields > 0 ? (
+                  <DeriveImageMapButton
+                    calibrationId={calibration.id}
+                    previewUrl={`/api/setup-documents/${calibration.exampleDocumentId}/file`}
+                    hasImageMap={mappingCounts.imageFields > 0}
+                  />
+                ) : null}
+                <CalibrationDeleteButton
+                  calibrationId={calibration.id}
+                  calibrationName={calibration.name}
+                  redirectTo="/setup-calibrations"
+                />
+              </div>
+            </details>
           </>
         ) : (
           <CardPanel className="max-w-2xl" contentClassName="text-sm space-y-3">

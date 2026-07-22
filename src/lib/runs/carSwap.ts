@@ -1,13 +1,15 @@
-import { isSameCarClass } from "@/lib/cars/carClasses";
+import { isSamePlatform } from "@/lib/cars/carClasses";
 
 /**
  * What a mid-context car change does to each layer of the run (founder
  * interview 2026-07-17 evening). The day context — event / track / session /
  * laps / notes — ALWAYS stays: you didn't teleport. The car-bound layers:
  *
- * - **Tires + prep**: carry between same-class cars (the same wheels bolt on);
- *   a different-class swap re-derives them from the new car's own last run.
- *   Unknown class on either car counts as same class (safe default).
+ * - **Tires + prep**: carry between cars on the same platform (the same wheels
+ *   bolt on); a cross-platform swap re-derives them from the new car's own last
+ *   run. Unknown platform on either car counts as the same platform (safe
+ *   default). The platform is inferred from the car's chassis — it used to come
+ *   from a user-set `Car.carClass` picker, dropped 2026-07-22.
  * - **Setup**: always car-specific → reload from the new car's last run,
  *   EXCEPT when the driver hand-edited setup values this session AND both cars
  *   read the same setup-sheet model — then the edits transfer meaningfully and
@@ -15,14 +17,15 @@ import { isSameCarClass } from "@/lib/cars/carClasses";
  */
 
 export type CarSwapCar = {
-  carClass?: string | null;
+  /** `CHASSIS_PLATFORMS` id, resolved from the car's chassis. Null = unknown. */
+  platform?: string | null;
   setupSheetModelId?: string | null;
   /** Legacy template id — the sheet identity fallback for pre-model cars. */
   setupSheetTemplate?: string | null;
 };
 
 export type CarSwapPlan = {
-  /** Re-derive tire set + prep from the new car's last run (cross-class swap). */
+  /** Re-derive tire set + prep from the new car's last run (cross-platform swap). */
   rederiveTiresPrep: boolean;
   /** Load the new car's last-run setup ("replace") or keep the hand edits ("keep"). */
   setup: "replace" | "keep";
@@ -45,10 +48,10 @@ export function planCarSwap(
   to: CarSwapCar,
   opts: { setupHandEdited: boolean },
 ): CarSwapPlan {
-  const sameClass = isSameCarClass(from.carClass, to.carClass);
+  const samePlatform = isSamePlatform(from.platform, to.platform);
   const keepEdits = opts.setupHandEdited && isSameSetupSheet(from, to);
   return {
-    rederiveTiresPrep: !sameClass,
+    rederiveTiresPrep: !samePlatform,
     setup: keepEdits ? "keep" : "replace",
   };
 }

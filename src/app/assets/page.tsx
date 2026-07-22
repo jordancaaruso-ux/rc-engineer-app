@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
+import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
 
 /** Live "Mine" totals change on asset mutations — keep the hub fresh. */
 export const revalidate = 30;
@@ -21,7 +22,7 @@ function sectionsForUser(isAdmin: boolean): NavHubSection[] {
 export default async function AssetsHubPage() {
   let counts: Record<string, number> | undefined;
   let isAdmin = false;
-  /** Cars for the Upload-setup-sheet flow; null hides the bar (DB missing / hiccup). */
+  /** Cars for the Create / Upload setup sheet flow; null hides the bar (no cars / DB hiccup). */
   let uploadCars: UploadSetupCar[] | null = null;
 
   if (hasDatabaseUrl()) {
@@ -36,16 +37,32 @@ export default async function AssetsHubPage() {
         prisma.car.findMany({
           where: { userId: user.id },
           orderBy: { createdAt: "desc" },
-          select: { id: true, name: true, setupSheetModel: { select: { name: true } } },
+          select: {
+            id: true,
+            name: true,
+            setupSheetModelId: true,
+            setupSheetModel: { select: { name: true } },
+          },
           take: 25,
         }),
       ]);
       counts = { "/cars": cars, "/tire-sets": tireSets };
-      uploadCars = carRows.map((c) => ({
-        id: c.id,
-        name: c.name,
-        chassisName: c.setupSheetModel?.name ?? null,
-      }));
+      // Every car can CREATE a setup, so the bar lists them all. `supportsUpload` (a green-lit
+      // calibration) only decides which door a car opens: the upload/photo/paste sheet, or
+      // straight into the create-a-setup flow.
+      const uploadableModelIds = await setupSheetModelIdsSupportingUpload(
+        carRows.map((c) => c.setupSheetModelId)
+      );
+      uploadCars = carRows.length
+        ? carRows.map((c) => ({
+            id: c.id,
+            name: c.name,
+            chassisName: c.setupSheetModel?.name ?? null,
+            supportsUpload: Boolean(
+              c.setupSheetModelId && uploadableModelIds.has(c.setupSheetModelId)
+            ),
+          }))
+        : null;
     } catch {
       // Counts are decoration — a DB hiccup shouldn't blank the hub.
       counts = undefined;
@@ -56,7 +73,10 @@ export default async function AssetsHubPage() {
     <>
       <header className="page-header">
         <div className="min-w-0">
-          <h1 className="page-title">Assets</h1>
+          {/* "Garage" matches the nav label and the /garage redirect — the page
+              used to say "Assets", so a new user tapped one word and landed on
+              another (2026-07-22). */}
+          <h1 className="page-title">Garage</h1>
           <p className="page-subtitle">Your equipment and the shared catalogs.</p>
         </div>
       </header>

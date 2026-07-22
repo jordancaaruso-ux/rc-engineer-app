@@ -2,8 +2,11 @@ import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { prisma } from "@/lib/prisma";
 import { EngineerPageClient } from "@/components/engineer/EngineerPageClientLazy";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 
 function EngineerClientSkeleton() {
@@ -38,6 +41,10 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
 
   const user = await requireCurrentUser();
   const ratingsEnabled = isAuthAdminEmail(user.email);
+  // The chat answers fine with an empty run log, so nothing here was broken —
+  // but a first-time user burned a request to discover the tool only gets good
+  // once it has their runs to read. Say so before they type (2026-07-22).
+  const hasAnyRun = (await prisma.run.findFirst({ where: { userId: user.id }, select: { id: true } })) != null;
 
   return (
     <>
@@ -48,6 +55,19 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body flex min-h-0 flex-1 flex-col pb-2 md:pb-0">
+        {hasAnyRun ? null : (
+          <CardPanel className="mx-auto mb-3 w-full max-w-4xl">
+            <Eyebrow>Before you ask</Eyebrow>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+              The Engineer is at its best reading <span className="text-foreground">your</span> runs —
+              what you changed, how the car felt, what the laps did. With none logged yet it can only
+              answer in general terms.
+            </p>
+            <ButtonLink href="/runs/new" className="mt-4 px-3 py-2 text-[13px]">
+              Log your first run
+            </ButtonLink>
+          </CardPanel>
+        )}
         <Suspense fallback={<EngineerClientSkeleton />}>
           <EngineerPageClient ratingsEnabled={ratingsEnabled} />
         </Suspense>

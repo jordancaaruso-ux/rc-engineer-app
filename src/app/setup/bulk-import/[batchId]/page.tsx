@@ -60,8 +60,8 @@ export default async function BulkImportBatchPage({
           <Link href="/setup/bulk-import" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted">
             All batches
           </Link>
-          <Link href="/setup" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted">
-            Setup
+          <Link href="/setup/admin" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted">
+            Setup tools
           </Link>
         </div>
       </header>

@@ -300,6 +300,16 @@ export async function resolveSourcePdfLinksForNewRun(
   explicitDocumentId: string | null
 ): Promise<{ sourceSetupDocumentId: string | null; sourceSetupCalibrationId: string | null }> {
   let docId = explicitDocumentId?.trim() || null;
+  if (docId) {
+    // `Run.sourceSetupDocumentId` is a real FK: an id that isn't one of this user's documents
+    // would fail the whole run insert. Drop it instead — the PDF link is an optimisation, and
+    // losing it must never cost the driver their run.
+    const owned = await prisma.setupDocument.findFirst({
+      where: { id: docId, userId },
+      select: { id: true },
+    });
+    if (!owned) docId = null;
+  }
   if (!docId && baselineSnapshotId) {
     const d = await prisma.setupDocument.findFirst({
       where: { userId, createdSetupId: baselineSnapshotId },

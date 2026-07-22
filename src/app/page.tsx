@@ -3,6 +3,8 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getCachedDashboardHomeModel } from "@/lib/cachedReads";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
+import { loadOnboardingView } from "@/lib/onboarding/server";
+import { loadSetupSheetPrompt } from "@/lib/setup/setupSheetPrompt";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { CardPanel } from "@/components/ui/CardPanel";
 
@@ -30,7 +32,22 @@ export default async function DashboardPage(): Promise<ReactNode> {
     requireCurrentUser(),
     getExplicitTimeZoneForRunFormatting(),
   ]);
-  const model = await getCachedDashboardHomeModel(user.id, displayTimeZone);
 
-  return <DashboardHome model={model} displayTimeZone={displayTimeZone} />;
+  // No takeover anymore (founder 2026-07-22, round 3): a truly-empty account
+  // lands HERE, on the real dashboard, with the intro card + guided-intro chip.
+  // The app is the tour — docs/ONBOARDING_NORTH_STAR.md.
+  const [model, onboarding, setupPrompt] = await Promise.all([
+    getCachedDashboardHomeModel(user.id, displayTimeZone),
+    loadOnboardingView(user.id),
+    loadSetupSheetPrompt(user.id),
+  ]);
+
+  return (
+    <DashboardHome
+      model={model}
+      displayTimeZone={displayTimeZone}
+      onboarding={onboarding}
+      setupPrompt={setupPrompt}
+    />
+  );
 }

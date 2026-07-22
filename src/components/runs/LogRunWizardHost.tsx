@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { CardPanel } from "@/components/ui/CardPanel";
 import type { WizardDraftRow } from "@/components/runs/WizardStartControls";
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
 import { deriveFreshEntry } from "@/lib/runs/wizardEntry";
@@ -36,6 +39,8 @@ export function LogRunWizardHost({
   favouriteTracks,
   dashboardPrefill,
   initialCopyPreviewRun,
+  isFirstRun = false,
+  homeTrackId = null,
 }: {
   entryCars: Array<{ id: string; name: string }>;
   initialCandidate: EntryCandidate | null;
@@ -47,20 +52,48 @@ export function LogRunWizardHost({
   favouriteTracks: TrackOption[];
   dashboardPrefill: DashboardNewRunPrefill | null;
   initialCopyPreviewRun: CopyPreviewRunRecord | null;
+  /** No runs logged yet — turns on the first-run coach line (one quiet line per step). */
+  isFirstRun?: boolean;
+  /** Favourited home track, used to seed the very first run's Session step. */
+  homeTrackId?: string | null;
 }) {
   // A candidate with no car can't be prefilled (nothing to copy from). Only
   // used as the manifest card's instant placeholder while the form's own
   // per-car last-run fetch resolves.
   const candidate = initialCandidate?.carId ? initialCandidate : null;
   const defaultCarId = entryCars[0]?.id ?? "";
+  const hasNoCars = entryCars.length === 0;
 
   // Bumped by "Start blank instead" so the remount fully clears the run.
   const [restartSeq, setRestartSeq] = useState(0);
 
   const entry = useMemo(
-    () => deriveFreshEntry(defaultCarId, currentEventId),
-    [defaultCarId, currentEventId]
+    // Home track only seeds the very first run — see deriveFreshEntry.
+    () => deriveFreshEntry(defaultCarId, currentEventId, isFirstRun ? homeTrackId : null),
+    [defaultCarId, currentEventId, isFirstRun, homeTrackId]
   );
+
+  // Runs belong to a car, so with none there is nothing this wizard can save.
+  // It used to mount anyway: all six tabs walked, the bar kept promising
+  // "Tires →", and Save sat disabled with no label saying why — the only
+  // explanation was a card at the top of step 1 that scrolled away. Reached
+  // straight from the dashboard's primary CTA and the mobile Log-run circle,
+  // so it was the first thing a new account hit (2026-07-22).
+  if (hasNoCars) {
+    return (
+      <CardPanel className="text-center" contentClassName="px-5 py-8">
+        <h2 className="text-[17px] font-bold tracking-[-0.01em] text-foreground">Add a car first</h2>
+        <p className="mx-auto mt-2 max-w-[34ch] text-[13px] leading-relaxed text-muted-foreground">
+          Runs attach to a car — it’s the one thing we can’t guess for you. Takes about twenty
+          seconds, then you’re logging.
+        </p>
+        <ButtonLink href="/cars" className="mt-5 gap-1.5 px-4 py-2.5 text-sm">
+          Add your car
+          <ArrowRight aria-hidden className="size-4" strokeWidth={2.4} />
+        </ButtonLink>
+      </CardPanel>
+    );
+  }
 
   return (
     <NewRunForm
@@ -76,6 +109,7 @@ export function LogRunWizardHost({
       wizardCandidate={candidate}
       wizardDrafts={drafts}
       wizardDeepLinkedEventId={currentEventId}
+      wizardFirstRun={isFirstRun}
       onWizardRestart={() => setRestartSeq((s) => s + 1)}
     />
   );

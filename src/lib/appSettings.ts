@@ -10,6 +10,12 @@ export const APP_SETTING_KEYS = {
   speedhiveDriverName: "speedhiveDriverName",
   /** Comma-separated or JSON array of MYLAPS transponder numbers for Speedhive discovery. */
   speedhiveTransponderNumbersJson: "speedhiveTransponderNumbersJson",
+  /**
+   * ISO timestamp the driver declared they race a club / loaner transponder, so
+   * there is no number to give. Onboarding requires a transponder OR this — name
+   * matching carries them instead. Cleared the moment a real number is saved.
+   */
+  speedhiveTransponderLoanerAt: "speedhiveTransponderLoanerAt",
   /** MYLAPS / Speedhive account id (from linked login). */
   mylapsAccountId: "mylapsAccountId",
   /** Bearer access token for usersandproducts-api (server only). */
@@ -26,6 +32,24 @@ export const APP_SETTING_KEYS = {
    * in the Settings tab when moving on to the next day.
    */
   currentPracticeDayUrl: "currentPracticeDayUrl",
+  /**
+   * Onboarding (docs/ONBOARDING_NORTH_STAR.md). Kept here rather than on `User`
+   * so first-run state needs no migration.
+   */
+  /** ISO timestamp the guided intro was finished. Absent = not done. */
+  onboardingCompletedAt: "onboardingCompletedAt",
+  /**
+   * ISO timestamp the dashboard intro card was answered (either button). It
+   * shows ONCE — without this, "I'll look around first" writes nothing and the
+   * card nags every load (the same trap the old `/welcome` takeover had,
+   * caught in the browser 2026-07-22). Being "seen" is not progress; the
+   * resume card still shows until the garage is actually ready.
+   */
+  onboardingSeenAt: "onboardingSeenAt",
+  /** JSON array of step ids the driver skipped, e.g. `["sheet"]`, so we can re-offer them. */
+  onboardingSkippedSteps: "onboardingSkippedSteps",
+  /** ISO timestamp they tapped Ignore on the dashboard resume card — it never returns. */
+  onboardingResumeDismissedAt: "onboardingResumeDismissedAt",
 } as const;
 
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[keyof typeof APP_SETTING_KEYS];
@@ -149,6 +173,22 @@ export async function setSpeedhiveTransponderNumbersSetting(
   await setUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderNumbersJson, value);
 }
 
+export async function getSpeedhiveTransponderLoanerSetting(userId: string): Promise<boolean> {
+  return Boolean(await getUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderLoanerAt));
+}
+
+export async function setSpeedhiveTransponderLoanerSetting(
+  userId: string,
+  value: boolean,
+  when: Date = new Date()
+): Promise<void> {
+  await setUserSetting(
+    userId,
+    APP_SETTING_KEYS.speedhiveTransponderLoanerAt,
+    value ? when.toISOString() : null
+  );
+}
+
 export async function getSpeedhiveDriverNameForUser(userId: string): Promise<string | null> {
   const sh = (await getSpeedhiveDriverNameSetting(userId))?.trim();
   if (sh) return sh;
@@ -161,4 +201,85 @@ export async function getCurrentPracticeDayUrlSetting(userId: string): Promise<s
 
 export async function setCurrentPracticeDayUrlSetting(userId: string, value: string | null): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.currentPracticeDayUrl, value);
+}
+
+/* ── Onboarding (docs/ONBOARDING_NORTH_STAR.md) ────────────────────────────── */
+
+/** Steps of the set-up wizard a driver is allowed to skip and be re-offered. */
+export const ONBOARDING_SKIPPABLE_STEPS = ["sheet", "track"] as const;
+export type OnboardingSkippableStep = (typeof ONBOARDING_SKIPPABLE_STEPS)[number];
+
+export type OnboardingState = {
+  /** True once the guided intro has been finished (or explicitly completed later). */
+  completed: boolean;
+  completedAt: string | null;
+  /** Steps they chose to skip — drives the "add it later" re-offers. */
+  skippedSteps: OnboardingSkippableStep[];
+  /** True once they tapped Ignore on the dashboard resume card. */
+  resumeDismissed: boolean;
+  /** True once the dashboard intro card was answered — it never shows twice. */
+  seen: boolean;
+};
+
+/** Tolerant parse — a hand-edited or legacy value must never break the dashboard. */
+export function parseOnboardingSkippedSteps(raw: string | null): OnboardingSkippableStep[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const allowed = new Set<string>(ONBOARDING_SKIPPABLE_STEPS);
+  const out: OnboardingSkippableStep[] = [];
+  for (const v of parsed) {
+    if (typeof v === "string" && allowed.has(v) && !out.includes(v as OnboardingSkippableStep)) {
+      out.push(v as OnboardingSkippableStep);
+    }
+  }
+  return out;
+}
+
+export async function getOnboardingState(userId: string): Promise<OnboardingState> {
+  const [completedAt, skippedRaw, dismissedAt, seenAt] = await Promise.all([
+    getUserSetting(userId, APP_SETTING_KEYS.onboardingCompletedAt),
+    getUserSetting(userId, APP_SETTING_KEYS.onboardingSkippedSteps),
+    getUserSetting(userId, APP_SETTING_KEYS.onboardingResumeDismissedAt),
+    getUserSetting(userId, APP_SETTING_KEYS.onboardingSeenAt),
+  ]);
+  return {
+    completed: Boolean(completedAt),
+    completedAt: completedAt ?? null,
+    skippedSteps: parseOnboardingSkippedSteps(skippedRaw),
+    resumeDismissed: Boolean(dismissedAt),
+    seen: Boolean(seenAt),
+  };
+}
+
+/** Records that the takeover has fired, so it never fires again. Idempotent. */
+export async function markOnboardingSeen(userId: string, when: Date = new Date()): Promise<void> {
+  const existing = await getUserSetting(userId, APP_SETTING_KEYS.onboardingSeenAt);
+  if (existing) return;
+  await setUserSetting(userId, APP_SETTING_KEYS.onboardingSeenAt, when.toISOString());
+}
+
+export async function markOnboardingCompleted(userId: string, when: Date = new Date()): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.onboardingCompletedAt, when.toISOString());
+}
+
+export async function setOnboardingSkippedSteps(
+  userId: string,
+  steps: OnboardingSkippableStep[]
+): Promise<void> {
+  const unique = Array.from(new Set(steps));
+  await setUserSetting(
+    userId,
+    APP_SETTING_KEYS.onboardingSkippedSteps,
+    unique.length ? JSON.stringify(unique) : null
+  );
+}
+
+export async function dismissOnboardingResume(userId: string, when: Date = new Date()): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.onboardingResumeDismissedAt, when.toISOString());
 }

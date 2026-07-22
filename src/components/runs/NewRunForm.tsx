@@ -12,6 +12,7 @@ import { Eyebrow, PanelSubtitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
+import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
@@ -54,10 +55,12 @@ import {
   type WizardSheetRow,
 } from "@/components/runs/LogRunWizardBottomBar";
 import {
+  firstRunCoachLine,
   firstUnfinishedStep,
   type WizardStepId,
   type WizardStepStatus,
 } from "@/lib/runs/wizardWalk";
+import { InlineNewTrackRow } from "@/components/runs/InlineNewTrackRow";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
@@ -153,8 +156,8 @@ const fabPillOutlineClass =
 type CarOption = {
   id: string;
   name: string;
-  /** Race class (carClasses.ts id) — drives the wizard car-swap rule. */
-  carClass?: string | null;
+  /** Chassis platform (`CHASSIS_PLATFORMS` id, resolved server-side) — drives the car-swap rule. */
+  platform?: string | null;
   setupSheetTemplate?: string | null;
   setupSheetModelId?: string | null;
 };
@@ -292,7 +295,19 @@ type DownloadedSetupOption = {
   baselineSetupSnapshotId?: string | null;
   /** Car this snapshot belongs to (null = legacy / unknown). */
   carId?: string | null;
+  /**
+   * "library" = a named setup the driver built on this car (listed first); "document" = a setup
+   * sheet they imported. Same shape either way — only the label differs.
+   */
+  kind?: "library" | "document";
 };
+
+/** Option line for the saved-setups picker: named setups read as names, documents as filenames. */
+function setupOptionLabel(d: DownloadedSetupOption): string {
+  return d.kind === "library"
+    ? `${d.originalFilename} · saved ${formatRunCreatedAtDateTime(d.createdAt)}`
+    : `${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`;
+}
 
 function copyPreviewRecordToLastRun(r: CopyPreviewRunRecord): LastRun {
   return {
@@ -352,20 +367,6 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 function setupSnapshotWithDerived(raw: unknown): SetupSnapshotData {
   return applyDerivedFieldsToSnapshot(normalizeSetupData(raw));
 }
-
-/**
- * Run-context selections (tires, additive) are mirrored into the setup
- * snapshot by the deterministic sync (`applyRunContextToSetupSnapshot`) so they
- * ride along in the saved sheet — but they are captured on their own Tires
- * tab, not the chassis sheet. They must NOT count toward the "changes
- * since loaded" setup diff, or picking today's tires reads as a setup change.
- */
-const RUN_CONTEXT_SETUP_KEYS = new Set([
-  "tires",
-  "tires_setup",
-  "additive",
-  "additive_time",
-]);
 
 /**
  * localStorage key for the silent autosave of an in-progress (never-saved) new-run
@@ -507,6 +508,12 @@ export function NewRunForm(props: {
   /** Switch continue ↔ new-log (host remounts the form with the other payload). */
   /** "Start blank instead" — the host remounts the form for a clean slate (v6). */
   onWizardRestart?: () => void;
+  /**
+   * This is the driver's very first run — drives the G1 coach line under the
+   * recap (docs/ONBOARDING_NORTH_STAR.md, founder-locked 2026-07-22). One quiet
+   * per-step line; it never appears again once they have a run.
+   */
+  wizardFirstRun?: boolean;
 }) {
   const router = useRouter();
   const copyLastRunCtx = useCopyLastRunFormOptional();
@@ -803,6 +810,12 @@ export function NewRunForm(props: {
   const [loadOtherSetupSelection, setLoadOtherSetupSelection] = useState("");
   const [setupSource, setSetupSource] = useState<"previous_runs" | "other" | "new">("previous_runs");
   const [newSetupMode, setNewSetupMode] = useState<"blank" | "upload">("blank");
+  /**
+   * Sheet upload only extracts values on a chassis whose sheet has been calibrated. Elsewhere the
+   * upload affordances are simply absent — offering an import that would silently read nothing is
+   * worse than not offering it (SETUP_UPLOAD_NORTH_STAR: trust is absolute).
+   */
+  const [supportsSheetUpload, setSupportsSheetUpload] = useState(false);
   const [downloadedSetups, setDownloadedSetups] = useState<DownloadedSetupOption[]>([]);
   const [setupSectionExpanded, setSetupSectionExpanded] = useState(false);
   /**
@@ -1491,7 +1504,7 @@ export function NewRunForm(props: {
   const setupChangedRowsSinceBaseline = useMemo(() => {
     if (!setupBaselineData) return [] as ReturnType<typeof buildSetupDiffRows>;
     return buildSetupDiffRows(setupData, setupBaselineData).filter(
-      (r) => r.changed && !RUN_CONTEXT_SETUP_KEYS.has(r.key)
+      (r) => r.changed && !isRunContextSetupKey(r.key)
     );
   }, [setupData, setupBaselineData]);
   const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
@@ -1541,8 +1554,8 @@ export function NewRunForm(props: {
     [loadOtherSetupSelection, downloadedSetups]
   );
   const loadOtherSetupLabel = selectedDownloadedSetup
-    ? `${selectedDownloadedSetup.originalFilename} · ${formatRunCreatedAtDateTime(selectedDownloadedSetup.createdAt)}`
-    : "Load from downloaded setup";
+    ? setupOptionLabel(selectedDownloadedSetup)
+    : "Load a saved setup";
 
   const needsEvent = sessionType === "RACE_MEETING";
 
@@ -1988,12 +2001,13 @@ export function NewRunForm(props: {
     if (!carId) {
       setPickerRuns([]);
       setDownloadedSetups([]);
+      setSupportsSheetUpload(false);
       return;
     }
     let alive = true;
     Promise.all([
       jsonFetch<{ runs: RunPickerRun[] }>(`/api/runs/for-picker?carId=${encodeURIComponent(carId)}`),
-      jsonFetch<{ downloadedSetups: DownloadedSetupOption[] }>(
+      jsonFetch<{ downloadedSetups: DownloadedSetupOption[]; supportsSheetUpload?: boolean }>(
         `/api/setup/options?carId=${encodeURIComponent(carId)}`
       ),
     ])
@@ -2001,11 +2015,13 @@ export function NewRunForm(props: {
         if (!alive) return;
         setPickerRuns(Array.isArray(runsRes.runs) ? runsRes.runs : []);
         setDownloadedSetups(Array.isArray(dlRes.downloadedSetups) ? dlRes.downloadedSetups : []);
+        setSupportsSheetUpload(dlRes.supportsSheetUpload === true);
       })
       .catch(() => {
         if (!alive) return;
         setPickerRuns([]);
         setDownloadedSetups([]);
+        setSupportsSheetUpload(false);
       });
     return () => {
       alive = false;
@@ -2125,8 +2141,8 @@ export function NewRunForm(props: {
       },
       {
         id: "other",
-        label: "Downloaded setups",
-        shortLabel: "Downloaded",
+        label: "Saved setups",
+        shortLabel: "Saved",
         content: (
           <div className="space-y-2 pt-0.5">
             <div className="space-y-1 text-sm">
@@ -2134,25 +2150,25 @@ export function NewRunForm(props: {
                 {loadOtherSetupLabel}
               </div>
               <SearchableSelect
-                aria-label="Downloaded setup"
+                aria-label="Saved setup"
                 className="max-w-2xl"
-                placeholder="Choose a downloaded setup…"
+                placeholder="Choose a saved setup…"
                 clearable
-                clearLabel="Choose a downloaded setup…"
+                clearLabel="Choose a saved setup…"
                 triggerMono
                 disabled={downloadedSetups.length === 0}
                 value={loadOtherSetupSelection}
                 onChange={(next) => applyDownloadedSetupOnly(next)}
                 options={downloadedSetups.map((d) => ({
                   value: d.id,
-                  label: `${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`,
+                  label: setupOptionLabel(d),
                 }))}
               />
             </div>
             {downloadedSetups.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
-                No downloaded setups for this car yet. Switch to{" "}
-                <span className="font-medium">New</span> to upload a setup sheet.
+                No saved setups for this car yet. Build one on the car&apos;s page, or switch to{" "}
+                <span className="font-medium">New</span>.
               </p>
             ) : null}
           </div>
@@ -2164,16 +2180,18 @@ export function NewRunForm(props: {
         shortLabel: "New",
         content: (
           <div className="space-y-2 pt-0.5">
-            <SegmentedControl<"blank" | "upload">
-              ariaLabel="New setup source"
-              value={newSetupMode}
-              onChange={(next) => setNewSetupMode(next)}
-              options={[
-                { value: "blank", label: "Write from scratch" },
-                { value: "upload", label: "Upload sheet" },
-              ]}
-            />
-            {newSetupMode === "blank" ? (
+            {supportsSheetUpload ? (
+              <SegmentedControl<"blank" | "upload">
+                ariaLabel="New setup source"
+                value={newSetupMode}
+                onChange={(next) => setNewSetupMode(next)}
+                options={[
+                  { value: "blank", label: "Write from scratch" },
+                  { value: "upload", label: "Upload sheet" },
+                ]}
+              />
+            ) : null}
+            {!supportsSheetUpload || newSetupMode === "blank" ? (
               <p className="text-[11px] text-muted-foreground">
                 Blank setup for this car — edit the sheet below, or lock in when you are ready.
               </p>
@@ -3181,8 +3199,14 @@ export function NewRunForm(props: {
           tirePrep: pruneTirePrepForSave(tirePrep),
           setupData: applyDerivedFieldsToSnapshot(setupData),
           setupBaselineSnapshotId,
+          // Only an imported *document* has a document id. A library setup's option id is its
+          // SetupSnapshot id, which must never be sent here — it would be written to
+          // Run.sourceSetupDocumentId as a dangling reference. Its lineage travels on
+          // setupBaselineSnapshotId instead.
           sourceSetupDocumentId:
-            setupSource === "other" && loadOtherSetupSelection ? loadOtherSetupSelection : null,
+            setupSource === "other" && selectedDownloadedSetup?.kind !== "library"
+              ? loadOtherSetupSelection || null
+              : null,
           lapTimes,
           lapIngestMeta: {
             sourceKind: lapIngest.sourceKind,
@@ -3983,6 +4007,22 @@ export function NewRunForm(props: {
                       >
                         {trackAutoDetectLoading ? "Detecting…" : "Detect from location"}
                       </button>
+                      <InlineNewTrackRow
+                        onCreated={(t) => {
+                          setTracksList((prev) =>
+                            prev.some((x) => x.id === t.id) ? prev : [...prev, t]
+                          );
+                          trackPickedManuallyRef.current = true;
+                          wizardCtxTouchedRef.current = true;
+                          setTrackId(t.id);
+                          setTrackLayoutId("");
+                          setTrackDirection("");
+                          layoutPickedManuallyRef.current = false;
+                          setCopyTrackWarning(null);
+                          setNearbyTrackSuggestions([]);
+                          setTrackAutoDetectMessage(null);
+                        }}
+                      />
                       {trackAutoDetectMessage ? (
                         <span className="text-[11px] text-muted-foreground leading-snug">
                           {trackAutoDetectMessage}
@@ -4089,6 +4129,13 @@ export function NewRunForm(props: {
             {wizardCarName ? ` · ${wizardCarName}` : null}
           </span>
         </div>
+      ) : null}
+      {wizardActive && props.wizardFirstRun && !isEditing ? (
+        /* G1 coach line (founder 2026-07-22): one quiet per-step line for the
+           driver's first run only — never a tip card, never a tour. */
+        <p className="border-l-2 border-primary py-0.5 pl-3 text-[12.5px] leading-relaxed text-muted-foreground">
+          {firstRunCoachLine(wizardStep)}
+        </p>
       ) : null}
       {carsList.length === 0 ? (
         <CardPanel contentClassName="text-sm text-muted-foreground">
@@ -5108,6 +5155,7 @@ export function NewRunForm(props: {
               enableFieldSearch
             />
             {carId &&
+            supportsSheetUpload &&
             downloadedSetups.length === 0 &&
             setupSource !== "other" &&
             (pickerRuns.length === 0 || setupSource === "new") ? (

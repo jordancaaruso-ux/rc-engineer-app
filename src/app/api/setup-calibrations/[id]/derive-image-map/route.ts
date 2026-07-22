@@ -7,13 +7,10 @@ import {
   canManageCalibration,
 } from "@/lib/setupCalibrations/calibrationAccess";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
-import { extractPdfFormFields } from "@/lib/setupDocuments/pdfFormFields";
-import { deriveImageFieldsFromPdfMappings } from "@/lib/setupCalibrations/deriveImageFieldsFromPdfMappings";
-import { fingerprintImageBytes } from "@/lib/setupCalibrations/imageFingerprint";
+import { buildDerivedImageCalibration } from "@/lib/setupCalibrations/deriveImageMap";
 import {
   diffImageCalibrationFieldKeys,
   normalizeCalibrationData,
-  type ImageCalibration,
 } from "@/lib/setupCalibrations/types";
 
 export const maxDuration = 120;
@@ -21,11 +18,11 @@ export const dynamic = "force-dynamic";
 
 /**
  * One-click "derive image map" for an AcroForm calibration that already has field mappings.
- * The client renders the calibration's example PDF to a PNG and posts it; we derive image
- * regions deterministically from the existing `formFieldMappings` widget geometry (no AI, no
- * screenshot upload), fingerprint the render as the reference, and write the `imageCalibration`
- * lane onto the same calibration row. Lets already-calibrated AcroForms accept image/photo
- * uploads without redoing any work.
+ * We render the calibration's example PDF to a PNG **server-side** (same rasterizer real uploads
+ * go through, so alignment is identity), derive image regions deterministically from the existing
+ * `formFieldMappings` widget geometry (no AI), fingerprint the render + detect the sheet's content
+ * box as the reference, and write the `imageCalibration` lane onto the same calibration row. Lets
+ * already-calibrated AcroForms accept image/photo/flattened-PDF uploads without redoing any work.
  */
 export async function POST(
   request: Request,
@@ -46,6 +43,7 @@ export async function POST(
       userId: true,
       calibrationDataJson: true,
       exampleDocumentId: true,
+      setupSheetModelId: true,
       exampleDocument: { select: { id: true, storagePath: true, mimeType: true } },
     },
   });
@@ -60,18 +58,6 @@ export async function POST(
     );
   }
 
-  // Rendered PNG of the PDF page (produced client-side) becomes the reference image.
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return NextResponse.json({ error: "Expected multipart form data (png)." }, { status: 400 });
-  }
-  const png = form.get("png");
-  if (!(png instanceof File)) {
-    return NextResponse.json({ error: "The rendered page image (png) is required." }, { status: 400 });
-  }
-
   let pdfBytes: Buffer;
   try {
     pdfBytes = await readBytesFromStorageRef(calibration.exampleDocument.storagePath);
@@ -82,57 +68,18 @@ export async function POST(
     );
   }
 
-  const extracted = await extractPdfFormFields(pdfBytes);
-  if (!extracted.hasFormFields) {
-    return NextResponse.json(
-      { error: extracted.loadError || "The example PDF has no AcroForm fields." },
-      { status: 400 }
-    );
-  }
-
-  const derived = deriveImageFieldsFromPdfMappings({
+  const built = await buildDerivedImageCalibration({
+    pdfBytes: new Uint8Array(pdfBytes),
     calibrationDataJson: calibration.calibrationDataJson,
-    extracted,
+    exampleDocumentId: calibration.exampleDocumentId ?? null,
   });
-  if (derived.fields.length === 0) {
+  if (!built.ok) {
     return NextResponse.json(
-      {
-        error: "No image fields could be derived — map this AcroForm's fields to parameters first.",
-        warnings: derived.warnings,
-      },
+      { error: built.error, warnings: built.warnings },
       { status: 400 }
     );
   }
-
-  const imageBytes = Buffer.from(await png.arrayBuffer());
-  let fingerprint: Awaited<ReturnType<typeof fingerprintImageBytes>>;
-  try {
-    fingerprint = await fingerprintImageBytes(new Uint8Array(imageBytes));
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Failed to fingerprint the rendered page." },
-      { status: 500 }
-    );
-  }
-  if (fingerprint.widthPx <= 0 || fingerprint.heightPx <= 0) {
-    return NextResponse.json({ error: "Could not read the rendered page dimensions." }, { status: 400 });
-  }
-
-  const imageCalibration: ImageCalibration = {
-    reference: {
-      exampleDocumentId: calibration.exampleDocumentId ?? "",
-      widthPx: fingerprint.widthPx,
-      heightPx: fingerprint.heightPx,
-      // Full page: derived field regions are relative to the whole PDF page. Setting pageRegion
-      // (rather than leaving it undefined) makes the extract pipeline detect the sheet's white
-      // boundary in each upload and crop to it before applying regions — so screenshots/photos
-      // whose borders or margins differ from the PDF still align. See extractImageRawDataFromFile.
-      pageRegion: { xPct: 0, yPct: 0, wPct: 1, hPct: 1 },
-      pHash64: fingerprint.pHash64,
-      headerTokens: fingerprint.headerTokens,
-    },
-    fields: derived.fields,
-  };
+  const imageCalibration = built.imageCalibration;
 
   const merged = normalizeCalibrationData(calibration.calibrationDataJson);
   // Geometry edits after green-light invalidate just the affected fields (the calibration stays
@@ -152,9 +99,27 @@ export async function POST(
     data: { calibrationDataJson: merged as unknown as object },
   });
 
+  // Make the derived map discoverable on image upload: resolveModelImageCalibration finds it via
+  // the model's default calibration (or any model-linked calibration with an imageCalibration). If
+  // this calibration is model-linked and the model has no default yet, adopt it — mirrors the
+  // "first calibration becomes the model default" convention in POST /api/setup-calibrations.
+  if (calibration.setupSheetModelId) {
+    const model = await prisma.setupSheetModel.findUnique({
+      where: { id: calibration.setupSheetModelId },
+      select: { defaultCalibrationId: true },
+    });
+    if (model && !model.defaultCalibrationId) {
+      await prisma.setupSheetModel.update({
+        where: { id: calibration.setupSheetModelId },
+        data: { defaultCalibrationId: calibration.id },
+      });
+    }
+  }
+
   return NextResponse.json({
     ok: true,
-    derivedFields: derived.fields.length,
-    warnings: derived.warnings.length ? derived.warnings : undefined,
+    derivedFields: built.derivedFields,
+    contentBoxDetected: built.contentBoxDetected,
+    warnings: built.warnings.length ? built.warnings : undefined,
   });
 }

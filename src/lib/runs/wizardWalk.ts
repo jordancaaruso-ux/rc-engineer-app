@@ -83,3 +83,29 @@ export function nextWalkStep(
   return null;
 }
 
+
+/**
+ * G1 coach line for the driver's very first run — docs/ONBOARDING_NORTH_STAR.md
+ * (founder-locked 2026-07-22, chosen over a one-time tip card and over no copy
+ * at all). One quiet line per step, worded so it reassures rather than
+ * instructs: the recurring worry on a first run is "have I broken something by
+ * leaving this blank", and the honest answer is almost always no.
+ */
+export function firstRunCoachLine(step: WizardStepId): string {
+  switch (step) {
+    case "session":
+      return "First run — six tabs, and none of them can stop you. Save a draft any time.";
+    case "equipment":
+      return "Tires aren’t required to save. Pick what you’re on if you know it.";
+    case "prep":
+      return "Skip this unless you ran warmers or additive — it’s here when you need it.";
+    case "setup":
+      return "Attach a sheet now if you have one. From run two it copies forward on its own.";
+    case "laps":
+      return "Laps attach on their own when your timing name matches. Paste a link or leave it.";
+    case "feel":
+      return "A rating is the only thing standing between this and a complete run.";
+    default:
+      return "";
+  }
+}

@@ -38,8 +38,8 @@ export default async function SetupAggregationsDebugPage(): Promise<ReactNode> {
           <h1 className="page-title">Setup aggregations (debug)</h1>
           <p className="page-subtitle">
             Car × parameter stats from eligible parsed snapshots —{" "}
-            <Link href="/setup" className="underline underline-offset-2">
-              Back to setup
+            <Link href="/setup/admin" className="underline underline-offset-2">
+              Back to setup tools
             </Link>
           </p>
         </div>

@@ -97,6 +97,7 @@ function groupFieldsBySection(
       unit: f.unit,
       editable: true,
       input: f.uiType === "checkbox" ? "checkbox" : "text",
+      valueType: f.valueType,
     });
   }
   return [...bySec.entries()].map(([id, g]) => ({

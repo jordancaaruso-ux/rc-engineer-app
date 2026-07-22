@@ -14,6 +14,7 @@ import {
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { ProfilePictureSection } from "@/components/settings/ProfilePictureSection";
 import { AccountSection } from "@/components/settings/AccountSection";
+import { OnboardingResetSection } from "@/components/settings/OnboardingResetSection";
 import { NotificationsSection } from "@/components/settings/NotificationsSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
 import { EngineerFeedbackAdminSection } from "@/components/settings/EngineerFeedbackAdminSection";
@@ -54,15 +55,18 @@ export default async function SettingsPage() {
         </div>
       </header>
       <section className="page-body max-w-2xl">
-        <SettingsClient
-          initial={{
+        {/* Onboarding guide anchor — the "you" step rings the identity card. */}
+        <div data-guide="you-section">
+          <SettingsClient
+            initial={{
             myName: myName ?? "",
             liveRcDriverName: liveRcDriverName ?? "",
             liveRcDriverId: liveRcDriverId ?? "",
             speedhiveDriverName: speedhiveDriverName ?? "",
             speedhiveTransponderNumbers: speedhiveTransponderNumbersText,
-          }}
-        />
+            }}
+          />
+        </div>
         <SettingsNavSection />
         <NotificationsSection />
         <ProfilePictureSection
@@ -73,6 +77,7 @@ export default async function SettingsPage() {
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (
           <>
+            <OnboardingResetSection />
             <AllowlistAdminSection />
             <ManufacturerBaselineAdminSection />
             <EngineerGoldSetAdminSection />

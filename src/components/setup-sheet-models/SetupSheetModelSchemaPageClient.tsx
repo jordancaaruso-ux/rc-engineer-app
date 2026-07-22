@@ -19,6 +19,8 @@ export function SetupSheetModelSchemaPageClient(props: {
   returnTo?: string | null;
   /** False when the model is shared/curated and this user may only view it. */
   canEdit?: boolean;
+  /** Admins get the canonical-parameter picker; for everyone else it is inferred and hidden. */
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const returnTo = props.returnTo?.trim() || null;
@@ -107,7 +109,11 @@ export function SetupSheetModelSchemaPageClient(props: {
           {tab === "layout" ? (
             <SetupSheetModelLayoutEditor schema={schema} onChange={setSchema} />
           ) : (
-            <SetupSheetModelSchemaEditor schema={schema} onChange={setSchema} />
+            <SetupSheetModelSchemaEditor
+              schema={schema}
+              onChange={setSchema}
+              isAdmin={props.isAdmin}
+            />
           )}
         </fieldset>
         <SetupSheetModelLivePreview

@@ -9,12 +9,15 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CarDeleteClient } from "@/components/cars/CarDeleteClient";
-import { CarClassEdit } from "@/components/cars/CarClassEdit";
 import {
   CarSetupSheetModelCard,
   showLegacySetupSheetTemplateEdit,
 } from "@/components/cars/CarSetupSheetModelCard";
 import { CarSetupSheetTemplateEdit } from "@/components/cars/CarSetupSheetTemplateEdit";
+import { CarSetupsCard } from "@/components/setup/CarSetupsCard";
+import { CarCurrentSetupCard } from "@/components/setup/CarCurrentSetupCard";
+import { CarSetupHistory } from "@/components/setup/CarSetupHistory";
+import { getCarSetupHistory } from "@/lib/setup/getCarSetupHistory";
 
 export default async function CarDetailPage(props: {
   params: Promise<{ carId: string }>;
@@ -50,7 +53,6 @@ export default async function CarDetailPage(props: {
       id: true,
       name: true,
       chassis: true,
-      carClass: true,
       notes: true,
       setupSheetTemplate: true,
       setupSheetModelId: true,
@@ -77,6 +79,27 @@ export default async function CarDetailPage(props: {
 
   const runCount = await prisma.run.count({
     where: { userId: user.id, carId },
+  });
+
+  // The car's saved baselines. `isLibrary` keeps per-run snapshots out of this list — those are
+  // history and belong to the setup history below.
+  const librarySetups = await prisma.setupSnapshot.findMany({
+    where: { userId: user.id, carId, isLibrary: true },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      createdAt: true,
+      _count: { select: { runs: true, derivedSnapshots: true } },
+    },
+  });
+
+  // Everything this car has been set up with: newest run's setup, then the chassis changes and
+  // uploaded sheets behind it.
+  const setupHistory = await getCarSetupHistory({
+    userId: user.id,
+    car,
+    displayTimeZone,
   });
 
   const tireRunRows = await prisma.run.findMany({
@@ -138,26 +161,35 @@ export default async function CarDetailPage(props: {
           <PageBackLink href="/cars" />
           <div>
             <h1 className="page-title">{car.name}</h1>
-            <p className="page-subtitle">Car details and safe delete.</p>
+            <p className="page-subtitle">
+              {car.setupSheetModel?.name ?? car.chassis ?? "No chassis type"}
+            </p>
           </div>
         </div>
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
-          <CardPanel contentClassName="text-sm">
-            <div className="grid gap-2">
-              <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(car.createdAt, displayTimeZone)}</span></div>
-              <div><span className="text-sm font-medium text-muted-foreground">Runs</span> <span className="ml-2">{runCount}</span></div>
-              {car.chassis ? (
-                <div><span className="text-sm font-medium text-muted-foreground">Chassis</span> <span className="ml-2">{car.chassis}</span></div>
-              ) : null}
-              {car.notes ? (
-                <div><span className="text-sm font-medium text-muted-foreground">Notes</span> <span className="ml-2">{car.notes}</span></div>
-              ) : null}
-            </div>
-          </CardPanel>
+          {setupHistory.current ? (
+            <CarCurrentSetupCard carId={car.id} current={setupHistory.current} />
+          ) : null}
 
-          <CarClassEdit carId={car.id} currentClass={car.carClass} />
+          <CarSetupsCard
+            carId={car.id}
+            label="Saved baselines"
+            hrefPrefix={`/cars/${car.id}/setups`}
+            setups={librarySetups.map((s) => ({
+              id: s.id,
+              name: s.name,
+              createdAtLabel: formatRunCreatedAtDateTime(s.createdAt, displayTimeZone),
+              usedInRuns: s._count.runs + s._count.derivedSnapshots,
+            }))}
+          />
+
+          <CarSetupHistory
+            entries={setupHistory.entries}
+            hasMore={setupHistory.hasMore}
+            truncated={setupHistory.truncated}
+          />
 
           {car.setupSheetModel ? (
             <CarSetupSheetModelCard
@@ -211,6 +243,34 @@ export default async function CarDetailPage(props: {
                 ))}
               </ul>
             )}
+          </CardPanel>
+
+          <CardPanel contentClassName="space-y-3">
+            <Eyebrow>Car</Eyebrow>
+            <div className="grid gap-2 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-muted-foreground">Added</span>
+                <span className="font-mono tabular-nums">
+                  {formatRunCreatedAtDateTime(car.createdAt, displayTimeZone)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-muted-foreground">Runs</span>
+                <span className="font-mono tabular-nums">{runCount}</span>
+              </div>
+              {car.chassis ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-muted-foreground">Chassis</span>
+                  <span className="min-w-0 truncate">{car.chassis}</span>
+                </div>
+              ) : null}
+              {car.notes ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-muted-foreground">Notes</span>
+                  <span>{car.notes}</span>
+                </div>
+              ) : null}
+            </div>
           </CardPanel>
 
           <CarDeleteClient carId={car.id} carName={car.name} runCount={runCount} />

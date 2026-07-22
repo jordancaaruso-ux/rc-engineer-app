@@ -4,6 +4,7 @@
  */
 
 import type { StructuredSection } from "@/lib/a800rrSetupDisplayConfig";
+import type { CustomFieldValueType } from "@/lib/setupCalibrations/types";
 
 export type SetupSheetFieldDef = {
   key: string;
@@ -13,6 +14,11 @@ export type SetupSheetFieldDef = {
   editable?: boolean;
   /** Optional UI control hint (defaults to text/number-ish input). */
   input?: "text" | "checkbox";
+  /**
+   * Schema value type, when the template came from a `SetupSheetModel`. Lets the sequential fill
+   * flow pick a numeric keypad vs a text keyboard; every other consumer ignores it.
+   */
+  valueType?: CustomFieldValueType;
 };
 
 export type SetupSheetGroupDef = {

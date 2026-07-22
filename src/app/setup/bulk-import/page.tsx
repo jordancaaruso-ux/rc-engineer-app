@@ -61,8 +61,8 @@ export default async function BulkImportPage(): Promise<ReactNode> {
             Confirm accurate parses for a future aggregation dataset.
           </p>
         </div>
-        <Link href="/setup" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted self-start">
-          Back to Setup
+        <Link href="/setup/admin" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted self-start">
+          Setup tools
         </Link>
       </header>
       <section className="page-body">

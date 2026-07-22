@@ -1,18 +1,25 @@
 /**
- * Race classes / disciplines a car can belong to (founder interview
- * 2026-07-17). Curated ids stored on `Car.carClass` (nullable — unspecified is
- * fine and treated as "same class" everywhere it matters).
+ * Chassis **platform** — the physical family a car belongs to (touring, 1/8 buggy, …).
  *
- * Why this exists: the log-run wizard's car-swap rule. Switching cars keeps
- * the day context (event/track/session/laps/notes always); tires + prep carry
- * only between SAME-class cars (the same wheels bolt on), while a
- * different-class swap re-derives them from the new car's own last run. Setup
- * is always car-specific and swaps regardless.
+ * Why this exists: the log-run wizard's car-swap rule. Switching cars keeps the day context
+ * (event/track/session/laps/notes always); tires + prep carry only between cars on the SAME
+ * platform (the same wheels bolt on), while a cross-platform swap re-derives them from the new
+ * car's own last run. Setup is always car-specific and swaps regardless.
+ *
+ * History (2026-07-22): this used to be a user-facing `Car.carClass` picker offering
+ * touring / buggy / crawler / … Nothing consumed it but the swap rule, no car ever had one set,
+ * and on a touring-only app the picker read as noise — so the field was dropped and the platform
+ * is now **inferred from the car's chassis** (`platformForChassisSlug` in
+ * `setupSheetModels/authorizedCatalog.ts`). Drivers never see it. `Car.carClass` stays in the DB,
+ * dormant and unread.
+ *
+ * Racing class (17.5, Modified, …) is a *different* concept and already lives on the run/event as
+ * `raceClass`; if it ever needs to drive behaviour it belongs there, not here.
  */
 
-export type CarClassOption = { id: string; label: string };
+export type ChassisPlatform = { id: string; label: string };
 
-export const CAR_CLASSES: readonly CarClassOption[] = [
+export const CHASSIS_PLATFORMS: readonly ChassisPlatform[] = [
   { id: "touring", label: "Touring car" },
   { id: "formula", label: "Formula (F1)" },
   { id: "pan-12th", label: "1/12th pan car" },
@@ -26,20 +33,21 @@ export const CAR_CLASSES: readonly CarClassOption[] = [
   { id: "truggy", label: "Truggy" },
   { id: "rally", label: "Rally" },
   { id: "crawler", label: "Crawler / trail" },
-  { id: "other", label: "Other" },
 ] as const;
 
-export function carClassLabel(id: string | null | undefined): string | null {
+export type ChassisPlatformId = (typeof CHASSIS_PLATFORMS)[number]["id"];
+
+export function chassisPlatformLabel(id: string | null | undefined): string | null {
   if (!id) return null;
-  return CAR_CLASSES.find((c) => c.id === id)?.label ?? id;
+  return CHASSIS_PLATFORMS.find((p) => p.id === id)?.label ?? id;
 }
 
 /**
- * Same-class check for the car-swap rule. Unknown (null) on either side counts
- * as SAME class — the safe default: a garage that never sets classes keeps
- * today's behavior (tires/prep carry across swaps).
+ * Same-platform check for the car-swap rule. Unknown (null) on either side counts as SAME — the
+ * safe default: a car whose chassis isn't in the catalog keeps today's behaviour (tires/prep carry
+ * across the swap) rather than silently re-deriving them.
  */
-export function isSameCarClass(
+export function isSamePlatform(
   a: string | null | undefined,
   b: string | null | undefined,
 ): boolean {

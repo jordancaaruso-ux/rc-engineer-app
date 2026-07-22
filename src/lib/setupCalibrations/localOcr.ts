@@ -80,12 +80,55 @@ function getSession(): Promise<Ort.InferenceSession> {
   return sessionPromise;
 }
 
+/**
+ * Crop to the ink bounding box (plus a small quiet margin) before recognition.
+ *
+ * PP-OCR's rec model is trained on tight text LINES, but a calibration region is a whole form
+ * CELL. A short value in a wide cell survives the height-48 squash below as a few pixels of glyph
+ * in a long white strip, and the model truncates or drops it entirely — measured on the X4 sheet:
+ * "37" -> "3", "8.9" -> "8.", "8" -> "" (a 342x26 cell holding one digit becomes 631x48).
+ * Tightening restores a normal line aspect. Returns the crop unchanged when the cell has no ink,
+ * so a genuinely blank cell still recognizes as empty rather than zooming into noise.
+ */
+async function tightenToInk(cropPng: Buffer): Promise<Buffer> {
+  try {
+    const { data, info } = await sharp(cropPng).removeAlpha().grayscale().raw().toBuffer({ resolveWithObject: true });
+    const { width, height } = info;
+    const INK = 165;
+    let minX = width, minY = height, maxX = -1, maxY = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if ((data[y * width + x] ?? 255) < INK) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < minX || maxY < minY) return cropPng; // blank cell
+    const mx = Math.max(3, Math.round(height * 0.18));
+    const my = Math.max(2, Math.round(height * 0.12));
+    const left = Math.max(0, minX - mx);
+    const top = Math.max(0, minY - my);
+    const right = Math.min(width - 1, maxX + mx);
+    const bottom = Math.min(height - 1, maxY + my);
+    const w = right - left + 1;
+    const h = bottom - top + 1;
+    if (w < 4 || h < 4) return cropPng;
+    return await sharp(cropPng).extract({ left, top, width: w, height: h }).png().toBuffer();
+  } catch {
+    return cropPng;
+  }
+}
+
 /** PP-OCR rec preprocessing: RGB, fixed height 48, keep aspect, normalize to [-1,1], CHW tensor. */
 async function toTensor(ort: typeof Ort, cropPng: Buffer): Promise<Ort.Tensor> {
-  const meta = await sharp(cropPng).metadata();
+  const tight = await tightenToInk(cropPng);
+  const meta = await sharp(tight).metadata();
   const H = 48;
   const W = Math.max(16, Math.min(1200, Math.round((H * (meta.width ?? 1)) / (meta.height ?? 1))));
-  const { data } = await sharp(cropPng).removeAlpha().resize({ width: W, height: H, fit: "fill" }).raw().toBuffer({ resolveWithObject: true });
+  const { data } = await sharp(tight).removeAlpha().resize({ width: W, height: H, fit: "fill" }).raw().toBuffer({ resolveWithObject: true });
   const chw = new Float32Array(3 * H * W);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {

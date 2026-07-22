@@ -37,16 +37,21 @@ import {
   validateCustomFieldKey,
 } from "@/lib/setupCalibrations/customFieldCatalog";
 import { buildCatalogFromModelSchema, modelFieldKeys } from "@/lib/setupSheetModels/modelFieldCatalog";
-import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { modelMappingProgress } from "@/lib/setupSheetModels/modelCalibrationMapping";
+import {
+  parseSetupSheetModelSchema,
+  type SetupSheetModelFieldDef,
+  type SetupSheetModelSchema,
+} from "@/lib/setupSheetModels/types";
 import {
   applyCalibrationFieldRecipe,
   inferGroupedFieldDefaultsFromPdfNames,
   inferSectionAndDomainForNewCustomField,
 } from "@/lib/setupCalibrations/calibrationCustomFieldHints";
-import { SetupFieldDefinitionForm } from "@/components/setup-documents/SetupFieldDefinitionForm";
-import { SetupCalibrationQuickParamsPanel } from "@/components/setup-documents/SetupCalibrationQuickParamsPanel";
-import { SetupCalibrationLinkParameterDialog } from "@/components/setup-documents/SetupCalibrationLinkParameterDialog";
-import { SetupCalibrationModelSidebar } from "@/components/setup-documents/SetupCalibrationModelSidebar";
+import {
+  SetupCalibrationModelSidebar,
+  type NewParameterInput,
+} from "@/components/setup-documents/SetupCalibrationModelSidebar";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -54,6 +59,9 @@ import {
   buildGroupedRuleFromAssignments,
   extractAssignmentsFromGroupedRule,
   groupedBehaviorForAssignments,
+  isModelParameterMapped,
+  listModelParameters,
+  modelFieldOptionEntries,
   sanitizeFormFieldMappingsForPersistence,
   type ModelOptionAssignment,
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
@@ -452,6 +460,9 @@ export function SetupCalibrationEditorClient({
   const examplePdfSectionRef = useRef<HTMLDivElement | null>(null);
   const [pdfRenderWidth, setPdfRenderWidth] = useState<number>(900);
   /** PDF source multi-select: toggle per unmapped widget; `activeKey` drives the detail panel. */
+  /** Parameter-first mapping: the armed parameter and its options assigned so far. */
+  const [armedKey, setArmedKey] = useState<string | null>(null);
+  const [armedAssignments, setArmedAssignments] = useState<ModelOptionAssignment[]>([]);
   const [acroSelection, setAcroSelection] = useState<{ keys: string[]; activeKey: string | null }>({
     keys: [],
     activeKey: null,
@@ -505,6 +516,7 @@ export function SetupCalibrationEditorClient({
   const [savingAsNew, setSavingAsNew] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [attachListOpen, setAttachListOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [attachCandidates, setAttachCandidates] = useState<Array<{ id: string; originalFilename: string }>>([]);
   const [attachListLoading, setAttachListLoading] = useState(false);
   const [attachLinking, setAttachLinking] = useState(false);
@@ -558,6 +570,11 @@ export function SetupCalibrationEditorClient({
     [setupSheetModelSchema]
   );
 
+  const modelProgress = useMemo(
+    () => (setupSheetModelSchema ? modelMappingProgress(setupSheetModelSchema, formFieldMappings) : null),
+    [setupSheetModelSchema, formFieldMappings]
+  );
+
   const calibrationPersistedSnapshot = useMemo(() => {
     const initial = normalizeCalibrationData(initialCalibrationData);
     return JSON.stringify({
@@ -609,6 +626,17 @@ export function SetupCalibrationEditorClient({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [calibrationDirty]);
 
+  // Autosave: persist ~1.5s after the last edit. The effect re-arms on every
+  // snapshot change, so the request always carries the latest state.
+  useEffect(() => {
+    if (!calibrationDirty || saving || savingAsNew) return;
+    const t = setTimeout(() => {
+      void save({ silent: true });
+    }, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calibrationDirty, calibrationDirtySnapshot, saving, savingAsNew]);
+
   const loadPdfCandidates = useCallback(async () => {
     setAttachListLoading(true);
     try {
@@ -633,6 +661,7 @@ export function SetupCalibrationEditorClient({
   }, []);
 
   const openExamplePdfPicker = useCallback(() => {
+    setSettingsOpen(true);
     setAttachListOpen(true);
     void loadPdfCandidates();
     requestAnimationFrame(() => {
@@ -700,9 +729,6 @@ export function SetupCalibrationEditorClient({
     return id;
   }
 
-  function updateSheetField(id: string, patch: Partial<CalibrationSheetField>) {
-    setSheetFields((prev) => prev.map((f) => (f.id === id ? ({ ...f, ...patch } as any) : f)));
-  }
 
   function deleteSheetField(id: string) {
     setSheetFields((prev) => prev.filter((f) => f.id !== id));
@@ -710,53 +736,9 @@ export function SetupCalibrationEditorClient({
     setDraftGroupFieldId((cur) => (cur === id ? null : cur));
   }
 
-  function addGroupOption(fieldId: string) {
-    setSheetFields((prev) =>
-      prev.map((f) => {
-        if (f.id !== fieldId) return f;
-        if (f.sourceType !== "group") return f;
-        return {
-          ...f,
-          options: [
-            { id: newId("opt"), sourceName: "", optionValue: "", label: "", active: true },
-            ...f.options,
-          ],
-        };
-      })
-    );
-  }
 
-  function updateGroupOption(fieldId: string, optId: string, patch: any) {
-    setSheetFields((prev) =>
-      prev.map((f) => {
-        if (f.id !== fieldId) return f;
-        if (f.sourceType !== "group") return f;
-        return { ...f, options: f.options.map((o) => (o.id === optId ? { ...o, ...patch } : o)) };
-      })
-    );
-  }
 
-  function deleteGroupOption(fieldId: string, optId: string) {
-    setSheetFields((prev) =>
-      prev.map((f) => {
-        if (f.id !== fieldId) return f;
-        if (f.sourceType !== "group") return f;
-        return { ...f, options: f.options.filter((o) => o.id !== optId) };
-      })
-    );
-  }
 
-  function duplicateSheetField(id: string) {
-    const src = sheetFields.find((f) => f.id === id);
-    if (!src) return;
-    const nextId = newId("sf");
-    const cloneBase = { ...src, id: nextId, label: src.label ? `${src.label} (copy)` : "" } as CalibrationSheetField;
-    if (cloneBase.sourceType === "group") {
-      cloneBase.options = cloneBase.options.map((o) => ({ ...o, id: newId("opt") }));
-    }
-    setSheetFields((prev) => [cloneBase, ...prev]);
-    setSelectedSheetFieldId(nextId);
-  }
 
   const resolvedFileUrl = useMemo(() => {
     if (!previewUrl) return "";
@@ -872,23 +854,6 @@ export function SetupCalibrationEditorClient({
     return ctx ? ctx.entries.map((e) => e.value) : [];
   }
 
-  /** Value + display label for chip buttons (custom options can show optionLabel). */
-  function chipOptionEntriesForField(fieldKey: string | null): Array<{ value: string; label: string }> {
-    if (!fieldKey) return [];
-    const def = customFieldByKey.get(fieldKey);
-    const custom = customFieldGroupedChipContext(def);
-    if (custom) return custom.entries;
-    if (setupSheetModelSchema) {
-      const mf = setupSheetModelSchema.fields.find((f) => f.key === fieldKey);
-      if (mf?.groupedOptionLabels?.length && mf.groupedOptionValues?.length) {
-        return mf.groupedOptionLabels.map((label, i) => ({
-          value: mf.groupedOptionValues![i] ?? `opt_${i + 1}`,
-          label,
-        }));
-      }
-    }
-    return baseCatalogChipOptionValues(fieldKey).map((v) => ({ value: v, label: v }));
-  }
 
   const mappedSheetPdfFieldNames = useMemo(() => {
     const mapped = new Set<string>();
@@ -1418,28 +1383,6 @@ export function SetupCalibrationEditorClient({
     setEditorMode(acroSelection.keys.length > 0 ? "sourceSelection" : "idle");
   }
 
-  function startNewFieldKind(kind: "text" | "single" | "multi") {
-    if (kind === "text") {
-      setNewFieldKindPreset(null);
-      setStatus(
-        "Text or single widget: select one control on the PDF, then use “Create new setup field” in the panel below."
-      );
-      return;
-    }
-    if (kind === "single") {
-      setNewFieldKindPreset({ valueType: "enum", ui: "select", behavior: "singleSelect" });
-      setGroupBehaviorType("singleSelect");
-      setStatus(
-        "One-of-many (like chassis): multi-select 2+ PDF controls, then “Create grouped setup field…”. Add optional names (one per line) below — same count as the PDFs you will select."
-      );
-    } else {
-      setNewFieldKindPreset({ valueType: "multi", ui: "multiSelect", behavior: "multiChoiceGroup" });
-      setGroupBehaviorType("multiChoiceGroup");
-      setStatus(
-        "Many of many: select 2+ PDF controls, Continue, fill in each option’s name, then Create. Links are applied in order. After that, use the option buttons (blue = active) and the PDF to change a link if needed."
-      );
-    }
-  }
 
   function beginCreateGroupedFromSelection() {
     const keys = acroSelection.keys;
@@ -1523,76 +1466,7 @@ export function SetupCalibrationEditorClient({
     setCfSortOrder(maxOrder + 1);
   }
 
-  function openCreateFieldFromSelection() {
-    if (acroSelection.keys.length >= 2) {
-      beginCreateGroupedFromSelection();
-      return;
-    }
-    if (!selectedAcroField) return;
-    setActiveSetupFieldKey(null);
-    setPendingGroupedSourceKeys(null);
-    clearGroupedEditorState();
-    setSetupFieldFormScope("new");
-    setEditorMode("createSingleField");
-    setCreateFieldEditKey(null);
-    setCreateFieldError(null);
-    const row = selectedAcroPdfRow;
-    const nameHint = row?.name ?? "";
-    const inferredPlacement = inferSectionAndDomainForNewCustomField(nameHint);
-    setCfKey(suggestKeyFromPdfFieldName(nameHint || "field"));
-    setCfLabel(nameHint ? nameHint.replace(/_/g, " ") : "");
-    const uiBase = inferUiTypeFromAcroType(row?.type ?? "Text");
-    const looksLikeDate = /date|datum|time|event/i.test(nameHint);
-    if (uiBase === "text" && looksLikeDate) {
-      setCfUiType("date");
-      setCfValueType("date");
-    } else {
-      setCfUiType(uiBase);
-      setCfValueType(uiBase === "checkbox" || uiBase === "groupOption" ? "boolean" : "string");
-    }
-    setCfFieldDomain(inferredPlacement.fieldDomain);
-    setCfIsMetadata(inferredPlacement.isMetadata);
-    setCfSectionId(inferredPlacement.sectionId);
-    setCfShowInSetupSheet(true);
-    setCfShowInAnalysis(true);
-    setCfPdfExportable(true);
-    setCfUnit("");
-    setCfCheckedValue("1");
-    setCfUncheckedValue("");
-    setCfGroupKey("");
-    setCfOptionValue("");
-    setCfNotes("");
-    setCfSubsectionId("");
-    setCfLayoutPlacement("none");
-    setCfPairGroupId("");
-    const maxOrder = customFieldDefinitions.reduce((m, c) => Math.max(m, c.sortOrder), -1);
-    setCfSortOrder(maxOrder + 1);
-    setShowCreateFieldForm(true);
-    setShowAddMappingForm(false);
-  }
 
-  /** Catalog click: same as mapped PDF — highlight source + open the unified setup field editor. */
-  function selectCanonicalField(key: string) {
-    if (activeSetupFieldKey === key) {
-      clearActiveSetupFieldEditor();
-      return;
-    }
-    setActiveSetupFieldKey(key);
-    setPendingGroupOption(null);
-    setPendingGroupedSourceKeys(null);
-    setShowAddMappingForm(false);
-    setCreateFieldError(null);
-    setEditorMode("editSetupField");
-    const rule = formFieldMappings[key];
-    const ref = resolveAcroFromCanonicalKey(key, rule);
-    if (ref) {
-      const ak = acroSourceKey(ref);
-      setAcroSelection({ keys: [ak], activeKey: ak });
-    } else {
-      setAcroSelection({ keys: [], activeKey: null });
-    }
-    openEditSetupFieldUnified(key);
-  }
 
   function buildGroupedOptionsPayload(sourceKeys: string[]): GroupedFieldOptionDefinition[] | null {
     const byValue = new Set<string>();
@@ -1669,398 +1543,8 @@ export function SetupCalibrationEditorClient({
     };
   }
 
-  function commitCreateField() {
-    setCreateFieldError(null);
-    const reserved = getReservedKeysForCalibrationEditor(modelFieldKeySet);
 
-    if (setupFieldFormScope === "template" && activeSetupFieldKey) {
-      const key = activeSetupFieldKey;
-      const opt = mergedSectionOptions.find((o) => o.id === cfSectionId);
-      setFieldDisplayOverrides((prev) => {
-        const next = { ...prev };
-        const cur: FieldDisplayOverride = { ...(next[key] ?? {}) };
-        if (cfShowInSetupSheet) delete cur.showInSetupSheet;
-        else cur.showInSetupSheet = false;
-        if (cfShowInAnalysis) delete cur.showInAnalysis;
-        else cur.showInAnalysis = false;
-        if (cfSectionId.trim()) {
-          cur.sheetGroupId = cfSectionId.trim();
-          cur.sheetGroupTitle = opt?.title ?? cfSectionId;
-        } else {
-          delete cur.sheetGroupId;
-          delete cur.sheetGroupTitle;
-        }
-        if (Object.keys(cur).length === 0) delete next[key];
-        else next[key] = cur;
-        return next;
-      });
-      if (groupedEditorSourceKeys && groupedEditorSourceKeys.length >= 2) {
-        const groupedPayload = buildGroupedOptionsPayload(groupedEditorSourceKeys);
-        if (!groupedPayload) {
-          setCreateFieldError("Each grouped option needs a unique label and value.");
-          return;
-        }
-        const buildB = resolveGroupedBuildBehavior(cfUiType, groupBehaviorType);
-        const groupedRule = buildGroupedFormMappingFromPayload(buildB, groupedPayload);
-        if (!groupedRule) {
-          setCreateFieldError("Grouped fields require at least two valid source options.");
-          return;
-        }
-        setFormFieldMappings((prev) => ({ ...prev, [key]: groupedRule }));
-      }
-      setStatus("Saved calibration field preferences.");
-      setShowCreateFieldForm(false);
-      setSetupFieldFormScope("new");
-      setEditorMode("editSetupField");
-      return;
-    }
 
-    if (createFieldEditKey) {
-      if (!cfLabel.trim()) {
-        setCreateFieldError("Display label is required.");
-        return;
-      }
-      const section =
-        mergedSectionOptions.find((o) => o.id === cfSectionId)
-        ?? CUSTOM_FIELD_SECTION_PRESETS.find((p) => p.id === cfSectionId)
-        ?? CUSTOM_FIELD_SECTION_PRESETS[CUSTOM_FIELD_SECTION_PRESETS.length - 1]!;
-      if (cfUiType === "groupOption" && !cfGroupKey.trim()) {
-        setCreateFieldError("Group key is required for group option fields.");
-        return;
-      }
-      if ((cfUiType === "checkbox" || cfUiType === "groupOption") && !String(cfCheckedValue ?? "").trim()) {
-        setCreateFieldError("Checked value is required for checkbox-style fields.");
-        return;
-      }
-      const oldKey = createFieldEditKey;
-      const groupedPayloadForEdit =
-        groupedEditorSourceKeys && groupedEditorSourceKeys.length >= 2
-          ? buildGroupedOptionsPayload(groupedEditorSourceKeys)
-          : null;
-      if (groupedEditorSourceKeys && groupedEditorSourceKeys.length >= 2 && !groupedPayloadForEdit) {
-        setCreateFieldError("Each grouped option needs a unique label and value.");
-        return;
-      }
-      const buildBEdit = resolveGroupedBuildBehavior(cfUiType, groupBehaviorType);
-      const groupedRuleForEdit = groupedPayloadForEdit
-        ? buildGroupedFormMappingFromPayload(buildBEdit, groupedPayloadForEdit)
-        : null;
-      if (groupedPayloadForEdit && !groupedRuleForEdit) {
-        setCreateFieldError("Grouped fields require at least two valid source options.");
-        return;
-      }
-      const existingIds = new Set(customFieldDefinitions.map((c) => c.key));
-      existingIds.delete(oldKey);
-      const keyErr = validateCustomFieldKey(cfKey, reserved, existingIds);
-      if (keyErr) {
-        setCreateFieldError(keyErr);
-        return;
-      }
-      const targetKey = cfKey.trim();
-      const existingDef = customFieldDefinitions.find((c) => c.key === oldKey);
-      if (!existingDef) {
-        setCreateFieldError("Could not find field to update.");
-        return;
-      }
-      const def: CustomSetupFieldDefinition = {
-        ...existingDef,
-        key: targetKey,
-        displayLabel: cfLabel.trim(),
-        sectionId: section.id,
-        sectionTitle: section.title,
-        fieldDomain: cfFieldDomain,
-        valueType: cfValueType,
-        uiType: cfUiType,
-        isMetadata: cfIsMetadata,
-        showInSetupSheet: cfShowInSetupSheet,
-        showInAnalysis: cfShowInAnalysis,
-        isPdfExportable: cfPdfExportable,
-        sortOrder: cfSortOrder,
-        unit: cfUnit.trim() || undefined,
-        subsectionId: cfSubsectionId.trim() || undefined,
-        layoutPlacement: cfLayoutPlacement === "none" ? undefined : cfLayoutPlacement,
-        pairGroupId: cfPairGroupId.trim() || undefined,
-        checkedValue: cfUiType === "checkbox" || cfUiType === "groupOption" ? cfCheckedValue : undefined,
-        uncheckedValue: cfUiType === "checkbox" || cfUiType === "groupOption" ? cfUncheckedValue : undefined,
-        groupKey: cfUiType === "groupOption" ? cfGroupKey.trim() : undefined,
-        optionValue: cfUiType === "groupOption" ? cfOptionValue.trim() || undefined : undefined,
-        groupBehaviorType: normalizeGroupedBehaviorForStorage(
-          buildBEdit,
-          Boolean(groupedEditorSourceKeys && groupedEditorSourceKeys.length >= 2)
-        ),
-        groupedOptions:
-          groupedEditorSourceKeys && groupedEditorSourceKeys.length >= 2
-            ? (groupedPayloadForEdit ?? undefined)
-            : undefined,
-        notes: cfNotes.trim() || undefined,
-      };
-      setCustomFieldDefinitions((prev) => prev.map((c) => (c.key === oldKey ? def : c)));
-      if (targetKey !== oldKey) {
-        setFormFieldMappings((prev) => {
-          const rule = prev[oldKey];
-          if (!rule) return prev;
-          const next = { ...prev };
-          delete next[oldKey];
-          next[targetKey] = rule;
-          return next;
-        });
-        setFieldMappings((prev) => {
-          const rule = prev[oldKey];
-          if (!rule) return prev;
-          const next = { ...prev };
-          delete next[oldKey];
-          next[targetKey] = rule;
-          return next;
-        });
-        setFields((prev) => {
-          const region = prev[oldKey];
-          if (!region) return prev;
-          const next = { ...prev };
-          delete next[oldKey];
-          next[targetKey] = region;
-          return next;
-        });
-        setActiveSetupFieldKey((cur) => (cur === oldKey ? targetKey : cur));
-      }
-      setCreateFieldEditKey(null);
-      setShowCreateFieldForm(false);
-      if (groupedRuleForEdit) {
-        setFormFieldMappings((prev) => ({ ...prev, [targetKey]: groupedRuleForEdit }));
-      }
-      setStatus("Updated setup field.");
-      return;
-    }
-
-    if (pendingGroupedSourceKeys && pendingGroupedSourceKeys.length >= 2) {
-      const existing = new Set(customFieldDefinitions.map((c) => c.key));
-      const keyTrim = cfKey.trim();
-      if (reserved.has(keyTrim)) {
-        setCreateFieldError(reservedTemplateKeyError(keyTrim, cfLabel));
-        return;
-      }
-      const err = validateCustomFieldKey(keyTrim, reserved, existing);
-      if (err) {
-        setCreateFieldError(err);
-        return;
-      }
-      if (!cfLabel.trim()) {
-        setCreateFieldError("Display label is required.");
-        return;
-      }
-      const section =
-        mergedSectionOptions.find((o) => o.id === cfSectionId)
-        ?? CUSTOM_FIELD_SECTION_PRESETS.find((p) => p.id === cfSectionId)
-        ?? CUSTOM_FIELD_SECTION_PRESETS[CUSTOM_FIELD_SECTION_PRESETS.length - 1]!;
-      if (cfUiType === "groupOption" && !cfGroupKey.trim()) {
-        setCreateFieldError("Group key is required for group option fields.");
-        return;
-      }
-      if ((cfUiType === "checkbox" || cfUiType === "groupOption") && !String(cfCheckedValue ?? "").trim()) {
-        setCreateFieldError("Checked value is required for checkbox-style fields.");
-        return;
-      }
-      const groupedPayload = buildGroupedOptionsPayload(pendingGroupedSourceKeys);
-      if (!groupedPayload) {
-        setCreateFieldError("Each grouped option needs a unique label and value.");
-        return;
-      }
-      const buildB = resolveGroupedBuildBehavior(cfUiType, groupBehaviorType);
-      const groupedRule = buildGroupedFormMappingFromPayload(buildB, groupedPayload);
-      if (!groupedRule) {
-        setCreateFieldError("Grouped fields require at least two valid source options.");
-        return;
-      }
-      const def: CustomSetupFieldDefinition = {
-        id: newId("cf"),
-        key: cfKey.trim(),
-        displayLabel: cfLabel.trim(),
-        sectionId: section.id,
-        sectionTitle: section.title,
-        fieldDomain: cfFieldDomain,
-        valueType: cfValueType,
-        uiType: cfUiType,
-        isMetadata: cfIsMetadata,
-        showInSetupSheet: cfShowInSetupSheet,
-        showInAnalysis: cfShowInAnalysis,
-        isPdfExportable: cfPdfExportable,
-        sortOrder: cfSortOrder,
-        unit: cfUnit.trim() || undefined,
-        subsectionId: cfSubsectionId.trim() || undefined,
-        layoutPlacement: cfLayoutPlacement === "none" ? undefined : cfLayoutPlacement,
-        pairGroupId: cfPairGroupId.trim() || undefined,
-        checkedValue: cfUiType === "checkbox" || cfUiType === "groupOption" ? cfCheckedValue : undefined,
-        uncheckedValue: cfUiType === "checkbox" || cfUiType === "groupOption" ? cfUncheckedValue : undefined,
-        groupKey: cfUiType === "groupOption" ? cfGroupKey.trim() : undefined,
-        optionValue: cfUiType === "groupOption" ? cfOptionValue.trim() || undefined : undefined,
-        groupBehaviorType: normalizeGroupedBehaviorForStorage(buildB, true),
-        groupedOptions: groupedPayload,
-        notes: cfNotes.trim() || undefined,
-      };
-      setCustomFieldDefinitions((prev) => [...prev, def]);
-      setFormFieldMappings((prev) => ({
-        ...prev,
-        [def.key]: groupedRule,
-      }));
-      setPendingGroupedSourceKeys(null);
-      setAcroSelection({ keys: [], activeKey: null });
-      clearGroupedEditorState();
-      setShowCreateFieldForm(false);
-      setCreateFieldEditKey(null);
-      setActiveSetupFieldKey(def.key);
-      setSetupFieldFormScope("custom");
-      setEditorMode("editSetupField");
-      setPendingGroupOption(null);
-      setStatus(
-        `Created “${def.displayLabel}” — the PDFs you selected are already linked in order. Scroll to Setup field catalog, keep this field active, and use the option buttons (blue = on, blue stays on when linked) to reassign. Save the calibration to persist.`
-      );
-      if (typeof window !== "undefined") {
-        window.setTimeout(() => {
-          document.getElementById("calibration-setup-field-catalog")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, 50);
-      }
-      return;
-    }
-
-    if (!selectedAcroField) return;
-    const existing = new Set(customFieldDefinitions.map((c) => c.key));
-    const err = validateCustomFieldKey(cfKey, reserved, existing);
-    if (err) {
-      setCreateFieldError(err);
-      return;
-    }
-    if (!cfLabel.trim()) {
-      setCreateFieldError("Display label is required.");
-      return;
-    }
-    const section =
-      mergedSectionOptions.find((o) => o.id === cfSectionId)
-      ?? CUSTOM_FIELD_SECTION_PRESETS.find((p) => p.id === cfSectionId)
-      ?? CUSTOM_FIELD_SECTION_PRESETS[CUSTOM_FIELD_SECTION_PRESETS.length - 1]!;
-    if (cfUiType === "groupOption" && !cfGroupKey.trim()) {
-      setCreateFieldError("Group key is required for group option fields.");
-      return;
-    }
-    if ((cfUiType === "checkbox" || cfUiType === "groupOption") && !String(cfCheckedValue ?? "").trim()) {
-      setCreateFieldError("Checked value is required for checkbox-style fields.");
-      return;
-    }
-    const def: CustomSetupFieldDefinition = {
-      id: newId("cf"),
-      key: cfKey.trim(),
-      displayLabel: cfLabel.trim(),
-      sectionId: section.id,
-      sectionTitle: section.title,
-      fieldDomain: cfFieldDomain,
-      valueType: cfValueType,
-      uiType: cfUiType,
-      isMetadata: cfIsMetadata,
-      showInSetupSheet: cfShowInSetupSheet,
-      showInAnalysis: cfShowInAnalysis,
-      isPdfExportable: cfPdfExportable,
-      sortOrder: cfSortOrder,
-      unit: cfUnit.trim() || undefined,
-      subsectionId: cfSubsectionId.trim() || undefined,
-      layoutPlacement: cfLayoutPlacement === "none" ? undefined : cfLayoutPlacement,
-      pairGroupId: cfPairGroupId.trim() || undefined,
-      checkedValue: cfUiType === "checkbox" || cfUiType === "groupOption" ? cfCheckedValue : undefined,
-      uncheckedValue: cfUiType === "checkbox" || cfUiType === "groupOption" ? cfUncheckedValue : undefined,
-      groupKey: cfUiType === "groupOption" ? cfGroupKey.trim() : undefined,
-      optionValue: cfUiType === "groupOption" ? cfOptionValue.trim() || undefined : undefined,
-      notes: cfNotes.trim() || undefined,
-    };
-    setCustomFieldDefinitions((prev) => [...prev, def]);
-    applyWidgetToCanonicalKey(def.key, selectedAcroField.pdfFieldName, selectedAcroField.instanceIndex, def);
-    setShowCreateFieldForm(false);
-    setStatus("Created setup field and mapped.");
-  }
-
-  function handleQuickAddField(input: {
-    displayLabel: string;
-    key: string;
-    kind: QuickCalibrationFieldKind;
-    optionLines: string;
-    sectionId: string;
-  }): { ok: true } | { ok: false; error: string } {
-    const reserved = getReservedKeysForCalibrationEditor(modelFieldKeySet);
-    const existing = new Set(customFieldDefinitions.map((c) => c.key));
-    const displayLabel = input.displayLabel.trim();
-    if (!displayLabel) return { ok: false, error: "Parameter label is required." };
-    const keyRaw = (input.key.trim() || suggestKeyFromPdfFieldName(displayLabel)).trim();
-    if (reserved.has(keyRaw)) {
-      return { ok: false, error: reservedTemplateKeyError(keyRaw, displayLabel) };
-    }
-    const err = validateCustomFieldKey(keyRaw, reserved, existing);
-    if (err) return { ok: false, error: err };
-
-    const optLines = input.optionLines.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (input.kind === "one_of_many" || input.kind === "many_of_many") {
-      if (optLines.length < 2) {
-        return { ok: false, error: "One-of-many and many-of-many need at least two option lines." };
-      }
-    }
-
-    const sectionOpt =
-      mergedSectionOptions.find((o) => o.id === input.sectionId) ??
-      CUSTOM_FIELD_SECTION_PRESETS.find((p) => p.id === input.sectionId) ??
-      CUSTOM_FIELD_SECTION_PRESETS[CUSTOM_FIELD_SECTION_PRESETS.length - 1]!;
-    const maxOrder = customFieldDefinitions.reduce((m, c) => Math.max(m, c.sortOrder), -1);
-
-    const def = buildQuickCustomFieldDefinition({
-      id: newId("cf"),
-      key: keyRaw,
-      displayLabel,
-      kind: input.kind,
-      optionLabels: optLines,
-      sectionId: sectionOpt.id,
-      sectionTitle: sectionOpt.title,
-      sortOrder: maxOrder + 1,
-    });
-
-    setCustomFieldDefinitions((prev) => [...prev, def]);
-    setActiveSetupFieldKey(def.key);
-    setCreateFieldError(null);
-
-    if (input.kind === "one_of_many" || input.kind === "many_of_many") {
-      const first = def.groupedOptions?.[0]?.optionValue ?? null;
-      setPendingGroupOption(first);
-      setTab("form");
-      setStatus(
-        "Quick field added. For each option, pick an Acro widget in the list below or use the Form tab (select the chip, then click the PDF)."
-      );
-    } else {
-      setPendingGroupOption(null);
-      setTab("form");
-      setStatus(
-        "Quick field added. Pick an Acro widget from the Quick panel dropdown or use the Form tab and click the PDF."
-      );
-    }
-    return { ok: true };
-  }
-
-  function quickAssignGroupOption(
-    canonicalKey: string,
-    optionValue: string,
-    pdfFieldName: string,
-    instanceIndex: number
-  ) {
-    const row = pdfRowByName.get(pdfFieldName);
-    const cross = filterCrossFieldConflicts(
-      listPdfWidgetOwnershipDetails(formFieldMappings, pdfFieldName, instanceIndex, row),
-      canonicalKey
-    );
-    if (cross.length > 0) {
-      setPdfMappingConflict({
-        kind: "groupChip",
-        pdfFieldName,
-        instanceIndex,
-        optionValue,
-        targetCanonicalKey: canonicalKey,
-        conflicts: cross,
-      });
-      return;
-    }
-    assignGroupPdfWidgetApply(canonicalKey, pdfFieldName, instanceIndex, optionValue);
-  }
 
   function assignGroupPdfWidget(pdfFieldName: string, instanceIndex: number, optionValue: string) {
     if (!activeSetupFieldKey) return;
@@ -2091,22 +1575,6 @@ export function SetupCalibrationEditorClient({
     setLinkAssignOnPdfOption(null);
   }
 
-  function openLinkDialogForSelection(editKey?: string | null) {
-    if (!setupSheetModelSchema) return;
-    if (editKey) {
-      const rule = formFieldMappings[editKey];
-      const assignments = rule ? extractAssignmentsFromGroupedRule(rule) : [];
-      const keys = assignments.map((a) => a.sourceKey).filter(Boolean);
-      setAcroSelection({ keys, activeKey: keys[0] ?? null });
-      setLinkDialogEditKey(editKey);
-      setLinkDialogAssignments(assignments);
-    } else {
-      setLinkDialogEditKey(null);
-      setLinkDialogAssignments(null);
-    }
-    setLinkAssignOnPdfOption(null);
-    setLinkDialogOpen(true);
-  }
 
   function commitModelGroupedLink(parameterKey: string, assignments: ModelOptionAssignment[]) {
     const field = setupSheetModelSchema?.fields.find((f) => f.key === parameterKey);
@@ -2135,62 +1603,141 @@ export function SetupCalibrationEditorClient({
     setStatus(`Mapped “${field.displayLabel}”.`);
   }
 
-  function handleNavigateToSchema() {
-    if (!initialSetupSheetModelId) return;
-    const href = `/setup-sheet-models/${initialSetupSheetModelId}/schema?returnTo=${encodeURIComponent(`/setup-calibrations/${calibrationId}`)}`;
-    if (calibrationDirty) {
-      setSchemaNavPending(true);
-      return;
-    }
-    router.push(href);
+
+  /** Arm a parameter: the next PDF clicks map its box(es). */
+  function armParameter(parameterKey: string) {
+    setArmedKey(parameterKey);
+    setArmedAssignments([]);
+    setAcroSelection({ keys: [], activeKey: null });
+    setStatus(null);
   }
 
-  /** Model-linked: PDF-first selection and link dialog only. */
-  function onAcroWidgetClickModel(pdfFieldName: string, instanceIndex: number) {
-    const toggleKey = acroSourceKey({ pdfFieldName, instanceIndex });
-    const row = pdfRowByName.get(pdfFieldName);
+  function disarmParameter() {
+    setArmedKey(null);
+    setArmedAssignments([]);
+    setStatus(null);
+  }
 
-    if (linkDialogOpen && linkAssignOnPdfOption && linkDialogAssignments) {
-      const inSelection = acroSelection.keys.includes(toggleKey);
-      if (inSelection) {
-        setLinkDialogAssignments(
-          linkDialogAssignments.map((a) =>
-            a.optionValue === linkAssignOnPdfOption ? { ...a, sourceKey: toggleKey } : a
-          )
-        );
-        setLinkAssignOnPdfOption(null);
-        setStatus(null);
-      }
+  /** After a parameter completes, arm the next unmapped one (wrapping). */
+  function advanceAfter(justMappedKey: string) {
+    if (!setupSheetModelSchema) {
+      disarmParameter();
+      return;
+    }
+    const all = listModelParameters(setupSheetModelSchema);
+    const idx = all.findIndex((r) => r.field.key === justMappedKey);
+    const ordered = idx >= 0 ? [...all.slice(idx + 1), ...all.slice(0, idx)] : all;
+    const next = ordered.find(
+      (r) => r.field.key !== justMappedKey && !isModelParameterMapped(r.field, formFieldMappings)
+    );
+    if (next) {
+      setArmedKey(next.field.key);
+      setArmedAssignments([]);
+    } else {
+      setArmedKey(null);
+      setArmedAssignments([]);
+    }
+  }
+
+  /** Model-linked: parameter-first — arm a parameter, then click its box(es). */
+  function onAcroWidgetClickModel(pdfFieldName: string, instanceIndex: number) {
+    const sourceKey = acroSourceKey({ pdfFieldName, instanceIndex });
+    const armedField = armedKey
+      ? setupSheetModelSchema?.fields.find((f) => f.key === armedKey) ?? null
+      : null;
+
+    if (!armedField) {
+      setStatus("Pick a parameter on the right, then click its box on the sheet.");
       return;
     }
 
-    const mappingKeys = findAppKeysForWidget(formFieldMappings, pdfFieldName, instanceIndex, row);
-    const knownMappingKeys = mappingKeys.filter((k) => knownCalibrationFieldKeys.has(k));
-    const orphanMappingKeys = mappingKeys.filter((k) => !knownCalibrationFieldKeys.has(k));
+    const options = modelFieldOptionEntries(armedField);
 
-    setActiveSetupFieldKey(knownMappingKeys[0] ?? null);
-    setAcroSelection((prev) => {
-      const removing = prev.keys.includes(toggleKey);
-      const nextKeys = removing ? prev.keys.filter((k) => k !== toggleKey) : [...prev.keys, toggleKey];
-      const nextActive = !removing
-        ? toggleKey
-        : prev.activeKey === toggleKey
-          ? nextKeys[0] ?? null
-          : prev.activeKey;
-      return { keys: nextKeys, activeKey: nextActive };
-    });
+    if (options.length === 0) {
+      applyWidgetToCanonicalKey(armedField.key, pdfFieldName, instanceIndex);
+      setStatus(`Mapped “${armedField.displayLabel}”.`);
+      advanceAfter(armedField.key);
+      return;
+    }
 
-    if (orphanMappingKeys.length > 0) {
-      setStatus(
-        `Was mapped to removed parameter(s) (${orphanMappingKeys.join(", ")}). Select PDF controls, then Link to parameter.`
-      );
-    } else if (knownMappingKeys.length > 0) {
-      const k0 = knownMappingKeys[0]!;
-      setStatus(
-        `Mapped to ${setupSheetModelSchema?.fields.find((f) => f.key === k0)?.displayLabel ?? k0}. Click again to deselect, or Link to parameter to reassign.`
-      );
+    const nextIndex = armedAssignments.length;
+    const option = options[nextIndex];
+    if (!option) return;
+    if (armedAssignments.some((a) => a.sourceKey === sourceKey)) {
+      setStatus("That box is already used by another option of this parameter.");
+      return;
+    }
+
+    const nextAssignments = [
+      ...armedAssignments,
+      { optionValue: option.value, optionLabel: option.label, sourceKey },
+    ];
+    if (nextAssignments.length >= options.length) {
+      commitModelGroupedLink(armedField.key, nextAssignments);
+      advanceAfter(armedField.key);
     } else {
+      setArmedAssignments(nextAssignments);
       setStatus(null);
+    }
+  }
+
+  /** Adds a parameter to the car's sheet model schema, then arms it. */
+  async function createSchemaParameter(input: NewParameterInput): Promise<boolean> {
+    if (!setupSheetModelSchema || !initialSetupSheetModelId) return false;
+    const base = input.displayLabel
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "parameter";
+    const existingKeys = new Set(setupSheetModelSchema.fields.map((f) => f.key));
+    let key = base;
+    let n = 2;
+    while (existingKeys.has(key)) key = `${base}_${n++}`;
+
+    const grouped = input.kind !== "value";
+    const maxSort = setupSheetModelSchema.fields.reduce((m, f) => Math.max(m, f.sortOrder ?? 0), 0);
+    const field: SetupSheetModelFieldDef = {
+      key,
+      displayLabel: input.displayLabel,
+      sectionId: input.sectionId,
+      sectionTitle: input.sectionTitle,
+      valueType: grouped ? (input.kind === "one_of_many" ? "enum" : "multi") : "string",
+      uiType: grouped ? (input.kind === "one_of_many" ? "select" : "multiSelect") : "text",
+      showInSetupSheet: true,
+      showInAnalysis: true,
+      showInLogRun: true,
+      sortOrder: maxSort + 1,
+      ...(grouped
+        ? {
+            groupBehaviorType: (input.kind === "one_of_many"
+              ? "singleSelect"
+              : "multiChoiceGroup") as GroupedFieldBehaviorType,
+            groupedOptionLabels: input.optionLabels,
+            groupedOptionValues: input.optionLabels.map((l) =>
+              l.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "opt"
+            ),
+          }
+        : {}),
+    };
+
+    const nextSchema = { ...setupSheetModelSchema, fields: [...setupSheetModelSchema.fields, field] };
+    try {
+      const res = await fetch(`/api/setup-sheet-models/${initialSetupSheetModelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schema: nextSchema }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setStatus(data.error || "Could not add the parameter.");
+        return false;
+      }
+      setSetupSheetModelSchema(nextSchema);
+      armParameter(key);
+      setStatus(`Added “${input.displayLabel}”.`);
+      return true;
+    } catch {
+      setStatus("Could not add the parameter.");
+      return false;
     }
   }
 
@@ -2357,75 +1904,10 @@ export function SetupCalibrationEditorClient({
     }
   }
 
-  function clearSelectedMapping() {
-    if (!activeSetupFieldKey) return;
-    setFormFieldMappings((prev) => {
-      const next = { ...prev };
-      delete next[activeSetupFieldKey];
-      return next;
-    });
-    setFieldMappings((prev) => {
-      const next = { ...prev };
-      delete next[activeSetupFieldKey];
-      return next;
-    });
-    setFields((prev) => {
-      const next = { ...prev };
-      delete next[activeSetupFieldKey];
-      return next;
-    });
-    setPendingGroupOption(null);
-    setAcroSelection({ keys: [], activeKey: null });
-  }
 
-  function mappingLabel(key: string): string {
-    const parts: string[] = [];
-    if (formFieldMappings[key]) parts.push("form");
-    if (fieldMappings[key]) parts.push("text");
-    if (fields[key]) parts.push("region");
-    return parts.length ? parts.join("+") : "—";
-  }
 
-  function setTemplateFieldShowInSetupSheet(key: string, visible: boolean) {
-    setFieldDisplayOverrides((prev) => {
-      const next = { ...prev };
-      const cur: FieldDisplayOverride = { ...next[key] };
-      if (visible) delete cur.showInSetupSheet;
-      else cur.showInSetupSheet = false;
-      if (Object.keys(cur).length === 0) delete next[key];
-      else next[key] = cur;
-      return next;
-    });
-  }
 
-  function setTemplateFieldShowInAnalysis(key: string, visible: boolean) {
-    setFieldDisplayOverrides((prev) => {
-      const next = { ...prev };
-      const cur: FieldDisplayOverride = { ...next[key] };
-      if (visible) delete cur.showInAnalysis;
-      else cur.showInAnalysis = false;
-      if (Object.keys(cur).length === 0) delete next[key];
-      else next[key] = cur;
-      return next;
-    });
-  }
 
-  function setTemplateFieldSheetGroup(key: string, groupId: string | null, groupTitle: string | null) {
-    setFieldDisplayOverrides((prev) => {
-      const next = { ...prev };
-      const cur: FieldDisplayOverride = { ...next[key] };
-      if (!groupId) {
-        delete cur.sheetGroupId;
-        delete cur.sheetGroupTitle;
-      } else {
-        cur.sheetGroupId = groupId;
-        cur.sheetGroupTitle = groupTitle ?? groupId;
-      }
-      if (Object.keys(cur).length === 0) delete next[key];
-      else next[key] = cur;
-      return next;
-    });
-  }
 
   function buildCalibrationPayload(mode: "update" | "saveAsNew") {
     const pageCount = structure?.pages.length ?? normalized.documentMeta?.pageCount ?? numPages;
@@ -2465,7 +1947,8 @@ export function SetupCalibrationEditorClient({
     };
   }
 
-  async function save() {
+  async function save(opts?: { silent?: boolean }) {
+    const silent = opts?.silent === true;
     setSaving(true);
     setStatus(null);
     try {
@@ -2481,16 +1964,18 @@ export function SetupCalibrationEditorClient({
         return;
       }
       setSavedCalibrationSnapshot(calibrationDirtySnapshot);
-      setFormFieldMappings(
-        sanitizeFormFieldMappingsForPersistence(
-          formFieldMappings,
-          knownCalibrationFieldKeys,
-          setupSheetModelSchema,
-          customFieldDefinitions
-        )
-      );
-      setStatus("Calibration saved.");
-      router.refresh();
+      if (!silent) {
+        setFormFieldMappings(
+          sanitizeFormFieldMappingsForPersistence(
+            formFieldMappings,
+            knownCalibrationFieldKeys,
+            setupSheetModelSchema,
+            customFieldDefinitions
+          )
+        );
+        setStatus("Calibration saved.");
+        router.refresh();
+      }
     } catch {
       setStatus("Failed to save calibration");
     } finally {
@@ -2505,6 +1990,8 @@ export function SetupCalibrationEditorClient({
       const payload = {
         ...buildCalibrationPayload("saveAsNew"),
         clonedFromCalibrationId: calibrationId,
+        // Without this the copy lands unlinked and can't be mapped (it has no parameter list).
+        setupSheetModelId: initialSetupSheetModelId ?? null,
       };
       const res = await fetch("/api/setup-calibrations", {
         method: "POST",
@@ -2565,14 +2052,6 @@ export function SetupCalibrationEditorClient({
     return [...out];
   }, [acroSelection.keys, formFieldMappings, pdfRowByName]);
 
-  function clearMappingsForSelectedAcroWidget() {
-    if (!selectedAcroField) return;
-    const row = pdfRowByName.get(selectedAcroField.pdfFieldName);
-    setFormFieldMappings((prev) =>
-      removePdfWidgetFromMappings(prev, selectedAcroField.pdfFieldName, selectedAcroField.instanceIndex, row)
-    );
-    setStatus(null);
-  }
 
   const unmappedCanonicalKeys = useMemo(() => {
     return sortedCatalog.map((f) => f.key).filter((k) => !formFieldMappings[k]);
@@ -2712,137 +2191,79 @@ export function SetupCalibrationEditorClient({
     sheetFields,
   ]);
 
-  function handleSheetCanvasClick(input: { pdfFieldName?: string; instanceIndex?: number }) {
-    if (tool === "select") return;
-    if (tool === "delete") {
-      if (input.pdfFieldName && input.instanceIndex != null) {
-        // If they clicked a widget overlay while deleting, prefer deleting selected sheet field.
-        if (selectedSheetFieldId) deleteSheetField(selectedSheetFieldId);
-      }
-      return;
-    }
-
-    const pdfFieldName = input.pdfFieldName?.trim() ?? "";
-    const instanceIndex = input.instanceIndex ?? 0;
-
-    if (tool === "new_text") {
-      const id = addSheetField("text", {
-        sourceName: pdfFieldName,
-        page: currentPage,
-      } as any);
-      setTool("select");
-      setDraftGroupFieldId(null);
-      setSelectedSheetFieldId(id);
-      return;
-    }
-
-    if (tool === "new_checkbox") {
-      const id = addSheetField("checkbox", {
-        sourceName: pdfFieldName,
-        page: currentPage,
-        checkedValue: "1",
-        uncheckedValue: "",
-      } as any);
-      setTool("select");
-      setDraftGroupFieldId(null);
-      setSelectedSheetFieldId(id);
-      return;
-    }
-
-    if (tool === "new_group") {
-      const gid = draftGroupFieldId ?? addSheetField("group", { page: currentPage } as any);
-      setDraftGroupFieldId(gid);
-      if (pdfFieldName) {
-        setSheetFields((prev) =>
-          prev.map((f) => {
-            if (f.id !== gid) return f;
-            if (f.sourceType !== "group") return f;
-            const nextOpt = {
-              id: newId("opt"),
-              sourceName: pdfFieldName,
-              optionValue: "",
-              label: "",
-              widgetInstanceIndex: instanceIndex,
-              active: true,
-            };
-            return { ...f, options: [nextOpt, ...f.options] };
-          })
-        );
-      }
-      setSelectedSheetFieldId(gid);
-    }
-  }
 
   return (
     <section className="page-body">
-      {!modelLinkedMode ? (
-        <SetupCalibrationQuickParamsPanel
-          pdfFormRowsCount={pdfFormRows.length}
-          acroSelectOptions={acroSelectOptions}
-          customFieldDefinitions={customFieldDefinitions}
-          formFieldMappings={formFieldMappings}
-          onQuickAdd={handleQuickAddField}
-          onAssignSimple={(canonicalKey, pdfFieldName, instanceIndex) => {
-            applyWidgetToCanonicalKey(canonicalKey, pdfFieldName, instanceIndex);
-          }}
-          onAssignGroupOption={quickAssignGroupOption}
-        />
-      ) : null}
       <CardPanel contentClassName="p-3">
-        <Eyebrow>Calibration mapping profile</Eyebrow>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          {modelLinkedMode ? (
+        <div className="flex flex-wrap items-center gap-3">
+          {modelLinkedMode && modelProgress ? (
             <>
-              Click PDF controls on the left, then <span className="text-foreground">Link to parameter</span> in the side
-              panel. For grouped parameters (one of many / many of many), you will match each option to a specific control.
+              <span className="font-mono text-xs tabular-nums text-foreground">
+                {modelProgress.mapped}
+                <span className="text-muted-foreground"> / {modelProgress.total} mapped</span>
+              </span>
+              <div className="h-1 w-44 max-w-full overflow-hidden rounded bg-border">
+                <div
+                  className="h-full rounded bg-primary transition-[width] duration-300"
+                  style={{
+                    width: `${modelProgress.total ? Math.round((modelProgress.mapped / modelProgress.total) * 100) : 0}%`,
+                  }}
+                />
+              </div>
             </>
           ) : (
-            <>
-              <span className="text-foreground">Form fields</span> tab: click an AcroForm widget to select it, then link it to a
-              setup field in the side panel. Printed text and regions are{" "}
-              <span className="text-foreground/80">fallbacks only</span>.
-            </>
+            <span className="font-mono text-xs text-muted-foreground">
+              {formCount} form · {textCount} text · {regionCount} region
+            </span>
           )}
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            className="min-w-[18rem] rounded-md border border-border bg-muted/60 px-2 py-1.5 text-xs"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Calibration name / version"
-          />
-          <input
-            className="rounded-md border border-border bg-muted/60 px-2 py-1.5 text-xs"
-            value={sourceType}
-            onChange={(e) => setSourceType(e.target.value)}
-            placeholder="Source type"
-          />
-          <button
-            type="button"
-            className="rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
-            onClick={save}
-            disabled={saving}
+          <span
+            className={`text-xs ${
+              saving ? "text-muted-foreground" : calibrationDirty ? "text-amber-200/90" : "text-emerald-300"
+            }`}
           >
-            {saving ? "Saving…" : "Save calibration"}
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-accent/60 bg-accent/10 px-3 py-1.5 text-xs hover:bg-accent/20 disabled:opacity-60"
-            onClick={saveAsNewVersion}
-            disabled={savingAsNew || saving}
-          >
-            {savingAsNew ? "Saving copy…" : "Save as new version"}
-          </button>
-          <span className="text-xs text-muted-foreground">
-            {formCount} form · {textCount} text · {regionCount} region
+            {saving ? "Saving…" : calibrationDirty ? "Unsaved edits" : "Saved"}
           </span>
           {status ? <span className="text-xs text-muted-foreground">{status}</span> : null}
-          {calibrationDirty ? (
-            <span className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-100">
-              Unsaved changes — save before leaving this page
-            </span>
-          ) : null}
+          <button
+            type="button"
+            className="ml-auto rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+            onClick={() => setSettingsOpen((o) => !o)}
+          >
+            {settingsOpen ? "Close settings" : "Settings"}
+          </button>
         </div>
+        {settingsOpen ? (
+          <div className="mt-3 space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                className="min-w-[18rem] rounded-md border border-border bg-muted/60 px-2 py-1.5 text-xs"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Calibration name / version"
+              />
+              <input
+                className="rounded-md border border-border bg-muted/60 px-2 py-1.5 font-mono text-xs"
+                value={sourceType}
+                onChange={(e) => setSourceType(e.target.value)}
+                placeholder="Source type"
+              />
+              <button
+                type="button"
+                className="rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-60"
+                onClick={() => void save()}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save now"}
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-accent/60 bg-accent/10 px-3 py-1.5 text-xs hover:bg-accent/20 disabled:opacity-60"
+                onClick={saveAsNewVersion}
+                disabled={savingAsNew || saving}
+              >
+                {savingAsNew ? "Saving copy…" : "Save as new version"}
+              </button>
+            </div>
         <div
           ref={examplePdfSectionRef}
           className="mt-2 rounded-md border border-border/70 bg-muted/25 px-3 py-2 text-[11px]"
@@ -2915,497 +2336,13 @@ export function SetupCalibrationEditorClient({
             </div>
           ) : null}
         </div>
-        {!modelLinkedMode ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-b border-border pb-2">
-            <button
-              type="button"
-              className={`rounded px-3 py-1.5 text-xs font-medium ${tab === "sheet" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setTab("sheet")}
-            >
-              Full sheet
-            </button>
-            <button
-              type="button"
-              className={`rounded px-3 py-1.5 text-xs font-medium ${tab === "form" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setTab("form")}
-            >
-              Form fields
-            </button>
-            <span className="text-[10px] text-muted-foreground">Fallback</span>
-            <button
-              type="button"
-              className={`rounded px-2 py-1 text-[11px] ${tab === "text" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setTab("text")}
-            >
-              Printed text
-            </button>
-            <button
-              type="button"
-              className={`rounded px-2 py-1 text-[11px] ${tab === "region" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setTab("region")}
-            >
-              Regions
-            </button>
           </div>
         ) : null}
       </CardPanel>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[2fr_1fr]">
-        {tab === "sheet" ? (
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_420px]">
-            <div className="rounded-lg border border-border bg-card">
-              <div className="sticky top-0 z-[3] border-b border-border bg-card/95 p-2 backdrop-blur-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <Eyebrow>Calibration canvas</Eyebrow>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">
-                      Use tools to create mappings directly on the PDF. Editing happens in the inspector.
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1 text-xs">
-                    {[
-                      ["select", "Select"],
-                      ["new_text", "New Text"],
-                      ["new_checkbox", "New Checkbox"],
-                      ["new_group", "New Group"],
-                      ["delete", "Delete"],
-                    ].map(([k, label]) => (
-                      <button
-                        key={k}
-                        type="button"
-                        className={`rounded border px-2 py-1 ${tool === k ? "border-sky-500/70 bg-sky-500/10" : "border-border hover:bg-muted"}`}
-                        onClick={() => {
-                          setTool(k as CalibrationUiTool);
-                          if (k !== "new_group") setDraftGroupFieldId(null);
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      className={`ml-2 rounded border px-2 py-1 ${showExtractedFields ? "border-amber-500/60 bg-amber-500/10" : "border-border hover:bg-muted"}`}
-                      onClick={() => setShowExtractedFields((v) => !v)}
-                    >
-                      Toggle Debug
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                  <button
-                    type="button"
-                    className="rounded border border-border px-2 py-1 disabled:opacity-50"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage <= 1}
-                  >
-                    Prev
-                  </button>
-                  <span className="text-muted-foreground">
-                    Page {currentPage} / {numPages}
-                  </span>
-                  <button
-                    type="button"
-                    className="rounded border border-border px-2 py-1 disabled:opacity-50"
-                    onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
-                    disabled={currentPage >= numPages}
-                  >
-                    Next
-                  </button>
-                  {draftGroupFieldId ? (
-                    <span className="text-[11px] text-amber-200/90">
-                      Group mode: click multiple widgets, then switch back to Select.
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="p-2">
-                {!previewUrl ? (
-                  <div className="space-y-2 rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
-                    <div>No PDF preview URL — attach an example PDF to use the canvas.</div>
-                    <button
-                      type="button"
-                      className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted"
-                      onClick={openExamplePdfPicker}
-                    >
-                      Link example PDF…
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    ref={sheetPdfContainerRef}
-                    className="relative min-h-[55vh] overflow-auto rounded border border-border bg-muted/20"
-                    onMouseLeave={() => setHoveredSheetOverlayId(null)}
-                  >
-                    <PdfPreviewClient
-                      fileUrl={resolvedFileUrl || previewUrl}
-                      pageNumber={currentPage}
-                      width={pdfRenderWidth}
-                      renderAnnotationLayer={false}
-                      error={
-                        <div className="space-y-2 px-3 py-4 text-xs">
-                          <div className="text-rose-300">Failed to load PDF file.</div>
-                          {process.env.NODE_ENV === "development" ? (
-                            <div className="space-y-1 text-muted-foreground">
-                              <div>URL: {resolvedFileUrl || previewUrl || "—"}</div>
-                              {pdfLoadDetail ? (
-                                <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border/60 bg-muted/40 p-2 font-mono text-[10px]">
-                                  {pdfLoadDetail}
-                                </pre>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
-                      }
-                      onSourceError={(err) => {
-                        const msg = err instanceof Error ? err.message : String(err);
-                        setPdfLoadDetail(`Source error: ${msg}`);
-                      }}
-                      onLoadError={(err) => {
-                        const msg = err instanceof Error ? err.message : String(err);
-                        setPdfLoadDetail((prev) => `${prev ? `${prev}\n` : ""}Load error: ${msg}`);
-                      }}
-                      onDocumentLoadSuccess={({ numPages: loadedPages }) => {
-                        setPdfLoadDetail(null);
-                        setNumPages(loadedPages);
-                        setCurrentPage((p) => Math.min(Math.max(p, 1), loadedPages));
-                      }}
-                      onPageLoadSuccess={(page) => {
-                        const viewport = page.getViewport({ scale: 1 });
-                        setPdfPageSize({ width: viewport.width, height: viewport.height });
-                        const renderedWidth = pdfRenderWidth;
-                        const renderedHeight = viewport.height * (renderedWidth / viewport.width);
-                        setRenderedPageSize({ width: renderedWidth, height: renderedHeight });
-                      }}
-                    />
-
-                    {sheetOverlaysForPage.map((b) => (
-                      <button
-                        key={b.key}
-                        type="button"
-                        title={b.title}
-                        onMouseEnter={() => setHoveredSheetOverlayId(b.sheetFieldId ?? null)}
-                        onClick={() => {
-                          if (tool === "select") {
-                            if (b.sheetFieldId) setSelectedSheetFieldId(b.sheetFieldId);
-                            return;
-                          }
-                          handleSheetCanvasClick({ pdfFieldName: b.pdfFieldName, instanceIndex: b.instanceIndex });
-                        }}
-                        className={`absolute box-border rounded-sm border-2 transition-colors ${b.colorClass}`}
-                        style={{ left: b.left, top: b.top, width: b.width, height: b.height, zIndex: b.sheetFieldId === selectedSheetFieldId ? 5 : 2 }}
-                      />
-                    ))}
-
-                    {/* Click-to-create on blank canvas (no sourceName). */}
-                    <button
-                      type="button"
-                      className="absolute inset-0 cursor-crosshair bg-transparent"
-                      style={{ zIndex: 1 }}
-                      onClick={() => handleSheetCanvasClick({})}
-                      aria-label="PDF canvas click target"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-border bg-card p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <Eyebrow>Inspector</Eyebrow>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    {selectedSheetField ? (
-                      <span className="font-mono text-foreground/80">{selectedSheetField.sourceType}</span>
-                    ) : (
-                      "Select an overlay or create a new mapping."
-                    )}
-                  </div>
-                </div>
-                {selectedSheetField ? (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="rounded border border-border px-2 py-1 text-xs hover:bg-muted"
-                      onClick={() => duplicateSheetField(selectedSheetField.id)}
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-border px-2 py-1 text-xs hover:bg-muted"
-                      onClick={() => deleteSheetField(selectedSheetField.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-
-              {selectedSheetField ? (
-                <div className="mt-3 space-y-3">
-                  <div className="grid grid-cols-1 gap-2">
-                    <label className="text-[11px] text-muted-foreground">
-                      Canonical key
-                      <input
-                        className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                        value={selectedSheetField.canonicalFieldKey}
-                        onChange={(e) => updateSheetField(selectedSheetField.id, { canonicalFieldKey: e.target.value } as any)}
-                        placeholder="e.g. caster_front"
-                      />
-                    </label>
-                    <label className="text-[11px] text-muted-foreground">
-                      Label (optional)
-                      <input
-                        className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                        value={selectedSheetField.label}
-                        onChange={(e) => updateSheetField(selectedSheetField.id, { label: e.target.value } as any)}
-                        placeholder="Shown in editor"
-                      />
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="text-[11px] text-muted-foreground">
-                        Source type
-                        <input
-                          className="mt-1 w-full rounded border border-border bg-muted/50 px-2 py-1 font-mono text-xs"
-                          value={selectedSheetField.sourceType}
-                          readOnly
-                        />
-                      </label>
-                      <label className="text-[11px] text-muted-foreground">
-                        Page (optional)
-                        <input
-                          className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                          value={selectedSheetField.page ?? ""}
-                          onChange={(e) => {
-                            const v = e.target.value.trim();
-                            updateSheetField(selectedSheetField.id, { page: v ? Number(v) || undefined : undefined } as any);
-                          }}
-                          placeholder="1"
-                        />
-                      </label>
-                    </div>
-                    <label className="text-[11px] text-muted-foreground">
-                      Notes (optional)
-                      <textarea
-                        className="mt-1 min-h-16 w-full resize-y rounded border border-border bg-card px-2 py-1 text-xs"
-                        value={selectedSheetField.notes ?? ""}
-                        onChange={(e) => updateSheetField(selectedSheetField.id, { notes: e.target.value } as any)}
-                      />
-                    </label>
-                  </div>
-
-                  {"sourceName" in selectedSheetField ? (
-                    <label className="text-[11px] text-muted-foreground">
-                      Source name
-                      <input
-                        className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                        value={(selectedSheetField as any).sourceName ?? ""}
-                        onChange={(e) => updateSheetField(selectedSheetField.id, { sourceName: e.target.value } as any)}
-                        placeholder="AcroForm field name…"
-                      />
-                    </label>
-                  ) : null}
-
-                  {selectedSheetField.sourceType === "checkbox" ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="text-[11px] text-muted-foreground">
-                        Checked value
-                        <input
-                          className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                          value={(selectedSheetField as any).checkedValue ?? "1"}
-                          onChange={(e) => updateSheetField(selectedSheetField.id, { checkedValue: e.target.value } as any)}
-                        />
-                      </label>
-                      <label className="text-[11px] text-muted-foreground">
-                        Unchecked value
-                        <input
-                          className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                          value={(selectedSheetField as any).uncheckedValue ?? ""}
-                          onChange={(e) => updateSheetField(selectedSheetField.id, { uncheckedValue: e.target.value } as any)}
-                        />
-                      </label>
-                    </div>
-                  ) : null}
-
-                  {selectedSheetField.sourceType === "group" ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="text-[11px] font-medium text-muted-foreground">Group members</div>
-                        <button
-                          type="button"
-                          className="rounded border border-border px-2 py-1 text-[11px] hover:bg-muted"
-                          onClick={() => addGroupOption(selectedSheetField.id)}
-                        >
-                          Add member
-                        </button>
-                      </div>
-                      {(selectedSheetField.options ?? []).length === 0 ? (
-                        <div className="rounded border border-border/60 bg-muted/30 px-2 py-2 text-[11px] text-muted-foreground">
-                          No members yet. Use “New Group” then click widgets on the PDF, or add members here.
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {selectedSheetField.options.map((o) => (
-                            <div key={o.id} className="grid grid-cols-1 gap-2 rounded border border-border/60 bg-muted/20 p-2">
-                              <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-                                <input
-                                  className="rounded border border-border bg-card px-2 py-1 font-mono text-xs md:col-span-2"
-                                  value={o.sourceName}
-                                  onChange={(e) => updateGroupOption(selectedSheetField.id, o.id, { sourceName: e.target.value })}
-                                  placeholder="Source name"
-                                />
-                                <input
-                                  className="rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                                  value={o.optionValue}
-                                  onChange={(e) => updateGroupOption(selectedSheetField.id, o.id, { optionValue: e.target.value })}
-                                  placeholder="Option value"
-                                />
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    className="flex-1 rounded border border-border bg-card px-2 py-1 text-xs"
-                                    value={o.label ?? ""}
-                                    onChange={(e) => updateGroupOption(selectedSheetField.id, o.id, { label: e.target.value })}
-                                    placeholder="Label"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="rounded border border-border px-2 py-1 text-[11px] hover:bg-muted"
-                                    onClick={() => deleteGroupOption(selectedSheetField.id, o.id)}
-                                    title="Remove member"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="mt-3 rounded border border-border/60 bg-muted/20 px-3 py-6 text-xs text-muted-foreground">
-                  Click an overlay on the PDF or use the toolbar to create a new mapping.
-                </div>
-              )}
-
-              {showExtractedFields ? (
-                <div className="mt-4 border-t border-border pt-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <Eyebrow>Extracted fields (debug)</Eyebrow>
-                      <div className="mt-0.5 text-[10px] text-muted-foreground">
-                        {pdfFormRows.length} fields · {mappedSheetPdfFieldNames.size} mapped in full-sheet
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="rounded border border-border px-2 py-1 text-[11px] hover:bg-muted"
-                      onClick={() => void loadPdfFormFields()}
-                      disabled={pdfFormLoading || !documentId}
-                    >
-                      {pdfFormLoading ? "Loading…" : "Reload"}
-                    </button>
-                  </div>
-                  <div className="mt-2 max-h-[42vh] overflow-auto rounded border border-border/60 bg-muted/20 p-2">
-                    {pdfFormRows.length === 0 ? (
-                      <div className="text-xs text-muted-foreground">No extracted fields loaded.</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {pdfFormRows.map((r) => {
-                          const isMapped = mappedSheetPdfFieldNames.has(r.name);
-                          return (
-                            <div
-                              key={r.name}
-                              className={`rounded border p-2 ${isMapped ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/60 bg-card/60"}`}
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="truncate font-mono text-[11px] text-foreground/90">{r.name}</div>
-                                  <div className="text-[10px] text-muted-foreground">
-                                    {formatPdfFieldDisplayValue(r)} · {r.type} {r.pageNumber ? `· p${r.pageNumber}` : ""}
-                                  </div>
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  <button
-                                    type="button"
-                                    className="rounded border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
-                                    onClick={() => {
-                                      const id = addSheetField("text", { sourceName: r.name, page: r.pageNumber ?? undefined } as any);
-                                      setTool("select");
-                                      setSelectedSheetFieldId(id);
-                                    }}
-                                  >
-                                    New Text
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="rounded border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
-                                    onClick={() => {
-                                      const id = addSheetField("checkbox", { sourceName: r.name, page: r.pageNumber ?? undefined } as any);
-                                      setTool("select");
-                                      setSelectedSheetFieldId(id);
-                                    }}
-                                  >
-                                    New Checkbox
-                                  </button>
-                                  {selectedSheetField && "sourceName" in selectedSheetField ? (
-                                    <button
-                                      type="button"
-                                      className="rounded border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
-                                      onClick={() => updateSheetField(selectedSheetField.id, { sourceName: r.name } as any)}
-                                    >
-                                      Assign to selected
-                                    </button>
-                                  ) : null}
-                                  {selectedSheetField && selectedSheetField.sourceType === "group" ? (
-                                    <button
-                                      type="button"
-                                      className="rounded border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
-                                      onClick={() => {
-                                        setSheetFields((prev) =>
-                                          prev.map((f) => {
-                                            if (f.id !== selectedSheetField.id) return f;
-                                            if (f.sourceType !== "group") return f;
-                                            return {
-                                              ...f,
-                                              options: [
-                                                { id: newId("opt"), sourceName: r.name, optionValue: "", label: "", active: true },
-                                                ...f.options,
-                                              ],
-                                            };
-                                          })
-                                        );
-                                      }}
-                                    >
-                                      Add to group
-                                    </button>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : tab === "form" ? (
           <div className="rounded-lg border border-border bg-card p-3">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <Eyebrow>AcroForm map</Eyebrow>
-                <p className="mt-0.5 max-w-xl text-[11px] text-muted-foreground">
-                  {modelLinkedMode
-                    ? "Click PDF controls to select them, then link to a parameter in the side panel."
-                    : "Click a field to select it (highlighted on the PDF), then use the right panel to add or edit the setup mapping."}
-                </p>
-              </div>
+            <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <button
                   type="button"
@@ -3415,25 +2352,29 @@ export function SetupCalibrationEditorClient({
                 >
                   {pdfFormLoading ? "Loading…" : "Reload fields"}
                 </button>
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-1 disabled:opacity-50"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
-                >
-                  Prev
-                </button>
-                <span className="text-muted-foreground">
-                  Page {currentPage} / {numPages}
-                </span>
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-1 disabled:opacity-50"
-                  onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
-                  disabled={currentPage >= numPages}
-                >
-                  Next
-                </button>
+                {numPages > 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="rounded border border-border px-2 py-1 disabled:opacity-50"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                    >
+                      Prev
+                    </button>
+                    <span className="text-muted-foreground">
+                      Page {currentPage} / {numPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded border border-border px-2 py-1 disabled:opacity-50"
+                      onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
+                      disabled={currentPage >= numPages}
+                    >
+                      Next
+                    </button>
+                  </>
+                ) : null}
               </div>
             </div>
             {!documentId ? (
@@ -3553,11 +2494,12 @@ export function SetupCalibrationEditorClient({
                       })
                     : null}
                 </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  {modelLinkedMode
-                    ? "Highlighted controls are selectable. Green = already mapped. Select controls, then use Link to parameter in the side panel."
-                    : "For grouped fields: in the catalog, pick an option button (blue = active), then the PDF. The button stays blue when that option is linked. Details are in the right column."}
-                </p>
+                {!modelLinkedMode ? (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    For grouped fields: in the catalog, pick an option button (blue = active), then the PDF. The button stays
+                    blue when that option is linked.
+                  </p>
+                ) : null}
                 <div className="mt-3 border-t border-border pt-2">
                   <button
                     type="button"
@@ -3658,1211 +2600,24 @@ export function SetupCalibrationEditorClient({
               </>
             )}
           </div>
-        ) : tab === "text" ? (
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <Eyebrow>Printed text (secondary)</Eyebrow>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <label className="flex items-center gap-1 text-muted-foreground">
-                  Line ε
-                  <input
-                    type="number"
-                    step={0.5}
-                    min={1}
-                    max={12}
-                    className="w-14 rounded border border-border bg-muted/60 px-1 py-0.5"
-                    value={epsilon}
-                    onChange={(e) => setEpsilon(Number(e.target.value) || 2.5)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-1 hover:bg-muted disabled:opacity-50"
-                  onClick={() => void loadStructure()}
-                  disabled={structureLoading || !documentId}
-                >
-                  {structureLoading ? "Loading…" : "Reload"}
-                </button>
-              </div>
-            </div>
-            {!documentId ? (
-              <div className="space-y-2 rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
-                <div>No example PDF is linked to this calibration.</div>
-                <button
-                  type="button"
-                  className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted"
-                  onClick={openExamplePdfPicker}
-                >
-                  Link example PDF…
-                </button>
-              </div>
-            ) : structureError ? (
-              <div className="space-y-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-3 text-xs text-rose-200">
-                <div>Could not build printed text structure.</div>
-                <div className="font-mono text-[10px] text-rose-100/90">{structureError}</div>
-              </div>
-            ) : structureLoading && !structure ? (
-              <div className="text-xs text-muted-foreground">Parsing printed text…</div>
-            ) : structure ? (
-              <>
-                <div className="mb-2 flex flex-wrap gap-2 text-xs">
-                  <label className="flex items-center gap-1">
-                    <span className="text-muted-foreground">Page</span>
-                    <select
-                      className="rounded border border-border bg-card px-2 py-1"
-                      value={inspectPage}
-                      onChange={(e) => setInspectPage(Number(e.target.value))}
-                    >
-                      {structure.pages.map((p) => (
-                        <option key={p.pageNumber} value={p.pageNumber}>
-                          {p.pageNumber} ({p.lines.length} lines)
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <input
-                    className="min-w-[12rem] flex-1 rounded border border-border bg-muted/60 px-2 py-1"
-                    placeholder="Filter lines…"
-                    value={lineFilter}
-                    onChange={(e) => setLineFilter(e.target.value)}
-                  />
-                </div>
-                <div className="max-h-[65vh] space-y-2 overflow-auto rounded border border-border/60 bg-muted/20 p-2">
-                  {linesForInspect.length === 0 ? (
-                    <div className="text-xs text-muted-foreground">No lines match filter.</div>
-                  ) : (
-                    linesForInspect.map((line) => (
-                      <div
-                        key={`${inspectPage}-${line.lineIndex}`}
-                        className="rounded border border-border/50 bg-card/80 p-2 text-[11px]"
-                      >
-                        <div className="mb-1 font-mono text-muted-foreground">
-                          p{inspectPage} · L{line.lineIndex} · y≈{line.yBucket.toFixed(1)}
-                        </div>
-                        <div className="mb-1 break-words text-foreground/90">{line.text || "—"}</div>
-                        <div className="flex flex-wrap gap-1">
-                          {line.tokens.map((tok, ti) => (
-                            <button
-                              key={`${line.lineIndex}-${ti}-${tok.x}`}
-                              type="button"
-                              disabled={!activeSetupFieldKey}
-                              className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] hover:border-sky-500/60 hover:bg-sky-500/10 disabled:opacity-40"
-                              title={`Token ${ti}`}
-                              onClick={() => bindToken(inspectPage, line.lineIndex, ti)}
-                            >
-                              {tok.text || "·"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Optional anchor + token for printed labels. Prefer <strong>Form fields</strong> when the PDF is a real
-                  fillable sheet.
-                </p>
-              </>
-            ) : null}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <Eyebrow>Region fallback</Eyebrow>
-              <div className="flex items-center gap-2 text-xs">
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-1 disabled:opacity-50"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
-                >
-                  Prev
-                </button>
-                <span className="text-muted-foreground">
-                  Page {currentPage} / {numPages}
-                </span>
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-1 disabled:opacity-50"
-                  onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
-                  disabled={currentPage >= numPages}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-            {!previewUrl ? (
-              <div className="space-y-2 rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
-                <div>No example PDF attached to this calibration yet.</div>
-                <button
-                  type="button"
-                  className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted"
-                  onClick={openExamplePdfPicker}
-                >
-                  Link example PDF…
-                </button>
-              </div>
-            ) : (
-              <div
-                className="relative overflow-auto rounded border border-border bg-muted/30"
-                onMouseDown={(e) => {
-                  if (!activeSetupFieldKey || !renderedPageSize) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setDrawStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-                  setDrawCurrent({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-                }}
-                onMouseMove={(e) => {
-                  if (!drawStart) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setDrawCurrent({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-                }}
-                onMouseUp={() => {
-                  if (!drawStart || !drawCurrent || !pdfPageSize || !renderedPageSize || !inProgressRect || !activeSetupFieldKey) return;
-                  if (inProgressRect.width < 6 || inProgressRect.height < 6) {
-                    setDrawStart(null);
-                    setDrawCurrent(null);
-                    return;
-                  }
-                  const next: CalibrationFieldRegion = {
-                    page: currentPage,
-                    x: (inProgressRect.x / renderedPageSize.width) * pdfPageSize.width,
-                    y: (inProgressRect.y / renderedPageSize.height) * pdfPageSize.height,
-                    width: (inProgressRect.width / renderedPageSize.width) * pdfPageSize.width,
-                    height: (inProgressRect.height / renderedPageSize.height) * pdfPageSize.height,
-                  };
-                  setFields((prev) => ({ ...prev, [activeSetupFieldKey]: next }));
-                  setDrawStart(null);
-                  setDrawCurrent(null);
-                }}
-              >
-                <PdfPreviewClient
-                  fileUrl={resolvedFileUrl || previewUrl}
-                  pageNumber={currentPage}
-                  width={900}
-                  renderAnnotationLayer={false}
-                  error={
-                    <div className="space-y-2 px-3 py-4 text-xs">
-                      <div className="text-rose-300">Failed to load PDF file.</div>
-                      {process.env.NODE_ENV === "development" ? (
-                        <div className="space-y-1 text-muted-foreground">
-                          <div>URL: {resolvedFileUrl || previewUrl || "—"}</div>
-                          {pdfLoadDetail ? (
-                            <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border/60 bg-muted/40 p-2 font-mono text-[10px]">
-                              {pdfLoadDetail}
-                            </pre>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  }
-                  onSourceError={(err) => {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    setPdfLoadDetail(`Source error: ${msg}`);
-                  }}
-                  onLoadError={(err) => {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    setPdfLoadDetail((prev) => `${prev ? `${prev}\n` : ""}Load error: ${msg}`);
-                  }}
-                  onDocumentLoadSuccess={({ numPages: loadedPages }) => {
-                    setPdfLoadDetail(null);
-                    setNumPages(loadedPages);
-                    setCurrentPage((p) => Math.min(Math.max(p, 1), loadedPages));
-                  }}
-                  onPageLoadSuccess={(page) => {
-                    const viewport = page.getViewport({ scale: 1 });
-                    setPdfPageSize({ width: viewport.width, height: viewport.height });
-                    const renderedWidth = 900;
-                    const renderedHeight = viewport.height * (renderedWidth / viewport.width);
-                    setRenderedPageSize({ width: renderedWidth, height: renderedHeight });
-                  }}
-                />
-                {Object.entries(fields)
-                  .filter(([, region]) => region.page === currentPage)
-                  .map(([key, region]) => (
-                    <div
-                      key={key}
-                      className="pointer-events-none absolute border border-amber-400/80 bg-amber-400/15"
-                      style={{
-                        left: renderedPageSize && pdfPageSize ? (region.x / pdfPageSize.width) * renderedPageSize.width : 0,
-                        top: renderedPageSize && pdfPageSize ? (region.y / pdfPageSize.height) * renderedPageSize.height : 0,
-                        width: renderedPageSize && pdfPageSize ? (region.width / pdfPageSize.width) * renderedPageSize.width : 0,
-                        height: renderedPageSize && pdfPageSize ? (region.height / pdfPageSize.height) * renderedPageSize.height : 0,
-                      }}
-                      title={key}
-                    />
-                  ))}
-                {inProgressRect ? (
-                  <div
-                    className="pointer-events-none absolute border border-sky-400/90 bg-sky-400/20"
-                    style={inProgressRect}
-                  />
-                ) : null}
-              </div>
-            )}
-            <p className="mt-2 text-[11px] text-muted-foreground">Last resort when form fields and printed text are not usable.</p>
-          </div>
-        )}
 
         <CardPanel contentClassName="p-3">
-          {modelLinkedMode && tab === "form" && setupSheetModelSchema && initialSetupSheetModelId ? (
+          {modelLinkedMode && setupSheetModelSchema && initialSetupSheetModelId ? (
             <SetupCalibrationModelSidebar
               schema={setupSheetModelSchema}
               modelId={initialSetupSheetModelId}
               calibrationId={calibrationId}
               formFieldMappings={formFieldMappings}
-              widgetSelectionCount={acroSelection.keys.length}
-              onOpenLinkDialog={() => openLinkDialogForSelection(null)}
-              onClearSelection={() => setAcroSelection({ keys: [], activeKey: null })}
-              onEditGroupedParameter={(key) => openLinkDialogForSelection(key)}
-              calibrationDirty={calibrationDirty}
-              onNavigateToAddParameter={handleNavigateToSchema}
+              armedKey={armedKey}
+              armedAssignments={armedAssignments}
+              onArm={armParameter}
+              onDisarm={disarmParameter}
+              onCreateParameter={createSchemaParameter}
             />
-          ) : tab === "form" ? (
-            <>
-              <div className="mb-3 space-y-3 rounded border border-border/80 bg-muted/25 p-3 text-xs">
-                <Eyebrow>Add a custom field</Eyebrow>
-                <p className="text-[10px] leading-relaxed text-muted-foreground">
-                  <span className="font-medium text-foreground/85">Many of many</span> (independent checkboxes): pick that shape,
-                  optionally one name per line (same order as your PDF clicks), select 2+ PDF controls, continue, name each option
-                  in the form, then create. Your selection is linked in order; use the catalog option buttons to reassign if
-                  needed. <span className="font-medium text-foreground/85">Visual multi</span> (only in the grouped form) is for
-                  several boxes that share the <em>same</em> PDF field name (e.g. a row of positions) — not the same as many of
-                  many.
-                </p>
-                <div>
-                  <div className="text-[10px] font-medium text-muted-foreground">1. Field shape</div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    <button
-                      type="button"
-                      className={`rounded border px-2 py-1 text-[10px] ${
-                        newFieldKindPreset == null
-                          ? "border-foreground/25 bg-foreground/10 text-foreground"
-                          : "border-border bg-card/60 text-muted-foreground hover:bg-muted/60"
-                      }`}
-                      onClick={() => {
-                        setNewFieldKindPreset(null);
-                        setStatus(
-                          "Single control: select it on the PDF, then in “Map this PDF control” use “Create new setup field (single control)”."
-                        );
-                      }}
-                    >
-                      Text or one control
-                    </button>
-                    <button
-                      type="button"
-                      className={`rounded border px-2 py-1 text-[10px] ${
-                        newFieldKindPreset?.ui === "select" && newFieldKindPreset.behavior === "singleSelect"
-                          ? "border-foreground/25 bg-foreground/10 text-foreground"
-                          : "border-border bg-card/60 text-muted-foreground hover:bg-muted/60"
-                      }`}
-                      onClick={() => startNewFieldKind("single")}
-                    >
-                      One of many
-                    </button>
-                    <button
-                      type="button"
-                      className={`rounded border px-2 py-1 text-[10px] ${
-                        newFieldKindPreset?.ui === "multiSelect" && newFieldKindPreset.behavior === "multiChoiceGroup"
-                          ? "border-foreground/25 bg-foreground/10 text-foreground"
-                          : "border-border bg-card/60 text-muted-foreground hover:bg-muted/60"
-                      }`}
-                      onClick={() => startNewFieldKind("multi")}
-                    >
-                      Many of many
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-medium text-muted-foreground">2. Option names (optional, grouped only)</div>
-                  <textarea
-                    className="mt-1 w-full min-h-12 rounded border border-border/80 bg-card px-2 py-1 font-sans text-[10px] text-foreground"
-                    value={preGroupedOptionNameHints}
-                    onChange={(e) => setPreGroupedOptionNameHints(e.target.value)}
-                    placeholder={"Line 1 = first PDF control, etc.\nSoft\nMedium\nFirm"}
-                    spellCheck={false}
-                  />
-                </div>
-                <div>
-                  <div className="text-[10px] font-medium text-muted-foreground">3. Add PDF controls to the selection</div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Click the PDF on the left. Unmapped widgets toggle in/out of the selection. Current selection:{" "}
-                    <span className="font-mono text-foreground/90">{acroSelection.keys.length}</span> widget
-                    {acroSelection.keys.length === 1 ? "" : "s"}.
-                  </p>
-                  {acroSelection.keys.length >= 2 ? (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="rounded border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
-                        onClick={beginCreateGroupedFromSelection}
-                      >
-                        {activeSetupFieldKey && !customFieldKeySet.has(activeSetupFieldKey)
-                          ? `Continue — map to ${mergedLabelMap[activeSetupFieldKey] ?? activeSetupFieldKey}`
-                          : "Continue — open grouped field form"}
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-border/70 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/80"
-                        onClick={() => {
-                          setAcroSelection({ keys: [], activeKey: null });
-                          clearGroupedEditorState();
-                          setPendingGroupedSourceKeys(null);
-                          setEditorMode("idle");
-                        }}
-                      >
-                        Clear selection
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="mt-1.5 text-[10px] text-muted-foreground">
-                      For 2+ controls, keep adding until the count is at least 2, then use the button above. For a single
-                      text/checkbox, pick one control and use <strong>Map this PDF control</strong> (below) → &quot;Create new
-                      setup field (single control)&quot;.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="mb-3 rounded border border-sky-500/35 bg-sky-500/10 p-3 text-xs">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <Eyebrow>Selected setup field</Eyebrow>
-                  {activeSetupFieldKey ? (
-                    <button
-                      type="button"
-                      className="rounded border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
-                      onClick={clearActiveSetupFieldEditor}
-                    >
-                      Clear
-                    </button>
-                  ) : null}
-                </div>
-                {activeSetupFieldKey ? (
-                  <>
-                    <div className="mt-1 font-medium text-foreground">{mergedLabelMap[activeSetupFieldKey] ?? activeSetupFieldKey}</div>
-                    <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{activeSetupFieldKey}</div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {customFieldKeySet.has(activeSetupFieldKey) ? (
-                        <>
-                          <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-100">Custom</span>
-                          {(() => {
-                            const d = customFieldDefinitions.find((c) => c.key === activeSetupFieldKey);
-                            if (!d) return null;
-                            return (
-                              <>
-                                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{d.fieldDomain}</span>
-                                {d.showInSetupSheet === false ? (
-                                  <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-100">hidden · sheet</span>
-                                ) : null}
-                                {d.showInAnalysis === false ? (
-                                  <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-100">hidden · analysis</span>
-                                ) : null}
-                              </>
-                            );
-                          })()}
-                        </>
-                      ) : (
-                        <>
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">Base field</span>
-                          {fieldDisplayOverrides[activeSetupFieldKey]?.showInSetupSheet === false ? (
-                            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-100">hidden · sheet</span>
-                          ) : null}
-                          {fieldDisplayOverrides[activeSetupFieldKey]?.showInAnalysis === false ? (
-                            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-100">hidden · analysis</span>
-                          ) : null}
-                        </>
-                      )}
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] ${
-                          mappingLabel(activeSetupFieldKey) !== "—" ? "bg-emerald-500/20 text-emerald-100" : "bg-rose-500/15 text-rose-100"
-                        }`}
-                      >
-                        {mappingLabel(activeSetupFieldKey) !== "—" ? "mapped" : "unmapped"}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    No setup field selected for editing. Click a mapped PDF widget or a catalog field to open the editor — or
-                    select unmapped PDF widgets to create a new field.
-                  </p>
-                )}
-                {activeSetupFieldKey && !customFieldKeySet.has(activeSetupFieldKey) ? (
-                  <p className="mt-2 text-[10px] text-sky-100/90">
-                    Base sheet field: use One of many / Many of many above, select PDF controls, then{" "}
-                    <span className="font-medium text-foreground">Continue — map to …</span> (not Quick add).
-                  </p>
-                ) : null}
-              </div>
-
-              {showCreateFieldForm ? (
-                <div className="mb-3">
-                  <SetupFieldDefinitionForm
-                    mode={createFieldEditKey ? "edit" : "create"}
-                    fieldScope={setupFieldFormScope === "template" ? "template" : createFieldEditKey ? "custom" : "new"}
-                    error={createFieldError}
-                    onApplyRecipe={
-                      setupFieldFormScope === "template"
-                        ? undefined
-                        : (recipe) => {
-                            applyCalibrationFieldRecipe(recipe, {
-                              cfFieldDomain,
-                              setCfFieldDomain,
-                              cfIsMetadata,
-                              setCfIsMetadata,
-                              cfUiType,
-                              setCfUiType,
-                              cfValueType,
-                              setCfValueType,
-                              cfSectionId,
-                              setCfSectionId,
-                            });
-                          }
-                    }
-                    sectionOptions={mergedSectionOptions}
-                    cfKey={cfKey}
-                    setCfKey={setCfKey}
-                    cfLabel={cfLabel}
-                    setCfLabel={setCfLabel}
-                    cfSectionId={cfSectionId}
-                    setCfSectionId={setCfSectionId}
-                    cfFieldDomain={cfFieldDomain}
-                    setCfFieldDomain={setCfFieldDomain}
-                    cfValueType={cfValueType}
-                    setCfValueType={setCfValueType}
-                    cfUiType={cfUiType}
-                    setCfUiType={setCfUiType}
-                    cfIsMetadata={cfIsMetadata}
-                    setCfIsMetadata={setCfIsMetadata}
-                    cfShowInSetupSheet={cfShowInSetupSheet}
-                    setCfShowInSetupSheet={setCfShowInSetupSheet}
-                    cfShowInAnalysis={cfShowInAnalysis}
-                    setCfShowInAnalysis={setCfShowInAnalysis}
-                    cfPdfExportable={cfPdfExportable}
-                    setCfPdfExportable={setCfPdfExportable}
-                    cfUnit={cfUnit}
-                    setCfUnit={setCfUnit}
-                    cfCheckedValue={cfCheckedValue}
-                    setCfCheckedValue={setCfCheckedValue}
-                    cfUncheckedValue={cfUncheckedValue}
-                    setCfUncheckedValue={setCfUncheckedValue}
-                    cfGroupKey={cfGroupKey}
-                    setCfGroupKey={setCfGroupKey}
-                    cfOptionValue={cfOptionValue}
-                    setCfOptionValue={setCfOptionValue}
-                    cfNotes={cfNotes}
-                    setCfNotes={setCfNotes}
-                    cfSubsectionId={cfSubsectionId}
-                    setCfSubsectionId={setCfSubsectionId}
-                    cfLayoutPlacement={cfLayoutPlacement}
-                    setCfLayoutPlacement={setCfLayoutPlacement}
-                    cfPairGroupId={cfPairGroupId}
-                    setCfPairGroupId={setCfPairGroupId}
-                    cfSortOrder={cfSortOrder}
-                    setCfSortOrder={setCfSortOrder}
-                    fieldKindHint={
-                      activeSetupFieldKey
-                        ? `${getLogicalFieldKind(activeSetupFieldKey)} · ${getCalibrationFieldCategory(activeSetupFieldKey)}`
-                        : undefined
-                    }
-                    onCommit={commitCreateField}
-                    onCancel={() => {
-                      setShowCreateFieldForm(false);
-                      setCreateFieldEditKey(null);
-                      setCreateFieldError(null);
-                      setPendingGroupedSourceKeys(null);
-                      clearGroupedEditorState();
-                      setSetupFieldFormScope("new");
-                      setEditorMode(acroSelection.keys.length > 0 ? "sourceSelection" : "idle");
-                    }}
-                  />
-                </div>
-              ) : null}
-
-              {showCreateFieldForm
-              && groupedEditorSourceKeys
-              && groupedEditorSourceKeys.length >= 2
-              && !(
-                setupFieldFormScope === "template"
-                && activeSetupFieldKey
-                && usesSingleSelectChipWorkflow(activeSetupFieldKey)
-              ) ? (
-                <div className="mb-3 space-y-3 rounded border border-border/80 bg-card/60 p-3 text-xs">
-                  <div className="text-[10px] font-medium text-foreground/90">
-                    {isSingleSelectGroupedBehavior(groupBehaviorType)
-                      ? "One-of-many (one stored value)"
-                      : groupBehaviorType === "visualMulti"
-                        ? "Visual multi (one PDF name, many boxes in a row)"
-                        : "Many of many (independent checkboxes)"}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    {isSingleSelectGroupedBehavior(groupBehaviorType)
-                      ? "Like chassis: one value in the app, one PDF control active. “Stored value” is what import uses; display name is for the UI only."
-                      : groupBehaviorType === "visualMulti"
-                        ? "Use for several positions that share the same Acro name (e.g. screw A/B/C). This is not “many of many” — that uses separate PDF checkboxes, one option each."
-                        : "Each control is a separate on/off. Use Table to edit names. Use Map on PDF (chips) to pick which option you are moving, then click a PDF control — the chip stays blue when that option is linked (same as the catalog button row)."}
-                  </p>
-                  <div className="rounded border border-border/60 bg-muted/30 p-2">
-                    <div className="text-[10px] font-medium text-muted-foreground">Field behavior (advanced)</div>
-                    <label className="mt-2 block text-[11px] text-muted-foreground">
-                      Type
-                      <select
-                        className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                        value={isSingleSelectGroupedBehavior(groupBehaviorType) ? "singleSelect" : groupBehaviorType}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (v === "singleSelect") setGroupBehaviorType("singleSelect");
-                          else setGroupBehaviorType(v as "visualMulti" | "multiChoiceGroup");
-                        }}
-                      >
-                        <option value="singleSelect">Single-select · one value, many choices (e.g. chassis, body type)</option>
-                        <option value="visualMulti">Visual multi · same Acro name, a row of boxes (screw/position A–D)</option>
-                        <option value="multiChoiceGroup">Many of many · separate PDF checkboxes, each is its own option</option>
-                      </select>
-                    </label>
-                  </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
-                    <div className="text-[10px] font-medium text-muted-foreground">Option mapping</div>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        className={`rounded border px-2 py-0.5 text-[10px] ${
-                          groupedMappingPanelMode === "table"
-                            ? "border-foreground/30 bg-foreground/10"
-                            : "border-border hover:bg-muted/50"
-                        }`}
-                        onClick={() => setGroupedMappingPanelMode("table")}
-                      >
-                        Table
-                      </button>
-                      <button
-                        type="button"
-                        className={`rounded border px-2 py-0.5 text-[10px] ${
-                          groupedMappingPanelMode === "chips"
-                            ? "border-foreground/30 bg-foreground/10"
-                            : "border-border hover:bg-muted/50"
-                        }`}
-                        onClick={() => setGroupedMappingPanelMode("chips")}
-                      >
-                        Reassign (chips)
-                      </button>
-                    </div>
-                  </div>
-                  {groupedMappingPanelMode === "chips" ? (
-                    <div className="rounded border border-border/60 bg-card/50 p-2">
-                      <p className="text-[10px] text-muted-foreground">
-                        Click a chip so it is blue, then the PDF control for that option. The chip stays blue so you can see
-                        the link. If you just created the field with PDFs already selected, those links are already set — this
-                        is to fix or change one. Use <strong>Table</strong> for display names and unique stored values.
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {(() => {
-                          const seen = new Set<string>();
-                          const chips: { value: string; label: string }[] = [];
-                          for (const sk of groupedEditorSourceKeys) {
-                            const ref = parseAcroKey(sk);
-                            const r = pdfRowByName.get(ref.pdfFieldName);
-                            const d = groupedOptionDrafts[sk] ?? {
-                              optionLabel: r?.name ?? ref.pdfFieldName,
-                              optionValue: inferOptionValueFromPdfName(r?.name ?? ref.pdfFieldName),
-                              notes: "",
-                            };
-                            const v = d.optionValue.trim();
-                            if (!v || seen.has(v)) continue;
-                            seen.add(v);
-                            chips.push({ value: v, label: d.optionLabel?.trim() ? d.optionLabel : v });
-                          }
-                          return chips;
-                        })().map(({ value, label }) => (
-                          <button
-                            key={value}
-                            type="button"
-                            className={`max-w-full truncate rounded border px-2 py-0.5 text-[10px] ${
-                              pendingGroupOption === value
-                                ? "border-blue-500/90 bg-blue-500/25 text-foreground"
-                                : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
-                            }`}
-                            title={label !== value ? `Stored: ${value}` : value}
-                            onClick={() => setPendingGroupOption((c) => (c === value ? null : value))}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded border border-border/60 bg-card/50 p-2">
-                      <div className="text-[10px] font-medium text-muted-foreground">
-                        Options ({groupedEditorSourceKeys.length} PDF sources)
-                      </div>
-                      <div className="mt-2 max-h-56 space-y-2 overflow-y-auto">
-                        {groupedEditorSourceKeys.map((sourceKey) => {
-                          const ref = parseAcroKey(sourceKey);
-                          const row = pdfRowByName.get(ref.pdfFieldName);
-                          const draft = groupedOptionDrafts[sourceKey] ?? {
-                            optionLabel: row?.name ?? ref.pdfFieldName,
-                            optionValue: inferOptionValueFromPdfName(row?.name ?? ref.pdfFieldName),
-                            notes: "",
-                          };
-                          return (
-                            <div key={sourceKey} className="rounded border border-border/60 bg-muted/20 p-2">
-                              <details className="text-[10px] text-muted-foreground">
-                                <summary className="cursor-pointer text-foreground/80">AcroForm source (advanced)</summary>
-                                <div className="mt-1 break-all font-mono text-[9px] text-foreground/80">{sourceKey}</div>
-                              </details>
-                              <div className="mt-1 grid grid-cols-1 gap-2 md:grid-cols-2">
-                                <label className="block text-[10px] text-muted-foreground md:col-span-2">
-                                  Display label
-                                  <input
-                                    className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                                    value={draft.optionLabel}
-                                    onChange={(e) => setGroupedOptionDrafts((prev) => ({
-                                      ...prev,
-                                      [sourceKey]: { ...draft, optionLabel: e.target.value },
-                                    }))}
-                                    placeholder="e.g. Technical"
-                                  />
-                                </label>
-                                <label className="block text-[10px] text-muted-foreground md:col-span-2">
-                                  Stored value (canonical)
-                                  <input
-                                    className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                                    value={draft.optionValue}
-                                    onChange={(e) => setGroupedOptionDrafts((prev) => ({
-                                      ...prev,
-                                      [sourceKey]: { ...draft, optionValue: e.target.value },
-                                    }))}
-                                    placeholder="e.g. technical"
-                                  />
-                                </label>
-                                <label className="block text-[10px] text-muted-foreground md:col-span-2">
-                                  Notes (optional)
-                                  <input
-                                    className="mt-0.5 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                                    value={draft.notes}
-                                    onChange={(e) => setGroupedOptionDrafts((prev) => ({
-                                      ...prev,
-                                      [sourceKey]: { ...draft, notes: e.target.value },
-                                    }))}
-                                    placeholder=""
-                                  />
-                                </label>
-                              </div>
-                              <button
-                                type="button"
-                                className="mt-2 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-100 hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={!draft.optionValue.trim()}
-                                onClick={() => {
-                                  if (!draft.optionValue.trim()) return;
-                                  setPendingGroupOption(draft.optionValue.trim());
-                                  setStatus("Click the matching PDF control to link this stored value…");
-                                }}
-                              >
-                                Link: arm value, then click PDF
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-
-              <Eyebrow>Map this PDF control</Eyebrow>
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                Unmapped: click the PDF to add/remove from the selection (count is in <strong>Add a custom field</strong>).
-                Mapped: click to open that setup field. One widget: link or create a single field below. Two or more: use
-                the flow at the top first.
-              </p>
-              {!selectedAcroField ? (
-                <div className="mt-3 rounded border border-border/60 bg-muted/20 px-3 py-6 text-xs text-muted-foreground">
-                  {activeSetupFieldKey ? (
-                    <p>
-                      No PDF widget highlighted. Click the map to select a source, or add a mapping below.{" "}
-                      {formFieldMappings[activeSetupFieldKey]
-                        ? "A form mapping exists but could not resolve a widget — check the rule type."
-                        : "This setup field has no AcroForm mapping yet."}
-                    </p>
-                  ) : (
-                    <p>No field selected. Click a highlighted region on the PDF or choose a setup field in the catalog.</p>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-3 space-y-3 text-xs">
-                  <div className="rounded border border-border/60 bg-muted/20 p-2 font-mono text-[10px]">
-                    <div className="text-muted-foreground">Source id</div>
-                    <div className="break-all text-foreground">{acroSourceKey(selectedAcroField)}</div>
-                  </div>
-                  {selectedAcroPdfRow ? (
-                    <div className="space-y-1 text-[11px] text-muted-foreground">
-                      <div>
-                        <span className="text-muted-foreground">Name </span>
-                        <span className="font-mono text-foreground">{selectedAcroPdfRow.name}</span>
-                      </div>
-                      <div>Type {selectedAcroPdfRow.type}</div>
-                      {selectedAcroPdfRow.pageNumber != null ? <div>Page {selectedAcroPdfRow.pageNumber}</div> : null}
-                      <div>
-                        Value <span className="font-mono text-foreground">{formatPdfFieldDisplayValue(selectedAcroPdfRow)}</span>
-                      </div>
-                    </div>
-                  ) : null}
-                  <div>
-                    <span className="text-muted-foreground">Status: </span>
-                    {selectedAcroAppKeys.length > 0 ? (
-                      <span className="font-medium text-emerald-300">Mapped</span>
-                    ) : (
-                      <span className="text-amber-200/90">Unmapped</span>
-                    )}
-                  </div>
-
-                  {selectedAcroAppKeys.length > 0 ? (
-                    <div className="space-y-2 border-t border-border pt-2">
-                      <Eyebrow>App mapping</Eyebrow>
-                      {selectedAcroAppKeys.map((k) => {
-                        const rule = formFieldMappings[k];
-                        const label = mergedLabelMap[k] ?? k;
-                        return (
-                          <div key={k} className="rounded border border-border/60 bg-card/60 p-2">
-                            <div className="font-medium text-foreground">{label}</div>
-                            <div className="font-mono text-[10px] text-muted-foreground">{k}</div>
-                            {rule && selectedAcroPdfRow ? (
-                              <div className="mt-1 text-[10px] text-muted-foreground">
-                                {summarizeFormRuleForPanel(rule, selectedAcroPdfRow)} · {formatPdfFieldDisplayValue(selectedAcroPdfRow)}
-                              </div>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="mt-2 w-full rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[11px] font-medium text-sky-100 hover:bg-sky-500/20"
-                              onClick={() => openEditSetupFieldUnified(k)}
-                            >
-                              Edit setup field
-                            </button>
-                          </div>
-                        );
-                      })}
-                      <label className="block text-[11px] text-muted-foreground">
-                        Change linked setup field
-                        <select
-                          className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                          value={newMappingCanonicalKey}
-                          onChange={(e) => setNewMappingCanonicalKey(e.target.value)}
-                        >
-                          {sortedCatalog.map((f) => (
-                            <option key={f.key} value={f.key}>
-                              {f.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <button
-                        type="button"
-                        className="w-full rounded border border-rose-500/40 px-2 py-1.5 text-xs text-rose-200 hover:bg-rose-500/10"
-                        onClick={clearMappingsForSelectedAcroWidget}
-                      >
-                        Clear mapping
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 border-t border-border pt-2">
-                      <Eyebrow>Map this PDF control</Eyebrow>
-                      {!activeSetupFieldKey && !showAddMappingForm && !showCreateFieldForm ? (
-                        <div className="flex flex-col gap-2">
-                          <button
-                            type="button"
-                            className="w-full rounded border border-sky-500/60 bg-sky-500/10 px-3 py-2 text-left text-xs font-medium hover:bg-sky-500/20"
-                            onClick={() => {
-                              setShowAddMappingForm(true);
-                              setShowCreateFieldForm(false);
-                              setNewMappingCanonicalKey(sortedCatalog[0]?.key || "");
-                              setNewMappingNotes("");
-                            }}
-                          >
-                            Link to existing setup field…
-                          </button>
-                          <button
-                            type="button"
-                            className="w-full rounded border border-border bg-card px-3 py-2 text-left text-xs font-medium hover:bg-muted"
-                            onClick={openCreateFieldFromSelection}
-                          >
-                            Create new setup field (single control)…
-                          </button>
-                        </div>
-                      ) : null}
-
-                      {showAddMappingForm && !showCreateFieldForm && !activeSetupFieldKey ? (
-                        <div className="space-y-2 rounded border border-border/60 bg-muted/20 p-2">
-                          <div className="text-[10px] font-medium text-muted-foreground">Link to existing field</div>
-                          <label className="block text-[11px] text-muted-foreground">
-                            Setup field (canonical key)
-                            <select
-                              className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                              value={newMappingCanonicalKey}
-                              onChange={(e) => setNewMappingCanonicalKey(e.target.value)}
-                            >
-                              {sortedCatalog.map((f) => (
-                                <option key={f.key} value={f.key}>
-                                  {f.label}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="block text-[11px] text-muted-foreground">
-                            Notes (optional)
-                            <textarea
-                              className="mt-1 min-h-10 w-full resize-y rounded border border-border bg-card px-2 py-1 text-xs"
-                              value={newMappingNotes}
-                              onChange={(e) => setNewMappingNotes(e.target.value)}
-                            />
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              className="rounded border border-sky-500/60 bg-sky-500/15 px-3 py-1.5 text-xs font-medium hover:bg-sky-500/25"
-                              onClick={() => {
-                                if (!selectedAcroField) return;
-                                applyWidgetToCanonicalKey(newMappingCanonicalKey, selectedAcroField.pdfFieldName, selectedAcroField.instanceIndex);
-                              }}
-                            >
-                              Save mapping
-                            </button>
-                            <button
-                              type="button"
-                              className="rounded border border-border px-3 py-1.5 text-xs hover:bg-muted"
-                              onClick={() => setShowAddMappingForm(false)}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                          {unmappedCanonicalKeys.length > 0 ? (
-                            <div className="border-t border-border/60 pt-2">
-                              <label className="block text-[11px] text-muted-foreground">
-                                Quick link (unmapped keys only)
-                                <select
-                                  className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs"
-                                  value={linkTargetCanonicalKey}
-                                  onChange={(e) => setLinkTargetCanonicalKey(e.target.value)}
-                                >
-                                  {unmappedCanonicalKeys.map((k) => (
-                                    <option key={k} value={k}>
-                                      {mergedLabelMap[k] ?? k}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                              <button
-                                type="button"
-                                className="mt-1 w-full rounded border border-border px-2 py-1.5 text-xs hover:bg-muted"
-                                onClick={() => {
-                                  if (!selectedAcroField) return;
-                                  applyWidgetToCanonicalKey(linkTargetCanonicalKey, selectedAcroField.pdfFieldName, selectedAcroField.instanceIndex);
-                                }}
-                              >
-                                Link to selected key
-                              </button>
-                            </div>
-                          ) : (
-                            <p className="text-[10px] text-muted-foreground">
-                              All known keys are mapped; use <strong>Create new setup field</strong> for additional PDF fields.
-                            </p>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <details
-                id="calibration-setup-field-catalog"
-                className="mt-4 border-t border-border pt-3"
-                open
-              >
-                <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Setup field catalog &amp; groups</summary>
-                <div className="mt-3 space-y-3">
-                  {activeSetupFieldKey && effectiveWidgetGroupKind(activeSetupFieldKey) ? (
-                    <div className="rounded border border-blue-500/40 bg-blue-500/10 p-2 text-[11px]">
-                      <div className="text-[10px] font-medium text-blue-100/90">
-                        {effectiveWidgetGroupKind(activeSetupFieldKey) === "single"
-                          ? "Single-select (one value)"
-                          : customFieldByKey.get(activeSetupFieldKey)?.groupBehaviorType === "visualMulti"
-                            ? "Visual multi (same field name, row of boxes)"
-                            : "Many of many (independent checkboxes)"}
-                        <span className="ml-2 font-normal text-muted-foreground">
-                          ({getLogicalFieldKind(activeSetupFieldKey)})
-                        </span>
-                      </div>
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        Click a button so it is blue, then the PDF control. It stays blue when that option is linked. For a
-                        new control, use an <strong>unmapped</strong> widget; to move a link, click the control that already
-                        has it (chassis, custom groups, same idea).
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {chipOptionEntriesForField(activeSetupFieldKey).map(({ value, label }) => (
-                          <button
-                            key={value}
-                            type="button"
-                            className={`max-w-full truncate rounded border px-2 py-0.5 text-[10px] ${
-                              customFieldByKey.get(activeSetupFieldKey) ? "font-sans" : "font-mono"
-                            } ${
-                              pendingGroupOption === value
-                                ? "border-blue-500/90 bg-blue-500/25 text-foreground"
-                                : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
-                            }`}
-                            title={label !== value ? `Stored: ${value}` : value}
-                            onClick={() =>
-                              setPendingGroupOption((cur) => (cur === value ? null : value))
-                            }
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="max-h-[45vh] space-y-3 overflow-auto">
-            {catalogByGroup.order.map((groupTitle) => (
-              <div key={groupTitle} className="space-y-1">
-                <Eyebrow className="sticky top-0 z-[1] bg-card/95 py-1 backdrop-blur-sm">
-                  {groupTitle}
-                </Eyebrow>
-                <div className="space-y-1">
-                  {(catalogByGroup.map.get(groupTitle) ?? []).map((field) => {
-                    const isSelected = activeSetupFieldKey === field.key;
-                    const mapped = mappingLabel(field.key);
-                    const formRule = formFieldMappings[field.key];
-                    const pdfRow = formRule ? pdfRowForFormRule(formRule, pdfRowByName) : undefined;
-                    const panelValue = formRule ? formRulePanelValue(formRule, pdfRowByName) : null;
-                    const cf = customFieldByKey.get(field.key);
-                    const tmplHiddenSheet = !cf && fieldDisplayOverrides[field.key]?.showInSetupSheet === false;
-                    const tmplHiddenAnalysis = !cf && fieldDisplayOverrides[field.key]?.showInAnalysis === false;
-                    return (
-                      <button
-                        key={field.key}
-                        type="button"
-                        onClick={() => selectCanonicalField(field.key)}
-                        className={`flex w-full flex-col gap-0.5 rounded border px-2 py-1.5 text-left text-xs ${
-                          isSelected ? "border-sky-400/70 bg-sky-400/10" : "border-border bg-muted/30"
-                        }`}
-                      >
-                        <div className="flex w-full items-center justify-between gap-2">
-                          <span className="min-w-0 truncate">{field.label}</span>
-                          <span
-                            className={`shrink-0 text-[10px] ${mapped !== "—" ? "text-emerald-300" : "text-muted-foreground"}`}
-                          >
-                            {mapped}
-                          </span>
-                        </div>
-                        {cf ? (
-                          <div className="text-[9px] text-muted-foreground">
-                            {cf.fieldDomain}
-                            {cf.showInSetupSheet === false ? " · hidden · sheet" : ""}
-                            {cf.showInAnalysis === false ? " · hidden · analysis" : ""}
-                          </div>
-                        ) : tmplHiddenSheet || tmplHiddenAnalysis ? (
-                          <div className="text-[9px] text-amber-200/80">
-                            {tmplHiddenSheet ? "hidden · sheet " : ""}
-                            {tmplHiddenAnalysis ? "hidden · analysis" : ""}
-                          </div>
-                        ) : null}
-                        {formRule && panelValue ? (
-                          <div className="text-[10px] text-muted-foreground">
-                            <span className="font-mono text-foreground/80">{summarizeFormRuleForPanel(formRule, pdfRow)}</span>
-                            <span className="mx-1">·</span>
-                            <span>{panelValue}</span>
-                          </div>
-                        ) : formRule ? (
-                          <div className="text-[10px] text-muted-foreground">
-                            <span className="font-mono text-foreground/80">{rulePdfFieldName(formRule)}</span>
-                            <span className="mx-1">·</span>
-                            <span className="text-amber-200/80">value not loaded</span>
-                          </div>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-                  </div>
-                </div>
-              </details>
-            </>
-          ) : (
-            <>
-              <Eyebrow>Setup fields</Eyebrow>
-              {tab === "text" ? (
-                <div className="mt-2 space-y-2 rounded border border-border/60 bg-muted/30 p-2 text-[11px]">
-                  <div className="text-muted-foreground">Anchor (optional)</div>
-                  <input
-                    className="w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
-                    placeholder='Printed line contains…'
-                    value={anchorInput}
-                    onChange={(e) => setAnchorInput(e.target.value)}
-                  />
-                  {anchorInput.trim() ? (
-                    <label className="flex items-center gap-2 text-muted-foreground">
-                      Match index
-                      <input
-                        className="w-12 rounded border border-border bg-card px-1 py-0.5 font-mono"
-                        value={occurrenceInput}
-                        onChange={(e) => setOccurrenceInput(e.target.value)}
-                      />
-                    </label>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className="mt-2 max-h-[60vh] space-y-3 overflow-auto">
-                {catalogByGroup.order.map((groupTitle) => (
-                  <div key={groupTitle} className="space-y-1">
-                    <Eyebrow className="sticky top-0 z-[1] bg-card/95 py-1 backdrop-blur-sm">
-                      {groupTitle}
-                    </Eyebrow>
-                    <div className="space-y-1">
-                      {(catalogByGroup.map.get(groupTitle) ?? []).map((field) => {
-                        const isSelected = activeSetupFieldKey === field.key;
-                        const mapped = mappingLabel(field.key);
-                        const formRule = formFieldMappings[field.key];
-                        const pdfRow = formRule ? pdfRowForFormRule(formRule, pdfRowByName) : undefined;
-                        const panelValue = formRule ? formRulePanelValue(formRule, pdfRowByName) : null;
-                        return (
-                          <button
-                            key={field.key}
-                            type="button"
-                            onClick={() => selectCanonicalField(field.key)}
-                            className={`flex w-full flex-col gap-0.5 rounded border px-2 py-1.5 text-left text-xs ${
-                              isSelected ? "border-sky-400/70 bg-sky-400/10" : "border-border bg-muted/30"
-                            }`}
-                          >
-                            <div className="flex w-full items-center justify-between gap-2">
-                              <span className="min-w-0 truncate">{field.label}</span>
-                              <span
-                                className={`shrink-0 text-[10px] ${mapped !== "—" ? "text-emerald-300" : "text-muted-foreground"}`}
-                              >
-                                {mapped}
-                              </span>
-                            </div>
-                            {formRule && panelValue ? (
-                              <div className="text-[10px] text-muted-foreground">
-                                <span className="font-mono text-foreground/80">{summarizeFormRuleForPanel(formRule, pdfRow)}</span>
-                                <span className="mx-1">·</span>
-                                <span>{panelValue}</span>
-                              </div>
-                            ) : formRule ? (
-                              <div className="text-[10px] text-muted-foreground">
-                                <span className="font-mono text-foreground/80">{rulePdfFieldName(formRule)}</span>
-                                <span className="mx-1">·</span>
-                                <span className="text-amber-200/80">value not loaded</span>
-                              </div>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
-              onClick={clearSelectedMapping}
-              disabled={!activeSetupFieldKey || mappingLabel(activeSetupFieldKey) === "—"}
-            >
-              Clear selected field
-            </button>
-            {documentId ? (
-              <Link href={`/setup-documents/${documentId}`} className="text-xs text-muted-foreground hover:text-foreground">
-                Back to document review
-              </Link>
-            ) : (
-              <Link href="/setup-documents" className="text-xs text-muted-foreground hover:text-foreground">
-                Open setup documents
-              </Link>
-            )}
-          </div>
+          ) : null}
         </CardPanel>
       </div>
 
-      {setupSheetModelSchema && linkDialogOpen ? (
-        <SetupCalibrationLinkParameterDialog
-          open={linkDialogOpen}
-          widgetSourceKeys={acroSelection.keys}
-          widgetOptions={widgetOptionsForLink}
-          schema={setupSheetModelSchema}
-          formFieldMappings={formFieldMappings}
-          initialParameterKey={linkDialogEditKey}
-          initialAssignments={linkDialogAssignments}
-          assignments={linkDialogAssignments}
-          onAssignmentsChange={setLinkDialogAssignments}
-          assignOnPdfOptionValue={linkAssignOnPdfOption}
-          onAssignOnPdfOptionChange={setLinkAssignOnPdfOption}
-          onClose={closeLinkDialog}
-          onConfirmSimple={(parameterKey) => {
-            const key = acroSelection.keys[0];
-            if (!key) return;
-            const ref = parseAcroKey(key);
-            applyWidgetToCanonicalKey(parameterKey, ref.pdfFieldName, ref.instanceIndex);
-            setAcroSelection({ keys: [], activeKey: null });
-            closeLinkDialog();
-          }}
-          onConfirmGrouped={commitModelGroupedLink}
-        />
-      ) : null}
-
-      {schemaNavPending ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <SurfaceCard className="max-w-md shadow-lg" contentClassName="p-4">
-            <div className="text-sm font-semibold text-foreground">Save calibration first?</div>
-            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-              You have unsaved mapping changes. Save before adding parameters on the sheet model so your PDF links are kept.
-            </p>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                className="rounded border border-border px-3 py-1.5 text-xs hover:bg-muted"
-                onClick={() => setSchemaNavPending(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="rounded border border-border px-3 py-1.5 text-xs hover:bg-muted"
-                onClick={() => {
-                  setSchemaNavPending(false);
-                  if (initialSetupSheetModelId) {
-                    router.push(
-                      `/setup-sheet-models/${initialSetupSheetModelId}/schema?returnTo=${encodeURIComponent(`/setup-calibrations/${calibrationId}`)}`
-                    );
-                  }
-                }}
-              >
-                Continue without saving
-              </button>
-              <button
-                type="button"
-                className="rounded border border-accent/60 bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent/25"
-                onClick={async () => {
-                  await save();
-                  setSchemaNavPending(false);
-                  if (initialSetupSheetModelId) {
-                    router.push(
-                      `/setup-sheet-models/${initialSetupSheetModelId}/schema?returnTo=${encodeURIComponent(`/setup-calibrations/${calibrationId}`)}`
-                    );
-                  }
-                }}
-              >
-                Save & continue
-              </button>
-            </div>
-          </SurfaceCard>
-        </div>
-      ) : null}
 
       {pdfMappingConflict ? (
         <div

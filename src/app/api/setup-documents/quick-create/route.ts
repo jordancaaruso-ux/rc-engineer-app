@@ -28,6 +28,8 @@ import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreate
 import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
+import { extractPdfFormFields } from "@/lib/setupDocuments/pdfFormFields";
+import { renderPdfFirstPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
 import { calibrationsAutoPickableByUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 
 /**
@@ -238,6 +240,32 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   } catch {
     return NextResponse.json({ error: "Failed to read uploaded file" }, { status: 400 });
+  }
+
+  // Flattened/scanned PDF bridge: a PDF with zero AcroForm fields (a sheet rendered/scanned to a
+  // PDF) can't be read by the form pipeline. Rasterize page 1 to a PNG server-side and treat it as
+  // an image, so the model's derived imageCalibration reads it (same path as a photo/screenshot
+  // upload). Kill switch SETUP_PDF_RASTER=0; on any failure we keep the PDF and fall through.
+  if (mimeType === PDF_MIME && process.env.SETUP_PDF_RASTER !== "0") {
+    try {
+      const { hasFormFields } = await extractPdfFormFields(Buffer.from(bytes));
+      if (!hasFormFields) {
+        const png = await renderPdfFirstPageToPng(bytes, { scale: 2 });
+        bytes = new Uint8Array(png);
+        mimeType = "image/png";
+        originalFilename = originalFilename.replace(/\.pdf$/i, "") + ".png";
+        // The client-Blob path stored the original PDF; null the prestored path so the persistence
+        // step below stores the rendered PNG and records that as the document's file.
+        preStoredPath = null;
+        console.log(
+          `[setup-documents/quick-create] flattened PDF rasterized → PNG (${png.byteLength}b) ${originalFilename}`
+        );
+      }
+    } catch (e) {
+      console.warn(
+        `[setup-documents/quick-create] flattened-PDF raster skipped: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
   }
 
   // Fingerprint-based calibration pick. PDFs use AcroForm field name fingerprints; images use a

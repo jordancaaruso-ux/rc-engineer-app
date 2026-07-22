@@ -25,8 +25,10 @@ import {
   UNIVERSAL_TOURING_PARAMETERS,
   universalParameterIdForSnapshotKey,
 } from "@/lib/setupSheetModels/universalParameters";
+import { suggestUniversalParameterId } from "@/lib/setupSheetModels/matchUniversalParameter";
 import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import { awesomatixFieldKeyCollisionWarning } from "@/lib/setupSheetModels/awesomatixFieldKeyCollision";
+import { OptionRowsEditor } from "@/components/setup-sheet-models/OptionRowsEditor";
 import { Eyebrow } from "@/components/ui/panel";
 
 const KIND_OPTIONS: { value: SchemaParameterKind; label: string }[] = [
@@ -45,15 +47,22 @@ export function SetupSheetModelSchemaEditor(props: {
   schema: SetupSheetModelSchema;
   onChange: (schema: SetupSheetModelSchema) => void;
   readOnly?: boolean;
+  /**
+   * Admins pick a field's canonical parameter by hand. For everyone else it is inferred and hidden:
+   * cross-car pooling is invisible to the person building a sheet, and a *wrong* canonical id is
+   * worse than none — it pools this car's numbers into another parameter's distribution.
+   */
+  isAdmin?: boolean;
 }) {
   const { schema, onChange, readOnly } = props;
+  const isAdmin = props.isAdmin === true;
   const [addOpen, setAddOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [key, setKey] = useState("");
   const [kind, setKind] = useState<SchemaParameterKind>("number");
   const [sectionId, setSectionId] = useState("tuning");
   const [unit, setUnit] = useState("");
-  const [optionLines, setOptionLines] = useState("");
+  const [optionLabels, setOptionLabels] = useState<string[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [selectedFieldKeys, setSelectedFieldKeys] = useState<Set<string>>(new Set());
@@ -125,7 +134,7 @@ export function SetupSheetModelSchemaEditor(props: {
     const sec = SECTION_PRESETS.find((p) => p.id === sectionId) ?? SECTION_PRESETS[SECTION_PRESETS.length - 1]!;
     const optLabels =
       kind === "one_of_many" || kind === "many_of_many"
-        ? optionLines.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+        ? optionLabels.map((l) => l.trim()).filter(Boolean)
         : undefined;
     const maxOrder = schema.fields.reduce((m, f) => Math.max(m, f.sortOrder), -1);
     const built = buildFieldDefFromKind({
@@ -151,7 +160,14 @@ export function SetupSheetModelSchemaEditor(props: {
       setLocalError(collision);
       return;
     }
-    const nextFields = [...schema.fields, built];
+    // Infer the canonical cross-car parameter up front. `suggestUniversalParameterId` returns
+    // nothing when it isn't sure (e.g. an axle-ambiguous "toe gain"), so a guess never pools this
+    // field into the wrong distribution. Admins can still override it in the edit panel.
+    const inferredUniversalId = suggestUniversalParameterId(built.key, built.displayLabel);
+    const nextFields = [
+      ...schema.fields,
+      inferredUniversalId ? { ...built, universalParameterId: inferredUniversalId } : built,
+    ];
     onChange({
       ...schema,
       fields: nextFields,
@@ -165,9 +181,9 @@ export function SetupSheetModelSchemaEditor(props: {
     });
     setLabel("");
     setKey("");
-    setOptionLines("");
+    setOptionLabels([]);
     setAddOpen(false);
-  }, [schema, onChange, label, key, kind, sectionId, unit, optionLines]);
+  }, [schema, onChange, label, key, kind, sectionId, unit, optionLabels]);
 
   const rebuildLayout = useCallback(() => {
     if (
@@ -398,6 +414,7 @@ export function SetupSheetModelSchemaEditor(props: {
                 {editingKey === f.key && !readOnly ? (
                   <FieldEditPanel
                     field={f}
+                    isAdmin={isAdmin}
                     layoutGroup={layoutGroup}
                     onSave={(patch) => {
                       updateField(f.key, patch);
@@ -499,15 +516,19 @@ export function SetupSheetModelSchemaEditor(props: {
                 </label>
               </div>
               {(kind === "one_of_many" || kind === "many_of_many") && (
-                <label className="flex flex-col gap-1 text-muted-foreground">
-                  Options (one per line, min 2)
-                  <textarea
-                    className="min-h-[4rem] rounded border border-border bg-card px-2 py-1.5 font-mono"
-                    value={optionLines}
-                    onChange={(e) => setOptionLines(e.target.value)}
-                    placeholder={"1\n2\n3\n4"}
+                <div className="space-y-1.5">
+                  <div className="text-muted-foreground">
+                    Options{" "}
+                    <span className="text-[10px]">
+                      ({kind === "one_of_many" ? "pick one" : "pick any"}, min 2)
+                    </span>
+                  </div>
+                  <OptionRowsEditor
+                    idPrefix="add"
+                    options={optionLabels}
+                    onChange={setOptionLabels}
                   />
-                </label>
+                </div>
               )}
               {addFieldCollisionWarning ? (
                 <div className="rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
@@ -543,6 +564,8 @@ export function SetupSheetModelSchemaEditor(props: {
 
 function FieldEditPanel(props: {
   field: SetupSheetModelFieldDef;
+  /** Admin-only: choose the canonical cross-car parameter by hand. */
+  isAdmin?: boolean;
   layoutGroup?: { id: string; label: string } | null;
   onSave: (patch: Partial<SetupSheetModelFieldDef>) => void;
   onSaveGroupLabel?: (label: string) => void;
@@ -550,8 +573,8 @@ function FieldEditPanel(props: {
 }) {
   const [displayLabel, setDisplayLabel] = useState(props.field.displayLabel);
   const [unit, setUnit] = useState(props.field.unit ?? "");
-  const [optionLines, setOptionLines] = useState(
-    (props.field.groupedOptionLabels ?? []).join("\n")
+  const [optionLabels, setOptionLabels] = useState<string[]>(
+    props.field.groupedOptionLabels ?? []
   );
   const [universalId, setUniversalId] = useState(props.field.universalParameterId ?? "");
   const [groupLabel, setGroupLabel] = useState(props.layoutGroup?.label ?? "");
@@ -585,37 +608,39 @@ function FieldEditPanel(props: {
           />
         </label>
       ) : null}
-      <label className="block text-[10px] text-muted-foreground">
-        Universal parameter (cross-car stats)
-        <select
-          className="mt-0.5 w-full rounded border border-border bg-muted/40 px-2 py-1 text-xs"
-          value={universalId}
-          onChange={(e) => setUniversalId(e.target.value)}
-        >
-          <option value="">None — use sheet key only</option>
-          {UNIVERSAL_TOURING_PARAMETERS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label} ({p.id})
-            </option>
-          ))}
-        </select>
-      </label>
-      {(kind === "one_of_many" || kind === "many_of_many") && (
+      {props.isAdmin ? (
         <label className="block text-[10px] text-muted-foreground">
-          Options (one per line)
-          <textarea
-            className="mt-0.5 w-full min-h-[3rem] rounded border border-border bg-muted/40 px-2 py-1 font-mono"
-            value={optionLines}
-            onChange={(e) => setOptionLines(e.target.value)}
-          />
+          Universal parameter (cross-car stats)
+          <select
+            className="mt-0.5 w-full rounded border border-border bg-muted/40 px-2 py-1 text-xs"
+            value={universalId}
+            onChange={(e) => setUniversalId(e.target.value)}
+          >
+            <option value="">None — use sheet key only</option>
+            {UNIVERSAL_TOURING_PARAMETERS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} ({p.id})
+              </option>
+            ))}
+          </select>
         </label>
+      ) : null}
+      {(kind === "one_of_many" || kind === "many_of_many") && (
+        <div className="space-y-1 text-[10px] text-muted-foreground">
+          <div>Options</div>
+          <OptionRowsEditor
+            idPrefix={`edit-${props.field.key}`}
+            options={optionLabels}
+            onChange={setOptionLabels}
+          />
+        </div>
       )}
       <div className="flex gap-2">
         <button
           type="button"
           className="rounded border border-border px-2 py-1 text-[10px]"
           onClick={() => {
-            const labels = optionLines.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+            const labels = optionLabels.map((l) => l.trim()).filter(Boolean);
             const patch: Partial<SetupSheetModelFieldDef> = {
               displayLabel: displayLabel.trim() || props.field.displayLabel,
               unit: unit.trim() || undefined,

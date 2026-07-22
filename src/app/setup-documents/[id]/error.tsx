@@ -34,8 +34,8 @@ export default function SetupDocumentError({
         >
           Try again
         </button>
-        <Link href="/setup" className="rounded-md border border-border bg-card px-3 py-2 text-xs hover:bg-muted">
-          Back to Setup
+        <Link href="/cars" className="rounded-md border border-border bg-card px-3 py-2 text-xs hover:bg-muted">
+          Back to cars
         </Link>
       </div>
     </section>

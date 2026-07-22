@@ -36,10 +36,13 @@ export function CarList({
   initialCars,
   setupSheetModels: initialSetupSheetModels = [],
   isAdmin = false,
+  setupMetaById,
 }: {
   initialCars: Car[];
   setupSheetModels?: SetupSheetModelOption[];
   isAdmin?: boolean;
+  /** Per-car setup line ("2 sheets · 20 setups · last run 19 Jul"), built server-side. */
+  setupMetaById?: Record<string, string>;
 }) {
   const router = useRouter();
   const [cars, setCars] = useState<Car[]>(initialCars);
@@ -63,7 +66,6 @@ export function CarList({
   }, [initialSetupSheetModels.length]);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [nameDirty, setNameDirty] = useState(false);
   const [notes, setNotes] = useState("");
@@ -169,11 +171,6 @@ export function CarList({
     }
   }
 
-  function toggleExpand(id: string) {
-    haptic("light");
-    setExpandedId((cur) => (cur === id ? null : id));
-  }
-
   return (
     <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
       <ul className="divide-y divide-border">
@@ -186,6 +183,8 @@ export function CarList({
               setAddOpen((v) => !v);
             }}
             aria-expanded={addOpen}
+            // Onboarding guide anchor — the "add your car" step's yellow ring.
+            data-guide="add-car"
             className="tap-active flex w-full items-center gap-3 px-3 py-3 text-left transition hover:bg-muted/50 sm:px-4"
           >
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-dashed border-border bg-secondary text-muted-foreground">
@@ -342,66 +341,41 @@ export function CarList({
             No cars yet. Add one above to log runs.
           </li>
         ) : (
-          cars.map((c) => {
-            const expanded = expandedId === c.id;
-            return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(c.id)}
-                  aria-expanded={expanded}
-                  className="tap-active flex w-full items-center gap-3 px-3 py-3 text-left transition hover:bg-muted/50 sm:px-4"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block">
-                      <HubRowTitle as="span">{c.name}</HubRowTitle>
-                      {c.chassis ? (
-                        <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>
-                      ) : null}
-                    </span>
-                    <span className="ui-caption mt-0.5 block">
-                      {c.setupSheetModel?.name ?? (
-                        <span className="text-amber-700 dark:text-amber-400">
-                          setup sheet coming
-                        </span>
-                      )}
-                    </span>
+          cars.map((c) => (
+            /* The row IS the link — tapping a car opens it. It used to expand into
+               "Edit parameters" / "Open car →", which made opening a car a two-tap
+               detour (2026-07-22). Sheet parameters live on the car page. */
+            <li key={c.id}>
+              <Link
+                href={`/cars/${c.id}`}
+                prefetch
+                onClick={() => haptic("light")}
+                className="tap-active flex w-full items-center gap-3 px-3 py-3 text-left transition hover:bg-muted/50 sm:px-4"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block">
+                    <HubRowTitle as="span">{c.name}</HubRowTitle>
+                    {c.chassis ? (
+                      <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>
+                    ) : null}
                   </span>
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                      expanded && "rotate-90"
-                    )}
-                    aria-hidden
-                  />
-                </button>
-
-                <Collapse open={expanded}>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 pb-4 pt-0 sm:px-4">
-                    {c.setupSheetModelId ? (
-                      <Link
-                        href={`/setup-sheet-models/${c.setupSheetModelId}/schema`}
-                        className="tap-active text-xs text-accent hover:underline"
-                      >
-                        {isAdmin ? "Edit parameters" : "View parameters"}
-                      </Link>
-                    ) : (
-                      <span className="text-xs text-amber-700 dark:text-amber-400">
-                        No setup sheet linked yet
+                  <span className="ui-caption mt-0.5 block">
+                    {c.setupSheetModel?.name ?? (
+                      <span className="text-amber-700 dark:text-amber-400">
+                        setup sheet coming
                       </span>
                     )}
-                    <Link
-                      href={`/cars/${c.id}`}
-                      prefetch
-                      className="tap-active text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Open car →
-                    </Link>
-                  </div>
-                </Collapse>
-              </li>
-            );
-          })
+                  </span>
+                  {setupMetaById?.[c.id] ? (
+                    <span className="ui-caption mt-0.5 block truncate font-mono tabular-nums">
+                      {setupMetaById[c.id]}
+                    </span>
+                  ) : null}
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              </Link>
+            </li>
+          ))
         )}
       </ul>
     </SurfaceCard>

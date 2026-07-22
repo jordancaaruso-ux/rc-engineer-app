@@ -21,6 +21,11 @@ const generic = (name: string) => (): SetupSheetModelSchema => buildGenericPrese
 /**
  * Popular 1/10 electric touring chassis. Adding a row here makes it appear (Authorized) for every
  * user; uploads/quick-add reuse it by slug. Keep slugs stable — they key community aggregation.
+ *
+ * Adding a chassis? Also add its slug to `CHASSIS_PLATFORM_BY_SLUG`
+ * (`src/lib/cars/chassisPlatform.ts`) — that map drives the log-run car-swap tire rule and lives in
+ * a pure module because this file is server-only. Forgetting it is safe (unknown platform → tires
+ * still carry), just less precise.
  */
 export const AUTHORIZED_CHASSIS_CATALOG: AuthorizedChassisSeed[] = [
   { name: "Awesomatix A800RR", slug: SETUP_SHEET_MODEL_SLUG_A800RR, buildSchema: buildA800SeedSchema },

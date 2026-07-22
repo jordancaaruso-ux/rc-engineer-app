@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 import { canonicalSetupTemplateForUserCarId, carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
+import { carIdSupportsSheetUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
 
 function jsonObjectNonEmpty(v: unknown): v is Record<string, unknown> {
   return v != null && typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).length > 0;
@@ -81,5 +82,38 @@ export async function GET(request: Request) {
           return d.carId == null || (d.carId != null && scopeSet.has(d.carId));
         });
 
-  return NextResponse.json({ downloadedSetups });
+  // The car's setup library comes first: a setup the driver built and named is a better default
+  // baseline than a document they once imported. Same option shape so the run form's existing
+  // baseline wiring (`applyDownloadedSetupOnly` → `setupBaselineSnapshotId`) handles both — a
+  // library row is simply its own baseline.
+  const librarySetups = carId
+    ? await prisma.setupSnapshot.findMany({
+        where: { userId: user.id, carId, isLibrary: true },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        select: { id: true, name: true, createdAt: true, data: true },
+      })
+    : [];
+
+  const libraryOptions = librarySetups
+    .filter((s) => jsonObjectNonEmpty(s.data))
+    .map((s) => ({
+      id: s.id,
+      originalFilename: s.name ?? "Untitled setup",
+      createdAt: s.createdAt,
+      setupData: s.data,
+      carId,
+      documentSetupTemplate: null,
+      baselineSetupSnapshotId: s.id,
+      kind: "library" as const,
+    }));
+
+  return NextResponse.json({
+    downloadedSetups: [
+      ...libraryOptions,
+      ...downloadedSetups.map((d) => ({ ...d, kind: "document" as const })),
+    ],
+    // Upload only reads values on a calibrated chassis; the run form hides the prompt otherwise.
+    supportsSheetUpload: await carIdSupportsSheetUpload(user.id, carId),
+  });
 }

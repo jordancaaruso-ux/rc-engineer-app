@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
+import { CreateCalibrationForModel } from "@/components/setup-sheet-models/CreateCalibrationForModel";
 import { setCalibrationVerificationAction } from "./actions";
 
 export default async function SetupSheetModelWorkbenchPage({
@@ -45,6 +46,7 @@ export default async function SetupSheetModelWorkbenchPage({
       slug: true,
       isAuthorized: true,
       schemaJson: true,
+      kitSetupJson: true,
       defaultCalibration: {
         select: {
           id: true,
@@ -60,6 +62,8 @@ export default async function SetupSheetModelWorkbenchPage({
   if (!model) notFound();
 
   const schema = parseSetupSheetModelSchema(model.schemaJson);
+  const hasKitSetup =
+    model.kitSetupJson != null && Object.keys(model.kitSetupJson as object).length > 0;
   const calibration = model.defaultCalibration;
   const calData = calibration ? normalizeCalibrationData(calibration.calibrationDataJson) : null;
   const counts = calData ? calibrationMappingCounts(calData) : null;
@@ -164,19 +168,18 @@ export default async function SetupSheetModelWorkbenchPage({
               ) : null}
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              No default calibration yet. Ingest the manufacturer&apos;s blank sheet for this
-              chassis (admin: <span className="font-mono text-xs">npm run setup-extract:blank-pilot</span>,{" "}
-              <span className="font-mono text-xs">blank-apply</span>,{" "}
-              <span className="font-mono text-xs">register-blank</span> — in-app ingestion is the
-              next workbench build).
-            </p>
+            <CreateCalibrationForModel modelId={model.id} modelName={model.name} />
           )}
         </CardPanel>
 
         <CardPanel contentClassName="space-y-3">
           <Eyebrow>Edit</Eyebrow>
           <div className="flex flex-wrap gap-2">
+            {calibration ? (
+              <ButtonLink href={`/setup-calibrations/${calibration.id}`} variant="primary">
+                Open mapping editor
+              </ButtonLink>
+            ) : null}
             {boxEditorHref ? (
               <ButtonLink href={boxEditorHref} variant="outline">
                 Edit boxes on the blank
@@ -185,20 +188,27 @@ export default async function SetupSheetModelWorkbenchPage({
             <ButtonLink href={`/setup-sheet-models/${model.id}/schema`} variant="outline">
               Edit labels &amp; universal params
             </ButtonLink>
+            {isAdmin ? (
+              <ButtonLink href={`/setup-sheet-models/${model.id}/kit-setup`} variant="outline">
+                {hasKitSetup ? "Edit kit setup" : "Enter kit setup"}
+              </ButtonLink>
+            ) : null}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Boxes (where each value lives) save to the calibration; labels and universal-parameter
-            mapping save to the schema. Geometry edits after a green-light mark those fields for
-            re-check; label edits don&apos;t invalidate anything.
-          </p>
+          {isAdmin ? (
+            <p className="text-xs text-muted-foreground">
+              {hasKitSetup
+                ? "Drivers can start a new setup pre-filled at kit."
+                : "No kit setup yet — drivers start from empty or their own last setup."}
+            </p>
+          ) : null}
         </CardPanel>
 
         <CardPanel contentClassName="space-y-3">
           <Eyebrow>Test reads</Eyebrow>
           <p className="text-sm text-muted-foreground">
             Upload known filled sheets for this chassis at{" "}
-            <Link href="/setup" className="text-accent hover:underline">
-              /setup
+            <Link href="/cars" className="text-accent hover:underline">
+              /cars
             </Link>
             , then open each document below and compare every extracted value against the sheet.
             Green-light the calibration once 1–3 sheets read perfectly.

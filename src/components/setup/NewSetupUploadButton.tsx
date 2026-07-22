@@ -44,6 +44,15 @@ export function NewSetupUploadButton({
 
   const busy = stage !== "idle" && stage !== "done";
 
+  /**
+   * Setups attach to a car, so with no cars there is nothing to upload against.
+   * A pre-resolved car or a sheet-model target (model authoring, not a driver's
+   * setup) both satisfy that. Checked up front rather than after a file is
+   * chosen — the old post-hoc error let PDFs through entirely and only told
+   * image users once they'd already picked a file.
+   */
+  const needsCar = !defaultSetupSheetModelId && !defaultCarId && cars.length === 0;
+
   function clearStageTimers() {
     for (const id of stageTimersRef.current) window.clearTimeout(id);
     stageTimersRef.current = [];
@@ -93,13 +102,15 @@ export function NewSetupUploadButton({
   /** Route a chosen file: PDFs upload straight away; images need a car first. */
   const handleFile = useCallback(
     (file: File) => {
+      // Belt-and-braces: the controls are disabled when `needsCar`, but a paste
+      // can still reach here. PDFs used to skip this and upload with no car.
+      if (!defaultSetupSheetModelId && !defaultCarId && cars.length === 0) {
+        setError("Add a car first — setups attach to one of your cars.");
+        return;
+      }
       const isImage = (file.type || "").toLowerCase().startsWith("image/");
       if (!isImage || defaultSetupSheetModelId || defaultCarId) {
         void upload(file, defaultCarId);
-        return;
-      }
-      if (cars.length === 0) {
-        setError("Add a car first — setups attach to one of your cars.");
         return;
       }
       if (cars.length === 1) {
@@ -167,9 +178,9 @@ export function NewSetupUploadButton({
         <button
           type="button"
           onClick={openFilePicker}
-          disabled={busy}
+          disabled={busy || needsCar}
           className="rounded-md border border-primary/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
-          title="Upload a setup sheet (PDF or image)"
+          title={needsCar ? "Add a car first" : "Upload a setup sheet (PDF or image)"}
         >
           {stageLabel(stage)}
         </button>
@@ -177,13 +188,21 @@ export function NewSetupUploadButton({
           type="button"
           onClick={onPasteTap}
           onPaste={onPaste}
-          disabled={busy}
+          disabled={busy || needsCar}
           className="rounded border border-dashed border-border/80 bg-card/40 px-2 py-1 ui-label-meta outline-none focus-visible:ring-1 focus-visible:ring-accent/40 disabled:opacity-60"
-          title="Tap to paste a copied screenshot (or click here, then Ctrl+V)"
+          title={needsCar ? "Add a car first" : "Tap to paste a copied screenshot (or click here, then Ctrl+V)"}
         >
           Paste image
         </button>
       </div>
+      {needsCar ? (
+        <span className="text-xs text-muted-foreground">
+          Add a car first — setups attach to one of your cars.{" "}
+          <Link href="/cars" className="text-primary underline">
+            Add a car
+          </Link>
+        </span>
+      ) : null}
       {pendingImage ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card/60 px-2 py-1.5">
           <span className="text-xs text-muted-foreground">Which car is this for?</span>

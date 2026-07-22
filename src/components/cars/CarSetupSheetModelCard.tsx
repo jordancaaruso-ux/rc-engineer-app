@@ -67,7 +67,7 @@ export function CarSetupSheetModelCard({
         ) : null}
         <li>
           <Link
-            href={`/setup?carId=${encodeURIComponent(carId)}`}
+            href={`/cars?carId=${encodeURIComponent(carId)}`}
             className="text-accent hover:text-accent hover:underline"
           >
             Upload new setup for this car

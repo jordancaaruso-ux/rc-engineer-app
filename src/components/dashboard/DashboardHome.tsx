@@ -3,7 +3,13 @@ import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel"
 import { DashboardDayVerdictCard } from "@/components/dashboard/DashboardDayVerdictCard";
 import { DashboardNextOutingCard } from "@/components/dashboard/DashboardNextOutingCard";
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
+import { DashboardSetupSheetCard } from "@/components/dashboard/DashboardSetupSheetCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
+import { OnboardingIntroCard } from "@/components/onboarding/OnboardingIntroCard";
+import { OnboardingPayoffCard } from "@/components/onboarding/OnboardingPayoffCard";
+import { OnboardingResumeCard } from "@/components/onboarding/OnboardingResumeCard";
+import type { OnboardingView } from "@/lib/onboarding/server";
+import type { SetupSheetPrompt } from "@/lib/setup/setupSheetPrompt";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Reveal } from "@/components/ui/Reveal";
 
@@ -27,10 +33,16 @@ import { Reveal } from "@/components/ui/Reveal";
  */
 export function DashboardHome({
   model,
+  onboarding,
+  setupPrompt,
 }: {
   model: DashboardHomeModel;
   /** IANA zone from rc_tz cookie (UTC until cookie exists). */
   displayTimeZone?: string;
+  /** Guided-intro view; every card in it derives and self-retires. */
+  onboarding?: OnboardingView;
+  /** Set when they have a car but no setup at all; null once one exists. */
+  setupPrompt?: SetupSheetPrompt | null;
 }) {
   const {
     featuredEvent,
@@ -62,6 +74,24 @@ export function DashboardHome({
       </header>
 
       <section className="page-body max-w-3xl">
+        {/* Guided intro (founder-locked 2026-07-22, round 3) — one moment at a
+            time: arrival card for a truly-empty account, payoff card when the
+            garage just became ready, resume checklist in between. All derive
+            from what the driver HAS, so each retires itself. */}
+        {onboarding?.showIntro ? (
+          <Reveal index={0}>
+            <OnboardingIntroCard />
+          </Reveal>
+        ) : onboarding?.showPayoff ? (
+          <Reveal index={0}>
+            <OnboardingPayoffCard progress={onboarding.progress} />
+          </Reveal>
+        ) : onboarding?.progress.showResumeCard ? (
+          <Reveal index={0}>
+            <OnboardingResumeCard progress={onboarding.progress} />
+          </Reveal>
+        ) : null}
+
         {/* The primary action always leads — the single unmissable run entry point. */}
         <Reveal index={0}>
           <DashboardStartRunCta
@@ -69,6 +99,15 @@ export function DashboardHome({
             serverDraftSavedAt={todayDraftSavedAt}
           />
         </Reveal>
+
+        {/* Sits UNDER the run CTA on purpose: it's a standing ask, not today's
+            action. Hidden until the guided intro is over — one nag at a time. */}
+        {setupPrompt &&
+        (!onboarding || (onboarding.progress.complete && !onboarding.showPayoff)) ? (
+          <Reveal index={1}>
+            <DashboardSetupSheetCard prompt={setupPrompt} />
+          </Reveal>
+        ) : null}
 
         {isTrackDay ? (
           <>

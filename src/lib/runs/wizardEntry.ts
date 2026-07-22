@@ -134,8 +134,19 @@ export function deriveEditEntry(run: {
   };
 }
 
-/** Blank new-log context (deep-linked event honoured; GPS fills the track in-form). */
-export function deriveFreshEntry(carId: string, currentEventId: string | null): NewRunWizardEntry {
+/**
+ * Blank new-log context (deep-linked event honoured; GPS fills the track in-form).
+ *
+ * `homeTrackId` only applies to a driver with no run history — someone who just
+ * told the set-up wizard where they race and would otherwise be met with
+ * "track needed" on the very next screen (caught in the browser 2026-07-22).
+ * Once they have runs, prefill is the manifest card's job, not this.
+ */
+export function deriveFreshEntry(
+  carId: string,
+  currentEventId: string | null,
+  homeTrackId: string | null = null
+): NewRunWizardEntry {
   if (currentEventId) {
     return {
       carId,
@@ -156,7 +167,7 @@ export function deriveFreshEntry(carId: string, currentEventId: string | null): 
     meetingSessionType: null,
     sessionLabel: null,
     eventId: null,
-    trackId: null,
+    trackId: homeTrackId,
     trackLayoutId: null,
     trackDirection: null,
   };

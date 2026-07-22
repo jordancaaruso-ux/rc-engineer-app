@@ -51,14 +51,17 @@ export async function POST(request: Request) {
   const name = body.name?.trim() || "Setup sheet calibration";
   const sourceType = body.sourceType?.trim() || "awesomatix_pdf";
   let inheritedExampleDocumentId: string | null = null;
+  let inheritedSetupSheetModelId: string | null = null;
   if (body.clonedFromCalibrationId?.trim()) {
     const base = await prisma.setupSheetCalibration.findFirst({
       where: calibrationReadableByIdWhere(body.clonedFromCalibrationId.trim()),
-      select: { exampleDocumentId: true },
+      select: { exampleDocumentId: true, setupSheetModelId: true },
     });
     inheritedExampleDocumentId = base?.exampleDocumentId ?? null;
+    inheritedSetupSheetModelId = base?.setupSheetModelId ?? null;
   }
-  let setupSheetModelId = body.setupSheetModelId?.trim() || null;
+  // A copy keeps its chassis link, else it lands unmappable (no parameter list to map against).
+  let setupSheetModelId = body.setupSheetModelId?.trim() || inheritedSetupSheetModelId;
   if (setupSheetModelId) {
     const model = await prisma.setupSheetModel.findUnique({
       where: { id: setupSheetModelId },

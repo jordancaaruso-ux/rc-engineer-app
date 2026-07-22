@@ -34,6 +34,9 @@ export function isHiddenNavRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
   if (pathname === "/login" || pathname.startsWith("/login/")) return true;
   if (pathname === "/privacy") return true;
+  // The set-up wizard is a takeover: nav chrome undercuts that, and the dock's
+  // Log-run circle would jump a car-less new user straight past it.
+  if (pathname === "/welcome") return true;
   if (pathname.startsWith("/api/")) return true;
   return false;
 }
@@ -205,9 +208,11 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
     eyebrow: "My assets",
     links: [
       {
+        // Absorbed the old "My setups" entry (2026-07-22): a setup belongs to a car, so both
+        // questions get one answer. `/setup` redirects here.
         href: "/cars",
-        label: "Cars",
-        description: "Your cars — name each one and link it to a chassis type.",
+        label: "Cars & setups",
+        description: "Your cars and every setup on them.",
         icon: "car",
       },
       {
@@ -215,12 +220,6 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
         label: "Tires",
         description: "Your tire sets and run wear history.",
         icon: "disc",
-      },
-      {
-        href: "/setup",
-        label: "My setups",
-        description: "Your setup documents and bulk import.",
-        icon: "wrench",
       },
     ],
   },

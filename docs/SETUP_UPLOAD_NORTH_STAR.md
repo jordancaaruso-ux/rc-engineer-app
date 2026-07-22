@@ -1,6 +1,6 @@
 # Setup Upload North Star — any sheet, accurate every time
 
-**Status:** Locked from founder interview (2026-07-06). **Owner:** Jordan.
+**Status:** Locked from founder interview (2026-07-06); public-release strategy added 2026-07-20. **Owner:** Jordan.
 
 Governs the setup-sheet upload/extraction system. Sits under `PRODUCT_NORTH_STAR.md`
 (pillar 7 — garage & catalog; enables the 6-month "seamless to add new car models"
@@ -311,6 +311,73 @@ as the bar, user-visible calibrations), **these govern**:
   workbench need it: text transcription on calibrated crops, box/label drafting from blanks,
   and prefilling admin test-read comparisons.
 
+### Public-release strategy (founder interview 2026-07-20, five rounds)
+
+Triggered by "can anyone upload any setup for any car when the app goes public?" Where
+these rulings conflict with earlier framing, **they govern**.
+
+**Verdict on the ultimate goal:** not fully automatic, but honestly achievable in this
+form — any model whose manufacturer publishes a **fillable (AcroForm) blank PDF** gets
+calibrated fast by the founder with AI doing the heavy lifting; the founder's read is
+that **most top brands publish one**. Everything else degrades honestly (below).
+
+1. **Trust is absolute.** "A semi-working setup sheet reduces trust immediately" —
+   never show half-read values. Parked/pending until verified stands. This also
+   **rejects a user-facing calibration wizard**: users never calibrate, no
+   trusted-user tier for now (revisit only if new-model volume swamps the founder).
+2. **The architecture is streamlined-founder-calibration, not full-auto.** Corrected
+   mid-interview: the MTC3 loop's free ground truth existed only *because* a founder
+   calibration already defined field meaning. The blank gives geometry for free; the
+   **meaning layer** (names, groups, one-of-many vs many-of-many, conventions,
+   universal params) is AI-*drafted* but founder-*approved* — he reviews, never
+   authors. One human calibration then unlocks **both lanes**: the MTC3-style
+   fill→render→read-back→diff loop converts it to image detection automatically and
+   self-verifies against the PDF lane.
+3. **The measured time sink is volume, not difficulty** (MTC3/X4'26 experience):
+   authoring choice groups/checkboxes and verifying names across ~200 fields — not
+   cryptic field names, not conventions, not misread-chasing. The workbench therefore
+   optimizes **bulk review throughput**: proof-overlay (AI's understanding drawn on
+   the sheet — groups color-coded, names at each box; verify by glancing at the sheet,
+   not a 200-row list), group-at-a-time confirm, evidence crop beside every field.
+4. **New-car UX = pending → appears.** Unknown model: sheet attaches instantly as an
+   image, viewable on runs + compare — and **nothing more** during pending (no typed
+   essentials, no Engineer-reads-the-image). Values appear retroactively when the
+   model is green-lit (parked docs re-extract, per round 4).
+5. **No-blank models (image-only brands, discontinued cars): picture-only forever is
+   fine.** No image-drafting fallback lane, no hand-calibration promise. Softens
+   round 4's "pings the admin to calibrate" — models without a fillable blank simply
+   stay pictures.
+6. **Digital-only at launch.** Handwritten paper photos stay out of scope until they
+   clear the Stage 3 eval bar (reaffirms Stage 3 gating).
+7. **Pre-launch: pre-ingest sweep.** Collect fillable blanks for the popular
+   touring/off-road models and calibrate them ahead of time, so most public uploads
+   hit an already-verified model and pending is rare. Key metric: **founder-minutes
+   per model** — at ~20 min, 30–50 models is a couple of weekends.
+8. **Display direction: mirror the sheet's own layout** (values rendered in the
+   sheet's positions/groups — coordinates are free) so grouping never has to be
+   re-invented — **prototype via artifact before committing**; scope (all cars vs
+   auto-learned only) undecided.
+9. **Sequencing: workbench first**, bulk aggregation lane after.
+
+**Code-audit inventory (2026-07-20) — the workbench is assembly, not invention.**
+Already built and refined: the PDF calibration editor (click-widget-to-map, quick-add
+with inferred key/type/section, group creation with one-of-many/many-of-many
+inference, widget-ownership guards); the blank-sheet AI drafter wired in-app
+(`draft-from-pdf`, geometry + batched coordinate-guided labels + universal params);
+the image editor with seeded boxes + detect-boxes click-to-assign; in-app green-light
+with `fieldsNeedingRecheck`; fingerprint auto-pick with empty-shell + cross-model
+guards; silent region-detection import; ~14 hard-won image-pipeline refinements
+(redness marks, center measurement, Otsu, content-box alignment, consensus OCR…) —
+**no engine rebuilds, ever**. Genuinely missing, all glue: **(a)** one unified home
+for the flow (today it spans the wizard, schema editor, two calibration editors, and
+npm scripts), **(b)** test-read side-by-side UI behind the green-light, **(c)** the
+MTC3 self-test as an in-app button (productizing it should call the production
+pipeline directly, shrinking the `mtc3-common.ts` hand-mirror regression trap),
+**(d)** the proof-overlay review layer, plus the routing bug below. Backlog, not
+build-now: a "code-filling" pass (founder types matching codes into blank-PDF boxes to
+declare groups spatially — deterministic via AcroForm read-back; build only if group
+errors still eat time after 2–3 cars through the workbench).
+
 **Known bug (found 2026-07-07, unfixed):** every calibration link routes to
 `/setup-calibrations/[id]`, which unconditionally renders the PDF form editor
 (`SetupCalibrationEditorClient`); an image calibration (e.g. "Xray X4'26 — blank sheet (auto)",
@@ -437,6 +504,25 @@ aggregations for that parameter.
 - Gated entirely on the Stage 0 eval bar. Adds deskew/lighting normalization and
   handwriting (vision-LLM crops, not classical OCR). If it can't clear
   correct-or-flagged ≥95%, it doesn't ship.
+
+---
+
+## Where setups live — "My setups" is car-first (founder interview 2026-07-22)
+
+Uploading is only half the job; the other half is finding a setup again. Garage › **My setups**
+(`/setup`) is a **car index**, not a document list — the old "Downloaded setups" / "Setups from
+runs" split organised by provenance, which is never how a driver looks for a setup.
+
+| Surface | Contents |
+|---|---|
+| `/setup` | One row per car (saved + uploaded counts, last run). Upload button stays here. Sheets with no car, and the admin link, sit at the bottom. |
+| `/setup/[carId]` | Three grouped sections: **Saved setups** (`SetupSnapshot.isLibrary`, via `CarSetupsCard`) · **Uploaded sheets** (`SetupDocument`) · **From runs**. |
+| `/setup/[carId]/[setupId]` | Read-only sheet (`SetupSheetView readOnly`). Edit only for saved setups — run history is immutable. PDF + Open run alongside. |
+| `/setup/admin` | Calibrations list + bulk import / comparison / aggregation debug. Admin-only. |
+
+**From runs shows only runs where the setup actually changed** — filtered on the
+`setupDeltaJson` audit written at log time (`/api/runs`), plus runs with no baseline at all
+(pre-library history). A run that reused the previous setup unchanged adds no row.
 
 ---
 

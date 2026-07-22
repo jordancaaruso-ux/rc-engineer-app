@@ -30,6 +30,11 @@ export type UploadSetupCar = {
   name: string;
   /** Chassis / setup sheet model name, when the car has one (e.g. "Mugen MTC3"). */
   chassisName: string | null;
+  /**
+   * True when this car's chassis has a green-lit calibration, so a sheet upload actually reads
+   * values. False cars skip the upload doors and go straight to the create-a-setup flow.
+   */
+  supportsUpload: boolean;
 };
 
 type UploadStage = "idle" | "uploading" | "matching" | "creating";
@@ -90,8 +95,14 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
     setMismatch(null);
     setPendingFile(null);
     if (cars.length === 1) {
-      // One car — the question answers itself; land straight on the doors.
-      setCarId(cars[0]!.id);
+      // One car — the question answers itself; land straight on the doors, or on the create flow
+      // when that car can't be read from a sheet.
+      const only = cars[0]!;
+      if (!only.supportsUpload) {
+        goToCreateSetup(only.id);
+        return;
+      }
+      setCarId(only.id);
       setStep("doors");
     } else {
       setCarId(null);
@@ -136,7 +147,21 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
     [router]
   );
 
+  /**
+   * A car whose chassis has no green-lit calibration can't be read from a sheet, so it skips the
+   * upload doors entirely and goes to the create-a-setup flow — the primary path now.
+   */
+  function goToCreateSetup(id: string) {
+    setOpen(false);
+    router.push(`/cars/${id}/setups/new`);
+  }
+
   function pickCar(id: string) {
+    const car = cars.find((c) => c.id === id);
+    if (car && !car.supportsUpload) {
+      goToCreateSetup(id);
+      return;
+    }
     setCarId(id);
     setError(null);
     setStep("doors");
@@ -204,7 +229,7 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
           <FileUp className="size-4" strokeWidth={2} />
         </span>
         <span className="min-w-0 flex-1 text-[14px] font-semibold tracking-tight text-foreground">
-          Upload setup sheet
+          Create / Upload setup sheet
         </span>
         <ArrowRight className="size-4 shrink-0 text-primary" strokeWidth={2} aria-hidden />
       </button>
@@ -238,7 +263,7 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
               )}
               role="dialog"
               aria-modal="true"
-              aria-label="Upload setup sheet"
+              aria-label="Create or upload setup sheet"
               onClick={closeSheet}
             >
               <div
@@ -253,7 +278,7 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
                 </div>
                 <div className="flex items-center justify-between px-4 pb-1 pt-2.5">
                   <h2 className="text-[15px] font-bold tracking-tight text-foreground">
-                    Upload setup sheet
+                    Create / Upload setup sheet
                   </h2>
                   <button
                     type="button"
@@ -321,6 +346,10 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
                       <p className="pb-1 text-[13px] text-muted-foreground">
                         Which car is this setup for?
                       </p>
+                      <p className="pb-1 text-[12px] text-muted-foreground">
+                        Cars marked <span className="font-medium">Sheet upload</span> can read a
+                        setup sheet; the rest open a new setup to fill in.
+                      </p>
                       <ul className="divide-y divide-border">
                         {cars.map((car) => (
                           <li key={car.id}>
@@ -339,6 +368,11 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
                                   </span>
                                 ) : null}
                               </span>
+                              {car.supportsUpload ? (
+                                <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                  Sheet upload
+                                </span>
+                              ) : null}
                               <ChevronRight
                                 className="size-4 shrink-0 text-muted-foreground"
                                 strokeWidth={2}

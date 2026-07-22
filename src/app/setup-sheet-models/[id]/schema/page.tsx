@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { canEditSetupSheetModel } from "@/lib/setupSheetModels/modelAccess";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { SetupSheetModelSchemaPageClient } from "@/components/setup-sheet-models/SetupSheetModelSchemaPageClient";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 
@@ -103,6 +104,7 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
           initialTab={initialTab}
           returnTo={returnTo}
           canEdit={canEditSetupSheetModel(user, model)}
+          isAdmin={isAuthAdminEmail(user.email)}
         />
       </section>
     </>

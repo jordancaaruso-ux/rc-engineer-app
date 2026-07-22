@@ -544,8 +544,10 @@ export function SetupDocumentReviewClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: calibrationName.trim() || "Setup sheet calibration",
-          sourceType: doc.mimeType === "application/pdf" ? "awesomatix_pdf" : "awesomatix_image_v1",
+          sourceType: doc.mimeType === "application/pdf" ? "pdf" : "image_v1",
           exampleDocumentId: doc.id,
+          // Without the chassis link the calibration has no parameter list and can't be mapped.
+          setupSheetModelId: liveDoc.setupSheetModelId ?? null,
           calibrationDataJson: {
             templateType: "pdf_form_fields",
             documentMeta: { lineGroupingEpsilon: 2.5 },
@@ -585,8 +587,10 @@ export function SetupDocumentReviewClient({
           error?: string;
           parsedData?: unknown;
           importedKeys?: string[];
-          importedCount?: number;
+          importedCount?: number | null;
           calibration?: { name?: string };
+          deferToProcess?: boolean;
+          sourceType?: string;
           formImportDebug?: Array<{
             appKey: string;
             pdfFieldName?: string;
@@ -601,18 +605,33 @@ export function SetupDocumentReviewClient({
           setStatus(null);
           return;
         }
-        const next = postProcessImportedSetup(
-          normalizeSetupData(data.parsedData ?? {}),
-          useA800SheetPostProcess(liveDoc)
-        );
-        const imported = new Set(data.importedKeys ?? []);
-        setSetupData(next);
         setLiveDoc((cur) => ({
           ...cur,
           calibrationProfileId: selectedCalibration.id,
           parsedCalibrationProfileId: selectedCalibration.id,
           parsedSetupManuallyEdited: false,
         }));
+        // Image docs read nothing here — kick off /process so the image pipeline actually runs,
+        // instead of the PDF-only dead-end that always shows "no fields matched".
+        if (data.deferToProcess) {
+          setStatus("Reading the image — this can take up to a minute…");
+          const procRes = await fetch(`/api/setup-documents/${doc.id}/process`, { method: "POST" });
+          const procData = (await procRes.json().catch(() => ({}))) as { error?: string; status?: string };
+          if (!procRes.ok && procData.status !== "awaiting_calibration") {
+            setError(procData.error || "Processing failed after apply");
+            setStatus(null);
+            return;
+          }
+          setLiveDoc((cur) => ({ ...cur, importStatus: "PROCESSING" }));
+          setStatus("Calibration selected — reading the image…");
+          return;
+        }
+        const next = postProcessImportedSetup(
+          normalizeSetupData(data.parsedData ?? {}),
+          useA800SheetPostProcess(liveDoc)
+        );
+        const imported = new Set(data.importedKeys ?? []);
+        setSetupData(next);
         setCalibrationHighlightKeys(imported);
         setFormImportDebug(Array.isArray(data.formImportDebug) && data.formImportDebug.length ? data.formImportDebug : null);
         const count = data.importedCount ?? imported.size;
@@ -649,8 +668,10 @@ export function SetupDocumentReviewClient({
           error?: string;
           parsedData?: unknown;
           importedKeys?: string[];
-          importedCount?: number;
+          importedCount?: number | null;
           calibration?: { name?: string };
+          deferToProcess?: boolean;
+          sourceType?: string;
           formImportDebug?: Array<{
             appKey: string;
             pdfFieldName?: string;
@@ -665,41 +686,57 @@ export function SetupDocumentReviewClient({
           setStatus(null);
           return;
         }
-        const imported = new Set(applyData.importedKeys ?? []);
-        const count = applyData.importedCount ?? imported.size;
-        const next = postProcessImportedSetup(
-          normalizeSetupData(applyData.parsedData ?? {}),
-          useA800SheetPostProcess(liveDoc)
-        );
-        setSetupData(next);
         setLiveDoc((cur) => ({
           ...cur,
           calibrationProfileId: selectedCalibration.id,
           parsedCalibrationProfileId: selectedCalibration.id,
           parsedSetupManuallyEdited: false,
         }));
-        setCalibrationHighlightKeys(imported);
-        setFormImportDebug(
-          Array.isArray(applyData.formImportDebug) && applyData.formImportDebug.length
-            ? applyData.formImportDebug
-            : null
-        );
-        if (count === 0) {
-          setError(
-            "No PDF fields matched. Map PDF controls in the calibration editor, then try again."
+        // Image docs extract nothing here — apply-calibration only pins the calibration; the real
+        // read happens in /process below. Skip the PDF-only "no fields matched" branch for them.
+        let appliedCount: number | null = null;
+        if (!applyData.deferToProcess) {
+          const imported = new Set(applyData.importedKeys ?? []);
+          const count = applyData.importedCount ?? imported.size;
+          appliedCount = count;
+          const next = postProcessImportedSetup(
+            normalizeSetupData(applyData.parsedData ?? {}),
+            useA800SheetPostProcess(liveDoc)
           );
-          setStatus(null);
-          return;
+          setSetupData(next);
+          setCalibrationHighlightKeys(imported);
+          setFormImportDebug(
+            Array.isArray(applyData.formImportDebug) && applyData.formImportDebug.length
+              ? applyData.formImportDebug
+              : null
+          );
+          if (count === 0) {
+            setError(
+              "No PDF fields matched. Map PDF controls in the calibration editor, then try again."
+            );
+            setStatus(null);
+            return;
+          }
+        } else {
+          setStatus("Reading the image — this can take up to a minute…");
         }
         const procRes = await fetch(`/api/setup-documents/${doc.id}/process`, { method: "POST" });
         const procData = (await procRes.json().catch(() => ({}))) as { error?: string; status?: string };
         if (!procRes.ok && procData.status !== "awaiting_calibration") {
           setError(procData.error || "Processing failed after apply");
-          setStatus(`Applied ${count} fields; processing did not start.`);
+          setStatus(
+            appliedCount === null
+              ? "Calibration selected; processing did not start."
+              : `Applied ${appliedCount} fields; processing did not start.`
+          );
           return;
         }
         setLiveDoc((cur) => ({ ...cur, importStatus: "PROCESSING" }));
-        setStatus(`Applied ${count} fields and started processing.`);
+        setStatus(
+          appliedCount === null
+            ? "Calibration selected — reading the image…"
+            : `Applied ${appliedCount} fields and started processing.`
+        );
       } catch {
         setError("Failed to apply calibration and process");
         setStatus(null);

@@ -19,6 +19,7 @@ import { NewRunCopyLastRunSlot } from "@/components/runs/NewRunCopyLastRunSlot";
 import { decodeLabFields } from "@/lib/rollCenter/labState";
 import { LogRunWizardHost } from "@/components/runs/LogRunWizardHost";
 import { toEntryCandidate } from "@/lib/runs/entryCandidate";
+import { platformForChassisSlug } from "@/lib/cars/chassisPlatform";
 
 export default async function NewRunPage({
   searchParams,
@@ -89,9 +90,11 @@ export default async function NewRunPage({
         id: true,
         name: true,
         createdAt: true,
-        carClass: true,
         setupSheetTemplate: true,
         setupSheetModelId: true,
+        // Chassis slug → platform for the car-swap tire rule (replaces the dropped
+        // `Car.carClass` picker; drivers never see it).
+        setupSheetModel: { select: { slug: true } },
       },
     }),
     prisma.run.groupBy({
@@ -122,11 +125,17 @@ export default async function NewRunPage({
   const lastRunAtByCar = new Map(
     carLastRuns.map((g) => [g.carId, g._max.createdAt?.getTime() ?? 0]),
   );
-  const cars = [...carsByCreated].sort(
-    (a, b) =>
-      Math.max(lastRunAtByCar.get(b.id) ?? 0, b.createdAt.getTime()) -
-      Math.max(lastRunAtByCar.get(a.id) ?? 0, a.createdAt.getTime()),
-  );
+  const cars = [...carsByCreated]
+    .sort(
+      (a, b) =>
+        Math.max(lastRunAtByCar.get(b.id) ?? 0, b.createdAt.getTime()) -
+        Math.max(lastRunAtByCar.get(a.id) ?? 0, a.createdAt.getTime()),
+    )
+    .map(({ setupSheetModel, ...c }) => ({
+      ...c,
+      // Unknown chassis → null → treated as the same platform, so tires still carry.
+      platform: platformForChassisSlug(setupSheetModel?.slug),
+    }));
 
   const favSet = new Set(favouriteTrackIds);
   const favouriteTracks = allTracks.filter((t) => favSet.has(t.id));
@@ -179,6 +188,10 @@ export default async function NewRunPage({
             favouriteTracks={favouriteTracks}
             dashboardPrefill={dashboardPrefill}
             initialCopyPreviewRun={copyPreviewRun}
+            // Runs always carry a car, so an empty groupBy means no runs at all
+            // — a free first-run signal, no extra query.
+            isFirstRun={carLastRuns.length === 0}
+            homeTrackId={favouriteTrackIds[0] ?? null}
           />
         </section>
       </>

@@ -46,9 +46,11 @@ gates everything except `/login`, `/privacy`, `/api/health/*`, `/api/_debug/vers
 
 ## Talk to the founder: short, actionable, plain
 
-Lead with what changed or what to do next. Short messages — don't narrate options you won't take
-or pad with process talk. Plain words; minimal jargon (explain it in one line if unavoidable).
-Code, paths, and commit messages stay precise.
+**Answer in dot points, one line each.** No preamble, no closing summary paragraph, no narrating
+options you won't take. **Never cap the number of points to hit a length target** — say everything
+that matters, just say each thing in one line. Lead with what changed or what to do next. Plain
+words; minimal jargon (explain it in one line if unavoidable). Code, paths, and commit messages
+stay precise.
 
 ## Where to read before you start
 
@@ -69,6 +71,7 @@ Find your task; read that doc first. If nothing matches, you don't need one.
 | iOS shell, Capacitor, TestFlight, native push | `docs/TESTFLIGHT.md` |
 | Who can see or create what (access tiers, IDOR, global catalogs) | `docs/ASSET_ACCESS_NORTH_STAR.md` + `.cursor/skills/security-architect/SKILL.md` |
 | Handling / rating capture on the run form | `docs/HANDLING_CAPTURE_NORTH_STAR.md` |
+| First-run experience, empty states, `/welcome` set-up wizard | `docs/ONBOARDING_NORTH_STAR.md` |
 | Race results, trophies | `docs/RESULTS_TROPHIES_NORTH_STAR.md` |
 | Writing vehicle-dynamics KB drafts | `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md` |
 | Claiming a feature exists, or "fixing" something that looks broken | `docs/NOT_YET_BUILT.md` — a spec is intent, not shipped code |
@@ -89,4 +92,9 @@ file still exists before acting.
 
 `npx tsc --noEmit` → the matching `test:*` → `npx next build` before shipping. Report honestly:
 what changed, what you verified, what still needs eyes. Never call something working you haven't
-seen work. Don't spin up `npm run dev` unless asked (offer if it would settle a real question).
+seen work.
+
+**IMPORTANT — never drive the app. Jordan does it himself.** No `npm run dev`, no headless
+Chrome/CDP screenshots, no clicking through pages. Don't offer to, don't ask permission — it's
+slow and he checks it anyway. Stop at `tsc` + tests + build, then say plainly what you couldn't
+verify and what he should look at.

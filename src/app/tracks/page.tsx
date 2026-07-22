@@ -74,7 +74,9 @@ export default async function TracksPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl">
+        {/* Onboarding guide anchor — the "home track" step rings the list;
+            favouriting (or logging a run at) any track completes it. */}
+        <div className="max-w-2xl" data-guide="track-pick">
           <TrackList initialTracks={sortedTracks} favouriteTrackIds={favouriteTrackIds} />
         </div>
       </section>

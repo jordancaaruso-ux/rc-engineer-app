@@ -67,7 +67,7 @@ The **Priority (draft)** column in the table reflects this guess: navigation/tim
 
 Work through in **Priority** order from the table (after you fill it in). Check when merged.
 
-- [ ] FB-01 Small create car from log run  
+- [~] FB-01 Small create car from log run — **partly done 2026-07-22**: inline "＋ New track" landed in the log-run track picker (`InlineNewTrackRow.tsx`); car creation is covered by the `/welcome` set-up wizard, an in-run "＋ New car" is still open  
 - [ ] FB-02 Create new setup button  
 - [ ] FB-03 Skill level on profile  
 - [ ] FB-04 Goals  

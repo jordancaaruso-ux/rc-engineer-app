@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { calibrationReadableByIdWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import { applyCalibrationToSetupDocument } from "@/lib/setupDocuments/applyCalibrationToDocument";
+import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -31,6 +32,55 @@ export async function POST(request: Request, ctx: Ctx) {
     select: { id: true, name: true },
   });
   if (!calibration) return NextResponse.json({ error: "Calibration not found" }, { status: 404 });
+
+  const doc = await prisma.setupDocument.findFirst({
+    where: { id, userId: user.id },
+    select: { id: true, sourceType: true, mimeType: true },
+  });
+  if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
+
+  // Image extraction only runs inside processImport (extractImageRawDataFromFile +
+  // mapExtractedImageWithCalibration); applyCalibrationToSetupDocument is PDF-only. For an image
+  // doc we set the sticky calibration and let the caller kick off /process, which reads it — a
+  // single OCR pass rather than the misleading PDF-form extraction that always imports 0.
+  const isImage = doc.sourceType === "IMAGE" || (doc.mimeType ?? "").startsWith("image/");
+  if (isImage) {
+    await prisma.setupDocument.update({
+      where: { id: doc.id },
+      data: {
+        calibrationProfileId: effective.calibrationId,
+        calibrationResolvedProfileId: effective.calibrationId,
+        calibrationResolvedSource: effective.source,
+        parsedCalibrationProfileId: null,
+        parsedAt: null,
+        parseStatus: "PENDING",
+        importStatus: "PENDING",
+        importOutcome: null,
+        currentStage: SetupDocumentImportStages.CALIBRATION_SELECTED,
+        parsedSetupManuallyEdited: false,
+      },
+    });
+    console.log(
+      `[setup-documents/apply-calibration] doc=${id} calibration=${effective.calibrationId} source=${effective.source} deferToProcess (image)`
+    );
+    return NextResponse.json(
+      {
+        calibration: { id: calibration.id, name: calibration.name },
+        sourceType: "IMAGE",
+        deferToProcess: true,
+        importedKeys: [],
+        importedCount: null,
+        calibrationUsed: effective,
+      },
+      {
+        status: 200,
+        headers: {
+          "X-Setup-Calibration-Id": effective.calibrationId,
+          "X-Setup-Calibration-Source": effective.source,
+        },
+      }
+    );
+  }
 
   const result = await applyCalibrationToSetupDocument({
     docId: id,

@@ -409,8 +409,8 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             >
               {sourcesReloading ? "Refreshing…" : "Refresh sources"}
             </button>
-            <Link href="/setup" className="text-xs text-muted-foreground hover:text-foreground">
-              Back to Setup
+            <Link href="/cars" className="text-xs text-muted-foreground hover:text-foreground">
+              Back to cars
             </Link>
         </div>
 
