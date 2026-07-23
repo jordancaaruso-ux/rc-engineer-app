@@ -183,8 +183,6 @@ export function CarList({
               setAddOpen((v) => !v);
             }}
             aria-expanded={addOpen}
-            // Onboarding guide anchor — the "add your car" step's yellow ring.
-            data-guide="add-car"
             className="tap-active flex w-full items-center gap-3 px-3 py-3 text-left transition hover:bg-muted/50 sm:px-4"
           >
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-dashed border-border bg-secondary text-muted-foreground">

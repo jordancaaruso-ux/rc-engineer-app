@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type InitialSettings = {
   myName: string;
@@ -31,10 +31,13 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
     kind: "idle",
   });
 
+  const MAX_RETRIES = 3;
+
   async function postSetting(
     url: string,
     payload: Record<string, string | null>,
-    setState: (s: SaveState) => void
+    setState: (s: SaveState) => void,
+    attempt = 0
   ): Promise<boolean> {
     setState({ kind: "saving" });
     try {
@@ -51,9 +54,17 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
       window.setTimeout(() => setState({ kind: "idle" }), 1600);
       return true;
     } catch (err) {
+      // Auto-retry with backoff — there's no Save button to click, so recovery
+      // has to be automatic. The typed value stays in state throughout, so
+      // nothing is lost even if every attempt fails.
+      if (attempt < MAX_RETRIES) {
+        setState({ kind: "error", text: "Couldn’t save — retrying…" });
+        await new Promise((r) => window.setTimeout(r, 1500 * (attempt + 1)));
+        return postSetting(url, payload, setState, attempt + 1);
+      }
       setState({
         kind: "error",
-        text: err instanceof Error ? err.message : "Failed to save",
+        text: err instanceof Error ? err.message : "Couldn’t save — check your connection",
       });
       return false;
     }
@@ -162,10 +173,20 @@ function SettingField({
   label: string;
   value: string;
   onChange: (next: string) => void;
-  onSave: () => void;
+  onSave: () => Promise<boolean>;
   state: SaveState;
   placeholder?: string;
 }) {
+  // Last value we've committed to the server. Blur only writes when the trimmed
+  // value differs, so tabbing through untouched fields costs nothing.
+  const committed = useRef(value);
+
+  async function commit() {
+    if (value.trim() === committed.current.trim()) return;
+    const ok = await onSave();
+    if (ok) committed.current = value;
+  }
+
   return (
     <div className="space-y-1 text-sm">
       <label className="block text-sm font-medium text-foreground">{label}</label>
@@ -174,17 +195,16 @@ function SettingField({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
           placeholder={placeholder}
-          className="w-full min-w-[260px] flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent/50"
+          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent/50"
         />
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={state.kind === "saving"}
-          className="rounded-md border border-border bg-muted/70 px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-60"
-        >
-          {state.kind === "saving" ? "Saving…" : "Save"}
-        </button>
+        {state.kind === "saving" ? (
+          <span className="ui-caption text-muted-foreground">Saving…</span>
+        ) : null}
         {state.kind === "ok" ? <span className="ui-caption text-emerald-600">Saved.</span> : null}
         {state.kind === "error" ? (
           <span className="ui-caption text-destructive">{state.text}</span>

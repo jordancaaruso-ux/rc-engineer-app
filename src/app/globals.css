@@ -1180,54 +1180,8 @@ html.video-overlay-fullscreen-active body {
 
 /* Hairline / glow surfaces retired June 2026 — cards use `.glass-card` (frosted). */
 
-/* ── Onboarding guide: the next required tap pulses ──────────────────────────
-   docs/ONBOARDING_NORTH_STAR.md, founder-locked 2026-07-22 ("follow the yellow").
-   `OnboardingGuideRail` stamps `data-guide-target` on <body>; anchors are
-   either `data-guide` attributes on real controls or, where a stable href
-   exists, plain attribute selectors — so a redesigned surface that drops an
-   anchor silently degrades to tap-the-chip-to-navigate, never breaks. */
-@keyframes guide-pulse {
-  0%, 100% { box-shadow: 0 0 0 1.5px rgb(var(--color-primary) / 0.9); }
-  50% { box-shadow: 0 0 0 1.5px rgb(var(--color-primary) / 0.3); }
-}
-
-/* Dock hop: ring the Garage icon (the tight span around the glyph). */
-body[data-guide-target="dock-garage"] .bottom-nav a[href="/assets"] > span::after {
-  content: "";
-  position: absolute;
-  inset: -9px;
-  border-radius: 9999px;
-  animation: guide-pulse 2.2s ease-in-out infinite;
-  pointer-events: none;
-}
-
-/* Garage-hub hops: the row that leads to the step's page. */
-body[data-guide-target="assets-cars"] main a[href="/cars"],
-body[data-guide-target="assets-tracks"] main a[href="/tracks"],
-body[data-guide-target="assets-tires"] main a[href="/tire-sets"] {
-  border-radius: 12px;
-  animation: guide-pulse 2.2s ease-in-out infinite;
-}
-
-/* On-page targets: the control that completes the step. */
-body[data-guide-target="you-section"] [data-guide="you-section"],
-body[data-guide-target="add-car"] [data-guide="add-car"],
-body[data-guide-target="track-pick"] [data-guide="track-pick"],
-body[data-guide-target="add-tire-set"] [data-guide="add-tire-set"] {
-  border-radius: 14px;
-  animation: guide-pulse 2.2s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body[data-guide-target] .bottom-nav a[href="/assets"] > span::after,
-  body[data-guide-target="assets-cars"] main a[href="/cars"],
-  body[data-guide-target="assets-tracks"] main a[href="/tracks"],
-  body[data-guide-target="assets-tires"] main a[href="/tire-sets"],
-  body[data-guide-target] [data-guide] {
-    animation: none;
-    box-shadow: 0 0 0 1.5px rgb(var(--color-primary) / 0.7);
-  }
-}
+/* The onboarding guide-pulse (`data-guide-target` / `data-guide` anchors) was
+   retired with the guide chip — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23). */
 
 
 

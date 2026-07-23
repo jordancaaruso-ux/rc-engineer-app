@@ -203,81 +203,39 @@ export async function setCurrentPracticeDayUrlSetting(userId: string, value: str
   await setUserSetting(userId, APP_SETTING_KEYS.currentPracticeDayUrl, value);
 }
 
-/* ── Onboarding (docs/ONBOARDING_NORTH_STAR.md) ────────────────────────────── */
+/* ── Onboarding (docs/ONBOARDING_NORTH_STAR.md, reversal 2026-07-23) ─────────── */
 
-/** Steps of the set-up wizard a driver is allowed to skip and be re-offered. */
-export const ONBOARDING_SKIPPABLE_STEPS = ["sheet", "track"] as const;
-export type OnboardingSkippableStep = (typeof ONBOARDING_SKIPPABLE_STEPS)[number];
-
+/**
+ * First-run state. The old guide chip + 4-step progress + "completed"/"skipped"
+ * concepts are gone (2026-07-23): readiness is now DERIVED (a car, a timing
+ * identity, a setup) in `lib/onboarding/server.ts`. Only two flags remain — the
+ * welcome overlay was answered, and the "Get set up" card was dismissed. The old
+ * `onboardingCompletedAt` / `onboardingSkippedSteps` keys are kept (legacy rows,
+ * and the admin reset still clears them) but nothing writes them any more.
+ */
 export type OnboardingState = {
-  /** True once the guided intro has been finished (or explicitly completed later). */
-  completed: boolean;
-  completedAt: string | null;
-  /** Steps they chose to skip — drives the "add it later" re-offers. */
-  skippedSteps: OnboardingSkippableStep[];
-  /** True once they tapped Ignore on the dashboard resume card. */
-  resumeDismissed: boolean;
-  /** True once the dashboard intro card was answered — it never shows twice. */
+  /** True once the welcome overlay was answered — it never shows twice. */
   seen: boolean;
+  /** True once they tapped Ignore on the dashboard "Get set up" card. */
+  resumeDismissed: boolean;
 };
 
-/** Tolerant parse — a hand-edited or legacy value must never break the dashboard. */
-export function parseOnboardingSkippedSteps(raw: string | null): OnboardingSkippableStep[] {
-  if (!raw) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) return [];
-  const allowed = new Set<string>(ONBOARDING_SKIPPABLE_STEPS);
-  const out: OnboardingSkippableStep[] = [];
-  for (const v of parsed) {
-    if (typeof v === "string" && allowed.has(v) && !out.includes(v as OnboardingSkippableStep)) {
-      out.push(v as OnboardingSkippableStep);
-    }
-  }
-  return out;
-}
-
 export async function getOnboardingState(userId: string): Promise<OnboardingState> {
-  const [completedAt, skippedRaw, dismissedAt, seenAt] = await Promise.all([
-    getUserSetting(userId, APP_SETTING_KEYS.onboardingCompletedAt),
-    getUserSetting(userId, APP_SETTING_KEYS.onboardingSkippedSteps),
+  const [dismissedAt, seenAt] = await Promise.all([
     getUserSetting(userId, APP_SETTING_KEYS.onboardingResumeDismissedAt),
     getUserSetting(userId, APP_SETTING_KEYS.onboardingSeenAt),
   ]);
   return {
-    completed: Boolean(completedAt),
-    completedAt: completedAt ?? null,
-    skippedSteps: parseOnboardingSkippedSteps(skippedRaw),
-    resumeDismissed: Boolean(dismissedAt),
     seen: Boolean(seenAt),
+    resumeDismissed: Boolean(dismissedAt),
   };
 }
 
-/** Records that the takeover has fired, so it never fires again. Idempotent. */
+/** Records that the welcome overlay was answered, so it never shows again. Idempotent. */
 export async function markOnboardingSeen(userId: string, when: Date = new Date()): Promise<void> {
   const existing = await getUserSetting(userId, APP_SETTING_KEYS.onboardingSeenAt);
   if (existing) return;
   await setUserSetting(userId, APP_SETTING_KEYS.onboardingSeenAt, when.toISOString());
-}
-
-export async function markOnboardingCompleted(userId: string, when: Date = new Date()): Promise<void> {
-  await setUserSetting(userId, APP_SETTING_KEYS.onboardingCompletedAt, when.toISOString());
-}
-
-export async function setOnboardingSkippedSteps(
-  userId: string,
-  steps: OnboardingSkippableStep[]
-): Promise<void> {
-  const unique = Array.from(new Set(steps));
-  await setUserSetting(
-    userId,
-    APP_SETTING_KEYS.onboardingSkippedSteps,
-    unique.length ? JSON.stringify(unique) : null
-  );
 }
 
 export async function dismissOnboardingResume(userId: string, when: Date = new Date()): Promise<void> {

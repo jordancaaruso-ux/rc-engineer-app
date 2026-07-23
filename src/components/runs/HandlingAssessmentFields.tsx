@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { chipToggleClass } from "@/components/ui/chipToggle";
 import {
@@ -33,7 +33,7 @@ const PHASE_BALANCE_INFO =
   "US (understeer) = the front washes out and the car won't turn in. OS (oversteer) = the rear steps out and the car rotates too much. Mark how it felt through this part of the corner; the centre is neutral.";
 
 const CORNER_SPEEDS: CornerSpeed[] = ["slow", "fast", "both"];
-const SPEED_SHORT: Record<CornerSpeed, string> = { slow: "Slow", fast: "Fast", both: "Both" };
+const SPEED_SHORT: Record<CornerSpeed, string> = { slow: "Low speed", fast: "High speed", both: "Both" };
 const SEVERITIES: Array<1 | 2 | 3> = [1, 2, 3];
 
 /** Flat list of problem chips: bipolar traits (steering feel) contribute two. */
@@ -46,53 +46,68 @@ function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
   return sanitizeHandlingUiState(next);
 }
 
-/** Circle diameter grows toward the extremes (16personalities-style). */
-function circleSizeClass(n: PhaseBalance): string {
-  switch (Math.abs(n)) {
-    case 3:
-      return "h-8 w-8";
-    case 2:
-      return "h-6 w-6";
-    case 1:
-      return "h-5 w-5";
-    default:
-      return "h-4 w-4";
-  }
+// purple-500 / amber-500 as raw triplets so fill opacity can ramp toward the set notch.
+const US_RGB = "168, 85, 247"; // understeer, purple-500
+const OS_RGB = "245, 158, 11"; // oversteer, amber-500
+const SEG_OFF = "#232120"; // unfilled segment (matches LogRunWizardBottomBar track)
+
+/**
+ * Diverging fill for one angled segment at step `p`, given the selected `value`.
+ * This is a balance axis, not a quality axis — the two poles are directions, not good/bad, so it
+ * deliberately avoids the red/green pace-and-quality convention. The fill runs out of the neutral
+ * centre toward the set notch and brightens to its strongest there, so the value reads without a
+ * handle. Amber (not the reserved electric-yellow action colour) marks the oversteer end.
+ */
+function segmentFill(p: PhaseBalance, value: PhaseBalance | null): string {
+  if (value == null) return SEG_OFF;
+  if (p === 0) return value === 0 ? "rgba(160, 157, 150, 0.5)" : SEG_OFF; // grey centre only when neutral is chosen
+  const sameSide = (p < 0 && value < 0) || (p > 0 && value > 0);
+  if (!sameSide || Math.abs(p) > Math.abs(value)) return SEG_OFF;
+  const opacity = 0.5 + 0.5 * (Math.abs(p) / Math.abs(value)); // brightest at the tip
+  return `rgba(${p < 0 ? US_RGB : OS_RGB}, ${opacity})`;
 }
 
-/** Ring/fill color by pole: red (negative) → grey (neutral) → green (positive). */
-function circleColorClass(n: PhaseBalance, selected: boolean): string {
-  if (n < 0) {
-    return selected
-      ? "border-destructive bg-destructive"
-      : "border-destructive/60 hover:border-destructive hover:bg-destructive/10";
-  }
-  if (n > 0) {
-    return selected
-      ? "border-emerald-500 bg-emerald-500"
-      : "border-emerald-500/60 hover:border-emerald-500 hover:bg-emerald-500/10";
-  }
-  return selected
-    ? "border-muted-foreground bg-muted-foreground"
-    : "border-muted-foreground/40 hover:border-muted-foreground/70 hover:bg-muted/60";
+function balanceValueText(value: PhaseBalance | null): string {
+  if (value == null || value === 0) return "neutral";
+  const word = HANDLING_SEVERITY_CHIP_LABELS[Math.abs(value) as 1 | 2 | 3];
+  return `${word} ${value < 0 ? "understeer" : "oversteer"}`;
 }
 
-function BalanceCircleScale({
+/**
+ * Understeer ↔ oversteer balance, −3…+3, as a detented bar of angled (−21°) segments — the same
+ * skew treatment as the Log Run wizard progress bar (LogRunWizardBottomBar). No handle: the fill
+ * runs out of the neutral centre and brightens to the set notch. Tap a notch or drag across.
+ */
+function BalanceScale({
   title,
   info,
-  negLabel,
-  posLabel,
   current,
   onSelect,
 }: {
   title: string;
   info: string;
-  negLabel: string;
-  posLabel: string;
   current: PhaseBalance | null;
   onSelect: (n: PhaseBalance) => void;
 }) {
   const [infoOpen, setInfoOpen] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+
+  const pickFromClientX = (clientX: number) => {
+    const el = barRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const idx = Math.round(frac * (PHASE_BALANCE_LEVELS.length - 1));
+    onSelect(PHASE_BALANCE_LEVELS[idx]);
+  };
+
+  const nudge = (delta: number) => {
+    const idx = PHASE_BALANCE_LEVELS.indexOf(current ?? 0);
+    const next = Math.min(PHASE_BALANCE_LEVELS.length - 1, Math.max(0, idx + delta));
+    onSelect(PHASE_BALANCE_LEVELS[next]);
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
@@ -115,35 +130,58 @@ function BalanceCircleScale({
       {infoOpen ? (
         <p className="text-[10px] leading-snug text-muted-foreground">{info}</p>
       ) : null}
-      <div className="flex items-center" role="radiogroup" aria-label={title}>
-        <span className="w-14 shrink-0 pr-2 text-right text-[10px] font-medium text-destructive/90">
-          {negLabel}
-        </span>
-        <div className="flex flex-1 items-center justify-between px-1">
-          {PHASE_BALANCE_LEVELS.map((n) => {
-            const selected = current === n;
-            return (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={`${n > 0 ? `+${n}` : n} (${
-                  n < 0 ? negLabel : n > 0 ? posLabel : "neutral"
-                })`}
-                onClick={() => onSelect(n)}
-                className={cn(
-                  "rounded-full border-2 bg-transparent transition",
-                  circleSizeClass(n),
-                  circleColorClass(n, selected)
-                )}
+
+      <div
+        ref={barRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={title}
+        aria-valuemin={-3}
+        aria-valuemax={3}
+        aria-valuenow={current ?? 0}
+        aria-valuetext={balanceValueText(current)}
+        onPointerDown={(e) => {
+          draggingRef.current = true;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          pickFromClientX(e.clientX);
+        }}
+        onPointerMove={(e) => {
+          if (draggingRef.current) pickFromClientX(e.clientX);
+        }}
+        onPointerUp={() => {
+          draggingRef.current = false;
+        }}
+        onPointerCancel={() => {
+          draggingRef.current = false;
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+            nudge(1);
+            e.preventDefault();
+          } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+            nudge(-1);
+            e.preventDefault();
+          }
+        }}
+        className="relative h-7 cursor-pointer touch-none rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="absolute inset-x-0 top-1/2 h-[14px] -translate-y-1/2 overflow-hidden rounded-[3px] bg-[#141310] shadow-[inset_0_0_0_1px_#34322f]">
+          <div className="absolute -inset-x-[6px] inset-y-0 flex gap-[3px]" aria-hidden>
+            {PHASE_BALANCE_LEVELS.map((p) => (
+              <span
+                key={p}
+                className="flex-1 -skew-x-[21deg] transition-colors duration-150"
+                style={{ background: segmentFill(p, current) }}
               />
-            );
-          })}
+            ))}
+          </div>
         </div>
-        <span className="w-14 shrink-0 pl-2 text-left text-[10px] font-medium text-emerald-700/90 dark:text-emerald-400/90">
-          {posLabel}
-        </span>
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center text-[10px] font-medium">
+        <span className="text-left text-purple-700/90 dark:text-purple-400/90">◀ Understeer</span>
+        <span className="text-center text-[9px] font-normal text-muted-foreground">neutral</span>
+        <span className="text-right text-amber-700/90 dark:text-amber-400/90">Oversteer ▶</span>
       </div>
     </div>
   );
@@ -159,8 +197,8 @@ function SpeedTagPicker({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-muted-foreground">Where?</span>
-      <div className="flex gap-1" role="group" aria-label="Where does it happen">
+      <span className="text-[10px] text-muted-foreground">Which corners?</span>
+      <div className="flex gap-1" role="group" aria-label="Which corners">
         {CORNER_SPEEDS.map((s) => {
           const selected = value === s;
           return (
@@ -247,16 +285,14 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
               key={stateKey}
               className="border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
             >
-              <BalanceCircleScale
+              <BalanceScale
                 title={label}
                 info={PHASE_BALANCE_INFO}
-                negLabel="US"
-                posLabel="OS"
                 current={rowVal}
                 onSelect={(n) => setPhaseBalance(stateKey, n)}
               />
               {flagged ? (
-                <div className="mt-2 pl-14">
+                <div className="mt-2 pl-0.5">
                   <SpeedTagPicker
                     value={value.speedTags[issueKey]}
                     onChange={(s) => setSpeed(issueKey, s)}

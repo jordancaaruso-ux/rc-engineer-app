@@ -76,16 +76,24 @@ export function SetupFillFlow({
   const [values, setValues] = useState<SetupSnapshotData>(initialValues);
   const [index, setIndex] = useState(0);
   const [showSections, setShowSections] = useState(false);
+  // Raw string the user is typing into a text/number step. Kept separate from the stored value so
+  // an in-progress decimal ("3.") survives keystrokes — coercing on every change turned 3.2 into 32.
+  const [draft, setDraft] = useState("");
   const textRef = useRef<HTMLInputElement | null>(null);
 
   const step = steps[index];
   const atEnd = index >= steps.length;
 
-  // Focus the text/number box on arrival so typing can start immediately; choice steps are taps.
+  // On arrival at a text/number step, seed the draft from the stored value and focus so typing can
+  // start immediately (choice steps are taps). Reseed only on step change, never on commit, so a
+  // committed value doesn't wipe what you're typing.
   useEffect(() => {
     if (step && (step.kind === "text" || step.kind === "number")) {
+      const stored = values[step.key];
+      setDraft(stored == null ? "" : String(stored));
       textRef.current?.focus();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reseed on step change only, not `values`
   }, [index, step]);
 
   const answeredCount = useMemo(
@@ -97,10 +105,25 @@ export function SetupFillFlow({
     setValues((prev) => ({ ...prev, [key]: next }));
   }, []);
 
+  // Commit the raw draft to the stored value, coercing once (not per keystroke). No-op for non-text
+  // steps, so it's safe to call unconditionally before leaving any step.
+  const commitDraft = useCallback(() => {
+    if (!step || (step.kind !== "text" && step.kind !== "number")) return;
+    const coerced = coerceSetupValue(draft);
+    // A number field must never keep a partial/garbage token ("-", ".", "abc"); coerceSetupValue
+    // returns those unchanged as strings, so clear the field instead of storing junk.
+    const next =
+      step.kind === "number" && typeof coerced === "string" && coerced.trim() !== ""
+        ? ""
+        : coerced;
+    setValue(step.key, next);
+  }, [step, draft, setValue]);
+
   const advance = useCallback(() => {
+    commitDraft();
     haptic("light");
     setIndex((i) => Math.min(i + 1, steps.length));
-  }, [steps.length]);
+  }, [commitDraft, steps.length]);
 
   const goBack = useCallback(() => {
     setIndex((i) => Math.max(0, i - 1));
@@ -256,8 +279,9 @@ export function SetupFillFlow({
               inputMode={step.kind === "number" ? "decimal" : "text"}
               enterKeyHint="next"
               placeholder="—"
-              value={current == null ? "" : String(current)}
-              onChange={(e) => setValue(step.key, coerceSetupValue(e.target.value))}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitDraft}
             />
           </form>
         ) : null}

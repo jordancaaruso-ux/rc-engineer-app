@@ -1,9 +1,13 @@
+import { normalizeTireMark } from "@/lib/tires/tireMark";
+
 export type TireSelectionValue = {
   tireTypeId: string;
   /** Optional specific product model for this set. */
   specificModel?: string;
   insert?: string;
   wheel?: string;
+  /** Optional physical mark written on the sidewall (e.g. "7"). */
+  mark?: string;
   /** Denormalized for PDF/export; derived from TireType.displayName */
   displayName?: string;
 };
@@ -27,11 +31,12 @@ export function normalizeTireSelectionFromUnknown(
       typeof v.specificModel === "string" ? v.specificModel.trim() || undefined : undefined;
     const insert = typeof v.insert === "string" ? v.insert.trim() || undefined : undefined;
     const wheel = typeof v.wheel === "string" ? v.wheel.trim() || undefined : undefined;
+    const mark = normalizeTireMark(typeof v.mark === "string" ? v.mark : null) ?? undefined;
     const displayName =
       typeof v.displayName === "string" && v.displayName.trim()
         ? v.displayName.trim()
         : fallbackDisplayName?.trim() || undefined;
-    return { tireTypeId, specificModel, insert, wheel, displayName };
+    return { tireTypeId, specificModel, insert, wheel, mark, displayName };
   }
   return null;
 }
@@ -48,6 +53,7 @@ export function displayTireSelection(
     return t;
   }
   const parts: string[] = [];
+  if (value.mark?.trim()) parts.push(`Marked ${value.mark.trim()}`);
   const name = value.displayName?.trim() || "Tire";
   parts.push(name);
   if (value.specificModel?.trim()) parts.push(value.specificModel.trim());
@@ -64,6 +70,7 @@ export function buildTireSelectionValue(input: {
   specificModel?: string | null;
   insert?: string | null;
   wheel?: string | null;
+  mark?: string | null;
 }): TireSelectionValue {
   return {
     tireTypeId: input.tireTypeId,
@@ -71,6 +78,7 @@ export function buildTireSelectionValue(input: {
     specificModel: input.specificModel?.trim() || undefined,
     insert: input.insert?.trim() || undefined,
     wheel: input.wheel?.trim() || undefined,
+    mark: normalizeTireMark(input.mark) ?? undefined,
   };
 }
 

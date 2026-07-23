@@ -55,8 +55,7 @@ export default async function SettingsPage() {
         </div>
       </header>
       <section className="page-body max-w-2xl">
-        {/* Onboarding guide anchor — the "you" step rings the identity card. */}
-        <div data-guide="you-section">
+        <div>
           <SettingsClient
             initial={{
             myName: myName ?? "",

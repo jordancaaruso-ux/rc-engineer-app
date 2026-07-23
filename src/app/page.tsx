@@ -33,9 +33,9 @@ export default async function DashboardPage(): Promise<ReactNode> {
     getExplicitTimeZoneForRunFormatting(),
   ]);
 
-  // No takeover anymore (founder 2026-07-22, round 3): a truly-empty account
-  // lands HERE, on the real dashboard, with the intro card + guided-intro chip.
-  // The app is the tour — docs/ONBOARDING_NORTH_STAR.md.
+  // A truly-empty account lands HERE, on the real dashboard: the welcome overlay
+  // covers it once, then the "Get set up" card walks the real surfaces. Only a
+  // car is required — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23).
   const [model, onboarding, setupPrompt] = await Promise.all([
     getCachedDashboardHomeModel(user.id, displayTimeZone),
     loadOnboardingView(user.id),

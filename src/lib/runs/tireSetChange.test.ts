@@ -33,6 +33,17 @@ test("every run with a logged set gets an indicator; swaps are flagged changed",
   assert.equal(indicators.get("r1")?.changed, false);
 });
 
+test("a physical mark becomes the set's identity; unmarked sets keep the compound label", () => {
+  const indicators = computeTireIndicatorsByRunId([
+    { id: "r2", carId: "c1", tireSet: { id: "s2", label: "Soft", mark: "7" }, tireRunNumber: 4 },
+    { id: "r1", carId: "c1", tireSet: { id: "s1", label: "Soft" }, tireRunNumber: 3 },
+  ]);
+  assert.equal(indicators.get("r2")?.setLabel, "Marked 7");
+  assert.equal(indicators.get("r2")?.changed, true);
+  assert.equal(indicators.get("r2")?.previousSetLabel, "Soft");
+  assert.equal(indicators.get("r1")?.setLabel, "Soft");
+});
+
 test("runs without a tire set get no indicator and don't break the chain", () => {
   const indicators = computeTireIndicatorsByRunId([
     { id: "r4", carId: "c1", tireSet: set("s2", "Set 2"), tireRunNumber: 1 }, // vs r2's s1 → changed

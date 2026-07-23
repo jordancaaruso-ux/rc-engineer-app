@@ -275,7 +275,7 @@ export function LogRunWizardBottomBar({
     ) : nextId ? (
       <>
         <CtaNotch />
-        {stepLabel(nextId)}
+        Next
         <ArrowRight size={15} weight="bold" aria-hidden />
       </>
     ) : null;

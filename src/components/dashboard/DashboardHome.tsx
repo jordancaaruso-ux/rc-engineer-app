@@ -4,10 +4,9 @@ import { DashboardDayVerdictCard } from "@/components/dashboard/DashboardDayVerd
 import { DashboardNextOutingCard } from "@/components/dashboard/DashboardNextOutingCard";
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
 import { DashboardSetupSheetCard } from "@/components/dashboard/DashboardSetupSheetCard";
+import { DashboardGetSetUpCard } from "@/components/dashboard/DashboardGetSetUpCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
-import { OnboardingIntroCard } from "@/components/onboarding/OnboardingIntroCard";
-import { OnboardingPayoffCard } from "@/components/onboarding/OnboardingPayoffCard";
-import { OnboardingResumeCard } from "@/components/onboarding/OnboardingResumeCard";
+import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
 import type { OnboardingView } from "@/lib/onboarding/server";
 import type { SetupSheetPrompt } from "@/lib/setup/setupSheetPrompt";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -65,6 +64,13 @@ export function DashboardHome({
 
   const nextEvent = featuredEvent?.status === "next" ? featuredEvent : null;
 
+  // First-run readiness (docs/ONBOARDING_NORTH_STAR.md, reversal 2026-07-23).
+  // Only a car is required; the card carries the payoff + advised timing/setup and
+  // self-retires once the garage is ready, a run exists, or it's dismissed.
+  const ob = onboarding;
+  const setupReady = ob ? ob.hasCar && ob.hasTimingIdentity && ob.hasSetup : true;
+  const showGetSetUp = Boolean(ob && !ob.dismissed && !ob.hasAnyRun && !setupReady);
+
   return (
     <>
       <header className="page-header">
@@ -74,21 +80,18 @@ export function DashboardHome({
       </header>
 
       <section className="page-body max-w-3xl">
-        {/* Guided intro (founder-locked 2026-07-22, round 3) — one moment at a
-            time: arrival card for a truly-empty account, payoff card when the
-            garage just became ready, resume checklist in between. All derive
-            from what the driver HAS, so each retires itself. */}
-        {onboarding?.showIntro ? (
+        {/* First run (docs/ONBOARDING_NORTH_STAR.md, reversal 2026-07-23): the
+            welcome overlay covers a truly-empty account once, then the one
+            "Get set up" card leads. Both derive from what the driver HAS. */}
+        {ob?.showIntro ? <WelcomeScreen /> : null}
+        {showGetSetUp && ob ? (
           <Reveal index={0}>
-            <OnboardingIntroCard />
-          </Reveal>
-        ) : onboarding?.showPayoff ? (
-          <Reveal index={0}>
-            <OnboardingPayoffCard progress={onboarding.progress} />
-          </Reveal>
-        ) : onboarding?.progress.showResumeCard ? (
-          <Reveal index={0}>
-            <OnboardingResumeCard progress={onboarding.progress} />
+            <DashboardGetSetUpCard
+              hasCar={ob.hasCar}
+              hasTimingIdentity={ob.hasTimingIdentity}
+              hasSetup={ob.hasSetup}
+              setupCars={setupPrompt?.cars ?? []}
+            />
           </Reveal>
         ) : null}
 
@@ -101,9 +104,9 @@ export function DashboardHome({
         </Reveal>
 
         {/* Sits UNDER the run CTA on purpose: it's a standing ask, not today's
-            action. Hidden until the guided intro is over — one nag at a time. */}
-        {setupPrompt &&
-        (!onboarding || (onboarding.progress.complete && !onboarding.showPayoff)) ? (
+            action. The Get-set-up card owns the setup ask while it's up, so this
+            only shows once that card is gone — one nag at a time. */}
+        {setupPrompt && !showGetSetUp ? (
           <Reveal index={1}>
             <DashboardSetupSheetCard prompt={setupPrompt} />
           </Reveal>
