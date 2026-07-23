@@ -141,23 +141,18 @@ function LoginForm() {
     }
   }
 
-  /** Google needs the same allowlist row, so redeem with the typed email first. */
+  /**
+   * Empty email box → straight to Google like normal SSO; the `signIn` callback still enforces
+   * the allowlist and bounces a non-approved account back here with ?error=AccessDenied (which
+   * prompts for an access code). Email typed → redeem first, so a valid access code allowlists
+   * the address before the OAuth hop (self-serve signup in one round-trip).
+   */
   async function onGoogleSignIn() {
     setError(null);
     const normalized = email.trim().toLowerCase();
-    if (!normalized.includes("@")) {
-      setError(
-        accessCodeEnabled
-          ? "Enter your email and access code first, then continue with Google."
-          : "Enter your email first, then continue with Google."
-      );
-      return;
-    }
     setPending(true);
     try {
-      if (!(await redeemAccess(normalized))) return;
-      // Sign in with the *same* address you typed — a different Google account isn't allowlisted
-      // by the redemption above and lands back here with AccessDenied.
+      if (normalized.includes("@") && !(await redeemAccess(normalized))) return;
       await signIn("google", { callbackUrl });
     } finally {
       setPending(false);
