@@ -71,6 +71,7 @@
     "test:extract-normalize": "npx tsx src/lib/setupExtractAi/normalizeExtractedValue.test.ts",
     "test:auth-access-code": "npx tsx src/lib/auth/signupAccessCode.test.ts",
     "test:ai-usage": "npx tsx src/lib/aiUsage/budgets.test.ts",
+    "test:entitlement": "npx tsx src/lib/entitlementLogic.test.ts && npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx src/lib/entitlement.test.ts",
     "setup-extract:eval": "npx dotenv-cli -e .env.local -- npx tsx scripts/setup-extract-eval/run-eval.ts",
     "setup-extract:review": "npx tsx scripts/setup-extract-eval/build-review-page.ts",
     "setup-extract:demo": "npx dotenv-cli -e .env.local -- npx tsx scripts/setup-extract-eval/demo-upload.ts",
@@ -97,6 +98,7 @@
     "db:dedupe:setup-models": "npx dotenv-cli -e .env.local -- npx tsx scripts/dedupe-setup-sheet-models.ts",
     "db:dedupe:events": "npx dotenv-cli -e .env.local -- npx tsx scripts/dedupe-events.ts",
     "db:seed:additives": "npx dotenv-cli -e .env.local -- npx tsx scripts/sync-additive-types.ts",
+    "stripe:setup-prices": "npx dotenv-cli -e .env.local -- npx tsx scripts/stripe-setup-prices.ts",
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios"
   },
@@ -133,6 +135,7 @@
     "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
+    "stripe": "^22.3.2",
     "tailwind-merge": "^2.2.1",
     "web-push": "^3.6.7"
   },

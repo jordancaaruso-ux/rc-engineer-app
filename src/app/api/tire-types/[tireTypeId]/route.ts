@@ -81,6 +81,15 @@ export async function PATCH(
 
   const displayName = body?.displayName?.trim();
   if (!displayName) {
+    // Verify-only PATCH (admin approving from the review queue) — no name/code change.
+    if ("verifiedAt" in verifiedData) {
+      const tireType = await prisma.tireType.update({
+        where: { id: tireTypeId },
+        data: verifiedData,
+        select: { id: true, displayName: true, modelCode: true, verifiedAt: true },
+      });
+      return NextResponse.json({ tireType });
+    }
     return NextResponse.json({ error: "displayName is required" }, { status: 400 });
   }
 

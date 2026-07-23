@@ -70,6 +70,14 @@ async function notifyAdminsOfChassisRequest(
   }
 }
 
+/** Marks a request handled so it drops off the review queue (admin dismiss or after promotion). */
+export async function resolveChassisTypeRequest(id: string): Promise<void> {
+  await prisma.chassisTypeRequest.update({
+    where: { id },
+    data: { resolvedAt: new Date() },
+  });
+}
+
 export type PendingChassisRequest = {
   id: string;
   requestedName: string;

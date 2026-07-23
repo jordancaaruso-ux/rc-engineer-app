@@ -11,6 +11,7 @@ import {
   DOMINANT_TRACK_ORDER_BY,
   dominantTrackByNameWhere,
 } from "@/lib/tracks/trackCatalogDominance";
+import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -168,6 +169,11 @@ export async function POST(request: Request) {
       await addTrackToFavourites(user.id, track.id);
     }
     revalidateAfterTrackMutation(user.id);
+    await notifyAdminsOfUnverifiedAsset({
+      kind: "Track",
+      label: track.name,
+      createdByEmail: user.email,
+    });
     return NextResponse.json({ track }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create track";

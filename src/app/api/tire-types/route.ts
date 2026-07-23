@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { matchTireTypes, suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
+import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 
 const TIRE_TYPE_SELECT = {
   id: true,
@@ -100,6 +101,12 @@ export async function POST(request: Request) {
         createdByUserId: user.id,
       },
       select: TIRE_TYPE_SELECT,
+    });
+
+    await notifyAdminsOfUnverifiedAsset({
+      kind: "Tire type",
+      label: tireType.displayName,
+      createdByEmail: user.email,
     });
 
     return NextResponse.json({ tireType, nearMatches: nearMatches.map((m) => m.tireType) }, { status: 201 });

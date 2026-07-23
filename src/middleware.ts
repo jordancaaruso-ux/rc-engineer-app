@@ -29,6 +29,10 @@ export default auth((req) => {
   if (pathname === "/api/_debug/version") {
     return NextResponse.next();
   }
+  // Stripe webhooks are server-to-server and unauthenticated — the route verifies the signature.
+  if (pathname === "/api/stripe/webhook") {
+    return NextResponse.next();
+  }
 
   const authed = Boolean(req.auth);
 

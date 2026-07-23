@@ -77,6 +77,15 @@ export async function PATCH(
 
   const displayName = body?.displayName?.trim();
   if (!displayName) {
+    // Verify-only PATCH (admin approving from the review queue) — no name/code change.
+    if ("verifiedAt" in verifiedData) {
+      const additiveType = await prisma.additiveType.update({
+        where: { id: additiveTypeId },
+        data: verifiedData,
+        select: { id: true, displayName: true, modelCode: true, verifiedAt: true },
+      });
+      return NextResponse.json({ additiveType });
+    }
     return NextResponse.json({ error: "displayName is required" }, { status: 400 });
   }
 

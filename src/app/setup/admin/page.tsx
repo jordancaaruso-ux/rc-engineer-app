@@ -111,10 +111,10 @@ export default async function SetupAdminPage(): Promise<ReactNode> {
           <div className="flex items-center justify-between px-1">
             <Eyebrow>Chassis type requests</Eyebrow>
             <Link
-              href="/setup-sheet-models"
-              className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted"
+              href="/admin/review"
+              className="rounded-md border border-primary/50 px-2.5 py-1 text-xs text-primary hover:bg-muted"
             >
-              Add one
+              Review queue
             </Link>
           </div>
           <SurfaceCard variant="panel" contentClassName="p-0">

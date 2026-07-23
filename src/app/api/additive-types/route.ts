@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedAdditiveTypes } from "@/lib/additives/ensureSeedAdditiveTypes";
+import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 
 const ADDITIVE_TYPE_SELECT = {
   id: true,
@@ -95,6 +96,12 @@ export async function POST(request: Request) {
         createdByUserId: user.id,
       },
       select: ADDITIVE_TYPE_SELECT,
+    });
+
+    await notifyAdminsOfUnverifiedAsset({
+      kind: "Additive type",
+      label: additiveType.displayName,
+      createdByEmail: user.email,
     });
 
     return NextResponse.json({ additiveType }, { status: 201 });

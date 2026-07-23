@@ -19,9 +19,11 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  stripeCustomerId String? @unique
 
   accounts Account[]
   sessions Session[]
+  subscription Subscription?
 
   cars            Car[]
   runs            Run[]
@@ -61,6 +63,37 @@ model User {
   teamsCreated    Team[]           @relation("TeamsCreated")
   aiUsageDaily    AiUsageDaily[]
   chassisTypeRequests ChassisTypeRequest[]
+}
+
+/**
+ * Paid subscription (Stripe). One row per user; the webhook (`/api/stripe/webhook`) is the source
+ * of truth. `tier` is our internal label ("standard" | "pro") mapped from the Stripe price.
+ * Entitlement is DERIVED server-side in `src/lib/entitlement.ts` — never trust the client.
+ */
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  stripeSubscriptionId String    @unique
+  stripeCustomerId     String
+  status               String
+  tier                 String
+  priceId              String?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  seats                Int       @default(1)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+}
+
+/** Processed Stripe webhook event ids — dedupe so retried/replayed events stay idempotent. */
+model StripeWebhookEvent {
+  id         String   @id
+  type       String
+  receivedAt DateTime @default(now())
 }
 
 /**
