@@ -2,6 +2,7 @@ import {
   parseLapHistoryDateWindow,
   type LapHistoryDateWindow,
 } from "@/lib/engineerPhase5/parseLapHistoryWindow";
+import { isPlausibleTrackName } from "@/lib/engineerPhase5/trackNameGuard";
 
 export type LapHistoryPriorContext = {
   trackQuery: string;
@@ -59,7 +60,9 @@ function extractTrackQuery(message: string): string | null {
     const m = message.match(re);
     const raw = m?.[1]?.trim();
     if (raw && raw.length >= 2) {
-      return raw.replace(/\s+(in|over|during|for|within)\s+the\b.*$/i, "").trim();
+      const trimmed = raw.replace(/\s+(in|over|during|for|within)\s+the\b.*$/i, "").trim();
+      // Shared guard: reject clause leads like "on how the previous day there went".
+      if (isPlausibleTrackName(trimmed)) return trimmed;
     }
   }
   return null;

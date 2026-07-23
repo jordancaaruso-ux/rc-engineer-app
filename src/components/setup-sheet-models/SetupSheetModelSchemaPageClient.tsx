@@ -4,18 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { SetupSheetModelLayoutEditor } from "@/components/setup-sheet-models/SetupSheetModelLayoutEditor";
-import { SetupSheetModelLivePreview } from "@/components/setup-sheet-models/SetupSheetModelLivePreview";
-import { SetupSheetModelSchemaEditor } from "@/components/setup-sheet-models/SetupSheetModelSchemaEditor";
+import { SetupSheetModelEditor } from "@/components/setup-sheet-models/SetupSheetModelEditor";
+import { normalizeGroupsForEditing } from "@/lib/setupSheetModels/layoutCanvasOps";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
-
-export type SetupSheetModelEditorTab = "parameters" | "layout";
 
 export function SetupSheetModelSchemaPageClient(props: {
   modelId: string;
   modelName: string;
   initialSchema: SetupSheetModelSchema;
-  initialTab?: SetupSheetModelEditorTab;
   returnTo?: string | null;
   /** False when the model is shared/curated and this user may only view it. */
   canEdit?: boolean;
@@ -25,10 +21,9 @@ export function SetupSheetModelSchemaPageClient(props: {
   const router = useRouter();
   const returnTo = props.returnTo?.trim() || null;
   const canEdit = props.canEdit !== false;
-  const [tab, setTab] = useState<SetupSheetModelEditorTab>(
-    props.initialTab === "layout" ? "layout" : "parameters"
-  );
-  const [schema, setSchema] = useState(props.initialSchema);
+  // Rewrite persisted legacy pair/corner4 group records into slots so the canvas deals with one
+  // shape. Display-only — parse/save are untouched, so existing schemaJson blobs load unchanged.
+  const [schema, setSchema] = useState(() => normalizeGroupsForEditing(props.initialSchema));
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -46,7 +41,7 @@ export function SetupSheetModelSchemaPageClient(props: {
         model?: { schema?: SetupSheetModelSchema };
       };
       if (!res.ok) throw new Error(data.error || "Save failed");
-      if (data.model?.schema) setSchema(data.model.schema);
+      if (data.model?.schema) setSchema(normalizeGroupsForEditing(data.model.schema));
       setStatus("Saved.");
       router.refresh();
     } catch (e) {
@@ -76,52 +71,17 @@ export function SetupSheetModelSchemaPageClient(props: {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-muted/30 p-1">
-        <button
-          type="button"
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-            tab === "layout"
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-          onClick={() => setTab("layout")}
-        >
-          Layout
-        </button>
-        <button
-          type="button"
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-            tab === "parameters"
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-          onClick={() => setTab("parameters")}
-        >
-          Parameters
-        </button>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <fieldset
-          disabled={!canEdit}
-          className={`min-w-0 space-y-4 border-0 p-0 m-0 ${canEdit ? "" : "pointer-events-none select-none"}`}
-        >
-          {tab === "layout" ? (
-            <SetupSheetModelLayoutEditor schema={schema} onChange={setSchema} />
-          ) : (
-            <SetupSheetModelSchemaEditor
-              schema={schema}
-              onChange={setSchema}
-              isAdmin={props.isAdmin}
-            />
-          )}
-        </fieldset>
-        <SetupSheetModelLivePreview
-          modelId={props.modelId}
-          modelName={props.modelName}
+      <fieldset
+        disabled={!canEdit}
+        className={`min-w-0 space-y-4 border-0 p-0 m-0 ${canEdit ? "" : "pointer-events-none select-none"}`}
+      >
+        <SetupSheetModelEditor
           schema={schema}
+          onChange={setSchema}
+          isAdmin={props.isAdmin}
+          readOnly={!canEdit}
         />
-      </div>
+      </fieldset>
 
       <div className="flex flex-wrap items-center gap-2">
         {canEdit ? (

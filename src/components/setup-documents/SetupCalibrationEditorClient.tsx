@@ -386,7 +386,8 @@ export function SetupCalibrationEditorClient({
   const normalized = normalizeCalibrationData(initialCalibrationData);
   const [tab, setTab] = useState<"sheet" | "form" | "text" | "region">("form");
   const [name, setName] = useState(initialName);
-  const [sourceType, setSourceType] = useState(initialSourceType);
+  // Source type is a stored metadata tag ("pdf" / "image"); set at creation, not user-editable here.
+  const [sourceType] = useState(initialSourceType);
   const [formFieldMappings, setFormFieldMappings] = useState<Record<string, PdfFormFieldMappingRule>>(() => ({
     ...(normalized.formFieldMappings ?? {}),
   }));
@@ -2119,7 +2120,7 @@ export function SetupCalibrationEditorClient({
     );
     return {
       name: trimmedName,
-      sourceType: sourceType.trim() || "awesomatix_pdf",
+      sourceType: sourceType.trim() || "pdf",
       exampleDocumentId: documentId.trim() || null,
       calibrationDataJson: {
         templateType: "pdf_form_fields" as const,
@@ -2269,19 +2270,27 @@ export function SetupCalibrationEditorClient({
     const el = tab === "form" ? formPdfContainerRef.current : tab === "sheet" ? sheetPdfContainerRef.current : null;
     if (!el) return;
 
-    function commitWidth(w: number) {
-      const clamped = Math.max(520, Math.min(1600, Math.floor(w)));
+    // Contain-fit: render the PDF at whichever of width/height runs out first, so the
+    // whole page sits inside the frame with no internal scroll. Height-fit needs the page
+    // aspect ratio (pdfPageSize), known only after the first load — until then fit to
+    // width so the page can load and report its size, then this effect re-runs.
+    function fit(el: HTMLDivElement) {
+      const widthFit = el.clientWidth;
+      const heightFitWidth =
+        pdfPageSize && pdfPageSize.height > 0
+          ? (el.clientHeight - 4) * (pdfPageSize.width / pdfPageSize.height)
+          : Infinity;
+      const target = Math.min(widthFit, heightFitWidth);
+      const clamped = Math.max(240, Math.min(1600, Math.floor(target)));
       setPdfRenderWidth((prev) => (Math.abs(prev - clamped) > 2 ? clamped : prev));
     }
 
-    commitWidth(el.clientWidth);
+    fit(el);
 
     let ro: ResizeObserver | null = null;
     try {
-      ro = new ResizeObserver((entries) => {
-        const entry = entries[0];
-        const width = entry?.contentRect?.width ?? el.clientWidth;
-        commitWidth(width);
+      ro = new ResizeObserver(() => {
+        fit(el);
       });
       ro.observe(el);
     } catch {
@@ -2295,7 +2304,16 @@ export function SetupCalibrationEditorClient({
         /* ignore */
       }
     };
-  }, [tab]);
+  }, [tab, pdfPageSize]);
+
+  // Keep the on-screen page size (used to place overlay hit-boxes) in sync with the
+  // fitted render width. The fit can change pdfRenderWidth after the page loads, and
+  // onPageLoadSuccess won't re-fire on a width-only change, so derive it here instead.
+  useEffect(() => {
+    if (!pdfPageSize || pdfPageSize.width <= 0) return;
+    const height = (pdfPageSize.height * pdfRenderWidth) / pdfPageSize.width;
+    setRenderedPageSize({ width: pdfRenderWidth, height });
+  }, [pdfRenderWidth, pdfPageSize]);
 
   const selectedSheetField = useMemo(() => {
     if (!selectedSheetFieldId) return null;
@@ -2438,12 +2456,6 @@ export function SetupCalibrationEditorClient({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Calibration name / version"
-              />
-              <input
-                className="rounded-md border border-border bg-muted/60 px-2 py-1.5 font-mono text-xs"
-                value={sourceType}
-                onChange={(e) => setSourceType(e.target.value)}
-                placeholder="Source type"
               />
               <button
                 type="button"
@@ -2611,9 +2623,11 @@ export function SetupCalibrationEditorClient({
                 ) : null}
                 <div
                   ref={formPdfContainerRef}
-                  className="relative min-h-[50vh] overflow-auto rounded border border-border bg-muted/30"
+                  className="flex h-[78vh] items-center justify-center overflow-hidden"
                   onMouseLeave={() => setHoveredFormOverlayKey(null)}
                 >
+                  {/* Tight wrapper: border hugs the PDF, overlays anchor to its top-left */}
+                  <div className="relative overflow-hidden rounded border border-border bg-muted/30">
                   <PdfPreviewClient
                     fileUrl={resolvedFileUrl || previewUrl}
                     pageNumber={currentPage}
@@ -2650,9 +2664,8 @@ export function SetupCalibrationEditorClient({
                     onPageLoadSuccess={(page) => {
                       const viewport = page.getViewport({ scale: 1 });
                       setPdfPageSize({ width: viewport.width, height: viewport.height });
-                      const renderedWidth = pdfRenderWidth;
-                      const renderedHeight = viewport.height * (renderedWidth / viewport.width);
-                      setRenderedPageSize({ width: renderedWidth, height: renderedHeight });
+                      // renderedPageSize is derived reactively from pdfRenderWidth below,
+                      // so it stays correct when the fit shrinks the width post-load.
                     }}
                   />
                   {pdfPageSize && renderedPageSize
@@ -2693,6 +2706,7 @@ export function SetupCalibrationEditorClient({
                         );
                       })
                     : null}
+                  </div>
                 </div>
                 {!modelLinkedMode ? (
                   <p className="mt-2 text-[11px] text-muted-foreground">

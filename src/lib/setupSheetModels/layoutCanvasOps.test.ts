@@ -12,9 +12,12 @@ import {
   makeSlotsGroup,
   moveFieldToSection,
   moveRow,
+  moveSection,
   normalizeGroupsForEditing,
   placeMissingParameters,
+  removeRowToTray,
   removeSlot,
+  renameSection,
   setSlotLabel,
   unplacedFields,
 } from "@/lib/setupSheetModels/layoutCanvasOps";
@@ -306,6 +309,57 @@ test("placeMissingParameters leaves hand-made rows byte-identical", () => {
 
   assert.equal(JSON.stringify(rows.slice(0, rowsOf(withOrphan, "suspension").length)), before);
   assert.equal(unplacedFields(after).length, 0);
+});
+
+test("removeRowToTray sends a single row's parameter back to the tray", () => {
+  const schema = shimSchema();
+  const after = ok(removeRowToTray(schema, "suspension", 0));
+  // The row is gone but the field def remains, now unplaced.
+  assert.equal(rowsOf(after, "suspension").length, 3);
+  assert.equal(after.fields.length, schema.fields.length);
+  const tray = unplacedFields(after).map((f) => f.key);
+  assert.deepEqual(tray, ["lower_arm_shim_a"]);
+});
+
+test("removeRowToTray on a group frees every member and drops the group record", () => {
+  const schema = shimSchema();
+  const grouped = ok(
+    makeSlotsGroup(schema, ["lower_arm_shim_a", "lower_arm_shim_b", "lower_arm_shim_c"])
+  );
+  const rowIndex = rowsOf(grouped, "suspension").findIndex((r) => r.type === "slots");
+  const after = ok(removeRowToTray(grouped, "suspension", rowIndex));
+
+  assert.equal(after.layoutGroups, undefined);
+  const tray = unplacedFields(after).map((f) => f.key).sort();
+  assert.deepEqual(tray, ["lower_arm_shim_a", "lower_arm_shim_b", "lower_arm_shim_c"]);
+  for (const key of ["lower_arm_shim_a", "lower_arm_shim_b", "lower_arm_shim_c"]) {
+    assert.equal(after.fields.find((f) => f.key === key)?.layoutGroupId, undefined);
+  }
+});
+
+test("removeRowToTray keeps an emptied section as a drop target", () => {
+  const schema = shimSchema();
+  const after = ok(removeRowToTray(schema, "drivetrain", 0));
+  assert.ok(after.structuredSections.some((s) => s.id === "drivetrain"));
+  assert.equal(rowsOf(after, "drivetrain").length, 0);
+  assert.deepEqual(unplacedFields(after).map((f) => f.key), ["spool"]);
+});
+
+test("moveSection reorders sections and rejects bad indexes", () => {
+  const schema = shimSchema();
+  const after = ok(moveSection(schema, 0, 1));
+  assert.deepEqual(after.structuredSections.map((s) => s.id), ["drivetrain", "suspension"]);
+  assert.ok("error" in moveSection(schema, 0, 5));
+});
+
+test("renameSection updates the title on the section and its field defs", () => {
+  const schema = shimSchema();
+  const after = ok(renameSection(schema, "suspension", "  Front suspension  "));
+  assert.equal(after.structuredSections.find((s) => s.id === "suspension")?.title, "Front suspension");
+  const susp = after.fields.filter((f) => f.sectionId === "suspension");
+  assert.ok(susp.length > 0);
+  assert.ok(susp.every((f) => f.sectionTitle === "Front suspension"));
+  assert.ok("error" in renameSection(schema, "suspension", "   "));
 });
 
 test("A800 seed schema round-trips through the editor unchanged", () => {
