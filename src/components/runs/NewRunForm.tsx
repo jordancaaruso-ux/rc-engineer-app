@@ -180,6 +180,7 @@ type TireSetOption = {
   insertLabel?: string | null;
   wheelLabel?: string | null;
   specificModel?: string | null;
+  mark?: string | null;
   tireTypeId?: string | null;
   tireType?: { id: string; displayName: string; modelCode: string } | null;
 };
@@ -3192,6 +3193,7 @@ export function NewRunForm(props: {
               ? {
                   tireTypeId: newTireSetIntent.tireTypeId,
                   initialRunCount: Math.max(0, Math.floor(runsCompleted)),
+                  mark: newTireSetIntent.mark ?? null,
                 }
               : undefined,
           tireRunNumber: Math.max(1, runsCompleted + 1),
@@ -4835,12 +4837,18 @@ export function NewRunForm(props: {
               }}
               newSetIntent={newTireSetIntent}
               onNewSetIntentChange={(intent) => {
+                // Only a genuinely new compound resets the prior-run count; editing the mark
+                // on the same intent must preserve a Used-set count the driver already set.
+                const compoundChanged =
+                  (intent?.tireTypeId ?? null) !== (newTireSetIntentRef.current?.tireTypeId ?? null);
                 setNewTireSetIntent(intent);
                 newTireSetIntentRef.current = intent;
                 if (intent) {
                   setTireSetId("");
-                  tireRunUserTouchedRef.current = false;
-                  setRunsCompleted(0);
+                  if (compoundChanged) {
+                    tireRunUserTouchedRef.current = false;
+                    setRunsCompleted(0);
+                  }
                   setCopyTireWarning(null);
                 }
                 applyTiresToSetupSnapshot(intent ? "" : tireSetIdRef.current);
@@ -5192,6 +5200,33 @@ export function NewRunForm(props: {
       ) : null}
 
       <div hidden={wizardActive && wizardStep !== "laps"}>
+      {wizardStep === "laps" &&
+      !wizardLapsIn &&
+      (!isEditing || isDraft) ? (
+        <div
+          role="note"
+          className="mb-3 flex flex-col gap-2 rounded-md border border-amber-500/50 bg-amber-500/15 px-3 py-2.5"
+        >
+          <div className="space-y-0.5">
+            <p className="text-[13px] font-semibold text-amber-100">
+              Haven&apos;t driven yet? Save your draft.
+            </p>
+            <p className="text-[12px] leading-snug text-amber-100/80">
+              Laps come after the run. Save now and this tab is waiting for you —
+              finish it trackside when you&apos;ve got your times.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => saveRun(undefined, "draft")}
+              className="rounded-md bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition hover:brightness-95"
+            >
+              Save draft
+            </button>
+          </div>
+        </div>
+      ) : null}
       <LapTimesIngestPanel
         value={lapIngest}
         onChange={setLapIngest}

@@ -259,7 +259,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       calibrationDataJson: merged as unknown as object,
     };
     if (!deriveFromCalibrationId) {
-      data.sourceType = "awesomatix_image_v1";
+      data.sourceType = "image";
       data.exampleDocumentId = exampleDocumentId;
     }
     await prisma.setupSheetCalibration.update({
@@ -280,7 +280,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     data: {
       userId: user.id,
       name,
-      sourceType: "awesomatix_image_v1",
+      sourceType: "image",
       calibrationDataJson: ({ templateType: "image_region_v1", imageCalibration } as unknown) as object,
       exampleDocumentId,
       // Admin-authored calibrations are auto-trusted for cross-user auto-pick.

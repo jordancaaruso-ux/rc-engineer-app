@@ -7,7 +7,6 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { MobileBrandMark } from "@/components/layout/MobileBrandMark";
 import { MobileTitleCondenser } from "@/components/layout/MobileTitleCondenser";
 import { MobileBackProvider } from "@/components/layout/MobileBackContext";
-import { OnboardingGuideRail } from "@/components/onboarding/OnboardingGuideRail";
 import { isHiddenNavRoute, MOBILE_NAV, resolveActiveNavId } from "@/components/layout/navConfig";
 import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -59,9 +58,6 @@ export function AppShell({ children }: { children: ReactNode }) {
            * account avatar (Settings + account).
            */}
           <BottomNav />
-          {/* Guided-intro chip: floats above the dock while the garage is
-              unfinished, self-retires after (docs/ONBOARDING_NORTH_STAR.md). */}
-          <OnboardingGuideRail />
           <MobileBrandMark />
           <MobileTitleCondenser />
           <AccountMenu />

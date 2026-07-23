@@ -3,6 +3,7 @@ import {
   displayTireSelection,
   type TireSelectionValue,
 } from "@/lib/tires/tireSelectionValue";
+import { formatMark } from "@/lib/tires/tireMark";
 
 export type TireSetForSelection = {
   label: string;
@@ -10,6 +11,7 @@ export type TireSetForSelection = {
   insertLabel?: string | null;
   wheelLabel?: string | null;
   specificModel?: string | null;
+  mark?: string | null;
   tireTypeId?: string | null;
   tireType?: { id: string; displayName: string; modelCode: string } | null;
 };
@@ -23,6 +25,7 @@ export function tireSelectionFromTireSet(tireSet: TireSetForSelection): TireSele
       specificModel: tireSet.specificModel,
       insert: tireSet.insertLabel,
       wheel: tireSet.wheelLabel,
+      mark: tireSet.mark,
     });
   }
   const legacy = displayTireSelection(tireSet.label, tireSet.setNumber);
@@ -43,10 +46,13 @@ export function tireSetDisplayLine(tireSet: TireSetForSelection): string {
           specificModel: tireSet.specificModel,
           insert: tireSet.insertLabel,
           wheel: tireSet.wheelLabel,
+          // mark is rendered as the suffix below, not prepended into the base line
         })
       )
     : displayTireSelection(tireSet.label);
+  // A physical mark is the real-world identity; fall back to the internal set number only when unmarked.
   const suffix =
-    tireSet.setNumber != null && tireSet.setNumber >= 1 ? `Set ${tireSet.setNumber}` : "";
+    formatMark(tireSet.mark) ??
+    (tireSet.setNumber != null && tireSet.setNumber >= 1 ? `Set ${tireSet.setNumber}` : "");
   return suffix ? `${base} · ${suffix}` : base;
 }

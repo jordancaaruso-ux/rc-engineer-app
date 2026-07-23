@@ -13,6 +13,8 @@ Every knob in a KB entry splits into two labelled blocks so the Engineer can quo
 - **Physics.** What the change does **mechanically** — geometry, loads, kinematics. **Stated flat, with confidence** (this is Layer 1: irrefutable, condition-independent, portable across disciplines forever). No hedging on mechanism.
 - **Handling.** What it *can* do to the car — the **situational** effects on grip/balance/feel (Layer 2). **Openly hedged**: name the dependencies (grip, tyre, layout, what's limiting the car) and frame as a test to confirm. Never assert a handling outcome the physics doesn't force.
 
+**Refinement (2026-07-23, founder-adopted).** The Handling block is written as **explicitly context-keyed effects**, not one hedged paragraph: each effect names the **condition it depends on** (grip / tyre / layout / what's limiting the car) inline, and the block ends with a **Predictability:** line — one tag (`reliable` | `usual` | `situational` | `experimental`) plus a short reason naming what makes the effect dependable or variable. It rates how reliably the *effect* appears (the honesty keystone from `ENGINEER_SUGGESTION_QUALITY_PLAN.md`), kept separate from effect strength, and carries **no coaching** — "always / never change X", "tune together with Y", "test first" are tuning discipline and live in the system prompt, not the KB. Ladder: reliable = shows up almost every time · usual = normal, exceptions exist · situational = flips with grip/tyre/layout · experimental = theory-first, founder-unconfirmed. Retrofit label: **"Effects (context-dependent — confirm on track)."** In a pure retrofit, physics content must not change — restructure + context-tag only; any physics/claim change the founder dictates during the pass is a separate, explicitly-approved edit.
+
 Maps onto the three-layer architecture in `ENGINEER_NORTH_STAR.md` and the epistemic stance *"confident on mechanism, humble on outcome."* Reference implementation: `drafts/shock-geometry.md` (2026-07-08). This is the house style for **all new entries**; the 16 approved files predate it and are queued for retrofit (see below).
 
 ## Governance
@@ -61,7 +63,7 @@ Founder direction (interview 2026-07-08): breadth is the bottleneck, not depth; 
 
 ## Queued projects
 
-- **Retrofit approved files to the Physics/Handling split** (founder-approved as a project 2026-07-08, not started). All 16 top-level `content/vehicle-dynamics/*.md` files predate the split and blend the two in prose. This is an **approved-tier edit** — gated by `AGENTS.md`: each file restructured as a chat proposal with a diff, founder types approval, then written. Physics content must not change — restructure only. Re-verify any `parameterEffects/catalog.ts` anchors after (catalog is currently empty, so none today).
+- **Retrofit approved files to the Physics/Handling split** — **in progress, started 2026-07-23** (was founder-approved 2026-07-08). All 16 top-level `content/vehicle-dynamics/*.md` files predate the split and blend the two in prose. This is an **approved-tier edit** — gated by `AGENTS.md`: per file, agent proposes the restructured diff, founder types casual change notes, agent folds them in, founder approves, then written. Physics content unchanged in a pure restructure; founder-dictated claim changes are separate approved edits. Re-verify any `parameterEffects/catalog.ts` anchors after (catalog is currently empty, so none today). **Retrofit order + status tracked in the Authoring walkthrough table below.**
 
 ## Suggested physics-first topics (fill over time)
 

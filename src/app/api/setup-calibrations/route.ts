@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     setupSheetModelId?: string | null;
   };
   const name = body.name?.trim() || "Setup sheet calibration";
-  const sourceType = body.sourceType?.trim() || "awesomatix_pdf";
+  const sourceType = body.sourceType?.trim() || "pdf";
   let inheritedExampleDocumentId: string | null = null;
   let inheritedSetupSheetModelId: string | null = null;
   if (body.clonedFromCalibrationId?.trim()) {

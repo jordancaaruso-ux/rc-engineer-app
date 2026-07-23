@@ -115,6 +115,7 @@ const runHistorySelect = {
       id: true,
       label: true,
       setNumber: true,
+      mark: true,
       tireType: { select: { displayName: true } },
     },
   },

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string; tab?: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
 };
 
 export default async function SetupSheetModelSchemaPage({ params, searchParams }: Props) {
@@ -40,7 +40,6 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
   const { id } = await params;
   const sp = await searchParams;
   const returnTo = typeof sp.returnTo === "string" ? sp.returnTo.trim() : null;
-  const initialTab = sp.tab === "parameters" ? "parameters" : "layout";
   // Models are global — load by id only; edit rights are computed separately.
   const model = await prisma.setupSheetModel.findUnique({
     where: { id },
@@ -101,7 +100,6 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
           modelId={model.id}
           modelName={model.name}
           initialSchema={schema}
-          initialTab={initialTab}
           returnTo={returnTo}
           canEdit={canEditSetupSheetModel(user, model)}
           isAdmin={isAuthAdminEmail(user.email)}

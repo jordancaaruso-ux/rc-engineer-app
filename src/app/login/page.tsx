@@ -42,6 +42,7 @@ function LoginForm() {
   const [pending, setPending] = useState(false);
   const [googleOAuthConfigured, setGoogleOAuthConfigured] = useState(false);
   const [accessCodeEnabled, setAccessCodeEnabled] = useState(false);
+  const [openSignup, setOpenSignup] = useState(false);
   const [smtpConfigured, setSmtpConfigured] = useState(true);
   const [configLoaded, setConfigLoaded] = useState(false);
 
@@ -51,10 +52,12 @@ function LoginForm() {
   useEffect(() => {
     if (searchParams.get("error") === "AccessDenied") {
       setError(
-        "That sign-in is not allowed. Enter your access code below, or ask for an invite."
+        openSignup
+          ? "That sign-in didn't go through. Please try again."
+          : "That sign-in is not allowed. Enter your access code below, or ask for an invite."
       );
     }
-  }, [searchParams]);
+  }, [searchParams, openSignup]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,10 +68,12 @@ function LoginForm() {
           googleOAuthConfigured?: boolean;
           accessCodeEnabled?: boolean;
           smtpConfigured?: boolean;
+          openSignup?: boolean;
         };
         if (cancelled) return;
         if (hint.googleOAuthConfigured === true) setGoogleOAuthConfigured(true);
         if (hint.accessCodeEnabled === true) setAccessCodeEnabled(true);
+        if (hint.openSignup === true) setOpenSignup(true);
         setSmtpConfigured(hint.smtpConfigured === true);
       } catch {
         /* ignore */
@@ -124,7 +129,9 @@ function LoginForm() {
         // instructions about; point them at Google, which doesn't depend on mail delivery.
         setError(
           res.error === "AccessDenied"
-            ? "That email isn't allowed yet. Check your access code, or ask for an invite."
+            ? openSignup
+              ? "That sign-in didn't go through. Please try again."
+              : "That email isn't allowed yet. Check your access code, or ask for an invite."
             : googleOAuthConfigured
               ? "We couldn't send the sign-in email. Try “Continue with Google” instead."
               : "We couldn't send the sign-in email just now. Please try again shortly."

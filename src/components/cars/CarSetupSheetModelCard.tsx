@@ -37,7 +37,7 @@ export function CarSetupSheetModelCard({
       <ul className="flex flex-col gap-2 text-xs">
         <li>
           <Link
-            href={`/setup-sheet-models/${model.id}/schema?tab=layout`}
+            href={`/setup-sheet-models/${model.id}/schema`}
             className="text-accent hover:text-accent hover:underline"
           >
             Edit setup sheet

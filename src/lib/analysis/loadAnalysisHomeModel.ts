@@ -41,7 +41,7 @@ const analysisRunSelect = {
   carNameSnapshot: true,
   car: { select: { name: true } },
   tireRunNumber: true,
-  tireSet: { select: { id: true, label: true } },
+  tireSet: { select: { id: true, label: true, mark: true } },
   event: { select: { name: true } },
   lapTimes: true,
   lapSession: true,

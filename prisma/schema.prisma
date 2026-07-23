@@ -537,6 +537,9 @@ model TireSet {
   wheelLabel  String?
   /** Optional specific product model for this physical set (e.g. premount SKU). */
   specificModel String?
+  /** Optional physical mark the driver writes on the sidewall (or race-control mark).
+      Short free text (≤4 chars, trimmed). Repeats freely across compounds/events → NOT unique. */
+  mark       String?
   notes      String?
   createdAt  DateTime @default(now())
   /** Soft delete: hidden from pickers/lists but kept so linked run history stays intact. */

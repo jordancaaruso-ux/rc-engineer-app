@@ -24,3 +24,24 @@ test("parsePlanningQuery detects meeting prep", () => {
   assert.equal(q!.trackQuery?.toLowerCase(), "tftr");
   assert.equal(q!.wantsSetupConsiderations, true);
 });
+
+test("parsePlanningQuery takes the track from travel phrasing, not a trailing 'on' clause", () => {
+  // Real 2/10 case: the loose "on <x>" pattern used to grab "how the previous day there went".
+  const q = parsePlanningQuery(
+    "I'm going to tftr in a few days - what are some things i could test based on how the previous day there went"
+  );
+  assert.ok(q);
+  assert.equal(q!.trackQuery?.toLowerCase(), "tftr");
+});
+
+test("parsePlanningQuery returns a null track for prepositional phrases that aren't track names", () => {
+  for (const msg of [
+    "what should i consider based on how the previous day went",
+    "going to prepare for the next race on power delivery",
+    "what should i consider at the moment",
+  ]) {
+    const q = parsePlanningQuery(msg);
+    assert.ok(q, `expected planning intent for: ${msg}`);
+    assert.equal(q!.trackQuery, null, `expected null track for: ${msg}`);
+  }
+});

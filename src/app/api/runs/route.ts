@@ -18,6 +18,7 @@ import {
   parseWarmerTimingMinutes,
 } from "@/lib/runs/applyRunContextToSetupSnapshot";
 import { normalizeTirePrep, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
+import { normalizeTireMark } from "@/lib/tires/tireMark";
 import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysForCar";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
@@ -55,6 +56,7 @@ type RunUpsertBody = {
     tireTypeId?: string;
     initialRunCount?: number;
     specificModel?: string | null;
+    mark?: string | null;
   };
   tireRunNumber?: number;
   additiveTypeId?: string | null;
@@ -364,6 +366,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     insertLabel: true,
     wheelLabel: true,
     specificModel: true,
+    mark: true,
     tireTypeId: true,
     tireType: { select: { id: true, displayName: true, modelCode: true } },
   } as const;
@@ -408,6 +411,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         setNumber: nextSetNumber,
         initialRunCount,
         specificModel: body.newTireSet?.specificModel?.trim() || null,
+        mark: normalizeTireMark(body.newTireSet?.mark),
         userId: params.userId,
       },
       select: TIRE_SET_CONTEXT_SELECT,

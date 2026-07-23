@@ -50,6 +50,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Enter a valid email address." }, { status: 400 });
   }
 
+  // Per-email brake. In open-signup mode this preflight is the only thing between a script and a
+  // flood of magic-link sends to one address, so limit by email as well as IP: an IP rotating
+  // addresses is caught above; a botnet hammering one address is caught here. Same per-instance
+  // caveat as the IP limit — real defence is code entropy (invite mode) or a captcha (open mode).
+  const emailRl = checkApiRateLimit({
+    key: `redeem-access-code:email:${email}`,
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!emailRl.ok) return rateLimitResponse(emailRl.retryAfterSec);
+
   const codeValid = isSignupAccessCodeConfigured() && verifySignupAccessCode(body?.code);
 
   // A valid code always writes the row, even for an address that already passes the allowlist.

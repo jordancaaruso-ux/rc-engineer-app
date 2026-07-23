@@ -7,12 +7,14 @@
  * Keep this file Prisma-free; it runs client-side and in offline tests.
  */
 
+import { formatMark } from "@/lib/tires/tireMark";
+
 export type TireIndicatorSourceRun = {
   id: string;
   carId: string | null;
   /** Nth run on the set as logged on the run (wear counter). */
   tireRunNumber?: number | null;
-  tireSet?: { id: string; label: string } | null;
+  tireSet?: { id: string; label: string; mark?: string | null } | null;
 };
 
 export type RunTireIndicator = {
@@ -34,10 +36,12 @@ export function computeTireIndicatorsByRunId(
   for (let i = runsDescending.length - 1; i >= 0; i--) {
     const run = runsDescending[i];
     if (!run.carId || !run.tireSet) continue;
+    // A physical mark ("Marked 7") is the real-world identity; unmarked sets fall back to the compound label.
+    const label = formatMark(run.tireSet.mark) ?? run.tireSet.label;
     const prev = lastSetByCar.get(run.carId);
     const changed = prev != null && prev.id !== run.tireSet.id;
     indicators.set(run.id, {
-      setLabel: run.tireSet.label,
+      setLabel: label,
       runNumber:
         typeof run.tireRunNumber === "number" && run.tireRunNumber > 0
           ? run.tireRunNumber
@@ -45,7 +49,7 @@ export function computeTireIndicatorsByRunId(
       changed,
       previousSetLabel: changed ? prev.label : null,
     });
-    lastSetByCar.set(run.carId, { id: run.tireSet.id, label: run.tireSet.label });
+    lastSetByCar.set(run.carId, { id: run.tireSet.id, label });
   }
   return indicators;
 }

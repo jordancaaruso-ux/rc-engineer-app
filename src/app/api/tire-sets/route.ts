@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { normalizeTireMark } from "@/lib/tires/tireMark";
 
 const TIRE_SET_SELECT = {
   id: true,
@@ -11,6 +12,7 @@ const TIRE_SET_SELECT = {
   insertLabel: true,
   wheelLabel: true,
   specificModel: true,
+  mark: true,
   tireTypeId: true,
   tireType: { select: { id: true, displayName: true, modelCode: true } },
 } as const;
@@ -45,6 +47,7 @@ export async function POST(request: Request) {
       insertLabel?: string | null;
       wheelLabel?: string | null;
       specificModel?: string | null;
+      mark?: string | null;
       notes?: string;
     };
 
@@ -58,6 +61,7 @@ export async function POST(request: Request) {
     const insertLabel = body.insertLabel?.trim() || null;
     const wheelLabel = body.wheelLabel?.trim() || null;
     const specificModel = body.specificModel?.trim() || null;
+    const mark = normalizeTireMark(body.mark);
 
     const tireTypeId = body.tireTypeId?.trim();
     if (tireTypeId) {
@@ -88,7 +92,8 @@ export async function POST(request: Request) {
           const needsUpdate =
             (specificModel != null && specificModel !== existing.specificModel) ||
             (insertLabel && insertLabel !== existing.insertLabel) ||
-            (wheelLabel && wheelLabel !== existing.wheelLabel);
+            (wheelLabel && wheelLabel !== existing.wheelLabel) ||
+            (mark != null && mark !== existing.mark);
           const updated = needsUpdate
             ? await prisma.tireSet.update({
                 where: { id: existing.id },
@@ -96,6 +101,7 @@ export async function POST(request: Request) {
                   specificModel: specificModel ?? existing.specificModel,
                   insertLabel: insertLabel ?? existing.insertLabel,
                   wheelLabel: wheelLabel ?? existing.wheelLabel,
+                  mark: mark ?? existing.mark,
                 },
                 select: TIRE_SET_SELECT,
               })
@@ -122,6 +128,7 @@ export async function POST(request: Request) {
           insertLabel,
           wheelLabel,
           specificModel,
+          mark,
           notes: body.notes?.trim() || null,
           userId: user.id,
         },
@@ -148,6 +155,7 @@ export async function POST(request: Request) {
         insertLabel,
         wheelLabel,
         specificModel,
+        mark,
         notes: body.notes?.trim() || null,
         userId: user.id,
       },

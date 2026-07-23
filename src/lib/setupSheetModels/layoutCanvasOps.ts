@@ -574,6 +574,44 @@ export function removeSlot(
   });
 }
 
+/**
+ * Take a whole row off the sheet without deleting its parameters. Every member returns to the tray
+ * (`unplacedFields`) with its group metadata cleared, and a group's record is removed. Fixed rows
+ * (`screw_strip` / `top_deck_block`) carry no field, so they simply disappear. The section is kept
+ * even when it ends up empty, so it stays a drop target — use {@link deleteSection} to remove one.
+ */
+export function removeRowToTray(
+  schema: SetupSheetModelSchema,
+  sectionId: string,
+  rowIndex: number
+): OpResult {
+  const sec = schema.structuredSections.find((s) => s.id === sectionId);
+  if (!sec) return { error: "Section not found." };
+  const row = sec.rows[rowIndex];
+  if (!row) return { error: "Row not found." };
+
+  let next = schema;
+  for (const key of layoutRowKeys(row)) {
+    next = patchField(next, key, {
+      layoutGroupId: undefined,
+      layoutGroupRole: undefined,
+      layoutSlotIndex: undefined,
+    });
+  }
+
+  const groupId = rowGroupId(row);
+  if (groupId) {
+    const nextGroups = { ...groups(next) };
+    delete nextGroups[groupId];
+    next = withGroups(next, nextGroups);
+  }
+
+  return mapSection(next, sectionId, (rows) => {
+    rows.splice(rowIndex, 1);
+    return rows;
+  });
+}
+
 export function setSlotLabel(
   schema: SetupSheetModelSchema,
   sectionId: string,
@@ -766,6 +804,44 @@ export function deleteSection(schema: SetupSheetModelSchema, sectionId: string):
   return {
     ...next,
     structuredSections: next.structuredSections.filter((s) => s.id !== sectionId),
+  };
+}
+
+/** Reorder whole sections on the canvas. */
+export function moveSection(
+  schema: SetupSheetModelSchema,
+  fromIndex: number,
+  toIndex: number
+): OpResult {
+  const sections = [...schema.structuredSections];
+  if (fromIndex < 0 || fromIndex >= sections.length || toIndex < 0 || toIndex >= sections.length) {
+    return { error: "Invalid section index." };
+  }
+  if (fromIndex === toIndex) return schema;
+  const [moved] = sections.splice(fromIndex, 1);
+  sections.splice(toIndex, 0, moved!);
+  return { ...schema, structuredSections: sections };
+}
+
+/** Rename a section; the new title propagates to that section's field defs so they stay in sync. */
+export function renameSection(
+  schema: SetupSheetModelSchema,
+  sectionId: string,
+  title: string
+): OpResult {
+  const trimmed = title.trim();
+  if (!trimmed) return { error: "Section title is required." };
+  if (!schema.structuredSections.some((s) => s.id === sectionId)) {
+    return { error: "Section not found." };
+  }
+  return {
+    ...schema,
+    structuredSections: schema.structuredSections.map((s) =>
+      s.id === sectionId ? { ...s, title: trimmed } : s
+    ),
+    fields: schema.fields.map((f) =>
+      f.sectionId === sectionId ? { ...f, sectionTitle: trimmed } : f
+    ),
   };
 }
 

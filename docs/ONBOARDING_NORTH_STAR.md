@@ -1,11 +1,58 @@
 # Onboarding North Star — first run, first day
 
-**Status:** Locked from founder interview (2026-07-22, 2 rounds over an artifact board). **Owner:** Jordan.
+**Status:** ⚠️ **Partly superseded — see "Reversal 2026-07-23" below.** The guide chip, the derived
+4-step progress, the resume/payoff/intro cards and the required-up-front timing step were retired after
+the founder drove the empty account and found the chip dead-clicked, forced steps, and didn't teach.
+Original spec (2026-07-22, 2 rounds over an artifact board) kept below for history. **Owner:** Jordan.
 Prototype: https://claude.ai/code/artifact/7e5cd6ad-73fa-4a41-98d9-eb2e92315e7d
 
 Governs what a brand-new account sees, from first sign-in to their first complete run. Sits under
 `PRODUCT_NORTH_STAR.md` (pillar 1 — lap-time ingestion / session capture; nothing matters if the
 first run never gets logged). Visual work on these screens follows `VISUAL_NORTH_STAR.md`.
+
+---
+
+## Reversal — 2026-07-23 (current model)
+
+The founder drove the empty account and reopened the locked spec. The guide chip did nothing on a
+dead-tap (you were already on the page, and the "pulse the yellow anchor" it leaned on was never wired
+on the Garage hub — the `assets-cars/tracks/tires` anchors did not exist), it *forced* steps, and it
+neither taught the app nor sold it. Re-derived from the founder's own priorities: **getting set up to log
+the first run is #1**, most testers set up *ahead* of an event, and only a **car** is truly required —
+timing and a setup are strongly advised but never gate.
+
+**The whole apparatus collapses to two surfaces:**
+
+1. **Welcome screen** — a full-screen overlay shown once on a truly-empty first sign-in (gated by
+   `onboardingSeenAt`, both buttons write it, never returns). Framing line + 3 value bullets
+   ("Log every run in seconds · Analyze your performance · Ask the Engineer") + "Get set up" +
+   "Look around". An overlay, **not** a `/welcome` route (no redirect flash, no PWA back-strand).
+   `src/components/onboarding/WelcomeScreen.tsx`, mounted by `DashboardHome` on `showIntro`.
+2. **"Get set up" card** — one dashboard card, rows are **real links** (every tap navigates — no dead
+   clicks). **Car** (required) gates the payoff: the moment a car exists the card flips to "You're ready
+   — log your first run", with **Timing** and **Setup** persisting beneath as advised extras. The Setup
+   row delegates to `UploadSetupSheetBar` (quick upload for a green-lit chassis, hand-build otherwise —
+   never blocks). Dismissible (Ignore, reuses `onboardingResumeDismissedAt`); self-retires once
+   car + timing + setup are in, a run exists, or dismissed.
+   `src/components/dashboard/DashboardGetSetUpCard.tsx`.
+
+**Timing moved from required-up-front to just-in-time.** It is never walled at the start; the prompt
+lives at the lap-ingest point (`LapTimesIngestPanel`, keyed off the scan route's existing per-source
+`hasDriverNameSetting`) — a real, Settings-linked block that stays source-aware so it never over-asks a
+LiveRC-name-only or manual-results driver.
+
+**Cut:** the home-track step and the tire step (both are picked *during* log-run, so neither can be a
+readiness blocker).
+
+**Readiness is derived** (`src/lib/onboarding/server.ts` → `loadOnboardingView`): `hasCar`, `carId`,
+`hasTimingIdentity`, `hasSetup`, `hasAnyRun`, `seen`, `dismissed`. The timing predicate moved to
+`src/lib/onboarding/timingIdentity.ts` (`hasTimingIdentity` + `getTimingIdentityForUser`), shared by the
+card and the lap gate. `src/lib/onboarding/progress.ts` (the 4-step engine), `OnboardingGuideRail`,
+`OnboardingResumeCard`, `OnboardingPayoffCard`, `OnboardingIntroCard`, the guide-pulse CSS and every
+`data-guide` anchor are **deleted**.
+
+**Everything below this section is the retired 2026-07-22 spec, kept for history — the State table,
+rollout rows and Code map no longer describe the shipped app.**
 
 ---
 

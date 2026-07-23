@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { parseManualLapText } from "@/lib/lapSession/parseManual";
@@ -1044,11 +1045,27 @@ export function LapTimesIngestPanel({
                 </button>
               </div>
               {hasTrackDiscovery && !dayScanHasDriverName ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {hasSpeedhiveTrack && !hasLiveRcTrack
-                    ? "Set your MYLAPS transponder number and/or Speedhive driver name in Settings so we can find your sessions at this track."
-                    : "Set your driver name in Settings (LiveRC and/or Speedhive transponder / name) so we can find your sessions."}
-                </p>
+                // Just-in-time timing gate (docs/ONBOARDING_NORTH_STAR.md, reversal
+                // 2026-07-23): timing isn't required up front, so this is where it
+                // actually bites — no identity, no way to match your sessions. Kept
+                // source-aware (LiveRC name vs Speedhive transponder) so it never
+                // over-asks; a plain link, not a hard wall, so manual picking still works.
+                <div className="rounded-md border border-border bg-surface-runna-inset p-2.5">
+                  <p className="text-[12px] font-semibold text-foreground">
+                    Add your timing details so laps attach on their own
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {hasSpeedhiveTrack && !hasLiveRcTrack
+                      ? "We need your MYLAPS transponder number and/or Speedhive driver name to find your sessions at this track."
+                      : "We need your driver name (LiveRC, and/or a Speedhive transponder / name) to find your sessions at this track."}
+                  </p>
+                  <Link
+                    href="/settings"
+                    className="mt-2 inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground transition hover:brightness-95"
+                  >
+                    Add timing details
+                  </Link>
+                </div>
               ) : null}
               {importPickerRows.length > 0 ? (
                 <div className="space-y-1">

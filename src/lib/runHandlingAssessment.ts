@@ -119,7 +119,7 @@ export type CaptureTraitAxisKey = (typeof CAPTURE_TRAIT_AXIS_KEYS)[number];
 /**
  * Flag-if-notable chip metadata. Each chip flags a *problem* pole; the good state is the
  * absence of a flag. `sign` is the direction the stored −3…+3 value takes when flagged;
- * severity (1/2/3 = slight/moderate/severe) supplies the magnitude. Steering feel is the
+ * severity (1/2/3 = mild/moderate/severe) supplies the magnitude. Steering feel is the
  * only genuinely bipolar chip (both poles are real problems).
  */
 export const HANDLING_TRAIT_CHIP_META: Record<
@@ -140,7 +140,7 @@ export const HANDLING_TRAIT_CHIP_META: Record<
 } as const;
 
 export const HANDLING_SEVERITY_CHIP_LABELS: Record<1 | 2 | 3, string> = {
-  1: "slight",
+  1: "mild",
   2: "moderate",
   3: "severe",
 };
@@ -939,6 +939,14 @@ export function sanitizeHandlingUiState(ui: HandlingAssessmentUiState): Handling
 function primaryFocusTraitShortLabel(axis: HandlingTraitAxisKey, v: PhaseBalance): string {
   const u = HANDLING_TRAIT_AXIS_UI[axis];
   const mag = phaseBalanceMagnitudeWord(v);
+  // Single-pole traits (only one problem direction) never carry meaningful sign — the value is
+  // always the same polarity — so the signed number is noise. Word-only: "Traction rolling (mild)".
+  // The bipolar balance axis (steering feel) keeps the sign, where it actually denotes direction.
+  const meta = (HANDLING_TRAIT_CHIP_META as Partial<
+    Record<HandlingTraitAxisKey, { problemPoles: Array<{ sign: -1 | 1; label: string }> }>
+  >)[axis];
+  const singlePole = meta?.problemPoles.length === 1;
+  if (singlePole) return mag ? `${u.title} (${mag})` : u.title;
   const magSeg = mag ? ` — ${mag}` : "";
   return `${u.title}${magSeg}: ${v > 0 ? "+" : ""}${v}`;
 }

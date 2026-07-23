@@ -40,6 +40,14 @@ test("parseLapHistoryQueryIntent extracts track", () => {
   assert.equal(intent!.tireLabelContains, null);
 });
 
+test("parseLapHistoryQueryIntent rejects a trailing clause as a track name", () => {
+  // Twin of the planning-route 2/10: "on how the previous day there went" is not a track.
+  const intent = parseLapHistoryQueryIntent(
+    "what was my best lap based on how the previous day there went"
+  );
+  assert.equal(intent, null);
+});
+
 test("parseLapHistoryQueryIntent splits track and tire qualifier", () => {
   const intent = parseLapHistoryQueryIntent(
     "what is the fastest lap ive done at tftr on vaulk tires"

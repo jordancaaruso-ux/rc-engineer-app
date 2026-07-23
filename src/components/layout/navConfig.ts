@@ -34,9 +34,6 @@ export function isHiddenNavRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
   if (pathname === "/login" || pathname.startsWith("/login/")) return true;
   if (pathname === "/privacy") return true;
-  // The set-up wizard is a takeover: nav chrome undercuts that, and the dock's
-  // Log-run circle would jump a car-less new user straight past it.
-  if (pathname === "/welcome") return true;
   if (pathname.startsWith("/api/")) return true;
   return false;
 }

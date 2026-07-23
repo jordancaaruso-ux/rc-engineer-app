@@ -58,6 +58,51 @@ Trace of how aggregation reaches the LLM (`setupSpreadForEngineer.ts` → `engin
 
 ---
 
+## Session findings (2026-07-23) — newest; supersedes above where they differ
+
+**The flywheel now has data (it was empty at rev 3).** First `failure-distribution.ts
+--classify --production` over **11 rated answers** (avg **5.55/10**, mixed gpt-4o +
+gpt-5.5 eras): primary **genericness 4 (36%)**, misdiagnosis 1 (isolated — not a KB gap,
+not despite-coverage), **miscalibration 0**, clean 5 (45%). Weakest rubric bars:
+**prediction 0.36/1**, **actionability 1.36/3**; **no_prediction 45%**. Read with caveats:
+
+- **Genericness is inflated.** ~2 of the 4 are pre-switch gpt-4o answers, and the
+  classifier tagged the **two track-error refusals as "genericness"** — they are the
+  routing bug, which the taxonomy has no class for. True current-model genericness ≈ 1–2,
+  concentrated on hypotheticals / short follow-ups.
+- **No keystone warranted.** misdiagnosis isolated, miscalibration 0 — consistent with the
+  frontier model diagnosing/calibrating fine. The real measurable lever is **prediction +
+  one-prioritized-action discipline**, not the diagnosis or calibration keystones.
+- **Two taxonomy blind spots, proven by real data:** `route_error` (the worst-scored 2/10
+  UX failures) and `verbosity/presentation` (the most frequent founder note) are invisible
+  to the four-class axis. **Proposed:** add both as secondary signals so the flywheel can
+  see the founder's actual top complaints.
+
+**Fixed this session:** the meeting-prep / lap-history track-resolution bug (both 2/10s).
+Planning + lap-history parsers now share one non-track-lead guard
+(`src/lib/engineerPhase5/trackNameGuard.ts`); regression tests added. Removes the
+worst-scored failures from the pool.
+
+**Scope reality — derived geometry is Awesomatix-A800-only.** `resolvePackForSnapshot`
+matches exactly one pack (`AWESOMATIX_A800_PACK`) by shim-key fingerprint; every other car
+→ all `derived_*` null → **no computed roll-center / true arm angles**. The "true angles
+retire the index proxies" win applies to A800 sheets only; on all other platforms the
+Engineer reasons from raw shims + general KB + community spread. The pack registry is built
+to scale (VSUSP admin import) but today = one platform. **KB implication:** suggestion
+logic that leans on derived geometry must degrade gracefully for non-A800 cars, and the KB
+must carry the general-physics fallback those cars depend on.
+
+**New action item (founder-gated) — setup-suggestion → KB-change review.** Before any
+calibration/KB edits (the parked step-5 nuances: less-camber-after-improvement, the
+0.1-vs-0.2 ARB split, ackermann↔steering-lock), **Jordan reviews the Engineer's setup-change
+suggestions and decides, per case, whether the KB itself should change** vs whether it's a
+prompt/wording issue. Only KB-change candidates that survive that review go to the
+`AGENTS.md` propose-diff-and-approve gate; then we discuss what to do. This keeps the
+calibration keystone honest — KB edits are driven by reviewed evidence, not by the model's
+own phrasing. **Status: open — founder review pending.**
+
+---
+
 ## The fundamental decomposition
 
 A best-possible suggestion is four things. Each is a distinct demand on the knowledge
@@ -280,6 +325,12 @@ next month. Both proposed in chat, founder-gated where they touch KB content, pe
 ---
 
 **Changelog:**
+- 2026-07-23 — first production failure-distribution run (n=11, avg 5.55): genericness
+  inflated by mixed-era answers + route-error mislabeling; prediction/actionability the
+  weakest bars; no keystone warranted. Proposed `route_error` + `verbosity` taxonomy
+  signals. Fixed the track-resolution bug (shared `trackNameGuard`). Documented
+  derived-geometry = A800-only scope. Added the founder-gated setup-suggestion → KB-change
+  review as the gate before step-5 calibration/KB edits.
 - 2026-07-08 rev 3 — **step 1 built + run; premise revised.** Added "Session findings & revised direction" up top: both pre-nominated keystones ruled out on gpt-5.5 (misdiagnosis/miscalibration 0/30); differential grounding refuted the genericness alarm as a single-context artifact; production flywheel empty (3 rated answers). Founder redefined the target to best-possible-relentless (not failure-free), with aggregation judgment (incl. data-density trust + "median is not a target") as the sharpest axis. Shipped first quality fix: `openaiEngineer.ts` rule (12) sample-size trust + rule-10 dead-reference fix. Sequencing revised (measure real+cold → improvement engine → aggregation-judgment eval → shelve steps 2a–5 → moat rises).
 - 2026-07-08 rev 2 — third review round: keystone ranking now earned by failure-class
   data, not asserted; claim atomization inserted as step 2a; disambiguators data-first

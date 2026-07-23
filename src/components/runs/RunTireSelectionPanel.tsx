@@ -7,6 +7,7 @@ import { Eyebrow } from "@/components/ui/panel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatSessionChain } from "@/lib/tires/tireSetSessionChain";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
+import { TIRE_MARK_MAX, normalizeTireMark, suggestTireMark } from "@/lib/tires/tireMark";
 
 export type RunTireSetOption = {
   id: string;
@@ -16,12 +17,14 @@ export type RunTireSetOption = {
   insertLabel?: string | null;
   wheelLabel?: string | null;
   specificModel?: string | null;
+  /** Optional physical mark written on the sidewall (e.g. "7"). */
+  mark?: string | null;
   tireTypeId?: string | null;
   tireType?: { id: string; displayName: string; modelCode: string } | null;
 };
 
 /** NEW-set choice is pure form state — the set row is created when the run is saved. */
-export type NewTireSetIntent = { tireTypeId: string; displayName: string };
+export type NewTireSetIntent = { tireTypeId: string; displayName: string; mark?: string | null };
 
 /** Picker row: a set plus its derived, zero-typing identity (wear, chain, recency, feel). */
 type PickerRow = RunTireSetOption & {
@@ -115,6 +118,20 @@ export function RunTireSelectionPanel({
     []
   );
   const [showCompoundPicker, setShowCompoundPicker] = useState(false);
+  // Add-a-set sub-flow: age-neutral entry, then fresh-or-used. `createFork` stays null until the
+  // driver answers, so a set with history is never pre-labelled "fresh". `markDraft` is the raw
+  // sidewall mark being typed; it's pushed (normalized) into the new-set intent as it changes.
+  const [createFork, setCreateFork] = useState<"fresh" | "used" | null>(null);
+  const [markDraft, setMarkDraft] = useState("");
+  const [markNudgeDismissed, setMarkNudgeDismissed] = useState(false);
+  // Inline mark editing for a set you already own (the picker doubles as light inventory admin).
+  const [markEditingId, setMarkEditingId] = useState<string | null>(null);
+  const [markEditValue, setMarkEditValue] = useState("");
+  const [markSaving, setMarkSaving] = useState(false);
+  const markSavingRef = useRef(false);
+  // "write it on the sidewall" reinforcement after naming a set (single row / bulk).
+  const [justMarkedId, setJustMarkedId] = useState<string | null>(null);
+  const [bulkWriteNums, setBulkWriteNums] = useState<string[] | null>(null);
   const defaultTireSetAppliedRef = useRef(false);
   /** Selection token last mirrored into `viewGroupKey`, so picker refetches don't snap the view. */
   const lastSyncedSelectionRef = useRef<string | null>(null);
@@ -205,6 +222,30 @@ export function RunTireSelectionPanel({
     [rows, tireSetId]
   );
 
+  // The single most-recently-used set across all compounds — it gets the explicit
+  // "ran it last" words (and is auto-selected), so recency never masquerades as a badge.
+  const mostRecentSetId = useMemo(() => {
+    let bestId: string | null = null;
+    let bestMs = 0;
+    for (const r of rows) {
+      const ms = r.lastUsedAt ? new Date(r.lastUsedAt).getTime() : 0;
+      if (ms > bestMs) {
+        bestMs = ms;
+        bestId = r.id;
+      }
+    }
+    return bestId;
+  }, [rows]);
+
+  // Leaving the add-a-set flow (selecting an existing set, or clearing) resets the fork and
+  // mark draft so the next "Add a set" always starts age-neutral.
+  useEffect(() => {
+    if (!newSetIntent) {
+      setCreateFork(null);
+      setMarkDraft("");
+    }
+  }, [newSetIntent]);
+
   // A controlled event locks the compound list to the mandated tire (always
   // keeping any already-selected set visible so history is never hidden).
   const specLocked = Boolean(specTireType);
@@ -259,8 +300,16 @@ export function RunTireSelectionPanel({
 
   function handleNewSet(group: CompoundGroup) {
     if (!group.tireTypeId) return;
+    beginAddSet(group.tireTypeId, group.display, group.rows);
+  }
+
+  // Age-neutral "Add a set": pre-loads the suggested (lowest-free) mark so a set is born named.
+  function beginAddSet(tireTypeId: string, display: string, existingRows: PickerRow[]) {
+    const suggested = suggestTireMark(existingRows.map((r) => r.mark));
+    setCreateFork(null);
+    setMarkDraft(suggested);
     onSelectExistingSet("", null);
-    onNewSetIntentChange({ tireTypeId: group.tireTypeId, displayName: group.display });
+    onNewSetIntentChange({ tireTypeId, displayName: display, mark: normalizeTireMark(suggested) });
     onPrefillClear?.();
   }
 
@@ -287,9 +336,7 @@ export function RunTireSelectionPanel({
     if (!existing || existing.rows.length === 0) {
       const display = option?.displayName ?? existing?.display ?? "";
       if (display) {
-        onSelectExistingSet("", null);
-        onNewSetIntentChange({ tireTypeId: id, displayName: display });
-        onPrefillClear?.();
+        beginAddSet(id, display, existing?.rows ?? []);
       }
     }
   }
@@ -318,9 +365,123 @@ export function RunTireSelectionPanel({
   );
   const hasSelection = Boolean(tireSetId || newSetIntent);
 
-  function nudge(delta: number) {
+  function nudge(delta: number, min = 0) {
     onRunsCompletedUserTouched();
-    onRunsCompletedChange(Math.max(0, runsCompleted + delta));
+    onRunsCompletedChange(Math.max(min, runsCompleted + delta));
+  }
+
+  // Fresh = brand-new rubber = always run 1, no counter. Used = has history, reveal the count.
+  function chooseFresh() {
+    setCreateFork("fresh");
+    onRunsCompletedUserTouched();
+    onRunsCompletedChange(0);
+  }
+  function chooseUsed() {
+    setCreateFork("used");
+    onRunsCompletedUserTouched();
+    onRunsCompletedChange(Math.max(1, runsCompleted));
+  }
+  function handleMarkChange(raw: string) {
+    setMarkDraft(raw);
+    // Same compound → NewRunForm preserves runsCompleted; only the mark updates on the intent.
+    if (newSetIntent) {
+      onNewSetIntentChange({ ...newSetIntent, mark: normalizeTireMark(raw) });
+    }
+  }
+
+  const activeUnmarked = activeGroup
+    ? activeGroup.rows.filter((r) => !normalizeTireMark(r.mark))
+    : [];
+  const showMarkNudge = !specLocked && !markNudgeDismissed && activeUnmarked.length >= 2;
+
+  // Lowest-free number suggested for each unmarked set of the active compound (ascending, recycled).
+  const suggestedByRow = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!activeGroup) return map;
+    const taken = new Set<number>();
+    for (const r of activeGroup.rows) {
+      const m = normalizeTireMark(r.mark);
+      if (m && /^\d+$/.test(m)) taken.add(parseInt(m, 10));
+    }
+    let n = 1;
+    for (const r of activeGroup.rows) {
+      if (normalizeTireMark(r.mark)) continue;
+      while (taken.has(n)) n++;
+      map.set(r.id, String(n));
+      taken.add(n);
+    }
+    return map;
+  }, [activeGroup]);
+
+  function startMarkEdit(row: PickerRow) {
+    setMarkEditingId(row.id);
+    setMarkEditValue(normalizeTireMark(row.mark) ?? "");
+  }
+  function cancelMarkEdit() {
+    setMarkEditingId(null);
+    setMarkEditValue("");
+  }
+  async function commitMark(rowId: string, mark: string | null) {
+    await fetch(`/api/tire-sets/${encodeURIComponent(rowId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mark }),
+    });
+  }
+  // One tap: accept the suggested number for an unnamed set.
+  async function markOne(row: PickerRow, mark: string) {
+    if (markSavingRef.current) return;
+    markSavingRef.current = true;
+    setMarkSaving(true);
+    setBulkWriteNums(null);
+    try {
+      await commitMark(row.id, mark);
+      await loadPickerRows();
+      setJustMarkedId(row.id);
+    } catch {
+      // leave as-is; retryable
+    } finally {
+      markSavingRef.current = false;
+      setMarkSaving(false);
+    }
+  }
+  // Name every unnamed set of the compound at once.
+  async function markAll() {
+    if (markSavingRef.current || !activeGroup) return;
+    const targets = activeGroup.rows
+      .filter((r) => !normalizeTireMark(r.mark) && suggestedByRow.get(r.id))
+      .map((r) => ({ id: r.id, mark: suggestedByRow.get(r.id) as string }));
+    if (targets.length === 0) return;
+    markSavingRef.current = true;
+    setMarkSaving(true);
+    setJustMarkedId(null);
+    try {
+      for (const t of targets) await commitMark(t.id, t.mark);
+      setBulkWriteNums(targets.map((t) => t.mark));
+    } catch {
+      // partial success is fine — the refetch shows what stuck
+    } finally {
+      await loadPickerRows();
+      markSavingRef.current = false;
+      setMarkSaving(false);
+    }
+  }
+  async function saveMarkEdit(rowId: string) {
+    if (markSavingRef.current) return; // dedupe Enter-then-blur double fire
+    markSavingRef.current = true;
+    const mark = normalizeTireMark(markEditValue);
+    setMarkSaving(true);
+    try {
+      await commitMark(rowId, mark);
+      await loadPickerRows();
+      if (mark) setJustMarkedId(rowId);
+    } catch {
+      // Leave the row as-is on failure; the driver can retry.
+    } finally {
+      markSavingRef.current = false;
+      setMarkSaving(false);
+      cancelMarkEdit();
+    }
   }
 
   return (
@@ -384,7 +545,7 @@ export function RunTireSelectionPanel({
         {pickerLoaded && groups.length === 0 ? (
           <p className="text-[11px] text-muted-foreground leading-snug">
             No tire sets yet. Tap <span className="font-medium text-foreground">+ Compound</span> to
-            pick what you&apos;re running — your first set starts on this log.
+            pick what you&apos;re running, then tell us if the set is fresh or already has runs.
           </p>
         ) : null}
 
@@ -393,31 +554,113 @@ export function RunTireSelectionPanel({
             {activeGroup.rows.map((row) => {
               const selected = row.id === tireSetId;
               const chain = formatSessionChain(row.chainItems);
+              const mark = normalizeTireMark(row.mark);
+              const runLabel = `${row.runCount} ${row.runCount === 1 ? "run" : "runs"}`;
+              const isMostRecent = row.id === mostRecentSetId && Boolean(row.lastUsedAt);
+              const editing = markEditingId === row.id;
+              const suggested = suggestedByRow.get(row.id);
+              const justWritten = justMarkedId === row.id && Boolean(mark);
+              const wear = `${runLabel}${chain ? ` · ${chain}` : row.lastUsedAt ? "" : " · not used yet"}`;
               return (
-                <button
-                  key={row.id}
-                  type="button"
-                  className={rowClass(selected)}
-                  aria-pressed={selected}
-                  onClick={() => handleSelectRow(row)}
-                >
-                  <span className="w-16 shrink-0 font-mono text-sm font-medium tabular-nums text-foreground">
-                    {row.runCount} {row.runCount === 1 ? "run" : "runs"}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
-                    {chain || (row.lastUsedAt ? "—" : "not used yet")}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {row.lastRating != null ? (
+                <div key={row.id} className={cn(rowClass(selected), "cursor-default")}>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    aria-pressed={selected}
+                    onClick={() => handleSelectRow(row)}
+                  >
+                    {mark ? (
+                      <span className="inline-flex w-11 shrink-0 flex-col items-center rounded-md border border-border px-1 py-0.5 leading-none">
+                        <span className="font-mono text-sm font-semibold text-foreground">{mark}</span>
+                        <span className="mt-0.5 font-mono text-[8px] uppercase tracking-wide text-muted-foreground">
+                          mark
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex w-11 shrink-0 items-center justify-center rounded-md border border-dashed border-border py-1.5 font-mono text-base font-light text-muted-foreground">
+                        ?
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={cn(
+                          "block truncate text-[13px]",
+                          mark ? "font-medium text-foreground" : "font-medium text-muted-foreground"
+                        )}
+                      >
+                        {mark ? `Marked ${mark}` : "Unnamed set"}
+                      </span>
+                      <span className="block truncate font-mono text-[11px] text-muted-foreground">{wear}</span>
+                    </span>
+                  </button>
+                  <span className="flex shrink-0 items-center gap-2 pl-1">
+                    {mark && row.lastRating != null ? (
                       <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
                         {row.lastRating}/10
                       </span>
                     ) : null}
-                    {row.lastUsedAt ? (
+                    {isMostRecent ? (
+                      <span className="font-mono text-[10px] text-muted-foreground">ran it last</span>
+                    ) : mark && row.lastUsedAt ? (
                       <RelativeTime iso={row.lastUsedAt} fallback="" className="text-[10px]" />
                     ) : null}
+                    {editing ? (
+                      <input
+                        autoFocus
+                        value={markEditValue}
+                        maxLength={TIRE_MARK_MAX}
+                        disabled={markSaving}
+                        placeholder="—"
+                        aria-label="Mark for this set"
+                        className="w-12 rounded border border-border bg-background px-1 py-0.5 text-center font-mono text-xs text-foreground"
+                        onChange={(e) => setMarkEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void saveMarkEdit(row.id);
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            cancelMarkEdit();
+                          }
+                        }}
+                        onBlur={() => void saveMarkEdit(row.id)}
+                      />
+                    ) : justWritten ? (
+                      <span className="font-mono text-[10px] text-primary">✎ write {mark} on it</span>
+                    ) : mark ? (
+                      <button
+                        type="button"
+                        className="rounded px-1 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+                        aria-label="Edit mark"
+                        onClick={() => startMarkEdit(row)}
+                      >
+                        edit
+                      </button>
+                    ) : (
+                      <>
+                        {suggested ? (
+                          <button
+                            type="button"
+                            className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                            aria-label={`Mark this set ${suggested}`}
+                            disabled={markSaving}
+                            onClick={() => markOne(row, suggested)}
+                          >
+                            Mark {suggested}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="rounded px-1 py-0.5 text-[11px] leading-none text-muted-foreground hover:text-foreground"
+                          aria-label="Type a custom mark"
+                          onClick={() => startMarkEdit(row)}
+                        >
+                          ✎
+                        </button>
+                      </>
+                    )}
                   </span>
-                </button>
+                </div>
               );
             })}
             {activeGroup.tireTypeId ? (
@@ -427,30 +670,147 @@ export function RunTireSelectionPanel({
                 aria-pressed={newSelected}
                 onClick={() => handleNewSet(activeGroup)}
               >
-                <span className="w-16 shrink-0 font-mono text-sm font-medium text-foreground">NEW</span>
-                <span className="min-w-0 flex-1 truncate text-left text-[11px] text-muted-foreground">
-                  first run on a fresh set
+                <span className="w-16 shrink-0 text-center font-mono text-lg font-light text-muted-foreground">
+                  +
+                </span>
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block text-[13px] font-medium text-foreground">Add a set</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    new tires — or one that already has runs
+                  </span>
                 </span>
               </button>
             ) : null}
+          </div>
+        ) : null}
+
+        {bulkWriteNums && bulkWriteNums.length > 0 ? (
+          <div className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-[11px] leading-snug text-muted-foreground">
+            Named <span className="font-medium text-primary">{bulkWriteNums.join(", ")}</span>. Grab a
+            paint pen and write each number on its set — then they&apos;re never mixed up again.
+          </div>
+        ) : showMarkNudge ? (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2 text-[11px] text-muted-foreground">
+            <span className="flex-1 leading-snug">
+              {activeUnmarked.length} {activeGroup?.display} sets look alike — name them so they never
+              get mixed up.
+            </span>
+            <button
+              type="button"
+              className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              disabled={markSaving}
+              onClick={markAll}
+            >
+              Mark all {activeUnmarked.length}
+            </button>
+            <button
+              type="button"
+              className="shrink-0 leading-none text-muted-foreground hover:text-foreground"
+              aria-label="Dismiss"
+              onClick={() => setMarkNudgeDismissed(true)}
+            >
+              ×
+            </button>
           </div>
         ) : null}
       </div>
 
       {copyTireWarning ? <div className="text-[11px] text-muted-foreground">{copyTireWarning}</div> : null}
 
-      {hasSelection ? (
+      {newSelected ? (
+        <div className="space-y-2.5 rounded-xl border border-border bg-secondary/40 px-3 py-3">
+          <div className="space-y-1.5">
+            <div className="text-[11px] text-muted-foreground">
+              Fresh tires, or does this set already have runs?
+            </div>
+            <div className="flex gap-1.5" role="group" aria-label="Set condition">
+              <button
+                type="button"
+                aria-pressed={createFork === "fresh"}
+                className={chipClass(createFork === "fresh")}
+                onClick={chooseFresh}
+              >
+                Fresh · new rubber
+              </button>
+              <button
+                type="button"
+                aria-pressed={createFork === "used"}
+                className={chipClass(createFork === "used")}
+                onClick={chooseUsed}
+              >
+                Used · has runs
+              </button>
+            </div>
+          </div>
+
+          {createFork === "used" ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] text-muted-foreground">Runs it&apos;s already done</span>
+              <div className="flex shrink-0 items-center gap-1.5" role="group" aria-label="Prior run count">
+                <button
+                  type="button"
+                  className="btn-surface h-7 w-7 font-mono text-sm leading-none"
+                  aria-label="One fewer prior run"
+                  disabled={runsCompleted <= 1}
+                  onClick={() => nudge(-1, 1)}
+                >
+                  −
+                </button>
+                <span className="w-6 text-center font-mono text-sm tabular-nums text-foreground">
+                  {runsCompleted}
+                </span>
+                <button
+                  type="button"
+                  className="btn-surface h-7 w-7 font-mono text-sm leading-none"
+                  aria-label="One more prior run"
+                  onClick={() => nudge(1, 1)}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="tire-mark" className="text-[11px] text-muted-foreground">
+              Mark
+            </label>
+            <input
+              id="tire-mark"
+              value={markDraft}
+              maxLength={TIRE_MARK_MAX}
+              onChange={(e) => handleMarkChange(e.target.value)}
+              placeholder="—"
+              aria-label="Mark written on the tire"
+              className="w-16 rounded-md border border-border bg-background px-2 py-1 font-mono text-sm text-foreground"
+            />
+            <span className="text-[10px] text-muted-foreground">write it on the sidewall too</span>
+          </div>
+
+          <div className="text-[11px] text-muted-foreground leading-snug">
+            {createFork === null ? (
+              "Choose fresh or used to continue."
+            ) : createFork === "fresh" ? (
+              <>
+                This log is <span className="font-medium text-foreground">run #1</span> on a fresh set
+                {markDraft.trim() ? ` · Marked ${markDraft.trim()}` : ""}.
+              </>
+            ) : (
+              <>
+                This log is{" "}
+                <span className="font-medium text-foreground">run #{runsCompleted + 1}</span> on a used
+                set — {runsCompleted} prior run{runsCompleted === 1 ? "" : "s"}
+                {markDraft.trim() ? ` · Marked ${markDraft.trim()}` : ""}.
+              </>
+            )}
+          </div>
+        </div>
+      ) : hasSelection ? (
         <div className="flex items-center justify-between gap-3">
           <div className="text-[11px] text-muted-foreground leading-snug">
             This log is{" "}
-            <span className="font-medium text-foreground">run #{runsCompleted + 1}</span>
-            {newSelected ? " on a fresh set" : " on these"}
-            {newSelected && runsCompleted > 0
-              ? ` — counting ${runsCompleted} unlogged prior run${runsCompleted === 1 ? "" : "s"}`
-              : runsCompleted === 0
-                ? " — first run on them"
-                : ""}
-            .
+            <span className="font-medium text-foreground">run #{runsCompleted + 1}</span> on these
+            {runsCompleted === 0 ? " — first run on them" : ""}.
           </div>
           <div className="flex shrink-0 items-center gap-1.5" role="group" aria-label="Adjust prior run count">
             <button

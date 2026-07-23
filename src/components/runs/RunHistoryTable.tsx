@@ -22,6 +22,7 @@ import {
   computeTireIndicatorsByRunId,
   type RunTireIndicator,
 } from "@/lib/runs/tireSetChange";
+import { formatMark } from "@/lib/tires/tireMark";
 import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import {
@@ -117,7 +118,7 @@ type Run = {
   conditionsWindKph?: number | null;
   car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
   track?: { id: string; name: string } | null;
-  tireSet?: { id: string; label: string; setNumber: number | null } | null;
+  tireSet?: { id: string; label: string; setNumber: number | null; mark?: string | null } | null;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
   tirePrep?: unknown;
@@ -1009,7 +1010,7 @@ function RunDetail({
   const runInstant = resolveRunDisplayInstant(run);
   const dateTimeLabel = formatRunDateTime(runInstant, displayTimeZone);
   const tireSetDisplay = run.tireSet
-    ? `${run.tireSet.label} · run ${run.tireRunNumber}`
+    ? `${formatMark(run.tireSet.mark) ?? run.tireSet.label} · run ${run.tireRunNumber}`
     : "—";
   // Additive well = the product; Tire prep well = the application sequence.
   // Compound toggles (ST205, ABH, AT15, …) are setup-sheet parameters, not tire
