@@ -1,17 +1,22 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { VerifyRequestAutoAdvance } from "./VerifyRequestAutoAdvance";
 
 export default async function VerifyRequestPage({
   searchParams,
 }: {
-  searchParams: Promise<{ delivery?: string }>;
+  searchParams: Promise<{ delivery?: string; from?: string }>;
 }): Promise<ReactNode> {
   const sp = await searchParams;
   const consoleOnly = sp.delivery === "console";
+  const callbackUrl = sp.from && sp.from.startsWith("/") ? sp.from : "/";
 
   return (
     <main className="mx-auto max-w-md px-4 py-16 text-center">
+      {/* Once the link is opened in this same browser, the session cookie lands here too —
+          detect it and move straight into the app instead of leaving the user stuck here. */}
+      <VerifyRequestAutoAdvance callbackUrl={callbackUrl} />
       <h1 className="page-title">Check your email</h1>
       {consoleOnly ? (
         <div className="mt-4 text-left" role="status">
@@ -35,6 +40,9 @@ export default async function VerifyRequestPage({
           If this address is on the invite list, we sent a sign-in link. It may take a minute to arrive.
         </p>
       )}
+      <p className="mt-2 text-xs text-muted-foreground">
+        Open the link on this device and you&rsquo;ll be signed in here automatically.
+      </p>
       <p className="mt-4 text-sm">
         <Link href="/login" className="text-accent underline-offset-2 hover:underline">
           Use a different email
