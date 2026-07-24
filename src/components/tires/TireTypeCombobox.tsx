@@ -47,6 +47,7 @@ export function TireTypeCombobox({
   const [newDisplayName, setNewDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<TireTypeOption[]>([]);
 
   // Notify the parent of the resolved option through a stable funnel:
   //  - a ref keeps the latest callback without putting it in effect deps
@@ -119,6 +120,34 @@ export function TireTypeCombobox({
     };
   }, [value, options, recentOptions, reportSelected]);
 
+  // Convergence steering: while typing a new type, surface existing near-matches so the driver
+  // adopts one instead of forking a duplicate. Advisory only — creating still works.
+  useEffect(() => {
+    if (!showCreate) {
+      setSuggestions([]);
+      return;
+    }
+    const q = newDisplayName.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/tire-types?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+        const data = (await res.json()) as { tireTypes?: TireTypeOption[] };
+        if (!cancelled) setSuggestions((data.tireTypes ?? []).slice(0, 3));
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [showCreate, newDisplayName]);
+
   const recentIds = new Set(recentOptions.map((o) => o.id));
   const rest = options.filter((o) => !recentIds.has(o.id));
   const known = new Set([...recentOptions, ...options].map((o) => o.id));
@@ -132,6 +161,13 @@ export function TireTypeCombobox({
     reportSelected(opt);
     setShowCreate(false);
     setError(null);
+  }
+
+  function adopt(option: TireTypeOption) {
+    setOptions((prev) => (prev.some((o) => o.id === option.id) ? prev : [option, ...prev]));
+    pick(option.id);
+    setNewDisplayName("");
+    setSuggestions([]);
   }
 
   function handleChange(next: string) {
@@ -231,6 +267,23 @@ export function TireTypeCombobox({
             onChange={(e) => setNewDisplayName(e.target.value)}
             aria-label="Tire type name"
           />
+          {suggestions.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-[11px] text-muted-foreground">Did you mean an existing type?</p>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => adopt(s)}
+                    className="rounded-md border border-primary/40 px-2 py-1 text-[11px] text-primary hover:bg-muted/50"
+                  >
+                    {s.displayName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <button

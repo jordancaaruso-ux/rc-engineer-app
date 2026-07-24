@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured, tierForPriceId } from "@/lib/stripe";
+import { deriveSubscriptionSchedule } from "@/lib/stripeSubscriptionSync";
 
 /**
  * Stripe webhook — the ONLY source of truth for entitlement. Public (server-to-server), verified
@@ -21,14 +22,7 @@ async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
 
   const priceId = sub.items.data[0]?.price?.id ?? null;
   const tier = tierForPriceId(priceId);
-  // `current_period_end` lives on the subscription in older API versions and on the item in newer
-  // ones — read defensively so this survives an account's API version.
-  const periodEndUnix =
-    (sub as unknown as { current_period_end?: number }).current_period_end ??
-    (sub.items?.data?.[0] as unknown as { current_period_end?: number } | undefined)
-      ?.current_period_end ??
-    null;
-  const currentPeriodEnd = periodEndUnix ? new Date(periodEndUnix * 1000) : null;
+  const { currentPeriodEnd, cancelAtPeriodEnd } = deriveSubscriptionSchedule(sub);
 
   const data = {
     stripeSubscriptionId: sub.id,
@@ -37,7 +31,7 @@ async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
     tier,
     priceId,
     currentPeriodEnd,
-    cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
+    cancelAtPeriodEnd,
   };
 
   await prisma.subscription.upsert({

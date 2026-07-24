@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedAdditiveTypes } from "@/lib/additives/ensureSeedAdditiveTypes";
 import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
@@ -11,6 +10,7 @@ const ADDITIVE_TYPE_SELECT = {
   id: true,
   displayName: true,
   modelCode: true,
+  verifiedAt: true,
 } as const;
 
 export async function GET(request: Request) {
@@ -49,6 +49,8 @@ export async function GET(request: Request) {
     orderBy: [{ displayName: "asc" }],
     take,
   });
+  // Verified-first (stable → alphabetical within each group). At launch all null → unchanged.
+  additiveTypes.sort((a, b) => (a.verifiedAt ? 0 : 1) - (b.verifiedAt ? 0 : 1));
   return NextResponse.json({ additiveTypes });
 }
 
@@ -57,11 +59,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   try {
+    // Open create (any signed-in user). New rows land unverified → surfaced in /admin/review
+    // and the founder is pinged. See docs/ASSET_ACCESS_NORTH_STAR.md.
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!isAuthAdminEmail(user.email)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
     const body = (await request.json()) as {
       displayName?: string;
       modelCode?: string;

@@ -9,6 +9,13 @@ export type BillingPlan = {
   label: string;
 };
 
+export type BillingSubscription = {
+  tier: string;
+  status: string;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+};
+
 export function BillingClient({
   plans,
   entitled,
@@ -16,6 +23,7 @@ export function BillingClient({
   grandfathered,
   hasCustomer,
   enforced,
+  subscription,
 }: {
   plans: BillingPlan[];
   entitled: boolean;
@@ -23,6 +31,7 @@ export function BillingClient({
   grandfathered: boolean;
   hasCustomer: boolean;
   enforced: boolean;
+  subscription: BillingSubscription | null;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +60,17 @@ export function BillingClient({
 
   return (
     <div className="flex flex-col gap-4">
+      {subscription && (
+        <div className="rounded-lg border border-neutral-300 px-4 py-3 text-sm dark:border-neutral-700">
+          <span className="font-medium">Current subscription:</span>{" "}
+          {subscription.tier} · {subscription.status}
+          {subscription.currentPeriodEnd &&
+            ` · ${subscription.cancelAtPeriodEnd ? "ends" : "renews"} ${new Date(
+              subscription.currentPeriodEnd,
+            ).toLocaleDateString()}`}
+        </div>
+      )}
+
       <p className="text-sm text-neutral-500">
         {grandfathered
           ? "You have full access as an existing member — no payment needed."

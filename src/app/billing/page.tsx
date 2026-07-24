@@ -1,4 +1,5 @@
 import { requireCurrentUser } from "@/lib/currentUser";
+import { prisma } from "@/lib/prisma";
 import { getEntitlement } from "@/lib/entitlement";
 import { isBillingEnforced } from "@/lib/entitlementLogic";
 import { getPricePlans } from "@/lib/stripe";
@@ -15,6 +16,15 @@ const TIER_LABEL: Record<string, string> = { standard: "Standard", pro: "Pro" };
 export default async function BillingPage() {
   const user = await requireCurrentUser();
   const entitlement = await getEntitlement(user);
+  const sub = await prisma.subscription.findUnique({ where: { userId: user.id } });
+  const subscription = sub
+    ? {
+        tier: sub.tier,
+        status: sub.status,
+        currentPeriodEnd: sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
+        cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      }
+    : null;
   const plans: BillingPlan[] = getPricePlans().map((p) => ({
     tier: p.tier,
     interval: p.interval,
@@ -32,6 +42,7 @@ export default async function BillingPage() {
         grandfathered={entitlement.grandfathered}
         hasCustomer={Boolean(user.stripeCustomerId)}
         enforced={isBillingEnforced()}
+        subscription={subscription}
       />
     </main>
   );

@@ -1,0 +1,603 @@
+﻿
+> rc-engineer@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.50.91:3000
+- Environments: .env.local
+✓ Ready in 609ms
+node.exe : ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: 
+https://nextjs.org/docs/messages/middleware-to-proxy
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (⚠ The "middlewa...leware-to-proxy:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+- Experiments (use with caution):
+  · optimizePackageImports
+  · staleTimes
+
+(node:11164) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of 
+file:///C:/Users/Jordan/rc-engineer-app/tailwind.config.ts?id=1784849717854 is not specified and it doesn't parse as 
+CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Jordan\rc-engineer-app\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 472ms (next.js: 302ms, proxy.ts: 5ms, application-code: 165ms)
+ GET /billing?checkout=success 200 in 3.1s (next.js: 1857ms, proxy.ts: 79ms, application-code: 1203ms)
+[browser] Image with src "/brand/jrc-mark-white.svg" was detected as the Largest Contentful Paint (LCP). Please add 
+the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+ GET /api/runs/today-draft 200 in 248ms (next.js: 54ms, proxy.ts: 28ms, application-code: 166ms)
+ GET /api/profile-image?v=4224593923 200 in 785ms (next.js: 216ms, proxy.ts: 40ms, application-code: 529ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 92ms (next.js: 37ms, proxy.ts: 2ms, application-code: 53ms)
+ POST /api/billing/checkout 200 in 962ms (next.js: 227ms, proxy.ts: 9ms, application-code: 726ms)
+ GET /billing?status=cancel 200 in 186ms (next.js: 21ms, proxy.ts: 6ms, application-code: 159ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 62ms (next.js: 11ms, proxy.ts: 4ms, application-code: 48ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 53ms (next.js: 4ms, proxy.ts: 4ms, application-code: 46ms)
+ GET /api/runs/today-draft 200 in 106ms (next.js: 5ms, proxy.ts: 45ms, application-code: 56ms)
+[browser] Uncaught Error: Hydration failed because the server rendered text didn't match the client. As a result this 
+tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+      <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+        <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+          <LoadingBoundary name="billing/" loading={null}>
+            <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <InnerLayoutRouter url="/billing?s..." tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                    <SegmentViewNode type="page" pagePath="billing/pa...">
+                      <SegmentTrieNode>
+                      <BillingPage>
+                        <main className="mx-auto ma...">
+                          <h1>
+                          <BillingClient plans={[...]} entitled={true} tier="pro" grandfathered={true} 
+hasCustomer={true} ...>
+                            <div className="flex flex-...">
+                              <div className="rounded-lg...">
+                                <span>
++                               {" · renews 24/08/2026"}
+-                               {" · renews 8/24/2026"}
+                              ...
+                    ...
+                  ...
+        ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at div (<anonymous>)
+    at BillingClient (src/components/billing/BillingClient.tsx:64:9)
+    at BillingPage (src\app\billing\page.tsx:38:7)
+  62 |     <div className="flex flex-col gap-4">
+  63 |       {subscription && (
+> 64 |         <div className="rounded-lg border border-neutral-300 px-4 py-3 text-sm dark:border...
+     |         ^
+  65 |           <span className="font-medium">Current subscription:</span>{" "}
+  66 |           {subscription.tier} · {subscription.status}
+  67 |           {subscription.currentPeriodEnd &&
+ GET /billing?status=cancel 200 in 163ms (next.js: 43ms, proxy.ts: 18ms, application-code: 102ms)
+ GET /billing?status=cancel 200 in 203ms (next.js: 6ms, proxy.ts: 21ms, application-code: 176ms)
+ GET /billing?status=cancel 200 in 209ms (next.js: 6ms, proxy.ts: 37ms, application-code: 167ms)
+ GET /billing?status=cancel 200 in 244ms (next.js: 20ms, proxy.ts: 36ms, application-code: 188ms)
+ GET /billing?status=cancel 200 in 96ms (next.js: 3ms, proxy.ts: 20ms, application-code: 74ms)
+ GET /billing?status=cancel 200 in 107ms (next.js: 3ms, proxy.ts: 12ms, application-code: 91ms)
+ GET /billing?status=cancel 200 in 110ms (next.js: 4ms, proxy.ts: 15ms, application-code: 91ms)
+ GET /billing?status=cancel 200 in 351ms (next.js: 9ms, proxy.ts: 94ms, application-code: 248ms)
+ GET /billing?status=cancel 200 in 375ms (next.js: 35ms, proxy.ts: 36ms, application-code: 305ms)
+ GET /billing?status=cancel 200 in 376ms (next.js: 51ms, proxy.ts: 35ms, application-code: 290ms)
+ GET /billing?status=cancel 200 in 148ms (next.js: 8ms, proxy.ts: 26ms, application-code: 114ms)
+ GET /billing?status=cancel 200 in 94ms (next.js: 4ms, proxy.ts: 15ms, application-code: 74ms)
+ GET /billing?status=cancel 200 in 189ms (next.js: 7ms, proxy.ts: 23ms, application-code: 159ms)
+ GET /billing?status=cancel 200 in 204ms (next.js: 10ms, proxy.ts: 44ms, application-code: 150ms)
+ GET /billing?status=cancel 200 in 213ms (next.js: 27ms, proxy.ts: 43ms, application-code: 143ms)
+ GET /billing?status=cancel 200 in 201ms (next.js: 11ms, proxy.ts: 85ms, application-code: 105ms)
+ GET /billing?status=cancel 200 in 232ms (next.js: 45ms, proxy.ts: 43ms, application-code: 143ms)
+ GET /billing?status=cancel 200 in 201ms (next.js: 31ms, proxy.ts: 85ms, application-code: 85ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 78ms (next.js: 7ms, proxy.ts: 1774µs, application-code: 69ms)
+ POST /api/billing/portal 200 in 605ms (next.js: 170ms, proxy.ts: 5ms, application-code: 430ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+ GET /login?from=%2Fmanifest.webmanifest 200 in 81ms (next.js: 4ms, proxy.ts: 3ms, application-code: 74ms)
+ GET /api/runs/today-draft 200 in 652ms (next.js: 16ms, proxy.ts: 21ms, application-code: 615ms)
+ GET / 200 in 2.6s (next.js: 103ms, proxy.ts: 9ms, application-code: 2.5s)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 39ms (next.js: 3ms, proxy.ts: 1920µs, application-code: 34ms)
+ GET /settings 200 in 432ms (next.js: 309ms, proxy.ts: 21ms, application-code: 103ms)
+ GET /api/runs/today-draft 200 in 91ms (next.js: 1854µs, proxy.ts: 4ms, application-code: 85ms)
+ GET /api/settings/setup-sheet-manufacturer-baseline 200 in 300ms (next.js: 153ms, proxy.ts: 13ms, application-code: 134ms)
+ GET /api/settings/auth-allowed-emails 200 in 306ms (next.js: 133ms, proxy.ts: 13ms, application-code: 160ms)
+ GET /api/admin/engineer-gold-set?limit=40&status=pending 200 in 343ms (next.js: 173ms, proxy.ts: 12ms, application-code: 157ms)
+ GET /api/settings/setup-sheet-manufacturer-baseline 200 in 91ms (next.js: 3ms, proxy.ts: 7ms, application-code: 81ms)
+ GET /api/settings/auth-allowed-emails 200 in 86ms (next.js: 2ms, proxy.ts: 10ms, application-code: 73ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 46ms (next.js: 3ms, proxy.ts: 3ms, application-code: 40ms)
+ GET /api/admin/engineer-ratings?limit=30 200 in 459ms (next.js: 103ms, proxy.ts: 12ms, application-code: 344ms)
+ GET /api/admin/engineer-gold-set?limit=40&status=pending 200 in 140ms (next.js: 1981µs, proxy.ts: 6ms, application-code: 132ms)
+ GET /api/admin/engineer-ratings?limit=30 200 in 179ms (next.js: 2ms, proxy.ts: 4ms, application-code: 173ms)
+ GET /api/auth/session 200 in 666ms (next.js: 654ms, application-code: 12ms)
+ GET /api/auth/session 200 in 12ms (next.js: 6ms, application-code: 6ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+(node:11356) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of 
+file:///C:/Users/Jordan/rc-engineer-app/tailwind.config.ts?id=1784851265707 is not specified and it doesn't parse as 
+CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Jordan\rc-engineer-app\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ GET /api/auth/session 200 in 16ms (next.js: 8ms, application-code: 8ms)
+ GET /api/auth/session 200 in 8ms (next.js: 3ms, application-code: 6ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 86ms (next.js: 5ms, proxy.ts: 4ms, application-code: 77ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 38ms (next.js: 3ms, proxy.ts: 2ms, application-code: 33ms)
+ GET /api/runs/today-draft 200 in 485ms (next.js: 12ms, proxy.ts: 47ms, application-code: 425ms)
+ GET / 200 in 532ms (next.js: 4ms, proxy.ts: 9ms, application-code: 519ms)
+ GET / 200 in 484ms (next.js: 6ms, proxy.ts: 55ms, application-code: 423ms)
+ GET /runs/new 200 in 320ms (next.js: 3ms, proxy.ts: 58ms, application-code: 258ms)
+ GET /runs/new 200 in 1030ms (next.js: 573ms, proxy.ts: 6ms, application-code: 451ms)
+ GET /runs/new 200 in 300ms (next.js: 5ms, proxy.ts: 23ms, application-code: 271ms)
+ GET /runs/new 200 in 352ms (next.js: 3ms, proxy.ts: 21ms, application-code: 328ms)
+ GET /runs/new 200 in 401ms (next.js: 45ms, proxy.ts: 23ms, application-code: 333ms)
+ GET /runs/new 200 in 406ms (next.js: 22ms, proxy.ts: 23ms, application-code: 361ms)
+ GET /runs/new 200 in 214ms (next.js: 6ms, proxy.ts: 5ms, application-code: 203ms)
+ GET /runs/new 200 in 249ms (next.js: 3ms, proxy.ts: 10ms, application-code: 235ms)
+ GET /runs/new 200 in 325ms (next.js: 3ms, proxy.ts: 15ms, application-code: 307ms)
+ GET /runs/new 200 in 348ms (next.js: 4ms, proxy.ts: 32ms, application-code: 311ms)
+ GET /runs/new 200 in 323ms (next.js: 58ms, proxy.ts: 12ms, application-code: 253ms)
+ GET /runs/new 200 in 398ms (next.js: 5ms, proxy.ts: 17ms, application-code: 376ms)
+ GET /runs/new 200 in 250ms (next.js: 26ms, proxy.ts: 10ms, application-code: 213ms)
+ GET /runs/new 200 in 271ms (next.js: 4ms, proxy.ts: 12ms, application-code: 254ms)
+ GET /runs/new 200 in 537ms (next.js: 40ms, proxy.ts: 12ms, application-code: 485ms)
+ GET /runs/new 200 in 282ms (next.js: 3ms, proxy.ts: 4ms, application-code: 274ms)
+ GET /runs/new 200 in 394ms (next.js: 3ms, proxy.ts: 7ms, application-code: 384ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 244ms (next.js: 11ms, proxy.ts: 3ms, application-code: 230ms)
+ GET /api/runs/today-draft 200 in 319ms (next.js: 62ms, proxy.ts: 132ms, application-code: 125ms)
+ GET /api/settings/live-rc-driver 200 in 259ms (next.js: 25ms, proxy.ts: 17ms, application-code: 217ms)
+ GET /api/tracks 200 in 283ms (next.js: 69ms, proxy.ts: 16ms, application-code: 199ms)
+ GET /api/tire-sets 200 in 301ms (next.js: 20ms, proxy.ts: 178ms, application-code: 103ms)
+ GET /api/runs/for-picker?carId=cmru0izh9001bu4j07eoqo13j 200 in 324ms (next.js: 93ms, proxy.ts: 15ms, application-code: 216ms)
+ GET /api/teams 200 in 144ms (next.js: 18ms, proxy.ts: 15ms, application-code: 112ms)
+ GET /api/teams 200 in 103ms (next.js: 2ms, proxy.ts: 10ms, application-code: 91ms)
+ GET /api/runs/last?carId=cmru0izh9001bu4j07eoqo13j 200 in 199ms (next.js: 18ms, proxy.ts: 4ms, application-code: 177ms)
+ GET /api/tracks 200 in 68ms (next.js: 6ms, proxy.ts: 6ms, application-code: 56ms)
+ GET /api/settings/live-rc-driver 200 in 76ms (next.js: 3ms, proxy.ts: 7ms, application-code: 67ms)
+ GET /api/tire-sets 200 in 92ms (next.js: 1904µs, proxy.ts: 6ms, application-code: 84ms)
+ GET /api/settings/live-rc-driver 200 in 49ms (next.js: 1997µs, proxy.ts: 6ms, application-code: 41ms)
+ GET /api/runs/last?carId=cmru0izh9001bu4j07eoqo13j 200 in 106ms (next.js: 5ms, proxy.ts: 6ms, application-code: 94ms)
+ GET /api/runs/for-picker?carId=cmru0izh9001bu4j07eoqo13j 200 in 131ms (next.js: 3ms, proxy.ts: 15ms, application-code: 114ms)
+ GET /api/setup/options?carId=cmru0izh9001bu4j07eoqo13j 200 in 648ms (next.js: 122ms, proxy.ts: 15ms, application-code: 510ms)
+ GET /api/tire-sets 200 in 77ms (next.js: 2ms, proxy.ts: 10ms, application-code: 65ms)
+ GET /api/settings/live-rc-driver 200 in 72ms (next.js: 2ms, proxy.ts: 9ms, application-code: 61ms)
+ GET /api/tire-sets 200 in 101ms (next.js: 1725µs, proxy.ts: 6ms, application-code: 93ms)
+ GET /api/cars/cmru0izh9001bu4j07eoqo13j/setup-sheet-template?view=logRun 200 in 595ms (next.js: 463ms, proxy.ts: 12ms, application-code: 120ms)
+ GET /api/cars/cmru0izh9001bu4j07eoqo13j/setup-sheet-template?view=logRun 200 in 924ms (next.js: 782ms, proxy.ts: 17ms, application-code: 125ms)
+ GET /api/setup/options?carId=cmru0izh9001bu4j07eoqo13j 200 in 325ms (next.js: 1825µs, proxy.ts: 4ms, application-code: 319ms)
+ GET /api/tire-sets/picker 200 in 116ms (next.js: 25ms, proxy.ts: 9ms, application-code: 82ms)
+ GET /api/tire-sets/picker 200 in 131ms (next.js: 21ms, proxy.ts: 10ms, application-code: 101ms)
+ GET /api/runs/last-tire-run-number?tireSetId=cmrren69v0001ju04jx3qejv1 200 in 90ms (next.js: 19ms, proxy.ts: 5ms, application-code: 66ms)
+ GET /api/tire-sets/picker 200 in 119ms (next.js: 5ms, proxy.ts: 12ms, application-code: 102ms)
+ GET /api/tire-sets/picker 200 in 119ms (next.js: 11ms, proxy.ts: 12ms, application-code: 96ms)
+ GET /api/tire-types?limit=200 200 in 253ms (next.js: 141ms, proxy.ts: 17ms, application-code: 96ms)
+ GET /api/tire-types?limit=200 200 in 251ms (next.js: 135ms, proxy.ts: 15ms, application-code: 102ms)
+ GET /api/tire-types/recent 200 in 274ms (next.js: 100ms, proxy.ts: 14ms, application-code: 160ms)
+ GET /api/tire-types/recent 200 in 280ms (next.js: 109ms, proxy.ts: 16ms, application-code: 155ms)
+ POST /api/tire-types 201 in 169ms (next.js: 1971µs, proxy.ts: 6ms, application-code: 161ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 43ms (next.js: 3ms, proxy.ts: 3ms, application-code: 37ms)
+ GET /api/runs/today-draft 200 in 238ms (next.js: 3ms, proxy.ts: 10ms, application-code: 225ms)
+ GET / 200 in 435ms (next.js: 34ms, proxy.ts: 5ms, application-code: 397ms)
+ GET / 200 in 390ms (next.js: 7ms, proxy.ts: 8ms, application-code: 375ms)
+ GET /settings 200 in 137ms (next.js: 12ms, proxy.ts: 8ms, application-code: 117ms)
+ GET /api/runs/today-draft 200 in 99ms (next.js: 2ms, proxy.ts: 4ms, application-code: 92ms)
+ GET /api/settings/setup-sheet-manufacturer-baseline 200 in 161ms (next.js: 37ms, proxy.ts: 13ms, application-code: 111ms)
+ GET /api/settings/auth-allowed-emails 200 in 212ms (next.js: 19ms, proxy.ts: 13ms, application-code: 180ms)
+ GET /api/settings/setup-sheet-manufacturer-baseline 200 in 59ms (next.js: 2ms, proxy.ts: 4ms, application-code: 53ms)
+ GET /api/admin/engineer-gold-set?limit=40&status=pending 200 in 252ms (next.js: 60ms, proxy.ts: 13ms, application-code: 179ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 53ms (next.js: 6ms, proxy.ts: 1992µs, application-code: 45ms)
+ GET /api/settings/auth-allowed-emails 200 in 75ms (next.js: 2ms, proxy.ts: 5ms, application-code: 68ms)
+ GET /api/admin/engineer-gold-set?limit=40&status=pending 200 in 76ms (next.js: 2ms, proxy.ts: 16ms, application-code: 58ms)
+ GET /api/admin/engineer-ratings?limit=30 200 in 367ms (next.js: 78ms, proxy.ts: 13ms, application-code: 276ms)
+ GET /api/admin/engineer-ratings?limit=30 200 in 118ms (next.js: 3ms, proxy.ts: 10ms, application-code: 105ms)
+ GET /login?from=%2Fadmin%2Freview 200 in 41ms (next.js: 3ms, proxy.ts: 2ms, application-code: 36ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 50ms (next.js: 4ms, proxy.ts: 4ms, application-code: 42ms)
+ GET /api/auth/config-hint 200 in 88ms (next.js: 85ms, application-code: 3ms)
+ GET /api/auth/providers 200 in 18ms (next.js: 13ms, application-code: 4ms)
+ GET /api/auth/csrf 200 in 5ms (next.js: 1429µs, application-code: 4ms)
+ POST /api/auth/signin/google? 200 in 427ms (next.js: 1665µs, application-code: 426ms)
+ GET /teams 200 in 514ms (next.js: 275ms, proxy.ts: 7ms, application-code: 232ms)
+ GET /teams 200 in 250ms (next.js: 68ms, proxy.ts: 23ms, application-code: 159ms)
+ GET /teams 200 in 231ms (next.js: 4ms, proxy.ts: 28ms, application-code: 199ms)
+ GET /teams 200 in 293ms (next.js: 6ms, proxy.ts: 50ms, application-code: 237ms)
+ GET /teams 200 in 293ms (next.js: 23ms, proxy.ts: 49ms, application-code: 221ms)
+ GET /teams 200 in 291ms (next.js: 42ms, proxy.ts: 47ms, application-code: 202ms)
+ GET /teams 200 in 291ms (next.js: 57ms, proxy.ts: 46ms, application-code: 187ms)
+ GET /teams 200 in 316ms (next.js: 4ms, proxy.ts: 77ms, application-code: 235ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 68ms (next.js: 14ms, proxy.ts: 3ms, application-code: 51ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 52ms (next.js: 3ms, proxy.ts: 1978µs, application-code: 47ms)
+ GET /api/runs/today-draft 200 in 143ms (next.js: 42ms, proxy.ts: 4ms, application-code: 96ms)
+ GET /api/teams 200 in 109ms (next.js: 12ms, proxy.ts: 5ms, application-code: 92ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 72ms (next.js: 7ms, proxy.ts: 3ms, application-code: 62ms)
+ GET /api/runs/today-draft 200 in 145ms (next.js: 3ms, proxy.ts: 12ms, application-code: 130ms)
+ GET /admin/review 200 in 641ms (next.js: 345ms, proxy.ts: 9ms, application-code: 287ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 40ms (next.js: 3ms, proxy.ts: 1895µs, application-code: 35ms)
+ DELETE /api/tire-types/cmry6nybm0001vl9w2q0byrh9 200 in 831ms (next.js: 700ms, proxy.ts: 8ms, application-code: 123ms)
+ GET /admin/review 200 in 185ms (next.js: 3ms, proxy.ts: 5ms, application-code: 177ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 41ms (next.js: 3ms, proxy.ts: 3ms, application-code: 34ms)
+ GET /api/runs/today-draft 200 in 70ms (next.js: 2ms, proxy.ts: 7ms, application-code: 60ms)
+ GET /setup/admin 200 in 453ms (next.js: 297ms, proxy.ts: 4ms, application-code: 152ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 41ms (next.js: 3ms, proxy.ts: 2ms, application-code: 36ms)
+ GET /api/runs/today-draft 200 in 155ms (next.js: 3ms, proxy.ts: 7ms, application-code: 145ms)
+ GET / 200 in 335ms (next.js: 68ms, proxy.ts: 5ms, application-code: 262ms)
+ GET / 200 in 185ms (next.js: 17ms, proxy.ts: 11ms, application-code: 157ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 118ms (next.js: 20ms, proxy.ts: 14ms, application-code: 84ms)
+ GET /analysis 200 in 713ms (next.js: 453ms, proxy.ts: 5ms, application-code: 255ms)
+ GET /analysis 200 in 183ms (next.js: 4ms, proxy.ts: 52ms, application-code: 127ms)
+ GET /analysis 200 in 1184ms (next.js: 3ms, proxy.ts: 31ms, application-code: 1150ms)
+ GET /analysis 200 in 1208ms (next.js: 103ms, proxy.ts: 42ms, application-code: 1062ms)
+ GET /analysis 200 in 1205ms (next.js: 123ms, proxy.ts: 40ms, application-code: 1042ms)
+ GET /analysis 200 in 1201ms (next.js: 165ms, proxy.ts: 36ms, application-code: 1000ms)
+ GET /analysis 200 in 1208ms (next.js: 768ms, proxy.ts: 223ms, application-code: 217ms)
+ GET /analysis 200 in 1365ms (next.js: 14ms, proxy.ts: 41ms, application-code: 1310ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 234ms (next.js: 15ms, proxy.ts: 5ms, application-code: 215ms)
+ GET /analysis 200 in 281ms (next.js: 15ms, proxy.ts: 78ms, application-code: 188ms)
+ GET /analysis 200 in 226ms (next.js: 13ms, proxy.ts: 43ms, application-code: 170ms)
+ GET /analysis 200 in 225ms (next.js: 32ms, proxy.ts: 43ms, application-code: 150ms)
+ GET /analysis 200 in 224ms (next.js: 53ms, proxy.ts: 42ms, application-code: 129ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 179ms (next.js: 4ms, proxy.ts: 3ms, application-code: 172ms)
+ GET /api/runs/today-draft 200 in 247ms (next.js: 66ms, proxy.ts: 45ms, application-code: 136ms)
+ GET / 200 in 191ms (next.js: 31ms, proxy.ts: 4ms, application-code: 155ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 112ms (next.js: 13ms, proxy.ts: 3ms, application-code: 97ms)
+ GET /api/runs/today-draft 200 in 166ms (next.js: 35ms, proxy.ts: 21ms, application-code: 110ms)
+ GET / 200 in 189ms (next.js: 32ms, proxy.ts: 44ms, application-code: 113ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 55ms (next.js: 3ms, proxy.ts: 2ms, application-code: 50ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 54ms (next.js: 3ms, proxy.ts: 2ms, application-code: 48ms)
+ GET /api/runs/today-draft 200 in 107ms (next.js: 5ms, proxy.ts: 45ms, application-code: 57ms)
+ GET /runs/new 200 in 338ms (next.js: 28ms, proxy.ts: 4ms, application-code: 306ms)
+ GET /api/settings/live-rc-driver 200 in 253ms (next.js: 24ms, proxy.ts: 22ms, application-code: 207ms)
+ GET /api/tracks 200 in 251ms (next.js: 62ms, proxy.ts: 21ms, application-code: 168ms)
+ GET /api/tire-sets 200 in 292ms (next.js: 131ms, proxy.ts: 19ms, application-code: 142ms)
+ GET /api/cars/cmru0izh9001bu4j07eoqo13j/setup-sheet-template?view=logRun 200 in 322ms (next.js: 167ms, proxy.ts: 22ms, application-code: 134ms)
+ GET /api/runs/for-picker?carId=cmru0izh9001bu4j07eoqo13j 200 in 330ms (next.js: 84ms, proxy.ts: 20ms, application-code: 225ms)
+ GET /api/teams 200 in 133ms (next.js: 10ms, proxy.ts: 7ms, application-code: 115ms)
+ GET /api/settings/live-rc-driver 200 in 60ms (next.js: 5ms, proxy.ts: 12ms, application-code: 43ms)
+ GET /api/teams 200 in 98ms (next.js: 1680µs, proxy.ts: 5ms, application-code: 92ms)
+ GET /api/cars/cmru0izh9001bu4j07eoqo13j/setup-sheet-template?view=logRun 200 in 149ms (next.js: 3ms, proxy.ts: 11ms, application-code: 134ms)
+ GET /api/runs/last?carId=cmru0izh9001bu4j07eoqo13j 200 in 193ms (next.js: 30ms, proxy.ts: 7ms, application-code: 156ms)
+ GET /api/tracks 200 in 72ms (next.js: 4ms, proxy.ts: 4ms, application-code: 64ms)
+ GET /api/tire-sets 200 in 102ms (next.js: 2ms, proxy.ts: 12ms, application-code: 88ms)
+ GET /api/settings/live-rc-driver 200 in 96ms (next.js: 4ms, proxy.ts: 17ms, application-code: 75ms)
+ GET /api/runs/for-picker?carId=cmru0izh9001bu4j07eoqo13j 200 in 155ms (next.js: 2ms, proxy.ts: 6ms, application-code: 147ms)
+ GET /api/tire-sets 200 in 76ms (next.js: 2ms, proxy.ts: 6ms, application-code: 67ms)
+ GET /api/setup/options?carId=cmru0izh9001bu4j07eoqo13j 200 in 592ms (next.js: 111ms, proxy.ts: 20ms, application-code: 461ms)
+ GET /api/settings/live-rc-driver 200 in 66ms (next.js: 2ms, proxy.ts: 4ms, application-code: 60ms)
+ GET /api/runs/last?carId=cmru0izh9001bu4j07eoqo13j 200 in 177ms (next.js: 8ms, proxy.ts: 17ms, application-code: 153ms)
+ GET /api/tire-sets 200 in 102ms (next.js: 1783µs, proxy.ts: 4ms, application-code: 96ms)
+ GET /api/setup/options?carId=cmru0izh9001bu4j07eoqo13j 200 in 373ms (next.js: 1982µs, proxy.ts: 7ms, application-code: 364ms)
+ GET /api/tire-sets/picker 200 in 104ms (next.js: 18ms, proxy.ts: 10ms, application-code: 76ms)
+ GET /api/tire-sets/picker 200 in 141ms (next.js: 22ms, proxy.ts: 9ms, application-code: 110ms)
+ GET /api/runs/last-tire-run-number?tireSetId=cmrren69v0001ju04jx3qejv1 200 in 80ms (next.js: 16ms, proxy.ts: 5ms, application-code: 59ms)
+ GET /api/auth/session 200 in 39ms (next.js: 28ms, application-code: 11ms)
+ GET /api/auth/session 200 in 8ms (next.js: 3ms, application-code: 5ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+ GET /runs/new 200 in 1713ms (next.js: 3ms, proxy.ts: 19ms, application-code: 1691ms)
+ GET /runs/new 200 in 2.0s (next.js: 170ms, proxy.ts: 20ms, application-code: 1842ms)
+ GET /runs/new 200 in 1671ms (next.js: 3ms, proxy.ts: 14ms, application-code: 1654ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 127ms (next.js: 11ms, proxy.ts: 1934µs, application-code: 114ms)
+ GET /runs/new 200 in 419ms (next.js: 130ms, proxy.ts: 21ms, application-code: 268ms)
+ GET /runs/new 200 in 332ms (next.js: 3ms, proxy.ts: 18ms, application-code: 312ms)
+ GET /runs/new 200 in 323ms (next.js: 3ms, proxy.ts: 15ms, application-code: 305ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 124ms (next.js: 15ms, proxy.ts: 2ms, application-code: 107ms)
+ GET /runs/new 200 in 654ms (next.js: 188ms, proxy.ts: 19ms, application-code: 446ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 120ms (next.js: 11ms, proxy.ts: 1868µs, application-code: 107ms)
+ GET /runs/new 200 in 466ms (next.js: 195ms, proxy.ts: 21ms, application-code: 250ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 118ms (next.js: 11ms, proxy.ts: 1887µs, application-code: 105ms)
+ GET /runs/new 200 in 505ms (next.js: 203ms, proxy.ts: 24ms, application-code: 278ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 130ms (next.js: 11ms, proxy.ts: 1974µs, application-code: 117ms)
+ GET /runs/new 200 in 529ms (next.js: 211ms, proxy.ts: 20ms, application-code: 298ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 129ms (next.js: 14ms, proxy.ts: 4ms, application-code: 111ms)
+✓ Compiled in 158ms
+ GET /runs/new 200 in 239ms (next.js: 3ms, proxy.ts: 16ms, application-code: 220ms)
+ GET /runs/new 200 in 533ms (next.js: 127ms, proxy.ts: 18ms, application-code: 388ms)
+ GET /runs/new 200 in 243ms (next.js: 22ms, proxy.ts: 23ms, application-code: 197ms)
+ GET /runs/new 200 in 255ms (next.js: 4ms, proxy.ts: 23ms, application-code: 228ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 223ms (next.js: 66ms, proxy.ts: 1842µs, application-code: 156ms)
+✓ Compiled in 150ms
+ GET /runs/new 200 in 429ms (next.js: 148ms, proxy.ts: 14ms, application-code: 266ms)
+ GET /runs/new 200 in 376ms (next.js: 26ms, proxy.ts: 18ms, application-code: 333ms)
+ GET /runs/new 200 in 378ms (next.js: 4ms, proxy.ts: 18ms, application-code: 356ms)
+ GET /runs/new 200 in 698ms (next.js: 3ms, proxy.ts: 20ms, application-code: 674ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 241ms (next.js: 71ms, proxy.ts: 2ms, application-code: 167ms)
+✓ Compiled in 270ms
+ GET /runs/new 200 in 434ms (next.js: 124ms, proxy.ts: 15ms, application-code: 296ms)
+ GET /runs/new 200 in 270ms (next.js: 4ms, proxy.ts: 20ms, application-code: 246ms)
+ GET /runs/new 200 in 225ms (next.js: 4ms, proxy.ts: 23ms, application-code: 199ms)
+ GET /runs/new 200 in 244ms (next.js: 25ms, proxy.ts: 22ms, application-code: 197ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 205ms (next.js: 67ms, proxy.ts: 1986µs, application-code: 137ms)
+✓ Compiled in 154ms
+ GET /runs/new 200 in 420ms (next.js: 126ms, proxy.ts: 15ms, application-code: 278ms)
+ GET /runs/new 200 in 242ms (next.js: 4ms, proxy.ts: 20ms, application-code: 219ms)
+ GET /runs/new 200 in 332ms (next.js: 4ms, proxy.ts: 22ms, application-code: 306ms)
+ GET /runs/new 200 in 364ms (next.js: 28ms, proxy.ts: 21ms, application-code: 315ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 213ms (next.js: 67ms, proxy.ts: 2ms, application-code: 143ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+(node:15156) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of 
+file:///C:/Users/Jordan/rc-engineer-app/tailwind.config.ts?id=1784852976362 is not specified and it doesn't parse as 
+CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Jordan\rc-engineer-app\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ GET /api/auth/session 200 in 133ms (next.js: 98ms, application-code: 35ms)
+ GET /api/auth/session 200 in 13ms (next.js: 4ms, application-code: 10ms)
+ GET /api/auth/session 200 in 22ms (next.js: 9ms, application-code: 14ms)
+ GET /api/auth/session 200 in 16ms (next.js: 5ms, application-code: 11ms)
+ GET /api/auth/session 200 in 24ms (next.js: 9ms, application-code: 15ms)
+ GET /api/auth/session 200 in 17ms (next.js: 5ms, application-code: 13ms)
+(node:6476) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of 
+file:///C:/Users/Jordan/rc-engineer-app/tailwind.config.ts?id=1784853496111 is not specified and it doesn't parse as 
+CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Jordan\rc-engineer-app\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:7224) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of 
+file:///C:/Users/Jordan/rc-engineer-app/tailwind.config.ts?id=1784853578785 is not specified and it doesn't parse as 
+CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Jordan\rc-engineer-app\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 677ms (next.js: 47ms, proxy.ts: 6ms, application-code: 625ms)
+ GET /api/profile-image?v=4224593923 200 in 928ms (next.js: 316ms, proxy.ts: 159ms, application-code: 453ms)
+ GET /assets 200 in 1243ms (next.js: 7ms, proxy.ts: 165ms, application-code: 1071ms)
+ GET /assets 200 in 2.5s (next.js: 713ms, proxy.ts: 15ms, application-code: 1817ms)
+ GET /assets 200 in 927ms (next.js: 21ms, proxy.ts: 475ms, application-code: 430ms)
+ GET /assets 200 in 1617ms (next.js: 297ms, proxy.ts: 30ms, application-code: 1289ms)
+ GET /assets 200 in 1666ms (next.js: 125ms, proxy.ts: 55ms, application-code: 1486ms)
+ GET /assets 200 in 576ms (next.js: 12ms, proxy.ts: 52ms, application-code: 512ms)
+ GET /assets 200 in 648ms (next.js: 135ms, proxy.ts: 99ms, application-code: 414ms)
+ GET /assets 200 in 736ms (next.js: 24ms, proxy.ts: 99ms, application-code: 614ms)
+ GET /assets 200 in 758ms (next.js: 85ms, proxy.ts: 98ms, application-code: 574ms)
+ GET /assets 200 in 759ms (next.js: 195ms, proxy.ts: 99ms, application-code: 465ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 221ms (next.js: 6ms, proxy.ts: 5ms, application-code: 210ms)
+ GET /api/runs/today-draft 200 in 375ms (next.js: 86ms, proxy.ts: 108ms, application-code: 181ms)
+ GET /setup-sheet-models 200 in 1858ms (next.js: 572ms, proxy.ts: 12ms, application-code: 1274ms)
+ GET /setup-sheet-models 200 in 1120ms (next.js: 155ms, proxy.ts: 38ms, application-code: 926ms)
+ GET /setup-sheet-models 200 in 865ms (next.js: 10ms, proxy.ts: 40ms, application-code: 815ms)
+ GET /setup-sheet-models 200 in 872ms (next.js: 9ms, proxy.ts: 65ms, application-code: 798ms)
+ GET /setup-sheet-models 200 in 871ms (next.js: 41ms, proxy.ts: 56ms, application-code: 774ms)
+ GET /setup-sheet-models 200 in 875ms (next.js: 59ms, proxy.ts: 58ms, application-code: 758ms)
+ GET /setup-sheet-models 200 in 675ms (next.js: 33ms, proxy.ts: 32ms, application-code: 610ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 517ms (next.js: 47ms, proxy.ts: 5ms, application-code: 464ms)
+ GET /api/runs/today-draft 200 in 583ms (next.js: 150ms, proxy.ts: 329ms, application-code: 105ms)
+ GET /setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 1466ms (next.js: 1173ms, proxy.ts: 7ms, application-code: 286ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 205ms (next.js: 11ms, proxy.ts: 5ms, application-code: 189ms)
+ GET /api/runs/today-draft 200 in 260ms (next.js: 13ms, proxy.ts: 153ms, application-code: 94ms)
+ GET /api/runs/today-draft 200 in 105ms (next.js: 7ms, proxy.ts: 12ms, application-code: 86ms)
+ GET /setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 1936ms (next.js: 1721ms, proxy.ts: 8ms, application-code: 208ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 1140ms (next.js: 993ms, proxy.ts: 59ms, application-code: 88ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 1141ms (next.js: 987ms, proxy.ts: 47ms, application-code: 106ms)
+ GET /api/setup-sheet-models 200 in 1269ms (next.js: 443ms, proxy.ts: 53ms, application-code: 774ms)
+ GET /api/setup-sheet-models 200 in 53ms (next.js: 1950µs, proxy.ts: 7ms, application-code: 44ms)
+ GET /login?from=%2Fmanifest.webmanifest 200 in 187ms (next.js: 13ms, proxy.ts: 4ms, application-code: 169ms)
+ GET /api/setup-documents/cmrwswo9z0001vlzssidyf00a/file 200 in 799ms (next.js: 260ms, proxy.ts: 12ms, application-code: 527ms)
+ HEAD /api/setup-documents/cmrwswo9z0001vlzssidyf00a/file 200 in 2.0s (next.js: 1374ms, proxy.ts: 56ms, application-code: 574ms)
+ HEAD /api/setup-documents/cmrwswo9z0001vlzssidyf00a/file 200 in 2.0s (next.js: 1372ms, proxy.ts: 48ms, application-code: 582ms)
+ GET /api/setup-documents/cmrwswo9z0001vlzssidyf00a/pdf-form-fields 200 in 2.3s (next.js: 1646ms, proxy.ts: 59ms, application-code: 595ms)
+ GET /api/setup-documents/cmrwswo9z0001vlzssidyf00a/pdf-form-fields 200 in 1356ms (next.js: 555ms, proxy.ts: 11ms, application-code: 791ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 203ms (next.js: 26ms, proxy.ts: 21ms, application-code: 156ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 1182ms (next.js: 923ms, proxy.ts: 15ms, application-code: 244ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 110ms (next.js: 14ms, proxy.ts: 8ms, application-code: 88ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 94ms (next.js: 16ms, proxy.ts: 11ms, application-code: 67ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 106ms (next.js: 13ms, proxy.ts: 10ms, application-code: 84ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 180ms (next.js: 26ms, proxy.ts: 12ms, application-code: 143ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 250ms (next.js: 86ms, proxy.ts: 11ms, application-code: 153ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 176ms (next.js: 19ms, proxy.ts: 10ms, application-code: 148ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 109ms (next.js: 12ms, proxy.ts: 9ms, application-code: 87ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 196ms (next.js: 40ms, proxy.ts: 13ms, application-code: 143ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 89ms (next.js: 12ms, proxy.ts: 9ms, application-code: 69ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 233ms (next.js: 23ms, proxy.ts: 11ms, application-code: 200ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 103ms (next.js: 23ms, proxy.ts: 8ms, application-code: 72ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 105ms (next.js: 16ms, proxy.ts: 8ms, application-code: 81ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 179ms (next.js: 14ms, proxy.ts: 13ms, application-code: 152ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 171ms (next.js: 12ms, proxy.ts: 12ms, application-code: 147ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 122ms (next.js: 11ms, proxy.ts: 8ms, application-code: 103ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 94ms (next.js: 12ms, proxy.ts: 9ms, application-code: 73ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 188ms (next.js: 23ms, proxy.ts: 9ms, application-code: 155ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 257ms (next.js: 87ms, proxy.ts: 35ms, application-code: 136ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 116ms (next.js: 15ms, proxy.ts: 11ms, application-code: 89ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 103ms (next.js: 13ms, proxy.ts: 10ms, application-code: 80ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 170ms (next.js: 23ms, proxy.ts: 12ms, application-code: 135ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 171ms (next.js: 16ms, proxy.ts: 11ms, application-code: 144ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 261ms (next.js: 10ms, proxy.ts: 8ms, application-code: 243ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 111ms (next.js: 14ms, proxy.ts: 8ms, application-code: 90ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 236ms (next.js: 15ms, proxy.ts: 8ms, application-code: 213ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 182ms (next.js: 23ms, proxy.ts: 9ms, application-code: 150ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 112ms (next.js: 13ms, proxy.ts: 8ms, application-code: 90ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 116ms (next.js: 14ms, proxy.ts: 12ms, application-code: 90ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 163ms (next.js: 15ms, proxy.ts: 13ms, application-code: 136ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 174ms (next.js: 19ms, proxy.ts: 12ms, application-code: 143ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 110ms (next.js: 11ms, proxy.ts: 8ms, application-code: 91ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 121ms (next.js: 11ms, proxy.ts: 11ms, application-code: 100ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 189ms (next.js: 18ms, proxy.ts: 16ms, application-code: 155ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 211ms (next.js: 26ms, proxy.ts: 21ms, application-code: 164ms)
+ GET /api/auth/session 200 in 38ms (next.js: 14ms, application-code: 24ms)
+ GET /api/auth/session 200 in 11ms (next.js: 2ms, application-code: 9ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 125ms (next.js: 8ms, proxy.ts: 29ms, application-code: 88ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 77ms (next.js: 9ms, proxy.ts: 6ms, application-code: 62ms)
+ GET /api/auth/session 200 in 19ms (next.js: 7ms, application-code: 12ms)
+ GET /api/auth/session 200 in 17ms (next.js: 5ms, application-code: 11ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 94ms (next.js: 10ms, proxy.ts: 8ms, application-code: 76ms)
+ GET /api/auth/session 200 in 22ms (next.js: 9ms, application-code: 13ms)
+ GET /api/auth/session 200 in 12ms (next.js: 4ms, application-code: 9ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 89ms (next.js: 12ms, proxy.ts: 27ms, application-code: 50ms)
+ GET /api/auth/session 200 in 30ms (next.js: 8ms, application-code: 23ms)
+ GET /api/auth/session 200 in 12ms (next.js: 4ms, application-code: 8ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 106ms (next.js: 9ms, proxy.ts: 23ms, application-code: 73ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 278ms (next.js: 12ms, proxy.ts: 10ms, application-code: 257ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 84ms (next.js: 10ms, proxy.ts: 9ms, application-code: 65ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 229ms (next.js: 11ms, proxy.ts: 9ms, application-code: 209ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 150ms (next.js: 9ms, proxy.ts: 8ms, application-code: 133ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 97ms (next.js: 10ms, proxy.ts: 5ms, application-code: 82ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 82ms (next.js: 10ms, proxy.ts: 9ms, application-code: 63ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 146ms (next.js: 7ms, proxy.ts: 7ms, application-code: 132ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 154ms (next.js: 7ms, proxy.ts: 5ms, application-code: 142ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc/parameter-usage?key=diff_oil_front 200 in 861ms (next.js: 735ms, proxy.ts: 5ms, application-code: 122ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 76ms (next.js: 7ms, proxy.ts: 5ms, application-code: 64ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 101ms (next.js: 10ms, proxy.ts: 5ms, application-code: 86ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 155ms (next.js: 8ms, proxy.ts: 6ms, application-code: 140ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 107ms (next.js: 13ms, proxy.ts: 6ms, application-code: 88ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 108ms (next.js: 15ms, proxy.ts: 11ms, application-code: 82ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 161ms (next.js: 11ms, proxy.ts: 11ms, application-code: 139ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 190ms (next.js: 13ms, proxy.ts: 9ms, application-code: 167ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 179ms (next.js: 9ms, proxy.ts: 9ms, application-code: 161ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 159ms (next.js: 8ms, proxy.ts: 6ms, application-code: 146ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 96ms (next.js: 10ms, proxy.ts: 9ms, application-code: 77ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 162ms (next.js: 7ms, proxy.ts: 8ms, application-code: 146ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 111ms (next.js: 8ms, proxy.ts: 10ms, application-code: 93ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 148ms (next.js: 7ms, proxy.ts: 5ms, application-code: 136ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 90ms (next.js: 8ms, proxy.ts: 8ms, application-code: 75ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 156ms (next.js: 7ms, proxy.ts: 5ms, application-code: 144ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 265ms (next.js: 10ms, proxy.ts: 5ms, application-code: 251ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 97ms (next.js: 9ms, proxy.ts: 7ms, application-code: 80ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 239ms (next.js: 10ms, proxy.ts: 6ms, application-code: 223ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 144ms (next.js: 8ms, proxy.ts: 6ms, application-code: 130ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 100ms (next.js: 9ms, proxy.ts: 8ms, application-code: 83ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 158ms (next.js: 10ms, proxy.ts: 11ms, application-code: 138ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 99ms (next.js: 8ms, proxy.ts: 9ms, application-code: 83ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 146ms (next.js: 8ms, proxy.ts: 7ms, application-code: 131ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 144ms (next.js: 7ms, proxy.ts: 7ms, application-code: 130ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 166ms (next.js: 8ms, proxy.ts: 8ms, application-code: 150ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 158ms (next.js: 10ms, proxy.ts: 8ms, application-code: 140ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 116ms (next.js: 10ms, proxy.ts: 10ms, application-code: 96ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 170ms (next.js: 8ms, proxy.ts: 9ms, application-code: 153ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 289ms (next.js: 10ms, proxy.ts: 6ms, application-code: 273ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 224ms (next.js: 12ms, proxy.ts: 7ms, application-code: 204ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 98ms (next.js: 10ms, proxy.ts: 8ms, application-code: 80ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 145ms (next.js: 9ms, proxy.ts: 10ms, application-code: 126ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 109ms (next.js: 12ms, proxy.ts: 5ms, application-code: 92ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 149ms (next.js: 11ms, proxy.ts: 10ms, application-code: 128ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 92ms (next.js: 9ms, proxy.ts: 6ms, application-code: 77ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 137ms (next.js: 7ms, proxy.ts: 7ms, application-code: 123ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 107ms (next.js: 7ms, proxy.ts: 8ms, application-code: 92ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 148ms (next.js: 7ms, proxy.ts: 5ms, application-code: 137ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 105ms (next.js: 9ms, proxy.ts: 10ms, application-code: 86ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 191ms (next.js: 7ms, proxy.ts: 6ms, application-code: 178ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 120ms (next.js: 8ms, proxy.ts: 5ms, application-code: 107ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 145ms (next.js: 7ms, proxy.ts: 8ms, application-code: 129ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 116ms (next.js: 8ms, proxy.ts: 9ms, application-code: 99ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 116ms (next.js: 10ms, proxy.ts: 8ms, application-code: 99ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 150ms (next.js: 9ms, proxy.ts: 8ms, application-code: 134ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 149ms (next.js: 8ms, proxy.ts: 8ms, application-code: 133ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 107ms (next.js: 7ms, proxy.ts: 5ms, application-code: 95ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 118ms (next.js: 12ms, proxy.ts: 5ms, application-code: 102ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 154ms (next.js: 9ms, proxy.ts: 12ms, application-code: 133ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 287ms (next.js: 12ms, proxy.ts: 9ms, application-code: 267ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 208ms (next.js: 7ms, proxy.ts: 9ms, application-code: 193ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 118ms (next.js: 12ms, proxy.ts: 10ms, application-code: 96ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 129ms (next.js: 11ms, proxy.ts: 11ms, application-code: 108ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 163ms (next.js: 10ms, proxy.ts: 10ms, application-code: 143ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 137ms (next.js: 9ms, proxy.ts: 7ms, application-code: 120ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 118ms (next.js: 10ms, proxy.ts: 8ms, application-code: 100ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 160ms (next.js: 7ms, proxy.ts: 12ms, application-code: 141ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 124ms (next.js: 12ms, proxy.ts: 10ms, application-code: 102ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 147ms (next.js: 9ms, proxy.ts: 9ms, application-code: 129ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 128ms (next.js: 13ms, proxy.ts: 11ms, application-code: 103ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 141ms (next.js: 7ms, proxy.ts: 8ms, application-code: 126ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 115ms (next.js: 11ms, proxy.ts: 5ms, application-code: 99ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 148ms (next.js: 13ms, proxy.ts: 9ms, application-code: 126ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 122ms (next.js: 16ms, proxy.ts: 9ms, application-code: 98ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 154ms (next.js: 9ms, proxy.ts: 10ms, application-code: 134ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 299ms (next.js: 10ms, proxy.ts: 6ms, application-code: 284ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 208ms (next.js: 8ms, proxy.ts: 7ms, application-code: 193ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 113ms (next.js: 9ms, proxy.ts: 8ms, application-code: 95ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 91ms (next.js: 7ms, proxy.ts: 7ms, application-code: 77ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 137ms (next.js: 7ms, proxy.ts: 5ms, application-code: 124ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 172ms (next.js: 10ms, proxy.ts: 7ms, application-code: 155ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 106ms (next.js: 11ms, proxy.ts: 10ms, application-code: 85ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 151ms (next.js: 6ms, proxy.ts: 5ms, application-code: 140ms)
+ PATCH /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 113ms (next.js: 8ms, proxy.ts: 7ms, application-code: 99ms)
+ PATCH /api/setup-calibrations/cmrwswofc0005vlzsu6dibiyj 200 in 145ms (next.js: 8ms, proxy.ts: 5ms, application-code: 133ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+ GET /api/auth/session 200 in 30ms (next.js: 10ms, application-code: 20ms)
+ GET /api/auth/session 200 in 30ms (next.js: 8ms, application-code: 22ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 1053ms (next.js: 21ms, proxy.ts: 33ms, application-code: 999ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 101ms (next.js: 15ms, proxy.ts: 8ms, application-code: 78ms)
+ GET /api/auth/session 200 in 27ms (next.js: 11ms, application-code: 15ms)
+ GET /api/auth/session 200 in 11ms (next.js: 2ms, application-code: 9ms)
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 131ms (next.js: 15ms, proxy.ts: 33ms, application-code: 82ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
+ GET /api/setup-sheet-models/cmrwswods0003vlzsbo2krjsc 200 in 290ms (next.js: 12ms, proxy.ts: 13ms, application-code: 264ms)
+prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }
