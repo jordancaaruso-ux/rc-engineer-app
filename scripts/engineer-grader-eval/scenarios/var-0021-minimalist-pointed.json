@@ -1,0 +1,257 @@
+{
+  "id": "var-0021-minimalist-pointed",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-11-a800r-bvvwqv",
+  "question": "It's loose on the way out and it's getting worse. What would you change?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Boronia",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36",
+      "setNumber": 1,
+      "initialRunCount": 5,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.5",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "30",
+          "damper_oil_rear": "30",
+          "diff_oil": "12K",
+          "motor": "Corsatec CT-R 5.5",
+          "pinion": "21",
+          "spur": "84"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 25,
+        "conditionsTrackTempC": 30,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 4,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.5",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "30",
+          "damper_oil_rear": "30",
+          "diff_oil": "12K",
+          "motor": "Corsatec CT-R 5.5",
+          "pinion": "21",
+          "spur": "84"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 21,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.5",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "30",
+          "damper_oil_rear": "30",
+          "diff_oil": "12K",
+          "motor": "Corsatec CT-R 5.5",
+          "pinion": "21",
+          "spur": "84"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 21,
+        "conditionsTrackTempC": 34,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.5",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "30",
+          "damper_oil_rear": "30",
+          "diff_oil": "12K",
+          "motor": "Corsatec CT-R 5.5",
+          "pinion": "21",
+          "spur": "84"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 24,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 5",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.5",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "30",
+          "damper_oil_rear": "30",
+          "diff_oil": "12K",
+          "motor": "Corsatec CT-R 5.5",
+          "pinion": "21",
+          "spur": "84"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 4
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-day",
+    "handlingRichness": "none",
+    "setupFreshness": "stale",
+    "questionShape": "pointed",
+    "problemType": "exit-oversteer",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 5
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "exit-oversteer"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-mmiv08n0",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 83
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "pointed",
+    "exit-oversteer"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

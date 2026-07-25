@@ -1,0 +1,261 @@
+{
+  "id": "var-0074-typical-demanding",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-158-a800rr-jdyzx7",
+  "question": "Straight answer please, no hedging. What's the fix?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Bayside",
+      "location": "Brisbane",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 4,
+      "initialRunCount": 0,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Yellow",
+      "modelCode": "MIGHTY-GRIPPER-YELLOW"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Hobbywing G3",
+          "date": "01.+02.11.2025",
+          "name": "Simon Lauter",
+          "race": "TOS",
+          "spur": "114",
+          "wing": "Twister 0.5",
+          "motor": "Hobbywing 5T (30°)",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL575SL",
+          "tires": "Matrix 28",
+          "track": "TSV1871 Augsburg - non permanent",
+          "pinion": "29",
+          "battery": "Nosram 4200mAh",
+          "country": "Germany",
+          "winglet": "yes",
+          "additive": "MR33 V5",
+          "arb_rear": "1.1",
+          "diff_oil": "10K",
+          "receiver": "RX 492",
+          "toe_rear": 2.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "at15_rear": "1",
+          "bodyshell": "Speciale 0.4",
+          "toe_front": -1,
+          "at15_front": "1",
+          "bw52r_rear": "1",
+          "diff_shims": "Small",
+          "st205_rear": "1",
+          "bw52r_front": "1",
+          "camber_rear": -1.75,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "st205_front": "1",
+          "camber_front": -1.5,
+          "caster_front": 4.5,
+          "damping_rear": "P2",
+          "front_bumper": {
+            "selectedPreset": "C07R",
+            "otherText": "MXLR V2"
+          },
+          "spring_front": "S",
+          "total_weight": "1285g",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "2x",
+          "damping_front": "P2",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "rear_hrb_setting": "3.5",
+          "ride_height_rear": "5.2",
+          "spring_gap_front": "1.0",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "7.469",
+          "ride_height_front": "5.0",
+          "servo_horn_height": "17mm",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Rearward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "0.5",
+          "toe_gain_shims_rear": "2.75",
+          "damper_percent_front": "60",
+          "front_body_post_hole": "4",
+          "inner_steering_angle": "25,5°",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1.75",
+          "upper_inner_shims_fr": "1.75",
+          "upper_inner_shims_rf": "1.75",
+          "upper_inner_shims_rr": "1.75",
+          "front_body_post_oring": "no",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "2.25",
+          "bodyshell_upstop_height": "11.5",
+          "front_spring_rate_gf_mm": "60.8",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "0.5",
+          "under_lower_arm_shims_fr": "0.5",
+          "under_lower_arm_shims_rf": "1.0",
+          "under_lower_arm_shims_rr": "1.0",
+          "lower_arm_extension_front": "0",
+          "body_position_from_windshield": "46.5"
+        },
+        "lapTimes": [
+          10.897,
+          15.815,
+          15.903,
+          15.895,
+          15.721,
+          16.121,
+          16.196,
+          15.882,
+          16.015,
+          16.046,
+          16.142,
+          16.279,
+          16.309,
+          16.153,
+          16.132,
+          16.117,
+          15.924,
+          16.258,
+          16.363
+        ],
+        "bestLapSeconds": 10.897,
+        "avgTop5LapSeconds": 14.842,
+        "handlingProblems": "on edge, one lap good one lap bad",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 25,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "typical",
+    "historyDepth": "single-run",
+    "handlingRichness": "free-text",
+    "setupFreshness": "fresh",
+    "questionShape": "demanding",
+    "problemType": "inconsistent",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "typical"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "inconsistent"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-4xkwd8a6",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 95
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "typical",
+    "demanding",
+    "inconsistent"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

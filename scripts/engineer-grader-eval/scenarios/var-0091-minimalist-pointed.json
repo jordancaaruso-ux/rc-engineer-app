@@ -1,0 +1,296 @@
+{
+  "id": "var-0091-minimalist-pointed",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-173-a800rr-gur2mh",
+  "question": "Struggling with falling off over the run this run. One change — what is it?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Boronia",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "HIGH"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Volante 28R V9X Evolution",
+      "setNumber": 2,
+      "initialRunCount": 0,
+      "tireType": {
+        "displayName": "Volante 28R V9X Evolution",
+        "modelCode": "VOLANTE-28R-V9X-EVOLUTION"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Orange",
+      "modelCode": "MIGHTY-GRIPPER-ORANGE"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 2.25,
+          "ride_height_front": "5,0",
+          "ride_height_rear": "5,2",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8k",
+          "motor": "Hobbywing G4R 17,5t ETS",
+          "pinion": "43",
+          "spur": "102"
+        },
+        "lapTimes": [
+          0.758,
+          17.37,
+          17.034,
+          17.082,
+          17.078,
+          17.509,
+          17.272,
+          17.309,
+          17.185,
+          17.433,
+          17.234,
+          17.216,
+          17.396,
+          17.36,
+          17.297
+        ],
+        "bestLapSeconds": 0.758,
+        "avgTop5LapSeconds": 13.827,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 24,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 2.25,
+          "ride_height_front": "5,0",
+          "ride_height_rear": "5,2",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8k",
+          "motor": "Hobbywing G4R 17,5t ETS",
+          "pinion": "43",
+          "spur": "102"
+        },
+        "lapTimes": [
+          0.955,
+          17.567,
+          17.231,
+          17.279,
+          17.275,
+          17.706,
+          17.469,
+          17.506,
+          17.382,
+          17.63,
+          17.431,
+          17.413,
+          17.593,
+          17.557,
+          17.494
+        ],
+        "bestLapSeconds": 0.955,
+        "avgTop5LapSeconds": 14.024,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 32,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 2.25,
+          "ride_height_front": "5,0",
+          "ride_height_rear": "5,2",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8k",
+          "motor": "Hobbywing G4R 17,5t ETS",
+          "pinion": "43",
+          "spur": "102"
+        },
+        "lapTimes": [
+          0.956,
+          17.568,
+          17.232,
+          17.28,
+          17.276,
+          17.707,
+          17.47,
+          17.507,
+          17.383,
+          17.631,
+          17.432,
+          17.414,
+          17.594,
+          17.558,
+          17.495
+        ],
+        "bestLapSeconds": 0.956,
+        "avgTop5LapSeconds": 14.025,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 18,
+        "conditionsTrackTempC": 32,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 2.25,
+          "ride_height_front": "5,0",
+          "ride_height_rear": "5,2",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8k",
+          "motor": "Hobbywing G4R 17,5t ETS",
+          "pinion": "43",
+          "spur": "102"
+        },
+        "lapTimes": [
+          0.459,
+          17.071,
+          16.735,
+          16.783,
+          16.779,
+          17.21,
+          16.973,
+          17.01,
+          16.886,
+          17.134,
+          16.935,
+          16.917,
+          17.097,
+          17.061,
+          16.998
+        ],
+        "bestLapSeconds": 0.459,
+        "avgTop5LapSeconds": 13.878,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 18,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-day",
+    "handlingRichness": "none",
+    "setupFreshness": "stale",
+    "questionShape": "pointed",
+    "problemType": "tires-going-off",
+    "dataConflict": "felt-worse-but-faster",
+    "gripLevel": "HIGH",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "tires-going-off"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "HIGH"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-whrun6k3",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 98
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "pointed",
+    "tires-going-off"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

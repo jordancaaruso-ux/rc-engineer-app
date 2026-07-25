@@ -1,0 +1,736 @@
+{
+  "id": "var-0054-completionist-demanding",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-14-a800r-dnbqxh",
+  "question": "Give me a definite answer. What am I changing?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Boronia",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "LOW"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36",
+      "setNumber": 1,
+      "initialRunCount": 5,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "HW JUSTOCK 13.5T",
+          "date": "23-25/06/23",
+          "name": "HUGO VARELA",
+          "race": "3rd ROUND OF THE SPANISH CHAMPIONSHIP",
+          "spur": "99",
+          "wing": "WOLVERINE",
+          "motor": "HW JUSTOCK 13.5T",
+          "radio": "SANWA",
+          "servo": "SRT D1",
+          "tires": "TPRO 36",
+          "track": "VALLADOLID (CLUB PICAL)",
+          "pinion": "47",
+          "battery": "RC PROSTYLE 7500",
+          "country": "SPAIN",
+          "air_temp": "37º",
+          "arb_rear": "1.2",
+          "diff_oil": "15000",
+          "receiver": "SANWA",
+          "toe_rear": 1.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "WOLVERINE",
+          "toe_front": -1.5,
+          "track_temp": "55º",
+          "camber_rear": -1,
+          "caster_rear": -2,
+          "spring_rear": "STD",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1328",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "70",
+          "damping_front": "P1",
+          "downstop_rear": "4.4",
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "top_deck_front": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "damper_oil_rear": "400",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "a",
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "0",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "4.0021",
+          "ride_height_front": "5.2",
+          "ackermann_position": "CENTER",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "4.5",
+          "damper_percent_front": "90",
+          "inner_steering_angle": "26º",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.75",
+          "upper_inner_shims_fr": "2.75",
+          "upper_inner_shims_rf": "3",
+          "upper_inner_shims_rr": "3",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "54.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3",
+          "under_lower_arm_shims_rf": "3",
+          "under_lower_arm_shims_rr": "3",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 1,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "braking": -1,
+          "balanceByPhase": {
+            "entry": 1
+          },
+          "primaryFocus": {
+            "kind": "braking",
+            "value": -1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 28,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 4,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "HW JUSTOCK 13.5T",
+          "date": "23-25/06/23",
+          "name": "HUGO VARELA",
+          "race": "3rd ROUND OF THE SPANISH CHAMPIONSHIP",
+          "spur": "99",
+          "wing": "WOLVERINE",
+          "motor": "HW JUSTOCK 13.5T",
+          "radio": "SANWA",
+          "servo": "SRT D1",
+          "tires": "TPRO 36",
+          "track": "VALLADOLID (CLUB PICAL)",
+          "pinion": "47",
+          "battery": "RC PROSTYLE 7500",
+          "country": "SPAIN",
+          "air_temp": "37º",
+          "arb_rear": "1.2",
+          "diff_oil": "15000",
+          "receiver": "SANWA",
+          "toe_rear": 1.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "WOLVERINE",
+          "toe_front": -1.5,
+          "track_temp": "55º",
+          "camber_rear": -1.5,
+          "caster_rear": -2,
+          "spring_rear": "STD",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1328",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "70",
+          "damping_front": "P1",
+          "downstop_rear": "4.4",
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "top_deck_front": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "damper_oil_rear": "400",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "a",
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "0",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "4.0021",
+          "ride_height_front": "5.2",
+          "ackermann_position": "CENTER",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "4.5",
+          "damper_percent_front": "90",
+          "inner_steering_angle": "26º",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.75",
+          "upper_inner_shims_fr": "2.75",
+          "upper_inner_shims_rf": "3",
+          "upper_inner_shims_rr": "3",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "54.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3",
+          "under_lower_arm_shims_rf": "3",
+          "under_lower_arm_shims_rr": "3",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 2,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "braking": -2,
+          "balanceByPhase": {
+            "entry": 2
+          },
+          "primaryFocus": {
+            "kind": "braking",
+            "value": -2
+          },
+          "feelVsLastRun": 0,
+          "speedTags": {
+            "balance:entry": "fast",
+            "trait:braking": "fast"
+          }
+        },
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "HW JUSTOCK 13.5T",
+          "date": "23-25/06/23",
+          "name": "HUGO VARELA",
+          "race": "3rd ROUND OF THE SPANISH CHAMPIONSHIP",
+          "spur": "99",
+          "wing": "WOLVERINE",
+          "motor": "HW JUSTOCK 13.5T",
+          "radio": "SANWA",
+          "servo": "SRT D1",
+          "tires": "TPRO 36",
+          "track": "VALLADOLID (CLUB PICAL)",
+          "pinion": "47",
+          "battery": "RC PROSTYLE 7500",
+          "country": "SPAIN",
+          "air_temp": "37º",
+          "arb_rear": "1.2",
+          "diff_oil": "15000",
+          "receiver": "SANWA",
+          "toe_rear": 1.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "WOLVERINE",
+          "toe_front": -1.5,
+          "track_temp": "55º",
+          "camber_rear": -1.5,
+          "caster_rear": -2,
+          "spring_rear": "STD",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1328",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "70",
+          "damping_front": "P1",
+          "downstop_rear": "4.4",
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "top_deck_front": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "damper_oil_rear": "400",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "a",
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "0",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "4.0021",
+          "ride_height_front": "5.2",
+          "ackermann_position": "CENTER",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "4.5",
+          "damper_percent_front": "90",
+          "inner_steering_angle": "26º",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.75",
+          "upper_inner_shims_fr": "2.75",
+          "upper_inner_shims_rf": "3",
+          "upper_inner_shims_rr": "3",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": -0.5,
+          "bump_steer_shims_front": "3",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "54.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3",
+          "under_lower_arm_shims_rf": "3",
+          "under_lower_arm_shims_rr": "3",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 3,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "braking": -1,
+          "balanceByPhase": {
+            "entry": 1
+          },
+          "primaryFocus": {
+            "kind": "braking",
+            "value": -1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 28,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "HW JUSTOCK 13.5T",
+          "date": "23-25/06/23",
+          "name": "HUGO VARELA",
+          "race": "3rd ROUND OF THE SPANISH CHAMPIONSHIP",
+          "spur": "99",
+          "wing": "WOLVERINE",
+          "motor": "HW JUSTOCK 13.5T",
+          "radio": "SANWA",
+          "servo": "SRT D1",
+          "tires": "TPRO 36",
+          "track": "VALLADOLID (CLUB PICAL)",
+          "pinion": "47",
+          "battery": "RC PROSTYLE 7500",
+          "country": "SPAIN",
+          "air_temp": "37º",
+          "arb_rear": "1.2",
+          "diff_oil": "15000",
+          "receiver": "SANWA",
+          "toe_rear": 1.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "WOLVERINE",
+          "toe_front": -1.5,
+          "track_temp": "55º",
+          "camber_rear": -1.5,
+          "caster_rear": -2,
+          "spring_rear": "STD",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1328",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "70",
+          "damping_front": "P1",
+          "downstop_rear": "4.4",
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "top_deck_front": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "damper_oil_rear": "400",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "a",
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "0",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "4.0021",
+          "ride_height_front": "5.2",
+          "ackermann_position": "CENTER",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "4.5",
+          "damper_percent_front": "90",
+          "inner_steering_angle": "26º",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.75",
+          "upper_inner_shims_fr": "2.75",
+          "upper_inner_shims_rf": "3",
+          "upper_inner_shims_rr": "3",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": 0,
+          "bump_steer_shims_front": "3",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "54.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3",
+          "under_lower_arm_shims_rf": "3",
+          "under_lower_arm_shims_rr": "3",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 4,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "braking": -2,
+          "balanceByPhase": {
+            "entry": 2
+          },
+          "primaryFocus": {
+            "kind": "braking",
+            "value": -2
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 22,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 5",
+        "setupData": {
+          "esc": "HW JUSTOCK 13.5T",
+          "date": "23-25/06/23",
+          "name": "HUGO VARELA",
+          "race": "3rd ROUND OF THE SPANISH CHAMPIONSHIP",
+          "spur": "99",
+          "wing": "WOLVERINE",
+          "motor": "HW JUSTOCK 13.5T",
+          "radio": "SANWA",
+          "servo": "SRT D1",
+          "tires": "TPRO 36",
+          "track": "VALLADOLID (CLUB PICAL)",
+          "pinion": "47",
+          "battery": "RC PROSTYLE 7500",
+          "country": "SPAIN",
+          "air_temp": "37º",
+          "arb_rear": "1.2",
+          "diff_oil": "15000",
+          "receiver": "SANWA",
+          "toe_rear": 1.75,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "WOLVERINE",
+          "toe_front": -1.5,
+          "track_temp": "55º",
+          "camber_rear": -1.5,
+          "caster_rear": -2,
+          "spring_rear": "STD",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1328",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "70",
+          "damping_front": "P1",
+          "downstop_rear": "4.4",
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "top_deck_front": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "damper_oil_rear": "400",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "a",
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "0",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "4.0021",
+          "ride_height_front": "5.2",
+          "ackermann_position": "CENTER",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "4.5",
+          "damper_percent_front": "90",
+          "inner_steering_angle": "26º",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.75",
+          "upper_inner_shims_fr": "2.75",
+          "upper_inner_shims_rf": "3",
+          "upper_inner_shims_rr": "3",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": 0,
+          "bump_steer_shims_front": "3",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "54.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3",
+          "under_lower_arm_shims_rf": "3",
+          "under_lower_arm_shims_rr": "3",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 5,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "braking": -2,
+          "balanceByPhase": {
+            "entry": 2
+          },
+          "primaryFocus": {
+            "kind": "braking",
+            "value": -2
+          },
+          "feelVsLastRun": -1
+        },
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 36,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 4
+  },
+  "axes": {
+    "archetype": "completionist",
+    "historyDepth": "single-day",
+    "handlingRichness": "full",
+    "setupFreshness": "fresh",
+    "questionShape": "demanding",
+    "problemType": "braking-loose",
+    "dataConflict": null,
+    "gripLevel": "LOW",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "completionist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 5
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "braking-loose"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "LOW"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-xhvhh64s",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 79
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "completionist",
+    "demanding",
+    "braking-loose"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

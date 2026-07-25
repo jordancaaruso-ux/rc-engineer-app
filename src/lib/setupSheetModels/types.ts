@@ -48,7 +48,10 @@ export type SetupSheetModelFieldDef = {
   notes?: string;
   /**
    * When set, equals {@link canonicalAggregationParameterKey} for cross-car stats
-   * (e.g. `droop_front` even if this sheet labels the row "Downstop").
+   * (e.g. `damper_oil_front` even if this sheet labels the row "Shock oil").
+   *
+   * Only for genuinely the SAME measurement under a different name — droop and downstop read
+   * different numbers off the same car and each have their own id.
    */
   universalParameterId?: string;
   /** Links field to a manual pair / corner4 / slots layout group. */

@@ -1,5 +1,19 @@
 import { GENERIC_SETUP_SHEET_V1 } from "@/lib/setupSheetTemplate";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { universalParameterIdForSnapshotKey } from "@/lib/setupSheetModels/universalParameters";
+
+/**
+ * Help text for fields a driver can plausibly fill in wrong.
+ *
+ * Droop and downstop are the live case: plenty of people use the words interchangeably, but they
+ * are different measurements, and the typical magnitudes make a mix-up obvious once stated.
+ */
+const FIELD_NOTES: Record<string, string> = {
+  droop_front: "Measured ground to wheel — typically 21-24 mm.",
+  droop_rear: "Measured ground to wheel — typically 21-24 mm.",
+  downstop_front: "Measured ground to bottom of arm — typically 4-7 mm.",
+  downstop_rear: "Measured ground to bottom of arm — typically 4-7 mm.",
+};
 
 /** Build initial schema from the built-in generic touring preset. */
 export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSchema {
@@ -21,6 +35,22 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
           sectionId: sec.id,
           sectionTitle: sec.title,
         });
+      } else if (row.type === "corner4") {
+        // Four bulkhead pickup points, not four corners — FF/FR are the front bulkhead's front and
+        // rear pickup, RF/RR the rear bulkhead's. Left/right are symmetric.
+        for (const [position, key] of [
+          ["FF", row.ff],
+          ["FR", row.fr],
+          ["RF", row.rf],
+          ["RR", row.rr],
+        ] as const) {
+          keyMeta.set(key, {
+            label: `${row.label} (${position})`,
+            unit: row.unit,
+            sectionId: sec.id,
+            sectionTitle: sec.title,
+          });
+        }
       } else if (row.type === "single") {
         keyMeta.set(row.key, {
           label: row.label,
@@ -57,12 +87,11 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
             }
           : null;
 
-    const universalParameterId =
-      key === "spring_rate_front"
-        ? "spring_front"
-        : key === "spring_rate_rear"
-          ? "spring_rear"
-          : undefined;
+    // Resolved from the shared registry rather than hand-mapped, so every preset field that names
+    // a cross-car concept pools into the same bucket — and a future sheet that spells it slightly
+    // differently maps here too instead of minting a near-duplicate parameter.
+    const universalParameterId = universalParameterIdForSnapshotKey(key);
+    const notes = FIELD_NOTES[key];
 
     fields.push({
       key,
@@ -78,6 +107,7 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
       showInAnalysis: !isSession || sessionInAnalysis,
       showInLogRun: true,
       sortOrder: order++,
+      ...(notes ? { notes } : {}),
       ...(universalParameterId ? { universalParameterId } : {}),
       ...(sessionFieldExtras
         ? {
@@ -101,6 +131,17 @@ export function buildGenericPresetSchema(modelLabel: string): SetupSheetModelSch
             unit: row.unit,
             leftKey: row.leftKey,
             rightKey: row.rightKey,
+          };
+        }
+        if (row.type === "corner4") {
+          return {
+            type: "corner4" as const,
+            label: row.label,
+            unit: row.unit,
+            ff: row.ff,
+            fr: row.fr,
+            rf: row.rf,
+            rr: row.rr,
           };
         }
         if (row.type === "single") {

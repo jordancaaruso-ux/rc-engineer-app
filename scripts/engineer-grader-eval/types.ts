@@ -13,7 +13,85 @@
  * runs — the factory perturbs known keys but never invents the blob wholesale.
  */
 
+/**
+ * Chat mode. The flaw-hunt corpus always uses "normal": Jordan doubts the quick/deep
+ * feature ("I think it'll cause confusing"), so urgency lives in the QUESTION'S WORDS
+ * and whether the engine infers trackside-vs-debrief on its own is a hunted finding.
+ */
 export type ScenarioMode = "quick" | "normal" | "deep";
+
+/** Which user fills context how — completeness is correlated, not random. */
+export type ArchetypeId = "minimalist" | "typical" | "completionist" | "no-timing" | "race-weekend";
+
+export type HistoryDepth = "single-run" | "single-day" | "season";
+
+/** Structured handling chips are the most-skipped field — corpus skews sparse. */
+export type HandlingRichness = "none" | "free-text" | "full";
+
+/**
+ * Whether the setup sheet keeps up with reality. "stale" is the silent killer: the car
+ * changed but the sheet didn't, so the setup diff comes back EMPTY between two runs that
+ * genuinely differ — the engine reasons as if nothing changed. Jordan doesn't know how
+ * common this is in practice, so the corpus generates all three and lets the flaw map say.
+ */
+export type SetupFreshness = "fresh" | "stale" | "partial";
+
+export type QuestionShapeId =
+  | "vague"
+  | "pointed"
+  | "trackside-urgent"
+  | "debrief"
+  | "demanding"
+  | "challenging"
+  | "teaching"
+  | "laundry-bait"
+  | "no-change-bait"
+  | "off-piste";
+
+export type ProblemTypeId =
+  | "entry-understeer"
+  | "mid-understeer"
+  | "exit-oversteer"
+  | "on-power-snap"
+  | "traction-roll"
+  | "braking-loose"
+  | "darty"
+  | "inconsistent"
+  | "tires-going-off"
+  | "nothing-wrong";
+
+/**
+ * One real setup sheet drawn from the AGGREGATION DATASET — the same pool that feeds
+ * CommunitySetupParameterAggregation. Jordan's ~14 runs are one driver's taste on two
+ * tracks; this pool is the full mix of chassis and tuning philosophies, so generated
+ * scenarios start from genuinely varied real setups instead of variations on his own.
+ */
+export type SetupPoolEntry = {
+  id: string;
+  setupSheetTemplate: string | null;
+  /** "asphalt" | "carpet" — the community bucket axis. */
+  trackSurface?: string | null;
+  data: Record<string, unknown>;
+  source: "setup-document" | "run-snapshot";
+  /** e.g. "petitrc" for publicly-published sheets vs a private user upload. */
+  sourceSite?: string | null;
+  keyCount: number;
+};
+
+/** The coverage grid, stamped on every scenario so the flaw map can group by axis. */
+export type ScenarioAxes = {
+  archetype: ArchetypeId;
+  historyDepth: HistoryDepth;
+  handlingRichness: HandlingRichness;
+  setupFreshness: SetupFreshness;
+  questionShape: QuestionShapeId;
+  problemType: ProblemTypeId;
+  /** e.g. "felt-worse-but-faster", "no-laps", "contradictory-notes". */
+  dataConflict?: string | null;
+  gripLevel?: string;
+  /** Full setup-sheet template vs a sparse unknown chassis. */
+  carFamiliarity: "template" | "sparse";
+};
 
 /** One logged run within a scenario's day. Array order = chronological (index 0 earliest). */
 export type ScenarioRun = {
@@ -100,6 +178,8 @@ export type Scenario = {
   question: string;
   mode: ScenarioMode;
   world: ScenarioWorld;
+  /** The coverage-grid cell this scenario occupies (variation only). */
+  axes?: ScenarioAxes;
   /** Provenance of factory perturbations (variation only). */
   perturbation?: Array<{ op: string; params?: Record<string, unknown> }>;
   coherence?: CoherenceVerdict;

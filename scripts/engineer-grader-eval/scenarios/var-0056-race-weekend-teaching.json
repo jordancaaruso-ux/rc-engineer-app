@@ -1,0 +1,259 @@
+{
+  "id": "var-0056-race-weekend-teaching",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-141-a800rr-j67lgi",
+  "question": "Explain what rear roll centre actually does physically — I want to understand it, not just be told a change.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "HIGH"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": {
+      "name": "Club Round",
+      "raceClass": null
+    },
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 1,
+      "initialRunCount": 0,
+      "mark": "2",
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Xerun XR10 Pro G2",
+          "date": "20-21.01.24",
+          "name": "Eric Dankel",
+          "race": "GP3F Longwy",
+          "spur": "112",
+          "wing": "standard/middle psotion",
+          "motor": "Hobbywing 5T",
+          "radio": "Flysky Noble Pro",
+          "servo": "Power HD S15",
+          "tires": "Rush 28 Handout",
+          "track": "Longwy",
+          "pinion": "29",
+          "battery": "EZ Power 4400",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "additive": "Phub Fusion",
+          "air_temp": "20",
+          "arb_rear": "1,1",
+          "diff_oil": "8k",
+          "receiver": "Flysky FGr4D",
+          "toe_rear": 2,
+          "traction": [
+            "high"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Twister Speciale 0,4",
+          "toe_front": -1,
+          "bw52r_rear": "1",
+          "diff_shims": "small",
+          "bw52r_front": "1",
+          "camber_rear": -1.5,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1303",
+          "track_layout": [
+            "mixed"
+          ],
+          "damping_front": "P1",
+          "downstop_rear": "4,4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "3",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "steer_travel_out": "16",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "7.3379",
+          "ride_height_front": "5,2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "toe_gain_shims_rear": "3,5",
+          "damper_percent_front": "60",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2,75",
+          "upper_inner_shims_fr": "2,75",
+          "upper_inner_shims_rf": "2,5",
+          "upper_inner_shims_rr": "2,5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4,5",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "1,75",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0"
+        },
+        "lapTimes": [
+          25.403,
+          20.596,
+          19.259,
+          21.412,
+          41.424,
+          8.826,
+          25.161,
+          10.811,
+          10.667,
+          12.6,
+          11.173,
+          10.279,
+          10.275,
+          24.175,
+          12.37,
+          10.772,
+          10.611,
+          10.455,
+          10.522,
+          39.281,
+          10.321,
+          10.244,
+          19.032,
+          18.402,
+          18.886,
+          18.068,
+          18.554,
+          17.967,
+          17.971
+        ],
+        "bestLapSeconds": 8.826,
+        "avgTop5LapSeconds": 9.989,
+        "tireRunNumber": 1,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 24,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "RACE_MEETING",
+        "meetingSessionType": "QUALIFYING",
+        "meetingSessionCode": "Q2"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "race-weekend",
+    "historyDepth": "single-run",
+    "handlingRichness": "none",
+    "setupFreshness": "fresh",
+    "questionShape": "teaching",
+    "problemType": "braking-loose",
+    "dataConflict": null,
+    "gripLevel": "HIGH",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "race-weekend"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "braking-loose"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "HIGH"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-09c0b13t",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 80
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "race-weekend",
+    "teaching",
+    "braking-loose"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

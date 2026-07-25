@@ -1,0 +1,330 @@
+{
+  "id": "var-0019-minimalist-off-piste",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-108-a800r-8n853k",
+  "question": "Does the shape of the body shell change how the car handles mid-corner much?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Bayside",
+      "location": "Brisbane",
+      "gripTags": [
+        "HIGH"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36",
+      "setNumber": 4,
+      "initialRunCount": 0,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5,2",
+          "ride_height_rear": "5,6",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "250",
+          "damper_oil_rear": "27",
+          "diff_oil": "8K Hudy",
+          "motor": "Orca 21.5T",
+          "pinion": "48",
+          "spur": "96"
+        },
+        "lapTimes": [
+          15.939,
+          17.893,
+          15.744,
+          15.731,
+          16.634,
+          16.599,
+          25.752,
+          17.239,
+          15.839,
+          16.946,
+          15.813,
+          16.091,
+          16.047,
+          16.05,
+          21.439,
+          16.244,
+          16.218,
+          15.843,
+          16.678,
+          16.496,
+          16.095,
+          17.173,
+          16.081,
+          16.119,
+          16.127
+        ],
+        "bestLapSeconds": 15.731,
+        "avgTop5LapSeconds": 15.794,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 22,
+        "conditionsTrackTempC": 27,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5,2",
+          "ride_height_rear": "5,6",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "250",
+          "damper_oil_rear": "27",
+          "diff_oil": "8K Hudy",
+          "motor": "Orca 21.5T",
+          "pinion": "48",
+          "spur": "96"
+        },
+        "lapTimes": [
+          15.892,
+          17.846,
+          15.697,
+          15.684,
+          16.587,
+          16.552,
+          25.705,
+          17.192,
+          15.792,
+          16.899,
+          15.766,
+          16.044,
+          16,
+          16.003,
+          21.392,
+          16.197,
+          16.171,
+          15.796,
+          16.631,
+          16.449,
+          16.048,
+          17.126,
+          16.034,
+          16.072,
+          16.08
+        ],
+        "bestLapSeconds": 15.684,
+        "avgTop5LapSeconds": 15.747,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 30,
+        "conditionsTrackTempC": 36,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5,2",
+          "ride_height_rear": "5,6",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "250",
+          "damper_oil_rear": "27",
+          "diff_oil": "8K Hudy",
+          "motor": "Orca 21.5T",
+          "pinion": "48",
+          "spur": "96"
+        },
+        "lapTimes": [
+          15.963,
+          17.917,
+          15.768,
+          15.755,
+          16.658,
+          16.623,
+          25.776,
+          17.263,
+          15.863,
+          16.97,
+          15.837,
+          16.115,
+          16.071,
+          16.074,
+          21.463,
+          16.268,
+          16.242,
+          15.867,
+          16.702,
+          16.52,
+          16.119,
+          17.197,
+          16.105,
+          16.143,
+          16.151
+        ],
+        "bestLapSeconds": 15.755,
+        "avgTop5LapSeconds": 15.818,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 29,
+        "conditionsTrackTempC": 30,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2.5,
+          "ride_height_front": "5,2",
+          "ride_height_rear": "5,6",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "250",
+          "damper_oil_rear": "27",
+          "diff_oil": "8K Hudy",
+          "motor": "Orca 21.5T",
+          "pinion": "48",
+          "spur": "96"
+        },
+        "lapTimes": [
+          15.558,
+          17.512,
+          15.363,
+          15.35,
+          16.253,
+          16.218,
+          25.371,
+          16.858,
+          15.458,
+          16.565,
+          15.432,
+          15.71,
+          15.666,
+          15.669,
+          21.058,
+          15.863,
+          15.837,
+          15.462,
+          16.297,
+          16.115,
+          15.714,
+          16.792,
+          15.7,
+          15.738,
+          15.746
+        ],
+        "bestLapSeconds": 15.35,
+        "avgTop5LapSeconds": 15.763,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 28,
+        "conditionsTrackTempC": 27,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-day",
+    "handlingRichness": "none",
+    "setupFreshness": "stale",
+    "questionShape": "off-piste",
+    "problemType": "mid-understeer",
+    "dataConflict": "felt-worse-but-faster",
+    "gripLevel": "HIGH",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "mid-understeer"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "HIGH"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-psywbcm5",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 83
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "off-piste",
+    "mid-understeer"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

@@ -423,7 +423,7 @@ function mergeSectionRows(
   return [...manualRows, ...autoRows, ...specialRows];
 }
 
-function layoutRowFieldKeys(row: SetupSheetModelLayoutRow): string[] {
+export function layoutRowFieldKeys(row: SetupSheetModelLayoutRow): string[] {
   if (row.type === "single") return [row.key];
   if (row.type === "pair") return [row.leftKey, row.rightKey];
   if (row.type === "corner4") return [row.ff, row.fr, row.rf, row.rr];
