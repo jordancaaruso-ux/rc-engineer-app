@@ -57,9 +57,12 @@ import {
   type PendingBox,
 } from "@/components/setup-documents/NewParameterFromBoxesPanel";
 import {
+  POSITION_LABELS,
   buildNewParameterField,
+  buildPositionSplitFields,
   existingGroupTitles,
   type NewParameterInput as BoxParameterInput,
+  type PositionSplit,
 } from "@/lib/setupSheetModels/newParameterDef";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
@@ -477,7 +480,12 @@ export function SetupCalibrationEditorClient({
    * Box-first mapping: boxes clicked on the sheet with no parameter armed, in click order. The
    * name panel stays open while more are added, so a row of checkboxes becomes one grouped param.
    */
-  const [pendingBoxKeys, setPendingBoxKeys] = useState<string[]>([]);
+  const [pendingBoxKeys, setPendingBoxKeys] = useState<(string | null)[]>([]);
+  /**
+   * Positions the parameter being named occupies. `single` keeps `pendingBoxKeys` a dense click
+   * list; a split fixes its length to the positions, each slot `null` until its box is clicked.
+   */
+  const [positionSplit, setPositionSplit] = useState<PositionSplit>("single");
   const [newParamBusy, setNewParamBusy] = useState(false);
   const [newParamError, setNewParamError] = useState<string | null>(null);
   /** Parameter row under the cursor in the sidebar — previews its boxes on the sheet. */
@@ -953,19 +961,21 @@ export function SetupCalibrationEditorClient({
 
   /** Boxes drawn amber: the ones being named right now, plus the selected/hovered parameter's. */
   const highlightedWidgetKeys = useMemo(() => {
-    const s = new Set<string>(pendingBoxKeys);
+    const s = new Set<string>(pendingBoxKeys.filter((k): k is string => k !== null));
     for (const k of widgetKeysForParameter(armedKey)) s.add(k);
     for (const k of widgetKeysForParameter(hoveredParameterKey)) s.add(k);
     for (const a of armedAssignments) s.add(a.sourceKey);
     return s;
   }, [pendingBoxKeys, armedKey, hoveredParameterKey, armedAssignments, widgetKeysForParameter]);
 
-  /** The clicked-but-unnamed boxes, with any parameter that currently owns them. */
-  const pendingBoxes = useMemo((): PendingBox[] => {
+  /** The clicked-but-unnamed boxes, with any parameter that currently owns them. `null` = an
+   * unfilled position slot. */
+  const pendingBoxes = useMemo((): (PendingBox | null)[] => {
     const labelByKey = new Map(
       (setupSheetModelSchema?.fields ?? []).map((f) => [f.key, f.displayLabel] as const)
     );
     return pendingBoxKeys.map((sourceKey) => {
+      if (!sourceKey) return null;
       const ref = parseAcroKey(sourceKey);
       const row = pdfRowByName.get(ref.pdfFieldName);
       const owners = findAppKeysForWidget(
@@ -1706,7 +1716,41 @@ export function SetupCalibrationEditorClient({
 
   function cancelNewParameter() {
     setPendingBoxKeys([]);
+    setPositionSplit("single");
     setNewParamError(null);
+  }
+
+  /**
+   * Clear one pending slot. Emptying the last one closes the naming panel, so the split resets with
+   * it — otherwise the next unrelated box click would silently land in an armed 4-corner split.
+   */
+  function clearPendingSlot(slotIndex: number) {
+    setNewParamError(null);
+    const next =
+      positionSplit === "single"
+        ? pendingBoxKeys.filter((_, i) => i !== slotIndex)
+        : pendingBoxKeys.map((k, i) => (i === slotIndex ? null : k));
+    if (!next.some((k) => k !== null)) {
+      cancelNewParameter();
+      return;
+    }
+    setPendingBoxKeys(next);
+  }
+
+  /** Resize the pending slots to the split, keeping the boxes already clicked in slot order. */
+  function changePositionSplit(next: PositionSplit) {
+    const clicked = pendingBoxKeys.filter((k): k is string => k !== null);
+    setPositionSplit(next);
+    setNewParamError(null);
+    if (next === "single") {
+      setPendingBoxKeys(clicked);
+      return;
+    }
+    const slots = POSITION_LABELS[next].length;
+    setPendingBoxKeys(Array.from({ length: slots }, (_, i) => clicked[i] ?? null));
+    if (clicked.length > slots) {
+      setNewParamError(`Only the first ${slots} boxes were kept.`);
+    }
   }
 
   /** Follow a parameter's mapping to the page its box lives on, so selecting it always shows it. */
@@ -1751,9 +1795,26 @@ export function SetupCalibrationEditorClient({
     // Box-first: nothing armed → the click starts (or extends) a new parameter named right here.
     if (!armedField) {
       setNewParamError(null);
-      setPendingBoxKeys((prev) =>
-        prev.includes(sourceKey) ? prev.filter((k) => k !== sourceKey) : [...prev, sourceKey]
-      );
+      if (positionSplit === "single") {
+        setPendingBoxKeys((prev) =>
+          prev.includes(sourceKey) ? prev.filter((k) => k !== sourceKey) : [...prev, sourceKey]
+        );
+        setStatus(null);
+        return;
+      }
+      // Split: the click fills the next empty position; re-clicking a filled one clears it.
+      const at = pendingBoxKeys.indexOf(sourceKey);
+      if (at >= 0) {
+        clearPendingSlot(at);
+        setStatus(null);
+        return;
+      }
+      const empty = pendingBoxKeys.indexOf(null);
+      if (empty < 0) {
+        setStatus("Every position is mapped — clear one first, or save.");
+        return;
+      }
+      setPendingBoxKeys((prev) => prev.map((k, i) => (i === empty ? sourceKey : k)));
       setStatus(null);
       return;
     }
@@ -1843,7 +1904,7 @@ export function SetupCalibrationEditorClient({
    */
   async function createParameterFromBoxes(input: BoxParameterInput): Promise<void> {
     if (!setupSheetModelSchema || newParamBusy) return;
-    const boxKeys = [...pendingBoxKeys];
+    const boxKeys = pendingBoxKeys.filter((k): k is string => k !== null);
     if (boxKeys.length === 0) return;
 
     const built = buildNewParameterField(input, setupSheetModelSchema);
@@ -1883,6 +1944,69 @@ export function SetupCalibrationEditorClient({
     }));
     commitModelGroupedLinkForField(field, assignments);
     setStatus(`Added “${field.displayLabel}” across ${boxKeys.length} boxes.`);
+  }
+
+  /**
+   * Box-first with a position split: one typed stem becomes one sibling parameter per position in a
+   * single schema PATCH, and every clicked box is mapped in one mappings update.
+   */
+  async function createParameterSplitFromBoxes(
+    input: BoxParameterInput,
+    split: Exclude<PositionSplit, "single">
+  ): Promise<void> {
+    if (!setupSheetModelSchema || newParamBusy) return;
+    const slots = [...pendingBoxKeys];
+    if (!slots.some((k) => k !== null)) return;
+
+    const built = buildPositionSplitFields(input, split, setupSheetModelSchema);
+    if (!built.ok) {
+      setNewParamError(built.error);
+      return;
+    }
+
+    setNewParamBusy(true);
+    setNewParamError(null);
+    const error = await persistModelSchema({
+      ...setupSheetModelSchema,
+      fields: [...setupSheetModelSchema.fields, ...built.fields],
+    });
+    setNewParamBusy(false);
+    if (error) {
+      setNewParamError(error);
+      return;
+    }
+
+    // One updater for the whole batch. Looping applyWidgetToCanonicalKey would read mappings from
+    // this render's closure (stale after the first box) and bail into the single-slot conflict
+    // modal, so only the detach half of it is inlined here — the panel has already warned which
+    // boxes get taken off another parameter.
+    setFormFieldMappings((prev) => {
+      let next = prev;
+      slots.forEach((sourceKey, i) => {
+        const field = built.fields[i];
+        if (!sourceKey || !field) return;
+        const ref = parseAcroKey(sourceKey);
+        const row = pdfRowByName.get(ref.pdfFieldName);
+        next = removePdfWidgetFromMappings(next, ref.pdfFieldName, ref.instanceIndex, row);
+        // Only toggle rows with sibling widgets need the instance index pinned (as simple mapping).
+        const useIndex = !!row && isToggleFieldType(row.type) && (row.widgets?.length ?? 0) > 1;
+        next = {
+          ...next,
+          [field.key]: useIndex
+            ? { pdfFieldName: ref.pdfFieldName, widgetInstanceIndex: ref.instanceIndex }
+            : { pdfFieldName: ref.pdfFieldName },
+        };
+      });
+      return next;
+    });
+
+    const mapped = slots.filter((k) => k !== null).length;
+    setPendingBoxKeys([]);
+    setPositionSplit("single");
+    setAcroSelection({ keys: [], activeKey: null });
+    setStatus(
+      `Added “${input.displayLabel.trim()}” at ${built.fields.length} positions (${mapped} mapped).`
+    );
   }
 
   /** Clear a parameter's box(es) but keep the parameter — its boxes go back to unmapped. */
@@ -2818,18 +2942,23 @@ export function SetupCalibrationEditorClient({
         <CardPanel contentClassName="space-y-3 p-3">
           {modelLinkedMode && setupSheetModelSchema && initialSetupSheetModelId ? (
             <>
-              {pendingBoxes.length > 0 ? (
+              {pendingBoxes.some((b) => b !== null) ? (
                 <NewParameterFromBoxesPanel
                   boxes={pendingBoxes}
+                  split={positionSplit}
+                  onSplitChange={changePositionSplit}
+                  schema={setupSheetModelSchema}
                   groupTitles={existingGroupTitles(setupSheetModelSchema)}
                   busy={newParamBusy}
                   error={newParamError}
-                  onRemoveBox={(sourceKey) =>
-                    setPendingBoxKeys((prev) => prev.filter((k) => k !== sourceKey))
-                  }
+                  onRemoveBox={clearPendingSlot}
                   onHoverBox={setHoveredFormOverlayKey}
                   onCancel={cancelNewParameter}
-                  onSubmit={(input) => void createParameterFromBoxes(input)}
+                  onSubmit={(input) =>
+                    void (positionSplit === "single"
+                      ? createParameterFromBoxes(input)
+                      : createParameterSplitFromBoxes(input, positionSplit))
+                  }
                 />
               ) : null}
               <SetupCalibrationModelSidebar

@@ -39,7 +39,7 @@
     "test:setup-model-dedupe": "npx tsx src/lib/setupSheetModels/dedupeElection.test.ts",
     "test:setup-model-match": "npx tsx src/lib/setupSheetModels/matchAuthorizedModel.test.ts",
     "test:picker-models": "npx tsx src/lib/setupSheetModels/pickerModels.test.ts",
-    "test:new-parameter": "npx tsx --test src/lib/setupSheetModels/newParameterDef.test.ts",
+    "test:new-parameter": "npx tsx --test src/lib/setupSheetModels/newParameterDef.test.ts src/lib/setupSheetModels/parameterNameSuggestions.test.ts",
     "test:setup-fill-order": "npx tsx --test src/lib/setup/setupFillOrder.test.ts",
     "test:setup-history": "npx tsx --test src/lib/setup/carSetupHistory.test.ts",
     "test:run-picker": "npx tsx src/lib/runPickerFormat.test.ts",

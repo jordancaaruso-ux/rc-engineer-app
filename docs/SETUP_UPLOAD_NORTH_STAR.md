@@ -65,6 +65,40 @@ draft cost more than it saved. The in-app AI template wizard (`/setup-sheet-mode
   `draftSetupSheetModelSchema` remains the uncalibrated-upload fallback below. Neither is reachable
   from the app UI.
 
+#### Positions: one stem, several parameters (2026-07-25)
+
+Typing the position on every box was most of the typing on a paired/per-corner sheet, and the
+easiest way to end up with a label that breaks grouping. The naming panel gained a **Positions**
+row — `Single · Front/Rear · FF/FR/RF/RR`.
+
+- **Siblings, not a group.** `Camber` + Front/Rear creates `camber_front` **and** `camber_rear`
+  ("Camber (Front)" / "Camber (Rear)"), one box each, in one schema PATCH. Grouped
+  (`one_of_many`/`many_of_many`) still means *these boxes are one parameter's options* and remains
+  the `Single` meaning — everything downstream (the flat snapshot map, the universal registry, the
+  per-axle Engineer notes) is per-position, so a grouped parameter would be the wrong shape.
+- **No layout metadata is written.** The generated `_front`/`_rear`/`_ff`/`_fr`/`_rf`/`_rr` suffixes
+  are exactly what `layoutGroupOps` infers pair/corner4 rows from, so the schema editor groups them
+  with no extra state. The suffix is load bearing: `buildPositionSplitFields` **refuses** a
+  collision rather than letting `uniqueParameterKey` emit `camber_front_2`.
+- **Universal ids per position, and never for corners.** Front/Rear derives each sibling's id from
+  its own generated label, so a split gets cross-car pooling that the old grouped path suppressed
+  entirely. Corners get none on purpose — `detectAxle` reads the `FR` in "Camber (FR)" as *front*
+  and would book one inner pickup stack as the whole front axle, and the registry has no per-corner
+  ids anyway.
+- **Boxes are slot-addressed while a split is active.** `pendingBoxKeys` is fixed to the split's
+  length with `null` for unfilled positions; a sheet click fills the next empty slot, re-clicking a
+  filled one clears it. Saving with slots empty still creates all N parameters — the unmapped ones
+  appear under the sidebar's "Unmapped" filter.
+- **The Name box suggests stems** — names already on this sheet first, then the 8 universal
+  concepts; picking one pre-selects its split. Built on `AnchoredMenu`, which already handles the
+  two iOS faults that retired the old custom comboboxes (visual-viewport re-pin when the keyboard
+  opens, touch scroll-lock).
+- **Considered and left out:** `Left/Right` (not a `LayoutGroupRole`, so nothing downstream would
+  group it) and custom 2–6 slot labels. Split × grouped options (a front row of 3 holes plus the
+  same 3 at the rear) is wanted eventually for other disciplines but is not built —
+  `buildPositionSplitFields` already takes a full `NewParameterInput`, so only the panel's box UI
+  and the grouped mapping call would change.
+
 ---
 
 ## Stages
