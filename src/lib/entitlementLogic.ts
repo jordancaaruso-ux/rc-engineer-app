@@ -50,17 +50,39 @@ export type SubscriptionShape = {
 };
 
 /**
- * Effective tier from a subscription row. `null` / inactive / expired → "none". A row whose `tier`
- * string isn't exactly "pro" resolves to "standard" — fail-safe to the cheaper grant, never
- * accidentally to Pro.
+ * Grace window applied AFTER `currentPeriodEnd` before access is revoked.
+ *
+ * Without this, a paying customer loses access the instant their period ends and regains it only
+ * when the renewal webhook lands — so one delayed or failed `customer.subscription.updated` locks
+ * a payer out mid-race-weekend. Stripe's own dunning runs for days; matching that is strictly
+ * safer than being stricter than the payment processor.
+ *
+ * This only ever extends a subscription that is STILL `active`/`trialing`. A `canceled` row is
+ * rejected by the status check above and never reaches here, so this cannot resurrect a real
+ * cancellation — at worst a user who cancels keeps access for a few extra days between the period
+ * ending and Stripe's `canceled` webhook arriving.
+ */
+export const SUBSCRIPTION_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Effective tier from a subscription row. `null` / inactive / expired-past-grace → "none". A row
+ * whose `tier` string isn't exactly "pro" resolves to "standard" — fail-safe to the cheaper grant,
+ * never accidentally to Pro.
+ *
+ * `graceMs` is a parameter (not an env read) to keep this function pure and unit-testable; pass 0
+ * to assert the hard expiry boundary.
  */
 export function deriveSubscriptionTier(
   sub: SubscriptionShape | null | undefined,
   now: Date,
+  graceMs: number = SUBSCRIPTION_GRACE_MS,
 ): Tier {
   if (!sub) return "none";
   if (!isActiveSubscriptionStatus(sub.status)) return "none";
-  if (sub.currentPeriodEnd && sub.currentPeriodEnd.getTime() <= now.getTime()) {
+  if (
+    sub.currentPeriodEnd &&
+    sub.currentPeriodEnd.getTime() + Math.max(0, graceMs) <= now.getTime()
+  ) {
     return "none";
   }
   return sub.tier === "pro" ? "pro" : "standard";

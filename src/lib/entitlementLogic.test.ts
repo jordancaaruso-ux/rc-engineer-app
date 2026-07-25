@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  SUBSCRIPTION_GRACE_MS,
   deriveSubscriptionTier,
   isActiveSubscriptionStatus,
   isBillingEnforced,
@@ -73,6 +74,41 @@ test("canceled or expired subscriptions grant nothing", () => {
   );
   assert.equal(
     deriveSubscriptionTier({ status: "active", tier: "pro", currentPeriodEnd: past }, now),
+    "none",
+  );
+});
+
+test("a just-ended active subscription keeps access through the grace window", () => {
+  // A renewal webhook that is late (or fails and retries) must not lock a paying customer out
+  // mid-race-weekend. Being stricter than Stripe's own dunning helps nobody.
+  const justEnded = new Date(now.getTime() - 1_000);
+  assert.equal(
+    deriveSubscriptionTier({ status: "active", tier: "pro", currentPeriodEnd: justEnded }, now),
+    "pro",
+  );
+  const pastGrace = new Date(now.getTime() - SUBSCRIPTION_GRACE_MS - 1_000);
+  assert.equal(
+    deriveSubscriptionTier({ status: "active", tier: "pro", currentPeriodEnd: pastGrace }, now),
+    "none",
+  );
+});
+
+test("grace never resurrects a canceled subscription", () => {
+  const justEnded = new Date(now.getTime() - 1_000);
+  assert.equal(
+    deriveSubscriptionTier({ status: "canceled", tier: "pro", currentPeriodEnd: justEnded }, now),
+    "none",
+  );
+});
+
+test("graceMs 0 asserts the hard expiry boundary", () => {
+  const justEnded = new Date(now.getTime() - 1_000);
+  assert.equal(
+    deriveSubscriptionTier(
+      { status: "active", tier: "pro", currentPeriodEnd: justEnded },
+      now,
+      0,
+    ),
     "none",
   );
 });

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseEnvAuthAllowlist } from "@/lib/authAllowlist";
@@ -37,15 +38,46 @@ export async function isGrandfatheredEmail(email: string | null | undefined): Pr
   if (!normalized) return false;
   if (isAuthAdminEmail(normalized)) return true;
   if (parseEnvAuthAllowlist().has(normalized)) return true;
-  const row = await prisma.authAllowedEmail.findUnique({ where: { email: normalized } });
+  const row = await findAllowedEmailRow(normalized);
   return row != null;
 }
 
-/** Resolve a user's current entitlement. Enforcement-off or grandfathered → full (Pro) access. */
-export async function getEntitlement(user: User): Promise<Entitlement> {
+/**
+ * Per-request memoized DB reads.
+ *
+ * Keyed on PRIMITIVES (an id / a normalized email), never on the `User` object — React `cache()`
+ * memoizes by argument identity, and `getAuthenticatedApiUser` returns a fresh object per call, so
+ * an object-keyed cache would miss on exactly the paths that call this most.
+ *
+ * In non-render contexts (route handlers, actions, unit tests) `cache()` is a passthrough — same
+ * behaviour as `requireCurrentUser`, just without the dedupe.
+ */
+const findAllowedEmailRow = cache(async function findAllowedEmailRow(email: string) {
+  return prisma.authAllowedEmail.findUnique({ where: { email } });
+});
+
+const findSubscription = cache(async function findSubscription(userId: string) {
+  return prisma.subscription.findUnique({ where: { userId } });
+});
+
+const resolveEntitlement = cache(async function resolveEntitlement(
+  userId: string,
+  email: string | null,
+): Promise<Entitlement> {
   if (!isBillingEnforced()) return FULL_ACCESS;
-  if (await isGrandfatheredEmail(user.email)) return FULL_ACCESS;
-  const sub = await prisma.subscription.findUnique({ where: { userId: user.id } });
+  if (await isGrandfatheredEmail(email)) return FULL_ACCESS;
+  const sub = await findSubscription(userId);
   const tier = deriveSubscriptionTier(sub, new Date());
   return { tier, entitled: tier !== "none", grandfathered: false };
+});
+
+/**
+ * Resolve a user's current entitlement. Enforcement-off or grandfathered → full (Pro) access.
+ *
+ * Memoized per request: conversion surfaces (nav entry, upgrade CTA, settings row, page guard) all
+ * ask independently, and without this each answer costs an `AuthAllowedEmail` + a `Subscription`
+ * query.
+ */
+export async function getEntitlement(user: User): Promise<Entitlement> {
+  return resolveEntitlement(user.id, user.email ?? null);
 }

@@ -8,6 +8,7 @@ import {
   estimateCostUsd,
   evaluateAiBudget,
   modelRate,
+  remainingMonthlyCalls,
   resolveAiBudget,
   type AiBudget,
 } from "@/lib/aiUsage/budgets";
@@ -103,6 +104,69 @@ test("features get their own per-day call allowance", () => {
   const empty = {};
   assert.equal(resolveAiBudget("engineer-chat", empty).dailyCalls, 60);
   assert.equal(resolveAiBudget("setup-extract", empty).dailyCalls, 25);
+});
+
+test("cached input tokens are charged at a fraction of the input rate", () => {
+  const base = { model: "gpt-4o", promptTokens: 1_000_000, completionTokens: 0 };
+  assert.equal(estimateCostUsd(base), 2.5);
+  assert.equal(estimateCostUsd({ ...base, cachedPromptTokens: 1_000_000 }), 0.25);
+  assert.equal(estimateCostUsd({ ...base, cachedPromptTokens: 500_000 }), 1.375);
+});
+
+test("a bogus cached count cannot manufacture a discount", () => {
+  const base = { model: "gpt-4o", promptTokens: 1_000, completionTokens: 0 };
+  // Cached can never exceed the prompt itself...
+  assert.equal(
+    estimateCostUsd({ ...base, cachedPromptTokens: 999_999 }),
+    estimateCostUsd({ ...base, cachedPromptTokens: 1_000 })
+  );
+  assert.ok(estimateCostUsd({ ...base, cachedPromptTokens: 999_999 }) > 0);
+  // ...and a negative count is ignored, not treated as a surcharge.
+  assert.equal(estimateCostUsd({ ...base, cachedPromptTokens: -5 }), estimateCostUsd(base));
+});
+
+test("no monthly call quota by default — today's behaviour is unchanged", () => {
+  assert.equal(resolveAiBudget("engineer-chat", {}).monthlyCalls, undefined);
+  assert.equal(evaluateAiBudget({ ...clear, featureCallsMonth: 10_000 }).ok, true);
+});
+
+test("a monthly call quota blocks with its own reason and is inclusive", () => {
+  const capped: AiBudget = { ...budget, monthlyCalls: 15 };
+  assert.equal(evaluateAiBudget({ ...clear, budget: capped, featureCallsMonth: 14 }).ok, true);
+  const v = evaluateAiBudget({ ...clear, budget: capped, featureCallsMonth: 15 });
+  assert.equal(v.ok, false);
+  assert.equal(v.ok === false && v.reason, "monthly-calls");
+  if (v.ok === false) {
+    // Same driver-facing rule as the other messages: no operator vocabulary.
+    assert.doesNotMatch(v.message, /usd|token|budget|quota/i);
+  }
+});
+
+test("the visible monthly allowance is reported ahead of the invisible dollar brakes", () => {
+  const capped: AiBudget = { ...budget, monthlyCalls: 15 };
+  const v = evaluateAiBudget({
+    ...clear,
+    budget: capped,
+    featureCallsMonth: 15,
+    costTodayUsd: 99,
+  });
+  assert.equal(v.ok === false && v.reason, "monthly-calls");
+});
+
+test("remainingMonthlyCalls counts down, floors at zero, null when unlimited", () => {
+  assert.equal(remainingMonthlyCalls(budget, 5), null);
+  const capped: AiBudget = { ...budget, monthlyCalls: 15 };
+  assert.equal(remainingMonthlyCalls(capped, 3), 12);
+  assert.equal(remainingMonthlyCalls(capped, 15), 0);
+  assert.equal(remainingMonthlyCalls(capped, 99), 0);
+});
+
+test("AI_MONTHLY_CALL_LIMIT sets the quota; junk leaves it unlimited", () => {
+  assert.equal(resolveAiBudget("engineer-chat", { AI_MONTHLY_CALL_LIMIT: "15" }).monthlyCalls, 15);
+  assert.equal(
+    resolveAiBudget("engineer-chat", { AI_MONTHLY_CALL_LIMIT: "nope" }).monthlyCalls,
+    undefined
+  );
 });
 
 test("ledger day zone is fixed by default, env-overridable", () => {

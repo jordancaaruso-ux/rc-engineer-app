@@ -370,6 +370,7 @@ export async function POST(request: Request) {
               model: out.model,
               promptTokens: out.usage?.promptTokens ?? 0,
               completionTokens: out.usage?.completionTokens ?? 0,
+              cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
             });
             const feedback = await maybePersistEngineerReply({
               userId: user.id,
@@ -441,6 +442,7 @@ export async function POST(request: Request) {
       model: out.model,
       promptTokens: out.usage?.promptTokens ?? 0,
       completionTokens: out.usage?.completionTokens ?? 0,
+      cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
     });
 
     const feedback = await maybePersistEngineerReply({
