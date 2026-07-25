@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildNewParameterField,
+  buildPositionSplitFields,
   existingGroupTitles,
   sectionIdForGroupTitle,
   uniqueParameterKey,
@@ -181,4 +182,118 @@ test("a universal parameter id is carried onto the field", () => {
 test("uniqueParameterKey falls back for labels with no usable characters", () => {
   assert.equal(uniqueParameterKey("???", []), "custom_field");
   assert.equal(uniqueParameterKey("2 shim", []), "f_2_shim");
+});
+
+test("a front/rear split turns one stem into two siblings with the suffixes layout groups need", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "  Camber  ", groupTitle: "Front end", kind: "number" },
+    "front_rear",
+    schema()
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.deepEqual(
+    res.fields.map((f) => f.key),
+    ["camber_front", "camber_rear"]
+  );
+  assert.deepEqual(
+    res.fields.map((f) => f.displayLabel),
+    ["Camber (Front)", "Camber (Rear)"]
+  );
+  // Siblings, not one grouped parameter — everything downstream is per-position.
+  for (const f of res.fields) {
+    assert.equal(f.valueType, "number");
+    assert.equal(f.sectionId, "front_end");
+    assert.equal(f.groupBehaviorType, undefined);
+    assert.equal(f.layoutGroupId, undefined);
+  }
+});
+
+test("each sibling gets its own sort order rather than all sharing max + 1", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Upper inner shims", groupTitle: "Geometry", kind: "text" },
+    "corner4",
+    schema([field({ key: "existing", sortOrder: 7 })])
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.deepEqual(
+    res.fields.map((f) => f.sortOrder),
+    [8, 9, 10, 11]
+  );
+  assert.deepEqual(
+    res.fields.map((f) => f.key),
+    [
+      "upper_inner_shims_ff",
+      "upper_inner_shims_fr",
+      "upper_inner_shims_rf",
+      "upper_inner_shims_rr",
+    ]
+  );
+});
+
+test("front/rear siblings pick up their own universal parameter id", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Downstop", groupTitle: "Front end", kind: "number" },
+    "front_rear",
+    schema()
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.deepEqual(
+    res.fields.map((f) => f.universalParameterId),
+    ["droop_front", "droop_rear"]
+  );
+});
+
+test("corner siblings get no universal id — FR would be misread as the whole front axle", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Camber", groupTitle: "Geometry", kind: "number" },
+    "corner4",
+    schema()
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  for (const f of res.fields) assert.equal(f.universalParameterId, undefined);
+});
+
+test("a stem with no universal concept leaves the id unset", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Bulkhead insert", groupTitle: "Chassis", kind: "text" },
+    "front_rear",
+    schema()
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  for (const f of res.fields) assert.equal(f.universalParameterId, undefined);
+});
+
+test("a split refuses on collision instead of suffixing away the position", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Camber", groupTitle: "Geometry", kind: "number" },
+    "front_rear",
+    schema([field({ key: "camber_rear", displayLabel: "Camber (Rear)" })])
+  );
+  assert.equal(res.ok, false);
+  if (res.ok) return;
+  assert.match(res.error, /already exists/);
+});
+
+test("a split needs a name, and only applies to number/text parameters", () => {
+  assert.equal(
+    buildPositionSplitFields(
+      { displayLabel: "  ", groupTitle: "x", kind: "number" },
+      "front_rear",
+      schema()
+    ).ok,
+    false
+  );
+  assert.equal(
+    buildPositionSplitFields(
+      { displayLabel: "Shim", groupTitle: "x", kind: "one_of_many", optionLabels: ["A", "B"] },
+      "front_rear",
+      schema()
+    ).ok,
+    false
+  );
 });

@@ -1,5 +1,6 @@
 import { suggestKeyFromPdfFieldName } from "@/lib/setupCalibrations/customFieldCatalog";
 import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
+import { suggestUniversalParameterId } from "@/lib/setupSheetModels/matchUniversalParameter";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 /**
@@ -136,4 +137,79 @@ export function buildNewParameterField(
       groupedOptionValues: values,
     },
   };
+}
+
+/**
+ * One parameter measured at several places on the car. `single` is one parameter as before; the
+ * others expand one typed stem ("Camber") into that many sibling parameters, saving the driver
+ * typing the position on every box.
+ */
+export type PositionSplit = "single" | "front_rear" | "corner4";
+
+/**
+ * Position label per split, in slot order. These are the *only* source of the label and key
+ * suffixes, so they must stay spellings that `layoutGroupOps` recognizes as roles — the schema
+ * page infers pair / corner4 rows from `_front`/`_rear` and `_ff`/`_fr`/`_rf`/`_rr` alone.
+ */
+export const POSITION_LABELS: Record<PositionSplit, readonly string[]> = {
+  single: [],
+  front_rear: ["Front", "Rear"],
+  corner4: ["FF", "FR", "RF", "RR"],
+};
+
+export type PositionSplitResult =
+  | { ok: true; fields: SetupSheetModelFieldDef[] }
+  | { ok: false; error: string };
+
+/**
+ * Expand a stem into one sibling parameter per position — `Camber` → `camber_front` +
+ * `camber_rear`, labelled "Camber (Front)" / "Camber (Rear)".
+ *
+ * Siblings, not one grouped parameter: everything downstream (the flat snapshot map, the universal
+ * registry, per-axle Engineer notes) is per-position, so a grouped parameter would be the wrong
+ * shape. No `layoutGroupId` is written — the suffixes are what the schema page groups on.
+ */
+export function buildPositionSplitFields(
+  input: NewParameterInput,
+  split: Exclude<PositionSplit, "single">,
+  schema: SetupSheetModelSchema
+): PositionSplitResult {
+  const stem = input.displayLabel.trim();
+  if (!stem) return { ok: false, error: "Name is required." };
+  if (input.kind !== "number" && input.kind !== "text") {
+    return { ok: false, error: "Positions apply to number and text parameters only." };
+  }
+
+  const takenKeys = new Set(schema.fields.map((f) => f.key));
+  const fields: SetupSheetModelFieldDef[] = [];
+  // Grows as each sibling is built so they get distinct sort orders and a shared section id.
+  let acc = schema;
+
+  for (const position of POSITION_LABELS[split]) {
+    const displayLabel = `${stem} (${position})`;
+    const key = suggestKeyFromPdfFieldName(displayLabel);
+    // Refuse rather than let `uniqueParameterKey` produce `camber_front_2` — the suffix is load
+    // bearing, and a silently renamed key drops out of both layout grouping and cross-car stats.
+    if (takenKeys.has(key)) {
+      return { ok: false, error: `“${displayLabel}” already exists on this sheet.` };
+    }
+    const built = buildNewParameterField(
+      {
+        ...input,
+        displayLabel,
+        // Front/rear labels map cleanly onto the registry. Corners must not: "Camber (FR)" reads
+        // `fr` as *front* (matchUniversalParameter's detectAxle) and would book one inner pickup
+        // stack as the whole front axle, and the registry has no per-corner ids anyway.
+        universalParameterId:
+          split === "front_rear" ? suggestUniversalParameterId(key, displayLabel) : undefined,
+      },
+      acc
+    );
+    if (!built.ok) return built;
+    takenKeys.add(built.field.key);
+    fields.push(built.field);
+    acc = { ...acc, fields: [...acc.fields, built.field] };
+  }
+
+  return { ok: true, fields };
 }

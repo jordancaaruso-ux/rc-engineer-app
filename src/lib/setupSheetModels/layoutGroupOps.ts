@@ -16,7 +16,8 @@ const CORNER_ROLES: LayoutGroupRole[] = ["ff", "fr", "rf", "rr"];
 const KEY_CORNER_SUFFIX_RE = /_(ff|fr|rf|rr)$/;
 const KEY_PAIR_SUFFIX_RE = /_(front|rear)$/;
 
-function stripSideFromLabel(label: string): string {
+/** "Camber (Front)" / "Droop — FF" → the bare stem. Canonical stripper; don't write a second one. */
+export function stripSideFromLabel(label: string): string {
   return label
     .replace(/\s*[-–—]\s*(FF|FR|RF|RR|Front|Rear)\s*$/i, "")
     .replace(/\s*[\(·]?\s*(FF|FR|RF|RR|Front|Rear)\s*\)?\s*$/i, "")
