@@ -1,5 +1,16 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
+    "deny": [
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(git * push)",
+      "Bash(git * push *)",
+      "PowerShell(git push)",
+      "PowerShell(git push *)",
+      "PowerShell(git * push)",
+      "PowerShell(git * push *)"
+    ],
     "allow": [
       "Bash(node \"/c/Users/Jordan/AppData/Local/Temp/claude/c--Users-Jordan-Documents-rc-engineer-app/a634c754-cd81-44a6-8a22-62e38ba78d5d/scratchpad/strip-accent-dots.cjs\")",
       "Bash(npx dotenv-cli *)",
