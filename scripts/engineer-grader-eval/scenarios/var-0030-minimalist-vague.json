@@ -1,0 +1,142 @@
+{
+  "id": "var-0030-minimalist-vague",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-118-a800r-wkw9q1",
+  "question": "Something changed and I don't know what.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": null,
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -1.5,
+          "camber_rear": -1.5,
+          "toe_front": -1.5,
+          "toe_rear": 1.5,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.2",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "MR33 8K",
+          "motor": "Orca Modtreme2 4.5",
+          "pinion": "28",
+          "spur": "112"
+        },
+        "lapTimes": [
+          16.56,
+          17.102,
+          16.487,
+          15.975,
+          15.978,
+          16.059,
+          17.14,
+          59.454,
+          16.588,
+          16.479,
+          16.205,
+          16.179,
+          44.117,
+          16.687
+        ],
+        "bestLapSeconds": 15.975,
+        "avgTop5LapSeconds": 16.079,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 30,
+        "conditionsTrackTempC": 36,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-run",
+    "handlingRichness": "none",
+    "setupFreshness": "fresh",
+    "questionShape": "vague",
+    "problemType": "on-power-snap",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "on-power-snap"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-doz96i8f",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 86
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "vague",
+    "on-power-snap"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

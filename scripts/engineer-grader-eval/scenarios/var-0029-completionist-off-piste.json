@@ -1,0 +1,832 @@
+{
+  "id": "var-0029-completionist-off-piste",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-117-a800r-1a9556",
+  "question": "Does the colour of my tyre inserts actually mean anything across brands?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "HIGH"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Sweep",
+      "setNumber": 1,
+      "initialRunCount": 0,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "ETS Orca",
+          "date": "21.07.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "ETS 2024/25 Rd.2",
+          "spur": "90",
+          "wing": "Wolverine",
+          "motor": "ETS Orca 17,5T",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Matrix",
+          "track": "Aigen, Austria",
+          "pinion": "45",
+          "battery": "Nosram 8100",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "additive": "MR33",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -2.5,
+          "spring_rear": "STD",
+          "camber_front": -2,
+          "caster_front": 4.5,
+          "damping_rear": "P1",
+          "spring_front": "STD",
+          "total_weight": "1320",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5,8",
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5,2",
+          "spring_gap_front": "3.6",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.8",
+          "ride_height_front": "5,0",
+          "wheel_spacer_rear": "-",
+          "ackermann_position": "Rearward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1,75",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2,75",
+          "upper_inner_shims_fr": "2,75",
+          "upper_inner_shims_rf": "2,25",
+          "upper_inner_shims_rr": "2,25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "65.5",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,5",
+          "under_lower_arm_shims_fr": "2,5",
+          "under_lower_arm_shims_rf": "3,5",
+          "under_lower_arm_shims_rr": "3,5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          18.485,
+          15.817,
+          15.532,
+          16.412,
+          23.242,
+          17.218,
+          16.264,
+          16.036,
+          16.192,
+          15.972,
+          16.001,
+          17.049,
+          30.011,
+          17.593,
+          17.076,
+          16.845,
+          16.639,
+          16.649,
+          17.723
+        ],
+        "bestLapSeconds": 15.532,
+        "avgTop5LapSeconds": 15.872,
+        "tireRunNumber": 1,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 1
+          },
+          "primaryFocus": {
+            "kind": "balance",
+            "phase": "exit",
+            "value": 1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "rear steps out on exit",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 28,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 4,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "ETS Orca",
+          "date": "21.07.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "ETS 2024/25 Rd.2",
+          "spur": "90",
+          "wing": "Wolverine",
+          "motor": "ETS Orca 17,5T",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Matrix",
+          "track": "Aigen, Austria",
+          "pinion": "45",
+          "battery": "Nosram 8100",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "additive": "MR33",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -2.5,
+          "spring_rear": "STD",
+          "camber_front": -1.5,
+          "caster_front": 4.5,
+          "damping_rear": "P1",
+          "spring_front": "STD",
+          "total_weight": "1320",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5,8",
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5,2",
+          "spring_gap_front": "3.6",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.8",
+          "ride_height_front": "5,0",
+          "wheel_spacer_rear": "-",
+          "ackermann_position": "Rearward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1,75",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2,75",
+          "upper_inner_shims_fr": "2,75",
+          "upper_inner_shims_rf": "2,25",
+          "upper_inner_shims_rr": "2,25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "65.5",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,5",
+          "under_lower_arm_shims_fr": "2,5",
+          "under_lower_arm_shims_rf": "3,5",
+          "under_lower_arm_shims_rr": "3,5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          18.43,
+          15.762,
+          15.477,
+          16.357,
+          23.187,
+          17.163,
+          16.209,
+          15.981,
+          16.137,
+          15.917,
+          15.946,
+          16.994,
+          29.956,
+          17.538,
+          17.021,
+          16.79,
+          16.584,
+          16.594,
+          17.668
+        ],
+        "bestLapSeconds": 15.477,
+        "avgTop5LapSeconds": 15.817,
+        "tireRunNumber": 2,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 2
+          },
+          "primaryFocus": {
+            "kind": "balance",
+            "phase": "exit",
+            "value": 2
+          },
+          "feelVsLastRun": 0,
+          "speedTags": {
+            "balance:exit": "slow"
+          }
+        },
+        "handlingProblems": "rear steps out on exit",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 25,
+        "conditionsTrackTempC": 26,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "ETS Orca",
+          "date": "21.07.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "ETS 2024/25 Rd.2",
+          "spur": "90",
+          "wing": "Wolverine",
+          "motor": "ETS Orca 17,5T",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Matrix",
+          "track": "Aigen, Austria",
+          "pinion": "45",
+          "battery": "Nosram 8100",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "additive": "MR33",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 1.75,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -2.5,
+          "spring_rear": "STD",
+          "camber_front": -1.5,
+          "caster_front": 4.5,
+          "damping_rear": "P1",
+          "spring_front": "STD",
+          "total_weight": "1320",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5,8",
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5,2",
+          "spring_gap_front": "3.6",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.8",
+          "ride_height_front": "5,0",
+          "wheel_spacer_rear": "-",
+          "ackermann_position": "Rearward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1,75",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2,75",
+          "upper_inner_shims_fr": "2,75",
+          "upper_inner_shims_rf": "2,25",
+          "upper_inner_shims_rr": "2,25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "65.5",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,5",
+          "under_lower_arm_shims_fr": "2,5",
+          "under_lower_arm_shims_rf": "3,5",
+          "under_lower_arm_shims_rr": "3,5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          18.572,
+          15.904,
+          15.619,
+          16.499,
+          23.329,
+          17.305,
+          16.351,
+          16.123,
+          16.279,
+          16.059,
+          16.088,
+          17.136,
+          30.098,
+          17.68,
+          17.163,
+          16.932,
+          16.726,
+          16.736,
+          17.81
+        ],
+        "bestLapSeconds": 15.619,
+        "avgTop5LapSeconds": 15.959,
+        "tireRunNumber": 3,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 1
+          },
+          "primaryFocus": {
+            "kind": "balance",
+            "phase": "exit",
+            "value": 1
+          },
+          "feelVsLastRun": 0,
+          "speedTags": {
+            "balance:exit": "fast"
+          }
+        },
+        "handlingProblems": "rear steps out on exit",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 22,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "ETS Orca",
+          "date": "21.07.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "ETS 2024/25 Rd.2",
+          "spur": "90",
+          "wing": "Wolverine",
+          "motor": "ETS Orca 17,5T",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Matrix",
+          "track": "Aigen, Austria",
+          "pinion": "45",
+          "battery": "Nosram 8100",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "additive": "MR33",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 1.75,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -2.5,
+          "spring_rear": "STD",
+          "camber_front": -1.5,
+          "caster_front": 4.5,
+          "damping_rear": "P1",
+          "spring_front": "STD",
+          "total_weight": "1320",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5,8",
+          "damper_oil_rear": 350,
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5,2",
+          "spring_gap_front": "3.6",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.8",
+          "ride_height_front": "5,0",
+          "wheel_spacer_rear": "-",
+          "ackermann_position": "Rearward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1,75",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2,75",
+          "upper_inner_shims_fr": "2,75",
+          "upper_inner_shims_rf": "2,25",
+          "upper_inner_shims_rr": "2,25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "65.5",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,5",
+          "under_lower_arm_shims_fr": "2,5",
+          "under_lower_arm_shims_rf": "3,5",
+          "under_lower_arm_shims_rr": "3,5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          18.554,
+          15.886,
+          15.601,
+          16.481,
+          23.311,
+          17.287,
+          16.333,
+          16.105,
+          16.261,
+          16.041,
+          16.07,
+          17.118,
+          30.08,
+          17.662,
+          17.145,
+          16.914,
+          16.708,
+          16.718,
+          17.792
+        ],
+        "bestLapSeconds": 15.601,
+        "avgTop5LapSeconds": 15.941,
+        "tireRunNumber": 4,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 2
+          },
+          "primaryFocus": {
+            "kind": "balance",
+            "phase": "exit",
+            "value": 2
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "rear steps out on exit",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 28,
+        "conditionsTrackTempC": 32,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 5",
+        "setupData": {
+          "esc": "ETS Orca",
+          "date": "21.07.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "ETS 2024/25 Rd.2",
+          "spur": "90",
+          "wing": "Wolverine",
+          "motor": "ETS Orca 17,5T",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Matrix",
+          "track": "Aigen, Austria",
+          "pinion": "45",
+          "battery": "Nosram 8100",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "additive": "MR33",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 1.75,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -2.5,
+          "spring_rear": "STD",
+          "camber_front": -2,
+          "caster_front": 4.5,
+          "damping_rear": "P1",
+          "spring_front": "STD",
+          "total_weight": "1320",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5,8",
+          "damper_oil_rear": 350,
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5,2",
+          "spring_gap_front": "3.6",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.8",
+          "ride_height_front": "5,0",
+          "wheel_spacer_rear": "-",
+          "ackermann_position": "Rearward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1,75",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2,75",
+          "upper_inner_shims_fr": "2,75",
+          "upper_inner_shims_rf": "2,25",
+          "upper_inner_shims_rr": "2,25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "65.5",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,5",
+          "under_lower_arm_shims_fr": "2,5",
+          "under_lower_arm_shims_rf": "3,5",
+          "under_lower_arm_shims_rr": "3,5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          18.409,
+          15.741,
+          15.456,
+          16.336,
+          23.166,
+          17.142,
+          16.188,
+          15.96,
+          16.116,
+          15.896,
+          15.925,
+          16.973,
+          29.935,
+          17.517,
+          17,
+          16.769,
+          16.563,
+          16.573,
+          17.647
+        ],
+        "bestLapSeconds": 15.456,
+        "avgTop5LapSeconds": 15.796,
+        "tireRunNumber": 5,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 2
+          },
+          "primaryFocus": {
+            "kind": "balance",
+            "phase": "exit",
+            "value": 2
+          },
+          "feelVsLastRun": -1
+        },
+        "handlingProblems": "rear steps out on exit",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 18,
+        "conditionsTrackTempC": 24,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 4
+  },
+  "axes": {
+    "archetype": "completionist",
+    "historyDepth": "single-day",
+    "handlingRichness": "full",
+    "setupFreshness": "partial",
+    "questionShape": "off-piste",
+    "problemType": "exit-oversteer",
+    "dataConflict": null,
+    "gripLevel": "HIGH",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "completionist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 5
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "partial"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "exit-oversteer"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "HIGH"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-09c3njck",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 80
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "completionist",
+    "off-piste",
+    "exit-oversteer"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

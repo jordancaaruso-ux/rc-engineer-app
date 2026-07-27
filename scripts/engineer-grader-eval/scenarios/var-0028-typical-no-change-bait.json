@@ -1,0 +1,621 @@
+{
+  "id": "var-0028-typical-no-change-bait",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-116-a800r-dpfq71",
+  "question": "Really happy with it. What's next?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Sweep",
+      "setNumber": 1,
+      "initialRunCount": 0,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Hobbywing",
+          "date": "30.06.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "Warm-Up European Championship",
+          "spur": "100",
+          "wing": "Speciale",
+          "motor": "Hobbywing 13.5T G4",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Rush",
+          "track": "Roeselare, Belgium",
+          "pinion": "47",
+          "battery": "Nosram 8100",
+          "country": "Germany",
+          "additive": "Tristar Blue",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2.75,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -2.5,
+          "caster_front": 4.5,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1320",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5,2",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.4",
+          "top_deck_screws": [
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,0",
+          "spring_gap_front": "3.0",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.0426",
+          "ride_height_front": "4,8",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "3,25",
+          "upper_inner_shims_fr": "3,25",
+          "upper_inner_shims_rf": "3,25",
+          "upper_inner_shims_rr": "3,25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,25",
+          "rear_spring_rate_gf_mm": "109.7",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "75.6",
+          "pss_percent_setup_front": "15",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,75",
+          "under_lower_arm_shims_fr": "2,75",
+          "under_lower_arm_shims_rf": "3,0",
+          "under_lower_arm_shims_rr": "3,0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          16.906,
+          15.957,
+          15.962,
+          16.008,
+          16.652,
+          15.853,
+          15.981,
+          39.764,
+          16.371,
+          16.39,
+          16.397,
+          15.898,
+          15.999,
+          16.063
+        ],
+        "bestLapSeconds": 15.853,
+        "avgTop5LapSeconds": 15.93,
+        "handlingProblems": "felt great, best it's been",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 24,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "Hobbywing",
+          "date": "30.06.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "Warm-Up European Championship",
+          "spur": "100",
+          "wing": "Speciale",
+          "motor": "Hobbywing 13.5T G4",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Rush",
+          "track": "Roeselare, Belgium",
+          "pinion": "47",
+          "battery": "Nosram 8100",
+          "country": "Germany",
+          "additive": "Tristar Blue",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2.75,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -2.5,
+          "caster_front": 4.5,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1320",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5,2",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.4",
+          "top_deck_screws": [
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,0",
+          "spring_gap_front": "3.0",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.0426",
+          "ride_height_front": "4,8",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "3,25",
+          "upper_inner_shims_fr": "3,25",
+          "upper_inner_shims_rf": "3,25",
+          "upper_inner_shims_rr": "3,25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,25",
+          "rear_spring_rate_gf_mm": "109.7",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "75.6",
+          "pss_percent_setup_front": "15",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,75",
+          "under_lower_arm_shims_fr": "2,75",
+          "under_lower_arm_shims_rf": "3,0",
+          "under_lower_arm_shims_rr": "3,0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          16.971,
+          16.022,
+          16.027,
+          16.073,
+          16.717,
+          15.918,
+          16.046,
+          39.829,
+          16.436,
+          16.455,
+          16.462,
+          15.963,
+          16.064,
+          16.128
+        ],
+        "bestLapSeconds": 15.918,
+        "avgTop5LapSeconds": 15.995,
+        "handlingProblems": "felt great, best it's been",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 27,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "Hobbywing",
+          "date": "30.06.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "Warm-Up European Championship",
+          "spur": "100",
+          "wing": "Speciale",
+          "motor": "Hobbywing 13.5T G4",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Rush",
+          "track": "Roeselare, Belgium",
+          "pinion": "47",
+          "battery": "Nosram 8100",
+          "country": "Germany",
+          "additive": "Tristar Blue",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2.75,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -2.5,
+          "caster_front": 4.5,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1320",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5,2",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.4",
+          "top_deck_screws": [
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,0",
+          "spring_gap_front": "3.0",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.0426",
+          "ride_height_front": "4,8",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "3,25",
+          "upper_inner_shims_fr": "3,25",
+          "upper_inner_shims_rf": "3,25",
+          "upper_inner_shims_rr": "3,25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,25",
+          "rear_spring_rate_gf_mm": "109.7",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "75.6",
+          "pss_percent_setup_front": "15",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,75",
+          "under_lower_arm_shims_fr": "2,75",
+          "under_lower_arm_shims_rf": "3,0",
+          "under_lower_arm_shims_rr": "3,0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          16.984,
+          16.035,
+          16.04,
+          16.086,
+          16.73,
+          15.931,
+          16.059,
+          39.842,
+          16.449,
+          16.468,
+          16.475,
+          15.976,
+          16.077,
+          16.141
+        ],
+        "bestLapSeconds": 15.931,
+        "avgTop5LapSeconds": 16.008,
+        "handlingProblems": "felt great, best it's been",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 22,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "Hobbywing",
+          "date": "30.06.2024",
+          "name": "Lukas Ellerbrock",
+          "race": "Warm-Up European Championship",
+          "spur": "100",
+          "wing": "Speciale",
+          "motor": "Hobbywing 13.5T G4",
+          "radio": "Sanwa",
+          "servo": "MKS",
+          "tires": "Rush",
+          "track": "Roeselare, Belgium",
+          "pinion": "47",
+          "battery": "Nosram 8100",
+          "country": "Germany",
+          "additive": "Tristar Blue",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1,0",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2.75,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -2.5,
+          "caster_front": 4.5,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1320",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5,2",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.4",
+          "top_deck_screws": [
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,0",
+          "spring_gap_front": "3.0",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.0426",
+          "ride_height_front": "4,8",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "-",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1",
+          "toe_gain_shims_rear": "4,0",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "3,25",
+          "upper_inner_shims_fr": "3,25",
+          "upper_inner_shims_rf": "3,25",
+          "upper_inner_shims_rr": "3,25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,25",
+          "rear_spring_rate_gf_mm": "109.7",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "75.6",
+          "pss_percent_setup_front": "15",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2,75",
+          "under_lower_arm_shims_fr": "2,75",
+          "under_lower_arm_shims_rf": "3,0",
+          "under_lower_arm_shims_rr": "3,0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49,5"
+        },
+        "lapTimes": [
+          16.57,
+          15.621,
+          15.626,
+          15.672,
+          16.316,
+          15.517,
+          15.645,
+          39.428,
+          16.035,
+          16.054,
+          16.061,
+          15.562,
+          15.663,
+          15.727
+        ],
+        "bestLapSeconds": 15.517,
+        "avgTop5LapSeconds": 15.944,
+        "handlingProblems": "felt great, best it's been",
+        "notes": null,
+        "carRating": 4,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "typical",
+    "historyDepth": "single-day",
+    "handlingRichness": "free-text",
+    "setupFreshness": "stale",
+    "questionShape": "no-change-bait",
+    "problemType": "nothing-wrong",
+    "dataConflict": "felt-worse-but-faster",
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "typical"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "nothing-wrong"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-1kuwxlct",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 80
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "typical",
+    "no-change-bait",
+    "nothing-wrong"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

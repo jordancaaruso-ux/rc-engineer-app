@@ -1,0 +1,231 @@
+{
+  "id": "var-0038-completionist-no-change-bait",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-125-car-v3tx4x",
+  "question": "That was the best run of the day by a mile. What do I do now?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "Car (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "Track",
+      "gripTags": [
+        "HIGH"
+      ],
+      "layoutTags": []
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Matrix Z36",
+      "setNumber": 1,
+      "initialRunCount": 0,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Hobbywing Xerun XR10",
+          "date": "25.02.-03.03.2024",
+          "name": "Louis Kretschmer",
+          "race": "TITC Thailand International Touringcar Championship",
+          "spur": "108",
+          "wing": "Xtreme Twister Speciale",
+          "motor": "Hobbywing 13,5T",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL 575 SL",
+          "tires": "Sweep TITC 40 Shore",
+          "track": "RC Addict Circuit Bangkok",
+          "pinion": "36",
+          "battery": "Team EAM 6300mAh",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "Thailand",
+          "additive": "Mighty Gripper Yellow",
+          "air_temp": "~35",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa RX481",
+          "toe_rear": 2.5,
+          "traction": [
+            "high"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Xtreme Twister Speciale",
+          "toe_front": -1,
+          "diff_shims": "small shims",
+          "track_temp": "-",
+          "camber_rear": -1.5,
+          "caster_rear": -1,
+          "spring_rear": "STD",
+          "camber_front": -1.75,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1325",
+          "track_layout": [
+            "mixed",
+            "fast"
+          ],
+          "additive_time": "7",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "g",
+            "h"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5,4",
+          "damper_oil_rear": "400",
+          "spring_gap_rear": "2.0",
+          "top_deck_screws": [
+            "f"
+          ],
+          "top_deck_single": {
+            "selectedPreset": "C27MMX",
+            "otherText": ""
+          },
+          "damper_oil_front": "400",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,0",
+          "spring_gap_front": "3.6",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "5.7",
+          "ride_height_front": "4,8",
+          "wheel_spacer_rear": "0,5",
+          "ackermann_position": "Rear",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "0,5",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "0,5",
+          "toe_gain_shims_rear": "3,75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "20",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2",
+          "upper_inner_shims_fr": "2",
+          "upper_inner_shims_rf": "2,75",
+          "upper_inner_shims_rr": "2,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3",
+          "rear_spring_rate_gf_mm": "105",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "80.7",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "1",
+          "under_lower_arm_shims_ff": "2,5",
+          "under_lower_arm_shims_fr": "2,5",
+          "under_lower_arm_shims_rf": "3",
+          "under_lower_arm_shims_rr": "3"
+        },
+        "lapTimes": [
+          16.882,
+          16.816,
+          16.91,
+          16.997,
+          16.881,
+          16.945,
+          17.202,
+          17.125,
+          17.147,
+          17.393,
+          17.242
+        ],
+        "bestLapSeconds": 16.816,
+        "avgTop5LapSeconds": 16.887,
+        "tireRunNumber": 1,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelVsLastRun": -1
+        },
+        "handlingProblems": "felt great, best it's been",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 24,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "completionist",
+    "historyDepth": "single-run",
+    "handlingRichness": "full",
+    "setupFreshness": "fresh",
+    "questionShape": "no-change-bait",
+    "problemType": "nothing-wrong",
+    "dataConflict": null,
+    "gripLevel": "HIGH",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "completionist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "nothing-wrong"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "HIGH"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-oi5ytgzr",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 82
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "completionist",
+    "no-change-bait",
+    "nothing-wrong"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

@@ -1,0 +1,672 @@
+{
+  "id": "var-0072-no-timing-trackside-urgent",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-156-a800rr-jwt092",
+  "question": "Five minutes. on edge the whole run. What do I touch?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "Bayside",
+      "location": "Brisbane",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 4,
+      "initialRunCount": 0,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Yellow",
+      "modelCode": "MIGHTY-GRIPPER-YELLOW"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Hobbywing XR10 pro",
+          "date": "29.05.-01.06.25",
+          "name": "Tim Wahl",
+          "race": "ETS Apeldoorn 2025",
+          "spur": "114",
+          "wing": "ZooRacing Pantera 0.5mm",
+          "motor": "Hobbywing 4.5T",
+          "radio": "Sanwa",
+          "servo": "Highest L210",
+          "tires": "Matrix D36",
+          "track": "AMCA Apeldoorn",
+          "pinion": "30",
+          "battery": "EAM 6300mAh",
+          "chassis": {
+            "selectedPreset": "C01RS",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "winglet": "yes",
+          "abh_rear": "1",
+          "additive": "MR33 Outdoor",
+          "air_temp": "22",
+          "arb_rear": "1.1",
+          "diff_oil": "9.000",
+          "receiver": "Sanwa",
+          "toe_rear": 2.25,
+          "traction": [
+            "high"
+          ],
+          "abh_front": "1",
+          "arb_front": "1.1",
+          "at15_rear": "1",
+          "bodyshell": "Xtreme Speciale 0.4mm",
+          "toe_front": -1,
+          "at15_front": "1",
+          "diff_shims": "small",
+          "st205_rear": "1",
+          "camber_rear": -1,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "st205_front": "1",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "front_bumper": {
+            "selectedPreset": "",
+            "otherText": "MXLR"
+          },
+          "spring_front": "STD",
+          "total_weight": "1315g",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "Linear",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.9",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "2.8",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "rear_hrb_setting": "3.5",
+          "ride_height_rear": "5.2",
+          "spring_gap_front": "1.8",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "7.22",
+          "ride_height_front": "4.8",
+          "servo_horn_height": "17.75mm",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "backwards",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "0.5",
+          "side_wall_glue_rear": "-",
+          "toe_gain_shims_rear": "3.0",
+          "damper_percent_front": "60",
+          "front_body_post_hole": "4",
+          "inner_steering_angle": "25",
+          "side_wall_glue_front": "-",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0.0",
+          "upper_inner_shims_ff": "1.0",
+          "upper_inner_shims_fr": "1.0",
+          "upper_inner_shims_rf": "1.0",
+          "upper_inner_shims_rr": "1.0",
+          "front_body_post_oring": "no",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0.0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "114.6",
+          "upper_outer_shims_rear": "2.25",
+          "bodyshell_upstop_height": "10",
+          "front_spring_rate_gf_mm": "83.2",
+          "pss_percent_setup_front": "30",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "0.5",
+          "under_lower_arm_shims_fr": "0.5",
+          "under_lower_arm_shims_rf": "1.75",
+          "under_lower_arm_shims_rr": "1.75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50",
+          "body_position_from_windshield": "46.5"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "on edge, one lap good one lap bad",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 24,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "Hobbywing XR10 pro",
+          "date": "29.05.-01.06.25",
+          "name": "Tim Wahl",
+          "race": "ETS Apeldoorn 2025",
+          "spur": "114",
+          "wing": "ZooRacing Pantera 0.5mm",
+          "motor": "Hobbywing 4.5T",
+          "radio": "Sanwa",
+          "servo": "Highest L210",
+          "tires": "Matrix D36",
+          "track": "AMCA Apeldoorn",
+          "pinion": "30",
+          "battery": "EAM 6300mAh",
+          "chassis": {
+            "selectedPreset": "C01RS",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "winglet": "yes",
+          "abh_rear": "1",
+          "additive": "MR33 Outdoor",
+          "air_temp": "22",
+          "arb_rear": "1.1",
+          "diff_oil": "9.000",
+          "receiver": "Sanwa",
+          "toe_rear": 2.25,
+          "traction": [
+            "high"
+          ],
+          "abh_front": "1",
+          "arb_front": "1.1",
+          "at15_rear": "1",
+          "bodyshell": "Xtreme Speciale 0.4mm",
+          "toe_front": -1,
+          "at15_front": "1",
+          "diff_shims": "small",
+          "st205_rear": "1",
+          "camber_rear": -1.5,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "st205_front": "1",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "front_bumper": {
+            "selectedPreset": "",
+            "otherText": "MXLR"
+          },
+          "spring_front": "STD",
+          "total_weight": "1315g",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "Linear",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.9",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "2.8",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "rear_hrb_setting": "3.5",
+          "ride_height_rear": "5.2",
+          "spring_gap_front": "1.8",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "7.22",
+          "ride_height_front": "4.8",
+          "servo_horn_height": "17.75mm",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "backwards",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "0.5",
+          "side_wall_glue_rear": "-",
+          "toe_gain_shims_rear": "3.0",
+          "damper_percent_front": "60",
+          "front_body_post_hole": "4",
+          "inner_steering_angle": "25",
+          "side_wall_glue_front": "-",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0.0",
+          "upper_inner_shims_ff": "1.0",
+          "upper_inner_shims_fr": "1.0",
+          "upper_inner_shims_rf": "1.0",
+          "upper_inner_shims_rr": "1.0",
+          "front_body_post_oring": "no",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0.0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "114.6",
+          "upper_outer_shims_rear": "2.25",
+          "bodyshell_upstop_height": "10",
+          "front_spring_rate_gf_mm": "83.2",
+          "pss_percent_setup_front": "30",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "0.5",
+          "under_lower_arm_shims_fr": "0.5",
+          "under_lower_arm_shims_rf": "1.75",
+          "under_lower_arm_shims_rr": "1.75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50",
+          "body_position_from_windshield": "46.5"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "on edge, one lap good one lap bad",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 21,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "Hobbywing XR10 pro",
+          "date": "29.05.-01.06.25",
+          "name": "Tim Wahl",
+          "race": "ETS Apeldoorn 2025",
+          "spur": "114",
+          "wing": "ZooRacing Pantera 0.5mm",
+          "motor": "Hobbywing 4.5T",
+          "radio": "Sanwa",
+          "servo": "Highest L210",
+          "tires": "Matrix D36",
+          "track": "AMCA Apeldoorn",
+          "pinion": "30",
+          "battery": "EAM 6300mAh",
+          "chassis": {
+            "selectedPreset": "C01RS",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "winglet": "yes",
+          "abh_rear": "1",
+          "additive": "MR33 Outdoor",
+          "air_temp": "22",
+          "arb_rear": "1.1",
+          "diff_oil": "9.000",
+          "receiver": "Sanwa",
+          "toe_rear": 2.25,
+          "traction": [
+            "high"
+          ],
+          "abh_front": "1",
+          "arb_front": "1.1",
+          "at15_rear": "1",
+          "bodyshell": "Xtreme Speciale 0.4mm",
+          "toe_front": -1,
+          "at15_front": "1",
+          "diff_shims": "small",
+          "st205_rear": "1",
+          "camber_rear": -1.5,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "st205_front": "1",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "front_bumper": {
+            "selectedPreset": "",
+            "otherText": "MXLR"
+          },
+          "spring_front": "STD",
+          "total_weight": "1315g",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "Linear",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.9",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "2.8",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": 350,
+          "diff_height_rear": "Down",
+          "rear_hrb_setting": "3.5",
+          "ride_height_rear": "5.2",
+          "spring_gap_front": "1.8",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "7.22",
+          "ride_height_front": "4.8",
+          "servo_horn_height": "17.75mm",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "backwards",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "0.5",
+          "side_wall_glue_rear": "-",
+          "toe_gain_shims_rear": "3.0",
+          "damper_percent_front": "60",
+          "front_body_post_hole": "4",
+          "inner_steering_angle": "25",
+          "side_wall_glue_front": "-",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0.0",
+          "upper_inner_shims_ff": "1.0",
+          "upper_inner_shims_fr": "1.0",
+          "upper_inner_shims_rf": "1.0",
+          "upper_inner_shims_rr": "1.0",
+          "front_body_post_oring": "no",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0.0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "114.6",
+          "upper_outer_shims_rear": "2.25",
+          "bodyshell_upstop_height": "10",
+          "front_spring_rate_gf_mm": "83.2",
+          "pss_percent_setup_front": "30",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "0.5",
+          "under_lower_arm_shims_fr": "0.5",
+          "under_lower_arm_shims_rf": "1.75",
+          "under_lower_arm_shims_rr": "1.75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50",
+          "body_position_from_windshield": "46.5"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "on edge, one lap good one lap bad",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 27,
+        "conditionsTrackTempC": 27,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "Hobbywing XR10 pro",
+          "date": "29.05.-01.06.25",
+          "name": "Tim Wahl",
+          "race": "ETS Apeldoorn 2025",
+          "spur": "114",
+          "wing": "ZooRacing Pantera 0.5mm",
+          "motor": "Hobbywing 4.5T",
+          "radio": "Sanwa",
+          "servo": "Highest L210",
+          "tires": "Matrix D36",
+          "track": "AMCA Apeldoorn",
+          "pinion": "30",
+          "battery": "EAM 6300mAh",
+          "chassis": {
+            "selectedPreset": "C01RS",
+            "otherText": ""
+          },
+          "country": "Germany",
+          "winglet": "yes",
+          "abh_rear": "1",
+          "additive": "MR33 Outdoor",
+          "air_temp": "22",
+          "arb_rear": "1.1",
+          "diff_oil": "9.000",
+          "receiver": "Sanwa",
+          "toe_rear": 2.25,
+          "traction": [
+            "high"
+          ],
+          "abh_front": "1",
+          "arb_front": "1.1",
+          "at15_rear": "1",
+          "bodyshell": "Xtreme Speciale 0.4mm",
+          "toe_front": -1,
+          "at15_front": "1",
+          "diff_shims": "small",
+          "st205_rear": "1",
+          "camber_rear": -1.5,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "st205_front": "1",
+          "camber_front": -1,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "front_bumper": {
+            "selectedPreset": "",
+            "otherText": "MXLR"
+          },
+          "spring_front": "STD",
+          "total_weight": "1315g",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "20",
+          "damping_front": "Linear",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.9",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "2.8",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": 350,
+          "diff_height_rear": "Down",
+          "rear_hrb_setting": "3.5",
+          "ride_height_rear": "5.2",
+          "spring_gap_front": "1.8",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "7.22",
+          "ride_height_front": 4.3,
+          "servo_horn_height": "17.75mm",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "backwards",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "0.5",
+          "side_wall_glue_rear": "-",
+          "toe_gain_shims_rear": "3.0",
+          "damper_percent_front": "60",
+          "front_body_post_hole": "4",
+          "inner_steering_angle": "25",
+          "side_wall_glue_front": "-",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0.0",
+          "upper_inner_shims_ff": "1.0",
+          "upper_inner_shims_fr": "1.0",
+          "upper_inner_shims_rf": "1.0",
+          "upper_inner_shims_rr": "1.0",
+          "front_body_post_oring": "no",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0.0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "114.6",
+          "upper_outer_shims_rear": "2.25",
+          "bodyshell_upstop_height": "10",
+          "front_spring_rate_gf_mm": "83.2",
+          "pss_percent_setup_front": "30",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "0.5",
+          "under_lower_arm_shims_fr": "0.5",
+          "under_lower_arm_shims_rf": "1.75",
+          "under_lower_arm_shims_rr": "1.75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50",
+          "body_position_from_windshield": "46.5"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "on edge, one lap good one lap bad",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 29,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "no-timing",
+    "historyDepth": "single-day",
+    "handlingRichness": "free-text",
+    "setupFreshness": "partial",
+    "questionShape": "trackside-urgent",
+    "problemType": "inconsistent",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "no-timing"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "partial"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "inconsistent"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-06coximi",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 100
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "no-timing",
+    "trackside-urgent",
+    "inconsistent"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

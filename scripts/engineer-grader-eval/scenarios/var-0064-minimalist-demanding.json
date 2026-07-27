@@ -1,0 +1,300 @@
+{
+  "id": "var-0064-minimalist-demanding",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-149-a800rr-iadiyo",
+  "question": "I don't want a list of options. One answer — what do I change?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "Bayside",
+      "location": "Brisbane",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 3,
+      "initialRunCount": 0,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Yellow",
+      "modelCode": "MIGHTY-GRIPPER-YELLOW"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -1.25,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.4",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "400",
+          "damper_oil_rear": "500",
+          "diff_oil": "10k",
+          "motor": "HW 5.0 / 12.1 rotor",
+          "pinion": "28",
+          "spur": "112"
+        },
+        "lapTimes": [
+          12.712,
+          16.849,
+          15.731,
+          15.598,
+          16.295,
+          15.909,
+          16.593,
+          15.773,
+          16.016,
+          15.873,
+          15.575,
+          15.968,
+          15.937,
+          15.72,
+          16.12,
+          16.287
+        ],
+        "bestLapSeconds": 12.712,
+        "avgTop5LapSeconds": 15.067,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "camber_front": -1.25,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 3.75,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.4",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "400",
+          "damper_oil_rear": "500",
+          "diff_oil": "10k",
+          "motor": "HW 5.0 / 12.1 rotor",
+          "pinion": "28",
+          "spur": "112"
+        },
+        "lapTimes": [
+          12.772,
+          16.909,
+          15.791,
+          15.658,
+          16.355,
+          15.969,
+          16.653,
+          15.833,
+          16.076,
+          15.933,
+          15.635,
+          16.028,
+          15.997,
+          15.78,
+          16.18,
+          16.347
+        ],
+        "bestLapSeconds": 12.772,
+        "avgTop5LapSeconds": 15.127,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 25,
+        "conditionsTrackTempC": 28,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "camber_front": -1.25,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 3.75,
+          "ride_height_front": 5.7,
+          "ride_height_rear": "5.4",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "400",
+          "damper_oil_rear": "500",
+          "diff_oil": "10k",
+          "motor": "HW 5.0 / 12.1 rotor",
+          "pinion": "28",
+          "spur": "112"
+        },
+        "lapTimes": [
+          12.738,
+          16.875,
+          15.757,
+          15.624,
+          16.321,
+          15.935,
+          16.619,
+          15.799,
+          16.042,
+          15.899,
+          15.601,
+          15.994,
+          15.963,
+          15.746,
+          16.146,
+          16.313
+        ],
+        "bestLapSeconds": 12.738,
+        "avgTop5LapSeconds": 15.093,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 24,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "camber_front": -1.25,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 3.75,
+          "ride_height_front": 5.7,
+          "ride_height_rear": "5.4",
+          "spring_front": "S",
+          "spring_rear": "STD",
+          "damper_oil_front": "400",
+          "damper_oil_rear": 450,
+          "diff_oil": "10k",
+          "motor": "HW 5.0 / 12.1 rotor",
+          "pinion": "28",
+          "spur": "112"
+        },
+        "lapTimes": [
+          12.351,
+          16.488,
+          15.37,
+          15.237,
+          15.934,
+          15.548,
+          16.232,
+          15.412,
+          15.655,
+          15.512,
+          15.214,
+          15.607,
+          15.576,
+          15.359,
+          15.759,
+          15.926
+        ],
+        "bestLapSeconds": 12.351,
+        "avgTop5LapSeconds": 15.056,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 28,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-day",
+    "handlingRichness": "none",
+    "setupFreshness": "fresh",
+    "questionShape": "demanding",
+    "problemType": "darty",
+    "dataConflict": "felt-worse-but-faster",
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "darty"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-dslptl9k",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 76
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "demanding",
+    "darty"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

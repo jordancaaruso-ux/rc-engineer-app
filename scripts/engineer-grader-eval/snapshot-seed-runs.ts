@@ -16,7 +16,11 @@ import path from "node:path";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loadFounderRatedExemplars } from "@/lib/engineerFeedback/calibratedJudge";
-import type { Scenario, ScenarioRun, ScenarioWorld } from "./types";
+import {
+  countNonEmptyKeys,
+  resolveNormalizedAggregationData,
+} from "@/lib/setupAggregations/eligibleDocAggregationCore";
+import type { Scenario, ScenarioRun, ScenarioWorld, SetupPoolEntry } from "./types";
 import { writeScenario } from "./scenarioIo";
 
 const RUN_INCLUDE = {
@@ -129,6 +133,84 @@ function buildWorld(focus: RunWithRels, history: RunWithRels[]): ScenarioWorld {
   };
 }
 
+/**
+ * Pull the SETUP POOL — every setup sheet that feeds the aggregation dataset, app-wide.
+ * This is the "full mix": many chassis and tuning philosophies, not just Jordan's own two
+ * tracks. Mirrors the real rebuild's eligibility gate (eligibleForAggregationDataset +
+ * PARSED/PARTIAL) and reuses its exact normalizer so pool values match what the community
+ * aggregations were actually built from.
+ *
+ * PRIVACY: this crosses users. Setup sheets are competitively sensitive in RC, so the pool
+ * (and anything generated from it) stays gitignored. Entries record `sourceSite` so
+ * publicly-published sheets (e.g. petitrc imports) can be told apart from private uploads.
+ */
+async function buildSetupPool(limit: number): Promise<SetupPoolEntry[]> {
+  const pool: SetupPoolEntry[] = [];
+  const seenShape = new Set<string>();
+
+  const docs = await prisma.setupDocument.findMany({
+    where: {
+      eligibleForAggregationDataset: true,
+      parseStatus: { in: ["PARSED", "PARTIAL"] },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      parsedDataJson: true,
+      sourceSite: true,
+      setupSheetTemplate: true,
+      createdSetup: { select: { data: true } },
+      car: { select: { setupSheetTemplate: true } },
+    },
+  });
+
+  for (const d of docs) {
+    const data = resolveNormalizedAggregationData(d.parsedDataJson, d.createdSetup);
+    // The rebuild drops documents with fewer than 2 non-empty keys — match that bar.
+    if (!data || countNonEmptyKeys(data) < 2) continue;
+    const surface = typeof data.track_surface === "string" ? data.track_surface : null;
+    // Dedupe identical sheets (re-imports of the same PDF) by their value fingerprint.
+    const shape = JSON.stringify(data);
+    if (seenShape.has(shape)) continue;
+    seenShape.add(shape);
+    pool.push({
+      id: `doc-${d.id.slice(-8)}`,
+      setupSheetTemplate: d.car?.setupSheetTemplate ?? d.setupSheetTemplate ?? null,
+      trackSurface: surface,
+      data: data as Record<string, unknown>,
+      source: "setup-document",
+      sourceSite: d.sourceSite ?? null,
+      keyCount: countNonEmptyKeys(data),
+    });
+  }
+
+  // Run-attached snapshots too — these feed the per-car condition aggregations.
+  const snaps = await prisma.setupSnapshot.findMany({
+    where: { isLibrary: false, runs: { some: {} } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: { id: true, data: true, car: { select: { setupSheetTemplate: true } } },
+  });
+  for (const s of snaps) {
+    const data = (s.data ?? {}) as Record<string, unknown>;
+    if (Object.keys(data).length < 2) continue;
+    const shape = JSON.stringify(data);
+    if (seenShape.has(shape)) continue;
+    seenShape.add(shape);
+    pool.push({
+      id: `snap-${s.id.slice(-8)}`,
+      setupSheetTemplate: s.car?.setupSheetTemplate ?? null,
+      trackSurface: typeof data.track_surface === "string" ? data.track_surface : null,
+      data,
+      source: "run-snapshot",
+      keyCount: Object.keys(data).length,
+    });
+  }
+
+  return pool;
+}
+
 async function main() {
   const user = await resolveUser(arg("user-email"));
   const history = Math.max(0, Math.floor(Number(arg("history") ?? 3)));
@@ -174,6 +256,26 @@ async function main() {
     }
   }
   console.log(`Wrote ${count} seed scenarios → ${outDir}`);
+
+  // Setup pool — the "full mix" of real sheets behind the aggregations.
+  const pool = await buildSetupPool(Math.max(1, Math.floor(Number(arg("pool-limit") ?? 400))));
+  const poolPath = path.join(outDir, "_setup-pool.json");
+  await fs.mkdir(outDir, { recursive: true });
+  await fs.writeFile(
+    poolPath,
+    JSON.stringify({ generatedAtIso: new Date().toISOString(), entries: pool }, null, 2),
+    "utf8"
+  );
+  const byTemplate = new Map<string, number>();
+  for (const e of pool) byTemplate.set(e.setupSheetTemplate ?? "(none)", (byTemplate.get(e.setupSheetTemplate ?? "(none)") ?? 0) + 1);
+  console.log(`Setup pool: ${pool.length} distinct sheets → ${poolPath}`);
+  console.log(`  templates: ${[...byTemplate.entries()].map(([t, n]) => `${t}×${n}`).join(" · ") || "none"}`);
+  if (pool.length === 0) {
+    console.warn(
+      `  ⚠ Empty pool — no SetupDocuments are flagged eligibleForAggregationDataset. ` +
+        `The factory will fall back to the setups on your own runs (narrower mix).`
+    );
+  }
 
   // Also dump the judge's founder-rated exemplars (read-only from prod) so the branch
   // run — where engineerMessageRating is empty — can calibrate the grader from a file.

@@ -77,13 +77,62 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
       title: "Suspension (Front / Rear)",
       rows: [
         { type: "pair", label: "Camber", unit: "°", leftKey: "camber_front", rightKey: "camber_rear" },
+        { type: "pair", label: "Caster", unit: "°", leftKey: "caster_front", rightKey: "caster_rear" },
         { type: "pair", label: "Toe", unit: "°", leftKey: "toe_front", rightKey: "toe_rear" },
         { type: "pair", label: "Ride Ht", unit: "mm", leftKey: "ride_height_front", rightKey: "ride_height_rear" },
         { type: "pair", label: "Droop", unit: "mm", leftKey: "droop_front", rightKey: "droop_rear" },
+        { type: "pair", label: "Downstop", unit: "mm", leftKey: "downstop_front", rightKey: "downstop_rear" },
         { type: "pair", label: "Spring", leftKey: "spring_rate_front", rightKey: "spring_rate_rear" },
-        { type: "pair", label: "Oil / damper", unit: "cSt", leftKey: "shock_oil_front", rightKey: "shock_oil_rear" },
+        { type: "pair", label: "Damper oil", unit: "cSt", leftKey: "damper_oil_front", rightKey: "damper_oil_rear" },
         { type: "pair", label: "Roll bar", leftKey: "arb_front", rightKey: "arb_rear" },
-        { type: "pair", label: "Roll ctr", leftKey: "roll_center_front", rightKey: "roll_center_rear" },
+      ],
+    },
+    /**
+     * Link geometry — the shim stacks the Engineer's roll-centre and link-balance reasoning runs
+     * on. Without these a generic sheet can only support camber/toe/spring/damping talk.
+     *
+     * The four-value rows are NOT per corner (left/right are symmetric): they are the front and
+     * rear pickup of the FRONT bulkhead (FF/FR) and of the REAR bulkhead (RF/RR). FF−FR is the
+     * anti-dive split, RF−RR the anti-squat split.
+     */
+    {
+      id: "geometry",
+      title: "Link geometry",
+      rows: [
+        {
+          type: "corner4",
+          label: "Upper inner shims",
+          unit: "mm",
+          ff: "upper_inner_shims_ff",
+          fr: "upper_inner_shims_fr",
+          rf: "upper_inner_shims_rf",
+          rr: "upper_inner_shims_rr",
+        },
+        {
+          type: "corner4",
+          label: "Under lower arm shims",
+          unit: "mm",
+          ff: "under_lower_arm_shims_ff",
+          fr: "under_lower_arm_shims_fr",
+          rf: "under_lower_arm_shims_rf",
+          rr: "under_lower_arm_shims_rr",
+        },
+        {
+          type: "pair",
+          label: "Upper outer shims",
+          unit: "mm",
+          leftKey: "upper_outer_shims_front",
+          rightKey: "upper_outer_shims_rear",
+        },
+        {
+          type: "pair",
+          label: "Under hub shims",
+          unit: "mm",
+          leftKey: "under_hub_shims_front",
+          rightKey: "under_hub_shims_rear",
+        },
+        { type: "single", key: "bump_steer_shims_front", label: "Bump steer shims (Front)", unit: "mm" },
+        { type: "single", key: "toe_gain_shims_rear", label: "Toe gain shims (Rear)", unit: "mm" },
       ],
     },
     {
@@ -91,6 +140,7 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
       title: "Diff & drivetrain",
       rows: [
         { type: "single", key: "diff", label: "Diff / slipper" },
+        { type: "single", key: "diff_oil", label: "Diff oil" },
         {
           type: "pair",
           label: "Diff height",
@@ -128,20 +178,43 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
       fields: [
         { key: "camber_front", label: "Camber (Front)", unit: "°" },
         { key: "camber_rear", label: "Camber (Rear)", unit: "°" },
+        { key: "caster_front", label: "Caster (Front)", unit: "°" },
+        { key: "caster_rear", label: "Caster (Rear)", unit: "°" },
         { key: "toe_front", label: "Toe (Front)", unit: "°" },
         { key: "toe_rear", label: "Toe (Rear)", unit: "°" },
         { key: "ride_height_front", label: "Ride Ht (Front)", unit: "mm" },
         { key: "ride_height_rear", label: "Ride Ht (Rear)", unit: "mm" },
         { key: "droop_front", label: "Droop (Front)", unit: "mm" },
         { key: "droop_rear", label: "Droop (Rear)", unit: "mm" },
+        { key: "downstop_front", label: "Downstop (Front)", unit: "mm" },
+        { key: "downstop_rear", label: "Downstop (Rear)", unit: "mm" },
         { key: "spring_rate_front", label: "Spring (Front)" },
         { key: "spring_rate_rear", label: "Spring (Rear)" },
-        { key: "shock_oil_front", label: "Oil / damper (Front)", unit: "cSt" },
-        { key: "shock_oil_rear", label: "Oil / damper (Rear)", unit: "cSt" },
+        { key: "damper_oil_front", label: "Damper oil (Front)", unit: "cSt" },
+        { key: "damper_oil_rear", label: "Damper oil (Rear)", unit: "cSt" },
         { key: "arb_front", label: "Roll bar (Front)" },
         { key: "arb_rear", label: "Roll bar (Rear)" },
-        { key: "roll_center_front", label: "Roll ctr (Front)" },
-        { key: "roll_center_rear", label: "Roll ctr (Rear)" },
+      ],
+    },
+    {
+      id: "geometry",
+      title: "Link geometry",
+      column: "full",
+      fields: [
+        { key: "upper_inner_shims_ff", label: "Upper inner shims (FF)", unit: "mm" },
+        { key: "upper_inner_shims_fr", label: "Upper inner shims (FR)", unit: "mm" },
+        { key: "upper_inner_shims_rf", label: "Upper inner shims (RF)", unit: "mm" },
+        { key: "upper_inner_shims_rr", label: "Upper inner shims (RR)", unit: "mm" },
+        { key: "under_lower_arm_shims_ff", label: "Under lower arm shims (FF)", unit: "mm" },
+        { key: "under_lower_arm_shims_fr", label: "Under lower arm shims (FR)", unit: "mm" },
+        { key: "under_lower_arm_shims_rf", label: "Under lower arm shims (RF)", unit: "mm" },
+        { key: "under_lower_arm_shims_rr", label: "Under lower arm shims (RR)", unit: "mm" },
+        { key: "upper_outer_shims_front", label: "Upper outer shims (Front)", unit: "mm" },
+        { key: "upper_outer_shims_rear", label: "Upper outer shims (Rear)", unit: "mm" },
+        { key: "under_hub_shims_front", label: "Under hub shims (Front)", unit: "mm" },
+        { key: "under_hub_shims_rear", label: "Under hub shims (Rear)", unit: "mm" },
+        { key: "bump_steer_shims_front", label: "Bump steer shims (Front)", unit: "mm" },
+        { key: "toe_gain_shims_rear", label: "Toe gain shims (Rear)", unit: "mm" },
       ],
     },
     {
@@ -150,6 +223,7 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
       column: "full",
       fields: [
         { key: "diff", label: "Diff / slipper" },
+        { key: "diff_oil", label: "Diff oil", unit: "cSt" },
         { key: "diff_height_front", label: "Diff height (Front)" },
         { key: "diff_height_rear", label: "Diff height (Rear)" },
       ],

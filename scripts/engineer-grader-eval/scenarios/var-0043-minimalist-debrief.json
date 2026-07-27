@@ -1,0 +1,226 @@
+{
+  "id": "var-0043-minimalist-debrief",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-13-a800r-91uxtw",
+  "question": "Day's done. Walk me through what happened across those runs and what I should try next time.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Boronia",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "HIGH"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36",
+      "setNumber": 1,
+      "initialRunCount": 5,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.4",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "5k",
+          "motor": "RCK 17.5",
+          "pinion": "36",
+          "spur": "76"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 21,
+        "conditionsTrackTempC": 25,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.4",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "5k",
+          "motor": "RCK 17.5",
+          "pinion": "36",
+          "spur": "76"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 24,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.4",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "5k",
+          "motor": "RCK 17.5",
+          "pinion": "36",
+          "spur": "76"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 32,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.2",
+          "ride_height_rear": "5.4",
+          "spring_front": "S",
+          "spring_rear": "S",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "5k",
+          "motor": "RCK 17.5",
+          "pinion": "36",
+          "spur": "76"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-day",
+    "handlingRichness": "none",
+    "setupFreshness": "stale",
+    "questionShape": "debrief",
+    "problemType": "traction-roll",
+    "dataConflict": null,
+    "gripLevel": "HIGH",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "traction-roll"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "HIGH"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-m1let1fr",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 77
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "debrief",
+    "traction-roll"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

@@ -1,0 +1,240 @@
+{
+  "id": "var-0027-typical-laundry-bait",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-115-a800r-37a8gh",
+  "question": "List everything I could try for loose on the way out.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "HIGH"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Sweep",
+      "setNumber": 1,
+      "initialRunCount": 0,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Cayote Crest X",
+          "date": "26.01.2025",
+          "name": "Marc Rheinard",
+          "race": "ETS round 4",
+          "spur": "112",
+          "wing": "MR33 Twister 0.5",
+          "motor": "HW 5T",
+          "radio": "Flysky Noble Pro +",
+          "servo": "PowerHD GTS-2",
+          "tires": "Matrix 28",
+          "track": "Daun Gemany",
+          "pinion": "28",
+          "battery": "Cayote 5300mAh",
+          "country": "Germany",
+          "additive": "MR33 V4",
+          "arb_rear": "1,1",
+          "diff_oil": "7K",
+          "receiver": "Flysky F52",
+          "toe_rear": 2.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,1",
+          "bodyshell": "Xtreme Speciale UL",
+          "toe_front": -1,
+          "bw22r_rear": "1",
+          "diff_shims": "Kit Shim",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1285",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "10",
+          "damping_front": "Linear",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "3",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "7.6",
+          "ride_height_front": "5,2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Backward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "80",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2,25",
+          "upper_inner_shims_fr": "2,25",
+          "upper_inner_shims_rf": "2",
+          "upper_inner_shims_rr": "2",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2,75",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1,75",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1,75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "1,5",
+          "under_lower_arm_shims_fr": "1,5",
+          "under_lower_arm_shims_rf": "2",
+          "under_lower_arm_shims_rr": "2",
+          "lower_arm_extension_front": "0"
+        },
+        "lapTimes": [
+          17.102,
+          15.934,
+          15.696,
+          16.237,
+          15.88,
+          21.358,
+          16.055,
+          16.156,
+          15.667,
+          33.11,
+          16.151,
+          16.03,
+          16.008,
+          15.932,
+          15.967,
+          48.441,
+          17.477,
+          16.606,
+          16.538,
+          16.233,
+          8.369
+        ],
+        "bestLapSeconds": 8.369,
+        "avgTop5LapSeconds": 14.309,
+        "handlingProblems": "rear steps out on exit",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 18,
+        "conditionsTrackTempC": 22,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "typical",
+    "historyDepth": "single-run",
+    "handlingRichness": "free-text",
+    "setupFreshness": "fresh",
+    "questionShape": "laundry-bait",
+    "problemType": "exit-oversteer",
+    "dataConflict": null,
+    "gripLevel": "HIGH",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "typical"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "exit-oversteer"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "HIGH"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-0d2pd4nd",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 82
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "typical",
+    "laundry-bait",
+    "exit-oversteer"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

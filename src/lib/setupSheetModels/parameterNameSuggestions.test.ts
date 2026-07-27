@@ -64,7 +64,9 @@ test("per-corner keys pre-select the four-corner split", () => {
       field({ key: "upper_inner_shims_ff", displayLabel: "Upper inner shims (FF)" }),
       field({ key: "upper_inner_shims_rr", displayLabel: "Upper inner shims (RR)" }),
     ]),
-    "upper"
+    // "upper" alone now also matches the registry's "Upper outer shims" — query the full stem so
+    // this stays a test of corner4 pre-selection, not of suggestion ordering (covered above).
+    "upper inner"
   );
   assert.equal(out.length, 1);
   assert.equal(out[0]!.stem, "Upper inner shims");

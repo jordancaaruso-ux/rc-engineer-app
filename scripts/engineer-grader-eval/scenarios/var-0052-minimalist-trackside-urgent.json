@@ -1,0 +1,152 @@
+{
+  "id": "var-0052-minimalist-trackside-urgent",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-138-a800rr-csjnzc",
+  "question": "About to go out again in 15. It's loose under brakes. Quick — what do I change?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "LOW"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36",
+      "setNumber": 5,
+      "initialRunCount": 0,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -1.9,
+          "camber_rear": -1.8,
+          "toe_front": 0,
+          "toe_rear": 1.85,
+          "ride_height_front": "4.7",
+          "ride_height_rear": "5.3",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "400",
+          "damper_oil_rear": "400",
+          "diff_oil": "8k 200 diff check",
+          "motor": "Hobby Wing 4.5",
+          "pinion": "27",
+          "spur": "110"
+        },
+        "lapTimes": [
+          11.305,
+          16.133,
+          16.571,
+          16.069,
+          16.007,
+          16.121,
+          15.89,
+          16.017,
+          15.966,
+          15.962,
+          16.131,
+          16.176,
+          16.112,
+          17.474,
+          16.283,
+          16.687,
+          16.166,
+          16.023,
+          16.174
+        ],
+        "bestLapSeconds": 11.305,
+        "avgTop5LapSeconds": 15.026,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 28,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-run",
+    "handlingRichness": "none",
+    "setupFreshness": "fresh",
+    "questionShape": "trackside-urgent",
+    "problemType": "braking-loose",
+    "dataConflict": null,
+    "gripLevel": "LOW",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "braking-loose"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "LOW"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-tl8l7awc",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 80
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "trackside-urgent",
+    "braking-loose"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

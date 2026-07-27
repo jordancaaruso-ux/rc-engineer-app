@@ -1,0 +1,601 @@
+{
+  "id": "var-0050-no-timing-vague",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-136-a800rr-jsjz46",
+  "question": "Something's not right with it but I can't put my finger on it.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36",
+      "setNumber": 6,
+      "initialRunCount": 3,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "R1 Digital-3 Super Stock",
+          "date": "12/10/2023",
+          "name": "Jeff Rowland",
+          "race": "Test",
+          "spur": "90",
+          "wing": "Xtreme Twister Speciale 0.4",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Gravity",
+          "track": "180 Raceway",
+          "pinion": "48",
+          "battery": "Team EAM 6000 ULCG",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "Middle River, MD, USA",
+          "arb_rear": "1.1",
+          "diff_oil": "10k",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "low"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Xtreme Twister Speciale 0.4",
+          "toe_front": -1,
+          "diff_shims": ".4",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.25,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1335",
+          "track_layout": [
+            "technical",
+            "mixed"
+          ],
+          "additive_time": "10",
+          "damping_front": "P1",
+          "downstop_rear": "5.8",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "350",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "3.5625",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "5.25",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "3.25",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.25",
+          "upper_inner_shims_fr": "2.25",
+          "upper_inner_shims_rf": "2.25",
+          "upper_inner_shims_rr": "2.25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1.75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.0",
+          "under_lower_arm_shims_fr": "2.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 22,
+        "conditionsTrackTempC": 26,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "R1 Digital-3 Super Stock",
+          "date": "12/10/2023",
+          "name": "Jeff Rowland",
+          "race": "Test",
+          "spur": "90",
+          "wing": "Xtreme Twister Speciale 0.4",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Gravity",
+          "track": "180 Raceway",
+          "pinion": "48",
+          "battery": "Team EAM 6000 ULCG",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "Middle River, MD, USA",
+          "arb_rear": "1.1",
+          "diff_oil": "10k",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "low"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Xtreme Twister Speciale 0.4",
+          "toe_front": -1,
+          "diff_shims": ".4",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.25,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1335",
+          "track_layout": [
+            "technical",
+            "mixed"
+          ],
+          "additive_time": "10",
+          "damping_front": "P1",
+          "downstop_rear": "5.8",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": 400,
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "3.5625",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "5.25",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "3.25",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.25",
+          "upper_inner_shims_fr": "2.25",
+          "upper_inner_shims_rf": "2.25",
+          "upper_inner_shims_rr": "2.25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1.75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.0",
+          "under_lower_arm_shims_fr": "2.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 25,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "R1 Digital-3 Super Stock",
+          "date": "12/10/2023",
+          "name": "Jeff Rowland",
+          "race": "Test",
+          "spur": "90",
+          "wing": "Xtreme Twister Speciale 0.4",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Gravity",
+          "track": "180 Raceway",
+          "pinion": "48",
+          "battery": "Team EAM 6000 ULCG",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "Middle River, MD, USA",
+          "arb_rear": "1.1",
+          "diff_oil": "10k",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "low"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Xtreme Twister Speciale 0.4",
+          "toe_front": -1,
+          "diff_shims": ".4",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.25,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1335",
+          "track_layout": [
+            "technical",
+            "mixed"
+          ],
+          "additive_time": "10",
+          "damping_front": "P1",
+          "downstop_rear": "5.8",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 300,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": 400,
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "3.5625",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "5.25",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "3.25",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.25",
+          "upper_inner_shims_fr": "2.25",
+          "upper_inner_shims_rf": "2.25",
+          "upper_inner_shims_rr": "2.25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1.75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.0",
+          "under_lower_arm_shims_fr": "2.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "R1 Digital-3 Super Stock",
+          "date": "12/10/2023",
+          "name": "Jeff Rowland",
+          "race": "Test",
+          "spur": "90",
+          "wing": "Xtreme Twister Speciale 0.4",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Gravity",
+          "track": "180 Raceway",
+          "pinion": "48",
+          "battery": "Team EAM 6000 ULCG",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "Middle River, MD, USA",
+          "arb_rear": "1.1",
+          "diff_oil": "10k",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "low"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Xtreme Twister Speciale 0.4",
+          "toe_front": -1,
+          "diff_shims": ".4",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.25,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1335",
+          "track_layout": [
+            "technical",
+            "mixed"
+          ],
+          "additive_time": "10",
+          "damping_front": "P1",
+          "downstop_rear": "5.8",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 300,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": 400,
+          "diff_height_rear": "Up",
+          "ride_height_rear": 5.9,
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "3.5625",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "5.25",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "3.25",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.25",
+          "upper_inner_shims_fr": "2.25",
+          "upper_inner_shims_rf": "2.25",
+          "upper_inner_shims_rr": "2.25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1.75",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.0",
+          "under_lower_arm_shims_fr": "2.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "rear comes around under brakes",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 21,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "no-timing",
+    "historyDepth": "single-day",
+    "handlingRichness": "free-text",
+    "setupFreshness": "partial",
+    "questionShape": "vague",
+    "problemType": "braking-loose",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "no-timing"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "partial"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "braking-loose"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-x4686th6",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 82
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "no-timing",
+    "vague",
+    "braking-loose"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

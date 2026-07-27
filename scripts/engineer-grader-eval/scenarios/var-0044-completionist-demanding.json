@@ -1,0 +1,1066 @@
+{
+  "id": "var-0044-completionist-demanding",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-130-car-kasm7i",
+  "question": "No waffle. What's the change?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "Car",
+      "setupSheetTemplate": "awesomatix_a800rr"
+    },
+    "track": {
+      "name": "Track",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": []
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": null,
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "HW XR10",
+          "date": "09.03.2025",
+          "name": "Thiersch Johann",
+          "race": "LE-Trophy",
+          "spur": "76",
+          "wing": "Wolv",
+          "motor": "HW G4R MSP",
+          "radio": "Sanwa",
+          "servo": "PowerHDS15",
+          "tires": "Hudy",
+          "track": "MRC Leipzig",
+          "pinion": "32",
+          "battery": "EAM 5000",
+          "country": "DE",
+          "additive": "MXLR R1",
+          "air_temp": "22",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.5125",
+          "ride_height_front": "5,2",
+          "ackermann_position": "max back",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "damper_percent_rear": "65",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "65",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1,75",
+          "upper_inner_shims_fr": "1,75",
+          "upper_inner_shims_rf": "1,75",
+          "upper_inner_shims_rr": "1,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 1,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 1,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 1
+          },
+          "feelVsLastRun": 0,
+          "speedTags": {
+            "trait:tractionRoll": "slow"
+          }
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 26,
+        "conditionsTrackTempC": 32,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 49,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "HW XR10",
+          "date": "09.03.2025",
+          "name": "Thiersch Johann",
+          "race": "LE-Trophy",
+          "spur": "76",
+          "wing": "Wolv",
+          "motor": "HW G4R MSP",
+          "radio": "Sanwa",
+          "servo": "PowerHDS15",
+          "tires": "Hudy",
+          "track": "MRC Leipzig",
+          "pinion": "32",
+          "battery": "EAM 5000",
+          "country": "DE",
+          "additive": "MXLR R1",
+          "air_temp": "22",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 250,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.5125",
+          "ride_height_front": "5,2",
+          "ackermann_position": "max back",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "damper_percent_rear": "65",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "65",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1,75",
+          "upper_inner_shims_fr": "1,75",
+          "upper_inner_shims_rf": "1,75",
+          "upper_inner_shims_rr": "1,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 2,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 2,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 2
+          },
+          "feelVsLastRun": 0,
+          "speedTags": {
+            "trait:tractionRoll": "fast"
+          }
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 28,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 42,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "HW XR10",
+          "date": "09.03.2025",
+          "name": "Thiersch Johann",
+          "race": "LE-Trophy",
+          "spur": "76",
+          "wing": "Wolv",
+          "motor": "HW G4R MSP",
+          "radio": "Sanwa",
+          "servo": "PowerHDS15",
+          "tires": "Hudy",
+          "track": "MRC Leipzig",
+          "pinion": "32",
+          "battery": "EAM 5000",
+          "country": "DE",
+          "additive": "MXLR R1",
+          "air_temp": "22",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 200,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.5125",
+          "ride_height_front": "5,2",
+          "ackermann_position": "max back",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "damper_percent_rear": "65",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "65",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1,75",
+          "upper_inner_shims_fr": "1,75",
+          "upper_inner_shims_rf": "1,75",
+          "upper_inner_shims_rr": "1,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 3,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 1,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 25,
+        "conditionsTrackTempC": 25,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 35,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "HW XR10",
+          "date": "09.03.2025",
+          "name": "Thiersch Johann",
+          "race": "LE-Trophy",
+          "spur": "76",
+          "wing": "Wolv",
+          "motor": "HW G4R MSP",
+          "radio": "Sanwa",
+          "servo": "PowerHDS15",
+          "tires": "Hudy",
+          "track": "MRC Leipzig",
+          "pinion": "32",
+          "battery": "EAM 5000",
+          "country": "DE",
+          "additive": "MXLR R1",
+          "air_temp": "22",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 150,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.5125",
+          "ride_height_front": "5,2",
+          "ackermann_position": "max back",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "damper_percent_rear": "65",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "65",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1,75",
+          "upper_inner_shims_fr": "1,75",
+          "upper_inner_shims_rf": "1,75",
+          "upper_inner_shims_rr": "1,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 4,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 2,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 2
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 26,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 28,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 5",
+        "setupData": {
+          "esc": "HW XR10",
+          "date": "09.03.2025",
+          "name": "Thiersch Johann",
+          "race": "LE-Trophy",
+          "spur": "76",
+          "wing": "Wolv",
+          "motor": "HW G4R MSP",
+          "radio": "Sanwa",
+          "servo": "PowerHDS15",
+          "tires": "Hudy",
+          "track": "MRC Leipzig",
+          "pinion": "32",
+          "battery": "EAM 5000",
+          "country": "DE",
+          "additive": "MXLR R1",
+          "air_temp": "22",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.25,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 150,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.5125",
+          "ride_height_front": "5,2",
+          "ackermann_position": "max back",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "damper_percent_rear": "65",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "65",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1,75",
+          "upper_inner_shims_fr": "1,75",
+          "upper_inner_shims_rf": "1,75",
+          "upper_inner_shims_rr": "1,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 5,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 1,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 21,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 6",
+        "setupData": {
+          "esc": "HW XR10",
+          "date": "09.03.2025",
+          "name": "Thiersch Johann",
+          "race": "LE-Trophy",
+          "spur": "76",
+          "wing": "Wolv",
+          "motor": "HW G4R MSP",
+          "radio": "Sanwa",
+          "servo": "PowerHDS15",
+          "tires": "Hudy",
+          "track": "MRC Leipzig",
+          "pinion": "32",
+          "battery": "EAM 5000",
+          "country": "DE",
+          "additive": "MXLR R1",
+          "air_temp": "22",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 150,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.5125",
+          "ride_height_front": "5,2",
+          "ackermann_position": "max back",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "damper_percent_rear": "65",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "65",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1,75",
+          "upper_inner_shims_fr": "1,75",
+          "upper_inner_shims_rf": "1,75",
+          "upper_inner_shims_rr": "1,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 6,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 2,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 2
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 24,
+        "conditionsTrackTempC": 26,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 14,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 7",
+        "setupData": {
+          "esc": "HW XR10",
+          "date": "09.03.2025",
+          "name": "Thiersch Johann",
+          "race": "LE-Trophy",
+          "spur": "76",
+          "wing": "Wolv",
+          "motor": "HW G4R MSP",
+          "radio": "Sanwa",
+          "servo": "PowerHDS15",
+          "tires": "Hudy",
+          "track": "MRC Leipzig",
+          "pinion": "32",
+          "battery": "EAM 5000",
+          "country": "DE",
+          "additive": "MXLR R1",
+          "air_temp": "22",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.25,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 150,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.5125",
+          "ride_height_front": "5,2",
+          "ackermann_position": "max back",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "damper_percent_rear": "65",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "65",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1,75",
+          "upper_inner_shims_fr": "1,75",
+          "upper_inner_shims_rf": "1,75",
+          "upper_inner_shims_rr": "1,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 7,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 1,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 34,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 7,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 8",
+        "setupData": {
+          "esc": "HW XR10",
+          "date": "09.03.2025",
+          "name": "Thiersch Johann",
+          "race": "LE-Trophy",
+          "spur": "76",
+          "wing": "Wolv",
+          "motor": "HW G4R MSP",
+          "radio": "Sanwa",
+          "servo": "PowerHDS15",
+          "tires": "Hudy",
+          "track": "MRC Leipzig",
+          "pinion": "32",
+          "battery": "EAM 5000",
+          "country": "DE",
+          "additive": "MXLR R1",
+          "air_temp": "22",
+          "arb_rear": "1,1",
+          "diff_oil": "7k",
+          "receiver": "Sanwa",
+          "toe_rear": 2.5,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1,2",
+          "bodyshell": "Wolverine",
+          "toe_front": -1,
+          "camber_rear": -2,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4,6",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5,6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": 150,
+          "spring_gap_rear": "3.0",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5,4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "4.5125",
+          "ride_height_front": "5,2",
+          "ackermann_position": "max back",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "damper_percent_rear": "65",
+          "toe_gain_shims_rear": "2,75",
+          "damper_percent_front": "65",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1,75",
+          "upper_inner_shims_fr": "1,75",
+          "upper_inner_shims_rf": "1,75",
+          "upper_inner_shims_rr": "1,75",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "4",
+          "rear_spring_rate_gf_mm": "93.3",
+          "upper_outer_shims_rear": "1",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "1",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2,75",
+          "under_lower_arm_shims_rr": "2,75",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 8,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 2,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 2
+          },
+          "feelVsLastRun": -1
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 27,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 7
+  },
+  "axes": {
+    "archetype": "completionist",
+    "historyDepth": "season",
+    "handlingRichness": "full",
+    "setupFreshness": "partial",
+    "questionShape": "demanding",
+    "problemType": "traction-roll",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "completionist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "season",
+        "runs": 8
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "partial"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "traction-roll"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-n2en3v9a",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 76
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "completionist",
+    "demanding",
+    "traction-roll"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

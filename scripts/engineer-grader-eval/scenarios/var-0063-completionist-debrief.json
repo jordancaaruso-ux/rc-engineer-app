@@ -1,0 +1,1413 @@
+{
+  "id": "var-0063-completionist-debrief",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-148-a800rr-5u21z4",
+  "question": "Give me the full picture of today. What worked, what didn't, what next?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Bayside",
+      "location": "Brisbane",
+      "gripTags": [
+        "LOW"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 2,
+      "initialRunCount": 0,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Yellow",
+      "modelCode": "MIGHTY-GRIPPER-YELLOW"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.198,
+          16.932,
+          16.101,
+          16.023,
+          16.063,
+          15.934,
+          16.063,
+          15.942,
+          15.894,
+          15.911,
+          15.867,
+          16.754,
+          16.512,
+          21.257
+        ],
+        "bestLapSeconds": 15.198,
+        "avgTop5LapSeconds": 15.761,
+        "tireRunNumber": 1,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 1,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 18,
+        "conditionsTrackTempC": 22,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 56,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.291,
+          17.025,
+          16.194,
+          16.116,
+          16.156,
+          16.027,
+          16.156,
+          16.035,
+          15.987,
+          16.004,
+          15.96,
+          16.847,
+          16.605,
+          21.35
+        ],
+        "bestLapSeconds": 15.291,
+        "avgTop5LapSeconds": 15.854,
+        "tireRunNumber": 2,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 2,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 2
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 32,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 49,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.201,
+          16.935,
+          16.104,
+          16.026,
+          16.066,
+          15.937,
+          16.066,
+          15.945,
+          15.897,
+          15.914,
+          15.87,
+          16.757,
+          16.515,
+          21.26
+        ],
+        "bestLapSeconds": 15.201,
+        "avgTop5LapSeconds": 15.764,
+        "tireRunNumber": 3,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 1,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 24,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 42,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.24,
+          16.974,
+          16.143,
+          16.065,
+          16.105,
+          15.976,
+          16.105,
+          15.984,
+          15.936,
+          15.953,
+          15.909,
+          16.796,
+          16.554,
+          21.299
+        ],
+        "bestLapSeconds": 15.24,
+        "avgTop5LapSeconds": 15.803,
+        "tireRunNumber": 4,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 2,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 2
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 29,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 35,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 5",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.263,
+          16.997,
+          16.166,
+          16.088,
+          16.128,
+          15.999,
+          16.128,
+          16.007,
+          15.959,
+          15.976,
+          15.932,
+          16.819,
+          16.577,
+          21.322
+        ],
+        "bestLapSeconds": 15.263,
+        "avgTop5LapSeconds": 15.826,
+        "tireRunNumber": 5,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 1,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 25,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 28,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 6",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.305,
+          17.039,
+          16.208,
+          16.13,
+          16.17,
+          16.041,
+          16.17,
+          16.049,
+          16.001,
+          16.018,
+          15.974,
+          16.861,
+          16.619,
+          21.364
+        ],
+        "bestLapSeconds": 15.305,
+        "avgTop5LapSeconds": 15.868,
+        "tireRunNumber": 6,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 2,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 2
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 30,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 21,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 7",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.378,
+          17.112,
+          16.281,
+          16.203,
+          16.243,
+          16.114,
+          16.243,
+          16.122,
+          16.074,
+          16.091,
+          16.047,
+          16.934,
+          16.692,
+          21.437
+        ],
+        "bestLapSeconds": 15.378,
+        "avgTop5LapSeconds": 15.941,
+        "tireRunNumber": 7,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 1,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 21,
+        "conditionsTrackTempC": 28,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 14,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 8",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.208,
+          16.942,
+          16.111,
+          16.033,
+          16.073,
+          15.944,
+          16.073,
+          15.952,
+          15.904,
+          15.921,
+          15.877,
+          16.764,
+          16.522,
+          21.267
+        ],
+        "bestLapSeconds": 15.208,
+        "avgTop5LapSeconds": 15.771,
+        "tireRunNumber": 8,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 2,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 2
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 32,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 7,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 9",
+        "setupData": {
+          "esc": "Tekin",
+          "date": "10/29/23",
+          "name": "Brian Card",
+          "race": "Halloween Classic",
+          "spur": "90",
+          "wing": "Stock",
+          "motor": "R1 21.5 Super Short",
+          "radio": "Sanwa",
+          "servo": "Sanwa",
+          "tires": "Jaco",
+          "track": "NORCAR",
+          "pinion": "1",
+          "battery": "PCR 5900 ulcg",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "US",
+          "additive": "SXT",
+          "air_temp": "72F",
+          "arb_rear": "1.1",
+          "diff_oil": "8K",
+          "receiver": "Sanwa",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Lens Ghibli Ultralight",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "track_temp": "72F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1326",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "5 min",
+          "damping_front": "P1",
+          "downstop_rear": "5.4",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "500",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "e"
+          ],
+          "damper_oil_front": "400",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.2",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "171",
+          "ride_height_front": "5.2",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4",
+            "5"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "70",
+          "toe_gain_shims_rear": "5",
+          "damper_percent_front": "85",
+          "inner_steering_angle": "24",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "4.0",
+          "upper_inner_shims_fr": "4.0",
+          "upper_inner_shims_rf": "3.5",
+          "upper_inner_shims_rr": "3.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "pss_percent_setup_rear": "25",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.75",
+          "front_spring_rate_gf_mm": "77.2",
+          "upper_outer_shims_front": "1.75",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "3.0",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [
+          15.235,
+          16.969,
+          16.138,
+          16.06,
+          16.1,
+          15.971,
+          16.1,
+          15.979,
+          15.931,
+          15.948,
+          15.904,
+          16.791,
+          16.549,
+          21.294
+        ],
+        "bestLapSeconds": 15.235,
+        "avgTop5LapSeconds": 15.798,
+        "tireRunNumber": 9,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "feelSteering": 2,
+          "primaryFocus": {
+            "kind": "feel_steering",
+            "value": 2
+          },
+          "feelVsLastRun": -1
+        },
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 18,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 8
+  },
+  "axes": {
+    "archetype": "completionist",
+    "historyDepth": "season",
+    "handlingRichness": "full",
+    "setupFreshness": "stale",
+    "questionShape": "debrief",
+    "problemType": "darty",
+    "dataConflict": null,
+    "gripLevel": "LOW",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "completionist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "season",
+        "runs": 9
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "darty"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "LOW"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-uwjb7m3p",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 81
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "completionist",
+    "debrief",
+    "darty"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

@@ -242,6 +242,20 @@ test("front/rear siblings pick up their own universal parameter id", () => {
   if (!res.ok) return;
   assert.deepEqual(
     res.fields.map((f) => f.universalParameterId),
+    ["downstop_front", "downstop_rear"]
+  );
+});
+
+test("droop and downstop resolve to their own ids — they are different measurements", () => {
+  const droop = buildPositionSplitFields(
+    { displayLabel: "Droop", groupTitle: "Front end", kind: "number" },
+    "front_rear",
+    schema()
+  );
+  assert.equal(droop.ok, true);
+  if (!droop.ok) return;
+  assert.deepEqual(
+    droop.fields.map((f) => f.universalParameterId),
     ["droop_front", "droop_rear"]
   );
 });

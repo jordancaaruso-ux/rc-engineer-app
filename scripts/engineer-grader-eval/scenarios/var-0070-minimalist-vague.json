@@ -1,0 +1,152 @@
+{
+  "id": "var-0070-minimalist-vague",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-154-a800rr-61id4b",
+  "question": "Car feels weird this run. Can't really explain it.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Bayside",
+      "location": "Brisbane",
+      "gripTags": [
+        "LOW"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 4,
+      "initialRunCount": 0,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Yellow",
+      "modelCode": "MIGHTY-GRIPPER-YELLOW"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -2,
+          "camber_rear": -2,
+          "toe_front": -1,
+          "toe_rear": 3,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.2",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8k",
+          "motor": "HW Handout 17.5",
+          "pinion": "38",
+          "spur": "100"
+        },
+        "lapTimes": [
+          15.893,
+          15.834,
+          15.669,
+          15.718,
+          15.755,
+          15.963,
+          15.645,
+          15.864,
+          15.852,
+          16.198,
+          21.098,
+          17.132
+        ],
+        "bestLapSeconds": 15.645,
+        "avgTop5LapSeconds": 15.724,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 22,
+        "conditionsTrackTempC": 27,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-run",
+    "handlingRichness": "none",
+    "setupFreshness": "fresh",
+    "questionShape": "vague",
+    "problemType": "inconsistent",
+    "dataConflict": null,
+    "gripLevel": "LOW",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "inconsistent"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "LOW"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-n4ann1n6",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 83
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "vague",
+    "inconsistent"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

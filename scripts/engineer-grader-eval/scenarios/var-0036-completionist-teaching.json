@@ -1,0 +1,1054 @@
+{
+  "id": "var-0036-completionist-teaching",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-123-a800r-u5ejlq",
+  "question": "How does rear roll centre actually change what the car does? Explain it properly.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": null,
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Orca OE1",
+          "date": "30.04.2023",
+          "name": "Lucas Urbain",
+          "race": "TOS Andernach",
+          "spur": "112",
+          "wing": "Wolverine 0.5 + Endplates",
+          "motor": "Orca Modtreme 5.0",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL575SL",
+          "tires": "Matrix ETS",
+          "track": "Arena 33",
+          "pinion": "28",
+          "battery": "Orca InfiniteX 4090",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "France",
+          "additive": "MR33 V3",
+          "arb_rear": "1.1",
+          "diff_oil": "MR33 8K",
+          "receiver": "Sanwa RX492",
+          "toe_rear": 2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister 0.5",
+          "toe_front": -1.2,
+          "bw22r_rear": "1",
+          "diff_shims": "SS",
+          "bw22r_front": "1",
+          "camber_rear": -1,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -1.2,
+          "caster_front": 5,
+          "damping_rear": "Linear",
+          "spring_front": "STD",
+          "total_weight": "1300",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "f",
+            "g",
+            "h"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "d"
+          ],
+          "top_deck_single": {
+            "selectedPreset": "C27MMX",
+            "otherText": ""
+          },
+          "damper_oil_front": "350",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.6",
+          "steer_travel_out": "16",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "7.6",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Forward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "5.75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "0.5",
+          "upper_inner_shims_fr": "0.5",
+          "upper_inner_shims_rf": "1.25",
+          "upper_inner_shims_rr": "1.25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "2.5",
+          "front_spring_rate_gf_mm": "65.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "2.5",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.25",
+          "under_lower_arm_shims_fr": "2.25",
+          "under_lower_arm_shims_rf": "3.25",
+          "under_lower_arm_shims_rr": "3.25",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [
+          18.435,
+          16.066,
+          16.606,
+          16.383,
+          16.172,
+          16.454,
+          16.248,
+          16.278,
+          16.148,
+          16.139,
+          16.095,
+          15.9,
+          15.983,
+          20.243,
+          16.599,
+          16.185,
+          16.152,
+          16.226,
+          16.186,
+          19.243,
+          21.808
+        ],
+        "bestLapSeconds": 15.9,
+        "avgTop5LapSeconds": 16.037,
+        "tireRunNumber": 1,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 1
+          },
+          "onPower": -1,
+          "primaryFocus": {
+            "kind": "on_power",
+            "value": -1
+          },
+          "feelVsLastRun": 0,
+          "speedTags": {
+            "balance:exit": "slow",
+            "trait:onPower": "slow"
+          }
+        },
+        "handlingProblems": "snaps loose the moment I get on the throttle",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 30,
+        "conditionsTrackTempC": 36,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 5,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "Orca OE1",
+          "date": "30.04.2023",
+          "name": "Lucas Urbain",
+          "race": "TOS Andernach",
+          "spur": "112",
+          "wing": "Wolverine 0.5 + Endplates",
+          "motor": "Orca Modtreme 5.0",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL575SL",
+          "tires": "Matrix ETS",
+          "track": "Arena 33",
+          "pinion": "28",
+          "battery": "Orca InfiniteX 4090",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "France",
+          "additive": "MR33 V3",
+          "arb_rear": "1.1",
+          "diff_oil": "MR33 8K",
+          "receiver": "Sanwa RX492",
+          "toe_rear": 2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister 0.5",
+          "toe_front": -1.2,
+          "bw22r_rear": "1",
+          "diff_shims": "SS",
+          "bw22r_front": "1",
+          "camber_rear": -1,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -1.2,
+          "caster_front": 5,
+          "damping_rear": "Linear",
+          "spring_front": "STD",
+          "total_weight": "1300",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "f",
+            "g",
+            "h"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "d"
+          ],
+          "top_deck_single": {
+            "selectedPreset": "C27MMX",
+            "otherText": ""
+          },
+          "damper_oil_front": "350",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.6",
+          "steer_travel_out": "16",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "7.6",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Forward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "5.75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "0.5",
+          "upper_inner_shims_fr": "0.5",
+          "upper_inner_shims_rf": "1.25",
+          "upper_inner_shims_rr": "1.25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "2.5",
+          "front_spring_rate_gf_mm": "65.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "2.5",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.25",
+          "under_lower_arm_shims_fr": "2.25",
+          "under_lower_arm_shims_rf": "3.25",
+          "under_lower_arm_shims_rr": "3.25",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [
+          18.424,
+          16.055,
+          16.595,
+          16.372,
+          16.161,
+          16.443,
+          16.237,
+          16.267,
+          16.137,
+          16.128,
+          16.084,
+          15.889,
+          15.972,
+          20.232,
+          16.588,
+          16.174,
+          16.141,
+          16.215,
+          16.175,
+          19.232,
+          21.797
+        ],
+        "bestLapSeconds": 15.889,
+        "avgTop5LapSeconds": 16.026,
+        "tireRunNumber": 2,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 2
+          },
+          "onPower": -2,
+          "primaryFocus": {
+            "kind": "on_power",
+            "value": -2
+          },
+          "feelVsLastRun": 0,
+          "speedTags": {
+            "balance:exit": "fast",
+            "trait:onPower": "fast"
+          }
+        },
+        "handlingProblems": "snaps loose the moment I get on the throttle",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 24,
+        "conditionsTrackTempC": 30,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 4,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "Orca OE1",
+          "date": "30.04.2023",
+          "name": "Lucas Urbain",
+          "race": "TOS Andernach",
+          "spur": "112",
+          "wing": "Wolverine 0.5 + Endplates",
+          "motor": "Orca Modtreme 5.0",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL575SL",
+          "tires": "Matrix ETS",
+          "track": "Arena 33",
+          "pinion": "28",
+          "battery": "Orca InfiniteX 4090",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "France",
+          "additive": "MR33 V3",
+          "arb_rear": "1.1",
+          "diff_oil": "MR33 8K",
+          "receiver": "Sanwa RX492",
+          "toe_rear": 2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister 0.5",
+          "toe_front": -1.2,
+          "bw22r_rear": "1",
+          "diff_shims": "SS",
+          "bw22r_front": "1",
+          "camber_rear": -1,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -1.2,
+          "caster_front": 5,
+          "damping_rear": "Linear",
+          "spring_front": "STD",
+          "total_weight": "1300",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "f",
+            "g",
+            "h"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "d"
+          ],
+          "top_deck_single": {
+            "selectedPreset": "C27MMX",
+            "otherText": ""
+          },
+          "damper_oil_front": "350",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.6",
+          "steer_travel_out": "16",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "7.6",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Forward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "5.75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "0.5",
+          "upper_inner_shims_fr": "0.5",
+          "upper_inner_shims_rf": "1.25",
+          "upper_inner_shims_rr": "1.25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "2.5",
+          "front_spring_rate_gf_mm": "65.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "2.5",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.25",
+          "under_lower_arm_shims_fr": "2.25",
+          "under_lower_arm_shims_rf": "3.25",
+          "under_lower_arm_shims_rr": "3.25",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [
+          18.261,
+          15.892,
+          16.432,
+          16.209,
+          15.998,
+          16.28,
+          16.074,
+          16.104,
+          15.974,
+          15.965,
+          15.921,
+          15.726,
+          15.809,
+          20.069,
+          16.425,
+          16.011,
+          15.978,
+          16.052,
+          16.012,
+          19.069,
+          21.634
+        ],
+        "bestLapSeconds": 15.726,
+        "avgTop5LapSeconds": 15.863,
+        "tireRunNumber": 3,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 1
+          },
+          "onPower": -1,
+          "primaryFocus": {
+            "kind": "on_power",
+            "value": -1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "snaps loose the moment I get on the throttle",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 22,
+        "conditionsTrackTempC": 27,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "Orca OE1",
+          "date": "30.04.2023",
+          "name": "Lucas Urbain",
+          "race": "TOS Andernach",
+          "spur": "112",
+          "wing": "Wolverine 0.5 + Endplates",
+          "motor": "Orca Modtreme 5.0",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL575SL",
+          "tires": "Matrix ETS",
+          "track": "Arena 33",
+          "pinion": "28",
+          "battery": "Orca InfiniteX 4090",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "France",
+          "additive": "MR33 V3",
+          "arb_rear": "1.1",
+          "diff_oil": "MR33 8K",
+          "receiver": "Sanwa RX492",
+          "toe_rear": 2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister 0.5",
+          "toe_front": -1.2,
+          "bw22r_rear": "1",
+          "diff_shims": "SS",
+          "bw22r_front": "1",
+          "camber_rear": -1,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -1.2,
+          "caster_front": 5,
+          "damping_rear": "Linear",
+          "spring_front": "STD",
+          "total_weight": "1300",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "f",
+            "g",
+            "h"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "d"
+          ],
+          "top_deck_single": {
+            "selectedPreset": "C27MMX",
+            "otherText": ""
+          },
+          "damper_oil_front": "350",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.6",
+          "steer_travel_out": "16",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "7.6",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Forward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "5.75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "0.5",
+          "upper_inner_shims_fr": "0.5",
+          "upper_inner_shims_rf": "1.25",
+          "upper_inner_shims_rr": "1.25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "2.5",
+          "front_spring_rate_gf_mm": "65.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "2.5",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.25",
+          "under_lower_arm_shims_fr": "2.25",
+          "under_lower_arm_shims_rf": "3.25",
+          "under_lower_arm_shims_rr": "3.25",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [
+          18.219,
+          15.85,
+          16.39,
+          16.167,
+          15.956,
+          16.238,
+          16.032,
+          16.062,
+          15.932,
+          15.923,
+          15.879,
+          15.684,
+          15.767,
+          20.027,
+          16.383,
+          15.969,
+          15.936,
+          16.01,
+          15.97,
+          19.027,
+          21.592
+        ],
+        "bestLapSeconds": 15.684,
+        "avgTop5LapSeconds": 15.821,
+        "tireRunNumber": 4,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 2
+          },
+          "onPower": -2,
+          "primaryFocus": {
+            "kind": "on_power",
+            "value": -2
+          },
+          "feelVsLastRun": 0,
+          "speedTags": {
+            "balance:exit": "fast",
+            "trait:onPower": "fast"
+          }
+        },
+        "handlingProblems": "snaps loose the moment I get on the throttle",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 22,
+        "conditionsTrackTempC": 27,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 5",
+        "setupData": {
+          "esc": "Orca OE1",
+          "date": "30.04.2023",
+          "name": "Lucas Urbain",
+          "race": "TOS Andernach",
+          "spur": "112",
+          "wing": "Wolverine 0.5 + Endplates",
+          "motor": "Orca Modtreme 5.0",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL575SL",
+          "tires": "Matrix ETS",
+          "track": "Arena 33",
+          "pinion": "28",
+          "battery": "Orca InfiniteX 4090",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "France",
+          "additive": "MR33 V3",
+          "arb_rear": "1.1",
+          "diff_oil": "MR33 8K",
+          "receiver": "Sanwa RX492",
+          "toe_rear": 2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister 0.5",
+          "toe_front": -1.2,
+          "bw22r_rear": "1",
+          "diff_shims": "SS",
+          "bw22r_front": "1",
+          "camber_rear": -1,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -1.2,
+          "caster_front": 5,
+          "damping_rear": "Linear",
+          "spring_front": "STD",
+          "total_weight": "1300",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "f",
+            "g",
+            "h"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "d"
+          ],
+          "top_deck_single": {
+            "selectedPreset": "C27MMX",
+            "otherText": ""
+          },
+          "damper_oil_front": "350",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.6",
+          "steer_travel_out": "16",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "7.6",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Forward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "5.75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "0.5",
+          "upper_inner_shims_fr": "0.5",
+          "upper_inner_shims_rf": "1.25",
+          "upper_inner_shims_rr": "1.25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "2.5",
+          "front_spring_rate_gf_mm": "65.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "2.5",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.25",
+          "under_lower_arm_shims_fr": "2.25",
+          "under_lower_arm_shims_rf": "3.25",
+          "under_lower_arm_shims_rr": "3.25",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [
+          18.309,
+          15.94,
+          16.48,
+          16.257,
+          16.046,
+          16.328,
+          16.122,
+          16.152,
+          16.022,
+          16.013,
+          15.969,
+          15.774,
+          15.857,
+          20.117,
+          16.473,
+          16.059,
+          16.026,
+          16.1,
+          16.06,
+          19.117,
+          21.682
+        ],
+        "bestLapSeconds": 15.774,
+        "avgTop5LapSeconds": 15.911,
+        "tireRunNumber": 5,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 1
+          },
+          "onPower": -1,
+          "primaryFocus": {
+            "kind": "on_power",
+            "value": -1
+          },
+          "feelVsLastRun": 0
+        },
+        "handlingProblems": "snaps loose the moment I get on the throttle",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 27,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "sessionType": "PRACTICE"
+      },
+      {
+        "label": "Run 6",
+        "setupData": {
+          "esc": "Orca OE1",
+          "date": "30.04.2023",
+          "name": "Lucas Urbain",
+          "race": "TOS Andernach",
+          "spur": "112",
+          "wing": "Wolverine 0.5 + Endplates",
+          "motor": "Orca Modtreme 5.0",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL575SL",
+          "tires": "Matrix ETS",
+          "track": "Arena 33",
+          "pinion": "28",
+          "battery": "Orca InfiniteX 4090",
+          "chassis": {
+            "selectedPreset": "C01B-RC",
+            "otherText": ""
+          },
+          "country": "France",
+          "additive": "MR33 V3",
+          "arb_rear": "1.1",
+          "diff_oil": "MR33 8K",
+          "receiver": "Sanwa RX492",
+          "toe_rear": 2,
+          "traction": [
+            "low",
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister 0.5",
+          "toe_front": -1.2,
+          "bw22r_rear": "1",
+          "diff_shims": "SS",
+          "bw22r_front": "1",
+          "camber_rear": -1,
+          "caster_rear": -3,
+          "spring_rear": "STD",
+          "camber_front": -1.2,
+          "caster_front": 5,
+          "damping_rear": "Linear",
+          "spring_front": "STD",
+          "total_weight": "1300",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "20",
+          "damping_front": "P1",
+          "downstop_rear": "4.6",
+          "top_deck_cuts": [
+            "f",
+            "g",
+            "h"
+          ],
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "d"
+          ],
+          "top_deck_single": {
+            "selectedPreset": "C27MMX",
+            "otherText": ""
+          },
+          "damper_oil_front": "350",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "3.6",
+          "steer_travel_out": "16",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "7.6",
+          "ride_height_front": "5.2",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Forward",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "5.75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "0.5",
+          "upper_inner_shims_fr": "0.5",
+          "upper_inner_shims_rf": "1.25",
+          "upper_inner_shims_rr": "1.25",
+          "srs_arrangement_front": "II",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3.5",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "2.5",
+          "front_spring_rate_gf_mm": "65.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "2.5",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.25",
+          "under_lower_arm_shims_fr": "2.25",
+          "under_lower_arm_shims_rf": "3.25",
+          "under_lower_arm_shims_rr": "3.25",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [
+          18.211,
+          15.842,
+          16.382,
+          16.159,
+          15.948,
+          16.23,
+          16.024,
+          16.054,
+          15.924,
+          15.915,
+          15.871,
+          15.676,
+          15.759,
+          20.019,
+          16.375,
+          15.961,
+          15.928,
+          16.002,
+          15.962,
+          19.019,
+          21.584
+        ],
+        "bestLapSeconds": 15.676,
+        "avgTop5LapSeconds": 15.813,
+        "tireRunNumber": 6,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "balanceByPhase": {
+            "exit": 2
+          },
+          "onPower": -2,
+          "primaryFocus": {
+            "kind": "on_power",
+            "value": -2
+          },
+          "feelVsLastRun": -1,
+          "speedTags": {
+            "balance:exit": "fast",
+            "trait:onPower": "fast"
+          }
+        },
+        "handlingProblems": "snaps loose the moment I get on the throttle",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 5
+  },
+  "axes": {
+    "archetype": "completionist",
+    "historyDepth": "single-day",
+    "handlingRichness": "full",
+    "setupFreshness": "stale",
+    "questionShape": "teaching",
+    "problemType": "on-power-snap",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "completionist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 6
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "on-power-snap"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-034n7y2o",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 86
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "completionist",
+    "teaching",
+    "on-power-snap"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

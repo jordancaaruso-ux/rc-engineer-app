@@ -1,0 +1,222 @@
+{
+  "id": "var-0067-no-timing-laundry-bait",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-151-a800rr-a8myno",
+  "question": "List everything I could try for over-reacting to steering input.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "Bayside",
+      "location": "Brisbane",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 3,
+      "initialRunCount": 0,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Yellow",
+      "modelCode": "MIGHTY-GRIPPER-YELLOW"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Hobbywing G3X",
+          "date": "Nov 5-10, 2024",
+          "name": "Billy Spence",
+          "race": "2024 IFMAR ISTC World Championship",
+          "wing": "OG Twister",
+          "motor": "R1 Wurks v30 17.5",
+          "radio": "Sanwa M17",
+          "servo": "Sanwa LH II",
+          "tires": "Sweep 36D",
+          "track": "Finishline RC Raceway",
+          "pinion": "1",
+          "battery": "Team EAM 5000",
+          "country": "Bakersfield, CA. USA",
+          "additive": "Mighty Gripper Yellow",
+          "air_temp": "75f",
+          "arb_rear": "1.2",
+          "diff_oil": "7.5k",
+          "receiver": "Sanwa",
+          "toe_rear": 3,
+          "traction": [
+            "high"
+          ],
+          "arb_front": "1.2",
+          "bodyshell": "Wolverine .4",
+          "toe_front": -0.5,
+          "diff_shims": ".4",
+          "camber_rear": -2,
+          "caster_rear": -4,
+          "spring_rear": "S",
+          "camber_front": -1.25,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "S",
+          "total_weight": "1322",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "10",
+          "damping_front": "Linear",
+          "downstop_rear": "5.2",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "asphalt",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "3.2",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "350",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "4.6",
+          "spring_gap_front": "2.8",
+          "diff_height_front": "Down",
+          "ride_height_front": "4.4",
+          "ackermann_position": "back",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "1.75",
+          "toe_gain_shims_rear": "3.5",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "22.5",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "3.5",
+          "upper_inner_shims_fr": "3.5",
+          "upper_inner_shims_rf": "3",
+          "upper_inner_shims_rr": "3",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "3",
+          "rear_spring_rate_gf_mm": "95.4",
+          "upper_outer_shims_rear": "1.5",
+          "front_spring_rate_gf_mm": "74",
+          "upper_outer_shims_front": "1.5",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2",
+          "under_lower_arm_shims_fr": "2",
+          "under_lower_arm_shims_rf": "2",
+          "under_lower_arm_shims_rr": "2",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50.2"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 21,
+        "conditionsTrackTempC": 25,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "no-timing",
+    "historyDepth": "single-run",
+    "handlingRichness": "free-text",
+    "setupFreshness": "fresh",
+    "questionShape": "laundry-bait",
+    "problemType": "darty",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "no-timing"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "darty"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-rtxg0w9p",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 79
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "no-timing",
+    "laundry-bait",
+    "darty"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

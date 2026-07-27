@@ -1,0 +1,288 @@
+{
+  "id": "var-0061-minimalist-pointed",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-146-a800rr-v9pyuh",
+  "question": "too darty is costing me the most time. What do I do about it?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Bayside",
+      "location": "Brisbane",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 2,
+      "initialRunCount": 0,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Yellow",
+      "modelCode": "MIGHTY-GRIPPER-YELLOW"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -1.7,
+          "camber_rear": -1.7,
+          "toe_front": -1,
+          "toe_rear": 2.25,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.2",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "350",
+          "diff_oil": "8K",
+          "motor": "HW Justock 17.5T",
+          "pinion": "43",
+          "spur": "102"
+        },
+        "lapTimes": [
+          9.976,
+          16.403,
+          16.274,
+          17.348,
+          16.977,
+          16.988,
+          16.639,
+          16.326,
+          17.752,
+          17.743,
+          16.541,
+          16.569,
+          16.902,
+          16.506,
+          17.48
+        ],
+        "bestLapSeconds": 9.976,
+        "avgTop5LapSeconds": 15.097,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "camber_front": -1.7,
+          "camber_rear": -1.7,
+          "toe_front": -1,
+          "toe_rear": 2.25,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.2",
+          "damper_oil_front": "300",
+          "damper_oil_rear": 400,
+          "diff_oil": "8K",
+          "motor": "HW Justock 17.5T",
+          "pinion": "43",
+          "spur": "102"
+        },
+        "lapTimes": [
+          10.104,
+          16.531,
+          16.402,
+          17.476,
+          17.105,
+          17.116,
+          16.767,
+          16.454,
+          17.88,
+          17.871,
+          16.669,
+          16.697,
+          17.03,
+          16.634,
+          17.608
+        ],
+        "bestLapSeconds": 10.104,
+        "avgTop5LapSeconds": 15.225,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 25,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "camber_front": -1.2,
+          "camber_rear": -1.7,
+          "toe_front": -1,
+          "toe_rear": 2.25,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.2",
+          "damper_oil_front": "300",
+          "damper_oil_rear": 400,
+          "diff_oil": "8K",
+          "motor": "HW Justock 17.5T",
+          "pinion": "43",
+          "spur": "102"
+        },
+        "lapTimes": [
+          10.082,
+          16.509,
+          16.38,
+          17.454,
+          17.083,
+          17.094,
+          16.745,
+          16.432,
+          17.858,
+          17.849,
+          16.647,
+          16.675,
+          17.008,
+          16.612,
+          17.586
+        ],
+        "bestLapSeconds": 10.082,
+        "avgTop5LapSeconds": 15.203,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 21,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "camber_front": -1.2,
+          "camber_rear": -1.7,
+          "toe_front": -1,
+          "toe_rear": 2.25,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.2",
+          "damper_oil_front": "300",
+          "damper_oil_rear": 350,
+          "diff_oil": "8K",
+          "motor": "HW Justock 17.5T",
+          "pinion": "43",
+          "spur": "102"
+        },
+        "lapTimes": [
+          9.994,
+          16.421,
+          16.292,
+          17.366,
+          16.995,
+          17.006,
+          16.657,
+          16.344,
+          17.77,
+          17.761,
+          16.559,
+          16.587,
+          16.92,
+          16.524,
+          17.498
+        ],
+        "bestLapSeconds": 9.994,
+        "avgTop5LapSeconds": 15.115,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 27,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-day",
+    "handlingRichness": "none",
+    "setupFreshness": "fresh",
+    "questionShape": "pointed",
+    "problemType": "darty",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "darty"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-8w36tu3g",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 58
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "pointed",
+    "darty"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

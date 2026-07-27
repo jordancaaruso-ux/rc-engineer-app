@@ -9,6 +9,7 @@ import {
 import { AUTHORIZED_CHASSIS_CATALOG } from "@/lib/setupSheetModels/authorizedCatalog";
 import { buildA800SeedSchema } from "@/lib/setupSheetModels/seedA800Model";
 import { mergeMissingA800CatalogFields } from "@/lib/setupSheetModels/mergeA800CatalogFields";
+import { mergeMissingGenericCatalogFields } from "@/lib/setupSheetModels/mergeGenericCatalogFields";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { getSuppressedCatalogSlugs } from "@/lib/setupSheetModels/catalogSuppression";
 
@@ -70,6 +71,15 @@ export async function ensureAuthorizedSetupSheetCatalog(): Promise<void> {
       const parsed = parseSetupSheetModelSchema(found.schemaJson);
       if (parsed) {
         const merged = mergeMissingA800CatalogFields(parsed, buildA800SeedSchema());
+        if (merged) patch.schemaJson = merged as object;
+      }
+    } else {
+      // Generic-preset chassis were seeded once and never revisited, so a chassis added before the
+      // preset gained (say) caster and the link-geometry stacks would keep the thinner sheet
+      // forever — and the Engineer would stay shallow on that car. Additive only.
+      const parsed = parseSetupSheetModelSchema(found.schemaJson);
+      if (parsed) {
+        const merged = mergeMissingGenericCatalogFields(parsed, entry.buildSchema());
         if (merged) patch.schemaJson = merged as object;
       }
     }

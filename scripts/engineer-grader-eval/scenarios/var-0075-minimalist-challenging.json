@@ -1,0 +1,480 @@
+{
+  "id": "var-0075-minimalist-challenging",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-159-a800rr-uykabo",
+  "question": "Everyone at my track says rear spring rate is the fix for on edge the whole run. I don't buy it — what do you reckon?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "LOW"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 5,
+      "initialRunCount": 5,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "4.6",
+          "ride_height_rear": "4.8",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8K",
+          "motor": "Hobbywing 5.0T (30°)",
+          "pinion": "28",
+          "spur": "114"
+        },
+        "lapTimes": [
+          19.217,
+          18.6,
+          18.432,
+          18.629,
+          18.146,
+          19.925,
+          18.107,
+          18.283,
+          17.842,
+          17.728,
+          19.377,
+          17.619,
+          18.429,
+          17.396,
+          17.697
+        ],
+        "bestLapSeconds": 17.396,
+        "avgTop5LapSeconds": 17.656,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 25,
+        "conditionsTrackTempC": 30,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 49,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "4.6",
+          "ride_height_rear": "4.8",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8K",
+          "motor": "Hobbywing 5.0T (30°)",
+          "pinion": "28",
+          "spur": "114"
+        },
+        "lapTimes": [
+          19.251,
+          18.634,
+          18.466,
+          18.663,
+          18.18,
+          19.959,
+          18.141,
+          18.317,
+          17.876,
+          17.762,
+          19.411,
+          17.653,
+          18.463,
+          17.43,
+          17.731
+        ],
+        "bestLapSeconds": 17.43,
+        "avgTop5LapSeconds": 17.69,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 24,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 42,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "4.6",
+          "ride_height_rear": "4.8",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8K",
+          "motor": "Hobbywing 5.0T (30°)",
+          "pinion": "28",
+          "spur": "114"
+        },
+        "lapTimes": [
+          19.162,
+          18.545,
+          18.377,
+          18.574,
+          18.091,
+          19.87,
+          18.052,
+          18.228,
+          17.787,
+          17.673,
+          19.322,
+          17.564,
+          18.374,
+          17.341,
+          17.642
+        ],
+        "bestLapSeconds": 17.341,
+        "avgTop5LapSeconds": 17.601,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 35,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "4.6",
+          "ride_height_rear": "4.8",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8K",
+          "motor": "Hobbywing 5.0T (30°)",
+          "pinion": "28",
+          "spur": "114"
+        },
+        "lapTimes": [
+          19.272,
+          18.655,
+          18.487,
+          18.684,
+          18.201,
+          19.98,
+          18.162,
+          18.338,
+          17.897,
+          17.783,
+          19.432,
+          17.674,
+          18.484,
+          17.451,
+          17.752
+        ],
+        "bestLapSeconds": 17.451,
+        "avgTop5LapSeconds": 17.711,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 27,
+        "conditionsTrackTempC": 26,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 28,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 5",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "4.6",
+          "ride_height_rear": "4.8",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8K",
+          "motor": "Hobbywing 5.0T (30°)",
+          "pinion": "28",
+          "spur": "114"
+        },
+        "lapTimes": [
+          19.256,
+          18.639,
+          18.471,
+          18.668,
+          18.185,
+          19.964,
+          18.146,
+          18.322,
+          17.881,
+          17.767,
+          19.416,
+          17.658,
+          18.468,
+          17.435,
+          17.736
+        ],
+        "bestLapSeconds": 17.435,
+        "avgTop5LapSeconds": 17.695,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 30,
+        "conditionsTrackTempC": 34,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 21,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 6",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "4.6",
+          "ride_height_rear": "4.8",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8K",
+          "motor": "Hobbywing 5.0T (30°)",
+          "pinion": "28",
+          "spur": "114"
+        },
+        "lapTimes": [
+          19.134,
+          18.517,
+          18.349,
+          18.546,
+          18.063,
+          19.842,
+          18.024,
+          18.2,
+          17.759,
+          17.645,
+          19.294,
+          17.536,
+          18.346,
+          17.313,
+          17.614
+        ],
+        "bestLapSeconds": 17.313,
+        "avgTop5LapSeconds": 17.573,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 14,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 7",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "4.6",
+          "ride_height_rear": "4.8",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8K",
+          "motor": "Hobbywing 5.0T (30°)",
+          "pinion": "28",
+          "spur": "114"
+        },
+        "lapTimes": [
+          19.291,
+          18.674,
+          18.506,
+          18.703,
+          18.22,
+          19.999,
+          18.181,
+          18.357,
+          17.916,
+          17.802,
+          19.451,
+          17.693,
+          18.503,
+          17.47,
+          17.771
+        ],
+        "bestLapSeconds": 17.47,
+        "avgTop5LapSeconds": 17.73,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 27,
+        "conditionsTrackTempC": 27,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 7,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 8",
+        "setupData": {
+          "camber_front": -1,
+          "camber_rear": -1,
+          "toe_front": -1,
+          "toe_rear": 3.5,
+          "ride_height_front": "4.6",
+          "ride_height_rear": "4.8",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "300",
+          "damper_oil_rear": "300",
+          "diff_oil": "8K",
+          "motor": "Hobbywing 5.0T (30°)",
+          "pinion": "28",
+          "spur": "114"
+        },
+        "lapTimes": [
+          19.12,
+          18.503,
+          18.335,
+          18.532,
+          18.049,
+          19.828,
+          18.01,
+          18.186,
+          17.745,
+          17.631,
+          19.28,
+          17.522,
+          18.332,
+          17.299,
+          17.6
+        ],
+        "bestLapSeconds": 17.299,
+        "avgTop5LapSeconds": 17.559,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 36,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 7
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "season",
+    "handlingRichness": "none",
+    "setupFreshness": "stale",
+    "questionShape": "challenging",
+    "problemType": "inconsistent",
+    "dataConflict": null,
+    "gripLevel": "LOW",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "season",
+        "runs": 8
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "inconsistent"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "LOW"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-vnjtiif5",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 95
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "challenging",
+    "inconsistent"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

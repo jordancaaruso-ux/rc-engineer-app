@@ -1,0 +1,295 @@
+{
+  "id": "var-0001-minimalist-pointed",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-01-tabitha-r91y73",
+  "question": "It's won't turn in and it's getting worse. What would you change?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "Tabitha",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": {
+      "name": "Whale"
+    },
+    "event": null,
+    "tireSet": {
+      "label": "Sweep D-36R3PGM",
+      "setNumber": 1,
+      "initialRunCount": 1,
+      "tireType": {
+        "displayName": "Sweep D-36R3PGM",
+        "modelCode": "SWEEP-D-36R3PGM"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Orange",
+      "modelCode": "MIGHTY-GRIPPER-ORANGE"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "camber_front": -3,
+          "camber_rear": -3,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.4",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "22",
+          "damper_oil_rear": "27",
+          "diff_oil": "8k Axon",
+          "motor": "Hobbywing 4,5",
+          "pinion": "29",
+          "spur": "112"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 29,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 5,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "camber_front": -3,
+          "camber_rear": -3,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.4",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "22",
+          "damper_oil_rear": "27",
+          "diff_oil": "8k Axon",
+          "motor": "Hobbywing 4,5",
+          "pinion": "29",
+          "spur": "112"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 31,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 4,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "camber_front": -3,
+          "camber_rear": -3,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.4",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "22",
+          "damper_oil_rear": "27",
+          "diff_oil": "8k Axon",
+          "motor": "Hobbywing 4,5",
+          "pinion": "29",
+          "spur": "112"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 23,
+        "conditionsTrackTempC": 30,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "camber_front": -3,
+          "camber_rear": -3,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.4",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "22",
+          "damper_oil_rear": "27",
+          "diff_oil": "8k Axon",
+          "motor": "Hobbywing 4,5",
+          "pinion": "29",
+          "spur": "112"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 33,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 5",
+        "setupData": {
+          "camber_front": -3,
+          "camber_rear": -3,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.4",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "22",
+          "damper_oil_rear": "27",
+          "diff_oil": "8k Axon",
+          "motor": "Hobbywing 4,5",
+          "pinion": "29",
+          "spur": "112"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 28,
+        "conditionsTrackTempC": 27,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 6",
+        "setupData": {
+          "camber_front": -3,
+          "camber_rear": -3,
+          "toe_front": -1,
+          "toe_rear": 2,
+          "ride_height_front": "5.0",
+          "ride_height_rear": "5.4",
+          "spring_front": "STD",
+          "spring_rear": "STD",
+          "damper_oil_front": "22",
+          "damper_oil_rear": "27",
+          "diff_oil": "8k Axon",
+          "motor": "Hobbywing 4,5",
+          "pinion": "29",
+          "spur": "112"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": null,
+        "conditionsAirTempC": 24,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 5
+  },
+  "axes": {
+    "archetype": "minimalist",
+    "historyDepth": "single-day",
+    "handlingRichness": "none",
+    "setupFreshness": "stale",
+    "questionShape": "pointed",
+    "problemType": "entry-understeer",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "minimalist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 6
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "entry-understeer"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-s0igzxju",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 79
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "minimalist",
+    "pointed",
+    "entry-understeer"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

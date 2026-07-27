@@ -1,0 +1,275 @@
+{
+  "id": "var-0096-race-weekend-teaching",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-178-a800rr-6jwj8r",
+  "question": "How does rear roll centre actually change what the car does? Explain it properly.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800RR",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "LOW"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": {
+      "name": "Club Round",
+      "raceClass": null
+    },
+    "tireSet": {
+      "label": "Vaulk 36SK",
+      "setNumber": 6,
+      "initialRunCount": 1,
+      "tireType": {
+        "displayName": "Vaulk 36SK",
+        "modelCode": "VAULK-36SK"
+      }
+    },
+    "additive": {
+      "displayName": "Mighty Gripper - Yellow",
+      "modelCode": "MIGHTY-GRIPPER-YELLOW"
+    },
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Hobbywing G3X",
+          "date": "11/1/2025",
+          "name": "Jeff Rowland",
+          "race": "2025 Memorial Race",
+          "spur": "88",
+          "wing": "Speciale 0.4",
+          "motor": "R1 21.5 SuperShort",
+          "radio": "Sanwa M17",
+          "servo": "Sanwa PGS-LH II",
+          "tires": "Gravity",
+          "track": "180 Raceway",
+          "pinion": "49",
+          "battery": "TeamEAM 5000",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "Middle River, MD, USA",
+          "winglet": "no",
+          "additive": "SXT 3.0",
+          "air_temp": "70F",
+          "arb_rear": "1.1",
+          "diff_oil": "10k",
+          "receiver": "Sanwa RX-492",
+          "toe_rear": 2,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.2",
+          "at15_rear": "1",
+          "bodyshell": "Wolverine 0.4",
+          "toe_front": -1,
+          "at15_front": "1",
+          "bw22r_rear": "1",
+          "diff_shims": "0.4",
+          "track_temp": "70F",
+          "bw22r_front": "1",
+          "camber_rear": -2,
+          "caster_rear": -4,
+          "spring_rear": "S",
+          "st05_r_rear": "1",
+          "camber_front": -1.75,
+          "caster_front": 4,
+          "damping_rear": "P2",
+          "front_bumper": {
+            "selectedPreset": "C07RF",
+            "otherText": "MXLR"
+          },
+          "spring_front": "S",
+          "st05_r_front": "1",
+          "total_weight": "1320",
+          "track_layout": [
+            "fast"
+          ],
+          "additive_time": "5",
+          "damping_front": "P2",
+          "downstop_rear": "5.2",
+          "top_deck_cuts": [
+            "a"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": "1.6 C127S"
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.8",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": "1.6 C127S"
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "2.6",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Up",
+          "rear_hrb_setting": "0",
+          "ride_height_rear": "5.2",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "3.4122",
+          "ride_height_front": "5.0",
+          "servo_horn_height": "17mm",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Back",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "motor_lateral_shift": "0.5",
+          "side_wall_glue_rear": "0",
+          "toe_gain_shims_rear": "2.75",
+          "damper_percent_front": "60",
+          "front_body_post_hole": "3 (2 orings)",
+          "inner_steering_angle": "24",
+          "side_wall_glue_front": "0",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "2.5",
+          "upper_inner_shims_fr": "2.5",
+          "upper_inner_shims_rf": "2.0",
+          "upper_inner_shims_rr": "2.0",
+          "front_body_post_oring": "yes",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.5",
+          "rear_spring_rate_gf_mm": "89.3",
+          "upper_outer_shims_rear": "2.25",
+          "bodyshell_upstop_height": "13.2",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.0",
+          "under_lower_arm_shims_fr": "2.5",
+          "under_lower_arm_shims_rf": "2.5",
+          "under_lower_arm_shims_rr": "2.5",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50",
+          "body_position_from_windshield": "62"
+        },
+        "lapTimes": [
+          16.373,
+          16.215,
+          17.118,
+          16.334,
+          16.442,
+          16.232,
+          16.142,
+          16.474,
+          16.323,
+          19.742,
+          16.567,
+          16.497,
+          17.126,
+          16.966,
+          16.481,
+          16.409,
+          16.178,
+          16.31,
+          16.037,
+          45.302
+        ],
+        "bestLapSeconds": 16.037,
+        "avgTop5LapSeconds": 16.161,
+        "tireRunNumber": 1,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 29,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "RACE_MEETING",
+        "meetingSessionType": "QUALIFYING",
+        "meetingSessionCode": "Q2"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "race-weekend",
+    "historyDepth": "single-run",
+    "handlingRichness": "none",
+    "setupFreshness": "fresh",
+    "questionShape": "teaching",
+    "problemType": "nothing-wrong",
+    "dataConflict": null,
+    "gripLevel": "LOW",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "race-weekend"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "nothing-wrong"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "LOW"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-8s1zo4u2",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 101
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "race-weekend",
+    "teaching",
+    "nothing-wrong"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

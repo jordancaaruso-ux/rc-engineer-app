@@ -1,0 +1,252 @@
+{
+  "id": "var-0034-race-weekend-demanding",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-121-a800r-yibl5h",
+  "question": "Give me a definite answer. What am I changing?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "TFTR",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "LOW"
+      ],
+      "layoutTags": [
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": {
+      "name": "Club Round",
+      "raceClass": null
+    },
+    "tireSet": null,
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "Orca OE1",
+          "date": "28.01.2024",
+          "name": "Lucas Urbain",
+          "race": "ETS Rnd5",
+          "spur": "112",
+          "wing": "Twister 0.4",
+          "motor": "Orca Modtreme 5.5",
+          "radio": "Sanwa M17",
+          "servo": "MKS HBL575SL",
+          "tires": "Matrix ETS",
+          "track": "Daun",
+          "pinion": "28",
+          "battery": "Orca InfiniteX 4090",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "France",
+          "additive": "MR33 V4",
+          "arb_rear": "1.1",
+          "diff_oil": "MR33 8K",
+          "receiver": "Sanwa RX492",
+          "toe_rear": 2.5,
+          "traction": [
+            "high"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Speciale 0.4",
+          "toe_front": -1.5,
+          "bw52r_rear": "1",
+          "diff_shims": "SS",
+          "bw52r_front": "1",
+          "camber_rear": -1.5,
+          "caster_rear": -3,
+          "spring_rear": "S",
+          "camber_front": -1.5,
+          "caster_front": 4.5,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1284",
+          "track_layout": [
+            "mixed"
+          ],
+          "additive_time": "5min",
+          "damping_front": "P1",
+          "downstop_rear": "4.4",
+          "top_deck_cuts": [
+            "a",
+            "b",
+            "c",
+            "f",
+            "g"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "300",
+          "spring_gap_rear": "3.6",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "300",
+          "diff_height_rear": "Down",
+          "ride_height_rear": "5.2",
+          "spring_gap_front": "1.4",
+          "steer_travel_out": "16",
+          "diff_height_front": "Down",
+          "final_drive_ratio": "7.6",
+          "ride_height_front": "5.0",
+          "wheel_spacer_rear": "0",
+          "ackermann_position": "Backward",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "wheel_spacer_front": "0",
+          "c45_installed_front": "No",
+          "damper_percent_rear": "70",
+          "motor_lateral_shift": "0",
+          "toe_gain_shims_rear": "3.5",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "25",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "1.0",
+          "upper_inner_shims_ff": "1.75",
+          "upper_inner_shims_fr": "1.75",
+          "upper_inner_shims_rf": "1.0",
+          "upper_inner_shims_rr": "1.0",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "99.6",
+          "upper_outer_shims_rear": "2.0",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "2.0",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.75",
+          "under_lower_arm_shims_fr": "2.75",
+          "under_lower_arm_shims_rf": "3.0",
+          "under_lower_arm_shims_rr": "3.0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "49"
+        },
+        "lapTimes": [
+          15.74,
+          16.252,
+          15.783,
+          15.565,
+          15.942,
+          16.168,
+          16.478,
+          15.988,
+          15.758,
+          15.936,
+          15.745,
+          16.518,
+          15.997,
+          16.067,
+          15.964,
+          15.89,
+          15.909,
+          18.185,
+          24.224,
+          16.211,
+          117.198
+        ],
+        "bestLapSeconds": 15.565,
+        "avgTop5LapSeconds": 15.718,
+        "tireRunNumber": 1,
+        "handlingProblems": null,
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 25,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "driverNotes": null,
+        "sessionType": "RACE_MEETING",
+        "meetingSessionType": "QUALIFYING",
+        "meetingSessionCode": "Q2"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "race-weekend",
+    "historyDepth": "single-run",
+    "handlingRichness": "none",
+    "setupFreshness": "fresh",
+    "questionShape": "demanding",
+    "problemType": "on-power-snap",
+    "dataConflict": null,
+    "gripLevel": "LOW",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "race-weekend"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "on-power-snap"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "LOW"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-95864q51",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 86
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "race-weekend",
+    "demanding",
+    "on-power-snap"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

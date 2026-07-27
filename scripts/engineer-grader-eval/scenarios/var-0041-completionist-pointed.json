@@ -1,0 +1,220 @@
+{
+  "id": "var-0041-completionist-pointed",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-128-car-4y0er9",
+  "question": "Struggling with rolling over in the hairpin this run. One change — what is it?",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "Car (unlisted chassis)",
+      "setupSheetTemplate": null,
+      "setupSheetModelId": null
+    },
+    "track": {
+      "name": "Moorebank",
+      "location": "Sydney, NSW",
+      "gripTags": [
+        "MEDIUM"
+      ],
+      "layoutTags": [
+        "FAST"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36",
+      "setNumber": 1,
+      "initialRunCount": 5,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "H.W. G3",
+          "date": "2024.12.29",
+          "name": "Kirk Lin",
+          "race": "MTTR cup",
+          "spur": "108",
+          "wing": "Twister Light",
+          "motor": "H.W. Bendit G4",
+          "servo": "MKS 575",
+          "tires": "Solaris 40J",
+          "track": "W.B. Track",
+          "pinion": "36",
+          "battery": "Coddar 7500",
+          "country": "Taiwan",
+          "additive": "MR33 red + M.G. yellow",
+          "air_temp": "15",
+          "arb_rear": "1.1",
+          "diff_oil": "7000",
+          "toe_rear": 2.5,
+          "traction": [
+            "low"
+          ],
+          "arb_front": "1.0",
+          "bodyshell": "Twister Light",
+          "toe_front": -1,
+          "diff_shims": "small",
+          "camber_rear": -2,
+          "caster_rear": -2,
+          "spring_rear": "STD",
+          "camber_front": -1.8,
+          "caster_front": 4,
+          "damping_rear": "Linear",
+          "spring_front": "STD",
+          "total_weight": "1323",
+          "track_layout": [
+            "technical"
+          ],
+          "damping_front": "Linear",
+          "downstop_rear": "4.4",
+          "track_surface": "asphalt",
+          "downstop_front": "5.4",
+          "damper_oil_rear": "350",
+          "spring_gap_rear": "2.2",
+          "top_deck_screws": [
+            "d"
+          ],
+          "top_deck_single": {
+            "selectedPreset": "C27MMX",
+            "otherText": ""
+          },
+          "damper_oil_front": "300",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.2",
+          "spring_gap_front": "0.4",
+          "steer_travel_out": "25",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "5.7",
+          "ride_height_front": "5.0",
+          "wheel_spacer_rear": "-",
+          "ackermann_position": "mid.",
+          "c45_installed_rear": "Yes",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "No",
+          "damper_percent_rear": "60",
+          "toe_gain_shims_rear": "2.75",
+          "damper_percent_front": "60",
+          "inner_steering_angle": "17",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "-",
+          "upper_inner_shims_ff": "2.25",
+          "upper_inner_shims_fr": "2.25",
+          "upper_inner_shims_rf": "2.25",
+          "upper_inner_shims_rr": "2.25",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "-",
+          "bump_steer_shims_front": "3",
+          "rear_spring_rate_gf_mm": "107.3",
+          "upper_outer_shims_rear": "2.25",
+          "front_spring_rate_gf_mm": "71.5",
+          "pss_percent_setup_front": "25",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.25",
+          "under_lower_arm_shims_fr": "2.25",
+          "under_lower_arm_shims_rf": "2.25",
+          "under_lower_arm_shims_rr": "2.25",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "50"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "tireRunNumber": 1,
+        "handlingAssessmentJson": {
+          "version": 6,
+          "tractionRoll": 2,
+          "primaryFocus": {
+            "kind": "traction_roll",
+            "value": 2
+          },
+          "feelVsLastRun": -1,
+          "speedTags": {
+            "trait:tractionRoll": "slow"
+          }
+        },
+        "handlingProblems": "tripping over itself in the tight stuff",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 29,
+        "conditionsTrackTempC": 35,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "PRACTICE"
+      }
+    ],
+    "focusRunIndex": 0
+  },
+  "axes": {
+    "archetype": "completionist",
+    "historyDepth": "single-run",
+    "handlingRichness": "full",
+    "setupFreshness": "fresh",
+    "questionShape": "pointed",
+    "problemType": "traction-roll",
+    "dataConflict": null,
+    "gripLevel": "MEDIUM",
+    "carFamiliarity": "sparse"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "completionist"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-run",
+        "runs": 1
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "fresh"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "traction-roll"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "MEDIUM"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-vc0hyksh",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 78
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "completionist",
+    "pointed",
+    "traction-roll"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}

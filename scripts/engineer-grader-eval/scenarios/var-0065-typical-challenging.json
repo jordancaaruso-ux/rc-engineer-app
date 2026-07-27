@@ -1,0 +1,578 @@
+{
+  "id": "var-0065-typical-challenging",
+  "version": 1,
+  "source": "variation",
+  "baseSeedId": "seed-15-a800r-muatnh",
+  "question": "I reckon this is a tyre problem, not a setup problem. Convince me otherwise.",
+  "mode": "normal",
+  "world": {
+    "car": {
+      "name": "A800R",
+      "setupSheetTemplate": "awesomatix_a800rr",
+      "setupSheetModelId": "cmpg8ad3x0001l804rbnhng5f"
+    },
+    "track": {
+      "name": "Boronia",
+      "location": "Melbourne, Australia",
+      "gripTags": [
+        "HIGH"
+      ],
+      "layoutTags": [
+        "VERY_TECHNICAL",
+        "TECHNICAL"
+      ]
+    },
+    "trackLayout": null,
+    "event": null,
+    "tireSet": {
+      "label": "Vaulk 36",
+      "setNumber": 1,
+      "initialRunCount": 5,
+      "tireType": null
+    },
+    "additive": null,
+    "runs": [
+      {
+        "label": "Run 1",
+        "setupData": {
+          "esc": "HW xr10 Pro",
+          "date": "1/6/24",
+          "name": "Brian Bodine",
+          "race": "Club",
+          "spur": "88",
+          "wing": "Standard",
+          "motor": "R1 v21s 21.5",
+          "radio": "Sanwa MT5",
+          "servo": "MKS hbl550lx",
+          "tires": "Gravity",
+          "track": "Nora",
+          "pinion": "46",
+          "battery": "Corsatec 7400",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "USA",
+          "additive": "Sxt3.0",
+          "arb_rear": "1.1",
+          "c26_rear": "1",
+          "diff_oil": "8k",
+          "receiver": "Sanwa 493i",
+          "toe_rear": 2.25,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister**",
+          "toe_front": -1,
+          "diff_shims": "Small",
+          "bw22r_front": "1",
+          "camber_rear": -2.5,
+          "caster_rear": -4,
+          "spring_rear": "STD",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1321",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "10",
+          "damping_front": "P1",
+          "downstop_rear": "5.2",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "425",
+          "spring_gap_rear": "1.",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "425",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.6348",
+          "ride_height_front": "5.2",
+          "ackermann_position": "Max back",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "85",
+          "toe_gain_shims_rear": "3.75",
+          "damper_percent_front": "60",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1.75",
+          "upper_inner_shims_fr": "1.75",
+          "upper_inner_shims_rf": "1.5",
+          "upper_inner_shims_rr": "1.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "94.2",
+          "upper_outer_shims_rear": "2.25",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "2.5",
+          "under_lower_arm_shims_rf": "3.0",
+          "under_lower_arm_shims_rr": "3.0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 3,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 2",
+        "setupData": {
+          "esc": "HW xr10 Pro",
+          "date": "1/6/24",
+          "name": "Brian Bodine",
+          "race": "Club",
+          "spur": "88",
+          "wing": "Standard",
+          "motor": "R1 v21s 21.5",
+          "radio": "Sanwa MT5",
+          "servo": "MKS hbl550lx",
+          "tires": "Gravity",
+          "track": "Nora",
+          "pinion": "46",
+          "battery": "Corsatec 7400",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "USA",
+          "additive": "Sxt3.0",
+          "arb_rear": "1.1",
+          "c26_rear": "1",
+          "diff_oil": "8k",
+          "receiver": "Sanwa 493i",
+          "toe_rear": 2.25,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister**",
+          "toe_front": -1,
+          "diff_shims": "Small",
+          "bw22r_front": "1",
+          "camber_rear": -2.5,
+          "caster_rear": -4,
+          "spring_rear": "STD",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1321",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "10",
+          "damping_front": "P1",
+          "downstop_rear": "5.2",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "425",
+          "spring_gap_rear": "1.",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "425",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.6348",
+          "ride_height_front": "5.2",
+          "ackermann_position": "Max back",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "85",
+          "toe_gain_shims_rear": "3.75",
+          "damper_percent_front": "60",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1.75",
+          "upper_inner_shims_fr": "1.75",
+          "upper_inner_shims_rf": "1.5",
+          "upper_inner_shims_rr": "1.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "94.2",
+          "upper_outer_shims_rear": "2.25",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "2.5",
+          "under_lower_arm_shims_rf": "3.0",
+          "under_lower_arm_shims_rr": "3.0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 20,
+        "conditionsTrackTempC": 23,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 2,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 3",
+        "setupData": {
+          "esc": "HW xr10 Pro",
+          "date": "1/6/24",
+          "name": "Brian Bodine",
+          "race": "Club",
+          "spur": "88",
+          "wing": "Standard",
+          "motor": "R1 v21s 21.5",
+          "radio": "Sanwa MT5",
+          "servo": "MKS hbl550lx",
+          "tires": "Gravity",
+          "track": "Nora",
+          "pinion": "46",
+          "battery": "Corsatec 7400",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "USA",
+          "additive": "Sxt3.0",
+          "arb_rear": "1.1",
+          "c26_rear": "1",
+          "diff_oil": "8k",
+          "receiver": "Sanwa 493i",
+          "toe_rear": 2.25,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister**",
+          "toe_front": -1,
+          "diff_shims": "Small",
+          "bw22r_front": "1",
+          "camber_rear": -2.5,
+          "caster_rear": -4,
+          "spring_rear": "STD",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1321",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "10",
+          "damping_front": "P1",
+          "downstop_rear": "5.2",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "425",
+          "spring_gap_rear": "1.",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "425",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.6348",
+          "ride_height_front": "5.2",
+          "ackermann_position": "Max back",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "85",
+          "toe_gain_shims_rear": "3.75",
+          "damper_percent_front": "60",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1.75",
+          "upper_inner_shims_fr": "1.75",
+          "upper_inner_shims_rf": "1.5",
+          "upper_inner_shims_rr": "1.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "94.2",
+          "upper_outer_shims_rear": "2.25",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "2.5",
+          "under_lower_arm_shims_rf": "3.0",
+          "under_lower_arm_shims_rr": "3.0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 6,
+        "conditionsAirTempC": 22,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 1,
+        "sessionType": "TESTING"
+      },
+      {
+        "label": "Run 4",
+        "setupData": {
+          "esc": "HW xr10 Pro",
+          "date": "1/6/24",
+          "name": "Brian Bodine",
+          "race": "Club",
+          "spur": "88",
+          "wing": "Standard",
+          "motor": "R1 v21s 21.5",
+          "radio": "Sanwa MT5",
+          "servo": "MKS hbl550lx",
+          "tires": "Gravity",
+          "track": "Nora",
+          "pinion": "46",
+          "battery": "Corsatec 7400",
+          "chassis": {
+            "selectedPreset": "C01B-RAF",
+            "otherText": ""
+          },
+          "country": "USA",
+          "additive": "Sxt3.0",
+          "arb_rear": "1.1",
+          "c26_rear": "1",
+          "diff_oil": "8k",
+          "receiver": "Sanwa 493i",
+          "toe_rear": 2.25,
+          "traction": [
+            "medium"
+          ],
+          "arb_front": "1.1",
+          "bodyshell": "Twister**",
+          "toe_front": -1,
+          "diff_shims": "Small",
+          "bw22r_front": "1",
+          "camber_rear": -2.5,
+          "caster_rear": -4,
+          "spring_rear": "STD",
+          "camber_front": -2,
+          "caster_front": 4,
+          "damping_rear": "P1",
+          "spring_front": "S",
+          "total_weight": "1321",
+          "track_layout": [
+            "technical"
+          ],
+          "additive_time": "10",
+          "damping_front": "P1",
+          "downstop_rear": "5.2",
+          "top_deck_cuts": [
+            "a",
+            "b"
+          ],
+          "top_deck_rear": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "track_surface": "carpet",
+          "downstop_front": "5.6",
+          "top_deck_front": {
+            "selectedPreset": "C127S",
+            "otherText": ""
+          },
+          "damper_oil_rear": "425",
+          "spring_gap_rear": "1.",
+          "top_deck_screws": [
+            "c",
+            "d"
+          ],
+          "damper_oil_front": "425",
+          "diff_height_rear": "Up",
+          "ride_height_rear": "5.4",
+          "spring_gap_front": "1.4",
+          "diff_height_front": "Up",
+          "final_drive_ratio": "3.6348",
+          "ride_height_front": "5.2",
+          "ackermann_position": "Max back",
+          "c45_installed_rear": "No",
+          "motor_mount_screws": [
+            "3",
+            "4"
+          ],
+          "c45_installed_front": "Yes",
+          "damper_percent_rear": "85",
+          "toe_gain_shims_rear": "3.75",
+          "damper_percent_front": "60",
+          "srs_arrangement_rear": "I",
+          "under_hub_shims_rear": "0",
+          "upper_inner_shims_ff": "1.75",
+          "upper_inner_shims_fr": "1.75",
+          "upper_inner_shims_rf": "1.5",
+          "upper_inner_shims_rr": "1.5",
+          "srs_arrangement_front": "I",
+          "under_hub_shims_front": "0",
+          "bump_steer_shims_front": "2.75",
+          "rear_spring_rate_gf_mm": "94.2",
+          "upper_outer_shims_rear": "2.25",
+          "front_spring_rate_gf_mm": "63.5",
+          "upper_outer_shims_front": "2.25",
+          "lower_arm_extension_rear": "0",
+          "under_lower_arm_shims_ff": "2.5",
+          "under_lower_arm_shims_fr": "2.5",
+          "under_lower_arm_shims_rf": "3.0",
+          "under_lower_arm_shims_rr": "3.0",
+          "lower_arm_extension_front": "0",
+          "weight_balance_front_percent": "51"
+        },
+        "lapTimes": [],
+        "bestLapSeconds": null,
+        "avgTop5LapSeconds": null,
+        "handlingProblems": "too darty, hard to place accurately",
+        "notes": null,
+        "carRating": 5,
+        "conditionsAirTempC": 19,
+        "conditionsTrackTempC": 29,
+        "conditionsSource": "manual",
+        "sortAtOffsetDays": 0,
+        "sessionType": "TESTING"
+      }
+    ],
+    "focusRunIndex": 3
+  },
+  "axes": {
+    "archetype": "typical",
+    "historyDepth": "single-day",
+    "handlingRichness": "free-text",
+    "setupFreshness": "stale",
+    "questionShape": "challenging",
+    "problemType": "darty",
+    "dataConflict": null,
+    "gripLevel": "HIGH",
+    "carFamiliarity": "template"
+  },
+  "perturbation": [
+    {
+      "op": "archetype",
+      "params": {
+        "id": "typical"
+      }
+    },
+    {
+      "op": "historyDepth",
+      "params": {
+        "depth": "single-day",
+        "runs": 4
+      }
+    },
+    {
+      "op": "setupFreshness",
+      "params": {
+        "mode": "stale"
+      }
+    },
+    {
+      "op": "problem",
+      "params": {
+        "type": "darty"
+      }
+    },
+    {
+      "op": "grip",
+      "params": {
+        "level": "HIGH"
+      }
+    },
+    {
+      "op": "setupFromPool",
+      "params": {
+        "entryId": "doc-utg6p77r",
+        "template": "awesomatix_a800rr",
+        "source": "setup-document",
+        "keyCount": 81
+      }
+    }
+  ],
+  "tags": [
+    "variation",
+    "typical",
+    "challenging",
+    "darty"
+  ],
+  "coherence": {
+    "verdict": "pass",
+    "reason": "rules only",
+    "checkedBy": "rules"
+  }
+}
