@@ -142,6 +142,14 @@ export type EngineerChatUsage = {
   promptTokens: number;
   completionTokens: number;
   completionCalls: number;
+  /**
+   * Subset of `promptTokens` OpenAI served from its prompt cache.
+   *
+   * The tool loop resends the whole system block every round, so this is what decides real input
+   * cost — the full-KB prefix is deliberately byte-stable to be cacheable, and this is the only
+   * evidence that it actually is.
+   */
+  cachedPromptTokens: number;
 };
 
 function spineFromContext(contextJson: unknown): ReasoningSpineV1 | null {
@@ -410,7 +418,11 @@ type ChatCompletionMessage =
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
 
-type OpenAiUsagePayload = { prompt_tokens?: number; completion_tokens?: number };
+type OpenAiUsagePayload = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+};
 
 type ChatCompletionStreamResult = {
   content: string | null;
@@ -736,13 +748,20 @@ export async function generateEngineerChatReplyWithTools(params: {
   // trailing stream_options.include_usage chunk, so the AI spend cap sees real user traffic.
   let usage: EngineerChatUsage | null = null;
   const addUsage = (data: Record<string, unknown> | undefined) => {
-    const u = data?.usage as
-      | { prompt_tokens?: number; completion_tokens?: number }
-      | undefined;
+    const u = data?.usage as OpenAiUsagePayload | undefined;
     if (!u || typeof u.prompt_tokens !== "number") return;
-    if (!usage) usage = { promptTokens: 0, completionTokens: 0, completionCalls: 0 };
+    if (!usage) {
+      usage = {
+        promptTokens: 0,
+        completionTokens: 0,
+        completionCalls: 0,
+        cachedPromptTokens: 0,
+      };
+    }
     usage.promptTokens += u.prompt_tokens;
     usage.completionTokens += typeof u.completion_tokens === "number" ? u.completion_tokens : 0;
+    const cached = u.prompt_tokens_details?.cached_tokens;
+    usage.cachedPromptTokens += typeof cached === "number" ? cached : 0;
     usage.completionCalls += 1;
   };
 

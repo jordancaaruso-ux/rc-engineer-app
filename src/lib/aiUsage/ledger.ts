@@ -42,15 +42,29 @@ export async function checkAiBudget(input: {
   const today = dayValue(ymd);
 
   try {
-    const [todayRows, monthAgg] = await Promise.all([
+    const monthStart = dayValueDaysAgo(ymd, 29);
+    const [todayRows, monthAgg, monthCallsAgg] = await Promise.all([
       prisma.aiUsageDaily.findMany({
         where: { userId: input.userId, day: today },
         select: { feature: true, calls: true, costUsd: true },
       }),
       prisma.aiUsageDaily.aggregate({
-        where: { userId: input.userId, day: { gte: dayValueDaysAgo(ymd, 29), lte: today } },
+        where: { userId: input.userId, day: { gte: monthStart, lte: today } },
         _sum: { costUsd: true },
       }),
+      // Only queried when a monthly allowance actually exists, so accounts without one pay no
+      // extra round trip. `monthAgg` above sums cost across ALL features; a countable question
+      // quota has to be per-feature, hence the separate aggregate.
+      budget.monthlyCalls != null
+        ? prisma.aiUsageDaily.aggregate({
+            where: {
+              userId: input.userId,
+              feature: input.feature,
+              day: { gte: monthStart, lte: today },
+            },
+            _sum: { calls: true },
+          })
+        : Promise.resolve(null),
     ]);
 
     return evaluateAiBudget({
@@ -58,6 +72,7 @@ export async function checkAiBudget(input: {
       featureCallsToday: todayRows.find((r) => r.feature === input.feature)?.calls ?? 0,
       costTodayUsd: todayRows.reduce((sum, r) => sum + r.costUsd, 0),
       costMonthUsd: monthAgg._sum.costUsd ?? 0,
+      featureCallsMonth: monthCallsAgg?._sum.calls ?? 0,
     });
   } catch (error) {
     console.error("[aiUsage] budget check failed; allowing the call", error);
@@ -76,6 +91,8 @@ export async function recordAiUsage(input: {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  /** Subset of `promptTokens` served from OpenAI's prompt cache, when the response reported it. */
+  cachedPromptTokens?: number;
   /** Calls with no usage reported still count as 1 against the per-day call limit. */
   calls?: number;
 }): Promise<void> {
@@ -83,7 +100,20 @@ export async function recordAiUsage(input: {
     model: input.model,
     promptTokens: input.promptTokens,
     completionTokens: input.completionTokens,
+    cachedPromptTokens: input.cachedPromptTokens,
   });
+
+  // Set AI_USAGE_DEBUG=1 to see whether the Engineer's stable KB prefix is actually being cached.
+  // Cache hit rate is the single biggest lever on Engineer unit cost, and it is otherwise
+  // invisible — `costUsd` alone can't tell you a cheap call from a well-cached expensive one.
+  if (process.env.AI_USAGE_DEBUG === "1") {
+    const cached = input.cachedPromptTokens ?? 0;
+    const pct = input.promptTokens > 0 ? Math.round((cached / input.promptTokens) * 100) : 0;
+    console.log(
+      `[aiUsage] ${input.feature} ${input.model} prompt=${input.promptTokens} ` +
+        `cached=${cached} (${pct}%) completion=${input.completionTokens} cost=$${costUsd.toFixed(5)}`
+    );
+  }
   const day = dayValue(todayYmdInTimeZone(aiUsageTimeZone()));
   const calls = input.calls ?? 1;
 

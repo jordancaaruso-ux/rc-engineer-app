@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import Stripe from "stripe";
 import type { Tier } from "@/lib/entitlementLogic";
 
@@ -45,6 +46,52 @@ export function getPricePlans(): PricePlan[] {
   }
   return plans;
 }
+
+/**
+ * A plan plus what it actually costs.
+ *
+ * `getPricePlans()` deliberately stays synchronous (checkout validates a client-supplied price id
+ * against it, and that must not depend on a network call). The amount lives here instead, because
+ * a plan picker cannot render "$14.99/mo" — or compute the annual saving — from a price id alone.
+ *
+ * `unitAmount` is in MINOR units (cents), exactly as Stripe reports it. Null means the lookup
+ * failed or Stripe isn't configured; render those plans without a figure rather than crashing the
+ * only page that can take the user's money.
+ */
+export type PricePlanWithAmount = PricePlan & {
+  unitAmount: number | null;
+  currency: string | null;
+};
+
+/**
+ * Plans enriched with live Stripe amounts. Memoized per request; prices are configuration that
+ * changes at most a few times a year, so this is a cheap read on a cold page.
+ */
+export const getPricePlansWithAmounts = cache(
+  async function getPricePlansWithAmounts(): Promise<PricePlanWithAmount[]> {
+    const plans = getPricePlans();
+    if (!stripeConfigured() || plans.length === 0) {
+      return plans.map((p) => ({ ...p, unitAmount: null, currency: null }));
+    }
+    const stripe = getStripe();
+    return Promise.all(
+      plans.map(async (plan) => {
+        try {
+          const price = await stripe.prices.retrieve(plan.priceId);
+          return {
+            ...plan,
+            unitAmount: price.unit_amount ?? null,
+            currency: price.currency ?? null,
+          };
+        } catch (error) {
+          // A missing/archived price must not take down /billing — the paywall sends people here.
+          console.error(`[stripe] could not load price ${plan.priceId}`, error);
+          return { ...plan, unitAmount: null, currency: null };
+        }
+      }),
+    );
+  },
+);
 
 /** Map a Stripe price id back to our internal tier. Unknown → "standard" (fail-safe to cheaper). */
 export function tierForPriceId(priceId: string | null | undefined): Tier {

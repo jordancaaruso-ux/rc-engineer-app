@@ -44,15 +44,35 @@ export function modelRate(model: string): { input: number; output: number } {
   return base ? MODEL_RATES_USD_PER_MTOK[base] : UNKNOWN_MODEL_RATE;
 }
 
+/**
+ * Fraction of the input rate charged for tokens served from OpenAI's prompt cache.
+ *
+ * The Engineer resends a large, stable prefix (full-KB system block, then the rules prompt) on
+ * every tool-loop round, so a big share of its input can be cached — counting those at full price
+ * overstates real spend and makes the caps bite far earlier than the invoice justifies.
+ * Verify against platform.openai.com/pricing when you touch model choice.
+ */
+const CACHED_INPUT_RATE_MULTIPLIER = 0.1;
+
 export function estimateCostUsd(input: {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  /**
+   * Subset of `promptTokens` served from cache (OpenAI's
+   * `usage.prompt_tokens_details.cached_tokens`). Omit or 0 when unknown — that prices every
+   * input token at full rate, which over-counts rather than under-counts.
+   */
+  cachedPromptTokens?: number;
 }): number {
   const rate = modelRate(input.model);
   const prompt = Math.max(0, input.promptTokens);
   const completion = Math.max(0, input.completionTokens);
-  return (prompt * rate.input + completion * rate.output) / 1_000_000;
+  // Never let a bogus cached count exceed the prompt and manufacture a discount.
+  const cached = Math.min(prompt, Math.max(0, input.cachedPromptTokens ?? 0));
+  const fresh = prompt - cached;
+  const promptCost = fresh * rate.input + cached * rate.input * CACHED_INPUT_RATE_MULTIPLIER;
+  return (promptCost + completion * rate.output) / 1_000_000;
 }
 
 export type AiBudget = {
@@ -62,6 +82,15 @@ export type AiBudget = {
   dailyCostUsd: number;
   /** Hard stop: USD per rolling 30 days across ALL features. */
   monthlyCostUsd: number;
+  /**
+   * Hard stop: calls per rolling 30 days for THIS feature. Undefined = unlimited.
+   *
+   * This is the countable product allowance ("12 of 15 questions left"), as opposed to the dollar
+   * caps, which are abuse brakes the user never sees. A tier allowance must be expressed here and
+   * NOT emulated with `monthlyCostUsd` — a racer needs a number they can plan around, and a dollar
+   * cap silently moves as prompt sizes and model rates change.
+   */
+  monthlyCalls?: number;
 };
 
 /**
@@ -86,21 +115,41 @@ function envNumber(raw: string | undefined): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** Budget for a feature, with env overrides (`AI_DAILY_COST_LIMIT_USD`, etc.). */
+/**
+ * Budget for a feature, with env overrides (`AI_DAILY_COST_LIMIT_USD`, etc.).
+ *
+ * `monthlyCalls` is omitted entirely unless configured, so the monthly call quota stays OFF until
+ * tiers set it (Phase 2) — today's behaviour is unchanged.
+ */
 export function resolveAiBudget(
   feature: AiUsageFeature,
   env: Record<string, string | undefined> = process.env
 ): AiBudget {
+  const monthlyCalls = envNumber(env.AI_MONTHLY_CALL_LIMIT);
   return {
     dailyCalls: envNumber(env.AI_DAILY_CALL_LIMIT) ?? FEATURE_DAILY_CALLS[feature],
     dailyCostUsd: envNumber(env.AI_DAILY_COST_LIMIT_USD) ?? DEFAULT_AI_BUDGET.dailyCostUsd,
     monthlyCostUsd: envNumber(env.AI_MONTHLY_COST_LIMIT_USD) ?? DEFAULT_AI_BUDGET.monthlyCostUsd,
+    ...(monthlyCalls != null ? { monthlyCalls } : {}),
   };
+}
+
+/** Remaining calls in this feature's monthly allowance, or null when there is no allowance. */
+export function remainingMonthlyCalls(
+  budget: AiBudget,
+  featureCallsMonth: number
+): number | null {
+  if (budget.monthlyCalls == null) return null;
+  return Math.max(0, budget.monthlyCalls - Math.max(0, featureCallsMonth));
 }
 
 export type AiBudgetVerdict =
   | { ok: true }
-  | { ok: false; reason: "daily-calls" | "daily-cost" | "monthly-cost"; message: string };
+  | {
+      ok: false;
+      reason: "daily-calls" | "daily-cost" | "monthly-cost" | "monthly-calls";
+      message: string;
+    };
 
 /** Messages are phrased for a driver, not an operator — this surfaces in the Engineer panel. */
 export function evaluateAiBudget(input: {
@@ -111,8 +160,22 @@ export function evaluateAiBudget(input: {
   costTodayUsd: number;
   /** USD already spent in the last 30 days, across all features. */
   costMonthUsd: number;
+  /** Calls already made in the last 30 days, for this feature. Omit when no monthly quota. */
+  featureCallsMonth?: number;
 }): AiBudgetVerdict {
   const { budget } = input;
+  // Checked FIRST: this is the visible product allowance, so it should be the reason a user is
+  // told about, ahead of the dollar/burst brakes they were never shown a number for.
+  if (
+    budget.monthlyCalls != null &&
+    (input.featureCallsMonth ?? 0) >= budget.monthlyCalls
+  ) {
+    return {
+      ok: false,
+      reason: "monthly-calls",
+      message: "You've used this month's included questions. They reset next month.",
+    };
+  }
   if (input.featureCallsToday >= budget.dailyCalls) {
     return {
       ok: false,
