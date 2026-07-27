@@ -6,6 +6,7 @@ import {
   parseSetupSheetModelSchema,
   type SetupSheetModelSchema,
 } from "@/lib/setupSheetModels/types";
+import { regroupStructuredSections } from "@/lib/setupSheetModels/setupSheetGroups";
 
 export type SetupSheetTemplateView = "setup" | "logRun" | "analysis";
 
@@ -46,7 +47,10 @@ export function buildSetupSheetTemplateFromParsedSchema(
     ...schema,
     structuredSections: filteredLayoutSections,
   };
-  const structuredSections = modelLayoutToStructuredSections(layoutSchema);
+  // Display is regrouped into the six universal groups so every car reads the same way. The stored
+  // `sectionId`/`sectionTitle` are untouched — they stay the structural keys the editors, layout
+  // ops and calibration mapping run on. See `setupSheetGroups.ts`.
+  const structuredSections = regroupStructuredSections(modelLayoutToStructuredSections(layoutSchema));
   const groups = groupFieldsBySection(visibleFields);
   const fieldChipOptionsByKey = buildFieldChipOptionsFromSchema(schema);
 
@@ -80,6 +84,15 @@ function buildFieldChipOptionsFromSchema(
   return out;
 }
 
+/**
+ * Bucket flat fields by the sheet's OWN sections — deliberately not the universal display groups.
+ *
+ * `groups` feeds two things: the render fallback for a model with no structured layout, and the
+ * guided fill flow (`setupFillOrder` reads group id/title for its per-section progress). While
+ * filling, a driver is transcribing from a printed sheet or measuring on the car, so the app should
+ * follow the paper's own blocks; regrouping here would make them jump around the sheet. Uniform
+ * display is applied to `structuredSections` instead.
+ */
 function groupFieldsBySection(
   fields: SetupSheetModelSchema["fields"]
 ): SetupSheetTemplate["groups"] {

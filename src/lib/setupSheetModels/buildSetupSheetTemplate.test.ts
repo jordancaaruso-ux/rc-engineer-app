@@ -99,7 +99,10 @@ test("logRun view filters structured sections by showInLogRun", () => {
   };
 
   const setupTpl = buildSetupSheetTemplateFromParsedSchema("m1", "Test", schema, "setup");
-  assert.equal(setupTpl.structuredSections?.[0]?.rows.length, 2);
+  // Both rows survive the setup view. Counted across sections, not within one: display is regrouped
+  // into the universal groups (setupSheetGroups.ts), so "motor" and the camber pair now land in
+  // Drivetrain and Suspension geometry rather than sharing the sheet's own "geo" section.
+  assert.equal(setupTpl.structuredSections?.flatMap((s) => s.rows).length, 2);
 
   const logRunTpl = buildSetupSheetTemplateFromParsedSchema("m1", "Test", schema, "logRun");
   assert.equal(logRunTpl.structuredSections?.length, 1);
