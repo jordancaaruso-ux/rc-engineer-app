@@ -1,6 +1,6 @@
 ## Differential (rear gear diff)
 **Keys:** `diff_oil`
-**Concepts:** [[differential-coupling]]
+**Concepts:** [[differential-coupling]], [[oil-viscosity-temperature]]
 
 **Physics.** Thicker diff oil raises the diff's **coupling** — it resists a speed difference between the
 rear wheels more strongly; thinner frees it. (Ball-diff tightness, one-ways, and a spool are other ways
