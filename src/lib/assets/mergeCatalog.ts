@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
  * Every write runs in one transaction so a partial repoint can never orphan a row.
  */
 
-/** TireType is referenced by TireSet.tireTypeId and EventParticipation.controlledTireTypeId. */
+/** TireType is referenced by Run.tireTypeId, TireSet.tireTypeId (dormant) and EventParticipation.controlledTireTypeId. */
 export async function mergeTireTypes(input: {
   winnerId: string;
   loserId: string;
@@ -21,6 +21,10 @@ export async function mergeTireTypes(input: {
   if (winnerId === loserId) return;
 
   await prisma.$transaction(async (tx) => {
+    await tx.run.updateMany({
+      where: { tireTypeId: loserId },
+      data: { tireTypeId: winnerId },
+    });
     await tx.tireSet.updateMany({
       where: { tireTypeId: loserId },
       data: { tireTypeId: winnerId },

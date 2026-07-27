@@ -26,7 +26,7 @@ const runSelect = {
   sessionCompletedAt: true,
   carId: true,
   trackId: true,
-  tireSetId: true,
+  tireStintId: true,
   tireRunNumber: true,
   carRating: true,
   loggingComplete: true,
@@ -127,7 +127,7 @@ export async function getOrComputeDashboardSuggestion(
       id: run.id,
       carId: run.carId,
       trackId: run.trackId,
-      tireSetId: run.tireSetId,
+      tireStintId: run.tireStintId,
       tireRunNumber: run.tireRunNumber,
       createdAt: run.createdAt,
       sessionCompletedAt: run.sessionCompletedAt,
@@ -160,6 +160,7 @@ export async function getOrComputeDashboardSuggestion(
     rich?.setupVsSpread.rows.slice(0, 60).map((r) => ({
       key: r.parameterKey,
       positionBand: r.positionBand,
+      spreadSource: r.spreadSource,
       currentDisplay: r.currentDisplay,
       median: r.spread?.median ?? null,
     })) ?? [];
@@ -313,7 +314,7 @@ export async function peekDashboardSuggestion(
       createdAt: true,
       sessionCompletedAt: true,
       trackId: true,
-      tireSetId: true,
+      tireStintId: true,
       tireRunNumber: true,
     },
   });
@@ -325,7 +326,7 @@ export async function peekDashboardSuggestion(
       id: primaryRunId,
       carId: run.carId,
       trackId: run.trackId,
-      tireSetId: run.tireSetId,
+      tireStintId: run.tireStintId,
       tireRunNumber: run.tireRunNumber,
       createdAt: run.createdAt,
       sessionCompletedAt: run.sessionCompletedAt,
@@ -358,6 +359,7 @@ export async function peekDashboardSuggestion(
     rich?.setupVsSpread.rows.slice(0, 60).map((r) => ({
       key: r.parameterKey,
       positionBand: r.positionBand,
+      spreadSource: r.spreadSource,
       currentDisplay: r.currentDisplay,
       median: r.spread?.median ?? null,
     })) ?? [];

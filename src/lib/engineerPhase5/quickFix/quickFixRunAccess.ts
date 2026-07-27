@@ -26,7 +26,7 @@ export type QuickFixRunRow = {
   createdAt: Date;
   sessionCompletedAt: Date | null;
   trackId: string | null;
-  tireSetId: string | null;
+  tireStintId: string | null;
   tireRunNumber: number;
 };
 
@@ -51,7 +51,7 @@ const quickFixRunSelect = {
   createdAt: true,
   sessionCompletedAt: true,
   trackId: true,
-  tireSetId: true,
+  tireStintId: true,
   tireRunNumber: true,
 } as const;
 

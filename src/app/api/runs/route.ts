@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 import { Prisma } from "@prisma/client";
@@ -18,7 +19,6 @@ import {
   parseWarmerTimingMinutes,
 } from "@/lib/runs/applyRunContextToSetupSnapshot";
 import { normalizeTirePrep, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
-import { normalizeTireMark } from "@/lib/tires/tireMark";
 import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysForCar";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
@@ -46,18 +46,11 @@ type RunUpsertBody = {
   trackId?: string | null;
   trackLayoutId?: string | null;
   trackDirection?: "CW" | "CCW" | null;
-  tireSetId?: string | null;
-  /**
-   * v2 create-on-save: when set (and `tireSetId` absent) the server mints the tire set at
-   * persist time — abandoning the form never leaves an orphan set. `initialRunCount`
-   * carries nudged unlogged prior runs so derived wear counts stay right.
-   */
-  newTireSet?: {
-    tireTypeId?: string;
-    initialRunCount?: number;
-    specificModel?: string | null;
-    mark?: string | null;
-  };
+  tireTypeId?: string | null;
+  /** Null means different rubber went on — the server mints a fresh stint. */
+  tireStintId?: string | null;
+  /** False when the driver said "not sure how many runs" (e.g. a set they were given). */
+  tireAgeKnown?: boolean;
   tireRunNumber?: number;
   additiveTypeId?: string | null;
   warmerTimingMinutes?: number | null;
@@ -358,80 +351,30 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       : null
   );
 
-  const TIRE_SET_CONTEXT_SELECT = {
-    id: true,
-    label: true,
-    setNumber: true,
-    initialRunCount: true,
-    insertLabel: true,
-    wheelLabel: true,
-    specificModel: true,
-    mark: true,
-    tireTypeId: true,
-    tireType: { select: { id: true, displayName: true, modelCode: true } },
-  } as const;
-
-  // v2 create-on-save: a NEW-set choice in the form materializes only now, when the run
-  // actually persists (draft or complete). The created set is returned so the client
-  // adopts its id — any follow-up save links the same set instead of minting another.
-  let tireSetId =
-    typeof body.tireSetId === "string" && body.tireSetId.trim() ? body.tireSetId.trim() : null;
-  let createdTireSet: Prisma.TireSetGetPayload<{ select: typeof TIRE_SET_CONTEXT_SELECT }> | null =
-    null;
-  const newTireSetTypeId =
-    !tireSetId && typeof body.newTireSet?.tireTypeId === "string"
-      ? body.newTireSet.tireTypeId.trim()
-      : "";
-  if (newTireSetTypeId) {
-    const tireType = await prisma.tireType.findUnique({
-      where: { id: newTireSetTypeId },
-      select: { id: true, displayName: true },
-    });
-    if (!tireType) {
-      return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
-    }
-    const initialRunCount =
-      typeof body.newTireSet?.initialRunCount === "number" &&
-      Number.isFinite(body.newTireSet.initialRunCount) &&
-      body.newTireSet.initialRunCount >= 0
-        ? Math.floor(body.newTireSet.initialRunCount)
-        : 0;
-    // setNumber stays an internal per-compound counter (max + 1) — never shown as identity.
-    const nextSetNumber =
-      ((
-        await prisma.tireSet.aggregate({
-          where: { userId: params.userId, tireTypeId: tireType.id },
-          _max: { setNumber: true },
-        })
-      )._max.setNumber ?? 0) + 1;
-    createdTireSet = await prisma.tireSet.create({
-      data: {
-        label: tireType.displayName,
-        tireTypeId: tireType.id,
-        setNumber: nextSetNumber,
-        initialRunCount,
-        specificModel: body.newTireSet?.specificModel?.trim() || null,
-        mark: normalizeTireMark(body.newTireSet?.mark),
-        userId: params.userId,
-      },
-      select: TIRE_SET_CONTEXT_SELECT,
-    });
-    tireSetId = createdTireSet.id;
+  // Tires are the compound plus how many runs are on them. `tireStintId` groups
+  // runs sharing one life of rubber; a null one from the client means different
+  // rubber went on, so mint a fresh stint here. Carrying one forward is what makes
+  // "same tires as last run" cost the driver nothing.
+  const tireTypeId =
+    typeof body.tireTypeId === "string" && body.tireTypeId.trim() ? body.tireTypeId.trim() : null;
+  const tireType = tireTypeId
+    ? await prisma.tireType.findUnique({
+        where: { id: tireTypeId },
+        select: { id: true, displayName: true },
+      })
+    : null;
+  if (tireTypeId && !tireType) {
+    return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
   }
+  const tireAgeKnown = body.tireAgeKnown !== false;
+  const tireStintId = tireTypeId
+    ? typeof body.tireStintId === "string" && body.tireStintId.trim()
+      ? body.tireStintId.trim()
+      : randomUUID()
+    : null;
 
   // Run-context tires MUST be applied before persisting the snapshot; otherwise loaded
   // baseline / client setupData leaks stale tires into DB (overwrite ran after create).
-  const tireSet =
-    createdTireSet ??
-    (tireSetId
-      ? await prisma.tireSet.findFirst({
-          where: { id: tireSetId, userId: params.userId },
-          select: TIRE_SET_CONTEXT_SELECT,
-        })
-      : null);
-  if (tireSetId && !tireSet) {
-    return NextResponse.json({ error: "Tire set not found" }, { status: 400 });
-  }
 
   const additiveTypeId =
     typeof body.additiveTypeId === "string" && body.additiveTypeId.trim()
@@ -482,7 +425,14 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     applyRunContextToSetupSnapshot({
       resolvedData,
       sheetKeys,
-      tireSet,
+      tire: tireType
+        ? {
+            tireTypeId: tireType.id,
+            displayName: tireType.displayName,
+            tireRunNumber,
+            tireAgeKnown,
+          }
+        : null,
       additiveDisplayName: additiveType?.displayName ?? null,
       warmerTimingMinutes,
     })
@@ -598,7 +548,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         trackLayoutId: trackLayout?.id ?? null,
         trackLayoutNameSnapshot: trackLayout?.name ?? null,
         trackDirection,
-        tireSetId,
+        tireTypeId,
+        tireStintId,
+        tireAgeKnown,
         tireRunNumber,
         additiveTypeId,
         warmerTimingMinutes,
@@ -645,7 +597,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       trackLayoutId: trackLayout?.id ?? null,
       trackLayoutNameSnapshot: trackLayout?.name ?? null,
       trackDirection,
-      tireSetId,
+      tireTypeId,
+      tireStintId,
+      tireAgeKnown,
       tireRunNumber,
       additiveTypeId,
       warmerTimingMinutes,
@@ -796,7 +750,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   });
 
   return NextResponse.json(
-    { run, tireSet: createdTireSet ?? undefined, promptMarkTrackLocation },
+    { run, tireStintId, promptMarkTrackLocation },
     { status: params.mode === "create" ? 201 : 200 }
   );
 }

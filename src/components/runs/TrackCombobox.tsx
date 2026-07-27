@@ -58,7 +58,7 @@ export function TrackCombobox({
 
   return (
     <select
-      className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none disabled:opacity-60"
+      className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none disabled:opacity-60"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={ariaLabel}

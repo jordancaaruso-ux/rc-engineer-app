@@ -265,13 +265,19 @@ export function buildRunHistoryPrismaWhere(
   if (filters.carIds.length) where.carId = { in: filters.carIds };
   if (filters.trackIds.length) where.trackId = { in: filters.trackIds };
   if (filters.tireTypes.length) {
-    // Identity = linked tireType.displayName when present, else the legacy set label.
-    where.tireSet = {
+    // Identity is the compound. Legacy runs reach it through the set they went out on.
+    // Nested under AND so it composes with whatever the caller's baseWhere already has.
+    const tireMatch: Prisma.RunWhereInput = {
       OR: [
         { tireType: { displayName: { in: filters.tireTypes } } },
-        { tireTypeId: null, label: { in: filters.tireTypes } },
+        { tireSet: { tireType: { displayName: { in: filters.tireTypes } } } },
       ],
     };
+    where.AND = Array.isArray(where.AND)
+      ? [...where.AND, tireMatch]
+      : where.AND
+        ? [where.AND, tireMatch]
+        : [tireMatch];
   }
   if (filters.eventId) where.eventId = filters.eventId;
   if (filters.sessionType) where.sessionType = filters.sessionType;
@@ -306,11 +312,9 @@ export type RunForHistoryFilter = {
   track?: { name: string } | null;
   trackNameSnapshot: string | null;
   event?: { name: string } | null;
-  tireSet?: {
-    label: string;
-    setNumber: number | null;
-    tireType?: { displayName: string } | null;
-  } | null;
+  tireType?: { displayName: string } | null;
+  tireRunNumber?: number | null;
+  tireAgeKnown?: boolean | null;
   additiveType?: { displayName: string } | null;
   handlingAssessmentJson?: unknown;
   /** Setup parameters JSON; may be attached inline or supplied via `setupDataByRunId`. */
@@ -477,14 +481,9 @@ function runSearchFields(run: RunForHistoryFilter, setupData: unknown): SearchFi
   pushField(fields, "event", run.event?.name);
   pushField(fields, "session", run.sessionLabel);
   pushField(fields, "class", run.raceClass);
-  if (run.tireSet) {
-    const setNo = run.tireSet.setNumber != null ? ` #${run.tireSet.setNumber}` : "";
-    const typeName = run.tireSet.tireType?.displayName;
-    pushField(
-      fields,
-      "tires",
-      `${run.tireSet.label}${setNo}${typeName && typeName !== run.tireSet.label ? ` ${typeName}` : ""}`
-    );
+  if (run.tireType) {
+    const wear = run.tireRunNumber != null && run.tireRunNumber > 0 ? ` run ${run.tireRunNumber}` : "";
+    pushField(fields, "tires", `${run.tireType.displayName}${wear}`);
   }
   pushField(fields, "additive", run.additiveType?.displayName);
   for (const set of run.importedLapSets ?? []) {

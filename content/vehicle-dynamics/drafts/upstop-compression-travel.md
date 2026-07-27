@@ -2,7 +2,7 @@
 
 ## Upstop (compression-travel limit)
 
-**Keys:** `upstop_front`, `upstop_rear` — limits how far the arm can travel **upward** (wheel toward chassis). **Bigger value = less compression travel** (founder-confirmed). The mirror of the droop side, which limits **down**-travel (see **droop-downstop-arb.md**).
+**Keys:** `upstop_front`, `upstop_rear` — limits how far the arm can travel **upward** (wheel toward chassis). **Bigger value = less compression travel** (founder-confirmed). The mirror of the droop side, which limits **down**-travel (see **droop-downstop.md**).
 
 **Mechanism.** Within its travel, the suspension carries load through the spring and damper. When a corner reaches its upstop, that corner effectively **goes solid** — additional load passes straight through the chassis with no suspension movement. Everything about the moment of contact matters: gradual approach under body roll is a progressive stiffening; slamming into it over a kerb is a spike.
 

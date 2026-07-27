@@ -195,12 +195,12 @@ export async function buildEngineerContextPacketV1(
       car: { select: { name: true } },
       track: { select: { name: true } },
       event: { select: { id: true, name: true } },
-      tireSet: { select: { label: true } },
+      tireType: { select: { displayName: true } },
       setupSnapshot: { select: { id: true, data: true } },
       carId: true,
       trackId: true,
       eventId: true,
-      tireSetId: true,
+      tireStintId: true,
       tireRunNumber: true,
     },
   });
@@ -234,11 +234,11 @@ export async function buildEngineerContextPacketV1(
     car: { select: { name: true } },
     track: { select: { name: true } },
     event: { select: { id: true, name: true } },
-    tireSet: { select: { label: true } },
+    tireType: { select: { displayName: true } },
     setupSnapshot: { select: { id: true, data: true } },
     trackId: true,
     eventId: true,
-    tireSetId: true,
+    tireStintId: true,
     tireRunNumber: true,
   } as const;
 
@@ -248,7 +248,7 @@ export async function buildEngineerContextPacketV1(
       id: latest.id,
       carId: latest.carId,
       trackId: latest.trackId,
-      tireSetId: latest.tireSetId,
+      tireStintId: latest.tireStintId,
       tireRunNumber: latest.tireRunNumber,
       createdAt: latest.createdAt,
       sessionCompletedAt: latest.sessionCompletedAt,
@@ -331,7 +331,7 @@ export async function buildEngineerContextPacketV1(
       trackId: latest.trackId,
       eventId: latest.eventId,
       tireRunNumber: latest.tireRunNumber,
-      tireSetLabel: latest.tireSet?.label ?? null,
+      tireSetLabel: latest.tireType?.displayName ?? null,
     },
     previousRun: prev
       ? {
@@ -345,7 +345,7 @@ export async function buildEngineerContextPacketV1(
           trackId: prev.trackId,
           eventId: prev.eventId,
           tireRunNumber: prev.tireRunNumber,
-          tireSetLabel: prev.tireSet?.label ?? null,
+          tireSetLabel: prev.tireType?.displayName ?? null,
         }
       : null,
     comparison: prev
@@ -367,7 +367,7 @@ export async function buildEngineerContextPacketV1(
           ),
           sameTireRunIndex: latest.tireRunNumber === prev.tireRunNumber,
           sameTireSet: Boolean(
-            latest.tireSetId && prev.tireSetId && latest.tireSetId === prev.tireSetId
+            latest.tireStintId && prev.tireStintId && latest.tireStintId === prev.tireStintId
           ),
         }
       : null,
@@ -570,14 +570,14 @@ const focusedRunSelect = {
   carId: true,
   trackId: true,
   eventId: true,
-  tireSetId: true,
+  tireStintId: true,
   tireRunNumber: true,
   carNameSnapshot: true,
   trackNameSnapshot: true,
   car: { select: { id: true, name: true } },
   track: { select: { name: true } },
   event: { select: { id: true, name: true } },
-  tireSet: { select: { label: true, initialRunCount: true } },
+  tireType: { select: { displayName: true } },
   setupSnapshot: { select: { data: true } },
   importedLapTimeSessionId: true,
   importedLapSets: {
@@ -615,7 +615,7 @@ function runSliceFromRow(
     trackId: string | null;
     eventId: string | null;
     tireRunNumber: number;
-    tireSet: { label: string } | null;
+    tireType: { displayName: string } | null;
   }
 ): EngineerFocusedRunPairContext["primary"] {
   const when = resolveRunDisplayInstant({
@@ -639,7 +639,7 @@ function runSliceFromRow(
     trackId: row.trackId,
     eventId: row.eventId,
     tireRunNumber: row.tireRunNumber,
-    tireSetLabel: row.tireSet?.label ?? null,
+    tireSetLabel: row.tireType?.displayName ?? null,
     lapSummary: {
       lapCount: lap.lapCount,
       bestLapSeconds: lap.bestLap,
@@ -735,7 +735,7 @@ export async function buildFocusedRunPairContext(
           ),
           sameTireRunNumber: primarySlice.tireRunNumber === compareSlice.tireRunNumber,
           sameTireSet: Boolean(
-            primary.tireSetId && compare.tireSetId && primary.tireSetId === compare.tireSetId
+            primary.tireStintId && compare.tireStintId && primary.tireStintId === compare.tireStintId
           ),
         };
 
@@ -899,18 +899,18 @@ export async function buildFocusedRunPairContext(
   }
 
   const primaryRunPacingContext = buildRunPacingContextV1({
-    tireSetId: primary.tireSetId,
-    tireSetLabel: primary.tireSet?.label ?? null,
-    initialRunCount: primary.tireSet?.initialRunCount ?? 0,
+    tireStintId: primary.tireStintId,
+    tireSetLabel: primary.tireType?.displayName ?? null,
+    initialRunCount: 0,
     tireRunNumber: primary.tireRunNumber,
     importedSessionFieldStats,
   });
 
   const compareRunPacingContext = compare
     ? buildRunPacingContextV1({
-        tireSetId: compare.tireSetId,
-        tireSetLabel: compare.tireSet?.label ?? null,
-        initialRunCount: compare.tireSet?.initialRunCount ?? 0,
+        tireStintId: compare.tireStintId,
+        tireSetLabel: compare.tireType?.displayName ?? null,
+        initialRunCount: 0,
         tireRunNumber: compare.tireRunNumber,
         importedSessionFieldStats: compareImportedSessionFieldStats,
       })
@@ -919,7 +919,7 @@ export async function buildFocusedRunPairContext(
   let pairPacingContext: EngineerFocusedRunPairContext["pairPacingContext"] = null;
   if (compare && compareSlice) {
     const sameSet = Boolean(
-      primary.tireSetId && compare.tireSetId && primary.tireSetId === compare.tireSetId
+      primary.tireStintId && compare.tireStintId && primary.tireStintId === compare.tireStintId
     );
     const sameTireWearSlot =
       sameSet && primarySlice.tireRunNumber === compareSlice.tireRunNumber;
@@ -930,9 +930,9 @@ export async function buildFocusedRunPairContext(
     let expectedWearVsHistoricSteps: TireLifeFocusedCompareNudgeV1 | null = null;
     let expectedWearDirectionNote: string | null = null;
 
-    if (sameSet && primary.tireSetId) {
+    if (sameSet && primary.tireStintId) {
       if (primarySlice.tireRunNumber > compareSlice.tireRunNumber) {
-        const steps = await loadTireStepAggregatesAllTracks(userId, primary.tireSetId);
+        const steps = await loadTireStepAggregatesAllTracks(userId, primary.tireStintId);
         if (steps) {
           const nudge = buildExpectedWearChainNudge(
             steps,

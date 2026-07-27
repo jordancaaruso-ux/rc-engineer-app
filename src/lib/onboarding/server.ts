@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getOnboardingState } from "@/lib/appSettings";
 import { getTimingIdentityForUser } from "@/lib/onboarding/timingIdentity";
+import { showWelcomeScreen } from "@/lib/onboarding/visibility";
 import { userHasAnySetup } from "@/lib/setup/setupSheetPrompt";
 
 /**
@@ -41,18 +42,19 @@ export async function loadOnboardingView(userId: string): Promise<OnboardingView
     userHasAnySetup(userId),
   ]);
 
-  const hasCar = car != null;
-  const hasAnyRun = anyRun != null;
-  return {
+  const facts = {
     seen: state.seen,
     dismissed: state.resumeDismissed,
-    hasCar,
-    carId: car?.id ?? null,
+    hasCar: car != null,
     hasTimingIdentity: hasTiming,
     hasSetup,
-    hasAnyRun,
-    // The welcome overlay: a brand-new account that hasn't answered it and has
-    // nothing yet. `seen` terminates it so "Look around" is never a trap.
-    showIntro: !state.seen && !hasCar && !hasAnyRun,
+    hasAnyRun: anyRun != null,
+  };
+  return {
+    ...facts,
+    carId: car?.id ?? null,
+    // Gate lives in `visibility.ts` so it's testable without a DB and drivable
+    // without a fresh account (`/debug/onboarding-preview`).
+    showIntro: showWelcomeScreen(facts),
   };
 }

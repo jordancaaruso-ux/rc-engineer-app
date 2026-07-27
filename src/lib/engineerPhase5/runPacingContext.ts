@@ -15,7 +15,7 @@ export type FieldPaceAvgTop10SnapshotV1 = {
 export type RunPacingContextV1 = {
   version: 1;
   tireWear: null | {
-    tireSetId: string;
+    tireStintId: string;
     tireSetLabel: string | null;
     tireRunNumber: number;
     effectiveWearIndex: number;
@@ -26,18 +26,18 @@ export type RunPacingContextV1 = {
 };
 
 export function buildRunPacingContextV1(input: {
-  tireSetId: string | null;
+  tireStintId: string | null;
   tireSetLabel: string | null;
   initialRunCount?: number | null;
   tireRunNumber: number;
   importedSessionFieldStats: ImportedSessionFieldStatsEngineerCompactV1 | null;
 }): RunPacingContextV1 {
   const initial = input.initialRunCount ?? 0;
-  const tid = input.tireSetId?.trim();
+  const tid = input.tireStintId?.trim();
   const tireWear =
     tid != null && tid.length > 0
       ? {
-          tireSetId: tid,
+          tireStintId: tid,
           tireSetLabel: input.tireSetLabel,
           tireRunNumber: input.tireRunNumber,
           effectiveWearIndex: input.tireRunNumber + initial,

@@ -134,7 +134,7 @@ export type PaceReadV1 = {
 export type TireChangeSignificanceV1 =
   | "none"
   | "unknown"
-  /** Same `tireSetId`, different `tireRunNumber` only — wear index / session count, not a compound swap. */
+  /** Same `tireStintId`, different `tireRunNumber` only — wear index / session count, not a compound swap. */
   | "wear_index_only"
   /** Different physical set row but same compound label — fresher rubber, not a new tyre family. */
   | "new_set_same_compound"
@@ -204,7 +204,7 @@ export type EngineeringReadRunInput = {
   sortAtIso: string;
   trackId: string | null;
   eventId: string | null;
-  tireSetId: string | null;
+  tireStintId: string | null;
   /** Label of the tire set (compound + set number). */
   tireLabel: string | null;
   /**
@@ -580,7 +580,7 @@ function classifyTireChangeSignificance(
   const refC = normalizeTireCompoundLabel(reference.tireCompoundLabel);
   if (curC && refC && curC !== refC) return "compound_change";
   if (tireSetChanged === true) return "new_set_same_compound";
-  const sameSet = Boolean(current.tireSetId && reference.tireSetId && current.tireSetId === reference.tireSetId);
+  const sameSet = Boolean(current.tireStintId && reference.tireStintId && current.tireStintId === reference.tireStintId);
   if (sameSet && tireRunNumberDelta != null && tireRunNumberDelta !== 0) return "wear_index_only";
   if (tireSetChanged == null && !curC && !refC && tireRunNumberDelta != null && tireRunNumberDelta !== 0) return "unknown";
   return "none";
@@ -605,7 +605,7 @@ function buildChangeRead(
   }
   const sameTrack = current.trackId && reference.trackId ? current.trackId === reference.trackId : null;
   const sameEvent = current.eventId && reference.eventId ? current.eventId === reference.eventId : null;
-  const tireSetChanged = current.tireSetId && reference.tireSetId ? current.tireSetId !== reference.tireSetId : null;
+  const tireSetChanged = current.tireStintId && reference.tireStintId ? current.tireStintId !== reference.tireStintId : null;
   const tireLabelChanged = current.tireLabel && reference.tireLabel ? current.tireLabel !== reference.tireLabel : null;
   const tireRunNumberDelta =
     typeof current.tireRunNumber === "number" && typeof reference.tireRunNumber === "number"

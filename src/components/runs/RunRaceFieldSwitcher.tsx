@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { chipToggleClass } from "@/components/ui/chipToggle";
 import { formatLap, formatStintTime } from "@/lib/runLaps";
 import {
+  computeFieldSheet,
   computeMistakeLaps,
   formatConsistencyScorePercent,
   formatMistakeLapDetail,
@@ -24,6 +25,7 @@ import {
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { LapTimeGraph, type LapGraphRow } from "@/components/runs/LapTimeGraph";
 import { LapGapGraph } from "@/components/runs/LapGapGraph";
+import { FieldAverageWells, RunFieldSheet, driverSurname } from "@/components/runs/RunFieldSheet";
 import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
 import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
 
@@ -51,6 +53,16 @@ const CLAIM_DISTANCE = 8;
 const COMMIT_DISTANCE = 56;
 
 /**
+ * Sentinel tab id for the whole-field sheet, which sits at the head of the strip
+ * ahead of every driver. Not a driver id, so it can never collide with one.
+ *
+ * It deliberately carries no identity-coloured top edge: that edge exists to tie a
+ * tab to its trace colour on the graph below, and the sheet has no trace. Its
+ * selected state is the plain neutral chip treatment, keeping yellow for actions.
+ */
+const FIELD_TAB_ID = "__field__";
+
+/**
  * Identity hues for the driver-compare view: your run vs the selected competitor.
  * Applied to both the notebook tab and the matching lap-graph trace so the eye
  * ties tab → laps → line together. Yellow = you (the hero line); white = the
@@ -68,16 +80,12 @@ export const RACE_IDENTITY = {
  * Collisions across the field are acceptable — the tooltip carries the full
  * `P{position} {name}` label.
  *
- * A trailing single-letter token is not a surname — some tracks append `M`
- * (member) to LiveRC names (e.g. "Jordan Caruso M"), so the last name is only
- * valid when it has more than one letter; otherwise fall back to the previous
- * word (→ CAR, not M).
+ * The surname rule (a trailing single letter is a member flag, not a name) lives
+ * in `driverSurname` so the field sheet's fuller labels derive it identically.
  */
 function driverTabCode(driver: RaceFieldDriver): string {
   if (driver.isUser) return "YOU";
-  const words = driver.name.trim().split(/\s+/).filter(Boolean);
-  const last = [...words].reverse().find((w) => w.length > 1) ?? words[words.length - 1] ?? "";
-  return last.slice(0, 3).toUpperCase() || "—";
+  return driverSurname(driver.name).slice(0, 3).toUpperCase() || "—";
 }
 
 export function RunRaceFieldSwitcher({
@@ -142,6 +150,30 @@ export function RunRaceFieldSwitcher({
     () => (drivers && selectedId ? drivers.findIndex((d) => d.id === selectedId) : -1),
     [drivers, selectedId]
   );
+  const isFieldTab = selectedId === FIELD_TAB_ID;
+
+  /**
+   * Whole-field metrics for the FIELD tab. Your row is built from your own run's
+   * lap rows — which carry your manual exclusions and no auto-exclude — while
+   * competitors get the median-band heuristic, exactly as their own tabs do. Doing
+   * it any other way makes your row in the sheet disagree with the stat wells
+   * rendered directly above it.
+   */
+  const fieldSheet = useMemo(() => {
+    if (!drivers || drivers.length < 2) return null;
+    return computeFieldSheet(
+      drivers.map((d) => ({
+        id: d.id,
+        name: d.name,
+        position: d.position,
+        isUser: d.isUser,
+        rows:
+          d.isUser && userLapRows.length > 0
+            ? userLapRows
+            : applyMedianBandAutoExclude(lapRowsFromTimesAndFlags(d.laps)),
+      }))
+    );
+  }, [drivers, userLapRows]);
 
   const goTo = useCallback(
     (index: number) => {
@@ -193,11 +225,22 @@ export function RunRaceFieldSwitcher({
       if (!g || e.pointerId !== g.pointerId || !g.claimed) return;
       suppressClickRef.current = true;
       const dx = e.clientX - g.startX;
-      if (Math.abs(dx) < COMMIT_DISTANCE || selectedIndex < 0) return;
+      if (Math.abs(dx) < COMMIT_DISTANCE) return;
+      // The field sheet sits one slot ahead of the first driver, so the pager runs
+      // FIELD → P1 → P2 … continuously in both directions.
+      if (isFieldTab) {
+        if (dx < 0) goTo(0);
+        return;
+      }
+      if (selectedIndex < 0) return;
+      if (selectedIndex === 0 && dx > 0) {
+        setSelectedId(FIELD_TAB_ID);
+        return;
+      }
       // Dragging left reveals the next (worse-placed) driver, matching PagedCard.
       goTo(selectedIndex + (dx < 0 ? 1 : -1));
     },
-    [goTo, selectedIndex]
+    [goTo, isFieldTab, selectedIndex]
   );
 
   const onClickCapture = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
@@ -224,6 +267,26 @@ export function RunRaceFieldSwitcher({
       aria-label="Race field"
       onPointerDown={(e) => e.stopPropagation()}
     >
+      {fieldSheet ? (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={isFieldTab}
+          aria-label="Whole field"
+          title="Whole field — every driver on best lap, pace, consistency and mistakes"
+          data-driver-id={FIELD_TAB_ID}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedId(FIELD_TAB_ID);
+          }}
+          className={cn(
+            chipToggleClass(isFieldTab),
+            "shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold"
+          )}
+        >
+          FIELD
+        </button>
+      ) : null}
       {drivers.map((driver) => {
         const active = driver.id === selectedId;
         const hue = driver.isUser ? RACE_IDENTITY.you : RACE_IDENTITY.competitor;
@@ -279,7 +342,21 @@ export function RunRaceFieldSwitcher({
       }}
       onClickCapture={onClickCapture}
     >
-      {selected.isUser ? (
+      {isFieldTab && fieldSheet ? (
+        <>
+          {/*
+            The wells stay put on the FIELD tab carrying the field's averages, the
+            same way they carry a competitor's figures on their tab — so the labels
+            always describe whatever the tab is showing, and switching tabs never
+            pulls the strip and sheet up the page.
+          */}
+          <FieldAverageWells sheet={fieldSheet} />
+          <div className="min-w-0">
+            {tabsNode}
+            <RunFieldSheet sheet={fieldSheet} onSelectDriver={setSelectedId} />
+          </div>
+        </>
+      ) : selected.isUser ? (
         <>
           {userStats}
           <div className="min-w-0">

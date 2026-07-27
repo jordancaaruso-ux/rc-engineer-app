@@ -22,7 +22,6 @@ import {
   computeTireIndicatorsByRunId,
   type RunTireIndicator,
 } from "@/lib/runs/tireSetChange";
-import { formatMark } from "@/lib/tires/tireMark";
 import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import {
@@ -118,7 +117,9 @@ type Run = {
   conditionsWindKph?: number | null;
   car?: { id: string; name: string; setupSheetTemplate?: string | null } | null;
   track?: { id: string; name: string } | null;
-  tireSet?: { id: string; label: string; setNumber: number | null; mark?: string | null } | null;
+  tireType?: { id: string; displayName: string } | null;
+  tireStintId?: string | null;
+  tireAgeKnown?: boolean | null;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
   tirePrep?: unknown;
@@ -367,7 +368,9 @@ export function RunHistoryTable({
           id: r.id,
           carId: r.carId ?? r.car?.id ?? null,
           tireRunNumber: r.tireRunNumber,
-          tireSet: r.tireSet ?? null,
+          tireType: r.tireType ?? null,
+          tireStintId: r.tireStintId ?? null,
+          tireAgeKnown: r.tireAgeKnown ?? true,
         }))
       ),
     [allRunsDescending]
@@ -1009,8 +1012,8 @@ function RunDetail({
 
   const runInstant = resolveRunDisplayInstant(run);
   const dateTimeLabel = formatRunDateTime(runInstant, displayTimeZone);
-  const tireSetDisplay = run.tireSet
-    ? `${formatMark(run.tireSet.mark) ?? run.tireSet.label} · run ${run.tireRunNumber}`
+  const tireSetDisplay = run.tireType
+    ? `${run.tireType.displayName} · run ${run.tireRunNumber}${run.tireAgeKnown === false ? " (age unknown)" : ""}`
     : "—";
   // Additive well = the product; Tire prep well = the application sequence.
   // Compound toggles (ST205, ABH, AT15, …) are setup-sheet parameters, not tire

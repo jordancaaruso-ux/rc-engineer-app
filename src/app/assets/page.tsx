@@ -33,7 +33,13 @@ export default async function AssetsHubPage() {
     try {
       const [cars, tireSets, carRows] = await Promise.all([
         prisma.car.count({ where: { userId: user.id } }),
-        prisma.tireSet.count({ where: { userId: user.id, archivedAt: null } }),
+        prisma.run
+          .findMany({
+            where: { userId: user.id, tireTypeId: { not: null } },
+            distinct: ["tireTypeId"],
+            select: { tireTypeId: true },
+          })
+          .then((rows) => rows.length),
         prisma.car.findMany({
           where: { userId: user.id },
           orderBy: { createdAt: "desc" },
@@ -46,7 +52,7 @@ export default async function AssetsHubPage() {
           take: 25,
         }),
       ]);
-      counts = { "/cars": cars, "/tire-sets": tireSets };
+      counts = { "/cars": cars, "/tires": tireSets };
       // Every car can CREATE a setup, so the bar lists them all. `supportsUpload` (a green-lit
       // calibration) only decides which door a car opens: the upload/photo/paste sheet, or
       // straight into the create-a-setup flow.

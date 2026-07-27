@@ -16,7 +16,7 @@ export async function tireTypeUsedByOthers(
   creatorUserId: string
 ): Promise<boolean> {
   const [setByOther, participationByOther] = await Promise.all([
-    prisma.tireSet.count({
+    prisma.run.count({
       where: { tireTypeId, userId: { not: creatorUserId } },
     }),
     prisma.eventParticipation.count({

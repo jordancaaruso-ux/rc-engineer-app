@@ -3,7 +3,8 @@ import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getMyNameSetting, getMyNameSettingsForUsers } from "@/lib/appSettings";
+import { getMyNameSetting } from "@/lib/appSettings";
+import { loadTeamMemberDisplays, memberDisplayLabelRecord } from "@/lib/teams/teamMemberDisplay";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
@@ -110,13 +111,12 @@ const runHistorySelect = {
   conditionsObservedAt: true,
   car: { select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true } },
   track: { select: { id: true, name: true } },
-  tireSet: {
+  tireStintId: true,
+  tireAgeKnown: true,
+  tireType: {
     select: {
       id: true,
-      label: true,
-      setNumber: true,
-      mark: true,
-      tireType: { select: { displayName: true } },
+      displayName: true,
     },
   },
   additiveType: { select: { id: true, displayName: true } },
@@ -305,21 +305,8 @@ export default async function RunHistoryPage({
       totalRunCount = loaded.totalRunCount;
       viewAll = loaded.viewAll;
       hasMoreRuns = loaded.hasMoreRuns;
-      const [members, myNames] = await Promise.all([
-        prisma.user.findMany({
-          where: { id: { in: memberIds } },
-          select: { id: true, name: true, email: true },
-        }),
-        // Display names are stored per-user in AppSetting (Settings → "My name"),
-        // not User.name — prefer that so the roster matches what each member set.
-        getMyNameSettingsForUsers(memberIds),
-      ]);
-      memberDisplayByUserId = Object.fromEntries(
-        members.map((m) => {
-          const base =
-            myNames[m.id]?.trim() || m.name?.trim() || m.email?.trim() || m.id.slice(0, 8);
-          return [m.id, m.id === user.id ? `You (${base})` : base] as const;
-        })
+      memberDisplayByUserId = memberDisplayLabelRecord(
+        await loadTeamMemberDisplays(memberIds, user.id)
       );
     }
   } else {
@@ -348,26 +335,35 @@ export default async function RunHistoryPage({
         select: { id: true, name: true },
       }),
       loadUserScopedEvents({ userId: user.id, take: 200 }),
-      prisma.tireSet.findMany({
-        where: { userId: user.id },
-        orderBy: [{ label: "asc" }, { setNumber: "asc" }],
-        select: { id: true, label: true, tireType: { select: { displayName: true } } },
+      prisma.run.groupBy({
+        by: ["tireTypeId"],
+        where: { userId: user.id, tireTypeId: { not: null } },
+        _count: { _all: true },
       }),
     ]);
     filterCars = cars.map((c) => ({ id: c.id, label: c.name }));
     filterTracks = tracks.map((t) => ({ id: t.id, label: t.name }));
     filterEvents = scopedEvents.map((e) => ({ id: e.id, label: e.name }));
-    // Group physical sets into tire *types*: linked type name, else legacy label.
+    // Compounds the driver has actually run, with how many runs are on each.
+    const tireTypeNames = new Map<string, string>(
+      (
+        await prisma.tireType.findMany({
+          where: { id: { in: tireSets.map((t) => t.tireTypeId!).filter(Boolean) } },
+          select: { id: true, displayName: true },
+        })
+      ).map((t) => [t.id, t.displayName] as const)
+    );
     const tireTypeCounts = new Map<string, number>();
-    for (const ts of tireSets) {
-      const identity = ts.tireType?.displayName ?? ts.label;
-      tireTypeCounts.set(identity, (tireTypeCounts.get(identity) ?? 0) + 1);
+    for (const row of tireSets) {
+      const identity = tireTypeNames.get(row.tireTypeId!);
+      if (!identity) continue;
+      tireTypeCounts.set(identity, (tireTypeCounts.get(identity) ?? 0) + row._count._all);
     }
     filterTireTypes = [...tireTypeCounts.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([identity, count]) => ({
         id: identity,
-        label: `${identity} · ${count} set${count === 1 ? "" : "s"}`,
+        label: `${identity} · ${count} run${count === 1 ? "" : "s"}`,
       }));
   }
 

@@ -3,7 +3,8 @@
 import { memo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Flag, Plus } from "@phosphor-icons/react";
+import { Flag } from "@phosphor-icons/react";
+import { IconAddRun } from "@/components/icons/JRCIcons";
 import { shouldShowLogRunFab } from "@/components/layout/navConfig";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
 import { haptic } from "@/lib/haptics";
@@ -55,7 +56,7 @@ export const LogRunFab = memo(function LogRunFab() {
         aria-label="Start a new run"
         className="tap-active flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[rgba(19,18,17,0.92)] text-muted-foreground shadow-[0_6px_16px_-10px_rgba(0,0,0,0.65)] backdrop-blur transition-transform duration-150 active:scale-95 touch-manipulation"
       >
-        <Plus size={24} weight="bold" aria-hidden />
+        <IconAddRun size={24} aria-hidden />
       </Link>
     );
   }
@@ -84,7 +85,7 @@ export const LogRunFab = memo(function LogRunFab() {
       {draftRunId ? (
         <Flag size={25} weight="bold" aria-hidden className="relative z-[2]" />
       ) : (
-        <Plus size={26} weight="bold" aria-hidden className="relative z-[2]" />
+        <IconAddRun size={26} aria-hidden className="relative z-[2]" />
       )}
       {draftRunId ? (
         <span

@@ -21,7 +21,9 @@ export type A800RRSetupSheetRun = {
   tireRunNumber: number;
   car?: { id: string; name: string } | null;
   track?: { id: string; name: string } | null;
-  tireSet?: { id: string; label: string; setNumber: number | null } | null;
+  tireType?: { id: string; displayName: string } | null;
+  tireStintId?: string | null;
+  tireAgeKnown?: boolean | null;
   event?: {
     name: string;
     startDate?: Date | string | null;
@@ -319,8 +321,8 @@ export function A800RRSetupSheet({ run, className }: { run: A800RRSetupSheetRun;
   const dateLabel = run.createdAt ? formatRunCreatedAtDateWeekday(run.createdAt) : "";
   const carName = run.car?.name ?? run.carNameSnapshot ?? "";
   const sessionLabel = run.sessionLabel?.trim() || formatRunSessionDisplay(run);
-  const tiresLabel = run.tireSet
-    ? `${run.tireSet.label} · run ${run.tireRunNumber}`
+  const tiresLabel = run.tireType
+    ? `${run.tireType.displayName} · run ${run.tireRunNumber}${run.tireAgeKnown === false ? " (age unknown)" : ""}`
     : fieldValue(setupData, "tires_setup") || "";
 
   return (

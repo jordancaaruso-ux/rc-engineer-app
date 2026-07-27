@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Check, LocateFixed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -20,11 +21,11 @@ import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/set
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { RunLayoutPicker } from "@/components/runs/RunLayoutPicker";
-import { tireSetDisplayLine } from "@/lib/tires/tireSelectionFromSet";
+import { displayTireSelection } from "@/lib/tires/tireSelectionValue";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
-import { RunTireSelectionPanel, type NewTireSetIntent } from "@/components/runs/RunTireSelectionPanel";
+import { RunTireSelectionPanel, type TireStintValue } from "@/components/runs/RunTireSelectionPanel";
 import { RunAdditiveTimingPanel } from "@/components/runs/RunAdditiveTimingPanel";
 import { collectSetupSheetTemplateKeys } from "@/lib/setupSheetModels/collectTemplateKeys";
 import { applyRunContextToSetupSnapshot } from "@/lib/runs/applyRunContextToSetupSnapshot";
@@ -225,8 +226,14 @@ type LastRun = {
   trackLayout?: { id: string; name: string } | null;
   trackDirection?: "CW" | "CCW" | null;
   eventId: string | null;
-  tireSetId: string | null;
+  /** Dormant: legacy runs only. Tires are identified by compound + run count now. */
+  tireSetId?: string | null;
   tireRunNumber: number;
+  /** Stint the run belongs to — one continuous life of rubber. */
+  tireStintId?: string | null;
+  tireAgeKnown?: boolean | null;
+  tireTypeId?: string | null;
+  tireType?: { id: string; displayName: string } | null;
   additiveTypeId?: string | null;
   warmerTimingMinutes?: number | null;
   /** Ordered tire-prep applications (see src/lib/runs/tirePrep.ts); JSON on the run. */
@@ -235,16 +242,6 @@ type LastRun = {
   setupSnapshot: { id: string; data: unknown };
   event?: EventOption | null;
   track?: { id: string; name: string } | null;
-  tireSet?: {
-    id: string;
-    label: string;
-    setNumber?: number | null;
-    insertLabel?: string | null;
-    wheelLabel?: string | null;
-    specificModel?: string | null;
-    tireTypeId?: string | null;
-    tireType?: { id: string; displayName: string; modelCode: string } | null;
-  } | null;
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;
@@ -386,8 +383,10 @@ type NewRunDraftSnapshot = {
   trackLayoutId: string;
   trackDirection: "" | "CW" | "CCW";
   eventId: string;
-  tireSetId: string;
-  newTireSetIntent: NewTireSetIntent | null;
+  tireTypeId: string;
+  tireStintId: string | null;
+  tireAgeKnown: boolean;
+  runsCompleted: number;
   additiveTypeId: string;
   tirePrep: TirePrepStep[];
   setupData: SetupSnapshotData;
@@ -412,8 +411,7 @@ function newRunDraftHasContent(s: NewRunDraftSnapshot): boolean {
   return Boolean(
     s.trackId ||
       s.eventId ||
-      s.tireSetId ||
-      s.newTireSetIntent ||
+      s.tireTypeId ||
       s.additiveTypeId ||
       (s.tirePrep && tirePrepHasContent(s.tirePrep)) ||
       s.notes.trim() ||
@@ -557,10 +555,13 @@ export function NewRunForm(props: {
   const [trackDirection, setTrackDirection] = useState<"" | "CW" | "CCW">(
     wizard?.trackDirection ?? ""
   );
-  const [tireSets, setTireSets] = useState<TireSetOption[]>([]);
-  const [tireSetId, setTireSetId] = useState<string>("");
-  /** NEW-set choice — pure form state; the set row is created when the run is saved. */
-  const [newTireSetIntent, setNewTireSetIntent] = useState<NewTireSetIntent | null>(null);
+  /** Compound on the car. Tires are identified by run count, not by a named set. */
+  const [tireTypeId, setTireTypeId] = useState<string>("");
+  const [tireTypeName, setTireTypeName] = useState<string>("");
+  /** Stint the run belongs to; null means different rubber went on — the server mints a new one. */
+  const [tireStintId, setTireStintId] = useState<string | null>(null);
+  /** False when the driver said "not sure how many runs" (e.g. a set they were given). */
+  const [tireAgeKnown, setTireAgeKnown] = useState<boolean>(true);
   /** Compound the picker should activate (event spec tire); never forces a selection. */
   const [preferredTireType, setPreferredTireType] = useState<{
     id: string;
@@ -668,7 +669,7 @@ export function NewRunForm(props: {
         : 0;
     return firstUnfinishedStep({
       session: Boolean(r.trackId ?? r.track?.id ?? r.event?.trackId),
-      equipment: Boolean(r.tireSetId),
+      equipment: Boolean(r.tireTypeId ?? r.tireType?.id),
       prep:
         (Array.isArray(r.tirePrep) && r.tirePrep.length > 0) ||
         Boolean(r.additiveTypeId ?? r.additiveType?.id) ||
@@ -845,20 +846,60 @@ export function NewRunForm(props: {
   const [sessionExpanded, setSessionExpanded] = useState<boolean>(!initialDraftCollapsed);
   const [runDetailsExpanded, setRunDetailsExpanded] = useState<boolean>(!initialDraftCollapsed);
 
-  const tireSetIdRef = useRef(tireSetId);
-  tireSetIdRef.current = tireSetId;
-  const newTireSetIntentRef = useRef(newTireSetIntent);
-  newTireSetIntentRef.current = newTireSetIntent;
+  /** One-line tire identity for wizard summaries: compound plus how many runs are on it. */
+  const tireSummaryLine = useMemo(() => {
+    if (!tireTypeId) return "";
+    return displayTireSelection({
+      tireTypeId,
+      displayName: tireTypeName,
+      tireRunNumber: Math.max(1, runsCompleted + 1),
+      tireAgeKnown,
+    });
+  }, [tireTypeId, tireTypeName, runsCompleted, tireAgeKnown]);
+
+  const tireTypeIdRef = useRef(tireTypeId);
+  tireTypeIdRef.current = tireTypeId;
+  const tireTypeNameRef = useRef(tireTypeName);
+  tireTypeNameRef.current = tireTypeName;
   const additiveTypeIdRef = useRef(additiveTypeId);
   additiveTypeIdRef.current = additiveTypeId;
   const tirePrepRef = useRef(tirePrep);
   tirePrepRef.current = tirePrep;
-  const tireRunUserTouchedRef = useRef(false);
-  /** Clear NEW-set intent (ref synced immediately so snapshot writes in the same tick see it). */
-  const clearNewTireSetIntent = useCallback(() => {
-    setNewTireSetIntent(null);
-    newTireSetIntentRef.current = null;
-  }, []);
+  const runsCompletedRef = useRef(runsCompleted);
+  runsCompletedRef.current = runsCompleted;
+  const tireAgeKnownRef = useRef(tireAgeKnown);
+  tireAgeKnownRef.current = tireAgeKnown;
+  /**
+   * Adopt a stint wholesale — from the car's last run, a copy-forward, or an edit
+   * hydrate. Keeps the count, its known/unknown flag and the stint id together so
+   * they can never drift apart.
+   */
+  const applyTireStint = useCallback(
+    (next: { runsCompleted: number; ageKnown: boolean; stintId: string | null }) => {
+      setRunsCompleted(Math.max(0, Math.floor(next.runsCompleted)));
+      setTireAgeKnown(next.ageKnown);
+      setTireStintId(next.stintId);
+    },
+    []
+  );
+  /**
+   * Carry a run's tires onto the next one: same compound, same stint, one run
+   * older. This is the whole "still on the same tires" path — it costs the
+   * driver nothing, which is the point.
+   */
+  const carryTiresForward = useCallback(
+    (run: LastRun | null) => {
+      const typeId = run?.tireTypeId ?? run?.tireType?.id ?? "";
+      setTireTypeId(typeId);
+      setTireTypeName(run?.tireType?.displayName ?? "");
+      applyTireStint({
+        runsCompleted: typeId ? (run?.tireRunNumber ?? 0) : 0,
+        ageKnown: typeId ? (run?.tireAgeKnown ?? true) : true,
+        stintId: typeId ? (run?.tireStintId ?? null) : null,
+      });
+    },
+    [applyTireStint]
+  );
   /**
    * True once the driver has explicitly chosen/imported/edited a setup since the
    * last copy-from-last-run or car change. Guards the `replicateLast`-armed
@@ -880,7 +921,15 @@ export function NewRunForm(props: {
   >([]);
   const [trackAutoDetectMessage, setTrackAutoDetectMessage] = useState<string | null>(null);
   const [trackAutoDetectLoading, setTrackAutoDetectLoading] = useState(false);
-  const trackTabAutoDetectDoneRef = useRef(false);
+  /**
+   * Track the *auto* path filled in on mount, or null. Stored as an id (not a
+   * boolean) so the "Detected from location" caption and the Detect chip key on
+   * `trackId === autoDetectedTrackId` — any later change of selection restores the
+   * chip and drops the caption without extra bookkeeping.
+   */
+  const [autoDetectedTrackId, setAutoDetectedTrackId] = useState<string | null>(null);
+  /** Once-per-mount latch for the permission-gated auto-detect effect. */
+  const trackAutoDetectRanRef = useRef(false);
   const trackPickedManuallyRef = useRef(false);
   /** True once the user has hand-picked a layout/direction; suppresses event auto-fill. */
   const layoutPickedManuallyRef = useRef(false);
@@ -1011,15 +1060,19 @@ export function NewRunForm(props: {
 
     setEventId(r.eventId ?? "");
     setRaceClass((r.raceClass ?? "").trim());
-    setTireSetId(r.tireSetId ?? "");
-    clearNewTireSetIntent();
-    // `runsCompleted` is always the count of *prior* runs on this tire set —
+    setTireTypeId(r.tireTypeId ?? r.tireType?.id ?? "");
+    setTireTypeName(r.tireType?.displayName ?? "");
+    // `runsCompleted` is always the count of *prior* runs on this rubber —
     // save() sends `runsCompleted + 1`. When hydrating an existing run we want
     // that re-save to preserve the run's current tireRunNumber, not bump it,
     // so subtract one from the stored number. Before this fix, editing any
     // saved run (especially a draft being completed) added +1 to the tire
     // slot on every save, producing the "+2 per draft→complete cycle" behavior.
-    setRunsCompleted(Math.max(0, (r.tireRunNumber ?? 1) - 1));
+    applyTireStint({
+      runsCompleted: Math.max(0, (r.tireRunNumber ?? 1) - 1),
+      ageKnown: r.tireAgeKnown ?? true,
+      stintId: r.tireStintId ?? null,
+    });
     setAdditiveTypeId(r.additiveTypeId ?? r.additiveType?.id ?? "");
     {
       const steps =
@@ -1077,7 +1130,7 @@ export function NewRunForm(props: {
     // Setup sheet collapsed so the user sees the draft-resume summary
     // with diff rows, and can hit Edit only if something needs to change.
     setSetupSectionExpanded(false);
-  }, [editRun, carsList, clearNewTireSetIntent]);
+  }, [editRun, carsList, applyTireStint]);
 
   useEffect(() => {
     const p = dashboardPrefill;
@@ -1218,9 +1271,13 @@ export function NewRunForm(props: {
     }
 
     setEventId(r.eventId ?? "");
-    setTireSetId(r.tireSetId ?? "");
-    clearNewTireSetIntent();
-    setRunsCompleted(r.tireRunNumber ?? 0);
+    setTireTypeId(r.tireTypeId ?? r.tireType?.id ?? "");
+    setTireTypeName(r.tireType?.displayName ?? "");
+    applyTireStint({
+      runsCompleted: r.tireRunNumber ?? 0,
+      ageKnown: r.tireAgeKnown ?? true,
+      stintId: r.tireStintId ?? null,
+    });
     if (typeof r.practiceDayUrl === "string") setPracticeDayUrl(r.practiceDayUrl);
 
     const nextSetup = setupSnapshotWithDerived(r.setupSnapshot?.data);
@@ -1231,7 +1288,7 @@ export function NewRunForm(props: {
     setNotes("");
     setLapIngest(defaultLapIngestValue());
     setReplicateLast(false);
-  }, [dashboardPrefill, carsList, clearNewTireSetIntent]);
+  }, [dashboardPrefill, carsList, applyTireStint]);
 
   /**
    * Roll Center Lab export: merge the Lab's geometry field values over whatever
@@ -1282,8 +1339,14 @@ export function NewRunForm(props: {
         if (s.trackDirection === "" || s.trackDirection === "CW" || s.trackDirection === "CCW")
           setTrackDirection(s.trackDirection);
         if (typeof s.eventId === "string") setEventId(s.eventId);
-        if (typeof s.tireSetId === "string") setTireSetId(s.tireSetId);
-        if (s.newTireSetIntent !== undefined) setNewTireSetIntent(s.newTireSetIntent);
+        if (typeof s.tireTypeId === "string") setTireTypeId(s.tireTypeId);
+        if (typeof s.runsCompleted === "number" || s.tireStintId !== undefined) {
+          applyTireStint({
+            runsCompleted: typeof s.runsCompleted === "number" ? s.runsCompleted : 0,
+            ageKnown: s.tireAgeKnown ?? true,
+            stintId: s.tireStintId ?? null,
+          });
+        }
         if (typeof s.additiveTypeId === "string") setAdditiveTypeId(s.additiveTypeId);
         if (Array.isArray(s.tirePrep)) {
           setTirePrep(normalizeTirePrep(s.tirePrep));
@@ -1321,8 +1384,10 @@ export function NewRunForm(props: {
       trackLayoutId,
       trackDirection,
       eventId,
-      tireSetId,
-      newTireSetIntent,
+      tireTypeId,
+      tireStintId,
+      tireAgeKnown,
+      runsCompleted,
       additiveTypeId,
       tirePrep,
       setupData,
@@ -1363,8 +1428,10 @@ export function NewRunForm(props: {
     trackLayoutId,
     trackDirection,
     eventId,
-    tireSetId,
-    newTireSetIntent,
+    tireTypeId,
+    tireStintId,
+    tireAgeKnown,
+    runsCompleted,
     additiveTypeId,
     tirePrep,
     setupData,
@@ -1416,27 +1483,27 @@ export function NewRunForm(props: {
   );
   const applyRunContextToSetupSnapshotLocal = useCallback(
     (
-      nextTireSetId: string,
+      nextTireTypeId: string,
+      nextRunsCompleted: number,
+      nextAgeKnown: boolean,
       nextAdditiveTypeId: string,
       nextTirePrep: TirePrepStep[]
     ) => {
-      // NEW-set intent has no row yet — a synthetic set keeps the sheet's tire line honest.
-      const intent = newTireSetIntentRef.current;
-      const tire = nextTireSetId
-        ? tireSets.find((t) => t.id === nextTireSetId) ?? null
-        : intent
-          ? {
-              label: intent.displayName,
-              tireType: { id: intent.tireTypeId, displayName: intent.displayName, modelCode: "" },
-            }
-          : null;
+      const tire = nextTireTypeId
+        ? {
+            tireTypeId: nextTireTypeId,
+            displayName: tireTypeNameRef.current,
+            tireRunNumber: Math.max(1, nextRunsCompleted + 1),
+            tireAgeKnown: nextAgeKnown,
+          }
+        : null;
       const additive =
         nextAdditiveTypeId ? additiveTypesById[nextAdditiveTypeId] ?? null : null;
       setSetupData((prev) => {
         const next = applyRunContextToSetupSnapshot({
           resolvedData: prev,
           sheetKeys: sheetFieldKeys,
-          tireSet: tire,
+          tire,
           additiveDisplayName: additive?.displayName ?? null,
           warmerTimingMinutes: derivedWarmerTimingMinutes(nextTirePrep),
         });
@@ -1444,20 +1511,14 @@ export function NewRunForm(props: {
         return applyDerivedFieldsToSnapshot(next);
       });
     },
-    [tireSets, additiveTypesById, sheetFieldKeys]
+    [additiveTypesById, sheetFieldKeys]
   );
-
-  function applyTiresToSetupSnapshot(nextTireSetId: string) {
-    applyRunContextToSetupSnapshotLocal(
-      nextTireSetId,
-      additiveTypeIdRef.current,
-      tirePrepRef.current
-    );
-  }
 
   function applyAdditiveTimingToSetupSnapshot(nextAdditiveTypeId: string, nextTirePrep: TirePrepStep[]) {
     applyRunContextToSetupSnapshotLocal(
-      tireSetIdRef.current,
+      tireTypeIdRef.current,
+      runsCompletedRef.current,
+      tireAgeKnownRef.current,
       nextAdditiveTypeId,
       nextTirePrep
     );
@@ -1465,16 +1526,19 @@ export function NewRunForm(props: {
 
 
   // Deterministic sync: snapshot tires/additive always mirror run context selections.
-  // `newTireSetIntent` is read via ref inside the callback; it's a dep so intent toggles re-sync.
   useEffect(() => {
     applyRunContextToSetupSnapshotLocal(
-      tireSetId,
+      tireTypeId,
+      runsCompleted,
+      tireAgeKnown,
       additiveTypeId,
       tirePrep
     );
   }, [
-    tireSetId,
-    newTireSetIntent,
+    tireTypeId,
+    tireTypeName,
+    runsCompleted,
+    tireAgeKnown,
     additiveTypeId,
     tirePrep,
     applyRunContextToSetupSnapshotLocal,
@@ -1629,76 +1693,138 @@ export function NewRunForm(props: {
     [tracksList]
   );
 
-  const runTrackAutoDetect = useCallback(async () => {
-    if (isEditing || trackLockedToEvent || trackPickedManuallyRef.current) return;
-    if (tracksList.filter((t) => trackHasMarkedLocation(t)).length === 0) {
-      setTrackAutoDetectMessage(
-        "No tracks have GPS saved yet. Open Track library to paste coordinates from Google Maps, then try again."
-      );
+  /**
+   * `mode: "auto"` is the silent mount path (permission already granted) — it
+   * prefills the picker and says nothing on failure, so a bad GPS fix never
+   * shouts at a driver who didn't ask. `"manual"` is the Detect chip and keeps
+   * the full messaging, including the Track library hints.
+   */
+  const runTrackAutoDetect = useCallback(
+    async (mode: "auto" | "manual" = "manual") => {
+      const silent = mode === "auto";
+      if (isEditing || trackLockedToEvent || trackPickedManuallyRef.current) return;
+      if (tracksList.filter((t) => trackHasMarkedLocation(t)).length === 0) {
+        if (!silent) {
+          setTrackAutoDetectMessage(
+            "No tracks have GPS saved yet. Open Track library to paste coordinates from Google Maps, then try again."
+          );
+        }
+        return;
+      }
+      setTrackAutoDetectLoading(true);
+      setTrackAutoDetectMessage(null);
+      setNearbyTrackSuggestions([]);
+      try {
+        const position = await getCurrentPosition();
+        const pick = pickTrackFromPosition(tracksList, position, {
+          radiusMeters: DEFAULT_TRACK_PROXIMITY_RADIUS_M,
+          favouriteTrackIds,
+        });
+        if (pick.kind === "no_marked_tracks") {
+          if (!silent) {
+            setTrackAutoDetectMessage(
+              "No tracks have GPS saved yet. Open Track library to paste coordinates from Google Maps, then try again."
+            );
+          }
+          return;
+        }
+        if (pick.kind === "single") {
+          if (silent) {
+            // Re-check: a manual pick or event apply can land during the await.
+            if (trackPickedManuallyRef.current) return;
+            let applied = false;
+            setTrackId((prev) => {
+              if (prev.trim()) return prev;
+              applied = true;
+              return pick.track.id;
+            });
+            if (applied) {
+              setCopyTrackWarning(null);
+              setAutoDetectedTrackId(pick.track.id);
+            }
+            return;
+          }
+          setTrackId(pick.track.id);
+          setCopyTrackWarning(null);
+          setTrackAutoDetectMessage(`Detected ${pick.track.name} (${Math.round(pick.distanceM)} m away).`);
+          return;
+        }
+        if (pick.kind === "multiple") {
+          const favSet = new Set(favouriteTrackIds);
+          setNearbyTrackSuggestions(
+            pick.nearby.map((n) => ({
+              trackId: n.track.id,
+              trackName: n.track.name,
+              distanceM: n.distanceM,
+              isFavourite: favSet.has(n.track.id),
+            }))
+          );
+          // Auto path stays quiet — TrackNearbySuggestions labels itself.
+          if (!silent) {
+            setTrackAutoDetectMessage("Multiple tracks nearby — pick one below (favourites listed first).");
+          }
+          return;
+        }
+        if (!silent) {
+          setTrackAutoDetectMessage(
+            "No saved track is within 800 m. Select manually or set GPS on a track in Track library."
+          );
+        }
+      } catch (e) {
+        if (silent) return;
+        if (e instanceof GeolocationRequestError) {
+          const hint =
+            e.code === "denied"
+              ? " Enable location in browser settings, then tap Detect from location."
+              : "";
+          setTrackAutoDetectMessage(e.message + hint);
+        } else {
+          setTrackAutoDetectMessage(
+            e instanceof Error ? e.message : "Could not detect track from location."
+          );
+        }
+      } finally {
+        setTrackAutoDetectLoading(false);
+      }
+    },
+    [isEditing, trackLockedToEvent, tracksList, favouriteTrackIds]
+  );
+
+  /**
+   * Quiet prefill on mount (founder decision 2026-07-27): if location permission
+   * is *already* granted, detect the track silently so the common case — standing
+   * at the track you always run at — needs zero taps. Never prompts: an ungranted
+   * or unknown permission state leaves this inert and the Detect chip owns asking.
+   * Replaces the two older ungated effects (classic mount + Track-tab open), which
+   * could throw the browser location prompt at a driver who never asked for it.
+   * Runs in both wizard and classic mode. The 800 ms delay plus the full dep list
+   * means any prefill that lands first (draft restore, event apply) wins the guard
+   * and cancels the pending timer.
+   */
+  useEffect(() => {
+    if (trackAutoDetectRanRef.current) return;
+    if (isEditing || trackLockedToEvent) return;
+    if (trackId.trim() || trackPickedManuallyRef.current) return;
+    if (typeof navigator === "undefined" || typeof navigator.permissions?.query !== "function") {
+      // Older WebKit / Capacitor shell: no permissions API — manual only.
       return;
     }
-    setTrackAutoDetectLoading(true);
-    setTrackAutoDetectMessage(null);
-    setNearbyTrackSuggestions([]);
-    try {
-      const position = await getCurrentPosition();
-      const pick = pickTrackFromPosition(tracksList, position, {
-        radiusMeters: DEFAULT_TRACK_PROXIMITY_RADIUS_M,
-        favouriteTrackIds,
-      });
-      if (pick.kind === "no_marked_tracks") {
-        setTrackAutoDetectMessage(
-          "No tracks have GPS saved yet. Open Track library to paste coordinates from Google Maps, then try again."
-        );
-        return;
-      }
-      if (pick.kind === "single") {
-        setTrackId(pick.track.id);
-        setCopyTrackWarning(null);
-        setTrackAutoDetectMessage(`Detected ${pick.track.name} (${Math.round(pick.distanceM)} m away).`);
-        return;
-      }
-      if (pick.kind === "multiple") {
-        const favSet = new Set(favouriteTrackIds);
-        setNearbyTrackSuggestions(
-          pick.nearby.map((n) => ({
-            trackId: n.track.id,
-            trackName: n.track.name,
-            distanceM: n.distanceM,
-            isFavourite: favSet.has(n.track.id),
-          }))
-        );
-        setTrackAutoDetectMessage("Multiple tracks nearby — pick one below (favourites listed first).");
-        return;
-      }
-      setTrackAutoDetectMessage(
-        "No saved track is within 800 m. Select manually or set GPS on a track in Track library."
-      );
-    } catch (e) {
-      if (e instanceof GeolocationRequestError) {
-        const hint =
-          e.code === "denied"
-            ? " Enable location in browser settings, then tap Detect from location."
-            : "";
-        setTrackAutoDetectMessage(e.message + hint);
-      } else {
-        setTrackAutoDetectMessage(
-          e instanceof Error ? e.message : "Could not detect track from location."
-        );
-      }
-    } finally {
-      setTrackAutoDetectLoading(false);
-    }
-  }, [isEditing, trackLockedToEvent, tracksList, favouriteTrackIds]);
-
-  useEffect(() => {
-    if (isEditing || trackLockedToEvent || wizardActive) return;
-    if (trackId.trim() || trackPickedManuallyRef.current) return;
     const t = window.setTimeout(() => {
-      void runTrackAutoDetect();
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then((status) => {
+          if (trackAutoDetectRanRef.current) return;
+          if (status.state !== "granted") return;
+          if (trackPickedManuallyRef.current) return;
+          trackAutoDetectRanRef.current = true;
+          void runTrackAutoDetect("auto");
+        })
+        .catch(() => {
+          // Safari < 16 throws on { name: "geolocation" } — treat as not granted.
+        });
     }, 800);
     return () => window.clearTimeout(t);
-  }, [isEditing, trackLockedToEvent, wizardActive, trackId, tracksGpsFingerprint, runTrackAutoDetect]);
+  }, [isEditing, trackLockedToEvent, trackId, tracksGpsFingerprint, runTrackAutoDetect]);
 
   // Effortless capture: silently pull conditions for a pinned track as soon as
   // one is selected — no permission prompt, no need to open the Conditions tab.
@@ -1736,14 +1862,6 @@ export function NewRunForm(props: {
     };
   }, [isEditing, wizardActive, conditions, trackId, trackLockedToEvent, selectedEventForRun, tracksList, lapIngest]);
 
-  useEffect(() => {
-    if (runDetailsTab !== "track") return;
-    if (isEditing || trackLockedToEvent || trackPickedManuallyRef.current || trackId.trim()) return;
-    if (trackTabAutoDetectDoneRef.current) return;
-    trackTabAutoDetectDoneRef.current = true;
-    void runTrackAutoDetect();
-  }, [runDetailsTab, isEditing, trackLockedToEvent, trackId, runTrackAutoDetect]);
-
   function applyEventOption(ev: EventOption) {
     setEventId(ev.id);
     setEventError(null);
@@ -1761,8 +1879,6 @@ export function NewRunForm(props: {
     if (sessionType === "RACE_MEETING" && ev.controlledTireTypeId) {
       // Spec-tire event: steer the picker to that compound. Never forces NEW — the
       // driver's most recent set of the spec compound is usually the right pick.
-      setTireSetId("");
-      clearNewTireSetIntent();
       const display = ev.controlledTireType?.displayName ?? ev.controlledTireLabel ?? "";
       if (display) {
         setPreferredTireType({ id: ev.controlledTireTypeId, displayName: display });
@@ -2250,22 +2366,6 @@ export function NewRunForm(props: {
     return () => window.clearTimeout(t);
   }, [setupData, carId]);
 
-  // All user-owned tire sets (includes assets with zero runs — not car-scoped).
-  useEffect(() => {
-    let alive = true;
-    jsonFetch<{ tireSets: TireSetOption[] }>(`/api/tire-sets`)
-      .then(({ tireSets }) => {
-        if (!alive) return;
-        setTireSets((prev) => mergeUniqueById(prev, tireSets ?? []));
-      })
-      .catch(() => {
-        /* keep in-session additions */
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   useEffect(() => {
     if (!carId) {
       setReplicateLoaded(true);
@@ -2286,12 +2386,10 @@ export function NewRunForm(props: {
 
     (async () => {
       try {
-        const [{ tireSets }, { lastRun }] = await Promise.all([
-          jsonFetch<{ tireSets: TireSetOption[] }>(`/api/tire-sets`),
-          jsonFetch<{ lastRun: LastRun | null }>(`/api/runs/last?carId=${carId}`),
-        ]);
+        const { lastRun } = await jsonFetch<{ lastRun: LastRun | null }>(
+          `/api/runs/last?carId=${carId}`
+        );
         if (!alive) return;
-        setTireSets((prev) => mergeUniqueById(prev, tireSets ?? []));
         setLastRun(lastRun);
 
         if (pendingSwap) {
@@ -2302,12 +2400,7 @@ export function NewRunForm(props: {
           if (plan.rederiveTiresPrep) {
             // Cross-class: this class's wheels don't bolt on — load the new
             // car's own last tires + prep (blank when it has no history).
-            const prevTireId = lastRun?.tireSetId ?? "";
-            const validTireId =
-              prevTireId && tireSets.some((ts) => ts.id === prevTireId) ? prevTireId : "";
-            setTireSetId(validTireId);
-            clearNewTireSetIntent();
-            setRunsCompleted(validTireId ? (lastRun?.tireRunNumber ?? 0) : 0);
+            carryTiresForward(lastRun);
             setAdditiveTypeId(lastRun?.additiveTypeId ?? "");
             setTirePrep(
               lastRun && Array.isArray(lastRun.tirePrep) ? normalizeTirePrep(lastRun.tirePrep) : []
@@ -2355,11 +2448,7 @@ export function NewRunForm(props: {
           }
           const prevEventId = lastRun.eventId ?? "";
           setEventId(prevEventId);
-          const prevTireId = lastRun.tireSetId ?? "";
-          const validTireId = prevTireId && tireSets.some((ts) => ts.id === prevTireId) ? prevTireId : "";
-          setTireSetId(validTireId);
-          clearNewTireSetIntent();
-          setRunsCompleted(validTireId ? (lastRun.tireRunNumber ?? 0) : 0);
+          carryTiresForward(lastRun);
           if (typeof lastRun.practiceDayUrl === "string" && lastRun.practiceDayUrl.trim()) {
             setPracticeDayUrl(lastRun.practiceDayUrl);
           }
@@ -2387,7 +2476,7 @@ export function NewRunForm(props: {
     return () => {
       alive = false;
     };
-  }, [carId, replicateLast, clearNewTireSetIntent]);
+  }, [carId, replicateLast, carryTiresForward]);
 
   // replicateLast still powers "copy from last run for this car" behavior after the initial copy decision.
   useEffect(() => {
@@ -2413,10 +2502,7 @@ export function NewRunForm(props: {
       setMeetingSessionCustom("");
     }
     setEventId(lastRun.eventId ?? "");
-    const prevTireId = lastRun.tireSetId ?? "";
-    setTireSetId(prevTireId);
-    clearNewTireSetIntent();
-    setRunsCompleted(prevTireId ? (lastRun.tireRunNumber ?? 0) : 0);
+    carryTiresForward(lastRun);
     if (typeof lastRun.practiceDayUrl === "string" && lastRun.practiceDayUrl.trim()) {
       setPracticeDayUrl(lastRun.practiceDayUrl);
     }
@@ -2429,7 +2515,7 @@ export function NewRunForm(props: {
       setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
       setSetupBaselineData(cloneSetupSnapshot(nextSetup));
     }
-  }, [replicateLast, lastRun, carId, clearNewTireSetIntent]);
+  }, [replicateLast, lastRun, carId, carryTiresForward]);
 
   // Wizard page-1 identity (session, event, track) must win over the continued
   // run's values — the replicate effects above copy the last run's context, so
@@ -2685,17 +2771,10 @@ export function NewRunForm(props: {
       setCopyTrackWarning(null);
     }
 
-    const nextTireId = r.tireSetId || r.tireSet?.id || "";
-    if (nextTireId && tireSets.some((ts) => ts.id === nextTireId)) {
-      setTireSetId(nextTireId);
-      clearNewTireSetIntent();
-      setRunsCompleted(r.tireRunNumber ?? 0);
-      setCopyTireWarning(null);
+    setCopyTireWarning(null);
+    if (r.tireTypeId || r.tireType?.id) {
+      carryTiresForward(r);
       highlights.tires = true;
-    } else if (r.tireSet?.label) {
-      setCopyTireWarning(`Last run used tire set that no longer exists: ${r.tireSet.label}. You can select a current set.`);
-    } else {
-      setCopyTireWarning(null);
     }
 
     const nextAdditiveId = r.additiveTypeId ?? r.additiveType?.id ?? "";
@@ -2780,44 +2859,6 @@ export function NewRunForm(props: {
   useEffect(() => {
     return () => setBridgeRef.current?.(null);
   }, []);
-
-  useEffect(() => {
-    tireRunUserTouchedRef.current = false;
-  }, [tireSetId]);
-
-  useEffect(() => {
-    if (!tireSetId) return;
-    const id = tireSetId;
-    let alive = true;
-
-    if (isEditing && editRun && id === (editRun.tireSetId ?? "")) {
-      if (!tireRunUserTouchedRef.current) {
-        setRunsCompleted(Math.max(0, (editRun.tireRunNumber ?? 1) - 1));
-      }
-      return;
-    }
-
-    // New run or edit with a different tire set than the saved run: next slot from completed history.
-    const excludeParam = editRun?.id
-      ? `&excludeRunId=${encodeURIComponent(editRun.id)}`
-      : "";
-    jsonFetch<{ lastTireRunNumber: number | null }>(
-      `/api/runs/last-tire-run-number?tireSetId=${encodeURIComponent(id)}${excludeParam}`
-    )
-      .then(({ lastTireRunNumber }) => {
-        if (!alive || tireSetIdRef.current !== id) return;
-        if (tireRunUserTouchedRef.current) return;
-        setRunsCompleted(lastTireRunNumber ?? 0);
-      })
-      .catch(() => {
-        if (!alive || tireSetIdRef.current !== id) return;
-        if (tireRunUserTouchedRef.current) return;
-        setRunsCompleted(0);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [tireSetId, editRun?.id, isEditing, editRun?.tireSetId, editRun?.tireRunNumber]);
 
   async function createEvent(e?: React.MouseEvent) {
     e?.preventDefault();
@@ -3162,10 +3203,10 @@ export function NewRunForm(props: {
         lapTimes = parseLapTimes(lapIngest.manualText);
       }
       const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
-      const { run, tireSet: createdTireSet, promptMarkTrackLocation } = await jsonFetch<{
+      const { run, tireStintId: savedStintId, promptMarkTrackLocation } = await jsonFetch<{
         run: { id: string; createdAt: string };
-        /** Present when the server minted a NEW set for this run (create-on-save). */
-        tireSet?: TireSetOption | null;
+        /** The stint the run landed on — freshly minted when the client sent null. */
+        tireStintId?: string | null;
         promptMarkTrackLocation?: { trackId: string; trackName: string } | null;
       }>("/api/runs", {
         method: isEditing ? "PUT" : "POST",
@@ -3185,17 +3226,11 @@ export function NewRunForm(props: {
           trackId: resolvedTrackId || null,
           trackLayoutId: trackLayoutId || null,
           trackDirection: trackDirection || null,
-          tireSetId: tireSetId || null,
-          // v2 create-on-save: a NEW-set choice materializes only when the run persists;
-          // nudged prior runs land as the set's initialRunCount so derived counts stay right.
-          newTireSet:
-            !tireSetId && newTireSetIntent
-              ? {
-                  tireTypeId: newTireSetIntent.tireTypeId,
-                  initialRunCount: Math.max(0, Math.floor(runsCompleted)),
-                  mark: newTireSetIntent.mark ?? null,
-                }
-              : undefined,
+          tireTypeId: tireTypeId || null,
+          // A null stint means different rubber went on — the server mints a fresh
+          // id. Carrying one forward is what makes "same tires" cost zero taps.
+          tireStintId: tireStintId,
+          tireAgeKnown,
           tireRunNumber: Math.max(1, runsCompleted + 1),
           additiveTypeId: additiveTypeId || null,
           tirePrep: pruneTirePrepForSave(tirePrep),
@@ -3292,14 +3327,9 @@ export function NewRunForm(props: {
         })
       });
 
-      // Adopt the server-minted set immediately: any follow-up save must link the same
-      // set, never create a second one.
-      if (createdTireSet?.id) {
-        const minted = createdTireSet;
-        setTireSets((prev) => (prev.some((t) => t.id === minted.id) ? prev : [minted, ...prev]));
-        setTireSetId(minted.id);
-        clearNewTireSetIntent();
-      }
+      // Adopt the server-minted stint immediately: a follow-up save must stay on the
+      // same rubber rather than minting a second stint for the same tires.
+      if (savedStintId) setTireStintId(savedStintId);
 
       if (intent === "completed" && promptMarkTrackLocation) {
         setTrackLocationPrompt({
@@ -3494,7 +3524,7 @@ export function NewRunForm(props: {
       done: Boolean(carId && trackId),
       attention: trackSaveWarning && !trackId,
     },
-    equipment: { done: Boolean(tireSetId || newTireSetIntent) },
+    equipment: { done: Boolean(tireTypeId) },
     prep: { done: wizardPrepIn },
     setup: {
       done: setupBaselineData != null || Object.keys(setupData).length > 0,
@@ -3512,8 +3542,7 @@ export function NewRunForm(props: {
     isEditing ||
     Boolean(
       trackId ||
-        tireSetId ||
-        newTireSetIntent ||
+        tireTypeId ||
         tirePrep.length > 0 ||
         additiveTypeId ||
         Object.keys(setupData).length > 0 ||
@@ -3644,12 +3673,7 @@ export function NewRunForm(props: {
       setTrackAutoDetectMessage(null);
     }
     // Tires.
-    const prevTireId = lastRun.tireSetId ?? "";
-    const validTireId =
-      prevTireId && tireSets.some((ts) => ts.id === prevTireId) ? prevTireId : "";
-    setTireSetId(validTireId);
-    clearNewTireSetIntent();
-    setRunsCompleted(validTireId ? (lastRun.tireRunNumber ?? 0) : 0);
+    carryTiresForward(lastRun);
     // Prep + additive (legacy warmer minutes fall back like the classic copy).
     const nextAdditiveId = lastRun.additiveTypeId ?? lastRun.additiveType?.id ?? "";
     setAdditiveTypeId(nextAdditiveId);
@@ -3711,7 +3735,8 @@ export function NewRunForm(props: {
     return {
       session: sessionUnchanged,
       car: carId === wizardAppliedPlan.carId,
-      tires: Boolean(tireSetId) && !newTireSetIntent && tireSetId === (lastRun?.tireSetId ?? ""),
+      tires:
+        Boolean(tireTypeId) && tireStintId != null && tireStintId === (lastRun?.tireStintId ?? null),
       prep:
         wizardPrepIn &&
         lastRun != null &&
@@ -3756,13 +3781,8 @@ export function NewRunForm(props: {
         {
           key: "tires",
           label: "Tires",
-          value: (() => {
-            const t = tireSets.find((x) => x.id === tireSetId);
-            if (t) return tireSetDisplayLine(t);
-            if (newTireSetIntent) return `${newTireSetIntent.displayName} · new set`;
-            return "not set";
-          })(),
-          state: tireSetId || newTireSetIntent ? "ok" : "miss",
+          value: tireSummaryLine || "not set",
+          state: tireTypeId ? "ok" : "miss",
           prefilled: wizardPrefilled.tires,
           go: "equipment",
         },
@@ -3908,8 +3928,13 @@ export function NewRunForm(props: {
             key: "tires",
             label: "Tires",
             value: lastRun
-              ? lastRun.tireSet
-                ? tireSetDisplayLine(lastRun.tireSet)
+              ? lastRun.tireTypeId || lastRun.tireType
+                ? displayTireSelection({
+                    tireTypeId: lastRun.tireTypeId ?? lastRun.tireType?.id ?? "",
+                    displayName: lastRun.tireType?.displayName,
+                    tireRunNumber: lastRun.tireRunNumber,
+                    tireAgeKnown: lastRun.tireAgeKnown ?? true,
+                  })
                 : "—"
               : "…",
           },
@@ -3952,21 +3977,20 @@ export function NewRunForm(props: {
     (lastRun != null ||
       (!replicateLoaded && props.wizardCandidate != null && props.wizardCandidate.carId === carId));
 
+  /** True while the picker still holds what the silent auto-detect chose. */
+  const trackAutoDetected = autoDetectedTrackId !== null && trackId === autoDetectedTrackId;
+
   /** Track picker section — the classic Run-details "Track" face; the wizard
    *  renders it inside the unified Session card instead (v6). Lifted like
    *  prepPanelJsx so both modes share one source. */
   const trackPanelJsx = (
           <div className="space-y-3 pt-1">
             <div className="space-y-1 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <Eyebrow dot="muted">Track</Eyebrow>
-                <Link
-                  href="/tracks"
-                  className="btn-surface px-2 py-1 text-[11px]"
-                >
-                  Track library
-                </Link>
-              </div>
+              {/* Header is the label alone (2026-07-27): the Track library chip was
+                  navigation competing with the two real actions, and it broke the
+                  Eyebrow's hairline. The library is still linked from the detect
+                  failure message below — its one genuinely useful moment. */}
+              <Eyebrow dot="muted">Track</Eyebrow>
               {trackLockedToEvent ? (
                 <div className="inset-panel-deep px-3 py-2 text-sm text-foreground">
                   {(() => {
@@ -3992,6 +4016,7 @@ export function NewRunForm(props: {
                       setCopyTrackWarning(null);
                       setNearbyTrackSuggestions([]);
                       setTrackAutoDetectMessage(null);
+                      setAutoDetectedTrackId(null);
                     }}
                     lastRunTrackId={lastRun?.trackId ?? null}
                     favouriteTrackIds={favouriteTrackIds}
@@ -4001,14 +4026,30 @@ export function NewRunForm(props: {
                   />
                   {!isEditing ? (
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        className="btn-surface px-2.5 py-1 text-[11px] font-medium disabled:opacity-60"
-                        disabled={trackAutoDetectLoading}
-                        onClick={() => void runTrackAutoDetect()}
-                      >
-                        {trackAutoDetectLoading ? "Detecting…" : "Detect from location"}
-                      </button>
+                      {/* Detect earned its keep by disappearing: on a granted-permission
+                          mount the auto path has already filled the picker, so the chip
+                          gives way to the caption. It comes back the moment the
+                          selection changes to anything the auto path didn't choose. */}
+                      {trackAutoDetected ? (
+                        <span className="flex min-h-8 items-center gap-1 text-[11px] text-muted-foreground">
+                          <Check
+                            aria-hidden
+                            className="size-3.5 text-[#4FD089]"
+                            strokeWidth={2.5}
+                          />
+                          Detected from location
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                          disabled={trackAutoDetectLoading}
+                          onClick={() => void runTrackAutoDetect("manual")}
+                        >
+                          <LocateFixed aria-hidden className="size-3.5" />
+                          {trackAutoDetectLoading ? "Detecting…" : "Detect from location"}
+                        </button>
+                      )}
                       <InlineNewTrackRow
                         onCreated={(t) => {
                           setTracksList((prev) =>
@@ -4023,6 +4064,7 @@ export function NewRunForm(props: {
                           setCopyTrackWarning(null);
                           setNearbyTrackSuggestions([]);
                           setTrackAutoDetectMessage(null);
+                          setAutoDetectedTrackId(null);
                         }}
                       />
                       {trackAutoDetectMessage ? (
@@ -4051,6 +4093,7 @@ export function NewRunForm(props: {
                       setCopyTrackWarning(null);
                       setNearbyTrackSuggestions([]);
                       setTrackAutoDetectMessage(null);
+                      setAutoDetectedTrackId(null);
                     }}
                   />
                 </div>
@@ -4737,12 +4780,7 @@ export function NewRunForm(props: {
             <span className="text-muted-foreground">Tires</span>
             <span className="min-w-0 truncate text-foreground/90">
               {(() => {
-                const t = tireSets.find((x) => x.id === tireSetId);
-                const base = t
-                  ? tireSetDisplayLine(t)
-                  : newTireSetIntent
-                    ? `${newTireSetIntent.displayName} · new set`
-                    : "—";
+                const base = tireSummaryLine || "—";
                 const extras: string[] = [];
                 const additive = formatTirePrepLine(
                   tirePrep,
@@ -4820,46 +4858,21 @@ export function NewRunForm(props: {
               content: (
           <div className="space-y-3 pt-1">
             <RunTireSelectionPanel
-              tireSets={tireSets}
-              tireSetId={tireSetId}
-              onSelectExistingSet={(nextId, ts) => {
-                setTireSetId(nextId);
-                clearNewTireSetIntent();
-                // Sets known only to the picker must land in the catalog so snapshot
-                // lookups (tires line on the sheet) resolve them.
-                if (ts) {
-                  setTireSets((prev) =>
-                    prev.some((t) => t.id === ts.id) ? prev : [ts, ...prev]
-                  );
-                }
-                applyTiresToSetupSnapshot(nextId);
+              tireTypeId={tireTypeId}
+              onTireTypeChange={(nextId, displayName) => {
+                const compoundChanged = nextId !== tireTypeIdRef.current;
+                setTireTypeId(nextId);
+                if (displayName != null) setTireTypeName(displayName);
+                // A different compound cannot be the same rubber, so the stint ends —
+                // but the count is left alone. Silently zeroing it is exactly the bug
+                // the old `runsCompleted = 0` default caused.
+                if (compoundChanged) setTireStintId(null);
                 setCopyTireWarning(null);
-              }}
-              newSetIntent={newTireSetIntent}
-              onNewSetIntentChange={(intent) => {
-                // Only a genuinely new compound resets the prior-run count; editing the mark
-                // on the same intent must preserve a Used-set count the driver already set.
-                const compoundChanged =
-                  (intent?.tireTypeId ?? null) !== (newTireSetIntentRef.current?.tireTypeId ?? null);
-                setNewTireSetIntent(intent);
-                newTireSetIntentRef.current = intent;
-                if (intent) {
-                  setTireSetId("");
-                  if (compoundChanged) {
-                    tireRunUserTouchedRef.current = false;
-                    setRunsCompleted(0);
-                  }
-                  setCopyTireWarning(null);
-                }
-                applyTiresToSetupSnapshot(intent ? "" : tireSetIdRef.current);
               }}
               preferredTireType={preferredTireType}
               specTireType={specTireType}
-              runsCompleted={runsCompleted}
-              onRunsCompletedChange={setRunsCompleted}
-              onRunsCompletedUserTouched={() => {
-                tireRunUserTouchedRef.current = true;
-              }}
+              value={{ runsCompleted, ageKnown: tireAgeKnown, stintId: tireStintId }}
+              onChange={applyTireStint}
               onPrefillClear={() => setPrefillHighlights((h) => (h ? { ...h, tires: false } : h))}
               copyTireWarning={copyTireWarning}
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}

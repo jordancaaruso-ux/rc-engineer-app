@@ -103,34 +103,23 @@ export default async function CarDetailPage(props: {
   });
 
   const tireRunRows = await prisma.run.findMany({
-    where: { userId: user.id, carId, tireSetId: { not: null } },
-    select: { tireSetId: true },
-  });
-  const tireIds = [...new Set(tireRunRows.map((r) => r.tireSetId!))];
-  const runsOnCarByTire = new Map<string, number>();
-  for (const r of tireRunRows) {
-    const id = r.tireSetId!;
-    runsOnCarByTire.set(id, (runsOnCarByTire.get(id) ?? 0) + 1);
-  }
-  const tireSetsOnCar =
-    tireIds.length > 0
-      ? await prisma.tireSet.findMany({
-          where: { userId: user.id, id: { in: tireIds } },
-          orderBy: [{ label: "asc" }, { setNumber: "asc" }],
-          select: { id: true, label: true, setNumber: true },
-        })
-      : [];
-  const latestTireRunGlobal = await prisma.run.findMany({
-    where: { userId: user.id, tireSetId: { in: tireIds } },
+    where: { userId: user.id, carId, tireTypeId: { not: null } },
     orderBy: { createdAt: "desc" },
-    select: { tireSetId: true, tireRunNumber: true },
+    select: { tireTypeId: true, tireRunNumber: true, tireType: { select: { displayName: true } } },
   });
-  const globalTireCount = new Map<string, number>();
-  for (const r of latestTireRunGlobal) {
-    if (r.tireSetId && !globalTireCount.has(r.tireSetId)) {
-      globalTireCount.set(r.tireSetId, r.tireRunNumber);
+  const runsOnCarByTire = new Map<string, number>();
+  /** Highest run count reached on this compound — a rough "how far you've taken it". */
+  const furthestRunByTire = new Map<string, number>();
+  const tireSetsOnCar: Array<{ id: string; label: string }> = [];
+  for (const r of tireRunRows) {
+    const id = r.tireTypeId!;
+    runsOnCarByTire.set(id, (runsOnCarByTire.get(id) ?? 0) + 1);
+    furthestRunByTire.set(id, Math.max(furthestRunByTire.get(id) ?? 0, r.tireRunNumber));
+    if (!tireSetsOnCar.some((t) => t.id === id)) {
+      tireSetsOnCar.push({ id, label: r.tireType?.displayName ?? "Tires" });
     }
   }
+  tireSetsOnCar.sort((a, b) => a.label.localeCompare(b.label));
 
   // Setup sheet models are global — never scope this read by userId.
   const modelRow = car.setupSheetModelId
@@ -225,7 +214,7 @@ export default async function CarDetailPage(props: {
             <Eyebrow>Tires used with this car</Eyebrow>
             {tireSetsOnCar.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No tire sets linked on runs for this car yet. Log a run and select a tire set.
+                No tires logged on runs for this car yet. Log a run and pick a compound.
               </p>
             ) : (
               <ul className="space-y-2 text-sm">
@@ -236,8 +225,8 @@ export default async function CarDetailPage(props: {
                   >
                     <span className="text-foreground">{ts.label}</span>
                     <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
-                      {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} on this car · set
-                      total {globalTireCount.get(ts.id) ?? "—"}
+                      {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} on this car ·
+                      taken to run {furthestRunByTire.get(ts.id) ?? "—"}
                     </span>
                   </li>
                 ))}

@@ -14,7 +14,7 @@ export type CopyPreviewRunRecord = Prisma.RunGetPayload<{
     trackId: true;
     trackNameSnapshot: true;
     eventId: true;
-    tireSetId: true;
+    tireTypeId: true;
     tireRunNumber: true;
     additiveTypeId: true;
     warmerTimingMinutes: true;
@@ -24,7 +24,9 @@ export type CopyPreviewRunRecord = Prisma.RunGetPayload<{
     bestLapSeconds: true;
     car: { select: { id: true; name: true } };
     track: { select: { id: true; name: true } };
-    tireSet: { select: { id: true; label: true; setNumber: true } };
+    tireType: { select: { id: true; displayName: true } };
+    tireStintId: true;
+    tireAgeKnown: true;
     additiveType: { select: { id: true; displayName: true; modelCode: true } };
     event: { select: { id: true; name: true } };
     setupSnapshot: { select: { id: true; data: true } };

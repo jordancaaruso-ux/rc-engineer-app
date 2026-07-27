@@ -91,7 +91,8 @@ test("applyRunHistoryPostFilters matches tire label in q", () => {
       handlingProblems: null,
       carNameSnapshot: null,
       trackNameSnapshot: null,
-      tireSet: { label: "Vaulk", setNumber: 2 },
+      tireType: { displayName: "Vaulk" },
+      tireRunNumber: 2,
     },
     {
       createdAt: new Date("2025-01-15T12:00:00Z"),
@@ -107,13 +108,14 @@ test("applyRunHistoryPostFilters matches tire label in q", () => {
       handlingProblems: null,
       carNameSnapshot: null,
       trackNameSnapshot: null,
-      tireSet: { label: "Sweep", setNumber: 1 },
+      tireType: { displayName: "Sweep" },
+      tireRunNumber: 1,
     },
   ];
   const filters = parseRunHistoryFilters({ q: "vaulk" });
   const out = applyRunHistoryPostFilters(runs, filters, "UTC");
   assert.equal(out.length, 1);
-  assert.equal(out[0]!.tireSet?.label, "Vaulk");
+  assert.equal(out[0]!.tireType?.displayName, "Vaulk");
 });
 
 test("applyRunHistoryPostFilters enforces lap bounds", () => {

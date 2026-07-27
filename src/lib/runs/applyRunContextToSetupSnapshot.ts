@@ -1,14 +1,20 @@
 import type { SetupSnapshotData } from "@/lib/runSetup";
-import { tireSelectionFromTireSet } from "@/lib/tires/tireSelectionFromSet";
+import { buildTireSelectionValue } from "@/lib/tires/tireSelectionValue";
 import { allTirePrepBooleanKeys } from "@/lib/tires/tirePrepFields";
 import { getBoolFromSetupString } from "@/lib/a800rrSetupRead";
 
-type TireSetForSnapshot = Parameters<typeof tireSelectionFromTireSet>[0];
+/** The compound on the car plus how many runs are on it — the whole tire identity. */
+export type TireContextForSnapshot = {
+  tireTypeId: string;
+  displayName: string;
+  tireRunNumber?: number | null;
+  tireAgeKnown?: boolean | null;
+};
 
 export type RunContextSnapshotInput = {
   resolvedData: SetupSnapshotData;
   sheetKeys: Set<string>;
-  tireSet: TireSetForSnapshot | null;
+  tire: TireContextForSnapshot | null;
   additiveDisplayName: string | null;
   warmerTimingMinutes: number | null;
 };
@@ -17,7 +23,10 @@ export type RunContextSnapshotInput = {
 export function applyRunContextToSetupSnapshot(input: RunContextSnapshotInput): SetupSnapshotData {
   const next: SetupSnapshotData = { ...input.resolvedData };
 
-  const tireValue = input.tireSet ? tireSelectionFromTireSet(input.tireSet) : undefined;
+  const tireValue =
+    input.tire && input.tire.tireTypeId.trim()
+      ? buildTireSelectionValue(input.tire)
+      : undefined;
   if (tireValue) {
     next.tires = tireValue;
   } else if ("tires" in next) {

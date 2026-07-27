@@ -17,7 +17,7 @@ function run(input: {
   notes?: string | null;
   laps?: number[];
   trackId?: string | null;
-  tireSetId?: string | null;
+  tireStintId?: string | null;
   tireRunNumber?: number;
 }): SetupOutcomeMemoryRunInput {
   return {
@@ -25,7 +25,7 @@ function run(input: {
     sortAt: new Date(`2026-01-${String(input.order).padStart(2, "0")}T00:00:00.000Z`),
     trackId: input.trackId ?? "track-1",
     eventId: "event-1",
-    tireSetId: input.tireSetId ?? "tire-1",
+    tireStintId: input.tireStintId ?? "tire-1",
     tireRunNumber: input.tireRunNumber ?? 1,
     lapTimes: input.laps ?? [10, 10.1, 10.2, 10.3, 10.4],
     lapSession: null,

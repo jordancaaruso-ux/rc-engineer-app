@@ -31,7 +31,9 @@ const pickerRunSelect = {
     select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true },
   },
   track: { select: { id: true, name: true } },
-  tireSet: { select: { id: true, label: true, setNumber: true } },
+  tireType: { select: { id: true, displayName: true } },
+    tireStintId: true,
+    tireAgeKnown: true,
   event: { select: { name: true } },
 } as const;
 

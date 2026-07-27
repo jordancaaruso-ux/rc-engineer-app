@@ -29,14 +29,14 @@ function clampText(s: string | null | undefined, max: number): string | null {
 }
 
 function buildTireContextLine(
-  primary: { tireSetId: string | null; tireRunNumber: number },
-  chrono: { tireSetId: string | null; tireRunNumber: number } | null
+  primary: { tireStintId: string | null; tireRunNumber: number },
+  chrono: { tireStintId: string | null; tireRunNumber: number } | null
 ): string | null {
-  if (!primary.tireSetId) return null;
-  if (!chrono?.tireSetId) {
+  if (!primary.tireStintId) return null;
+  if (!chrono?.tireStintId) {
     return `Linked tire set — this outing is run #${primary.tireRunNumber} on the set.`;
   }
-  if (chrono.tireSetId === primary.tireSetId) {
+  if (chrono.tireStintId === primary.tireStintId) {
     return `Same tire set as your immediate prior outing on this car: prior #${chrono.tireRunNumber} → this session #${primary.tireRunNumber}.`;
   }
   return `This session is run #${primary.tireRunNumber} on the linked tire set (your prior outing used a different set).`;
@@ -78,7 +78,7 @@ export type PreparedBetweenRunHintComputation = {
     suggestedPreRun: string | null;
     notes: string | null;
     driverNotes: string | null;
-    tireSetId: string | null;
+    tireStintId: string | null;
     tireRunNumber: number;
     id: string;
     carId: string;
@@ -130,7 +130,7 @@ export async function prepareBetweenRunHintComputation(
       suggestedPreRun: true,
       notes: true,
       driverNotes: true,
-      tireSetId: true,
+      tireStintId: true,
       tireRunNumber: true,
       carRating: true,
     },
@@ -150,7 +150,7 @@ export async function prepareBetweenRunHintComputation(
       carId: runMeta.carId,
       trackId: runMeta.trackId,
       eventId: runMeta.eventId,
-      tireSetId: runMeta.tireSetId,
+      tireStintId: runMeta.tireStintId,
       tireRunNumber: runMeta.tireRunNumber,
       createdAt: runMeta.createdAt,
       sessionCompletedAt: runMeta.sessionCompletedAt,
@@ -237,7 +237,7 @@ export async function prepareBetweenRunHintComputation(
     suggestedChangesPreview: clampText(runMeta.suggestedChanges, 420),
     suggestedPreRunPreview: clampText(runMeta.suggestedPreRun, 420),
     tireContextLine: buildTireContextLine(
-      { tireSetId: runMeta.tireSetId, tireRunNumber: runMeta.tireRunNumber },
+      { tireStintId: runMeta.tireStintId, tireRunNumber: runMeta.tireRunNumber },
       chronoPreviousTireMeta
     ),
     hintSessionBrief: sessionBrief,

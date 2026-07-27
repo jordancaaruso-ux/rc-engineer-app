@@ -5,7 +5,7 @@
 
 **Keys:** `wheel_spacer_front`, `wheel_spacer_rear` — spacers (or wheel offset) push the wheels outboard, widening the track at that end. Class rules cap overall width; the tuning space is usually the **front/rear split** within the legal maximum.
 
-**Mechanism.** For a given CoG height, an axle's **lateral load transfer is inversely proportional to its track width**. Widening one end reduces how much load shifts from inner to outer tire at that end in a corner — the tire pair stays more evenly loaded, and since tires give more total grip when evenly loaded, the widened end gains **cornering grip**. Front/rear track split is therefore a **balance lever**, the same family as roll-stiffness split (springs/ARBs — see **spring-rate**, **droop-downstop-arb**) but achieved through geometry instead of stiffness.
+**Mechanism.** For a given CoG height, an axle's **lateral load transfer is inversely proportional to its track width**. Widening one end reduces how much load shifts from inner to outer tire at that end in a corner — the tire pair stays more evenly loaded, and since tires give more total grip when evenly loaded, the widened end gains **cornering grip**. Front/rear track split is therefore a **balance lever**, the same family as roll-stiffness split (springs/ARBs — see **spring-rate**, **arb**) but achieved through geometry instead of stiffness.
 
 ## Handling tendencies
 
@@ -19,4 +19,4 @@ Direction is reliable; magnitude per millimetre is small — spacers are a **tri
 
 - **Front spacers change scrub radius.** Pushing the front wheels out moves the contact patch further from the steering axis, which increases steering torque, kickback over bumps, and how much the car self-steers on one-wheel bumps or under braking. A front-width change can alter steering *feel* noticeably even when grip barely changes.
 - **Overall (both ends) wider** lowers body-roll sensitivity slightly and resists **traction rolling** on very high grip; overall narrower does the opposite.
-- Changing width moves the wheel relative to the arc the suspension describes, so **camber** at the contact patch shifts slightly — re-check camber after a width change (see **camber-caster-toe**).
+- Changing width moves the wheel relative to the arc the suspension describes, so **camber** at the contact patch shifts slightly — re-check camber after a width change (see **camber**).

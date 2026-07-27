@@ -45,6 +45,18 @@ export type ParseNumericOptions = {
 };
 
 /**
+ * Numeric reading of a stored snapshot value (booleans count as 1/0, no K expansion).
+ *
+ * Shared so a driver's value and a base-setup value are always read the same way — parsing them
+ * differently would silently misalign the position bands built from them.
+ */
+export function setupValueToNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "boolean") return v ? 1 : 0;
+  return parseNumericFromSetupString(v, { allowKSuffix: false });
+}
+
+/**
  * Parse a setup value that should be numeric (geometry, gaps, ratios, etc.).
  * Returns null only when no safe number can be inferred.
  */

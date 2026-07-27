@@ -16,7 +16,7 @@ function collect(rows: Array<Record<string, string | null>>, key: string): strin
 export async function tireTypeIdsInUse(ids: string[]): Promise<Set<string>> {
   if (ids.length === 0) return new Set();
   const [sets, parts] = await Promise.all([
-    prisma.tireSet.groupBy({ by: ["tireTypeId"], where: { tireTypeId: { in: ids } } }),
+    prisma.run.groupBy({ by: ["tireTypeId"], where: { tireTypeId: { in: ids } } }),
     prisma.eventParticipation.groupBy({
       by: ["controlledTireTypeId"],
       where: { controlledTireTypeId: { in: ids } },

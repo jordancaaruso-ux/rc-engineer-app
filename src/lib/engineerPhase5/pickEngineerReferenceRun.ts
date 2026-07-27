@@ -5,7 +5,7 @@ type CurrentForReferencePick = {
   id: string;
   carId: string | null;
   trackId: string | null;
-  tireSetId: string | null;
+  tireStintId: string | null;
   tireRunNumber: number;
   createdAt: Date;
   sessionCompletedAt: Date | null;

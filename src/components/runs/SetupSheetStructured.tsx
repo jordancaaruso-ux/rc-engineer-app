@@ -1031,49 +1031,20 @@ function EditableSingle({
                 buildTireSelectionValue({
                   tireTypeId: option.id,
                   displayName: option.displayName,
-                  insert: prev?.insert,
-                  wheel: prev?.wheel,
+                  tireRunNumber: prev?.tireRunNumber,
+                  tireAgeKnown: prev?.tireAgeKnown,
                 })
               );
             }}
             aria-label={label}
           />
-          <div className="grid grid-cols-2 gap-1">
-            <input
-              className="rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-xs outline-none"
-              placeholder="Insert (optional)"
-              value={structured?.insert ?? ""}
-              onChange={(e) => {
-                if (!structured?.tireTypeId) return;
-                onCommit(
-                  fieldKey,
-                  buildTireSelectionValue({
-                    tireTypeId: structured.tireTypeId,
-                    displayName: structured.displayName ?? "",
-                    insert: e.target.value,
-                    wheel: structured.wheel,
-                  })
-                );
-              }}
-            />
-            <input
-              className="rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-xs outline-none"
-              placeholder="Wheel (optional)"
-              value={structured?.wheel ?? ""}
-              onChange={(e) => {
-                if (!structured?.tireTypeId) return;
-                onCommit(
-                  fieldKey,
-                  buildTireSelectionValue({
-                    tireTypeId: structured.tireTypeId,
-                    displayName: structured.displayName ?? "",
-                    insert: structured.insert,
-                    wheel: e.target.value,
-                  })
-                );
-              }}
-            />
-          </div>
+          {structured?.tireRunNumber != null ? (
+            <div className="text-[11px] text-muted-foreground">
+              {structured.tireAgeKnown === false
+                ? `run ${structured.tireRunNumber} · age unknown`
+                : `run ${structured.tireRunNumber} on these`}
+            </div>
+          ) : null}
         </div>
       </div>
     );

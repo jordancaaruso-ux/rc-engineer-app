@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { chipToggleClass } from "@/components/ui/chipToggle";
 import {
@@ -30,78 +30,77 @@ const PHASE_ROWS: {
 const PHASE_BALANCE_LEVELS: PhaseBalance[] = [-3, -2, -1, 0, 1, 2, 3];
 
 const PHASE_BALANCE_INFO =
-  "US (understeer) = the front washes out and the car won't turn in. OS (oversteer) = the rear steps out and the car rotates too much. Mark how it felt through this part of the corner; the centre is neutral.";
+  "Understeer = the front washes out and the car won't turn in. Oversteer = the rear steps out and it rotates too much. The centre notch means it felt neutral there; leave a phase untouched if you'd rather not say.";
 
 const CORNER_SPEEDS: CornerSpeed[] = ["slow", "fast", "both"];
 const SPEED_SHORT: Record<CornerSpeed, string> = { slow: "Low speed", fast: "High speed", both: "Both" };
 const SEVERITIES: Array<1 | 2 | 3> = [1, 2, 3];
 
-/** Flat list of problem chips: bipolar traits (steering feel) contribute two. */
-const CHIP_DEFS: Array<{ axis: CaptureTraitAxisKey; sign: -1 | 1; label: string }> =
-  CAPTURE_TRAIT_AXIS_KEYS.flatMap((axis) =>
-    HANDLING_TRAIT_CHIP_META[axis].problemPoles.map((p) => ({ axis, sign: p.sign, label: p.label }))
-  );
-
-function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
-  return sanitizeHandlingUiState(next);
-}
-
-// purple-500 / amber-500 as raw triplets so fill opacity can ramp toward the set notch.
-const US_RGB = "168, 85, 247"; // understeer, purple-500
-const OS_RGB = "245, 158, 11"; // oversteer, amber-500
-const SEG_OFF = "#232120"; // unfilled segment (matches LogRunWizardBottomBar track)
-
 /**
- * Diverging fill for one angled segment at step `p`, given the selected `value`.
- * This is a balance axis, not a quality axis — the two poles are directions, not good/bad, so it
- * deliberately avoids the red/green pace-and-quality convention. The fill runs out of the neutral
- * centre toward the set notch and brightens to its strongest there, so the value reads without a
- * handle. Amber (not the reserved electric-yellow action colour) marks the oversteer end.
+ * Fill for one notch. Balance is a **deviation** axis, not a direction-of-preference one — the
+ * capture model already treats any non-zero phase as a flagged issue (it's what unlocks the speed
+ * tag), so both poles read in `destructive`, the app's "negative data" colour, and the intensity
+ * ramps with magnitude so a slight lean stays quiet while a severe one shouts. Direction is
+ * carried by which side of centre fills, plus the written readout — never by hue. (The earlier
+ * purple/amber pairing collided with best-lap purple and validation amber elsewhere on this
+ * screen.)
  */
-function segmentFill(p: PhaseBalance, value: PhaseBalance | null): string {
-  if (value == null) return SEG_OFF;
-  if (p === 0) return value === 0 ? "rgba(160, 157, 150, 0.5)" : SEG_OFF; // grey centre only when neutral is chosen
+const NOTCH_FILL: Record<1 | 2 | 3, string> = {
+  1: "bg-destructive/35",
+  2: "bg-destructive/60",
+  3: "bg-destructive/90",
+};
+
+const NOTCH_EMPTY = "bg-secondary ring-1 ring-inset ring-border";
+
+function notchFillClass(p: PhaseBalance, value: PhaseBalance | null): string {
+  if (p === 0) return value === 0 ? "bg-muted-foreground/45" : NOTCH_EMPTY;
+  if (value == null || value === 0) return NOTCH_EMPTY;
   const sameSide = (p < 0 && value < 0) || (p > 0 && value > 0);
-  if (!sameSide || Math.abs(p) > Math.abs(value)) return SEG_OFF;
-  const opacity = 0.5 + 0.5 * (Math.abs(p) / Math.abs(value)); // brightest at the tip
-  return `rgba(${p < 0 ? US_RGB : OS_RGB}, ${opacity})`;
+  if (!sameSide || Math.abs(p) > Math.abs(value)) return NOTCH_EMPTY;
+  return NOTCH_FILL[Math.abs(p) as 1 | 2 | 3];
 }
 
 function balanceValueText(value: PhaseBalance | null): string {
-  if (value == null || value === 0) return "neutral";
+  if (value == null) return "—";
+  if (value === 0) return "neutral";
   const word = HANDLING_SEVERITY_CHIP_LABELS[Math.abs(value) as 1 | 2 | 3];
   return `${word} ${value < 0 ? "understeer" : "oversteer"}`;
 }
 
+function notchLabel(p: PhaseBalance): string {
+  if (p === 0) return "neutral";
+  return `${HANDLING_SEVERITY_CHIP_LABELS[Math.abs(p) as 1 | 2 | 3]} ${
+    p < 0 ? "understeer" : "oversteer"
+  }`;
+}
+
+function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
+  const clean = sanitizeHandlingUiState(next);
+  // Below two flagged issues the main problem is implicit and never asked, so a focus left over
+  // from a since-cleared flag would be a stored answer to a question that isn't on screen.
+  if (clean.primaryFocus && buildPrimaryFocusOptions(clean).length < 2) {
+    return { ...clean, primaryFocus: null };
+  }
+  return clean;
+}
+
 /**
- * Understeer ↔ oversteer balance, −3…+3, as a detented bar of angled (−21°) segments — the same
- * skew treatment as the Log Run wizard progress bar (LogRunWizardBottomBar). No handle: the fill
- * runs out of the neutral centre and brightens to the set notch. Tap a notch or drag across.
+ * One phase of the understeer ↔ oversteer axis: seven discrete notch buttons, −3…+3, keeping the
+ * −21° skew as brand but as separated notches rather than a filled track (a track reads as the
+ * wizard progress bar sitting at the bottom of the same screen). Tap-only by design: the panel
+ * lives inside a swipeable `PagedCard`, which claims horizontal drags, so a handle-less drag
+ * slider can never work here — and buttons can't be cleared by finger jitter mid-tap.
  */
-function BalanceScale({
-  title,
-  info,
+function BalanceRow({
+  label,
   current,
   onSelect,
 }: {
-  title: string;
-  info: string;
+  label: string;
   current: PhaseBalance | null;
   onSelect: (n: PhaseBalance) => void;
 }) {
-  const [infoOpen, setInfoOpen] = useState(false);
-  const barRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
-
-  const pickFromClientX = (clientX: number) => {
-    const el = barRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    const idx = Math.round(frac * (PHASE_BALANCE_LEVELS.length - 1));
-    onSelect(PHASE_BALANCE_LEVELS[idx]);
-  };
-
   const nudge = (delta: number) => {
     const idx = PHASE_BALANCE_LEVELS.indexOf(current ?? 0);
     const next = Math.min(PHASE_BALANCE_LEVELS.length - 1, Math.max(0, idx + delta));
@@ -109,51 +108,22 @@ function BalanceScale({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5">
-        <span className="text-[11px] font-medium text-foreground">{title}</span>
-        <button
-          type="button"
-          aria-label={`What does ${title} mean?`}
-          aria-expanded={infoOpen}
-          onClick={() => setInfoOpen((v) => !v)}
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-medium text-foreground">{label}</span>
+        <span
           className={cn(
-            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px] font-semibold leading-none transition",
-            infoOpen
-              ? "border-foreground/50 bg-muted text-foreground"
-              : "border-muted-foreground/40 text-muted-foreground hover:border-foreground/50 hover:text-foreground"
+            "font-mono text-[10px] leading-none",
+            current == null ? "text-muted-foreground/70" : "text-muted-foreground"
           )}
         >
-          i
-        </button>
+          {balanceValueText(current)}
+        </span>
       </div>
-      {infoOpen ? (
-        <p className="text-[10px] leading-snug text-muted-foreground">{info}</p>
-      ) : null}
-
       <div
-        ref={barRef}
-        role="slider"
-        tabIndex={0}
-        aria-label={title}
-        aria-valuemin={-3}
-        aria-valuemax={3}
-        aria-valuenow={current ?? 0}
-        aria-valuetext={balanceValueText(current)}
-        onPointerDown={(e) => {
-          draggingRef.current = true;
-          e.currentTarget.setPointerCapture(e.pointerId);
-          pickFromClientX(e.clientX);
-        }}
-        onPointerMove={(e) => {
-          if (draggingRef.current) pickFromClientX(e.clientX);
-        }}
-        onPointerUp={() => {
-          draggingRef.current = false;
-        }}
-        onPointerCancel={() => {
-          draggingRef.current = false;
-        }}
+        role="radiogroup"
+        aria-label={`${label} corner balance`}
+        className="flex gap-[3px]"
         onKeyDown={(e) => {
           if (e.key === "ArrowRight" || e.key === "ArrowUp") {
             nudge(1);
@@ -163,25 +133,31 @@ function BalanceScale({
             e.preventDefault();
           }
         }}
-        className="relative h-7 cursor-pointer touch-none rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <div className="absolute inset-x-0 top-1/2 h-[14px] -translate-y-1/2 overflow-hidden rounded-[3px] bg-[#141310] shadow-[inset_0_0_0_1px_#34322f]">
-          <div className="absolute -inset-x-[6px] inset-y-0 flex gap-[3px]" aria-hidden>
-            {PHASE_BALANCE_LEVELS.map((p) => (
+        {PHASE_BALANCE_LEVELS.map((p) => {
+          const selected = current === p;
+          return (
+            <button
+              key={p}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={notchLabel(p)}
+              tabIndex={selected || (current == null && p === 0) ? 0 : -1}
+              onClick={() => onSelect(p)}
+              className="group flex h-8 flex-1 items-center justify-center rounded-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <span
-                key={p}
-                className="flex-1 -skew-x-[21deg] transition-colors duration-150"
-                style={{ background: segmentFill(p, current) }}
+                className={cn(
+                  "h-4 w-full -skew-x-[21deg] rounded-[2px] transition-colors duration-150",
+                  notchFillClass(p, current),
+                  !selected && "group-hover:bg-destructive/20",
+                  p === 0 && !selected && "group-hover:bg-muted-foreground/25"
+                )}
               />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center text-[10px] font-medium">
-        <span className="text-left text-purple-700/90 dark:text-purple-400/90">◀ Understeer</span>
-        <span className="text-center text-[9px] font-normal text-muted-foreground">neutral</span>
-        <span className="text-right text-amber-700/90 dark:text-amber-400/90">Oversteer ▶</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -218,14 +194,42 @@ function SpeedTagPicker({
   );
 }
 
+/** Small round "i" that toggles a one-off explanation. 24px so it's a real tap target. */
+function InfoToggle({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-expanded={open}
+      onClick={onToggle}
+      className={cn(
+        "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold leading-none transition",
+        open
+          ? "border-foreground/50 bg-muted text-foreground"
+          : "border-muted-foreground/40 text-muted-foreground hover:border-foreground/50 hover:text-foreground"
+      )}
+    >
+      i
+    </button>
+  );
+}
+
 type Props = {
   value: HandlingAssessmentUiState;
   onChange: (next: HandlingAssessmentUiState) => void;
 };
 
 export function HandlingAssessmentFields({ value, onChange }: Props) {
+  const [balanceInfoOpen, setBalanceInfoOpen] = useState(false);
+  /** Flag order, so a freshly tapped chip's detail row lands nearest the chip you just hit. */
+  const [traitOrder, setTraitOrder] = useState<CaptureTraitAxisKey[]>(() =>
+    CAPTURE_TRAIT_AXIS_KEYS.filter((axis) => {
+      const v = value[axis];
+      return v != null && v !== 0;
+    })
+  );
   const primaryFocusOptions = useMemo(() => buildPrimaryFocusOptions(value), [value]);
-  const primaryFocusValue = primaryFocusSelectValue(value);
+  const primaryFocusId = selectedPrimaryFocusId(value);
 
   function emit(next: HandlingAssessmentUiState) {
     onChange(patch(next));
@@ -251,9 +255,11 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
     const cur = value[axis];
     const active = cur != null && cur !== 0 && Math.sign(cur) === sign;
     if (active) {
+      setTraitOrder((order) => order.filter((a) => a !== axis));
       emit({ ...value, [axis]: null });
       return;
     }
+    setTraitOrder((order) => (order.includes(axis) ? order : [...order, axis]));
     const severity = cur != null && cur !== 0 ? (Math.abs(cur) as 1 | 2 | 3) : 2;
     emit({ ...value, [axis]: (sign * severity) as PhaseBalance });
   }
@@ -265,67 +271,109 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
     emit({ ...value, [axis]: (sign * severity) as PhaseBalance });
   }
 
-  const activeTraitAxes = CAPTURE_TRAIT_AXIS_KEYS.filter((axis) => {
+  const flaggedTraitAxes = CAPTURE_TRAIT_AXIS_KEYS.filter((axis) => {
     const v = value[axis];
     return v != null && v !== 0;
   });
+  // Tap order first, then anything flagged outside this component (loading a saved run).
+  const activeTraitAxes = [
+    ...traitOrder.filter((axis) => flaggedTraitAxes.includes(axis)),
+    ...flaggedTraitAxes.filter((axis) => !traitOrder.includes(axis)),
+  ];
+
+  /* Primary focus only earns its place once there's a genuine choice to make — with 0–1 flagged
+     issues the main problem is implicit (HANDLING_CAPTURE_NORTH_STAR). */
+  const showPrimaryFocus = primaryFocusOptions.length >= 2;
 
   return (
     <div className="space-y-4 inset-panel p-3">
-      <div className="space-y-3">
-        <div className="text-xs font-medium text-muted-foreground">
-          Corner balance (understeer → oversteer, per phase)
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Corner balance</span>
+          <InfoToggle
+            label="What does corner balance mean?"
+            open={balanceInfoOpen}
+            onToggle={() => setBalanceInfoOpen((v) => !v)}
+          />
         </div>
-        {PHASE_ROWS.map(({ stateKey, phase, label }) => {
-          const rowVal = value[stateKey];
-          const flagged = rowVal != null && rowVal !== 0;
-          const issueKey = `balance:${phase}` as HandlingIssueKey;
-          return (
-            <div
-              key={stateKey}
-              className="border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
-            >
-              <BalanceScale
-                title={label}
-                info={PHASE_BALANCE_INFO}
-                current={rowVal}
-                onSelect={(n) => setPhaseBalance(stateKey, n)}
-              />
-              {flagged ? (
-                <div className="mt-2 pl-0.5">
-                  <SpeedTagPicker
-                    value={value.speedTags[issueKey]}
-                    onChange={(s) => setSpeed(issueKey, s)}
-                  />
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
+        {balanceInfoOpen ? (
+          <p className="text-[10px] leading-snug text-muted-foreground">{PHASE_BALANCE_INFO}</p>
+        ) : null}
+
+        {/* One legend for all three phases — they share a single scale. */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center text-[10px] font-medium text-muted-foreground">
+          <span className="text-left">Understeer ◀</span>
+          <span className="text-center font-mono text-[10px] font-normal text-muted-foreground/70">
+            neutral
+          </span>
+          <span className="text-right">▶ Oversteer</span>
+        </div>
+
+        <div className="space-y-2.5">
+          {PHASE_ROWS.map(({ stateKey, phase, label }) => {
+            const rowVal = value[stateKey];
+            const flagged = rowVal != null && rowVal !== 0;
+            const issueKey = `balance:${phase}` as HandlingIssueKey;
+            return (
+              <div key={stateKey}>
+                <BalanceRow
+                  label={label}
+                  current={rowVal}
+                  onSelect={(n) => setPhaseBalance(stateKey, n)}
+                />
+                {flagged ? (
+                  <div className="mt-1.5">
+                    <SpeedTagPicker
+                      value={value.speedTags[issueKey]}
+                      onChange={(s) => setSpeed(issueKey, s)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="space-y-2">
         <div className="text-xs font-medium text-muted-foreground">
           Anything notable? (tap only if it was a problem)
         </div>
+        {/* Grouped by axis: the two steering poles are one axis with two ends, so they sit as a
+            joined pair rather than two chips that mysteriously cancel each other out. */}
         <div className="flex flex-wrap gap-1.5">
-          {CHIP_DEFS.map(({ axis, sign, label }) => {
-            const cur = value[axis];
-            const active = cur != null && cur !== 0 && Math.sign(cur) === sign;
+          {CAPTURE_TRAIT_AXIS_KEYS.map((axis) => {
+            const poles = HANDLING_TRAIT_CHIP_META[axis].problemPoles;
+            const paired = poles.length > 1;
             return (
-              <button
-                key={`${axis}:${sign}`}
-                type="button"
-                aria-pressed={active}
-                onClick={() => toggleTraitChip(axis, sign)}
-                className={cn(
-                  chipToggleClass(active, { tone: "problem" }),
-                  "px-2.5 py-1 text-[11px]",
-                  !active && "hover:border-destructive/40"
-                )}
+              <div
+                key={axis}
+                className={cn("flex", paired && "gap-px")}
+                role={paired ? "group" : undefined}
+                aria-label={paired ? HANDLING_TRAIT_CHIP_META[axis].title : undefined}
               >
-                {label}
-              </button>
+                {poles.map((pole, i) => {
+                  const cur = value[axis];
+                  const active = cur != null && cur !== 0 && Math.sign(cur) === pole.sign;
+                  return (
+                    <button
+                      key={pole.sign}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => toggleTraitChip(axis, pole.sign)}
+                      className={cn(
+                        chipToggleClass(active, { tone: "problem" }),
+                        "px-2.5 py-1 text-[11px]",
+                        !active && "hover:border-destructive/40",
+                        paired && i === 0 && "rounded-r-none",
+                        paired && i === poles.length - 1 && "rounded-l-none"
+                      )}
+                    >
+                      {pole.label}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </div>
@@ -339,10 +387,7 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
               const pole = HANDLING_TRAIT_CHIP_META[axis].problemPoles.find((p) => p.sign === sign);
               const issueKey = `trait:${axis}` as HandlingIssueKey;
               return (
-                <div
-                  key={axis}
-                  className="rounded-md border border-border/60 bg-surface-runna-inset/40 p-2 space-y-2"
-                >
+                <div key={axis} className="space-y-2 rounded-md border border-border/60 bg-secondary/40 p-2">
                   <div className="text-[11px] font-medium text-foreground">{pole?.label ?? axis}</div>
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="flex gap-1" role="group" aria-label={`${axis} severity`}>
@@ -376,44 +421,34 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
         ) : null}
       </div>
 
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground" htmlFor="handling-primary-focus">
-          Primary focus (main problem or priority)
-        </label>
-        <select
-          id="handling-primary-focus"
-          className="form-control w-full px-2 py-1.5 text-xs disabled:opacity-60"
-          disabled={primaryFocusOptions.length === 0}
-          value={primaryFocusValue}
-          onChange={(e) => {
-            const raw = e.target.value;
-            if (!raw) {
-              emit({ ...value, primaryFocus: null });
-              return;
-            }
-            try {
-              const parsed = JSON.parse(raw) as PrimaryFocus;
-              emit({ ...value, primaryFocus: parsed });
-            } catch {
-              emit({ ...value, primaryFocus: null });
-            }
-          }}
-        >
-          <option value="">
-            {primaryFocusOptions.length === 0 ? "Select other options first" : "None selected"}
-          </option>
-          {primaryFocusOptions.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {showPrimaryFocus ? (
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-muted-foreground">
+            Which one mattered most?
+          </div>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Primary focus">
+            {primaryFocusOptions.map((o) => {
+              const selected = primaryFocusId === o.id;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => emit({ ...value, primaryFocus: selected ? null : o.focus })}
+                  className={cn(chipToggleClass(selected), "px-2.5 py-1 text-[11px]")}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function primaryFocusSelectValue(ui: HandlingAssessmentUiState): string {
+function selectedPrimaryFocusId(ui: HandlingAssessmentUiState): string {
   if (!ui.primaryFocus) return "";
   const id = JSON.stringify(ui.primaryFocus);
   const opts = buildPrimaryFocusOptions(ui);

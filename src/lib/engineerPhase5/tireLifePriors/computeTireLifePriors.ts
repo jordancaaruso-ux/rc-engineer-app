@@ -168,20 +168,20 @@ function buildStepsFromPairs(
 
 export async function computeTireLifePriorsV1(params: {
   userId: string;
-  tireSetId: string;
+  tireStintId: string;
   anchorTrackId: string | null;
   anchorTrackName: string | null;
-  tireSetLabel: string | null;
+  tireLabel: string | null;
   /** Optional focused compare (same tire set): primary tire run vs compare tire run. */
   focusedCompareTireRuns: null | { compare: number; primary: number };
 }): Promise<TireLifePriorsV1 | null> {
-  const tid = params.tireSetId.trim();
+  const tid = params.tireStintId.trim();
   if (!tid) return null;
 
   const runs = await prisma.run.findMany({
     where: {
       userId: params.userId,
-      tireSetId: tid,
+      tireStintId: tid,
       loggingComplete: true,
     },
     orderBy: { createdAt: "desc" },
@@ -230,8 +230,8 @@ export async function computeTireLifePriorsV1(params: {
 
   return {
     version: 1,
-    tireSetId: tid,
-    tireSetLabel: params.tireSetLabel,
+    tireStintId: tid,
+    tireLabel: params.tireLabel,
     anchorTrackId: params.anchorTrackId,
     anchorTrackName: params.anchorTrackName,
     atAnchorTrack,
@@ -256,13 +256,13 @@ export async function buildTireLifePriorsForChatContext(params: {
   const run = await prisma.run.findFirst({
     where: { id: rid, userId: params.userId },
     select: {
-      tireSetId: true,
+      tireStintId: true,
       trackId: true,
-      tireSet: { select: { label: true } },
+      tireType: { select: { displayName: true } },
       track: { select: { name: true } },
     },
   });
-  if (!run?.tireSetId) return null;
+  if (!run?.tireStintId) return null;
 
   let focusedCompareTireRuns: null | { compare: number; primary: number } = null;
   if (
@@ -278,10 +278,10 @@ export async function buildTireLifePriorsForChatContext(params: {
 
   return computeTireLifePriorsV1({
     userId: params.userId,
-    tireSetId: run.tireSetId,
+    tireStintId: run.tireStintId,
     anchorTrackId: run.trackId,
     anchorTrackName: run.track?.name ?? null,
-    tireSetLabel: run.tireSet?.label ?? null,
+    tireLabel: run.tireType?.displayName ?? null,
     focusedCompareTireRuns,
   });
 }
@@ -289,15 +289,15 @@ export async function buildTireLifePriorsForChatContext(params: {
 /** Tire-run step medians on one set, pooled across all tracks (same query shape as tire-life priors). */
 export async function loadTireStepAggregatesAllTracks(
   userId: string,
-  tireSetId: string
+  tireStintId: string
 ): Promise<TireLifeStepAggV1[] | null> {
-  const tid = tireSetId.trim();
+  const tid = tireStintId.trim();
   if (!tid) return null;
 
   const runs = await prisma.run.findMany({
     where: {
       userId,
-      tireSetId: tid,
+      tireStintId: tid,
       loggingComplete: true,
     },
     orderBy: { createdAt: "desc" },

@@ -43,7 +43,9 @@ export type CompareRunShape = {
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;
-  tireSet?: { id: string; label: string; setNumber: number | null } | null;
+  tireType?: { id: string; displayName: string } | null;
+  tireStintId?: string | null;
+  tireAgeKnown?: boolean | null;
   tireRunNumber: number;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
@@ -173,8 +175,8 @@ export function RunComparePanel({
   const tiresRight =
     mode === "current_setup"
       ? "—"
-      : baselineRun && baselineRun.tireSet
-        ? `${baselineRun.tireSet.label} · run ${baselineRun.tireRunNumber}`
+      : baselineRun && baselineRun.tireType
+        ? `${baselineRun.tireType.displayName} · run ${baselineRun.tireRunNumber}`
         : "—";
 
   return (
@@ -286,7 +288,8 @@ export function RunComparePanel({
               <Eyebrow>Tires · this run</Eyebrow>
               <p className="mt-1">
                 {formatRunTiresDetailLine({
-                  tireSet: baseRun.tireSet,
+                  tireType: baseRun.tireType,
+                  tireAgeKnown: baseRun.tireAgeKnown,
                   tireRunNumber: baseRun.tireRunNumber,
                   additiveType: baseRun.additiveType,
                   warmerTimingMinutes: baseRun.warmerTimingMinutes,

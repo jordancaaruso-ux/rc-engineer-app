@@ -458,7 +458,7 @@ function PaceTrendFace({
                     className="-my-1 shrink-0"
                   />
                   <span className="whitespace-nowrap text-[10.5px] text-muted-foreground">
-                    {displayRun.tireIndicator.setLabel}
+                    {displayRun.tireIndicator.tireLabel}
                     {displayRun.tireIndicator.runNumber != null
                       ? ` · run ${displayRun.tireIndicator.runNumber}`
                       : ""}

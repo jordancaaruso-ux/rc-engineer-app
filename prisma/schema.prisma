@@ -61,6 +61,7 @@ model User {
 
   teamMemberships TeamMembership[]
   teamsCreated    Team[]           @relation("TeamsCreated")
+  teamRunComments TeamRunComment[] @relation("TeamRunCommentAuthor")
   aiUsageDaily    AiUsageDaily[]
   chassisTypeRequests ChassisTypeRequest[]
 }
@@ -159,6 +160,7 @@ model Team {
   createdBy       User? @relation("TeamsCreated", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   memberships TeamMembership[]
+  runComments TeamRunComment[]
 }
 
 model TeamMembership {
@@ -175,6 +177,45 @@ model TeamMembership {
   @@unique([teamId, userId])
   @@index([userId])
   @@index([teamId])
+}
+
+/**
+ * A comment on a teammate's run, as seen in that team's delta feed.
+ *
+ * Anchored to (run, team): the same run appears in the feed of every team its owner belongs to,
+ * and those conversations stay separate — what you say to your club mates does not reach the
+ * factory squad. `parentId` gives ONE level of replies (threads, not trees); a reply's parent
+ * must be a root comment on the same (runId, teamId), enforced in `src/lib/teams/commentRules.ts`.
+ *
+ * There is no standalone posting: a comment only ever hangs off a run in the feed.
+ */
+model TeamRunComment {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /** Author deleted their own comment: body blanked, row kept so replies keep their anchor. */
+  deletedAt DateTime?
+
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId String
+
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  author       User   @relation("TeamRunCommentAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+  authorUserId String
+
+  parent   TeamRunComment?  @relation("TeamRunCommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId String?
+  replies  TeamRunComment[] @relation("TeamRunCommentThread")
+
+  /** Plain text, trimmed, max 2000 chars. No markdown — this is not Engineer prose. */
+  body String
+
+  @@index([teamId, runId, createdAt])
+  @@index([runId])
+  @@index([authorUserId])
+  @@index([parentId])
 }
 
 /** Emails allowed to receive magic-link sign-in (invite list). */
@@ -548,14 +589,31 @@ model TireType {
    */
   verifiedAt  DateTime?
 
+  /**
+   * Catalog attributes (AI pre-seed enrichment, TC touring first — see ASSET_ACCESS_NORTH_STAR.md).
+   * All nullable: legacy/user-created and non-touring rows leave them empty.
+   * surface = "asphalt" | "carpet" | "both" | "unknown"; tireType = "rubber" | "foam".
+   */
+  discipline  String?
+  brand       String?
+  model       String?
+  compound    String?
+  surface     String?
+  tireType    String?
+  /** Provenance for founder review of pre-seeded rows. */
+  sourceUrl   String?
+  productUrl  String?
+
   createdBy   User?   @relation("TireTypeCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdByUserId String?
 
   tireSets  TireSet[]
+  runs      Run[]
   eventParticipations EventParticipation[]
 
   @@index([displayName])
   @@index([createdByUserId])
+  @@index([discipline])
 }
 
 model TireSet {
@@ -958,11 +1016,34 @@ model Run {
   /** Session race class when not from event, or override (e.g. \"17.5 Stock\"). */
   raceClass String?
 
+  /**
+   * Dormant since the tire-counter rework (2026-07-26): tires are defined by how
+   * many runs are on them, not by a named set. Kept unread so existing history
+   * stays intact — same treatment `Car.carClass` got. Nothing writes this.
+   */
   tireSet   TireSet? @relation(fields: [tireSetId], references: [id])
   tireSetId String?
 
-  // Auto-increments per tire set based on last run with that set.
+  /** The compound on the car for this run — picked directly, no longer reached via a set. */
+  tireType   TireType? @relation(fields: [tireTypeId], references: [id], onDelete: SetNull)
+  tireTypeId String?
+
+  /** Runs on the rubber currently fitted; 1 = first run on it. Carried forward from the car's last run. */
   tireRunNumber Int      @default(1)
+
+  /**
+   * Groups runs sharing one continuous life of rubber. A new id is minted whenever
+   * the driver says the tires changed ("brand new", an explicit count, or "not sure").
+   * The wear chains group on this — it replaces `tireSetId` as the stint key.
+   */
+  tireStintId String?
+
+  /**
+   * False when the driver said "not sure how many runs" — e.g. a set they were given.
+   * `tireRunNumber` is then relative to when they got them, not absolute tire age, so
+   * k→k+1 deltas still chain but anything anchored to absolute position must exclude these.
+   */
+  tireAgeKnown Boolean @default(true)
 
   additiveType   AdditiveType? @relation(fields: [additiveTypeId], references: [id], onDelete: SetNull)
   additiveTypeId String?
@@ -1126,6 +1207,7 @@ model Run {
 
   videoAnalysisJobs VideoAnalysisJob[]
   videoAssets         VideoAsset[]
+  teamComments        TeamRunComment[]
 
   @@index([userId, sortAt])
   @@index([userId, carId, carRating])
@@ -1134,6 +1216,8 @@ model Run {
   @@index([trackLayoutId])
   @@index([eventId])
   @@index([tireSetId])
+  @@index([userId, tireStintId])
+  @@index([tireTypeId])
   @@index([additiveTypeId])
   @@index([batteryId])
   @@index([setupSnapshotId])

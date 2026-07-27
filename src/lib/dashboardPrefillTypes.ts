@@ -11,8 +11,11 @@ export type DashboardSerializedRun = {
   trackLayout?: { id: string; name: string } | null;
   trackDirection?: "CW" | "CCW" | null;
   eventId: string | null;
-  tireSetId: string | null;
+  tireTypeId: string | null;
+  tireType?: { id: string; displayName: string; modelCode: string } | null;
   tireRunNumber: number;
+  tireStintId: string | null;
+  tireAgeKnown: boolean;
   setupSnapshot: { id: string; data: unknown };
   event?: {
     id: string;
@@ -24,7 +27,7 @@ export type DashboardSerializedRun = {
     track?: { id: string; name: string; location?: string | null } | null;
   } | null;
   track?: { id: string; name: string } | null;
-  tireSet?: { id: string; label: string; setNumber?: number | null } | null;
+
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;

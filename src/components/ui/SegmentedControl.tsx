@@ -2,14 +2,22 @@
 
 import { useCallback, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { chipToggleClass } from "@/components/ui/chipToggle";
 
 /**
- * Segmented single-select: a row of equal-width flat chips (no sliding pill), so
- * it matches every other toggle group in the app via the shared `chipToggleClass`
- * treatment — `rounded-md` border, neutral `bg-muted` active surface, yellow
- * reserved for actions. Two or more segments; each is `flex-1 basis-0` so labels
- * of any length stay aligned. Size may differ per use; the style is identical.
+ * Segmented single-select: one inset rail holding equal-width segments, with the
+ * selected segment ink-inverted (`bg-foreground` + dark text) so "chosen" reads
+ * instantly. Redesigned 2026-07-27 — was flat `chipToggleClass` chips in a gapped
+ * row, where selected (`bg-muted`) vs unselected (`bg-secondary`) was grey-on-grey
+ * and the options read as two loose buttons rather than one control. The shared
+ * rail is what makes it a control; the inversion is what makes the state obvious.
+ * Yellow stays out of it — selection is state, and yellow means action.
+ *
+ * Segments are `rounded-md` inside the `rounded-lg` rail (concentric radii: 8px
+ * outer − 3px padding ≈ 5px inner) and `flex-1 basis-0` so labels of any length
+ * stay aligned. Size may differ per use; the style is identical.
+ *
+ * `chipToggleClass` is still the treatment for standalone multi-select toggle
+ * chips (layout direction, handling ratings) — this control no longer shares it.
  *
  * Semantics: `role="radiogroup"` + `role="radio"` per segment, with Left/Right
  * (and Up/Down) arrow keys walking the options like a native radio group.
@@ -82,7 +90,10 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
-      className={cn("flex w-full select-none gap-1", className)}
+      className={cn(
+        "flex w-full select-none items-stretch gap-[3px] rounded-lg border border-border bg-secondary p-[3px]",
+        className
+      )}
     >
       {options.map((opt) => {
         const active = opt.value === value;
@@ -96,10 +107,12 @@ export function SegmentedControl<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(opt.value)}
             className={cn(
-              chipToggleClass(active),
-              "flex flex-1 basis-0 items-center justify-center gap-1.5",
+              "flex flex-1 basis-0 items-center justify-center gap-1.5 rounded-md font-sans tracking-tight transition-colors duration-150 touch-manipulation disabled:opacity-60",
               segText,
               segPad,
+              active
+                ? "bg-foreground font-semibold text-background shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
+                : "font-medium text-muted-foreground hover:text-foreground",
               // A "hint" segment that is inactive reads fainter, still tappable.
               !active && opt.muted && "text-muted-foreground/45 hover:text-muted-foreground/45"
             )}

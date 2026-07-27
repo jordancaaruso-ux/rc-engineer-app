@@ -15,7 +15,7 @@ export type EngineeringReadDbRunRow = {
   sessionCompletedAt: Date | null;
   trackId: string | null;
   eventId: string | null;
-  tireSetId: string | null;
+  tireStintId: string | null;
   tireRunNumber: number;
   carRating: number | null;
   handlingAssessmentJson: unknown;
@@ -24,20 +24,16 @@ export type EngineeringReadDbRunRow = {
   handlingProblems: string | null;
   lapTimes: unknown;
   lapSession: unknown;
-  tireSet: {
-    id: string;
-    label: string;
-    setNumber: number;
-    tireType: { displayName: string; modelCode: string } | null;
-  } | null;
+  tireType: { displayName: string; modelCode: string } | null;
+  tireAgeKnown: boolean;
   setupSnapshot: { data: unknown } | null;
 };
 
 function tireLabel(row: EngineeringReadDbRunRow): string | null {
-  if (!row.tireSet) return null;
-  const name = row.tireSet.tireType?.displayName ?? row.tireSet.label;
-  const seg = row.tireSet.setNumber != null ? ` #${row.tireSet.setNumber}` : "";
-  return `${name}${seg}`;
+  if (!row.tireType) return null;
+  const wear = row.tireRunNumber > 0 ? ` · run ${row.tireRunNumber}` : "";
+  const unknown = row.tireAgeKnown === false ? " (age unknown)" : "";
+  return `${row.tireType.displayName}${wear}${unknown}`;
 }
 
 function rowToInput(row: EngineeringReadDbRunRow): EngineeringReadRunInput {
@@ -46,9 +42,9 @@ function rowToInput(row: EngineeringReadDbRunRow): EngineeringReadRunInput {
     sortAtIso: row.sortAt.toISOString(),
     trackId: row.trackId,
     eventId: row.eventId,
-    tireSetId: row.tireSetId,
+    tireStintId: row.tireStintId,
     tireLabel: tireLabel(row),
-    tireCompoundLabel: row.tireSet?.tireType?.displayName ?? row.tireSet?.label ?? null,
+    tireCompoundLabel: row.tireType?.displayName ?? null,
     tireRunNumber: row.tireRunNumber ?? 1,
     carRating: row.carRating ?? null,
     handlingAssessmentJson: row.handlingAssessmentJson,
@@ -68,7 +64,7 @@ const engineeringReadRunSelect = {
   sessionCompletedAt: true,
   trackId: true,
   eventId: true,
-  tireSetId: true,
+  tireStintId: true,
   tireRunNumber: true,
   carRating: true,
   handlingAssessmentJson: true,
@@ -77,14 +73,8 @@ const engineeringReadRunSelect = {
   handlingProblems: true,
   lapTimes: true,
   lapSession: true,
-  tireSet: {
-    select: {
-      id: true,
-      label: true,
-      setNumber: true,
-      tireType: { select: { displayName: true, modelCode: true } },
-    },
-  },
+  tireType: { select: { displayName: true, modelCode: true } },
+  tireAgeKnown: true,
   setupSnapshot: { select: { data: true } },
 } as const;
 
@@ -142,7 +132,7 @@ export async function buildEngineeringReadForCarRun(params: {
       id: anchor.id,
       carId: params.carId,
       trackId: anchor.trackId,
-      tireSetId: anchor.tireSetId,
+      tireStintId: anchor.tireStintId,
       tireRunNumber: anchor.tireRunNumber,
       createdAt: anchor.createdAt,
       sessionCompletedAt: anchor.sessionCompletedAt,

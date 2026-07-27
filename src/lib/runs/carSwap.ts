@@ -25,7 +25,7 @@ export type CarSwapCar = {
 };
 
 export type CarSwapPlan = {
-  /** Re-derive tire set + prep from the new car's last run (cross-platform swap). */
+  /** Re-derive tires + prep from the new car's last run (cross-platform swap). */
   rederiveTiresPrep: boolean;
   /** Load the new car's last-run setup ("replace") or keep the hand edits ("keep"). */
   setup: "replace" | "keep";

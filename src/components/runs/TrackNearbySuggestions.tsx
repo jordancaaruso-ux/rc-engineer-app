@@ -12,7 +12,7 @@ export function TrackNearbySuggestions({
   if (suggestions.length === 0) return null;
 
   return (
-    <div className="rounded-md border border-border/80 bg-muted/25 px-2.5 py-2 space-y-1.5">
+    <div className="rounded-lg border border-border/80 bg-muted/25 px-2.5 py-2 space-y-1.5">
       <p className="text-[11px] text-muted-foreground leading-snug">
         Nearby tracks — tap to select (favourites first):
       </p>
@@ -22,14 +22,14 @@ export function TrackNearbySuggestions({
             key={s.trackId}
             type="button"
             onClick={() => onSelect(s.trackId)}
-            className="rounded-md border border-border bg-card px-2 py-1 text-[11px] font-medium hover:bg-muted/80 transition"
+            className="flex min-h-7 items-center gap-1 rounded-lg border border-border bg-secondary px-2.5 text-[11px] font-medium text-foreground transition hover:bg-muted"
           >
             {s.isFavourite ? (
-              <span className="text-yellow-500 mr-0.5" aria-hidden>
+              <span className="text-primary" aria-hidden>
                 ★
               </span>
             ) : null}
-            {s.trackName}{" "}
+            {s.trackName}
             <span className="text-muted-foreground font-normal">({formatDistanceMeters(s.distanceM)})</span>
           </button>
         ))}

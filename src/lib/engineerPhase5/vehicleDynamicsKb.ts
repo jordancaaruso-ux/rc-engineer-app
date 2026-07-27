@@ -10,6 +10,12 @@ const KB_DIR = path.join(process.cwd(), "content", "vehicle-dynamics");
  * founder edits + moves the file up into KB_DIR.
  */
 const KB_DRAFTS_DIR = path.join(KB_DIR, "drafts");
+/**
+ * Founder-approved concept layer (KB restructure, 2026-07): shared physics / feel nodes stated once,
+ * linked from parameter files via `[[slug]]`. Same authority tier as the top-level files — NOT drafts.
+ * Lives in a subfolder, so both loaders must read it explicitly (readdir here is non-recursive).
+ */
+const KB_CONCEPTS_DIR = path.join(KB_DIR, "concepts");
 
 async function listKbMarkdownFiles(dir: string): Promise<string[]> {
   try {
@@ -36,6 +42,18 @@ const WEIGHT_BODY = 1;
 
 /** Cap on how many canonical-key guaranteed-coverage inserts we make per query. */
 const MAX_GUARANTEE_ADDS = 6;
+
+/** Cap on how many linked concept chunks we co-surface alongside a matched parameter chunk. */
+const MAX_CONCEPT_ADDS = 6;
+
+/** Pull every `[[concept-slug]]` link out of a chunk body (lowercased). */
+function extractLinkSlugs(body: string): string[] {
+  const out: string[] = [];
+  const re = /\[\[([a-z0-9-]+)\]\]/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) out.push(m[1].toLowerCase());
+  return out;
+}
 
 function tokenize(q: string): string[] {
   return q
@@ -113,6 +131,8 @@ function extractKeyLine(body: string): string {
 type ScoredChunk = {
   score: number;
   keyTokens: Set<string>;
+  /** `[[concept-slug]]` links found in this chunk — used to co-surface linked concepts. */
+  linkSlugs: string[];
   snippet: VehicleDynamicsKbSnippet;
 };
 
@@ -143,9 +163,16 @@ export async function loadFullVehicleDynamicsKb(): Promise<FullVehicleDynamicsKb
   if (!fullKbLoadPromise) {
     fullKbLoadPromise = (async () => {
       const approvedFiles = await listKbMarkdownFiles(KB_DIR);
+      const conceptFiles = await listKbMarkdownFiles(KB_CONCEPTS_DIR);
       const draftFiles = await listKbMarkdownFiles(KB_DRAFTS_DIR);
 
-      const readParts = async (dir: string, files: string[], pathPrefix: string, suffix: string) => {
+      const readParts = async (
+        dir: string,
+        files: string[],
+        pathPrefix: string,
+        suffix: string,
+        includedPrefix: string
+      ) => {
         const parts: string[] = [];
         const included: string[] = [];
         for (const file of files) {
@@ -158,27 +185,36 @@ export async function loadFullVehicleDynamicsKb(): Promise<FullVehicleDynamicsKb
           const body = raw.trim();
           if (!body) continue;
           parts.push(`=== ${pathPrefix}${file}${suffix} ===\n\n${body}`);
-          included.push(file);
+          included.push(`${includedPrefix}${file}`);
         }
         return { parts, included };
       };
 
-      const approved = await readParts(KB_DIR, approvedFiles, "vehicle-dynamics/", "");
+      const approved = await readParts(KB_DIR, approvedFiles, "vehicle-dynamics/", "", "");
+      // Concepts are founder-tier: ship them in the approved section (before the drafts divider).
+      const concepts = await readParts(
+        KB_CONCEPTS_DIR,
+        conceptFiles,
+        "vehicle-dynamics/concepts/",
+        "",
+        "concepts/"
+      );
       const drafts = await readParts(
         KB_DRAFTS_DIR,
         draftFiles,
         "vehicle-dynamics/drafts/",
-        " (AI DRAFT — unverified)"
+        " (AI DRAFT — unverified)",
+        ""
       );
 
-      const sections = [...approved.parts];
+      const sections = [...approved.parts, ...concepts.parts];
       if (drafts.parts.length > 0) {
         sections.push(FULL_KB_DRAFTS_DIVIDER, ...drafts.parts);
       }
       const markdown = sections.join("\n\n");
       const out = {
         markdown,
-        files: approved.included,
+        files: [...approved.included, ...concepts.included].sort(),
         draftFiles: drafts.included,
         totalChars: markdown.length,
       };
@@ -235,6 +271,9 @@ async function loadKbIndex(): Promise<KbIndexEntry[]> {
         }
       };
       await indexDir(KB_DIR, "", "");
+      // Concept layer (founder-tier) — retrievable so a bare keyword query can hit a concept,
+      // and so co-surfacing can pull a matched parameter's linked concepts.
+      await indexDir(KB_CONCEPTS_DIR, "concepts/", "");
       // AI-drafted tier: retrievable, but marked so consumers and the model can tell
       // the provenance apart from founder-approved prose (AGENTS.md drafts rules).
       await indexDir(KB_DRAFTS_DIR, "drafts/", "[draft] ");
@@ -275,6 +314,7 @@ export async function searchVehicleDynamicsKb(
     scored.push({
       score: sc,
       keyTokens,
+      linkSlugs: extractLinkSlugs(body),
       snippet: {
         sourcePath: `vehicle-dynamics/${file}`,
         title: title.length > 80 ? `${title.slice(0, 77)}…` : title,
@@ -353,5 +393,36 @@ export async function searchVehicleDynamicsKb(
     guaranteeAdds++;
   }
 
-  return selected.map((x) => x.snippet);
+  // Co-surface linked concepts (light-tier robustness): when a selected chunk references a concept
+  // via [[slug]], pull that concept in as supporting context — plus one hop of concept→concept links
+  // — even if the concept itself didn't match the query. Appended after the ranked matches, capped.
+  const conceptBySlug = new Map<string, KbIndexEntry>();
+  for (const e of index) {
+    if (!e.file.startsWith("concepts/")) continue;
+    conceptBySlug.set(e.file.slice("concepts/".length).replace(/\.md$/i, ""), e);
+  }
+  const alreadyPaths = new Set(selected.map((s) => s.snippet.sourcePath));
+  const visited = new Set<string>();
+  const queue: string[] = [];
+  for (const s of selected) for (const slug of s.linkSlugs) queue.push(slug);
+  const conceptAdds: VehicleDynamicsKbSnippet[] = [];
+  while (queue.length > 0 && conceptAdds.length < MAX_CONCEPT_ADDS) {
+    const slug = queue.shift()!;
+    if (visited.has(slug)) continue;
+    visited.add(slug);
+    const entry = conceptBySlug.get(slug);
+    if (!entry) continue;
+    const sourcePath = `vehicle-dynamics/${entry.file}`;
+    if (alreadyPaths.has(sourcePath)) continue;
+    alreadyPaths.add(sourcePath);
+    const text = `${entry.title}\n${entry.body}`;
+    conceptAdds.push({
+      sourcePath,
+      title: entry.title.length > 80 ? `${entry.title.slice(0, 77)}…` : entry.title,
+      excerpt: text.length > 900 ? `${text.slice(0, 897)}…` : text,
+    });
+    for (const next of extractLinkSlugs(entry.body)) queue.push(next);
+  }
+
+  return [...selected.map((x) => x.snippet), ...conceptAdds];
 }

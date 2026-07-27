@@ -11,8 +11,7 @@ import { formatRunSessionDisplay } from "@/lib/runSession";
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import type { RunTireIndicator } from "@/lib/runs/tireSetChange";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
-import { isTireFieldKey } from "@/lib/tires/tireSelectionValue";
-import { allTirePrepBooleanKeys } from "@/lib/tires/tirePrepFields";
+import { isExcludedSetupChangeKey } from "@/lib/setupCompare/setupChangeNoise";
 
 /**
  * Analysis debrief home model — pure types + shaping helpers shared by the
@@ -241,17 +240,6 @@ export function isTrackCarPersonalBest(
 ): boolean {
   if (best == null || minBestAtTrackCar == null) return false;
   return best <= minBestAtTrackCar + epsilon;
-}
-
-const EXCLUDED_TIRE_PREP_KEYS = new Set(allTirePrepBooleanKeys());
-
-/**
- * Setup keys the trend wrench row ignores: tire selection + legacy tire-prep
- * booleans. (Battery / additive / tire set are Run columns, not setup-sheet
- * data, so they never appear in the setup diff at all.)
- */
-function isExcludedSetupChangeKey(key: string): boolean {
-  return isTireFieldKey(key) || EXCLUDED_TIRE_PREP_KEYS.has(key);
 }
 
 /**

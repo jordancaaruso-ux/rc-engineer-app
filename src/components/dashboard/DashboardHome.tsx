@@ -8,6 +8,7 @@ import { DashboardGetSetUpCard } from "@/components/dashboard/DashboardGetSetUpC
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
 import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
 import type { OnboardingView } from "@/lib/onboarding/server";
+import { showGetSetUpCard } from "@/lib/onboarding/visibility";
 import type { SetupSheetPrompt } from "@/lib/setup/setupSheetPrompt";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Reveal } from "@/components/ui/Reveal";
@@ -66,10 +67,11 @@ export function DashboardHome({
 
   // First-run readiness (docs/ONBOARDING_NORTH_STAR.md, reversal 2026-07-23).
   // Only a car is required; the card carries the payoff + advised timing/setup and
-  // self-retires once the garage is ready, a run exists, or it's dismissed.
+  // self-retires once the garage is ready, a run exists, or it's dismissed. The
+  // rule itself lives in `lib/onboarding/visibility.ts` — tested there, and driven
+  // across every state at /debug/onboarding-preview.
   const ob = onboarding;
-  const setupReady = ob ? ob.hasCar && ob.hasTimingIdentity && ob.hasSetup : true;
-  const showGetSetUp = Boolean(ob && !ob.dismissed && !ob.hasAnyRun && !setupReady);
+  const showGetSetUp = ob ? showGetSetUpCard(ob) : false;
 
   return (
     <>

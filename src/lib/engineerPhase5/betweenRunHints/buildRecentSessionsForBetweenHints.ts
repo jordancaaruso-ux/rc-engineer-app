@@ -57,7 +57,7 @@ const runSelectForRefPick = {
   sortAt: true,
   carId: true,
   trackId: true,
-  tireSetId: true,
+  tireStintId: true,
   tireRunNumber: true,
   notes: true,
   driverNotes: true,
@@ -227,7 +227,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
   recentSessions: BetweenRunRecentSessionSnapshotV1[];
   fingerprintMaterial: RecentSessionsFingerprintMaterial;
   driverContextPack: BetweenRunHintPayloadV2["driverContextPack"];
-  chronoPreviousTireMeta: { tireSetId: string | null; tireRunNumber: number } | null;
+  chronoPreviousTireMeta: { tireStintId: string | null; tireRunNumber: number } | null;
 }> {
   const runIds = await loadChronoRunIdsForRecentHints(params.userId, params.primaryRunId, 3);
 
@@ -334,7 +334,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
 
   let previousRunHandling: string | null = null;
   let chronologicalSetupChangeLines: string[] = [];
-  let chronoPreviousTireMeta: { tireSetId: string | null; tireRunNumber: number } | null = null;
+  let chronoPreviousTireMeta: { tireStintId: string | null; tireRunNumber: number } | null = null;
   let bestPaceBaseline: {
     runId: string;
     displayLabel: string;
@@ -353,7 +353,7 @@ export async function buildRecentSessionsForBetweenHints(params: {
     const chronologicalPrevious = idx >= 0 && idx < carRuns.length - 1 ? carRuns[idx + 1]! : null;
     if (chronologicalPrevious) {
       chronoPreviousTireMeta = {
-        tireSetId: chronologicalPrevious.tireSetId,
+        tireStintId: chronologicalPrevious.tireStintId,
         tireRunNumber: chronologicalPrevious.tireRunNumber,
       };
       previousRunHandling = handlingPreviewFromRun(

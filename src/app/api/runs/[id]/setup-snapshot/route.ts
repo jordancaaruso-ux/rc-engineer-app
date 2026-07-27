@@ -1,29 +1,17 @@
 import { NextResponse } from "next/server";
+import { buildTireSelectionValue } from "@/lib/tires/tireSelectionValue";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { canViewPeerRuns, isRunSharedWithTeam, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
+import { viewerMayAccessRun } from "@/lib/teams/teamRunAccess";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import {
   normalizeSetupSnapshotForStorage,
   type SetupSnapshotData,
 } from "@/lib/runSetup";
-import { tireSelectionFromTireSet } from "@/lib/tires/tireSelectionFromSet";
 import { computeSetupDeltaForAudit } from "@/lib/setup/resolveSetupSnapshot";
 
 type Params = { params: Promise<{ id: string }> };
-
-async function viewerMayAccessRun(
-  viewerId: string,
-  run: { userId: string; shareWithTeam: boolean | null }
-): Promise<boolean> {
-  if (run.userId === viewerId) return true;
-  if (!(await canViewPeerRuns(viewerId, run.userId))) return false;
-  if (await peerAccessIsTeamOnly(viewerId, run.userId)) {
-    return isRunSharedWithTeam(run);
-  }
-  return true;
-}
 
 const runSelectForPdfReview = {
   id: true,
@@ -35,7 +23,6 @@ const runSelectForPdfReview = {
   meetingSessionCode: true,
   sessionLabel: true,
   carId: true,
-  tireSetId: true,
   setupSnapshotId: true,
   car: {
     select: {
@@ -104,7 +91,10 @@ export async function PATCH(request: Request, { params }: Params) {
     select: {
       id: true,
       carId: true,
-      tireSetId: true,
+      tireTypeId: true,
+      tireRunNumber: true,
+      tireAgeKnown: true,
+      tireType: { select: { id: true, displayName: true } },
       setupSnapshotId: true,
       setupSnapshot: { select: { id: true, data: true } },
     },
@@ -124,21 +114,15 @@ export async function PATCH(request: Request, { params }: Params) {
 
   let resolvedData = normalizeSetupSnapshotForStorage(body.setupData as SetupSnapshotData);
 
-  const tireSet = run.tireSetId
-    ? await prisma.tireSet.findFirst({
-        where: { id: run.tireSetId, userId: user.id },
-        select: {
-          label: true,
-          setNumber: true,
-          insertLabel: true,
-          wheelLabel: true,
-          specificModel: true,
-          tireTypeId: true,
-          tireType: { select: { id: true, displayName: true, modelCode: true } },
-        },
-      })
-    : null;
-  const tireValue = tireSet ? tireSelectionFromTireSet(tireSet) : undefined;
+  const tireValue =
+    run.tireTypeId && run.tireType
+      ? buildTireSelectionValue({
+          tireTypeId: run.tireTypeId,
+          displayName: run.tireType.displayName,
+          tireRunNumber: run.tireRunNumber,
+          tireAgeKnown: run.tireAgeKnown,
+        })
+      : undefined;
 
   resolvedData = normalizeSetupSnapshotForStorage({
     ...resolvedData,

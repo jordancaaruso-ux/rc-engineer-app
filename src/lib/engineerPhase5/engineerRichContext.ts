@@ -50,11 +50,11 @@ export type EngineerRichContextV1 = {
     source: "run" | "event" | "none";
   };
   tires: null | {
-    id: string;
     label: string;
     modelCode: string | null;
-    setNumber: number;
     tireRunNumber: number;
+    /** False when the driver didn't know the tires' age — the run number is relative, not absolute. */
+    tireAgeKnown: boolean;
     additiveType: string | null;
     additiveTypeModelCode: string | null;
     warmerTimingMinutes: number | null;
@@ -177,7 +177,7 @@ const runSelectRich = {
   carId: true,
   trackId: true,
   eventId: true,
-  tireSetId: true,
+  tireStintId: true,
   importedLapTimeSessionId: true,
   setupSnapshot: { select: { data: true } },
   car: {
@@ -190,15 +190,8 @@ const runSelectRich = {
   trackLayoutNameSnapshot: true,
   trackDirection: true,
   event: { select: { id: true, raceClass: true } },
-  tireSet: {
-    select: {
-      id: true,
-      label: true,
-      setNumber: true,
-      initialRunCount: true,
-      tireType: { select: { displayName: true, modelCode: true } },
-    },
-  },
+  tireType: { select: { displayName: true, modelCode: true } },
+  tireAgeKnown: true,
   additiveType: {
     select: { displayName: true, modelCode: true },
   },
@@ -393,7 +386,8 @@ export async function buildEngineerRichContextV1(params: {
     : " Community spread is unavailable until aggregations are rebuilt or your car has a setupSheetTemplate with eligible uploads.";
   const note =
     `${garageNote}${communityNote}` +
-    " Only chassis/suspension tuning parameters are included (excludes motor, pinion, wing, ESC, etc.). Each row includes spreadSource: community_eligible_uploads vs your_garage when numeric bands apply." +
+    " Only chassis/suspension tuning parameters are included (excludes motor, pinion, wing, ESC, etc.). Each row includes spreadSource: community_eligible_uploads vs your_garage vs base_setup when numeric bands apply." +
+    " spreadSource: base_setup means there is NO population data for that row—the band is a window drawn around this chassis' kit setup (baseSetupRef names it), one step either side for mid, three steps out for the edges, sampleCount 1. Treat it as a reference point, not a distribution: say \"wide of the kit setup\" and never \"wide of typical\" or \"most people run\". It still tells you which direction is further out, which is the point: a move that pushes an already-extreme parameter further out is a bigger call than one bringing it back, though it can still be the right answer." +
     " Rows with parameterKey starting with derived_: upper = upper outer − avg(upper inner L/R) per axle (larger = more angled upper in KB). Lower = avg(under-lower L/R) + under hub per axle (larger = more inner-lower+hub stack → higher RC on that end; not the same “angled” sign as upper—see arm-angles-camber-gain). Balance = front − rear. When describing the user’s setup, prefer concrete shim values (inner+outer per link) over a derived mm headline; use derived rows for field position and balance. Not literal °." +
     " Community bands are NOT filtered by tire compound, race class, or upload recency—only template·surface·grip; name tires + sessionClass when citing “typical.” manufacturerBaseline (when present) is the official PDF reference—separate from community counts. Do not state absolute roll-centre height (mm); relative RC tendency only.";
 
@@ -427,9 +421,9 @@ export async function buildEngineerRichContextV1(params: {
   }
 
   const runPacingContext = buildRunPacingContextV1({
-    tireSetId: run.tireSetId,
-    tireSetLabel: run.tireSet?.label ?? null,
-    initialRunCount: run.tireSet?.initialRunCount ?? 0,
+    tireStintId: run.tireStintId,
+    tireSetLabel: run.tireType?.displayName ?? null,
+    initialRunCount: 0,
     tireRunNumber: run.tireRunNumber,
     importedSessionFieldStats,
   });
@@ -447,13 +441,12 @@ export async function buildEngineerRichContextV1(params: {
         }
       : null,
     sessionClass,
-    tires: run.tireSet
+    tires: run.tireType
       ? {
-          id: run.tireSet.id,
-          label: run.tireSet.tireType?.displayName ?? run.tireSet.label,
-          modelCode: run.tireSet.tireType?.modelCode ?? null,
-          setNumber: run.tireSet.setNumber,
+          label: run.tireType.displayName,
+          modelCode: run.tireType.modelCode ?? null,
           tireRunNumber: run.tireRunNumber,
+          tireAgeKnown: run.tireAgeKnown,
           additiveType: run.additiveType?.displayName ?? null,
           additiveTypeModelCode: run.additiveType?.modelCode ?? null,
           warmerTimingMinutes: run.warmerTimingMinutes ?? null,
@@ -461,11 +454,10 @@ export async function buildEngineerRichContextV1(params: {
         }
       : run.additiveType || run.warmerTimingMinutes != null || tirePrepHasContent(normalizeTirePrep(run.tirePrep))
         ? {
-            id: "",
             label: "",
             modelCode: null,
-            setNumber: 0,
             tireRunNumber: run.tireRunNumber,
+            tireAgeKnown: run.tireAgeKnown,
             additiveType: run.additiveType?.displayName ?? null,
             additiveTypeModelCode: run.additiveType?.modelCode ?? null,
             warmerTimingMinutes: run.warmerTimingMinutes ?? null,

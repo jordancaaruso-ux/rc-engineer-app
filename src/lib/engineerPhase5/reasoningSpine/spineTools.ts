@@ -15,16 +15,12 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { buildTireLifePriorsForChatContext } from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
 
 function tireHaystack(run: {
-  tireSet: {
-    label: string | null;
-    tireType: { displayName: string; modelCode: string } | null;
-  } | null;
+  tireType: { displayName: string; modelCode: string } | null;
 }): string {
   return [
-    run.tireSet?.tireType?.displayName,
-    run.tireSet?.tireType?.modelCode,
-    run.tireSet?.label,
-  ]
+    run.tireType?.displayName,
+    run.tireType?.modelCode,
+      ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -71,6 +67,7 @@ export async function getParamSpreadTool(
       currentDisplay: r.currentDisplay,
       positionBand: r.positionBand,
       spreadSource: r.spreadSource,
+      baseSetupRef: r.baseSetupRef,
       communityGripLevel: r.communityGripLevel,
       spread: r.spread
         ? {
@@ -108,18 +105,14 @@ async function aggregateRunsByTireLabel(
     loggingCompletedAt: Date | null;
     lapTimes: unknown;
     lapSession: unknown;
-    tireSet: {
-      label: string | null;
-      tireType: { displayName: string; modelCode: string } | null;
-    } | null;
+    tireType: { displayName: string; modelCode: string } | null;
   }>,
   timeZone: string
 ): Promise<TireAggRow[]> {
   const byLabel = new Map<string, TireAggRow>();
   for (const run of runs) {
     const label =
-      run.tireSet?.label?.trim() ||
-      run.tireSet?.tireType?.displayName?.trim() ||
+      run.tireType?.displayName?.trim() ||
       "Unknown tire";
     const rows = primaryLapRowsFromRun(run);
     const dash = getIncludedLapDashboardMetrics(rows);
@@ -192,12 +185,7 @@ export async function compareTiresTool(
       loggingCompletedAt: true,
       lapTimes: true,
       lapSession: true,
-      tireSet: {
-        select: {
-          label: true,
-          tireType: { select: { displayName: true, modelCode: true } },
-        },
-      },
+      tireType: { select: { displayName: true, modelCode: true } },
     },
   });
 
@@ -256,12 +244,7 @@ export async function tireHistoryAtTrackTool(
       loggingCompletedAt: true,
       lapTimes: true,
       lapSession: true,
-      tireSet: {
-        select: {
-          label: true,
-          tireType: { select: { displayName: true, modelCode: true } },
-        },
-      },
+      tireType: { select: { displayName: true, modelCode: true } },
     },
   });
 
@@ -313,7 +296,7 @@ export async function tireLifePriorsAtRunTool(
   if (!runId) return { ok: false, error: "anchor_run_id is required." };
   const run = await prisma.run.findFirst({
     where: { id: runId, userId },
-    select: { id: true, tireSetId: true },
+    select: { id: true, tireStintId: true },
   });
   if (!run) return { ok: false, error: "Run not found." };
   const priors = await buildTireLifePriorsForChatContext({

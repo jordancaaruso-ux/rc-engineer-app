@@ -15,7 +15,7 @@ function makeRun(
     sortAtIso: overrides.sortAtIso ?? "2026-05-15T10:00:00.000Z",
     trackId: overrides.trackId ?? "track-a",
     eventId: overrides.eventId ?? "event-a",
-    tireSetId: overrides.tireSetId ?? "tire-set-1",
+    tireStintId: overrides.tireStintId ?? "tire-set-1",
     tireLabel: overrides.tireLabel ?? "Sweep 32R · set 1",
     tireCompoundLabel: overrides.tireCompoundLabel ?? null,
     tireRunNumber: overrides.tireRunNumber ?? 2,

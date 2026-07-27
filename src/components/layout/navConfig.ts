@@ -1,13 +1,13 @@
-import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
-  Car,
-  LayoutDashboard,
-  PlusCircle,
-  Settings,
-  Sparkles,
-  Users,
-} from "lucide-react";
+  IconAddRun,
+  IconAnalysis,
+  IconDashboard,
+  IconEngineer,
+  IconGarage,
+  IconSettings,
+  IconTeams,
+  type JrcIcon,
+} from "@/components/icons/JRCIcons";
 
 export type PrimaryNavId =
   | "dashboard"
@@ -22,7 +22,8 @@ export type PrimaryNavItem = {
   id: PrimaryNavId;
   href: string;
   label: string;
-  icon: LucideIcon;
+  /** JRC "Solid Form" glyph — solid in both states; active is a colour swap. */
+  icon: JrcIcon;
   /** Resolve href from today's draft run when available. */
   smartDraft?: boolean;
   /** Next.js Link prefetch — false for heavy routes. */
@@ -72,7 +73,6 @@ const ASSETS_PREFIXES = [
   "/setup",
   "/events",
   "/tracks",
-  "/tire-sets",
   "/tires",
   "/cars",
   "/assets",
@@ -121,20 +121,20 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
   return best?.id ?? null;
 }
 
-const DASHBOARD: PrimaryNavItem = { id: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard };
+const DASHBOARD: PrimaryNavItem = { id: "dashboard", href: "/", label: "Dashboard", icon: IconDashboard };
 const ADD_RUN: PrimaryNavItem = {
   id: "add-run",
   href: "/runs/new",
   label: "Add run",
-  icon: PlusCircle,
+  icon: IconAddRun,
   smartDraft: true,
   prefetch: false,
 };
-const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: BarChart3 };
-const ASSETS: PrimaryNavItem = { id: "assets", href: "/assets", label: "Garage", icon: Car };
-const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: Sparkles };
-const TEAMS: PrimaryNavItem = { id: "teams", href: "/teams", label: "Teams", icon: Users };
-const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: Settings };
+const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: IconAnalysis };
+const ASSETS: PrimaryNavItem = { id: "assets", href: "/assets", label: "Garage", icon: IconGarage };
+const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: IconEngineer };
+const TEAMS: PrimaryNavItem = { id: "teams", href: "/teams", label: "Teams", icon: IconTeams };
+const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: IconSettings };
 
 export const PRIMARY_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ENGINEER, ASSETS, TEAMS, SETTINGS];
 
@@ -213,9 +213,9 @@ export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
         icon: "car",
       },
       {
-        href: "/tire-sets",
+        href: "/tires",
         label: "Tires",
-        description: "Your tire sets and run wear history.",
+        description: "The tire compounds you can pick from.",
         icon: "disc",
       },
     ],

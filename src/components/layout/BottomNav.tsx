@@ -1,29 +1,12 @@
 "use client";
 
 import { memo } from "react";
-import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
-import { Car, ChartBar, Gauge, UsersThree } from "@phosphor-icons/react";
-import { MOBILE_NAV, type PrimaryNavId } from "@/components/layout/navConfig";
-import { EngineerNavIcon } from "@/components/layout/EngineerNavIcon";
+import { MOBILE_NAV } from "@/components/layout/navConfig";
 import { IdeasDockCap } from "@/components/layout/IdeasDockCap";
 import { LogRunFab } from "@/components/layout/LogRunFab";
 import { PrimaryNavLink } from "@/components/layout/PrimaryNavLink";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
 import { cn } from "@/lib/utils";
-
-/**
- * Dock icons — Phosphor (regular outline → solid fill when active), scoped to
- * the mobile dock's five destinations. `add-run` and `settings` are no longer
- * dock items (`add-run` is the yellow circle beside the bar, `settings` lives
- * behind the account `AccountMenu`). Engineer uses `EngineerNavIcon`; the
- * desktop sidebar keeps the Lucide set from navConfig.
- */
-const DOCK_ICON_MAP: Partial<Record<PrimaryNavId, PhosphorIcon>> = {
-  dashboard: Gauge,
-  analysis: ChartBar,
-  assets: Car,
-  teams: UsersThree,
-};
 
 /**
  * Mobile bottom chrome, one row (founder-locked 2026-07-14, artifact round 3
@@ -32,6 +15,10 @@ const DOCK_ICON_MAP: Partial<Record<PrimaryNavId, PhosphorIcon>> = {
  * beside the bar at matched height. Static on scroll — nothing collapses.
  * When `LogRunFab` is suppressed (create/edit flows) the bar stretches to fill
  * the row.
+ *
+ * Glyphs come from the JRC "Solid Form" set (`navConfig` → `JRCIcons`) — solid
+ * in both states, so active reads as the yellow colour swap plus the sliding
+ * indicator, not an outline→fill change.
  */
 export const BottomNav = memo(function BottomNav() {
   const { activeId } = usePrimaryNav();
@@ -59,8 +46,7 @@ export const BottomNav = memo(function BottomNav() {
             </span>
             {MOBILE_NAV.map((item) => {
               const active = activeId === item.id;
-              const isEngineer = item.id === "engineer";
-              const Icon = DOCK_ICON_MAP[item.id];
+              const Icon = item.icon;
 
               return (
                 <PrimaryNavLink
@@ -76,15 +62,7 @@ export const BottomNav = memo(function BottomNav() {
                   )}
                 >
                   <span className="relative shrink-0">
-                    {isEngineer ? (
-                      <EngineerNavIcon
-                        active={active}
-                        filled={active}
-                        className="h-[26px] w-[26px]"
-                      />
-                    ) : Icon ? (
-                      <Icon size={26} weight={active ? "fill" : "regular"} aria-hidden />
-                    ) : null}
+                    <Icon size={24} className="dock-icon" aria-hidden />
                   </span>
                 </PrimaryNavLink>
               );

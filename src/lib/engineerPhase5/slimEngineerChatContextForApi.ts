@@ -28,6 +28,7 @@ function compactSpreadRow(row: unknown): unknown {
     label: row.label,
     currentDisplay: row.currentDisplay,
     spreadSource: row.spreadSource,
+    baseSetupRef: row.baseSetupRef ?? null,
     positionBand: row.positionBand,
     communityGripLevel: row.communityGripLevel,
     spread: spread

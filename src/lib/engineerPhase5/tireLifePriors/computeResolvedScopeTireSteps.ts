@@ -45,11 +45,11 @@ type RunRow = {
   sessionCompletedAt: Date | null;
   eventId: string | null;
   trackId: string | null;
-  tireSetId: string | null;
+  tireStintId: string | null;
   tireRunNumber: number;
   lapTimes: unknown;
   lapSession: unknown;
-  tireSet: { label: string | null } | null;
+  tireType: { displayName: string } | null;
   event: { name: string } | null;
   track: { name: string } | null;
 };
@@ -135,7 +135,10 @@ export async function computeResolvedScopeTireStepsV1(params: {
       userId: params.userId,
       id: { in: ids },
       loggingComplete: true,
-      tireSetId: { not: null },
+      tireStintId: { not: null },
+      // This path anchors on absolute run 1→2, which an "age unknown" stint
+      // cannot supply — its count is relative to when the driver got the tires.
+      tireAgeKnown: true,
     },
     select: {
       id: true,
@@ -143,11 +146,11 @@ export async function computeResolvedScopeTireStepsV1(params: {
       sessionCompletedAt: true,
       eventId: true,
       trackId: true,
-      tireSetId: true,
+      tireStintId: true,
       tireRunNumber: true,
       lapTimes: true,
       lapSession: true,
-      tireSet: { select: { label: true } },
+      tireType: { select: { displayName: true } },
       event: { select: { name: true } },
       track: { select: { name: true } },
     },
@@ -156,12 +159,12 @@ export async function computeResolvedScopeTireStepsV1(params: {
   const filtered =
     labelNeedle == null
       ? runs
-      : runs.filter((r) => (r.tireSet?.label ?? "").toLowerCase().includes(labelNeedle));
+      : runs.filter((r) => (r.tireType?.displayName ?? "").toLowerCase().includes(labelNeedle));
 
   type PairSample = {
     d: PairDeltas;
-    tireSetId: string;
-    tireSetLabel: string | null;
+    tireStintId: string;
+    tireLabel: string | null;
     fromRunId: string;
     toRunId: string;
   };
@@ -179,7 +182,7 @@ export async function computeResolvedScopeTireStepsV1(params: {
   for (const group of byBucket.values()) {
     const bySet = new Map<string, RunRow[]>();
     for (const r of group) {
-      const sid = r.tireSetId;
+      const sid = r.tireStintId;
       if (!sid) continue;
       const arr = bySet.get(sid) ?? [];
       arr.push(r);
@@ -196,11 +199,11 @@ export async function computeResolvedScopeTireStepsV1(params: {
         if (!prev || prev.tireRunNumber !== 1) continue;
         const d = deltaPair(prev, curr);
         if (!d) continue;
-        const tid = curr.tireSetId!;
+        const tid = curr.tireStintId!;
         pairSamples.push({
           d,
-          tireSetId: tid,
-          tireSetLabel: curr.tireSet?.label ?? null,
+          tireStintId: tid,
+          tireLabel: curr.tireType?.displayName ?? null,
           fromRunId: prev.id,
           toRunId: curr.id,
         });
@@ -209,7 +212,7 @@ export async function computeResolvedScopeTireStepsV1(params: {
 
     if (pairSamples.length < MIN_PAIRS_PUBLISH) continue;
 
-    const distinctSets = new Set(pairSamples.map((p) => p.tireSetId));
+    const distinctSets = new Set(pairSamples.map((p) => p.tireStintId));
     const any = pairSamples[0]!;
     const metaFrom = group.find((r) => r.id === any.fromRunId || r.id === any.toRunId);
 
@@ -221,8 +224,8 @@ export async function computeResolvedScopeTireStepsV1(params: {
     const examplePairs = pairSamples.slice(0, MAX_EXAMPLE_PAIRS).map((p) => ({
       fromRunId: p.fromRunId,
       toRunId: p.toRunId,
-      tireSetId: p.tireSetId,
-      tireSetLabel: p.tireSetLabel,
+      tireStintId: p.tireStintId,
+      tireLabel: p.tireLabel,
     }));
 
     bucketsOut.push({

@@ -6,7 +6,7 @@ import { carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
 import type { NumericStats } from "@/lib/setupAggregations/numericStats";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
-import { parseNumericFromSetupString } from "@/lib/setup/parseSetupNumeric";
+import { setupValueToNumber } from "@/lib/setup/parseSetupNumeric";
 import {
   GRIP_BUCKET_ANY,
   gripBucketLabel,
@@ -36,9 +36,23 @@ import {
   computeGripSpreadContrast,
   type GripSpreadContrast,
 } from "@/lib/engineerPhase5/gripSpreadContrast";
+import {
+  baseSetupValueForKey,
+  buildBaseSetupReference,
+  type BaseSetupRef,
+} from "@/lib/setup/resolveBaseSetupForCar";
+import { getParameterStep } from "@/lib/setup/parameterStepSizes";
+import { synthesizeBaseSetupStats } from "@/lib/engineerPhase5/baseSetupBands";
 
 /** Base tuning rows plus six derived link-index keys. */
 const MAX_PARAMS = 52;
+
+/**
+ * Aggregations are real data from many uploads, so they win whenever they exist; the base setup only
+ * fills the hole they leave. Flip this to prefer the base setup even when an aggregation exists —
+ * open question whether one internally coherent sheet beats a blend of many across conditions.
+ */
+const AGGREGATION_WINS_OVER_BASE_SETUP = true;
 
 /** When `Car.setupSheetTemplate` is unset, infer A800RR community bucket from structured top-deck / motor keys. */
 const A800RR_SNAPSHOT_SIGNAL_KEYS = new Set([
@@ -224,11 +238,6 @@ function formatSetupVal(v: unknown): string {
   return String(v);
 }
 
-function tryParseNumericFromSetupValue(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "boolean") return v ? 1 : 0;
-  return parseNumericFromSetupString(v, { allowKSuffix: false });
-}
 
 function bandForValue(v: number, s: NumericStats): SetupSpreadPositionBand {
   if (v < s.p10) return "below_typical";
@@ -393,8 +402,16 @@ export type EngineerSetupSpreadRow = {
   parameterKey: string;
   currentDisplay: string;
   valueType: SetupAggregationValueType;
-  /** Where numeric spread bands came from: community eligible uploads vs your garage cars sharing the template. */
-  spreadSource: "community_eligible_uploads" | "your_garage" | "none";
+  /**
+   * Where numeric spread bands came from: community eligible uploads, your garage cars sharing the
+   * template, or — when neither exists — a window synthesized around this chassis' kit setup.
+   */
+  spreadSource: "community_eligible_uploads" | "your_garage" | "base_setup" | "none";
+  /**
+   * Set only when `spreadSource` is `base_setup`: which base setup the window was built around.
+   * The bands are one point wide by construction (`sampleCount` 1), never a measured distribution.
+   */
+  baseSetupRef: BaseSetupRef | null;
   /** Which community grip bucket served this row (after fallback). Null when community wasn't used. */
   communityGripLevel: GripBucket | null;
   spread: null | {
@@ -490,8 +507,17 @@ export async function buildSetupSpreadForEngineer(params: {
   const siblingCarIds = await carIdsSharingSetupTemplate(params.userId, params.carId);
   const carRow = await prisma.car.findFirst({
     where: { id: params.carId, userId: params.userId },
-    select: { setupSheetTemplate: true },
+    select: {
+      setupSheetTemplate: true,
+      setupSheetModel: { select: { name: true, kitSetupJson: true } },
+    },
   });
+  const baseSetup = carRow?.setupSheetModel
+    ? buildBaseSetupReference({
+        kitSetupJson: carRow.setupSheetModel.kitSetupJson,
+        modelName: carRow.setupSheetModel.name,
+      })
+    : null;
   const normalized = normalizeSetupData(params.setupSnapshotData as SetupSnapshotData | null);
   let setupSheetTemplate = canonicalSetupSheetTemplateId(carRow?.setupSheetTemplate ?? null);
   const inferredForCommunity =
@@ -657,13 +683,67 @@ export async function buildSetupSpreadForEngineer(params: {
       ? computeGripSpreadContrast(key, gripTrend, gripTrendSignal)
       : null;
 
-    if (!numericChosen) {
+    const num = setupValueToNumber(cur);
+
+    /**
+     * A window around this chassis' kit setup, used only where no aggregation reaches. Needs a
+     * numeric current value, a numeric base value, and a known step — any of those missing means no
+     * bands at all rather than a guessed width.
+     */
+    const baseBands = ((): { stats: NumericStats; ref: BaseSetupRef } | null => {
+      if (baseSetup == null || num == null) return null;
+      const centre = baseSetupValueForKey(baseSetup, key);
+      if (centre == null) return null;
+      const step = getParameterStep(key);
+      if (step == null) return null;
+      const synthesized = synthesizeBaseSetupStats(centre, step);
+      return synthesized ? { stats: synthesized, ref: baseSetup.ref } : null;
+    })();
+
+    const pushBaseSetupRow = (band: { stats: NumericStats; ref: BaseSetupRef }, value: number) => {
+      rows.push({
+        parameterKey: key,
+        currentDisplay,
+        valueType: SetupAggregationValueType.NUMERIC,
+        spreadSource: "base_setup",
+        baseSetupRef: band.ref,
+        communityGripLevel: null,
+        spread: {
+          sampleCount: band.stats.sampleCount,
+          min: band.stats.min,
+          max: band.stats.max,
+          p10: band.stats.p10,
+          p25: band.stats.p25,
+          p50: band.stats.p50,
+          p75: band.stats.p75,
+          p90: band.stats.p90,
+          median: band.stats.median,
+          mean: band.stats.mean,
+          iqr: band.stats.iqr,
+          topValues: [],
+          distinctValueCount: 0,
+        },
+        gripTrend,
+        gripTrendSignal,
+        gripSpreadContrast,
+        positionBand: bandForValue(value, band.stats),
+      });
+    };
+
+    const preferBase = !AGGREGATION_WINS_OVER_BASE_SETUP && baseBands != null;
+
+    if (preferBase || !numericChosen) {
+      if (baseBands && num != null) {
+        pushBaseSetupRow(baseBands, num);
+        continue;
+      }
       const meta = comm ?? garage;
       rows.push({
         parameterKey: key,
         currentDisplay,
         valueType: meta?.valueType ?? SetupAggregationValueType.NUMERIC,
         spreadSource,
+        baseSetupRef: null,
         communityGripLevel,
         spread: null,
         gripTrend,
@@ -674,13 +754,17 @@ export async function buildSetupSpreadForEngineer(params: {
       continue;
     }
     const stats = parseNumericStats(numericChosen.numericStatsJson);
-    const num = tryParseNumericFromSetupValue(cur);
     if (stats == null || num == null) {
+      if (baseBands && num != null) {
+        pushBaseSetupRow(baseBands, num);
+        continue;
+      }
       rows.push({
         parameterKey: key,
         currentDisplay,
         valueType: SetupAggregationValueType.NUMERIC,
         spreadSource,
+        baseSetupRef: null,
         communityGripLevel,
         spread: null,
         gripTrend,
@@ -695,6 +779,7 @@ export async function buildSetupSpreadForEngineer(params: {
       currentDisplay,
       valueType: SetupAggregationValueType.NUMERIC,
       spreadSource,
+      baseSetupRef: null,
       communityGripLevel,
       spread: {
         sampleCount: stats.sampleCount,

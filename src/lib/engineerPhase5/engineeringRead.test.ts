@@ -36,7 +36,7 @@ function makeRun(overrides: Partial<EngineeringReadRunInput> & { id: string }): 
     sortAtIso: overrides.sortAtIso ?? "2026-05-15T10:00:00.000Z",
     trackId: overrides.trackId ?? "track-a",
     eventId: overrides.eventId ?? "event-a",
-    tireSetId: overrides.tireSetId ?? "tire-set-1",
+    tireStintId: overrides.tireStintId ?? "tire-set-1",
     tireLabel: overrides.tireLabel ?? "Sweep 32R · set 1",
     tireCompoundLabel: overrides.tireCompoundLabel ?? null,
     tireRunNumber: overrides.tireRunNumber ?? 2,
@@ -143,7 +143,7 @@ test("pace vs feel disagreement surfaces a verify recommendation", () => {
 test("tire choice change shows up as a hypothesis and a known-fundamental signal", () => {
   const ref = makeRun({
     id: "ref",
-    tireSetId: "tire-set-1",
+    tireStintId: "tire-set-1",
     tireLabel: "Sweep 32R · set 1",
     tireCompoundLabel: "Sweep 32R",
   });
@@ -151,7 +151,7 @@ test("tire choice change shows up as a hypothesis and a known-fundamental signal
     id: "cur",
     sortAtIso: "2026-05-15T11:00:00.000Z",
     carRating: 4,
-    tireSetId: "tire-set-2",
+    tireStintId: "tire-set-2",
     tireLabel: "Sweep 28R · set 2",
     tireCompoundLabel: "Sweep 28R",
     handlingAssessmentJson: handling({ version: 3, feelVsLastRun: -2 }),

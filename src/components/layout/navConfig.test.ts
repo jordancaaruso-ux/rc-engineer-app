@@ -19,6 +19,8 @@ test("mobile dock is five pure destinations, in order, without add-run or settin
 test("resolveActiveNavId splits /teams from /settings (Teams is its own tab now)", () => {
   assert.equal(resolveActiveNavId("/teams"), "teams");
   assert.equal(resolveActiveNavId("/teams/abc"), "teams");
+  // Team admin lives at /teams/<id>/settings — it must not light up the Settings tab.
+  assert.equal(resolveActiveNavId("/teams/abc/settings"), "teams");
   assert.equal(resolveActiveNavId("/settings"), "settings");
   assert.equal(resolveActiveNavId("/settings/danger"), "settings");
 });

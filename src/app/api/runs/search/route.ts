@@ -77,7 +77,8 @@ export async function GET(request: Request) {
       car: { select: { name: true, setupSheetTemplate: true } },
       track: { select: { name: true } },
       event: { select: { name: true } },
-      tireSet: { select: { label: true, setNumber: true } },
+      tireType: { select: { displayName: true } },
+      tireAgeKnown: true,
     },
   });
 

@@ -24,13 +24,19 @@ function slugify(heading) {
     .replace(/^-|-$/g, "");
 }
 
-async function main() {
-  const files = (await fs.readdir(KB_DIR)).filter((f) => f.endsWith(".md"));
-  const chunks = [];
+async function chunkDir(dir, sourcePrefix, chunks) {
+  let files;
+  try {
+    files = (await fs.readdir(dir)).filter(
+      (f) => f.endsWith(".md") && f.toLowerCase() !== "readme.md"
+    );
+  } catch {
+    return; // dir may not exist (e.g. no concepts/ yet)
+  }
 
   for (const file of files.sort()) {
-    const sourcePath = file;
-    const body = await fs.readFile(path.join(KB_DIR, file), "utf8");
+    const sourcePath = `${sourcePrefix}${file}`;
+    const body = await fs.readFile(path.join(dir, file), "utf8");
     const sections = body.split(/^## /m);
     const preamble = sections.shift() ?? "";
     const fileTitle =
@@ -60,6 +66,14 @@ async function main() {
       });
     }
   }
+}
+
+async function main() {
+  const chunks = [];
+  // Top-level parameter files, then the founder-tier concept layer (subfolder — readdir is
+  // non-recursive, so it must be walked explicitly).
+  await chunkDir(KB_DIR, "", chunks);
+  await chunkDir(path.join(KB_DIR, "concepts"), "concepts/", chunks);
 
   await fs.writeFile(
     OUT,

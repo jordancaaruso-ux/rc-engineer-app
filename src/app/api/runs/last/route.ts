@@ -25,7 +25,9 @@ export async function GET(request: Request) {
   const baseInclude = {
     track: { select: { id: true, name: true } },
     trackLayout: { select: { id: true, name: true } },
-    tireSet: { select: { id: true, label: true, setNumber: true } },
+    tireType: { select: { id: true, displayName: true } },
+    tireStintId: true,
+    tireAgeKnown: true,
     event: { select: { id: true, name: true, trackId: true, startDate: true, endDate: true } },
     setupSnapshot: { select: { id: true, data: true } },
   } as const;

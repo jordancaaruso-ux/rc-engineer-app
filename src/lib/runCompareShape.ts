@@ -26,7 +26,9 @@ export function toCompareRunShape(run: {
   notes?: string | null;
   driverNotes?: string | null;
   handlingProblems?: string | null;
-  tireSet?: { id: string; label: string; setNumber: number | null } | null;
+  tireType?: { id: string; displayName: string } | null;
+  tireStintId?: string | null;
+  tireAgeKnown?: boolean | null;
   tireRunNumber: number;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
@@ -66,7 +68,9 @@ export function toCompareRunShape(run: {
     notes: run.notes,
     driverNotes: run.driverNotes,
     handlingProblems: run.handlingProblems,
-    tireSet: run.tireSet,
+    tireType: run.tireType ?? null,
+    tireStintId: run.tireStintId ?? null,
+    tireAgeKnown: run.tireAgeKnown ?? true,
     tireRunNumber: run.tireRunNumber,
     additiveType: run.additiveType ?? null,
     warmerTimingMinutes: run.warmerTimingMinutes ?? null,

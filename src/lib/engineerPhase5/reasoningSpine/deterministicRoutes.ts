@@ -22,16 +22,12 @@ import { parsePlanningQuery } from "@/lib/engineerPhase5/reasoningSpine/parsePla
 import { compareTiresTool } from "@/lib/engineerPhase5/reasoningSpine/spineTools";
 
 function tireHaystack(run: {
-  tireSet: {
-    label: string | null;
-    tireType: { displayName: string; modelCode: string } | null;
-  } | null;
+  tireType: { displayName: string; modelCode: string } | null;
 }): string {
   return [
-    run.tireSet?.tireType?.displayName,
-    run.tireSet?.tireType?.modelCode,
-    run.tireSet?.label,
-  ]
+    run.tireType?.displayName,
+    run.tireType?.modelCode,
+      ]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -77,10 +73,10 @@ export async function tryAnswerComparisonQuery(input: {
 
   if (result.rows.length >= 2) {
     const a = result.rows.find((r) =>
-      tireHaystack({ tireSet: { label: r.tireLabel, tireType: null } }).includes(intent.tireA.toLowerCase())
+      tireHaystack({ tireType: { displayName: r.tireLabel ?? "", modelCode: "" } }).includes(intent.tireA.toLowerCase())
     );
     const b = result.rows.find((r) =>
-      tireHaystack({ tireSet: { label: r.tireLabel, tireType: null } }).includes(intent.tireB.toLowerCase())
+      tireHaystack({ tireType: { displayName: r.tireLabel ?? "", modelCode: "" } }).includes(intent.tireB.toLowerCase())
     );
     if (a?.bestLapSeconds != null && b?.bestLapSeconds != null) {
       const delta = a.bestLapSeconds - b.bestLapSeconds;
@@ -157,12 +153,7 @@ export async function tryAnswerPlanningQuery(input: {
       setupSnapshot: { select: { data: true } },
       car: { select: { name: true } },
       track: { select: { name: true, gripTags: true, layoutTags: true } },
-      tireSet: {
-        select: {
-          label: true,
-          tireType: { select: { displayName: true } },
-        },
-      },
+      tireType: { select: { displayName: true } },
     },
   });
 
@@ -185,7 +176,7 @@ export async function tryAnswerPlanningQuery(input: {
     const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(run), tz);
     const session = formatRunSessionDisplay(run);
     const dash = getIncludedLapDashboardMetrics(primaryLapRowsFromRun(run));
-    const tire = run.tireSet?.label ?? run.tireSet?.tireType?.displayName ?? "—";
+    const tire = run.tireType?.displayName ?? "—";
     lines.push(
       `- ${when} — ${session}, ${run.car?.name ?? "car"}, tire **${tire}** (run ${run.tireRunNumber ?? "?"}), best **${formatSec(dash.bestLap)}**, rating ${run.carRating ?? "—"}`
     );

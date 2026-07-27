@@ -34,8 +34,8 @@ export type TireLifeFocusedCompareNudgeV1 = {
 
 export type TireLifePriorsV1 = {
   version: 1;
-  tireSetId: string;
-  tireSetLabel: string | null;
+  tireStintId: string;
+  tireLabel: string | null;
   anchorTrackId: string | null;
   anchorTrackName: string | null;
   /** Consecutive (k→k+1) pairs with both runs at anchor track (when anchor has a track). */
@@ -65,8 +65,8 @@ export type ResolvedScopeTireStepBucketV1 = {
   examplePairs: Array<{
     fromRunId: string;
     toRunId: string;
-    tireSetId: string;
-    tireSetLabel: string | null;
+    tireStintId: string;
+    tireLabel: string | null;
   }>;
 };
 

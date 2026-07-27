@@ -61,7 +61,7 @@ export type SetupOutcomeMemoryRunInput = {
   sortAt: Date;
   trackId: string | null;
   eventId: string | null;
-  tireSetId: string | null;
+  tireStintId: string | null;
   tireRunNumber: number;
   lapTimes: unknown;
   lapSession?: unknown;
@@ -310,7 +310,7 @@ export function buildSetupOutcomeMemoryFromRuns(params: {
     const prev = normalizeSetupData(previous.setupSnapshot?.data);
     const sameTrack = current.trackId && previous.trackId ? current.trackId === previous.trackId : null;
     const sameEvent = current.eventId && previous.eventId ? current.eventId === previous.eventId : null;
-    const sameTireSet = current.tireSetId && previous.tireSetId ? current.tireSetId === previous.tireSetId : null;
+    const sameTireSet = current.tireStintId && previous.tireStintId ? current.tireStintId === previous.tireStintId : null;
     const sameTireRunIndex = current.tireRunNumber === previous.tireRunNumber;
 
     for (const key of changedKeys) {
@@ -444,7 +444,7 @@ export async function buildSetupOutcomeMemoryForRun(params: {
       sortAt: true,
       trackId: true,
       eventId: true,
-      tireSetId: true,
+      tireStintId: true,
       tireRunNumber: true,
       lapTimes: true,
       lapSession: true,

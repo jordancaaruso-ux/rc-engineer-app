@@ -22,7 +22,7 @@ export type PrimaryRunForHintReferencePick = {
   carId: string;
   trackId: string | null;
   eventId: string | null;
-  tireSetId: string | null;
+  tireStintId: string | null;
   tireRunNumber: number;
   createdAt: Date;
   sessionCompletedAt: Date | null;

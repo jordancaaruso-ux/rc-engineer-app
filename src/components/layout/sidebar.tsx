@@ -4,7 +4,6 @@ import { memo } from "react";
 import Link from "next/link";
 import { JrcMark } from "@/components/brand/JrcMark";
 import { DESKTOP_NAV } from "@/components/layout/navConfig";
-import { EngineerNavIcon } from "@/components/layout/EngineerNavIcon";
 import { PrimaryNavLink } from "@/components/layout/PrimaryNavLink";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
@@ -25,7 +24,6 @@ export const Sidebar = memo(function Sidebar() {
           const href =
             item.smartDraft && item.id === "add-run" ? addRunHref(item.href) : item.href;
           const Icon = item.icon;
-          const isEngineer = item.id === "engineer";
 
           return (
             <PrimaryNavLink
@@ -40,15 +38,7 @@ export const Sidebar = memo(function Sidebar() {
             >
               <span className="flex min-w-0 items-center gap-2">
                 <span className={cn("shrink-0", active ? "opacity-100" : "opacity-75")}>
-                  {isEngineer ? (
-                    <EngineerNavIcon active={active} className="h-4 w-4" />
-                  ) : (
-                    <Icon
-                      className="h-4 w-4"
-                      strokeWidth={active ? 2.25 : 1.75}
-                      aria-hidden
-                    />
-                  )}
+                  <Icon size={18} aria-hidden />
                 </span>
                 <span className="nav-sidebar-label truncate">{item.label}</span>
               </span>

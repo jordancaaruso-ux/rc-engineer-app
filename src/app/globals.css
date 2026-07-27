@@ -204,6 +204,20 @@ body {
   background: radial-gradient(130% 120% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.45));
 }
 
+/* ===== TEMP TEST (2026-07-27): flat black background =====
+   Kills the photo wash, the charcoal gradients, the dark scrim and the vignette
+   so every page sits on pure black. Revert = delete this whole block. */
+.page-bg {
+  background-color: #000;
+  background-image: none;
+}
+.page-bg-img,
+.page-bg-dark,
+.page-bg-vig {
+  background: none;
+}
+/* ===== END TEMP TEST ===== */
+
 /*
  * Liquid-glass card surface (founder-tuned 2026-07-06: 0.6 card alpha ·
  * 30px backdrop blur — see `--tune-*`).
@@ -369,10 +383,23 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
    * z-index keeps the dock above `.page` when DOM/stacking order would otherwise bury it.
    */
   z-index: 50;
+  /* JRC icon negative space (gauge needle, garage door, teams keylines) is
+     painted, not punched — it must match the surface behind the glass bar. */
+  --jrc-icon-cutout: var(--background);
 }
 
 .bottom-nav a {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Spring press on the dock glyph itself — the link already carries `tap-active`
+   for the row; this gives the icon the sharper overshoot the set is drawn for. */
+.dock-icon {
+  transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bottom-nav a:active .dock-icon {
+  transform: scale(0.82);
 }
 
 /* Log-run wizard v5: while its step chrome is mounted it owns the bottom edge
@@ -398,6 +425,8 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
    */
   @apply w-64 flex-col gap-3 border-r border-border bg-secondary/80 px-4 pb-5 backdrop-blur-md;
   padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+  /* Surface colour behind the JRC icon cutouts (see `.bottom-nav`). */
+  --jrc-icon-cutout: rgb(var(--color-secondary));
 }
 
 /* Brand mark atop the desktop sidebar — white mark (chrome), reclaims the space

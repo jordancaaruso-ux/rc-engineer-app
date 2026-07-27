@@ -145,6 +145,29 @@ export const HANDLING_SEVERITY_CHIP_LABELS: Record<1 | 2 | 3, string> = {
   3: "severe",
 };
 
+/**
+ * The four bands a 1–10 car rating is read as (docs/HANDLING_CAPTURE_NORTH_STAR.md —
+ * "keep 1–10, read as bands"). Mirrored on the capture surface so the driver rates in
+ * the same vocabulary the advice is built from, instead of guessing what a 7 means.
+ *
+ * MUST stay in sync with the band sentence in the Engineer prompt
+ * (`engineerPhase5/openaiEngineer.ts`: "very bad (1–3) / workable (4–5) / good (6–7) /
+ * dialled (8–10)"). The top boundary is load-bearing: `KNOWN_GOOD_RATING_THRESHOLD = 8`
+ * in `engineerPhase5/knownGoodMemory.ts` promotes a run to a known-good reference setup
+ * at exactly that line — which is why the picker calls the top band out.
+ */
+export const CAR_RATING_BANDS: readonly { caption: string; ratings: readonly number[] }[] = [
+  { caption: "Bad", ratings: [1, 2, 3] },
+  { caption: "Workable", ratings: [4, 5] },
+  { caption: "Good", ratings: [6, 7] },
+  { caption: "Dialled", ratings: [8, 9, 10] },
+] as const;
+
+/** Band word for a rating, for the readout ("8 / 10 · dialled"). Null outside 1–10. */
+export function carRatingBandCaption(rating: number): string | null {
+  return CAR_RATING_BANDS.find((b) => b.ratings.includes(rating))?.caption ?? null;
+}
+
 /** Legacy v4 string presets — kept for migrating stored JSON only. */
 const STEERING_FEEL_PRESETS = ["pointy", "dull", "nervous", "neutral", "direct", "vague"] as const;
 type SteeringFeelPreset = (typeof STEERING_FEEL_PRESETS)[number];

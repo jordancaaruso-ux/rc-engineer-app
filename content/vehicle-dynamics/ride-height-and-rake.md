@@ -7,7 +7,7 @@ Ride height sets **CoG height**, and CoG height scales **every load transfer** i
 What a ride-height change also does:
 
 - **Suspension geometry.** Ride height changes where the arms and links sit in their travel, which **lowers or raises the roll centres** with the chassis and shifts static **camber** (see **roll-centre**, **arm-angles-camber-gain**). A large ride-height change is never *only* a CoG change — re-check camber and re-read the balance.
-- **Bottoming.** The chassis touching the track mid-corner or over bumps unloads tires abruptly — instant, unpredictable grip loss. Minimum usable height is set by track surface, kerbs, and how much the suspension travels (springs, oil, droop — see **spring-rate**, **droop-downstop-arb**).
+- **Bottoming.** The chassis touching the track mid-corner or over bumps unloads tires abruptly — instant, unpredictable grip loss. Minimum usable height is set by track surface, kerbs, and how much the suspension travels (springs, oil, droop — see **spring-rate**, **droop-downstop**).
 - **Traction rolling:** going **lower always helps against traction rolling** — the CoG drop directly reduces the roll moment that tips the car. Remember the same move lowers the roll centres too, so the balance can shift while the tipping risk falls.
 
 Small changes matter: ride height works in **tenths of a millimetre**; ~0.2 mm is a typical meaningful step (community aggregation stats are the reference for what the field runs).

@@ -61,7 +61,17 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
       where: { verifiedAt: null },
       orderBy: { createdAt: "desc" },
       take: TAKE,
-      select: { id: true, displayName: true, modelCode: true, createdAt: true },
+      select: {
+        id: true,
+        displayName: true,
+        modelCode: true,
+        createdAt: true,
+        brand: true,
+        compound: true,
+        surface: true,
+        productUrl: true,
+        sourceUrl: true,
+      },
     }),
     prisma.additiveType.findMany({
       where: { verifiedAt: null },
@@ -132,17 +142,21 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
         ) : null}
 
         <ReviewSection eyebrow="Tire types" empty={tireTypes.length === 0}>
-          {tireTypes.map((t) => (
-            <ReviewRow
-              key={t.id}
-              title={t.displayName}
-              meta={`${t.modelCode} · ${fmt(t.createdAt)}`}
-              endpoint={`/api/tire-types/${t.id}`}
-              openHref="/tires"
-              deletable={!tireInUse.has(t.id)}
-              merge={{ type: "tire", label: t.displayName }}
-            />
-          ))}
+          {tireTypes.map((t) => {
+            const attrs = [t.brand, t.compound, t.surface].filter(Boolean).join(" · ");
+            return (
+              <ReviewRow
+                key={t.id}
+                title={t.displayName}
+                meta={`${attrs || t.modelCode} · ${fmt(t.createdAt)}`}
+                sourceUrl={t.productUrl ?? t.sourceUrl ?? undefined}
+                endpoint={`/api/tire-types/${t.id}`}
+                openHref="/tires"
+                deletable={!tireInUse.has(t.id)}
+                merge={{ type: "tire", label: t.displayName }}
+              />
+            );
+          })}
         </ReviewSection>
 
         <ReviewSection eyebrow="Additive types" empty={additiveTypes.length === 0}>
@@ -253,6 +267,7 @@ function ReviewRow({
   openHref,
   deletable = false,
   merge,
+  sourceUrl,
 }: {
   title: string;
   meta: string;
@@ -260,6 +275,7 @@ function ReviewRow({
   openHref: string;
   deletable?: boolean;
   merge?: { type: "tire" | "track"; label: string };
+  sourceUrl?: string;
 }): ReactNode {
   return (
     <li className="space-y-1.5 px-4 py-2">
@@ -269,6 +285,16 @@ function ReviewRow({
           <div className="truncate text-[10px] text-muted-foreground">{meta}</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {sourceUrl ? (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+            >
+              Source
+            </a>
+          ) : null}
           <Link
             href={openHref}
             className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"

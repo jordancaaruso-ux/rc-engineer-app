@@ -78,7 +78,7 @@ export async function buildQuickFixLlmContext(params: {
       id: run.id,
       carId: run.carId,
       trackId: run.trackId,
-      tireSetId: run.tireSetId,
+      tireStintId: run.tireStintId,
       tireRunNumber: run.tireRunNumber,
       createdAt: run.createdAt,
       sessionCompletedAt: run.sessionCompletedAt,

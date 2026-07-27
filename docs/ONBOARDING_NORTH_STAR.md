@@ -51,6 +51,26 @@ card and the lap gate. `src/lib/onboarding/progress.ts` (the 4-step engine), `On
 `OnboardingResumeCard`, `OnboardingPayoffCard`, `OnboardingIntroCard`, the guide-pulse CSS and every
 `data-guide` anchor are **deleted**.
 
+### How to test it (added 2026-07-26)
+
+Onboarding is the one flow you can't re-experience on your own account: the admin reset only clears
+`onboardingSeenAt` / `onboardingResumeDismissedAt`, but both gates *also* read `hasCar` / `hasAnyRun`,
+so on an account with data a reset shows you nothing. That is why reviewing a copy tweak used to mean
+creating a throwaway account. Two surfaces now cover it:
+
+- **`/debug/onboarding-preview`** (dev only, `notFound()` in production) — every first-run state
+  through the **real** `WelcomeScreen` and `DashboardGetSetUpCard` with fabricated props: empty,
+  overlay-answered, car-only (green-lit *and* hand-build chassis), car+timing, car+setup, ready,
+  first-run-logged, ignored. `window.fetch` is stubbed for `/api/onboarding` only, so Ignore and the
+  welcome buttons behave exactly as they ship but write nothing to your account.
+- **`npm run test:onboarding`** — `src/lib/onboarding/visibility.ts` holds the gates as pure
+  functions (`showWelcomeScreen`, `showGetSetUpCard`, `isGarageReady`), consumed by
+  `loadOnboardingView` and `DashboardHome` so the tested rule *is* the shipped rule.
+
+**Still needs one drive on a fresh account** (the preview can't fake it): magic-link first sign-in
+landing on the dashboard with the overlay up, `seen` persisting across a reload, `/cars` → add car →
+the card flipping to the payoff, and the just-in-time timing gate at lap ingest.
+
 **Everything below this section is the retired 2026-07-22 spec, kept for history — the State table,
 rollout rows and Code map no longer describe the shipped app.**
 

@@ -46,7 +46,7 @@ const step = (
 
 void (async function main() {
   const a = buildRunPacingContextV1({
-    tireSetId: "ts1",
+    tireStintId: "ts1",
     tireSetLabel: "Test",
     initialRunCount: 2,
     tireRunNumber: 3,
@@ -57,7 +57,7 @@ void (async function main() {
   assert.equal(a.fieldPaceAvgTop10?.rankInField, 4);
 
   const noSet = buildRunPacingContextV1({
-    tireSetId: null,
+    tireStintId: null,
     tireSetLabel: null,
     tireRunNumber: 1,
     importedSessionFieldStats: null,

@@ -1,8 +1,9 @@
 ## Load transfer
 
 **Physics.** In a corner, lateral g shifts vertical load from the inside tyres to the outside
-tyres. The **total** amount is fixed by **CoG height, track width, and cornering g** — no setup
-knob changes the total, only *how fast* and *where* it moves.
+tyres. The **total** amount is set by **CoG height, track width, and cornering g**. Most knobs only
+change *how fast* and *where* it moves — but a few move the total itself: **track width**, and anything
+that changes **CoG** (ride height, ballast, chassis).
 
 Two facets the setup shapes:
 - **Speed** — load reaches the outside tyres two ways: through the **links / geometry** (roll
@@ -12,5 +13,5 @@ Two facets the setup shapes:
   roll-stiffness balance.
 
 **Affects:** [[bite-hold]] (via speed).
-**Moved by:** roll centre [[roll-center]] (fast fraction), springs / ARBs (roll-stiffness → split &
+**Moved by:** roll centre [[roll-center]] (fast fraction), springs / ARBs [[roll-stiffness]] (split &
 elastic path), track width & CoG / ride height / weight (the total).

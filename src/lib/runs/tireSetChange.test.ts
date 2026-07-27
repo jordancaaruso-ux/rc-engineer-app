@@ -8,61 +8,70 @@ import {
   formatTireIndicatorTitle,
 } from "@/lib/runs/tireSetChange";
 
-const set = (id: string, label: string) => ({ id, label });
+const tt = (displayName: string) => ({ id: `tt-${displayName}`, displayName });
 
-test("every run with a logged set gets an indicator; swaps are flagged changed", () => {
+test("every run with a logged compound gets an indicator; new rubber is flagged changed", () => {
   const indicators = computeTireIndicatorsByRunId([
-    { id: "r3", carId: "c1", tireSet: set("s2", "Set 2"), tireRunNumber: 1 }, // newest
-    { id: "r2", carId: "c1", tireSet: set("s1", "Set 1"), tireRunNumber: 4 },
-    { id: "r1", carId: "c1", tireSet: set("s1", "Set 1"), tireRunNumber: 3 }, // oldest
+    { id: "r3", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s2", tireRunNumber: 1 }, // newest
+    { id: "r2", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 4 },
+    { id: "r1", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 3 }, // oldest
   ]);
   assert.equal(indicators.size, 3);
   assert.deepEqual(indicators.get("r3"), {
-    setLabel: "Set 2",
+    tireLabel: "Sweep D32",
     runNumber: 1,
+    ageKnown: true,
     changed: true,
-    previousSetLabel: "Set 1",
+    previousTireLabel: "Sweep D32",
   });
   assert.deepEqual(indicators.get("r2"), {
-    setLabel: "Set 1",
+    tireLabel: "Sweep D32",
     runNumber: 4,
+    ageKnown: true,
     changed: false,
-    previousSetLabel: null,
+    previousTireLabel: null,
   });
   // First run on the car: shown, but no baseline to call it a change.
   assert.equal(indicators.get("r1")?.changed, false);
 });
 
-test("a physical mark becomes the set's identity; unmarked sets keep the compound label", () => {
+test("same stint across a compound rename is not a change; a new stint is", () => {
   const indicators = computeTireIndicatorsByRunId([
-    { id: "r2", carId: "c1", tireSet: { id: "s2", label: "Soft", mark: "7" }, tireRunNumber: 4 },
-    { id: "r1", carId: "c1", tireSet: { id: "s1", label: "Soft" }, tireRunNumber: 3 },
+    { id: "r2", carId: "c1", tireType: tt("Volante V5R"), tireStintId: "s2", tireRunNumber: 1 },
+    { id: "r1", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 3 },
   ]);
-  assert.equal(indicators.get("r2")?.setLabel, "Marked 7");
   assert.equal(indicators.get("r2")?.changed, true);
-  assert.equal(indicators.get("r2")?.previousSetLabel, "Soft");
-  assert.equal(indicators.get("r1")?.setLabel, "Soft");
+  assert.equal(indicators.get("r2")?.previousTireLabel, "Sweep D32");
+  assert.equal(indicators.get("r1")?.tireLabel, "Sweep D32");
 });
 
-test("runs without a tire set get no indicator and don't break the chain", () => {
+test("runs without a compound get no indicator and don't break the chain", () => {
   const indicators = computeTireIndicatorsByRunId([
-    { id: "r4", carId: "c1", tireSet: set("s2", "Set 2"), tireRunNumber: 1 }, // vs r2's s1 → changed
-    { id: "r3", carId: "c1", tireSet: null },
-    { id: "r2", carId: "c1", tireSet: set("s1", "Set 1"), tireRunNumber: 2 },
-    { id: "r1", carId: "c1" }, // tireSet omitted entirely
+    { id: "r4", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s2", tireRunNumber: 1 },
+    { id: "r3", carId: "c1", tireType: null },
+    { id: "r2", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 2 },
+    { id: "r1", carId: "c1" }, // tireType omitted entirely
   ]);
   assert.deepEqual([...indicators.keys()].sort(), ["r2", "r4"]);
   assert.equal(indicators.get("r4")?.changed, true);
-  assert.equal(indicators.get("r4")?.previousSetLabel, "Set 1");
+  assert.equal(indicators.get("r4")?.previousTireLabel, "Sweep D32");
+});
+
+test("legacy runs with no stint id are treated as continuous, not as a change", () => {
+  const indicators = computeTireIndicatorsByRunId([
+    { id: "r2", carId: "c1", tireType: tt("Sweep D32"), tireRunNumber: 4 },
+    { id: "r1", carId: "c1", tireType: tt("Sweep D32"), tireRunNumber: 3 },
+  ]);
+  assert.equal(indicators.get("r2")?.changed, false);
 });
 
 test("cars are tracked independently; null carId runs are ignored", () => {
   const indicators = computeTireIndicatorsByRunId([
-    { id: "b2", carId: "c2", tireSet: set("s9", "Set 9"), tireRunNumber: 2 },
-    { id: "a2", carId: "c1", tireSet: set("s2", "Set 2"), tireRunNumber: 1 },
-    { id: "x1", carId: null, tireSet: set("s5", "Set 5") },
-    { id: "b1", carId: "c2", tireSet: set("s9", "Set 9"), tireRunNumber: 1 },
-    { id: "a1", carId: "c1", tireSet: set("s1", "Set 1"), tireRunNumber: 6 },
+    { id: "b2", carId: "c2", tireType: tt("Sweep D32"), tireStintId: "s9", tireRunNumber: 2 },
+    { id: "a2", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s2", tireRunNumber: 1 },
+    { id: "x1", carId: null, tireType: tt("Sweep D32"), tireStintId: "s5" },
+    { id: "b1", carId: "c2", tireType: tt("Sweep D32"), tireStintId: "s9", tireRunNumber: 1 },
+    { id: "a1", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 6 },
   ]);
   assert.equal(indicators.has("x1"), false);
   assert.equal(indicators.get("a2")?.changed, true); // c1: s1 → s2
@@ -71,49 +80,76 @@ test("cars are tracked independently; null carId runs are ignored", () => {
 
 test("invalid or missing tireRunNumber → null runNumber", () => {
   const indicators = computeTireIndicatorsByRunId([
-    { id: "r2", carId: "c1", tireSet: set("s1", "Set 1"), tireRunNumber: 0 },
-    { id: "r1", carId: "c1", tireSet: set("s1", "Set 1") },
+    { id: "r2", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 0 },
+    { id: "r1", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1" },
   ]);
   assert.equal(indicators.get("r1")?.runNumber, null);
   assert.equal(indicators.get("r2")?.runNumber, null);
 });
 
+test("unknown tire age is carried onto the indicator", () => {
+  const indicators = computeTireIndicatorsByRunId([
+    {
+      id: "r1",
+      carId: "c1",
+      tireType: tt("Sweep D32"),
+      tireStintId: "s1",
+      tireRunNumber: 2,
+      tireAgeKnown: false,
+    },
+  ]);
+  assert.equal(indicators.get("r1")?.ageKnown, false);
+});
+
 test("back-and-forth swaps flag every switch", () => {
   const indicators = computeTireIndicatorsByRunId([
-    { id: "r3", carId: "c1", tireSet: set("s1", "Set 1"), tireRunNumber: 2 },
-    { id: "r2", carId: "c1", tireSet: set("s2", "Set 2"), tireRunNumber: 1 },
-    { id: "r1", carId: "c1", tireSet: set("s1", "Set 1"), tireRunNumber: 1 },
+    { id: "r3", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 2 },
+    { id: "r2", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s2", tireRunNumber: 1 },
+    { id: "r1", carId: "c1", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 1 },
   ]);
   assert.equal(indicators.get("r2")?.changed, true);
   assert.equal(indicators.get("r3")?.changed, true);
 });
 
-test("formatTireIndicatorTitle: changed vs steady, new-set callout", () => {
+test("formatTireIndicatorTitle: changed vs steady, new + unknown-age callouts", () => {
   assert.equal(
     formatTireIndicatorTitle({
-      setLabel: "Set 2",
+      tireLabel: "Volante V5R",
       runNumber: 1,
+      ageKnown: true,
       changed: true,
-      previousSetLabel: "Set 1",
+      previousTireLabel: "Sweep D32",
     }),
-    "Tire set changed · Set 1 → Set 2 · run 1 (new)"
+    "Tires changed · Sweep D32 → Volante V5R · run 1 (new)"
   );
   assert.equal(
     formatTireIndicatorTitle({
-      setLabel: "Set 2",
+      tireLabel: "Sweep D32",
       runNumber: 3,
+      ageKnown: true,
       changed: false,
-      previousSetLabel: null,
+      previousTireLabel: null,
     }),
-    "Set 2 · run 3"
+    "Sweep D32 · run 3"
   );
   assert.equal(
     formatTireIndicatorTitle({
-      setLabel: "Set 2",
-      runNumber: null,
+      tireLabel: "Sweep D32",
+      runNumber: 2,
+      ageKnown: false,
       changed: false,
-      previousSetLabel: null,
+      previousTireLabel: null,
     }),
-    "Set 2"
+    "Sweep D32 · run 2 (age unknown)"
+  );
+  assert.equal(
+    formatTireIndicatorTitle({
+      tireLabel: "Sweep D32",
+      runNumber: null,
+      ageKnown: true,
+      changed: false,
+      previousTireLabel: null,
+    }),
+    "Sweep D32"
   );
 });

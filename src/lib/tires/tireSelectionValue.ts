@@ -1,13 +1,15 @@
-import { normalizeTireMark } from "@/lib/tires/tireMark";
-
+/**
+ * The `tires` value stored inside a setup snapshot. Tires are identified by the
+ * compound plus how many runs are on them — there is no named set, no mark, and
+ * no insert/wheel (those had no writer in any UI and were overwritten on every
+ * save by `applyRunContextToSetupSnapshot`).
+ */
 export type TireSelectionValue = {
   tireTypeId: string;
-  /** Optional specific product model for this set. */
-  specificModel?: string;
-  insert?: string;
-  wheel?: string;
-  /** Optional physical mark written on the sidewall (e.g. "7"). */
-  mark?: string;
+  /** Runs on this rubber as of this run; 1 = first run on it. */
+  tireRunNumber?: number;
+  /** False when the driver said "not sure how many" — the count is relative. */
+  tireAgeKnown?: boolean;
   /** Denormalized for PDF/export; derived from TireType.displayName */
   displayName?: string;
 };
@@ -20,6 +22,12 @@ export function isTireSelectionValue(v: unknown): v is TireSelectionValue {
   return typeof rec.tireTypeId === "string" && rec.tireTypeId.trim().length > 0;
 }
 
+function coerceRunNumber(raw: unknown): number | undefined {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return undefined;
+  const n = Math.floor(raw);
+  return n >= 1 ? n : undefined;
+}
+
 export function normalizeTireSelectionFromUnknown(
   v: unknown,
   fallbackDisplayName?: string
@@ -27,58 +35,51 @@ export function normalizeTireSelectionFromUnknown(
   if (isTireSelectionValue(v)) {
     const tireTypeId = v.tireTypeId.trim();
     if (!tireTypeId) return null;
-    const specificModel =
-      typeof v.specificModel === "string" ? v.specificModel.trim() || undefined : undefined;
-    const insert = typeof v.insert === "string" ? v.insert.trim() || undefined : undefined;
-    const wheel = typeof v.wheel === "string" ? v.wheel.trim() || undefined : undefined;
-    const mark = normalizeTireMark(typeof v.mark === "string" ? v.mark : null) ?? undefined;
     const displayName =
       typeof v.displayName === "string" && v.displayName.trim()
         ? v.displayName.trim()
         : fallbackDisplayName?.trim() || undefined;
-    return { tireTypeId, specificModel, insert, wheel, mark, displayName };
+    return {
+      tireTypeId,
+      tireRunNumber: coerceRunNumber((v as TireSelectionValue).tireRunNumber),
+      // Legacy snapshots predate the flag; absent means the count is absolute.
+      tireAgeKnown:
+        typeof (v as TireSelectionValue).tireAgeKnown === "boolean"
+          ? (v as TireSelectionValue).tireAgeKnown
+          : undefined,
+      displayName,
+    };
   }
   return null;
 }
 
-export function displayTireSelection(
-  value: TireSelectionValue | string | null | undefined,
-  setNumber?: number | null
-): string {
+export function displayTireSelection(value: TireSelectionValue | string | null | undefined): string {
   if (!value) return "";
-  if (typeof value === "string") {
-    const t = value.trim();
-    if (!t) return "";
-    if (setNumber != null && setNumber >= 1) return `${t} #${setNumber}`;
-    return t;
+  if (typeof value === "string") return value.trim();
+  const parts: string[] = [value.displayName?.trim() || "Tire"];
+  if (value.tireAgeKnown === false) {
+    parts.push(
+      value.tireRunNumber != null && value.tireRunNumber > 0
+        ? `run ${value.tireRunNumber} · age unknown`
+        : "age unknown"
+    );
+  } else if (value.tireRunNumber != null && value.tireRunNumber > 0) {
+    parts.push(`run ${value.tireRunNumber}`);
   }
-  const parts: string[] = [];
-  if (value.mark?.trim()) parts.push(`Marked ${value.mark.trim()}`);
-  const name = value.displayName?.trim() || "Tire";
-  parts.push(name);
-  if (value.specificModel?.trim()) parts.push(value.specificModel.trim());
-  if (value.insert?.trim()) parts.push(`insert: ${value.insert.trim()}`);
-  if (value.wheel?.trim()) parts.push(`wheel: ${value.wheel.trim()}`);
-  let line = parts.join(" · ");
-  if (setNumber != null && setNumber >= 1) line = `${line} #${setNumber}`;
-  return line;
+  return parts.join(" · ");
 }
 
 export function buildTireSelectionValue(input: {
   tireTypeId: string;
   displayName: string;
-  specificModel?: string | null;
-  insert?: string | null;
-  wheel?: string | null;
-  mark?: string | null;
+  tireRunNumber?: number | null;
+  tireAgeKnown?: boolean | null;
 }): TireSelectionValue {
   return {
     tireTypeId: input.tireTypeId,
     displayName: input.displayName.trim(),
-    specificModel: input.specificModel?.trim() || undefined,
-    insert: input.insert?.trim() || undefined,
-    wheel: input.wheel?.trim() || undefined,
-    mark: normalizeTireMark(input.mark) ?? undefined,
+    tireRunNumber: coerceRunNumber(input.tireRunNumber),
+    tireAgeKnown: input.tireAgeKnown === false ? false : undefined,
   };
 }
 

@@ -49,7 +49,9 @@ export type SetupSheetModalRun = {
     setupSheetModelId?: string | null;
   } | null;
   track?: { id: string; name: string } | null;
-  tireSet?: { id: string; label: string; setNumber: number | null } | null;
+  tireType?: { id: string; displayName: string } | null;
+  tireStintId?: string | null;
+  tireAgeKnown?: boolean | null;
   event?: { name: string; track?: { name: string } | null } | null;
   setupSnapshot?: { id: string; data?: unknown } | null;
   lapTimes?: unknown;

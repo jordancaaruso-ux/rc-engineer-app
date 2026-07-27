@@ -20,23 +20,19 @@ export async function GET() {
   const recentRuns = await prisma.run.findMany({
     where: {
       userId: user.id,
-      tireSet: { tireTypeId: { not: null } },
+      tireTypeId: { not: null },
     },
     orderBy: { createdAt: "desc" },
     take: 40,
     select: {
-      tireSet: {
-        select: {
-          tireType: { select: TIRE_TYPE_SELECT },
-        },
-      },
+      tireType: { select: TIRE_TYPE_SELECT },
     },
   });
 
   const seen = new Set<string>();
   const tireTypes: Array<{ id: string; displayName: string; modelCode: string }> = [];
   for (const run of recentRuns) {
-    const tt = run.tireSet?.tireType;
+    const tt = run.tireType;
     if (!tt || seen.has(tt.id)) continue;
     seen.add(tt.id);
     tireTypes.push(tt);

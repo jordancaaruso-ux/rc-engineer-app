@@ -555,3 +555,219 @@ export function formatMistakeAnalysisSummary(analysis: MistakeLapAnalysis): stri
   const list = analysis.mistakes.map(formatMistakeLapDetail).join(" · ");
   return `${list} — slower than median ${analysis.medianSec.toFixed(3)}s (threshold +${analysis.thresholdSec.toFixed(2)}s)`;
 }
+
+/* ── Field sheet ─────────────────────────────────────────────────────────────
+ * Whole-field view of one imported multi-driver session (Sessions expanded
+ * view, FIELD tab): every entrant on Best / Pace / Consistency / Mistakes, with
+ * competition ranks so "P4 on one-lap speed, P9 on race pace" reads straight off.
+ *
+ * Takes already-built `LapRow[]` per driver rather than raw lap arrays, for two
+ * reasons: `applyMedianBandAutoExclude` lives in `lapImport/` and imports
+ * `LapRow` from this module (importing it back would be a cycle), and — more
+ * importantly — the caller must be free to build the two sides differently.
+ * See `computeFieldSheet`.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** Included-lap floor for a driver to be ranked. Below it a crashed-out run would top the pace column. */
+export const MIN_LAPS_FOR_FIELD_RANK = 5;
+
+/** Ties closer than this share a rank — matches `rankLowerIsBetter` in `lapImport/importedTimingFieldStatsForEngineer.ts`. */
+export const FIELD_RANK_TIE_EPSILON = 1e-9;
+
+export type FieldSheetDriverInput = {
+  id: string;
+  name: string;
+  /** 1-based classification position from the timing provider (most laps, then lowest total time). */
+  position: number;
+  isUser: boolean;
+  /** Lap rows already cleaned by the caller — see `computeFieldSheet` on why the two sides differ. */
+  rows: LapRow[];
+};
+
+export type FieldSheetRow = {
+  id: string;
+  name: string;
+  position: number;
+  isUser: boolean;
+  lapCount: number;
+  /** Sum of included lap times (seconds). */
+  stintSeconds: number | null;
+  bestLap: number | null;
+  avgTop5: number | null;
+  /** Mean of the 10 fastest included laps — the metric the Engineer already ranks on. */
+  pace: number | null;
+  median: number | null;
+  consistencyScore: number | null;
+  /** Null when the driver has too few laps for the mistake rule (`MIN_LAPS_FOR_MISTAKES`). */
+  mistakeCount: number | null;
+  /** Competition ranks (ties share a rank); null while `eligible` is false. */
+  rankByBest: number | null;
+  rankByPace: number | null;
+  rankByConsistency: number | null;
+  /** Has at least `MIN_LAPS_FOR_FIELD_RANK` included laps, so its metrics are comparable. */
+  eligible: boolean;
+};
+
+/**
+ * Arithmetic mean of each metric across the field — what the stat wells show while
+ * the FIELD tab is up, in place of one driver's figures.
+ *
+ * Averaged over RANKED drivers only: a car that crashed out on lap 3 would drag
+ * every figure, the same reason it's kept out of the ranking. Each metric averages
+ * independently over the drivers that have it, so one driver missing a mistake
+ * count doesn't blank the rest.
+ */
+export type FieldAverages = {
+  /** Ranked drivers the averages are taken over. */
+  driverCount: number;
+  lapCount: number | null;
+  stintSeconds: number | null;
+  bestLap: number | null;
+  avgTop5: number | null;
+  avgTop10: number | null;
+  median: number | null;
+  consistencyScore: number | null;
+  mistakeCount: number | null;
+};
+
+export type FieldSheet = {
+  /** Every entrant, in classification order. */
+  rows: FieldSheetRow[];
+  you: FieldSheetRow | null;
+  /** The ranked driver one place ahead of you on pace — your next target. */
+  nextAheadOnPace: FieldSheetRow | null;
+  /** Set instead of `nextAheadOnPace` when you have the fastest pace in the field. */
+  runnerUpOnPace: FieldSheetRow | null;
+  /** `theirPace − yourPace` for whichever of the two above is set: negative = they're faster. */
+  paceGapSeconds: number | null;
+  /** How many entrants had enough laps to be ranked. */
+  rankedCount: number;
+  /** Field-wide means over the ranked drivers. */
+  averages: FieldAverages;
+};
+
+/**
+ * Competition rank over a lower-is-better metric: ties share a rank and the next
+ * value skips (1, 2, 2, 4). Returns no ranks at all below two finite values,
+ * because "P1 of 1" is not information.
+ *
+ * Deliberately mirrors `rankLowerIsBetter` in
+ * `lapImport/importedTimingFieldStatsForEngineer.ts` (server-only, so it can't be
+ * imported here) — that one is the semantic the Engineer's prompt copy already
+ * quotes, so the two must stay in step.
+ */
+function ranksLowerIsBetter(entries: Array<{ id: string; value: number | null }>): Map<string, number> {
+  const out = new Map<string, number>();
+  const finite = entries.filter(
+    (e): e is { id: string; value: number } => e.value != null && Number.isFinite(e.value)
+  );
+  if (finite.length < 2) return out;
+  for (const mine of finite) {
+    const faster = finite.filter((x) => x.value < mine.value - FIELD_RANK_TIE_EPSILON).length;
+    out.set(mine.id, faster + 1);
+  }
+  return out;
+}
+
+/**
+ * Per-driver metrics + ranks for the field sheet.
+ *
+ * IMPORTANT — the two sides of `drivers` are built differently on purpose:
+ * competitors' rows come from the imported payload through
+ * `applyMedianBandAutoExclude` (a heuristic, since their laps can't be inspected),
+ * while YOUR row must come from your own run via `primaryLapRowsFromRun` — which
+ * carries your manual lap exclusions and no auto-exclude. Build your row from the
+ * payload instead and the sheet silently disagrees with the stat wells rendered
+ * directly above it whenever you've edited a lap.
+ */
+export function computeFieldSheet(drivers: FieldSheetDriverInput[]): FieldSheet {
+  const base = drivers.map((d) => {
+    const dash = getIncludedLapDashboardMetrics(d.rows);
+    const mistakes = computeMistakeLaps(d.rows);
+    return { input: d, dash, mistakes, eligible: dash.lapCount >= MIN_LAPS_FOR_FIELD_RANK };
+  });
+
+  // Only ranked drivers enter the ranking, so a 3-lap crash-out can't take P1 on pace.
+  const rankable = base.filter((b) => b.eligible);
+  const bestRanks = ranksLowerIsBetter(
+    rankable.map((b) => ({ id: b.input.id, value: b.dash.bestLap }))
+  );
+  const paceRanks = ranksLowerIsBetter(
+    rankable.map((b) => ({ id: b.input.id, value: b.dash.avgTop10 }))
+  );
+  // Consistency is higher-is-better, so rank the negated score.
+  const consistencyRanks = ranksLowerIsBetter(
+    rankable.map((b) => ({
+      id: b.input.id,
+      value: b.dash.consistencyScore == null ? null : -b.dash.consistencyScore,
+    }))
+  );
+
+  const rows: FieldSheetRow[] = base
+    .map((b) => ({
+      id: b.input.id,
+      name: b.input.name,
+      position: b.input.position,
+      isUser: b.input.isUser,
+      lapCount: b.dash.lapCount,
+      stintSeconds: b.dash.stintSeconds,
+      bestLap: b.dash.bestLap,
+      avgTop5: b.dash.avgTop5,
+      pace: b.dash.avgTop10,
+      median: b.dash.median,
+      consistencyScore: b.dash.consistencyScore,
+      mistakeCount: b.mistakes.eligible ? b.mistakes.mistakeCount : null,
+      rankByBest: bestRanks.get(b.input.id) ?? null,
+      rankByPace: paceRanks.get(b.input.id) ?? null,
+      rankByConsistency: consistencyRanks.get(b.input.id) ?? null,
+      eligible: b.eligible,
+    }))
+    .sort((a, b) => a.position - b.position);
+
+  const you = rows.find((r) => r.isUser) ?? null;
+
+  let nextAheadOnPace: FieldSheetRow | null = null;
+  let runnerUpOnPace: FieldSheetRow | null = null;
+  let paceGapSeconds: number | null = null;
+  if (you != null && you.eligible && you.pace != null) {
+    const byPace = rows
+      .filter((r): r is FieldSheetRow & { pace: number } => r.eligible && r.pace != null)
+      .sort((a, b) => a.pace - b.pace);
+    const myIndex = byPace.findIndex((r) => r.id === you.id);
+    if (myIndex > 0) {
+      nextAheadOnPace = byPace[myIndex - 1]!;
+      paceGapSeconds = nextAheadOnPace.pace! - you.pace;
+    } else if (myIndex === 0 && byPace.length > 1) {
+      // You have the fastest pace — show the margin over whoever is next instead.
+      runnerUpOnPace = byPace[1]!;
+      paceGapSeconds = runnerUpOnPace.pace! - you.pace;
+    }
+  }
+
+  const ranked = rows.filter((r) => r.eligible);
+  const meanOf = (pick: (r: FieldSheetRow) => number | null): number | null => {
+    const xs = ranked.map(pick).filter((v): v is number => v != null && Number.isFinite(v));
+    return xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length;
+  };
+  const averages: FieldAverages = {
+    driverCount: ranked.length,
+    lapCount: meanOf((r) => r.lapCount),
+    stintSeconds: meanOf((r) => r.stintSeconds),
+    bestLap: meanOf((r) => r.bestLap),
+    avgTop5: meanOf((r) => r.avgTop5),
+    avgTop10: meanOf((r) => r.pace),
+    median: meanOf((r) => r.median),
+    consistencyScore: meanOf((r) => r.consistencyScore),
+    mistakeCount: meanOf((r) => r.mistakeCount),
+  };
+
+  return {
+    rows,
+    you,
+    nextAheadOnPace,
+    runnerUpOnPace,
+    paceGapSeconds,
+    rankedCount: ranked.length,
+    averages,
+  };
+}
