@@ -32,6 +32,7 @@ test("parsePlanningQuery takes the track from travel phrasing, not a trailing 'o
   );
   assert.ok(q);
   assert.equal(q!.trackQuery?.toLowerCase(), "tftr");
+  assert.equal(q!.wantsSetupConsiderations, true);
 });
 
 test("parsePlanningQuery returns a null track for prepositional phrases that aren't track names", () => {
@@ -44,4 +45,10 @@ test("parsePlanningQuery returns a null track for prepositional phrases that are
     assert.ok(q, `expected planning intent for: ${msg}`);
     assert.equal(q!.trackQuery, null, `expected null track for: ${msg}`);
   }
+});
+
+test("parsePlanningQuery keeps multi-word track names", () => {
+  const q = parsePlanningQuery("I'm going to Melbourne Off Road this weekend");
+  assert.ok(q);
+  assert.equal(q!.trackQuery, "Melbourne Off Road");
 });

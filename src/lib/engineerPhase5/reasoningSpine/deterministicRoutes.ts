@@ -112,12 +112,9 @@ export async function tryAnswerPlanningQuery(input: {
 
   if (intent.trackQuery) {
     const matches = await matchTracksForEngineerQuery(input.userId, intent.trackQuery);
-    if (matches.length === 0) {
-      return {
-        reply: `I couldn't find a track matching "${intent.trackQuery}" for meeting prep. Try the exact track name or LiveRC slug.`,
-        source: "planning",
-      };
-    }
+    // Don't dead-end the user on a track we can't resolve — the extracted name is a guess, and
+    // the full Engineer has the run/setup context to answer or ask a sensible follow-up.
+    if (matches.length === 0) return null;
     trackIds = matches.slice(0, 3).map((m) => m.id);
     trackName = matches[0]!.name;
     const trackRow = await prisma.track.findFirst({
