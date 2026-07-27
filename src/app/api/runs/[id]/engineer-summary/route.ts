@@ -31,7 +31,7 @@ export async function GET(req: Request, ctx: Ctx) {
       return NextResponse.json(
         {
           error:
-            "Runs not found or compare not allowed (peer must be a linked teammate or share a pilot team; same track as primary for non-owner compare).",
+            "Runs not found or compare not allowed (peer must share a team; same track as primary for non-owner compare).",
         },
         { status: 404 }
       );

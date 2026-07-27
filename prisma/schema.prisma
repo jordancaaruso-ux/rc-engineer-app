@@ -51,8 +51,6 @@ model User {
   videoAssets     VideoAsset[]
   trackCameraProfiles TrackCameraProfile[]
   videoAnalysisJobs   VideoAnalysisJob[]
-  teammateLinksOwned TeammateLink[] @relation("TeammateLinksOwned")
-  teammateLinksPeer  TeammateLink[] @relation("TeammateLinksPeer")
   engineerBetweenRunHints EngineerBetweenRunHint[]
   engineerDashboardSuggestions EngineerDashboardSuggestion[]
   engineerChatThreads EngineerChatThread[]
@@ -62,6 +60,8 @@ model User {
   teamMemberships TeamMembership[]
   teamsCreated    Team[]           @relation("TeamsCreated")
   teamRunComments TeamRunComment[] @relation("TeamRunCommentAuthor")
+  teamInvitesReceived TeamInvite[] @relation("TeamInvitesReceived")
+  teamInvitesSent     TeamInvite[] @relation("TeamInvitesSent")
   aiUsageDaily    AiUsageDaily[]
   chassisTypeRequests ChassisTypeRequest[]
 }
@@ -161,6 +161,40 @@ model Team {
 
   memberships TeamMembership[]
   runComments TeamRunComment[]
+  invites     TeamInvite[]
+}
+
+/**
+ * Consent gate for joining a team. A `TeamMembership` row is the grant itself â€” mutual, retroactive
+ * over the member's whole history â€” so it must never be created by anyone but the invited user.
+ * Deliberately a separate model rather than a `status` column on `TeamMembership`: no membership row
+ * exists until the invitee accepts, so every query that reads memberships is fail-safe by
+ * construction instead of one forgotten `where: { status }` away from leaking a whole run history.
+ *
+ * One row per (team, user) for all time â€” a re-invite after a decline resets this row to `pending`.
+ */
+model TeamInvite {
+  id     String @id @default(cuid())
+  teamId String
+  /** Existing `User` who was invited; they are the only account that may accept or decline. */
+  invitedUserId String
+  /** Admin who sent it, for the "<name> invited you" push. Kept if they later leave the team. */
+  invitedByUserId String?
+  /** Role granted on accept â€” `admin` \| `member`. */
+  role String @default("member")
+  /** `pending` \| `accepted` \| `declined` \| `revoked` â€” see `src/lib/teams/teamInviteRules.ts`. */
+  status String @default("pending")
+
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  team        Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedUser User  @relation("TeamInvitesReceived", fields: [invitedUserId], references: [id], onDelete: Cascade)
+  invitedBy   User? @relation("TeamInvitesSent", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([teamId, invitedUserId])
+  @@index([invitedUserId, status])
+  @@index([teamId, status])
 }
 
 model TeamMembership {
@@ -260,21 +294,6 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
-}
-
-/** Viewer (`userId`) may browse peer runs in Engineer when same track (enforced in APIs + context). */
-model TeammateLink {
-  id         String   @id @default(cuid())
-  createdAt  DateTime @default(now())
-  userId     String
-  peerUserId String
-
-  user User @relation("TeammateLinksOwned", fields: [userId], references: [id], onDelete: Cascade)
-  peer User @relation("TeammateLinksPeer", fields: [peerUserId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, peerUserId])
-  @@index([userId])
-  @@index([peerUserId])
 }
 
 enum ActionItemSourceType {
@@ -1157,8 +1176,9 @@ model Run {
   sortAt DateTime @default(now())
 
   /**
-   * When false, mutual team members do not see this run in team Sessions / team-only Engineer paths.
-   * One-way TeammateLink visibility is unchanged (still sees the run).
+   * When false, team members do not see this run in team Sessions or any Engineer peer path.
+   * Team membership is now the only route to another user's runs, so this flag is absolute:
+   * there is no longer a link type that bypasses it.
    */
   shareWithTeam Boolean @default(true)
 

@@ -227,7 +227,7 @@ const runSelectWithOwner = {
 } as const;
 
 /**
- * Compare an explicit pair of runs (primary must be the viewer's; compare may be a peer via TeammateLink or mutual team).
+ * Compare an explicit pair of runs (primary must be the viewer's; compare may be a team peer).
  * Does not persist to `Run.engineerSummaryJson` (pair selection is ephemeral in the UI).
  */
 export async function getOrComputeEngineerSummaryForRunPair(

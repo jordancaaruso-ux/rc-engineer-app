@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLine } from "@/lib/runPickerFormat";
@@ -19,7 +20,8 @@ type TeammateOpt = {
   peerUserId: string;
   name: string | null;
   email: string | null;
-  source?: "link" | "team";
+  /** Mutual team membership is the only source of peers (TeammateLink was removed). */
+  source?: "team";
 };
 
 function toPickerRuns(raw: unknown[]): RunPickerRun[] {
@@ -67,9 +69,6 @@ export function EngineerCompareAndPattern({
   const [sameTrackOnly, setSameTrackOnly] = useState(false);
   const [compareCarId, setCompareCarId] = useState("");
   const [teammates, setTeammates] = useState<TeammateOpt[]>([]);
-  const [teammateEmail, setTeammateEmail] = useState("");
-  const [teammateAddBusy, setTeammateAddBusy] = useState(false);
-  const [teammateAddErr, setTeammateAddErr] = useState<string | null>(null);
   const [teammatePeerId, setTeammatePeerId] = useState("");
   const [teammateCars, setTeammateCars] = useState<CarOpt[]>([]);
   const [teammateCarId, setTeammateCarId] = useState("");
@@ -316,34 +315,6 @@ export function EngineerCompareAndPattern({
     return [r.trackName, ev || null, best].filter(Boolean).join(" · ");
   }
 
-  async function addTeammateByEmail() {
-    setTeammateAddErr(null);
-    const email = teammateEmail.trim();
-    if (!email) {
-      setTeammateAddErr("Enter an email");
-      return;
-    }
-    setTeammateAddBusy(true);
-    try {
-      const res = await fetch("/api/teammates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setTeammateAddErr((data as { error?: string }).error ?? "Could not add teammate");
-        return;
-      }
-      setTeammateEmail("");
-      const listRes = await fetch("/api/teammates", { cache: "no-store" });
-      const listData = await listRes.json().catch(() => ({}));
-      setTeammates(Array.isArray((listData as { teammates?: TeammateOpt[] }).teammates) ? (listData as { teammates: TeammateOpt[] }).teammates : []);
-    } finally {
-      setTeammateAddBusy(false);
-    }
-  }
-
   function toggleDigestRunSelected(runId: string) {
     setDigestSelectedRunIds((prev) =>
       prev.includes(runId) ? prev.filter((id) => id !== runId) : [...prev, runId]
@@ -551,41 +522,33 @@ export function EngineerCompareAndPattern({
               </>
             ) : (
               <CardPanel overflowHidden={false} contentClassName="space-y-2">
-                <div className="flex flex-wrap gap-1">
-                  <input
-                    className="flex-1 min-w-[140px] rounded border border-border bg-background px-2 py-1 text-[11px] outline-none"
-                    value={teammateEmail}
-                    onChange={(e) => setTeammateEmail(e.target.value)}
-                    placeholder="Add teammate email…"
-                  />
-                  <button
-                    type="button"
-                    disabled={teammateAddBusy}
-                    onClick={() => void addTeammateByEmail()}
-                    className="rounded border border-border bg-background px-2 py-1 text-[10px] font-medium hover:bg-muted"
-                  >
-                    {teammateAddBusy ? "…" : "Add"}
-                  </button>
-                </div>
-                {teammateAddErr ? <p className="text-[10px] text-destructive">{teammateAddErr}</p> : null}
                 <div className="space-y-1">
                   <label className="text-[10px] text-muted-foreground">Driver</label>
-                  <select
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
-                    value={teammatePeerId}
-                    onChange={(e) => {
-                      setTeammatePeerId(e.target.value);
-                      setQuery({ compareRunId: null });
-                    }}
-                  >
-                    <option value="">Select teammate…</option>
-                    {teammates.map((t) => (
-                      <option key={t.id} value={t.peerUserId}>
-                        {t.name?.trim() || t.email || t.peerUserId.slice(0, 8)}
-                        {t.source === "team" ? " (team)" : ""}
-                      </option>
-                    ))}
-                  </select>
+                  {teammates.length === 0 ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      No teammates yet —{" "}
+                      <Link href="/teams" className="text-accent underline">
+                        invite someone to a team
+                      </Link>
+                      . They choose whether to join.
+                    </p>
+                  ) : (
+                    <select
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none"
+                      value={teammatePeerId}
+                      onChange={(e) => {
+                        setTeammatePeerId(e.target.value);
+                        setQuery({ compareRunId: null });
+                      }}
+                    >
+                      <option value="">Select teammate…</option>
+                      {teammates.map((t) => (
+                        <option key={t.id} value={t.peerUserId}>
+                          {t.name?.trim() || t.email || t.peerUserId.slice(0, 8)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] text-muted-foreground">Select car</label>

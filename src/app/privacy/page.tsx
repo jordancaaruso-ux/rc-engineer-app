@@ -86,7 +86,14 @@ export default function PrivacyPage() {
           for example, typical settings for a chassis in given conditions. These aggregates are
           combined across users and are not labelled with your name, email, or account. Your
           individual runs, notes, videos and setup sheets are private to your account and are never
-          shown to other users, except where you deliberately link a teammate.
+          shown to other users unless you join a team.
+        </p>
+        <p>
+          Joining a team is always your choice: an invite has to be accepted by you before anything
+          is shared, and nobody can add you to a team without that. Once you accept, other members of
+          that team can see your runs, setups and lap data — including runs logged before you joined —
+          and you can see theirs. Individual runs can be withheld with “Share this run with my teams”,
+          and leaving a team ends the team’s access to your data.
         </p>
         <p>
           Records you add to shared catalogs — tracks, tire types, additive types, events — are

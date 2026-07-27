@@ -9,9 +9,8 @@ import { withIncludedBestLapForPicker } from "@/lib/lapAnalysis";
  * Teammate-visible runs for unanchored pickers (Roll Center Lab setup slots).
  * Unlike {@link file://./../teammate-for-setup-compare}, there is no anchor run
  * or sheet scope — callers filter to what they can use (the Lab keeps only
- * snapshots that fingerprint a geometry pack). Peers reached only via mutual
- * team (no one-way TeammateLink) are gated by `Run.shareWithTeam`; linked
- * teammates are not.
+ * snapshots that fingerprint a geometry pack). Peers come from mutual team
+ * membership and are always gated by `Run.shareWithTeam`.
  */
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -20,28 +19,17 @@ export async function GET() {
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Peers = one-way linked teammates ∪ mutual team members.
-  const links = await prisma.teammateLink.findMany({
-    where: { userId: user.id },
-    select: { peerUserId: true },
-  });
-  const linkedPeerIds = new Set(links.map((l) => l.peerUserId));
-  const teamPeerIds = await listTeamPeerUserIds(user.id);
-  const allPeerIds = [...new Set([...linkedPeerIds, ...teamPeerIds])].filter((id) => id !== user.id);
-  const hasTeammates = allPeerIds.length > 0;
+  const peerIds = (await listTeamPeerUserIds(user.id)).filter((id) => id !== user.id);
+  const hasTeammates = peerIds.length > 0;
   if (!hasTeammates) {
     return NextResponse.json({ runs: [], memberDisplayByUserId: {}, hasTeammates });
   }
 
-  const teamOnlyPeerIds = allPeerIds.filter((id) => !linkedPeerIds.has(id));
-
   const runs = await prisma.run.findMany({
     where: {
-      OR: [
-        { userId: { in: [...linkedPeerIds] } },
-        // `not: false` keeps null/legacy runs (treated as shared).
-        { userId: { in: teamOnlyPeerIds }, shareWithTeam: { not: false } },
-      ],
+      // `not: false` keeps null/legacy runs (treated as shared).
+      userId: { in: peerIds },
+      shareWithTeam: { not: false },
     },
     orderBy: { sortAt: "desc" },
     take: 200,

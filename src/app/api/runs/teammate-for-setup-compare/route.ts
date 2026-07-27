@@ -41,10 +41,9 @@ const pickerRunSelect = {
  * Teammate-visible runs on the anchor run's setup sheet, for the "Teammates"
  * compare source. Unlike {@link file://../for-setup-compare}, this works even
  * when the anchor is the viewer's OWN run (their Sessions) — the whole point is
- * "open my setup, compare to my teammate." Peers reached only via mutual team
- * (no one-way TeammateLink) are gated by `Run.shareWithTeam`; linked teammates
- * are not. Returns `hasTeammates` so the segment stays discoverable even when a
- * peer hasn't logged this car yet.
+ * "open my setup, compare to my teammate." Peers come from mutual team
+ * membership and are always gated by `Run.shareWithTeam`. Returns `hasTeammates`
+ * so the segment stays discoverable even when a peer hasn't logged this car yet.
  */
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -74,14 +73,7 @@ export async function GET(request: Request) {
 
   const empty = { runs: [], memberDisplayByUserId: {}, hasTeammates: false };
 
-  // Peers = one-way linked teammates ∪ mutual team members.
-  const links = await prisma.teammateLink.findMany({
-    where: { userId: user.id },
-    select: { peerUserId: true },
-  });
-  const linkedPeerIds = new Set(links.map((l) => l.peerUserId));
-  const teamPeerIds = await listTeamPeerUserIds(user.id);
-  const allPeerIds = [...new Set([...linkedPeerIds, ...teamPeerIds])].filter((id) => id !== user.id);
+  const allPeerIds = (await listTeamPeerUserIds(user.id)).filter((id) => id !== user.id);
   const hasTeammates = allPeerIds.length > 0;
   if (!hasTeammates) return NextResponse.json(empty);
 
@@ -99,16 +91,12 @@ export async function GET(request: Request) {
   const peerCarIds = peerCars.map((c) => c.id);
   if (peerCarIds.length === 0) return NextResponse.json({ ...empty, hasTeammates });
 
-  const teamOnlyPeerIds = allPeerIds.filter((id) => !linkedPeerIds.has(id));
-
   const runs = await prisma.run.findMany({
     where: {
       carId: { in: peerCarIds },
-      OR: [
-        { userId: { in: [...linkedPeerIds] } },
-        // `not: false` keeps null/legacy runs (treated as shared).
-        { userId: { in: teamOnlyPeerIds }, shareWithTeam: { not: false } },
-      ],
+      userId: { in: allPeerIds },
+      // `not: false` keeps null/legacy runs (treated as shared).
+      shareWithTeam: { not: false },
     },
     orderBy: { sortAt: "desc" },
     take: 200,

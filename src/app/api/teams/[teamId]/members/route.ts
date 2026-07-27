@@ -4,12 +4,21 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { assertTeamAdmin, assertUserInTeam } from "@/lib/teamAccess";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
+import { checkInviteCreate } from "@/lib/teams/teamInviteRules";
+import { notifyUserOfTeamInvite } from "@/lib/teams/notifyTeamInvite";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ teamId: string }> };
 
-/** Admin adds a member by email (existing User, allowlisted). */
+/**
+ * Admin **invites** a member by email (existing User, allowlisted).
+ *
+ * This route used to create the `TeamMembership` row outright, which meant an admin typing your
+ * email immediately got mutual, retroactive access to your entire run history with no accept step
+ * and no notification. It now only creates a `pending` `TeamInvite` and pushes it; the membership is
+ * created by the invited user in `POST /api/teams/invites/[inviteId]`.
+ */
 export async function POST(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
@@ -31,33 +40,67 @@ export async function POST(request: Request, ctx: Ctx) {
     where: { email },
     select: { id: true, email: true, name: true },
   });
+
+  const [existingMembership, existingInvite] = peer
+    ? await Promise.all([
+        prisma.teamMembership.findFirst({
+          where: { teamId, userId: peer.id },
+          select: { id: true },
+        }),
+        prisma.teamInvite.findUnique({
+          where: { teamId_invitedUserId: { teamId, invitedUserId: peer.id } },
+          select: { id: true, status: true },
+        }),
+      ])
+    : [null, null];
+
+  const decision = checkInviteCreate({
+    targetUserId: peer?.id ?? null,
+    inviterUserId: user.id,
+    targetIsAllowlisted: peer ? await isEmailAuthAllowed(peer.email ?? "") : false,
+    targetIsAlreadyMember: Boolean(existingMembership),
+    existingInviteStatus: existingInvite?.status ?? null,
+  });
+  if (!decision.ok) {
+    return NextResponse.json({ error: decision.error }, { status: decision.status });
+  }
+  // `decision.ok` guarantees a resolved target; narrow for TypeScript.
   if (!peer) {
     return NextResponse.json({ error: "No user found with that email" }, { status: 404 });
   }
-  if (peer.id === user.id) {
-    return NextResponse.json({ error: "You are already on this team" }, { status: 400 });
-  }
 
-  const allowed = await isEmailAuthAllowed(peer.email ?? "");
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "That user’s email is not on the sign-in allowlist for this app." },
-      { status: 403 }
-    );
-  }
+  // `mode: "reset"` reuses the row a previous decline/revoke left behind — the table is unique per
+  // (team, user) for all time, so a re-invite is an update rather than a second row.
+  const invite = await prisma.teamInvite.upsert({
+    where: { teamId_invitedUserId: { teamId, invitedUserId: peer.id } },
+    create: {
+      teamId,
+      invitedUserId: peer.id,
+      invitedByUserId: user.id,
+      role: "member",
+      status: "pending",
+    },
+    update: {
+      invitedByUserId: user.id,
+      role: "member",
+      status: "pending",
+      respondedAt: null,
+    },
+    select: { id: true, status: true, createdAt: true, team: { select: { name: true } } },
+  });
 
-  try {
-    await prisma.teamMembership.create({
-      data: { teamId, userId: peer.id, role: "member" },
-    });
-  } catch {
-    return NextResponse.json({ error: "User is already a member" }, { status: 409 });
-  }
+  await notifyUserOfTeamInvite({
+    invitedUserId: peer.id,
+    teamName: invite.team.name,
+    invitedByLabel: user.name?.trim() || user.email?.trim() || null,
+  });
 
   return NextResponse.json({
-    member: {
-      userId: peer.id,
-      role: "member",
+    invite: {
+      id: invite.id,
+      status: invite.status,
+      createdAt: invite.createdAt.toISOString(),
+      invitedUserId: peer.id,
       name: peer.name?.trim() || null,
       email: peer.email?.trim() || null,
     },

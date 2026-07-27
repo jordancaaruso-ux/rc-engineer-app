@@ -121,8 +121,8 @@ type RunUpsertBody = {
    */
   carRating?: number | null;
   /**
-   * When false, mutual team members will not see this run in team Sessions / team-only Engineer paths.
-   * TeammateLink peers are unaffected. Default true when omitted.
+   * When false, team members will not see this run in team Sessions or any Engineer peer path.
+   * There is no peer type that bypasses this. Default true when omitted.
    */
   shareWithTeam?: boolean;
   /**
