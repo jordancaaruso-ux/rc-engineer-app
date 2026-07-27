@@ -274,7 +274,12 @@ export function SetupSheetView({
         <div className="text-xs font-medium mt-0.5">{template.label}</div>
       </div>
 
-      <RollCenterGeometryBlock value={value} baselineValue={baseline} className="mb-3" />
+      <RollCenterGeometryBlock
+        value={value}
+        baselineValue={baseline}
+        templateKey={template.templateKey}
+        className="mb-3"
+      />
 
       {template.structuredSections?.length ? (
         <SetupSheetStructured

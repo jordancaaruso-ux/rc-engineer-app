@@ -46,6 +46,12 @@ export type SetupSheetTemplate = {
   structuredSections?: StructuredSection[];
   /** Per-key chip options from SetupSheetModel schema (e.g. Mugen ARB thicknesses). */
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions>;
+  /**
+   * Community-aggregation key for this chassis type (model slug, or a legacy template constant).
+   * Identifies the *car*, so surfaces that need per-car data — computed geometry above all — can
+   * resolve it without guessing from the snapshot's field names.
+   */
+  templateKey?: string | null;
 };
 
 /**

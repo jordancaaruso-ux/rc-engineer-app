@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   CUSTOM_FIELD_SECTION_PRESETS,
   suggestKeyFromPdfFieldName,
@@ -47,9 +47,38 @@ const KIND_OPTIONS: { value: SchemaParameterKind; label: string }[] = [
   { value: "many_of_many", label: "Many of many" },
 ];
 
-const SECTION_PRESETS = CUSTOM_FIELD_SECTION_PRESETS.filter((p) =>
-  ["suspension", "drivetrain", "tyres_body", "tuning", "platform_chassis", "other"].includes(p.id)
-);
+/**
+ * Sections offered when adding a parameter: the ones actually on *this* sheet first, then any
+ * presets not already there.
+ *
+ * The old list filtered `CUSTOM_FIELD_SECTION_PRESETS` for six ids, two of which ("suspension",
+ * "tyres_body") don't exist in it — so it silently offered four generic sections and none of the
+ * sheet's own. A parameter could not be added into "Front end" even though the canvas was full of
+ * them, so every new one landed in the wrong place and had to be dragged out.
+ */
+function sectionOptionsFor(schema: SetupSheetModelSchema): { id: string; title: string }[] {
+  const seen = new Set<string>();
+  const out: { id: string; title: string }[] = [];
+  for (const sec of schema.structuredSections) {
+    if (seen.has(sec.id)) continue;
+    seen.add(sec.id);
+    out.push({ id: sec.id, title: sec.title || sec.id });
+  }
+  for (const f of schema.fields) {
+    if (!f.sectionId || seen.has(f.sectionId)) continue;
+    seen.add(f.sectionId);
+    out.push({ id: f.sectionId, title: f.sectionTitle || f.sectionId });
+  }
+  for (const p of CUSTOM_FIELD_SECTION_PRESETS) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push(p);
+  }
+  return out;
+}
+
+/** Sentinel option that reveals the inline "new section" input, as TireTypeCombobox does. */
+const NEW_SECTION_VALUE = "__new_section__";
 
 type OpResult = SetupSheetModelSchema | { error: string };
 
@@ -121,10 +150,14 @@ export function SetupSheetModelEditor(props: {
   const [label, setLabelText] = useState("");
   const [key, setKeyText] = useState("");
   const [kind, setKind] = useState<SchemaParameterKind>("number");
-  const [sectionId, setSectionId] = useState("tuning");
+  const [sectionId, setSectionId] = useState("");
   const [unit, setUnit] = useState("");
   const [optionLabels, setOptionLabels] = useState<string[]>([]);
   const [newSectionTitle, setNewSectionTitle] = useState("");
+  /** Inline section creation from inside the add form, without leaving it. */
+  const [addSectionTitle, setAddSectionTitle] = useState("");
+  const [addedCount, setAddedCount] = useState(0);
+  const addLabelRef = useRef<HTMLInputElement | null>(null);
 
   const fieldByKey = useMemo(() => {
     const m = new Map<string, SetupSheetModelFieldDef>();
@@ -133,6 +166,10 @@ export function SetupSheetModelEditor(props: {
   }, [schema.fields]);
 
   const tray = useMemo(() => unplacedFields(schema), [schema]);
+  const sectionOptions = useMemo(() => sectionOptionsFor(schema), [schema]);
+  /** Default to the section last added into, else the first one on the sheet. */
+  const effectiveSectionId =
+    sectionId || sectionOptions[0]?.id || CUSTOM_FIELD_SECTION_PRESETS[0]!.id;
 
   const applySchema = useCallback(
     (next: OpResult) => {
@@ -208,7 +245,8 @@ export function SetupSheetModelEditor(props: {
 
   const addField = useCallback(() => {
     setLocalError(null);
-    const sec = SECTION_PRESETS.find((p) => p.id === sectionId) ?? SECTION_PRESETS[SECTION_PRESETS.length - 1]!;
+    const sec =
+      sectionOptions.find((p) => p.id === effectiveSectionId) ?? sectionOptions[0] ?? { id: "other", title: "Other" };
     const optLabels =
       kind === "one_of_many" || kind === "many_of_many"
         ? optionLabels.map((l) => l.trim()).filter(Boolean)
@@ -244,11 +282,16 @@ export function SetupSheetModelEditor(props: {
     ];
     // Creating a parameter places it on the sheet immediately — no separate "add to sheet" step.
     onChange(placeMissingParameters({ ...schema, fields: nextFields }));
+    // Stay open for the next one: adding parameters is a run of them, and re-opening the form and
+    // clicking back into Label cost two dead clicks each time. Section/Type carry over on purpose;
+    // unit does not — mm silently inherited onto a degrees or shim-count parameter.
     setLabelText("");
     setKeyText("");
+    setUnit("");
     setOptionLabels([]);
-    setAddOpen(false);
-  }, [schema, onChange, label, key, kind, sectionId, unit, optionLabels]);
+    setAddedCount((n) => n + 1);
+    addLabelRef.current?.focus();
+  }, [schema, onChange, label, key, kind, effectiveSectionId, sectionOptions, unit, optionLabels]);
 
   const keyPreview = key.trim() || (label.trim() ? suggestKeyFromPdfFieldName(label.trim()) : "");
   const collisionWarning = awesomatixFieldKeyCollisionWarning(keyPreview, kind);
@@ -368,25 +411,83 @@ export function SetupSheetModelEditor(props: {
                 </button>
               ) : (
                 <div className="space-y-2 text-xs">
-                  <Eyebrow>New parameter</Eyebrow>
+                  <div className="flex items-center justify-between gap-2">
+                    <Eyebrow>New parameter</Eyebrow>
+                    {addedCount > 0 ? (
+                      <span className="text-[10px] text-muted-foreground">
+                        {addedCount} added
+                      </span>
+                    ) : null}
+                  </div>
                   <label className="flex flex-col gap-1 text-muted-foreground">
                     Label *
                     <input
+                      ref={addLabelRef}
                       className="rounded border border-border bg-card px-2 py-1.5"
                       value={label}
                       onChange={(e) => setLabelText(e.target.value)}
+                      // Enter adds and refocuses here, so a run of parameters never needs the mouse.
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addField();
+                        }
+                      }}
                       placeholder="e.g. Front ARB"
+                      autoFocus
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-muted-foreground">
-                    Key (optional)
-                    <input
-                      className="rounded border border-border bg-card px-2 py-1.5 font-mono"
-                      value={key}
-                      onChange={(e) => setKeyText(e.target.value)}
-                      placeholder={keyPreview || "auto from label"}
-                    />
+                    Section
+                    <select
+                      className="rounded border border-border bg-card px-2 py-1.5"
+                      value={effectiveSectionId}
+                      onChange={(e) => {
+                        if (e.target.value === NEW_SECTION_VALUE) {
+                          setAddSectionTitle("");
+                          return;
+                        }
+                        setSectionId(e.target.value);
+                      }}
+                    >
+                      {sectionOptions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
+                        </option>
+                      ))}
+                      <option value={NEW_SECTION_VALUE}>+ New section…</option>
+                    </select>
                   </label>
+                  {addSectionTitle !== "" || sectionOptions.length === 0 ? (
+                    <div className="flex gap-1">
+                      <input
+                        className="min-w-0 flex-1 rounded border border-border bg-card px-2 py-1.5"
+                        value={addSectionTitle}
+                        onChange={(e) => setAddSectionTitle(e.target.value)}
+                        placeholder="New section name"
+                      />
+                      <button
+                        type="button"
+                        className="rounded border border-border px-2 py-1 text-[11px]"
+                        disabled={!addSectionTitle.trim()}
+                        onClick={() => {
+                          const next = addSection(schema, addSectionTitle.trim());
+                          if ("error" in next) {
+                            setLocalError(next.error);
+                            return;
+                          }
+                          const created = next.structuredSections.find(
+                            (s) => !schema.structuredSections.some((o) => o.id === s.id)
+                          );
+                          applySchema(next);
+                          if (created) setSectionId(created.id);
+                          setAddSectionTitle("");
+                        }}
+                      >
+                        Create
+                      </button>
+                    </div>
+                  ) : null}
                   <label className="flex flex-col gap-1 text-muted-foreground">
                     Type
                     <select
@@ -401,29 +502,29 @@ export function SetupSheetModelEditor(props: {
                       ))}
                     </select>
                   </label>
-                  <label className="flex flex-col gap-1 text-muted-foreground">
-                    Section
-                    <select
-                      className="rounded border border-border bg-card px-2 py-1.5"
-                      value={sectionId}
-                      onChange={(e) => setSectionId(e.target.value)}
-                    >
-                      {SECTION_PRESETS.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1 text-muted-foreground">
-                    Unit (optional)
-                    <input
-                      className="rounded border border-border bg-card px-2 py-1.5"
-                      value={unit}
-                      onChange={(e) => setUnit(e.target.value)}
-                      placeholder="mm, °, …"
-                    />
-                  </label>
+                  <details className="text-muted-foreground">
+                    <summary className="cursor-pointer text-[11px]">Key and unit</summary>
+                    <div className="mt-1 space-y-2">
+                      <label className="flex flex-col gap-1">
+                        Key (optional)
+                        <input
+                          className="rounded border border-border bg-card px-2 py-1.5 font-mono"
+                          value={key}
+                          onChange={(e) => setKeyText(e.target.value)}
+                          placeholder={keyPreview || "auto from label"}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        Unit (optional)
+                        <input
+                          className="rounded border border-border bg-card px-2 py-1.5"
+                          value={unit}
+                          onChange={(e) => setUnit(e.target.value)}
+                          placeholder="mm, °, …"
+                        />
+                      </label>
+                    </div>
+                  </details>
                   {(kind === "one_of_many" || kind === "many_of_many") && (
                     <div className="space-y-1.5">
                       <div className="text-muted-foreground">
@@ -453,10 +554,11 @@ export function SetupSheetModelEditor(props: {
                       className="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground"
                       onClick={() => {
                         setAddOpen(false);
+                        setAddedCount(0);
                         setLocalError(null);
                       }}
                     >
-                      Cancel
+                      Done
                     </button>
                   </div>
                 </div>
@@ -467,7 +569,7 @@ export function SetupSheetModelEditor(props: {
 
         {/* -------------------------------------------------------- CANVAS */}
         <div className="min-w-0 space-y-3">
-          {schema.structuredSections.map((sec) => {
+          {schema.structuredSections.map((sec, secIdx) => {
             const showSecAbove = secDrop?.sectionId === sec.id && secDrop.edge === "above";
             const showSecBelow = secDrop?.sectionId === sec.id && secDrop.edge === "below";
             return (
@@ -521,10 +623,35 @@ export function SetupSheetModelEditor(props: {
                     ) : (
                       <Eyebrow>{sec.title}</Eyebrow>
                     )}
+                    {/* Section reorder without dragging — the only path that works on touch. */}
+                    {!readOnly ? (
+                      <span className="flex shrink-0 items-center gap-0.5">
+                        <button
+                          type="button"
+                          className="min-h-6 min-w-6 rounded border border-border text-[11px] leading-none text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          onClick={() => applySchema(moveSection(schema, secIdx, secIdx - 1))}
+                          disabled={secIdx === 0}
+                          aria-label={`Move section ${sec.title} up`}
+                          title="Move section up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="min-h-6 min-w-6 rounded border border-border text-[11px] leading-none text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          onClick={() => applySchema(moveSection(schema, secIdx, secIdx + 1))}
+                          disabled={secIdx >= schema.structuredSections.length - 1}
+                          aria-label={`Move section ${sec.title} down`}
+                          title="Move section down"
+                        >
+                          ↓
+                        </button>
+                      </span>
+                    ) : null}
                     {!readOnly && sec.id !== "other" ? (
                       <button
                         type="button"
-                        className="text-[10px] text-rose-300 hover:underline"
+                        className="shrink-0 text-[10px] text-rose-300 hover:underline"
                         onClick={() => {
                           if (
                             window.confirm(
@@ -685,6 +812,7 @@ function RowItem(props: {
   } = props;
 
   const rowId = `${sectionId}|${rowIndex}`;
+  const rowCount = schema.structuredSections.find((s) => s.id === sectionId)?.rows.length ?? 0;
   const members = rowMembers(row);
   const isGroup = members != null;
   const isSingle = row.type === "single";
@@ -775,6 +903,56 @@ function RowItem(props: {
 
           <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{row.type}</span>
 
+          {/* Drag is mouse-only (HTML5 DnD never fires on touch), so every reorder also has a
+              button path — the only way this works on a phone, and faster than dragging anyway. */}
+          {!readOnly ? (
+            <span className="ml-auto flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                className="min-h-6 min-w-6 rounded border border-border text-[11px] leading-none text-muted-foreground hover:text-foreground disabled:opacity-30"
+                onClick={() => applySchema(moveRow(schema, sectionId, rowIndex, sectionId, rowIndex - 1))}
+                disabled={rowIndex === 0}
+                aria-label={`Move ${rowHeading(row, fieldByKey)} up`}
+                title="Move up"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                className="min-h-6 min-w-6 rounded border border-border text-[11px] leading-none text-muted-foreground hover:text-foreground disabled:opacity-30"
+                onClick={() => applySchema(moveRow(schema, sectionId, rowIndex, sectionId, rowIndex + 1))}
+                disabled={rowIndex >= rowCount - 1}
+                aria-label={`Move ${rowHeading(row, fieldByKey)} down`}
+                title="Move down"
+              >
+                ↓
+              </button>
+              <select
+                className="min-h-6 rounded border border-border bg-card px-1 text-[10px] text-muted-foreground"
+                value=""
+                onChange={(e) => {
+                  const toSection = e.target.value;
+                  if (!toSection) return;
+                  const target = schema.structuredSections.find((s) => s.id === toSection);
+                  applySchema(
+                    moveRow(schema, sectionId, rowIndex, toSection, target?.rows.length ?? 0)
+                  );
+                }}
+                aria-label={`Move ${rowHeading(row, fieldByKey)} to another section`}
+                title="Move to section"
+              >
+                <option value="">→</option>
+                {schema.structuredSections
+                  .filter((s) => s.id !== sectionId)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title || s.id}
+                    </option>
+                  ))}
+              </select>
+            </span>
+          ) : null}
+
           {!readOnly && isGroup ? (
             <button
               type="button"
@@ -787,7 +965,7 @@ function RowItem(props: {
           {!readOnly ? (
             <button
               type="button"
-              className="ml-auto shrink-0 text-[10px] text-rose-300 hover:underline"
+              className="shrink-0 text-[10px] text-rose-300 hover:underline"
               onClick={() => applySchema(removeRowToTray(schema, sectionId, rowIndex))}
             >
               Remove

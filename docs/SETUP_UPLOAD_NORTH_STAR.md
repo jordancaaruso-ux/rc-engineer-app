@@ -94,10 +94,39 @@ row — `Single · Front/Rear · FF/FR/RF/RR`.
   two iOS faults that retired the old custom comboboxes (visual-viewport re-pin when the keyboard
   opens, touch scroll-lock).
 - **Considered and left out:** `Left/Right` (not a `LayoutGroupRole`, so nothing downstream would
-  group it) and custom 2–6 slot labels. Split × grouped options (a front row of 3 holes plus the
-  same 3 at the rear) is wanted eventually for other disciplines but is not built —
-  `buildPositionSplitFields` already takes a full `NewParameterInput`, so only the panel's box UI
-  and the grouped mapping call would change.
+  group it) and custom 2–6 slot labels.
+
+#### Yes/no boxes and positions × options (2026-07-25)
+
+Two gaps closed the same day the split landed, both hit by real touring sheets.
+
+- **A lone tick box is now a type.** `checkbox` joins `NewParameterKind` → `{valueType: "boolean",
+  uiType: "checkbox"}`, the same shape `buildFieldDefFromKind` already emitted for the schema
+  editor, and the sheet already rendered (`buildSetupSheetTemplate` maps `uiType: "checkbox"` to a
+  checkbox input). Before this, a lone tick box had to be faked as text. Works with a split too —
+  one boolean per position.
+- **Positions × options.** A printed row of holes that repeats at the front and the rear is now one
+  pass: pick a split, pick `One of many`, declare the options, and the Boxes area becomes a
+  positions × options grid. Save creates **one independent choice parameter per position**, each
+  with its own option list and its own grouped mapping rule.
+- **Front and rear may differ.** Each position is a separate parameter, so nothing forces the option
+  lists to match — front with 3 holes and rear with 4 is legal. The panel shows one shared list
+  (the common case) with a per-position *"different here"* override, so a 4-corner parameter doesn't
+  put four editors on screen at 390px.
+- **Fill order is across a position, then the next position** — the order a sheet prints a checkbox
+  row (founder decision). It lives in `pendingBoxGrid.ts` (`findPendingCell`, row-major) rather than
+  the component, because getting it wrong silently maps the rear row's boxes onto the front row's
+  options. Unit-tested.
+- **Option counts are declared up front for splits only.** Single mode still infers the option count
+  from however many boxes you click — that flow is untouched.
+- **A choice position needs 2 mapped boxes or it stays unmapped.**
+  `buildGroupedRuleFromAssignments` returns `null` below two assignments, so a half-clicked row is
+  reported in the status line and left for the sidebar's "Unmapped" filter rather than half-mapped.
+- **Mapping rules are decided before the state update, not inside it.** A `setFormFieldMappings`
+  updater can run later than the calling function (and twice in dev), so counting mapped boxes
+  inside it left the status line lying. The rules are planned in a pure pass, then applied in one
+  updater.
+- **Grouped parameters never get a universal id** — the registry is numeric tuning values.
 
 ---
 

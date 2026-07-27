@@ -7,6 +7,7 @@
  * "authored via an admin page; no code change per new car" — that lands with the
  * second platform, not the first).
  */
+import { SETUP_SHEET_TEMPLATE_A800RR } from "@/lib/setupSheetTemplateId";
 import type { AxleGeometry } from "./engine";
 
 export type PackVerificationGrade = "measured" | "cross-checked" | "cad-verified";
@@ -33,6 +34,15 @@ export type RollCenterPack = {
   chassisOptions: Record<string, ChassisOption>;
   /** The chassis the pack's hardpoints were measured on. */
   baseChassisCode: string;
+  /**
+   * Chassis types these measurements belong to, as community-aggregation template keys (a sheet
+   * model's slug key, or a legacy template constant).
+   *
+   * Geometry is a property of the *car*, not of a snapshot's field names. Adding a car here is a
+   * deliberate act taken at the same time as entering its measured hardpoints above — which is what
+   * "authorized measurements" means in practice.
+   */
+  appliesToTemplateKeys: readonly string[];
 };
 
 /**
@@ -84,9 +94,32 @@ export const AWESOMATIX_A800_PACK: RollCenterPack = {
     "C01B-RAF": { label: "Alu", thicknessMm: 2.0 },
   },
   baseChassisCode: "C01RS",
+  // Both the built-in A800RR model and the legacy template collapse to this one key via
+  // `templateKeyFromModelSlug`. Any other chassis type gets no geometry until its own hardpoints
+  // are measured and added as a pack.
+  appliesToTemplateKeys: [SETUP_SHEET_TEMPLATE_A800RR],
 };
 
-/** Sheet keys whose presence fingerprints an Awesomatix A800-family snapshot. */
+const ALL_PACKS: readonly RollCenterPack[] = [AWESOMATIX_A800_PACK];
+
+/**
+ * The pack for a chassis type, by community-aggregation template key. This is the only resolver the
+ * setup sheet, compare surfaces and aggregations should use.
+ *
+ * Geometry belongs to the car. Resolving it from snapshot field names instead (see
+ * {@link resolvePackForSnapshot}) means any sheet that happens to use the same part names renders
+ * another car's hardpoints as if they were its own — confidently wrong numbers, which is the one
+ * failure this app treats as unacceptable.
+ */
+export function resolvePackForTemplateKey(
+  templateKey: string | null | undefined
+): RollCenterPack | null {
+  const key = templateKey?.trim();
+  if (!key) return null;
+  return ALL_PACKS.find((p) => p.appliesToTemplateKeys.includes(key)) ?? null;
+}
+
+/** Sheet keys whose presence hints at an Awesomatix A800-family snapshot. Lab use only. */
 const A800_FINGERPRINT_KEYS = [
   "under_hub_shims_front",
   "under_lower_arm_shims_ff",
@@ -95,9 +128,13 @@ const A800_FINGERPRINT_KEYS = [
 ] as const;
 
 /**
- * Resolve the platform pack from a setup snapshot. The Awesomatix shim keys only
- * exist on Awesomatix sheets, so key presence is a reliable fingerprint — this keeps
- * every call site template-agnostic (mirrors `inferA800RRSetupFromSnapshotData`).
+ * Resolve a pack by sniffing snapshot field names.
+ *
+ * **Only for the Roll Center Lab**, which is seeded from URL-encoded fields and has no car context.
+ * Everywhere a car is known, use {@link resolvePackForTemplateKey} instead: these key names are
+ * generic part names ("upper inner shims"), not Awesomatix-specific, and the box-first naming flow
+ * mints them from typed labels — so two matching rows on any brand's sheet would otherwise render
+ * Awesomatix hardpoints as that car's geometry.
  */
 export function resolvePackForSnapshot(
   data: Record<string, unknown>

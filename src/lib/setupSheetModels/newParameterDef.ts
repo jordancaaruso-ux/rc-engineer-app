@@ -11,7 +11,7 @@ import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setup
  * `value` splits into number/text at the call site; grouped kinds carry one option label per box the
  * driver clicked, in click order.
  */
-export type NewParameterKind = "number" | "text" | "one_of_many" | "many_of_many";
+export type NewParameterKind = "number" | "text" | "checkbox" | "one_of_many" | "many_of_many";
 
 export type NewParameterInput = {
   displayLabel: string;
@@ -119,6 +119,11 @@ export function buildNewParameterField(
   if (input.kind === "text") {
     return { ok: true, field: base };
   }
+  // A lone tick box on the sheet — ticked or not. Same shape `buildFieldDefFromKind` emits, so a
+  // checkbox made here and one made in the schema editor are indistinguishable downstream.
+  if (input.kind === "checkbox") {
+    return { ok: true, field: { ...base, valueType: "boolean", uiType: "checkbox" } };
+  }
 
   const values = optionLabels.map((l, i) => groupedOptionValueFromLabel(l, i));
   // Duplicate labels would collapse two boxes onto one option value and silently lose a box.
@@ -172,12 +177,21 @@ export type PositionSplitResult =
 export function buildPositionSplitFields(
   input: NewParameterInput,
   split: Exclude<PositionSplit, "single">,
-  schema: SetupSheetModelSchema
+  schema: SetupSheetModelSchema,
+  /**
+   * Grouped kinds only: one option-label list per position, index-aligned with
+   * `POSITION_LABELS[split]`. Front and rear can differ in labels *and* count — each position
+   * becomes its own independent parameter, so nothing forces them to match.
+   */
+  optionLabelsByPosition?: readonly string[][]
 ): PositionSplitResult {
   const stem = input.displayLabel.trim();
   if (!stem) return { ok: false, error: "Name is required." };
-  if (input.kind !== "number" && input.kind !== "text") {
-    return { ok: false, error: "Positions apply to number and text parameters only." };
+
+  const positions = POSITION_LABELS[split];
+  const grouped = input.kind === "one_of_many" || input.kind === "many_of_many";
+  if (grouped && (optionLabelsByPosition?.length ?? 0) !== positions.length) {
+    return { ok: false, error: "Each position needs its own option list." };
   }
 
   const takenKeys = new Set(schema.fields.map((f) => f.key));
@@ -185,7 +199,7 @@ export function buildPositionSplitFields(
   // Grows as each sibling is built so they get distinct sort orders and a shared section id.
   let acc = schema;
 
-  for (const position of POSITION_LABELS[split]) {
+  for (const [i, position] of positions.entries()) {
     const displayLabel = `${stem} (${position})`;
     const key = suggestKeyFromPdfFieldName(displayLabel);
     // Refuse rather than let `uniqueParameterKey` produce `camber_front_2` — the suffix is load
@@ -197,15 +211,20 @@ export function buildPositionSplitFields(
       {
         ...input,
         displayLabel,
+        optionLabels: grouped ? [...(optionLabelsByPosition![i] ?? [])] : undefined,
         // Front/rear labels map cleanly onto the registry. Corners must not: "Camber (FR)" reads
         // `fr` as *front* (matchUniversalParameter's detectAxle) and would book one inner pickup
-        // stack as the whole front axle, and the registry has no per-corner ids anyway.
+        // stack as the whole front axle, and the registry has no per-corner ids anyway. Grouped
+        // parameters are never universal — the registry is numeric tuning values.
         universalParameterId:
-          split === "front_rear" ? suggestUniversalParameterId(key, displayLabel) : undefined,
+          !grouped && split === "front_rear"
+            ? suggestUniversalParameterId(key, displayLabel)
+            : undefined,
       },
       acc
     );
-    if (!built.ok) return built;
+    // Name the position — "needs at least 2 boxes" is useless without knowing which row failed.
+    if (!built.ok) return { ok: false, error: `${position}: ${built.error}` };
     takenKeys.add(built.field.key);
     fields.push(built.field);
     acc = { ...acc, fields: [...acc.fields, built.field] };
