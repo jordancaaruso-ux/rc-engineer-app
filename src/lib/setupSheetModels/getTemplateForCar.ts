@@ -33,9 +33,16 @@ export async function getSetupSheetTemplateAndKeyForCar(
 ): Promise<{ template: SetupSheetTemplate; templateKey: string | null }> {
   const model = await resolveSetupSheetModelForCar(userId, car);
   if (model) {
+    const templateKey = templateKeyFromModelSlug(model.slug);
     return {
-      template: buildSetupSheetTemplateFromParsedSchema(model.id, model.name, model.schema, view),
-      templateKey: templateKeyFromModelSlug(model.slug),
+      template: buildSetupSheetTemplateFromParsedSchema(
+        model.id,
+        model.name,
+        model.schema,
+        view,
+        templateKey
+      ),
+      templateKey,
     };
   }
   if (isA800RRCar(car.setupSheetTemplate)) {

@@ -16,6 +16,7 @@ import { displayRunNotes } from "@/lib/runNotes";
 import { Eyebrow } from "@/components/ui/panel";
 import { formatRunTiresDetailLine } from "@/lib/runs/runTireContextDisplay";
 import { RollCenterCompareStrip } from "@/components/rollCenter/RollCenterGeometryBlock";
+import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
 export type CompareRunShape = {
   id: string;
@@ -272,6 +273,10 @@ export function RunComparePanel({
               a={historicalSetup}
               b={baselineForDiff}
               rightLabel={rightLabel.toLowerCase()}
+              // Only the legacy template constant is available on the client here; a car linked by
+              // sheet model would need its slug threaded from the server. Failing closed is correct
+              // — better no geometry strip than another car's hardpoints.
+              templateKey={canonicalSetupSheetTemplateId(baseRun.car?.setupSheetTemplate ?? null)}
             />
           )}
 

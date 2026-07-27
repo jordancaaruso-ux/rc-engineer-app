@@ -64,6 +64,12 @@ import {
   type NewParameterInput as BoxParameterInput,
   type PositionSplit,
 } from "@/lib/setupSheetModels/newParameterDef";
+import {
+  findPendingCell,
+  pendingGridMatchesShape,
+  pendingGridSourceKeys,
+  reshapePendingGrid,
+} from "@/lib/setupSheetModels/pendingBoxGrid";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -480,11 +486,14 @@ export function SetupCalibrationEditorClient({
    * Box-first mapping: boxes clicked on the sheet with no parameter armed, in click order. The
    * name panel stays open while more are added, so a row of checkboxes becomes one grouped param.
    */
-  const [pendingBoxKeys, setPendingBoxKeys] = useState<(string | null)[]>([]);
   /**
-   * Positions the parameter being named occupies. `single` keeps `pendingBoxKeys` a dense click
-   * list; a split fixes its length to the positions, each slot `null` until its box is clicked.
+   * Boxes clicked for the parameter being named, as rows × columns. One row per position (a single
+   * row when `positionSplit` is `single`, growing on click as it always did); one column per option
+   * box within that position. `null` = a slot still waiting for its box. This is the single source
+   * of truth for the pending shape — the panel drives the column counts, clicks fill the cells.
    */
+  const [pendingGrid, setPendingGrid] = useState<(string | null)[][]>([]);
+  /** Positions the parameter being named occupies. */
   const [positionSplit, setPositionSplit] = useState<PositionSplit>("single");
   const [newParamBusy, setNewParamBusy] = useState(false);
   const [newParamError, setNewParamError] = useState<string | null>(null);
@@ -961,37 +970,44 @@ export function SetupCalibrationEditorClient({
 
   /** Boxes drawn amber: the ones being named right now, plus the selected/hovered parameter's. */
   const highlightedWidgetKeys = useMemo(() => {
-    const s = new Set<string>(pendingBoxKeys.filter((k): k is string => k !== null));
+    const s = new Set<string>(pendingGrid.flat().filter((k): k is string => k !== null));
     for (const k of widgetKeysForParameter(armedKey)) s.add(k);
     for (const k of widgetKeysForParameter(hoveredParameterKey)) s.add(k);
     for (const a of armedAssignments) s.add(a.sourceKey);
     return s;
-  }, [pendingBoxKeys, armedKey, hoveredParameterKey, armedAssignments, widgetKeysForParameter]);
+  }, [pendingGrid, armedKey, hoveredParameterKey, armedAssignments, widgetKeysForParameter]);
 
-  /** The clicked-but-unnamed boxes, with any parameter that currently owns them. `null` = an
-   * unfilled position slot. */
-  const pendingBoxes = useMemo((): (PendingBox | null)[] => {
+  /** The clicked-but-unnamed boxes as rows × columns, with any parameter that currently owns them.
+   * `null` = a slot still waiting for its box. */
+  const pendingBoxGrid = useMemo((): (PendingBox | null)[][] => {
     const labelByKey = new Map(
       (setupSheetModelSchema?.fields ?? []).map((f) => [f.key, f.displayLabel] as const)
     );
-    return pendingBoxKeys.map((sourceKey) => {
-      if (!sourceKey) return null;
-      const ref = parseAcroKey(sourceKey);
-      const row = pdfRowByName.get(ref.pdfFieldName);
-      const owners = findAppKeysForWidget(
-        formFieldMappings,
-        ref.pdfFieldName,
-        ref.instanceIndex,
-        row
-      );
-      return {
-        sourceKey,
-        pdfFieldName: ref.pdfFieldName,
-        instanceIndex: ref.instanceIndex,
-        conflictLabels: owners.map((k) => labelByKey.get(k) ?? k),
-      };
-    });
-  }, [pendingBoxKeys, pdfRowByName, formFieldMappings, setupSheetModelSchema]);
+    return pendingGrid.map((cells) =>
+      cells.map((sourceKey) => {
+        if (!sourceKey) return null;
+        const ref = parseAcroKey(sourceKey);
+        const row = pdfRowByName.get(ref.pdfFieldName);
+        const owners = findAppKeysForWidget(
+          formFieldMappings,
+          ref.pdfFieldName,
+          ref.instanceIndex,
+          row
+        );
+        return {
+          sourceKey,
+          pdfFieldName: ref.pdfFieldName,
+          instanceIndex: ref.instanceIndex,
+          conflictLabels: owners.map((k) => labelByKey.get(k) ?? k),
+        };
+      })
+    );
+  }, [pendingGrid, pdfRowByName, formFieldMappings, setupSheetModelSchema]);
+
+  const hasPendingBox = useMemo(
+    () => pendingGrid.some((cells) => cells.some((k) => k !== null)),
+    [pendingGrid]
+  );
 
   const catalogByGroup = useMemo(() => {
     const order: string[] = [];
@@ -1715,43 +1731,61 @@ export function SetupCalibrationEditorClient({
   }
 
   function cancelNewParameter() {
-    setPendingBoxKeys([]);
+    setPendingGrid([]);
     setPositionSplit("single");
     setNewParamError(null);
   }
 
   /**
-   * Clear one pending slot. Emptying the last one closes the naming panel, so the split resets with
+   * Clear one pending cell. Emptying the last one closes the naming panel, so the split resets with
    * it — otherwise the next unrelated box click would silently land in an armed 4-corner split.
    */
-  function clearPendingSlot(slotIndex: number) {
+  function clearPendingSlot(rowIndex: number, colIndex: number) {
     setNewParamError(null);
     const next =
       positionSplit === "single"
-        ? pendingBoxKeys.filter((_, i) => i !== slotIndex)
-        : pendingBoxKeys.map((k, i) => (i === slotIndex ? null : k));
-    if (!next.some((k) => k !== null)) {
+        ? // Single mode is a dense click list — remove the entry rather than hole-punching it.
+          [(pendingGrid[0] ?? []).filter((_, c) => c !== colIndex)]
+        : pendingGrid.map((cells, r) =>
+            r === rowIndex ? cells.map((k, c) => (c === colIndex ? null : k)) : cells
+          );
+    if (!next.some((cells) => cells.some((k) => k !== null))) {
       cancelNewParameter();
       return;
     }
-    setPendingBoxKeys(next);
+    setPendingGrid(next);
   }
 
-  /** Resize the pending slots to the split, keeping the boxes already clicked in slot order. */
+  /**
+   * Resize the grid to the split — one row per position, one column each. A grouped kind widens the
+   * rows straight after via {@link setPendingGridShape}; boxes already clicked stay in column 0.
+   */
   function changePositionSplit(next: PositionSplit) {
-    const clicked = pendingBoxKeys.filter((k): k is string => k !== null);
+    const clicked = pendingGridSourceKeys(pendingGrid);
     setPositionSplit(next);
     setNewParamError(null);
     if (next === "single") {
-      setPendingBoxKeys(clicked);
+      setPendingGrid([clicked]);
       return;
     }
-    const slots = POSITION_LABELS[next].length;
-    setPendingBoxKeys(Array.from({ length: slots }, (_, i) => clicked[i] ?? null));
-    if (clicked.length > slots) {
-      setNewParamError(`Only the first ${slots} boxes were kept.`);
+    const rows = POSITION_LABELS[next].length;
+    setPendingGrid(Array.from({ length: rows }, (_, i) => [clicked[i] ?? null]));
+    if (clicked.length > rows) {
+      setNewParamError(`Only the first ${rows} boxes were kept.`);
     }
   }
+
+  /**
+   * Panel-driven column counts — one per position, from its option list. Returns `prev` untouched
+   * when the shape already matches so the panel's sync effect can't loop.
+   */
+  // Stable identity: the panel drives this from an effect, so a new function each render would
+  // re-run that effect on every render.
+  const setPendingGridShape = useCallback((counts: number[]) => {
+    setPendingGrid((prev) =>
+      pendingGridMatchesShape(prev, counts) ? prev : reshapePendingGrid(prev, counts)
+    );
+  }, []);
 
   /** Follow a parameter's mapping to the page its box lives on, so selecting it always shows it. */
   function jumpToParameterPage(parameterKey: string) {
@@ -1796,25 +1830,35 @@ export function SetupCalibrationEditorClient({
     if (!armedField) {
       setNewParamError(null);
       if (positionSplit === "single") {
-        setPendingBoxKeys((prev) =>
-          prev.includes(sourceKey) ? prev.filter((k) => k !== sourceKey) : [...prev, sourceKey]
-        );
+        setPendingGrid((prev) => {
+          const cells = prev[0] ?? [];
+          return [
+            cells.includes(sourceKey)
+              ? cells.filter((k) => k !== sourceKey)
+              : [...cells, sourceKey],
+          ];
+        });
         setStatus(null);
         return;
       }
-      // Split: the click fills the next empty position; re-clicking a filled one clears it.
-      const at = pendingBoxKeys.indexOf(sourceKey);
-      if (at >= 0) {
-        clearPendingSlot(at);
+      // Split: re-clicking a filled cell clears it; otherwise fill the next empty one, walking
+      // across each position's options before moving to the next position.
+      const at = findPendingCell(pendingGrid, (k) => k === sourceKey);
+      if (at) {
+        clearPendingSlot(at.row, at.col);
         setStatus(null);
         return;
       }
-      const empty = pendingBoxKeys.indexOf(null);
-      if (empty < 0) {
-        setStatus("Every position is mapped — clear one first, or save.");
+      const empty = findPendingCell(pendingGrid, (k) => k === null);
+      if (!empty) {
+        setStatus("Every box is mapped — clear one first, or save.");
         return;
       }
-      setPendingBoxKeys((prev) => prev.map((k, i) => (i === empty ? sourceKey : k)));
+      setPendingGrid((prev) =>
+        prev.map((cells, r) =>
+          r === empty.row ? cells.map((k, c) => (c === empty.col ? sourceKey : k)) : cells
+        )
+      );
       setStatus(null);
       return;
     }
@@ -1904,7 +1948,7 @@ export function SetupCalibrationEditorClient({
    */
   async function createParameterFromBoxes(input: BoxParameterInput): Promise<void> {
     if (!setupSheetModelSchema || newParamBusy) return;
-    const boxKeys = pendingBoxKeys.filter((k): k is string => k !== null);
+    const boxKeys = pendingGridSourceKeys(pendingGrid);
     if (boxKeys.length === 0) return;
 
     const built = buildNewParameterField(input, setupSheetModelSchema);
@@ -1926,7 +1970,7 @@ export function SetupCalibrationEditorClient({
       return;
     }
 
-    setPendingBoxKeys([]);
+    setPendingGrid([]);
     if (boxKeys.length === 1) {
       const ref = parseAcroKey(boxKeys[0]!);
       // Routes through the cross-field conflict modal when the box already belongs to something.
@@ -1952,13 +1996,19 @@ export function SetupCalibrationEditorClient({
    */
   async function createParameterSplitFromBoxes(
     input: BoxParameterInput,
-    split: Exclude<PositionSplit, "single">
+    split: Exclude<PositionSplit, "single">,
+    optionLabelsByPosition?: string[][]
   ): Promise<void> {
     if (!setupSheetModelSchema || newParamBusy) return;
-    const slots = [...pendingBoxKeys];
-    if (!slots.some((k) => k !== null)) return;
+    const grid = pendingGrid.map((cells) => [...cells]);
+    if (!grid.some((cells) => cells.some((k) => k !== null))) return;
 
-    const built = buildPositionSplitFields(input, split, setupSheetModelSchema);
+    const built = buildPositionSplitFields(
+      input,
+      split,
+      setupSheetModelSchema,
+      optionLabelsByPosition
+    );
     if (!built.ok) {
       setNewParamError(built.error);
       return;
@@ -1976,36 +2026,86 @@ export function SetupCalibrationEditorClient({
       return;
     }
 
-    // One updater for the whole batch. Looping applyWidgetToCanonicalKey would read mappings from
-    // this render's closure (stale after the first box) and bail into the single-slot conflict
-    // modal, so only the detach half of it is inlined here — the panel has already warned which
-    // boxes get taken off another parameter.
+    // Decide every position's rule up front, outside the state updater: a functional updater can
+    // run later than this function body (and twice in dev), so counting inside it would leave the
+    // status line disagreeing with what was actually mapped.
+    const plans: Array<{ key: string; rule: PdfFormFieldMappingRule; sourceKeys: string[] }> = [];
+    const skippedRows: string[] = [];
+    built.fields.forEach((field, r) => {
+      const filled = (grid[r] ?? [])
+        .map((sourceKey, col) => ({ sourceKey, col }))
+        .filter((c): c is { sourceKey: string; col: number } => c.sourceKey !== null);
+      if (filled.length === 0) return;
+      const positionLabel = POSITION_LABELS[split][r] ?? `row ${r + 1}`;
+
+      const values = field.groupedOptionValues ?? [];
+      if (values.length >= 2) {
+        // A grouped position needs two assigned options — buildGroupedRuleFromAssignments returns
+        // null below that, so a half-clicked row stays unmapped rather than half-mapped.
+        const labels = field.groupedOptionLabels ?? [];
+        const assignments: ModelOptionAssignment[] = filled.map(({ sourceKey, col }) => ({
+          optionValue: values[col] ?? `opt_${col + 1}`,
+          optionLabel: labels[col] ?? `Option ${col + 1}`,
+          sourceKey,
+        }));
+        const rule =
+          assignments.length >= 2
+            ? buildGroupedRuleFromAssignments(
+                groupedBehaviorForAssignments(field, assignments),
+                assignments
+              )
+            : null;
+        if (!rule) {
+          skippedRows.push(positionLabel);
+          return;
+        }
+        plans.push({ key: field.key, rule, sourceKeys: assignments.map((a) => a.sourceKey) });
+        return;
+      }
+
+      const ref = parseAcroKey(filled[0]!.sourceKey);
+      const row = pdfRowByName.get(ref.pdfFieldName);
+      // Only toggle rows with sibling widgets need the instance index pinned (as simple mapping).
+      const useIndex = !!row && isToggleFieldType(row.type) && (row.widgets?.length ?? 0) > 1;
+      plans.push({
+        key: field.key,
+        rule: useIndex
+          ? { pdfFieldName: ref.pdfFieldName, widgetInstanceIndex: ref.instanceIndex }
+          : { pdfFieldName: ref.pdfFieldName },
+        sourceKeys: [filled[0]!.sourceKey],
+      });
+    });
+    const mapped = plans.reduce((n, p) => n + p.sourceKeys.length, 0);
+
+    // One updater for the whole batch. Looping applyWidgetToCanonicalKey / commitModelGroupedLink-
+    // ForField would read mappings from this render's closure (stale after the first row), and the
+    // simple path bails into a single-slot conflict modal. The panel has already warned which boxes
+    // get taken off another parameter, so only the detach half is inlined here.
     setFormFieldMappings((prev) => {
       let next = prev;
-      slots.forEach((sourceKey, i) => {
-        const field = built.fields[i];
-        if (!sourceKey || !field) return;
-        const ref = parseAcroKey(sourceKey);
-        const row = pdfRowByName.get(ref.pdfFieldName);
-        next = removePdfWidgetFromMappings(next, ref.pdfFieldName, ref.instanceIndex, row);
-        // Only toggle rows with sibling widgets need the instance index pinned (as simple mapping).
-        const useIndex = !!row && isToggleFieldType(row.type) && (row.widgets?.length ?? 0) > 1;
-        next = {
-          ...next,
-          [field.key]: useIndex
-            ? { pdfFieldName: ref.pdfFieldName, widgetInstanceIndex: ref.instanceIndex }
-            : { pdfFieldName: ref.pdfFieldName },
-        };
-      });
+      for (const plan of plans) {
+        for (const sourceKey of plan.sourceKeys) {
+          const ref = parseAcroKey(sourceKey);
+          next = removePdfWidgetFromMappings(
+            next,
+            ref.pdfFieldName,
+            ref.instanceIndex,
+            pdfRowByName.get(ref.pdfFieldName)
+          );
+        }
+        next = { ...next, [plan.key]: plan.rule };
+      }
       return next;
     });
 
-    const mapped = slots.filter((k) => k !== null).length;
-    setPendingBoxKeys([]);
+    setPendingGrid([]);
     setPositionSplit("single");
     setAcroSelection({ keys: [], activeKey: null });
     setStatus(
-      `Added “${input.displayLabel.trim()}” at ${built.fields.length} positions (${mapped} mapped).`
+      `Added “${input.displayLabel.trim()}” at ${built.fields.length} positions (${mapped} box${mapped === 1 ? "" : "es"} mapped).`
+        + (skippedRows.length > 0
+          ? ` ${skippedRows.join(", ")} needs at least 2 boxes — left unmapped.`
+          : "")
     );
   }
 
@@ -2942,11 +3042,12 @@ export function SetupCalibrationEditorClient({
         <CardPanel contentClassName="space-y-3 p-3">
           {modelLinkedMode && setupSheetModelSchema && initialSetupSheetModelId ? (
             <>
-              {pendingBoxes.some((b) => b !== null) ? (
+              {hasPendingBox ? (
                 <NewParameterFromBoxesPanel
-                  boxes={pendingBoxes}
+                  grid={pendingBoxGrid}
                   split={positionSplit}
                   onSplitChange={changePositionSplit}
+                  onOptionCountsChange={setPendingGridShape}
                   schema={setupSheetModelSchema}
                   groupTitles={existingGroupTitles(setupSheetModelSchema)}
                   busy={newParamBusy}
@@ -2954,10 +3055,14 @@ export function SetupCalibrationEditorClient({
                   onRemoveBox={clearPendingSlot}
                   onHoverBox={setHoveredFormOverlayKey}
                   onCancel={cancelNewParameter}
-                  onSubmit={(input) =>
+                  onSubmit={(input, optionLabelsByPosition) =>
                     void (positionSplit === "single"
                       ? createParameterFromBoxes(input)
-                      : createParameterSplitFromBoxes(input, positionSplit))
+                      : createParameterSplitFromBoxes(
+                          input,
+                          positionSplit,
+                          optionLabelsByPosition
+                        ))
                   }
                 />
               ) : null}

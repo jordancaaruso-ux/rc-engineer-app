@@ -42,7 +42,7 @@
     "test:setup-model-match": "npx tsx src/lib/setupSheetModels/matchAuthorizedModel.test.ts",
     "test:setup-universal": "npx tsx src/lib/setupSheetModels/universalParameters.test.ts && npx tsx src/lib/setupSheetModels/genericPresetSchema.test.ts",
     "test:picker-models": "npx tsx src/lib/setupSheetModels/pickerModels.test.ts",
-    "test:new-parameter": "npx tsx --test src/lib/setupSheetModels/newParameterDef.test.ts src/lib/setupSheetModels/parameterNameSuggestions.test.ts",
+    "test:new-parameter": "npx tsx --test src/lib/setupSheetModels/newParameterDef.test.ts src/lib/setupSheetModels/parameterNameSuggestions.test.ts src/lib/setupSheetModels/pendingBoxGrid.test.ts",
     "test:setup-fill-order": "npx tsx --test src/lib/setup/setupFillOrder.test.ts",
     "test:setup-history": "npx tsx --test src/lib/setup/carSetupHistory.test.ts",
     "test:base-setup-bands": "npx tsx --test src/lib/engineerPhase5/baseSetupBands.test.ts",

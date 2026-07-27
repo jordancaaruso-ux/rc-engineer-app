@@ -8,6 +8,7 @@ import {
   adoptRowAsSlotsGroup,
   appendFieldToGroup,
   assignFieldToSlot,
+  autoPlaceOnArrival,
   deleteSection,
   makeSlotsGroup,
   moveFieldToSection,
@@ -18,6 +19,7 @@ import {
   removeRowToTray,
   removeSlot,
   renameSection,
+  resequenceSortOrderFromLayout,
   setSlotLabel,
   unplacedFields,
 } from "@/lib/setupSheetModels/layoutCanvasOps";
@@ -433,4 +435,89 @@ test("a relabelled corner row renders as a flat slots row", () => {
   const row = display[0]!.rows[0]!;
   if (row.type !== "slots") return assert.fail("expected slots row");
   assert.deepEqual(row.slots.map((s) => s.label), ["Inner", "FR", "RF", "RR"]);
+});
+
+/* ---------- arrival placement + one-order-everywhere (2026-07-25) ---------- */
+
+/** What a box-first calibration hands over: fields exist, the canvas is untouched. */
+function fromCalibration(): SetupSheetModelSchema {
+  return {
+    version: 1,
+    label: "Test",
+    fields: [
+      field({ key: "camber_front", displayLabel: "Camber (Front)", sortOrder: 0 }),
+      field({ key: "camber_rear", displayLabel: "Camber (Rear)", sortOrder: 1 }),
+      field({ key: "total_weight", displayLabel: "Total weight", sortOrder: 2 }),
+    ],
+    structuredSections: [],
+  };
+}
+
+test("arriving from a calibration places everything and pairs the front/rear set", () => {
+  const res = autoPlaceOnArrival(fromCalibration());
+  assert.equal(res.placedCount, 3);
+  assert.equal(unplacedFields(res.schema).length, 0);
+  const rows = res.schema.structuredSections.flatMap((s) => s.rows);
+  // Camber (Front) + Camber (Rear) become one row, not two singles.
+  assert.ok(rows.some((r) => r.type !== "single"), "expected a grouped row for the front/rear pair");
+  assert.ok(rows.some((r) => r.type === "single"), "expected total_weight to stay a single");
+});
+
+test("a canvas that already has rows is never reshuffled on arrival", () => {
+  const placed = autoPlaceOnArrival(fromCalibration()).schema;
+  const withExtra = { ...placed, fields: [...placed.fields, field({ key: "toe_front", displayLabel: "Toe (Front)" })] };
+  const second = autoPlaceOnArrival(withExtra);
+  assert.equal(second.placedCount, 0);
+  assert.equal(second.schema, withExtra, "expected the schema to come back untouched");
+  // The new one stays in the tray for the explicit "Place all" button.
+  assert.deepEqual(unplacedFields(second.schema).map((f) => f.key), ["toe_front"]);
+});
+
+test("an empty sheet with nothing to place is left alone", () => {
+  const empty: SetupSheetModelSchema = { version: 1, label: "T", fields: [], structuredSections: [] };
+  assert.equal(autoPlaceOnArrival(empty).placedCount, 0);
+});
+
+test("sortOrder is renumbered to the canvas order, so Log run follows the arrangement", () => {
+  const placed = autoPlaceOnArrival(fromCalibration()).schema;
+  const secId = placed.structuredSections[0]!.id;
+  const lastIdx = placed.structuredSections[0]!.rows.length - 1;
+  // Drag the last row to the top, the way ordering by importance works.
+  const moved = moveRow(placed, secId, lastIdx, secId, 0);
+  assert.ok(!("error" in moved));
+  if ("error" in moved) return;
+
+  const before = new Map(moved.fields.map((f) => [f.key, f.sortOrder]));
+  const after = resequenceSortOrderFromLayout(moved);
+  const orderNow = [...after.fields].sort((a, b) => a.sortOrder - b.sortOrder).map((f) => f.key);
+  const canvasOrder = after.structuredSections.flatMap((s) =>
+    s.rows.flatMap((r) => (r.type === "single" ? [r.key] : []))
+  );
+  // Every placed key appears in sortOrder in the same relative order as on the canvas.
+  const placedInSortOrder = orderNow.filter((k) => canvasOrder.includes(k));
+  assert.deepEqual(placedInSortOrder, canvasOrder);
+  assert.notDeepEqual([...after.fields.map((f) => f.sortOrder)], [...before.values()]);
+});
+
+test("unplaced parameters sort after the sheet and keep their relative order", () => {
+  const base = autoPlaceOnArrival(fromCalibration()).schema;
+  const withTray = {
+    ...base,
+    fields: [
+      ...base.fields,
+      field({ key: "zzz_note", displayLabel: "Note", sortOrder: 98 }),
+      field({ key: "aaa_note", displayLabel: "Other note", sortOrder: 99 }),
+    ],
+  };
+  const after = resequenceSortOrderFromLayout(withTray);
+  const placedKeys = new Set(base.fields.map((f) => f.key));
+  const maxPlaced = Math.max(...after.fields.filter((f) => placedKeys.has(f.key)).map((f) => f.sortOrder));
+  const tray = after.fields.filter((f) => !placedKeys.has(f.key)).sort((a, b) => a.sortOrder - b.sortOrder);
+  assert.ok(tray.every((f) => f.sortOrder > maxPlaced), "tray must sort after everything on the sheet");
+  assert.deepEqual(tray.map((f) => f.key), ["zzz_note", "aaa_note"], "relative order preserved");
+});
+
+test("resequencing an already-correct schema returns it unchanged", () => {
+  const once = resequenceSortOrderFromLayout(autoPlaceOnArrival(fromCalibration()).schema);
+  assert.equal(resequenceSortOrderFromLayout(once), once);
 });

@@ -293,7 +293,7 @@ test("a split refuses on collision instead of suffixing away the position", () =
   assert.match(res.error, /already exists/);
 });
 
-test("a split needs a name, and only applies to number/text parameters", () => {
+test("a split needs a name", () => {
   assert.equal(
     buildPositionSplitFields(
       { displayLabel: "  ", groupTitle: "x", kind: "number" },
@@ -302,12 +302,107 @@ test("a split needs a name, and only applies to number/text parameters", () => {
     ).ok,
     false
   );
-  assert.equal(
-    buildPositionSplitFields(
-      { displayLabel: "Shim", groupTitle: "x", kind: "one_of_many", optionLabels: ["A", "B"] },
-      "front_rear",
-      schema()
-    ).ok,
-    false
+});
+
+test("a lone tick box becomes a boolean checkbox parameter", () => {
+  const res = buildNewParameterField(
+    { displayLabel: "Ballast fitted", groupTitle: "Chassis", kind: "checkbox" },
+    schema()
   );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.equal(res.field.key, "ballast_fitted");
+  assert.equal(res.field.valueType, "boolean");
+  assert.equal(res.field.uiType, "checkbox");
+  assert.equal(res.field.groupedOptionLabels, undefined);
+});
+
+test("a checkbox split makes one boolean per position", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Anti-squat block", groupTitle: "Chassis", kind: "checkbox" },
+    "front_rear",
+    schema()
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.deepEqual(
+    res.fields.map((f) => f.key),
+    ["anti_squat_block_front", "anti_squat_block_rear"]
+  );
+  for (const f of res.fields) assert.equal(f.valueType, "boolean");
+});
+
+test("a grouped split makes one choice parameter per position, sharing the option list", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Link position", groupTitle: "Geometry", kind: "one_of_many" },
+    "front_rear",
+    schema(),
+    [
+      ["1", "2", "3"],
+      ["1", "2", "3"],
+    ]
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.deepEqual(
+    res.fields.map((f) => f.key),
+    ["link_position_front", "link_position_rear"]
+  );
+  for (const f of res.fields) {
+    assert.equal(f.valueType, "enum");
+    assert.equal(f.groupBehaviorType, "singleSelect");
+    assert.deepEqual(f.groupedOptionLabels, ["1", "2", "3"]);
+  }
+});
+
+test("front and rear can carry different option counts and labels", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Shock position", groupTitle: "Shocks", kind: "one_of_many" },
+    "front_rear",
+    schema(),
+    [
+      ["In", "Mid", "Out"],
+      ["A", "B", "C", "D"],
+    ]
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.deepEqual(res.fields[0]!.groupedOptionLabels, ["In", "Mid", "Out"]);
+  assert.deepEqual(res.fields[1]!.groupedOptionLabels, ["A", "B", "C", "D"]);
+});
+
+test("a grouped split never gets a universal id — the registry is numeric tuning values", () => {
+  const res = buildPositionSplitFields(
+    { displayLabel: "Camber", groupTitle: "Geometry", kind: "one_of_many" },
+    "front_rear",
+    schema(),
+    [
+      ["1", "2"],
+      ["1", "2"],
+    ]
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  for (const f of res.fields) assert.equal(f.universalParameterId, undefined);
+});
+
+test("a grouped split needs one option list per position, and 2 options in each", () => {
+  const missing = buildPositionSplitFields(
+    { displayLabel: "Link position", groupTitle: "x", kind: "one_of_many" },
+    "corner4",
+    schema(),
+    [["1", "2"], ["1", "2"]]
+  );
+  assert.equal(missing.ok, false);
+
+  const tooFew = buildPositionSplitFields(
+    { displayLabel: "Link position", groupTitle: "x", kind: "one_of_many" },
+    "front_rear",
+    schema(),
+    [["1", "2"], ["1"]]
+  );
+  assert.equal(tooFew.ok, false);
+  if (tooFew.ok) return;
+  // The failing position is named — "needs at least 2 boxes" alone wouldn't say which row.
+  assert.match(tooFew.error, /^Rear:/);
 });

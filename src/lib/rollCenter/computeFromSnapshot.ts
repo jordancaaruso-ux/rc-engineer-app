@@ -209,8 +209,13 @@ export function deriveRollCenterInputs(
   return deriveSnapshotInputs(data);
 }
 
-function deriveSnapshotInputs(data: Record<string, unknown>): SnapshotGeometryInputs | null {
-  const pack = resolvePackForSnapshot(data);
+function deriveSnapshotInputs(
+  data: Record<string, unknown>,
+  packOverride?: RollCenterPack | null
+): SnapshotGeometryInputs | null {
+  // An explicit pack means the caller knows the car (see `resolvePackForTemplateKey`); the sniffed
+  // fallback exists only for the Lab, which has no car context.
+  const pack = packOverride ?? resolvePackForSnapshot(data);
   if (!pack) return null;
 
   const assumptions: string[] = [];
@@ -232,13 +237,16 @@ function deriveSnapshotInputs(data: Record<string, unknown>): SnapshotGeometryIn
 }
 
 /**
- * Compute geometry for a setup snapshot. Null when no platform pack matches the
- * snapshot (non-Awesomatix sheets today) or the linkage can't assemble.
+ * Compute geometry for a setup snapshot. Null when no pack applies or the linkage can't assemble.
+ *
+ * Pass `pack` wherever the car is known — `resolvePackForTemplateKey(templateKey)`. Omitting it
+ * falls back to sniffing field names, which is only correct in the Lab.
  */
 export function computeRollCenterFromSnapshot(
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  packForCar?: RollCenterPack | null
 ): RollCenterComputation | null {
-  const inputs = deriveSnapshotInputs(data);
+  const inputs = deriveSnapshotInputs(data, packForCar);
   if (!inputs) return null;
   const { pack, frontAdj, rearAdj, assumptions } = inputs;
 
@@ -268,9 +276,10 @@ export type RollCenterDiagramSolves = {
 };
 
 export function solveRollCenterDiagram(
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  packForCar?: RollCenterPack | null
 ): RollCenterDiagramSolves | null {
-  const inputs = deriveSnapshotInputs(data);
+  const inputs = deriveSnapshotInputs(data, packForCar);
   if (!inputs) return null;
   const front = solveAxle(inputs.pack.front, inputs.frontAdj, 0);
   const rear = solveAxle(inputs.pack.rear, inputs.rearAdj, 0);

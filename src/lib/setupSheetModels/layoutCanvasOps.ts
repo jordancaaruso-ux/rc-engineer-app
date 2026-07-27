@@ -7,7 +7,10 @@
  * the top of its section, which throws away the order the user just dragged into place.
  */
 import { inferSectionLayoutRows } from "@/lib/setupSheetModels/inferStructuredLayout";
-import { collectModelLayoutKeys } from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
+import {
+  collectModelLayoutKeys,
+  modelLayoutRowKeys,
+} from "@/lib/setupSheetModels/filterStructuredLayoutByKeys";
 import { createLayoutGroupId, inferLayoutGroupLabel } from "@/lib/setupSheetModels/layoutGroupOps";
 import {
   MAX_LAYOUT_SLOTS,
@@ -884,4 +887,71 @@ export function placeMissingParameters(schema: SetupSheetModelSchema): SetupShee
 export function unplacedFields(schema: SetupSheetModelSchema): SetupSheetModelFieldDef[] {
   const placed = collectModelLayoutKeys(schema.structuredSections);
   return schema.fields.filter((f) => !placed.has(f.key));
+}
+
+export type ArrivalPlacement = {
+  schema: SetupSheetModelSchema;
+  /** Parameters placed; 0 when nothing happened and `schema` is untouched. */
+  placedCount: number;
+};
+
+/**
+ * Place everything on arrival, but only onto a blank canvas.
+ *
+ * Box-first calibration only appends to `fields` — it never touches `structuredSections` — so a
+ * sheet arrives here with every parameter in the unplaced tray and nothing on the sheet. Placing
+ * them automatically is the difference between one Save and sixty drags.
+ *
+ * Gated on the canvas being *completely* empty so this can never reshuffle an arrangement already
+ * made: come back later and it does nothing, leaving the explicit "Place all" button to catch
+ * whatever was mapped since.
+ */
+export function autoPlaceOnArrival(schema: SetupSheetModelSchema): ArrivalPlacement {
+  const canvasEmpty = schema.structuredSections.every((s) => s.rows.length === 0);
+  if (!canvasEmpty) return { schema, placedCount: 0 };
+  const missing = unplacedFields(schema);
+  if (missing.length === 0) return { schema, placedCount: 0 };
+  return { schema: placeMissingParameters(schema), placedCount: missing.length };
+}
+
+/**
+ * Renumber `sortOrder` to match the order things sit on the canvas — sections top to bottom, rows
+ * within a section, slots within a row.
+ *
+ * The sheet has two orders: `structuredSections` (what dragging changes, and what the structured
+ * setup sheet renders from) and `sortOrder` (what Log run and Analysis sort by — see
+ * `buildSetupSheetTemplate`'s `groups[]` and `setupFillOrder`). Dragging only ever touched the
+ * first, so arranging the sheet by importance did nothing to the order fields appear in when
+ * logging a run. This makes the canvas the single source of order for every view.
+ *
+ * Unplaced parameters keep their relative order and sort after everything on the sheet — they have
+ * no position to inherit, and shuffling them would churn the tray for no reason.
+ */
+export function resequenceSortOrderFromLayout(
+  schema: SetupSheetModelSchema
+): SetupSheetModelSchema {
+  const order = new Map<string, number>();
+  let n = 0;
+  for (const section of schema.structuredSections) {
+    for (const row of section.rows) {
+      for (const key of modelLayoutRowKeys(row)) {
+        if (!order.has(key)) order.set(key, n++);
+      }
+    }
+  }
+
+  // Unplaced fields follow, in their existing order, so the tray doesn't reshuffle on every save.
+  const unplaced = schema.fields
+    .filter((f) => !order.has(f.key))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
+  for (const f of unplaced) order.set(f.key, n++);
+
+  let changed = false;
+  const fields = schema.fields.map((f) => {
+    const next = order.get(f.key);
+    if (next === undefined || next === f.sortOrder) return f;
+    changed = true;
+    return { ...f, sortOrder: next };
+  });
+  return changed ? { ...schema, fields } : schema;
 }

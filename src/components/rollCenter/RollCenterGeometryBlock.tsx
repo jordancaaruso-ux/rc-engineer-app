@@ -24,6 +24,7 @@ import {
   computeRollCenterFromSnapshot,
   solveRollCenterDiagram,
 } from "@/lib/rollCenter/computeFromSnapshot";
+import { resolvePackForTemplateKey } from "@/lib/rollCenter/packs";
 import { encodeLabFields, extractGeometryFields } from "@/lib/rollCenter/labState";
 
 /** Deep link into the Roll Center Lab seeded with this sheet (+ optional ghost slot). */
@@ -91,19 +92,37 @@ export type RollCenterGeometryBlockProps = {
   value: Record<string, unknown>;
   /** Optional comparison snapshot: renders neutral ↑/↓ deltas vs it. */
   baselineValue?: Record<string, unknown> | null;
+  /**
+   * Chassis-type key (`SetupSheetTemplate.templateKey`). Geometry is a property of the car, so the
+   * block renders **only** when this resolves to a pack whose hardpoints were measured on it.
+   * Without it, nothing renders — no guessing from the snapshot's field names.
+   */
+  templateKey?: string | null;
   className?: string;
 };
 
-export function RollCenterGeometryBlock({ value, baselineValue, className }: RollCenterGeometryBlockProps) {
-  const computed = useMemo(() => computeRollCenterFromSnapshot(value), [value]);
+export function RollCenterGeometryBlock({
+  value,
+  baselineValue,
+  templateKey,
+  className,
+}: RollCenterGeometryBlockProps) {
+  const pack = useMemo(() => resolvePackForTemplateKey(templateKey), [templateKey]);
+  const computed = useMemo(
+    () => (pack ? computeRollCenterFromSnapshot(value, pack) : null),
+    [pack, value]
+  );
   const baseline = useMemo(
-    () => (baselineValue ? computeRollCenterFromSnapshot(baselineValue) : null),
-    [baselineValue]
+    () => (pack && baselineValue ? computeRollCenterFromSnapshot(baselineValue, pack) : null),
+    [pack, baselineValue]
   );
   const [expanded, setExpanded] = useState(false);
   const [axle, setAxle] = useState<"front" | "rear">("front");
   // The diagram solve only runs once the block is opened.
-  const solves = useMemo(() => (expanded ? solveRollCenterDiagram(value) : null), [expanded, value]);
+  const solves = useMemo(
+    () => (expanded && pack ? solveRollCenterDiagram(value, pack) : null),
+    [expanded, pack, value]
+  );
   const bodyId = useId();
   if (!computed) return null;
 
@@ -127,7 +146,8 @@ export function RollCenterGeometryBlock({ value, baselineValue, className }: Rol
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="eyebrow-label">Geometry</span>
+          {/* Name the pack: these are one car's measured hardpoints, not a universal calculation. */}
+          <span className="eyebrow-label">Geometry · {computed.packDisplayName}</span>
           <span className="font-mono text-[11px] tabular-nums font-semibold text-foreground">
             RC {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)}mm · rake {fmtMm(computed.rakeMm)}
           </span>
@@ -229,14 +249,17 @@ export function RollCenterGeometryBlock({ value, baselineValue, className }: Rol
  * Compact run-vs-run geometry line for compare panels: RC front/rear + rake deltas.
  * Renders nothing unless BOTH snapshots compute (same-pack comparison only).
  */
-export function RollCenterCompareStrip({ a, b, rightLabel, className }: {
+export function RollCenterCompareStrip({ a, b, rightLabel, templateKey, className }: {
   a: Record<string, unknown>;
   b: Record<string, unknown>;
   rightLabel: string;
+  /** Chassis-type key — same car gate as the sheet block; without it nothing renders. */
+  templateKey?: string | null;
   className?: string;
 }) {
-  const ca = useMemo(() => computeRollCenterFromSnapshot(a), [a]);
-  const cb = useMemo(() => computeRollCenterFromSnapshot(b), [b]);
+  const pack = useMemo(() => resolvePackForTemplateKey(templateKey), [templateKey]);
+  const ca = useMemo(() => (pack ? computeRollCenterFromSnapshot(a, pack) : null), [pack, a]);
+  const cb = useMemo(() => (pack ? computeRollCenterFromSnapshot(b, pack) : null), [pack, b]);
   if (!ca || !cb || ca.packId !== cb.packId) return null;
 
   const row = (label: string, va: number, vb: number) => {
