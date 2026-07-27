@@ -89,7 +89,7 @@ const runSelect = {
 } as const;
 
 /**
- * All runs the viewer may select for Engineer compare (mine + linked teammates + mutual team peers).
+ * All runs the viewer may select for Engineer compare (mine + mutual team peers).
  */
 export async function buildEngineerCompareOptions(
   viewerUserId: string,
@@ -105,43 +105,20 @@ export async function buildEngineerCompareOptions(
     .sort((a, b) => sortInstantMs(b) - sortInstantMs(a))
     .map((r) => rowToOption(r, "me", null, timeZone));
 
-  const links = await prisma.teammateLink.findMany({
-    where: { userId: viewerUserId },
-    select: {
-      peerUserId: true,
-      peer: { select: { name: true, email: true } },
-    },
-  });
-
+  // Every peer is a mutual team member now (one-way TeammateLink is gone), so a single pass —
+  // and `shareWithTeam` applies to all of them without exception.
   const teammates: Array<{ peerUserId: string; displayName: string; runs: EngineerCompareOptionRow[] }> = [];
-  const seenPeer = new Set<string>();
-  for (const l of links) {
-    const displayName = l.peer.name?.trim() || l.peer.email?.trim() || l.peerUserId.slice(0, 8);
-    const peerRuns = await prisma.run.findMany({
-      where: { userId: l.peerUserId },
-      orderBy: { sortAt: "desc" },
-      take: 120,
-      select: runSelect,
-    });
-    const runs = [...peerRuns]
-      .sort((a, b) => sortInstantMs(b) - sortInstantMs(a))
-      .map((r) => rowToOption(r, "teammate", displayName, timeZone));
-    teammates.push({ peerUserId: l.peerUserId, displayName, runs });
-    seenPeer.add(l.peerUserId);
-  }
-
   const teamPeerIds = await listTeamPeerUserIds(viewerUserId);
-  const teamOnlyIds = teamPeerIds.filter((id) => !seenPeer.has(id));
-  if (teamOnlyIds.length > 0) {
+  if (teamPeerIds.length > 0) {
     const teamUsers = await prisma.user.findMany({
-      where: { id: { in: teamOnlyIds } },
+      where: { id: { in: teamPeerIds } },
       select: { id: true, name: true, email: true },
     });
     for (const u of teamUsers) {
-      const base = u.name?.trim() || u.email?.trim() || u.id.slice(0, 8);
-      const displayName = `${base} (team)`;
+      const displayName = u.name?.trim() || u.email?.trim() || u.id.slice(0, 8);
       const peerRuns = await prisma.run.findMany({
-        where: { userId: u.id, shareWithTeam: true },
+        // `not: false` keeps null/legacy runs (treated as shared).
+        where: { userId: u.id, shareWithTeam: { not: false } },
         orderBy: { sortAt: "desc" },
         take: 120,
         select: runSelect,

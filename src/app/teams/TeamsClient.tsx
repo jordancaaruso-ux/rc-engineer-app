@@ -15,6 +15,13 @@ type MemberRow = {
   email: string | null;
 };
 
+type PendingInviteRow = {
+  id: string;
+  createdAt: string;
+  name: string | null;
+  email: string | null;
+};
+
 type TeamDetail = {
   id: string;
   name: string;
@@ -22,6 +29,16 @@ type TeamDetail = {
   viewerUserId: string;
   viewerRole: string;
   members: MemberRow[];
+  pendingInvites: PendingInviteRow[];
+};
+
+/** An invite addressed to the viewer, from `GET /api/teams/invites`. */
+type MyInviteRow = {
+  id: string;
+  teamId: string;
+  teamName: string;
+  invitedByLabel: string | null;
+  createdAt: string;
 };
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -50,6 +67,11 @@ export function TeamsClient() {
   const [addEmail, setAddEmail] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
+  const [addNotice, setAddNotice] = useState<string | null>(null);
+
+  const [myInvites, setMyInvites] = useState<MyInviteRow[]>([]);
+  const [inviteBusyId, setInviteBusyId] = useState<string | null>(null);
+  const [inviteErr, setInviteErr] = useState<string | null>(null);
 
   const [renameName, setRenameName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
@@ -83,9 +105,20 @@ export function TeamsClient() {
     }
   }, []);
 
+  const refreshMyInvites = useCallback(async () => {
+    try {
+      const data = await jsonFetch<{ invites: MyInviteRow[] }>("/api/teams/invites");
+      setMyInvites(Array.isArray(data.invites) ? data.invites : []);
+    } catch {
+      // Non-fatal: the teams list is still usable if the invite inbox fails to load.
+      setMyInvites([]);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshList();
-  }, [refreshList]);
+    void refreshMyInvites();
+  }, [refreshList, refreshMyInvites]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -117,12 +150,13 @@ export function TeamsClient() {
     }
   }
 
-  async function handleAddMember(e: React.FormEvent) {
+  async function handleInviteMember(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedId) return;
     const email = addEmail.trim().toLowerCase();
     if (!email) return;
     setAddErr(null);
+    setAddNotice(null);
     setAddBusy(true);
     try {
       await jsonFetch(`/api/teams/${encodeURIComponent(selectedId)}/members`, {
@@ -131,12 +165,46 @@ export function TeamsClient() {
         body: JSON.stringify({ email }),
       });
       setAddEmail("");
+      // They are not a member yet — say so, or the empty members table reads as a failure.
+      setAddNotice(`Invite sent to ${email}. They join once they accept.`);
       await loadDetail(selectedId);
       await refreshList();
     } catch (err) {
-      setAddErr(err instanceof Error ? err.message : "Could not add member");
+      setAddErr(err instanceof Error ? err.message : "Could not send invite");
     } finally {
       setAddBusy(false);
+    }
+  }
+
+  async function handleRespondToInvite(inviteId: string, action: "accept" | "decline") {
+    setInviteErr(null);
+    setInviteBusyId(inviteId);
+    try {
+      await jsonFetch(`/api/teams/invites/${encodeURIComponent(inviteId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      await refreshMyInvites();
+      await refreshList();
+    } catch (err) {
+      setInviteErr(err instanceof Error ? err.message : "Could not respond to that invite");
+    } finally {
+      setInviteBusyId(null);
+    }
+  }
+
+  async function handleRevokeInvite(inviteId: string) {
+    if (!selectedId) return;
+    if (!window.confirm("Withdraw this invite?")) return;
+    try {
+      await jsonFetch(
+        `/api/teams/${encodeURIComponent(selectedId)}/invites/${encodeURIComponent(inviteId)}`,
+        { method: "DELETE" }
+      );
+      await loadDetail(selectedId);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Could not withdraw invite");
     }
   }
 
@@ -190,6 +258,54 @@ export function TeamsClient() {
 
   return (
     <div className="space-y-6 max-w-4xl">
+      {myInvites.length > 0 ? (
+        <CardPanel contentClassName="space-y-3">
+          <div>
+            <h2 className="text-sm font-medium text-foreground">
+              {myInvites.length === 1 ? "Team invite" : `Team invites (${myInvites.length})`}
+            </h2>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Joining shares your runs, setups and lap data with everyone on the team — including
+              runs you logged before you joined. You can leave at any time, which ends their access.
+            </p>
+          </div>
+          {inviteErr ? <p className="text-xs text-destructive">{inviteErr}</p> : null}
+          <ul className="space-y-2">
+            {myInvites.map((inv) => (
+              <li
+                key={inv.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+              >
+                <span className="text-sm text-foreground">
+                  {inv.teamName}
+                  {inv.invitedByLabel ? (
+                    <span className="text-muted-foreground text-xs"> · from {inv.invitedByLabel}</span>
+                  ) : null}
+                </span>
+                <span className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={inviteBusyId === inv.id}
+                    onClick={() => void handleRespondToInvite(inv.id, "accept")}
+                    className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:brightness-105 disabled:opacity-50"
+                  >
+                    {inviteBusyId === inv.id ? "Joining…" : "Accept"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={inviteBusyId === inv.id}
+                    onClick={() => void handleRespondToInvite(inv.id, "decline")}
+                    className="rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </CardPanel>
+      ) : null}
+
       <CardPanel contentClassName="space-y-3">
         <h2 className="text-sm font-medium text-foreground">Create team</h2>
         <form onSubmit={handleCreateTeam} className="flex flex-wrap items-end gap-2">
@@ -289,8 +405,8 @@ export function TeamsClient() {
               ) : null}
 
               {isAdmin ? (
-                <form onSubmit={handleAddMember} className="border-t border-border pt-3 space-y-2">
-                  <Eyebrow>Add member (existing account email, allowlisted)</Eyebrow>
+                <form onSubmit={handleInviteMember} className="border-t border-border pt-3 space-y-2">
+                  <Eyebrow>Invite member (existing account email, allowlisted)</Eyebrow>
                   <div className="flex flex-wrap gap-2">
                     <input
                       className="flex-1 min-w-[200px] rounded-md border border-border bg-background px-2 py-1.5 text-sm"
@@ -304,11 +420,46 @@ export function TeamsClient() {
                       disabled={addBusy}
                       className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
                     >
-                      {addBusy ? "Adding…" : "Add"}
+                      {addBusy ? "Sending…" : "Send invite"}
                     </button>
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    They get a notification and choose whether to join. Nobody is added to a team
+                    without accepting.
+                  </p>
+                  {addNotice ? <p className="text-xs text-muted-foreground">{addNotice}</p> : null}
                   {addErr ? <p className="text-xs text-destructive">{addErr}</p> : null}
                 </form>
+              ) : null}
+
+              {detail.pendingInvites.length > 0 ? (
+                <div className="border-t border-border pt-3">
+                  <Eyebrow className="mb-2">Invited — awaiting response</Eyebrow>
+                  <ul className="space-y-1">
+                    {detail.pendingInvites.map((inv) => (
+                      <li
+                        key={inv.id}
+                        className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {inv.name ?? inv.email ?? "—"}
+                          {inv.name && inv.email ? (
+                            <span className="text-xs"> · {inv.email}</span>
+                          ) : null}
+                        </span>
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            className="text-xs text-destructive hover:underline"
+                            onClick={() => void handleRevokeInvite(inv.id)}
+                          >
+                            Withdraw
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
 
               <div className="border-t border-border pt-3">

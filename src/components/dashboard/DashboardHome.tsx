@@ -7,6 +7,7 @@ import { DashboardSetupSheetCard } from "@/components/dashboard/DashboardSetupSh
 import { DashboardGetSetUpCard } from "@/components/dashboard/DashboardGetSetUpCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
 import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
+import { PendingTeamInvitesCard } from "@/components/teams/PendingTeamInvitesCard";
 import type { OnboardingView } from "@/lib/onboarding/server";
 import type { SetupSheetPrompt } from "@/lib/setup/setupSheetPrompt";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -94,6 +95,10 @@ export function DashboardHome({
             />
           </Reveal>
         ) : null}
+
+        {/* Above the CTA and self-hiding when empty: an unanswered invite is somebody
+            waiting on this driver, and push only reaches installed apps. */}
+        <PendingTeamInvitesCard />
 
         {/* The primary action always leads — the single unmissable run entry point. */}
         <Reveal index={0}>

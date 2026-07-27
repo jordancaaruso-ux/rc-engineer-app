@@ -327,9 +327,9 @@ Keep replies short and direct.`;
 const TOOL_INSTRUCTIONS = `
 
 You have tools to find runs and focus the chat on specific runs:
-- list_linked_teammates: use when the user mentions a teammate by name/email and you need to see who is available (one-way TeammateLink rows and/or mutual pilot team members).
+- list_linked_teammates: use when the user mentions a teammate by name/email and you need to see who is available (members of teams the user shares).
 - search_runs: filter runs by owner (you vs a teammate or team peer), optional date range (ISO YYYY-MM-DD), car/track/event ids, or text. Compute date ranges yourself (e.g. "last weekend" → concrete calendar dates).
-- apply_engineer_focus: after you pick run ids from search_runs (or catalog), call this so the next context includes full lap/setup compare and richEngineerContext re-anchors to the primary run. **To only re-anchor** spread/KB to a session they named (no pairwise compare), pass compare_run_id null. Rules: primary_run_id MUST always be the user's own run id (owner_scope mine). compare_run_id can be the user's or a peer's run id when you are linked or share a pilot team (same track as primary for non-owner compare runs). If the user only asks about someone else's run, search with owner_scope teammate and answer from the search results; to compare, pick a primary run of the user on the same track when possible, then apply focus.
+- apply_engineer_focus: after you pick run ids from search_runs (or catalog), call this so the next context includes full lap/setup compare and richEngineerContext re-anchors to the primary run. **To only re-anchor** spread/KB to a session they named (no pairwise compare), pass compare_run_id null. Rules: primary_run_id MUST always be the user's own run id (owner_scope mine). compare_run_id can be the user's or a peer's run id when you share a team (same track as primary for non-owner compare runs). If the user only asks about someone else's run, search with owner_scope teammate and answer from the search results; to compare, pick a primary run of the user on the same track when possible, then apply focus.
 
 Always use real run ids returned by search_runs or the catalog—never guess ids.${SPINE_TOOL_INSTRUCTIONS}`;
 
@@ -339,7 +339,7 @@ const LEGACY_TOOLS = [
     function: {
       name: "list_linked_teammates",
       description:
-        "List people you can search/compare against: TeammateLink peers plus mutual pilot team members (email/name/label).",
+        "List people you can search/compare against: members of teams the user shares (email/name/label).",
       parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },

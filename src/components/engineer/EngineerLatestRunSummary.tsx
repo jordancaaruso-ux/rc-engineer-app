@@ -130,7 +130,7 @@ export function EngineerLatestRunSummary() {
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-foreground tracking-tight">Run summary (compare)</h2>
       <p className="text-[11px] text-muted-foreground leading-snug">
-        Choose your run (primary), then a reference run—your other sessions or a linked teammate&apos;s. The summary
+        Choose your run (primary), then a reference run—your other sessions or a teammate&apos;s. The summary
         shows lap-time deltas and setup differences vs that reference. Open the Engineer page with{" "}
         <span className="font-mono">?runId=</span> to focus chat on a specific run.
       </p>

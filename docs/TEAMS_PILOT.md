@@ -23,25 +23,30 @@ The seed script creates **one** team with that name and a `TeamMembership` for e
    Open `/runs/history`, use **View → [team name]** (or `/runs/history?teamId=<id>`). Confirm you see members’ runs, the **Member** column, and that **reorder** is off. Expand a **peer** row: **Edit** / **Delete** should be hidden; your own rows keep those actions.
 
 2. **Engineer — compare UI**  
-   Pick a primary run, switch to **Teammate** mode: the peer dropdown should list **linked** teammates and **team-only** peers (from `/api/teammates`). Same-track filtering for their runs should match your primary’s track.
+   Pick a primary run, switch to **Teammate** mode: the peer dropdown should list your **team** peers (from `/api/teammates`). Same-track filtering for their runs should match your primary’s track. There is no longer an "add teammate by email" box here — peers come from teams only.
 
 3. **Engineer — tools chat**  
-   Use `list_linked_teammates` and `search_runs` with `owner_scope: "teammate"` against a team-only peer (no `TeammateLink`). Confirm `apply_engineer_focus` works when the compare run is on the **same track** as the primary.
+   Use `list_linked_teammates` and `search_runs` with `owner_scope: "teammate"` against a team peer. Confirm `apply_engineer_focus` works when the compare run is on the **same track** as the primary.
 
-4. **Teams tab**  
-   Open `/teams` (sidebar **Teams**): create a team, add another allowlisted user by email, confirm they appear under members. Use **View team sessions** (or `/runs/history?teamId=…`) to see combined history.
+4. **Teams tab — invite handshake**  
+   Open `/teams` (sidebar **Teams**): create a team, **send an invite** to another allowlisted user by email. Confirm they do **not** appear under members, only under **Invited — awaiting response**, and that the second account gets a push plus a card on `/teams` and the dashboard. Accept from the second account, then confirm membership on both sides and **View team sessions** (`/runs/history?teamId=…`). Also check **decline**, **Withdraw** (admin), and re-inviting after a decline.
 
 5. **Run-level team sharing**  
-   On **Log your run** / **Edit run**, toggle **Share this run with my teams**. When off, that run is hidden from **mutual team** lists (Team Sessions, team-only Engineer peer runs). **TeammateLink** visibility is unchanged — linked peers still see the run when using link-based flows.
+   On **Log your run** / **Edit run**, toggle **Share this run with my teams**. When off, that run is hidden from every team surface (Team Sessions, Engineer peer runs, setup compare pickers) with no exceptions.
 
-## Sharing matrix (fill during pilot)
+## Sharing matrix
 
-| Asset | Pilot default | Gap / decision |
+| Asset | Behaviour | Decision |
 |--------|----------------|----------------|
-| Runs (list + detail) | Mutual team | |
-| Engineer compare / search | Link **or** team + same-track compare | |
-| Cars / tracks / events | Via run relations only | |
-| Setup snapshots / aggregations | Deferred | |
-| Privacy (hide run from team) | Per-run `shareWithTeam` (default on) | Team-only surfaces; not TeammateLink |
+| Joining a team | Invite + explicit accept by the invited user | Settled — `TeamInvite`; nobody is added without consent |
+| Runs (list + detail) | Mutual team | Full history, retroactive on accept |
+| Engineer compare / search | Team + same-track compare | `TeammateLink` deleted; teams are the only peer source |
+| Cars / tracks / events | Via run relations only | Unchanged |
+| Setup snapshots / aggregations | Deferred | Unchanged |
+| Privacy (hide run from team) | Per-run `shareWithTeam` (default on) | Now absolute — no peer type bypasses it |
+| Leaving a team | Team loses access to everything that member logged | Visibility follows current membership |
+
+**Note:** `prisma db seed` with `TEAM_PILOT_MEMBER_EMAILS` still creates memberships directly, bypassing
+the invite. That is deliberate — it is local DB-owner tooling, not a user-facing path.
 
 Capture decisions and follow-ups for `docs/TEAMS_POST_PILOT_HARDENING.md`.

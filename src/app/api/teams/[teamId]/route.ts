@@ -35,6 +35,15 @@ export async function GET(_request: Request, ctx: Ctx) {
           user: { select: { name: true, email: true } },
         },
       },
+      invites: {
+        where: { status: "pending" },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          createdAt: true,
+          invitedUser: { select: { name: true, email: true } },
+        },
+      },
     },
   });
   if (!team) return NextResponse.json({ error: "Team not found" }, { status: 404 });
@@ -55,6 +64,13 @@ export async function GET(_request: Request, ctx: Ctx) {
         joinedAt: m.joinedAt.toISOString(),
         name: m.user.name?.trim() || null,
         email: m.user.email?.trim() || null,
+      })),
+      /** Invited but not yet answered — visible to every member, revocable only by an admin. */
+      pendingInvites: team.invites.map((i) => ({
+        id: i.id,
+        createdAt: i.createdAt.toISOString(),
+        name: i.invitedUser.name?.trim() || null,
+        email: i.invitedUser.email?.trim() || null,
       })),
     },
   });

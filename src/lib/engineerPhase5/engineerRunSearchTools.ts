@@ -15,38 +15,23 @@ export type LinkedTeammateRow = {
   email: string | null;
   name: string | null;
   label: string;
-  /** `link` = one-way TeammateLink; `team` = mutual team only (no link row). */
-  source: "link" | "team";
+  /** Mutual team membership is the only source of peers now that TeammateLink is gone. */
+  source: "team";
 };
 
 export async function listLinkedTeammatesForEngineer(viewingUserId: string): Promise<LinkedTeammateRow[]> {
-  const links = await prisma.teammateLink.findMany({
-    where: { userId: viewingUserId },
-    select: {
-      peerUserId: true,
-      peer: { select: { email: true, name: true } },
-    },
-  });
-  const fromLinks: LinkedTeammateRow[] = links.map((l) => {
-    const email = l.peer.email ?? null;
-    const name = l.peer.name ?? null;
-    const label = name?.trim() || email?.trim() || l.peerUserId.slice(0, 8);
-    return { peerUserId: l.peerUserId, email, name, label, source: "link" as const };
-  });
-  const linkedIds = new Set(fromLinks.map((r) => r.peerUserId));
-  const teamPeerIds = (await listTeamPeerUserIds(viewingUserId)).filter((id) => !linkedIds.has(id));
-  if (teamPeerIds.length === 0) return fromLinks;
-  const extraUsers = await prisma.user.findMany({
+  const teamPeerIds = await listTeamPeerUserIds(viewingUserId);
+  if (teamPeerIds.length === 0) return [];
+  const peers = await prisma.user.findMany({
     where: { id: { in: teamPeerIds } },
     select: { id: true, email: true, name: true },
   });
-  const fromTeam: LinkedTeammateRow[] = extraUsers.map((u) => {
+  return peers.map((u) => {
     const email = u.email ?? null;
     const name = u.name ?? null;
-    const label = `${name?.trim() || email?.trim() || u.id.slice(0, 8)} (team)`;
+    const label = name?.trim() || email?.trim() || u.id.slice(0, 8);
     return { peerUserId: u.id, email, name, label, source: "team" as const };
   });
-  return [...fromLinks, ...fromTeam];
 }
 
 /** Resolve "bob" / partial email to a single linked peer, or null if ambiguous / none. */
@@ -60,8 +45,7 @@ export async function resolveTeammatePeerUserId(
   if (all.length === 0) {
     return {
       ok: false,
-      error:
-        "No teammates available (add a linked teammate on the Engineer compare section, or join a pilot team).",
+      error: "No teammates available (join a team, or invite someone to yours, on the Teams page).",
     };
   }
 
@@ -95,7 +79,7 @@ export async function resolveTeammatePeerUserId(
 
 export type SearchRunsForEngineerArgs = {
   owner_scope: "mine" | "teammate";
-  /** When owner_scope is teammate: match linked teammate by name/email fragment. */
+  /** When owner_scope is teammate: match a team peer by name/email fragment. */
   teammate_query?: string | null;
   date_from?: string | null;
   date_to?: string | null;

@@ -694,7 +694,7 @@ async function loadCompareRunForFocusedContext(
 
 /**
  * Deterministic context for comparing two user runs (any date). Setup diff only when same `carId`.
- * Compare run may be the viewer's or a peer's (TeammateLink **or** mutual Team membership).
+ * Compare run may be the viewer's or a peer's (mutual Team membership).
  * Same-track rule: compare run must match primary's track (keeps setup diff and lap compare meaningful).
  */
 export async function buildFocusedRunPairContext(
