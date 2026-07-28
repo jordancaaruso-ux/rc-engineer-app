@@ -7,7 +7,10 @@ import {
   engineerChatContextTier,
   engineerChatNeedsDeepContext,
 } from "@/lib/engineerPhase5/engineerChatContextTier";
-import type { EngineerChatMode } from "@/lib/engineerPhase5/engineerChatMode";
+import {
+  inferEngineerChatMode,
+  type EngineerChatMode,
+} from "@/lib/engineerPhase5/engineerChatMode";
 import { getOrComputeEngineerSummaryForLatestRun } from "@/lib/engineerPhase5/loadLatestEngineerSummary";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
@@ -65,7 +68,9 @@ export type BuiltEngineerChatContext =
       baseForMerge: Record<string, unknown>;
       lastUser: EngineerChatMessage | undefined;
       needsDeep: boolean;
-      contextTier: "light" | "full";
+      contextTier: "lookup" | "full";
+      /** Situation the answer contract was inferred for — the caller passes it to the model. */
+      mode: EngineerChatMode;
     };
 
 export async function buildEngineerChatContext(params: {
@@ -74,12 +79,17 @@ export async function buildEngineerChatContext(params: {
   messages: EngineerChatMessage[];
   runId: string;
   compareRunId: string;
-  mode?: EngineerChatMode;
+  /**
+   * Situation known by the caller (dashboard "today" card → quick). Not a user setting —
+   * the selector is retired. Absent means "infer it", which is the normal path.
+   */
+  modeHint?: EngineerChatMode | null;
   /** IANA zone for human time labels in the context (rc_tz / device zone). */
   timeZone?: string | null;
 }): Promise<BuiltEngineerChatContext> {
   return perfSpan("buildEngineerChatContext", async () => {
-    const { userId, body, messages, runId, compareRunId, mode, timeZone } = params;
+    const { userId, body, messages, runId, compareRunId, modeHint, timeZone } = params;
+    const mode = modeHint ?? undefined;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const needsDeep = engineerChatNeedsDeepContext({
       lastUserMessage: lastUser?.content,
@@ -108,6 +118,17 @@ export async function buildEngineerChatContext(params: {
     }
 
     const anchorForRichContext = runId || basePacket.latestRun?.id || null;
+
+    // The selector is retired, so the contract is inferred here — after basePacket, which
+    // is where the two signals live. A caller-supplied hint always wins: it knows where
+    // the driver tapped from, which beats guessing from a timestamp.
+    const effectiveMode: EngineerChatMode =
+      modeHint ??
+      inferEngineerChatMode({
+        latestRunCreatedAtIso: basePacket.latestRun?.createdAtIso ?? null,
+        latestRunEventId: basePacket.latestRun?.eventId ?? null,
+        nowMs: Date.now(),
+      });
 
     const richEngineerContext =
       lastUser && typeof lastUser.content === "string"
@@ -245,6 +266,7 @@ export async function buildEngineerChatContext(params: {
       lastUser,
       needsDeep,
       contextTier,
+      mode: effectiveMode,
     };
   });
 }
@@ -339,7 +361,7 @@ export async function runEngineerChatTurn(params: {
     messages,
     runId,
     compareRunId,
-    mode: params.mode,
+    modeHint: params.mode ?? null,
     timeZone: params.timeZone,
   });
   if ("error" in built) {
@@ -359,7 +381,7 @@ export async function runEngineerChatTurn(params: {
     userId: params.userId,
     mergeContextWithFocusedPair,
     contextTier: built.contextTier,
-    mode: params.mode,
+    mode: built.mode,
     timeZone: params.timeZone,
   });
 

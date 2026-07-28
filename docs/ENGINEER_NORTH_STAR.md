@@ -198,7 +198,13 @@ A **visible, editable driver profile** layered on top of run-history context —
 
 **Hard rule — no cheap models on the advice path.** Any surface that generates setup advice (chat, quick-fix card, hints) uses a full-strength model. Cheap models are acceptable only for non-advice plumbing (classification, formatting).
 
-**Selection:** explicit quick / normal / deep selector in chat, persisted. **Later:** auto-inference (run linked to an event today, time since last run, practice vs qual vs race) sets the *default*; the inferred mode is always visible and overridable. No location tracking initially.
+**Enforced 2026-07-28.** The chat "light" tier used to breach this rule in practice: it picked `gpt-4o-mini` whenever a regex failed to spot setup vocabulary in the message — so "doesn't feel right" and "where would you start?" were answered by the cheap model on the thinnest context. The tier survives as `lookup`, but it now selects **prompt shape and context budget only**, never the model, and it is reachable only from an allow-listed lap-history question with no run in focus. Anything unrecognised gets the full engineer path: over-serving a simple question costs cents, under-serving a real one costs the driver's trust.
+
+**Selection (founder decision 2026-07-28 — selector retired):** the driver does not pick the mode. The server **infers** it from the run log: a run logged in the last 3 hours → Quick; an event run in the last 36 hours but outside that window → Deep; otherwise Normal (`inferEngineerChatMode`). The selector asked the driver to classify their own question before asking it — a tax paid every message, in the one moment (between runs, gloves on) where taps are dearest — and drivers do not reliably know which mode they want.
+
+The **contracts above are not retired**; they were always the valuable part. Only the picker is gone. Two guardrails ship with the inference: the mode is **never named to the driver**, and the prompt tells the model to follow the **message** over the inferred mode when the two disagree (a trackside-shaped driver asking "why does that work?" gets the explanation). A wrong inference therefore costs a slightly differently-shaped answer, never a wrong one — every contract shares the same grounding and hedging rules.
+
+**Situational hints still override the inference:** a caller that knows where the driver is — currently the dashboard's "today" card (`?mode=quick`) — passes its situation and wins. That is a fact about where the tap came from, not a user preference, and it is never persisted. No location tracking.
 
 ### Asking UX — tap-to-answer
 
@@ -211,7 +217,7 @@ When the Engineer needs input, it asks **structured questions with tappable opti
 | Surface | Role | Default mode | Continuation |
 |---|---|---|---|
 | **Post-run card** (dashboard / run detail — evolves quick-fix + between-run hints) | The proactive **read**: appears automatically after logging, zero taps | Quick contract | Tap → chat in quick mode, pre-anchored to that run |
-| **Engineer chat** | The **conversation** | Selector (quick / normal / deep) | — |
+| **Engineer chat** | The **conversation** | Inferred from the run log (quick / normal / deep) — no picker | — |
 | **Dashboard suggestion** | Ambient "what to do next" | Quick contract | Tap → chat |
 
 Card = the read; chat = the conversation. Proactivity is hybrid by design: cards push, chat responds.
@@ -235,7 +241,7 @@ Guardrails from the existing quality loop (`ENGINEER_ITERATION.md`): admin 0–1
 | Phase | Scope | Status |
 |:--:|---|---|
 | **0** | This doc written, reviewed, locked; pointers from `AGENTS.md` + `PRODUCT_NORTH_STAR.md` | 🟡 Draft — awaiting founder lock |
-| **1** | **Modes + trackside contract** — quick/normal/deep selector, mode prompt addons, card→chat continuation, tap-to-answer questions, strong-model fix for quick-fix card | 🟡 Built + verified in-app (2026-07-05); gold-set eval not yet run on the new prompt addons |
+| **1** | **Modes + trackside contract** — mode prompt addons, card→chat continuation, tap-to-answer questions, strong-model fix for quick-fix card. Selector **retired 2026-07-28** in favour of `inferEngineerChatMode` (see Selection) | 🟡 Built + verified in-app (2026-07-05); gold-set eval not yet run on the new prompt addons, nor on the inference |
 | **2** | **KB completion sweep** — AI-drafted baseline tier + founder claim-check/promote ritual + gap logging (parallel, ongoing) | 🟡 Loop proven end-to-end 2026-07-07: 6 drafted → founder claim-checked via workbench artifact (3 directional inversions caught) → corrected → **5 promoted to ground truth** (+40% approved corpus, now 16 files ≈ 54K chars); track-width stays draft (founder untested). Batch 2 gated on platform-key interview |
 | **3** | **Suggestion lifecycle** — `EngineerSuggestion` model, "trying this" → outcome linkback, track-record context | ⬜ |
 | **4** | **Driver profile** — visible/editable model, Engineer-proposed + driver-confirmed, cited in context | ⬜ |

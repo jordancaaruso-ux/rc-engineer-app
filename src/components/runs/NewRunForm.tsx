@@ -4000,7 +4000,7 @@ export function NewRunForm(props: {
                   })()}
                 </div>
               ) : (
-                <div className={prefillFieldClass(Boolean(prefillHighlights?.track))}>
+                <div className={cn("space-y-2", prefillFieldClass(Boolean(prefillHighlights?.track)))}>
                   <TrackCombobox
                     tracks={tracksList}
                     value={trackId}
@@ -4873,6 +4873,9 @@ export function NewRunForm(props: {
               specTireType={specTireType}
               value={{ runsCompleted, ageKnown: tireAgeKnown, stintId: tireStintId }}
               onChange={applyTireStint}
+              // Another car is another set of tires — an answer given for the old
+              // one must not stand over the new car's value.
+              resetSignal={carId}
               onPrefillClear={() => setPrefillHighlights((h) => (h ? { ...h, tires: false } : h))}
               copyTireWarning={copyTireWarning}
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}

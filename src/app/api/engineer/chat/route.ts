@@ -8,7 +8,7 @@ import {
   buildMergeContextWithFocusedPair,
 } from "@/lib/engineerPhase5/engineerChatPipeline";
 import { generateEngineerChatReplyWithTools } from "@/lib/engineerPhase5/openaiEngineer";
-import { parseEngineerChatMode } from "@/lib/engineerPhase5/engineerChatMode";
+import { parseEngineerChatModeHint } from "@/lib/engineerPhase5/engineerChatMode";
 import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
 import {
   tryAnswerComparisonQuery,
@@ -140,7 +140,9 @@ export async function POST(request: Request) {
 
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
-    const chatMode = parseEngineerChatMode(body?.mode);
+    // `mode` is now a caller hint (dashboard "today" card), not a driver preference —
+    // null means the pipeline infers the situation from the run log.
+    const chatModeHint = parseEngineerChatModeHint(body?.mode);
     const useStream = body?.stream === true;
     const timeZone =
       typeof body?.timeZone === "string" && body.timeZone.trim() ? body.timeZone.trim() : "UTC";
@@ -339,14 +341,14 @@ export async function POST(request: Request) {
               messages,
               runId,
               compareRunId,
-              mode: chatMode,
+              modeHint: chatModeHint,
               timeZone,
             });
             if ("error" in built) {
               send("error", { message: built.error ?? "Run not found" });
               return;
             }
-            const { contextJson, baseForMerge, lastUser, contextTier } = built;
+            const { contextJson, baseForMerge, lastUser, contextTier, mode } = built;
             const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
               userId: user.id,
               baseForMerge,
@@ -360,7 +362,7 @@ export async function POST(request: Request) {
               userId: user.id,
               mergeContextWithFocusedPair,
               contextTier,
-              mode: chatMode,
+              mode,
               timeZone,
               onToken: (t) => send("token", { t }),
             });
@@ -412,13 +414,13 @@ export async function POST(request: Request) {
       messages,
       runId,
       compareRunId,
-      mode: chatMode,
+      modeHint: chatModeHint,
       timeZone,
     });
     if ("error" in built) {
       return jsonError(404, built.error ?? "Run not found");
     }
-    const { contextJson, baseForMerge, lastUser, contextTier } = built;
+    const { contextJson, baseForMerge, lastUser, contextTier, mode } = built;
     const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
       userId: user.id,
       baseForMerge,
@@ -432,7 +434,7 @@ export async function POST(request: Request) {
       userId: user.id,
       mergeContextWithFocusedPair,
       contextTier,
-      mode: chatMode,
+      mode,
       timeZone,
     });
 

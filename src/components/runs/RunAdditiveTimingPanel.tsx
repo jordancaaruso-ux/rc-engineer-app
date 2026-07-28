@@ -20,10 +20,7 @@ import {
   newTirePrepStep,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
-import {
-  AdditiveTypeCombobox,
-  type AdditiveTypeOption,
-} from "@/components/additives/AdditiveTypeCombobox";
+import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 
 type Props = {
   additiveTypeId: string;
@@ -41,15 +38,6 @@ type Props = {
    */
   controlAdditive?: { id: string; displayName: string } | null;
 };
-
-function chipClass(selected: boolean) {
-  return cn(
-    "rounded-md border px-2.5 py-1.5 text-xs font-medium transition text-left max-w-full truncate",
-    selected
-      ? "border-accent bg-accent/15 text-foreground"
-      : "border-border bg-secondary text-foreground hover:bg-muted"
-  );
-}
 
 /** Which ruler drawer is open: one per panel, keyed by row + which value. */
 type OpenRuler = { row: number; kind: "min" | "temp" } | null;
@@ -152,7 +140,6 @@ export function RunAdditiveTimingPanel({
   highlightMissing = false,
   controlAdditive = null,
 }: Props) {
-  const [recentTypes, setRecentTypes] = useState<AdditiveTypeOption[]>([]);
   // A controlled event locks the additive; "ran none" is the only escape.
   const [ranNone, setRanNone] = useState(false);
   const [openRuler, setOpenRuler] = useState<OpenRuler>(null);
@@ -170,20 +157,6 @@ export function RunAdditiveTimingPanel({
     const target = ranNone ? "" : controlAdditive.id;
     if (additiveTypeId !== target) onAdditiveTypeIdChange(target);
   }, [controlAdditive, ranNone, additiveTypeId, onAdditiveTypeIdChange]);
-
-  const loadRecentTypes = useCallback(async () => {
-    try {
-      const res = await fetch("/api/additive-types/recent", { cache: "no-store" });
-      const data = (await res.json()) as { additiveTypes?: AdditiveTypeOption[] };
-      setRecentTypes(data.additiveTypes ?? []);
-    } catch {
-      setRecentTypes([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadRecentTypes();
-  }, [loadRecentTypes]);
 
   const updateStep = (i: number, patch: Partial<TirePrepStep>) => {
     onTirePrepChange(tirePrep.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
@@ -235,35 +208,10 @@ export function RunAdditiveTimingPanel({
         </div>
       ) : (
       <div className="space-y-2">
-          {recentTypes.length > 0 ? (
-            <div className="space-y-1.5">
-              <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-faint">
-                Recently used
-              </div>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Recently used additives">
-                {!requireAdditive ? (
-                  <button
-                    type="button"
-                    className={chipClass(!additiveTypeId)}
-                    onClick={() => onAdditiveTypeIdChange("")}
-                  >
-                    None
-                  </button>
-                ) : null}
-                {recentTypes.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={chipClass(additiveTypeId === t.id)}
-                    onClick={() => onAdditiveTypeIdChange(t.id)}
-                  >
-                    {t.displayName}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
+          {/* One control, one label (2026-07-28). The "Recently used" chip row that
+              sat here duplicated the picker's own Recently-used optgroup from the
+              same endpoint — two labels and up to nine chips for a single value,
+              with chip-as-state reading like toggles rather than a choice. */}
           <div className="space-y-1">
             <div className="type-data-label">
               Additive{requireAdditive ? " *" : ""}

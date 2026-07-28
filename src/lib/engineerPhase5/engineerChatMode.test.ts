@@ -5,17 +5,74 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   engineerChatModePromptAddon,
+  inferEngineerChatMode,
   parseChoiceChipsFromReply,
-  parseEngineerChatMode,
+  parseEngineerChatModeHint,
 } from "@/lib/engineerPhase5/engineerChatMode";
 
-test("parseEngineerChatMode accepts known modes and defaults to normal", () => {
-  assert.equal(parseEngineerChatMode("quick"), "quick");
-  assert.equal(parseEngineerChatMode("deep"), "deep");
-  assert.equal(parseEngineerChatMode("normal"), "normal");
-  assert.equal(parseEngineerChatMode("QUICK"), "normal");
-  assert.equal(parseEngineerChatMode(undefined), "normal");
-  assert.equal(parseEngineerChatMode(42), "normal");
+const NOW = Date.parse("2026-07-28T18:00:00.000Z");
+const agoMs = (hours: number) => NOW - hours * 60 * 60 * 1000;
+const isoAgo = (hours: number) => new Date(agoMs(hours)).toISOString();
+
+test("hint parser takes only the three known values, else null", () => {
+  assert.equal(parseEngineerChatModeHint("quick"), "quick");
+  assert.equal(parseEngineerChatModeHint("deep"), "deep");
+  assert.equal(parseEngineerChatModeHint("normal"), "normal");
+  // Anything unrecognised must be null, not "normal" — null means "infer it", and
+  // silently defaulting would strip the inference away on every malformed hint.
+  assert.equal(parseEngineerChatModeHint("QUICK"), null);
+  assert.equal(parseEngineerChatModeHint(undefined), null);
+  assert.equal(parseEngineerChatModeHint(42), null);
+});
+
+test("a run logged an hour ago means the driver is still at the track", () => {
+  assert.equal(
+    inferEngineerChatMode({ latestRunCreatedAtIso: isoAgo(1), latestRunEventId: null, nowMs: NOW }),
+    "quick"
+  );
+});
+
+test("an event run from this morning is a debrief, not trackside", () => {
+  assert.equal(
+    inferEngineerChatMode({ latestRunCreatedAtIso: isoAgo(9), latestRunEventId: "evt1", nowMs: NOW }),
+    "deep"
+  );
+});
+
+test("the same gap without an event stays normal — practice alone is not a debrief", () => {
+  assert.equal(
+    inferEngineerChatMode({ latestRunCreatedAtIso: isoAgo(9), latestRunEventId: null, nowMs: NOW }),
+    "normal"
+  );
+});
+
+test("a cold week and a driver with no runs both fall back to normal", () => {
+  assert.equal(
+    inferEngineerChatMode({ latestRunCreatedAtIso: isoAgo(24 * 9), latestRunEventId: "evt1", nowMs: NOW }),
+    "normal"
+  );
+  assert.equal(
+    inferEngineerChatMode({ latestRunCreatedAtIso: null, latestRunEventId: null, nowMs: NOW }),
+    "normal"
+  );
+});
+
+test("junk and future timestamps never throw or classify", () => {
+  assert.equal(
+    inferEngineerChatMode({ latestRunCreatedAtIso: "not-a-date", latestRunEventId: null, nowMs: NOW }),
+    "normal"
+  );
+  assert.equal(
+    inferEngineerChatMode({ latestRunCreatedAtIso: isoAgo(-5), latestRunEventId: null, nowMs: NOW }),
+    "normal"
+  );
+});
+
+test("an inferred contract is never named to the driver", () => {
+  for (const mode of ["quick", "deep"] as const) {
+    assert.match(engineerChatModePromptAddon(mode), /HOW YOU GOT THIS ANSWER MODE/);
+    assert.match(engineerChatModePromptAddon(mode), /follow the MESSAGE, not the mode/);
+  }
 });
 
 test("quick addon carries the trackside contract", () => {

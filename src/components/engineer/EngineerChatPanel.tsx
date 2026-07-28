@@ -10,11 +10,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-import {
-  parseChoiceChipsFromReply,
-  parseEngineerChatMode,
-  type EngineerChatMode,
-} from "@/lib/engineerPhase5/engineerChatMode";
+import { parseChoiceChipsFromReply } from "@/lib/engineerPhase5/engineerChatMode";
 
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
 
@@ -24,7 +20,6 @@ import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
 
 import { Eyebrow } from "@/components/ui/panel";
 
-import { PillToggle } from "@/components/ui/PillToggle";
 
 import { RelativeTime } from "@/components/ui/RelativeTime";
 
@@ -94,17 +89,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 };
 
-const CHAT_MODE_STORAGE_KEY = "engineer-chat-mode";
-
 // History starts collapsed to the most recent few conversations; the rest live
 // behind a "Show all" toggle so the panel doesn't scroll into a wall of threads.
 const HISTORY_COLLAPSED_COUNT = 4;
-
-const CHAT_MODE_META: Array<{ value: EngineerChatMode; label: string; hint: string }> = [
-  { value: "quick", label: "Quick", hint: "Trackside — the read + one call, fast" },
-  { value: "normal", label: "Normal", hint: "Balanced setup conversation" },
-  { value: "deep", label: "Deep", hint: "Debrief, what-ifs, and the why" },
-];
 
 
 
@@ -329,33 +316,14 @@ export function EngineerChatPanel({
 
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
-  const [chatMode, setChatMode] = useState<EngineerChatMode>("normal");
-
-  const modeFromUrl = searchParams.get("mode")?.trim() || null;
-
-  useEffect(() => {
-    // URL mode (e.g. quick-fix card "Dig deeper" → mode=quick) wins over the stored
-    // preference for this visit, but is situational — don't persist it.
-    if (modeFromUrl) {
-      setChatMode(parseEngineerChatMode(modeFromUrl));
-      return;
-    }
-    try {
-      const stored = window.localStorage.getItem(CHAT_MODE_STORAGE_KEY);
-      if (stored) setChatMode(parseEngineerChatMode(stored));
-    } catch {
-      // localStorage unavailable (private mode) — keep default
-    }
-  }, [modeFromUrl]);
-
-  const selectChatMode = useCallback((next: EngineerChatMode) => {
-    setChatMode(next);
-    try {
-      window.localStorage.setItem(CHAT_MODE_STORAGE_KEY, next);
-    } catch {
-      // non-fatal
-    }
-  }, []);
+  /**
+   * Answer-mode selector retired 2026-07-28 — the server infers the contract from how
+   * recently the driver logged a run. What survives is the situational URL hint: a tap
+   * from the dashboard's "today" card (`?mode=quick`) genuinely knows the driver is at
+   * the track, which beats any inference. Forwarded per-request, never persisted, and
+   * never shown — it describes where the tap came from, not a preference.
+   */
+  const modeHintFromUrl = searchParams.get("mode")?.trim() || null;
 
 
 
@@ -589,7 +557,7 @@ export function EngineerChatPanel({
 
           stream: true,
 
-          mode: chatMode,
+          ...(modeHintFromUrl ? { mode: modeHintFromUrl } : {}),
 
           ...(threadId ? { threadId } : {}),
 
@@ -1114,38 +1082,6 @@ export function EngineerChatPanel({
           </p>
 
         ) : null}
-
-        <div className="space-y-1.5">
-
-          <PillToggle
-
-            ariaLabel="Answer mode"
-
-            disabled={panelBusy}
-
-            options={CHAT_MODE_META.map((m) => ({
-
-              value: m.value,
-
-              label: m.label,
-
-              ariaLabel: m.hint,
-
-            }))}
-
-            value={chatMode}
-
-            onChange={selectChatMode}
-
-          />
-
-          <p className="text-center text-[10px] text-muted-foreground">
-
-            {CHAT_MODE_META.find((m) => m.value === chatMode)?.hint}
-
-          </p>
-
-        </div>
 
         <div className="flex items-end gap-2">
 
