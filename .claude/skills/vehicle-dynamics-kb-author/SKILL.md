@@ -147,6 +147,31 @@ the speed of load transfer ([[load-transfer]])`.
 Delete it; keep the mechanism in Physics only.
 
 ## Correction log (LIVING — append new patterns, newest first, with date)
+- 2026-07-28 — "wouldn't this mean the rear would slide more because it has less even load across
+  rear tires?" **A ONE-WAY CHAIN IS USUALLY A MISSING TERM IN A NODE, NOT A SETTLED ANSWER.** I built
+  "softer rear → runs deeper in travel → RC drops ~1:1 → smaller fast fraction → less rear bite → rear
+  won't rotate" and offered it as *giving the founder's hunch a mechanism* — quietly dropping a
+  competing strand I had listed myself one message earlier. The root cause wasn't only reasoning:
+  `roll-center.md` listed three consequences of RC height (fast fraction, support, jacking) and
+  **omitted a fourth** — RC height also sets that axle's **share of the transfer amount**
+  (ΔF = axle mass share × h_RC ÷ track × a_y; verified against a load-transfer derivation). A node
+  missing a term makes one-way composition *possible*, so the bad chain looks sound from inside.
+  **New stop-signals:** "gives your observation a mechanism", "your gut has a mechanism now",
+  "it's X-specific in a way Y wasn't". **Guard:** when one number appears in more than one term of the
+  physics, enumerate every term ON THE NODE before composing anything; and when a chain runs cleanly
+  in one direction, suspect a missing term before believing the answer.
+- 2026-07-28 — **Sweep every input the engine takes, not the one the current story is about.** Two
+  hypotheses died to `solveAxle` in one session: mine (roll-camber explains rear-specific rotation —
+  refuted, camber loss is near-identical front and rear, ~0.05°/deg recovered at both ends) and the
+  founder's (camber isn't it — also refuted as stated, but for the *right* reason: camber is nearly
+  flat through travel while RC moves ~1.15 mm/mm). The sweep that actually mattered was the one
+  neither of us had run — **ride height / travel**, not roll. Run roll AND ride height AND both axles
+  before concluding.
+- 2026-07-28 — **Web sources give contradictory *directions*; derive direction yourself.** A forum
+  asserted "roll understeer = toe-out on compression"; deriving it from the rear-steer phase relation
+  (in-phase rear steer = stabilising, the known 4WS result) gave the opposite. Reinforces the existing
+  rule — import mechanisms, never tendencies — and adds: when a direction is genuinely needed to reason
+  in chat, derive it from a known invariant, never from a forum line.
 - 2026-07-27 — "not having the balance is okay as long as the KB can infer it." **PUSH vs NET — the
   structural resolution.** The skill used to say BOTH "parameters state their balance impact directly"
   AND "never editorialize what a knob does to balance" — a contradiction. Fix: a knob states each

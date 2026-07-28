@@ -14,6 +14,15 @@ Two facets the setup shapes:
 - **Front/rear split** — the lateral total can transfer more at the front or the rear, set by the
   front/rear roll-stiffness balance.
 
+**When each facet governs.** At turn-in the springs haven't deflected, so they've moved **no load
+yet** — the split at that moment is set by the **roll-centre heights alone**, and spring/ARB rates
+contribute nothing until the car has actually rolled. The elastic share ramps in as roll develops and
+only reaches full value once roll is steady. So **speed** governs the early part of a corner and
+fades out; the **split** arrives late and holds. How much of a corner each one owns depends on the
+corner's duration against how long that car takes to settle into roll — a short, quick corner is
+mostly the first, a long sweeper mostly the second.
+
 **Affects:** [[bite-hold]] (via speed).
 **Moved by:** roll centre [[roll-center]] & anti-dive/anti-squat [[anti-dive-anti-squat]] (fast fraction),
-springs / ARBs [[roll-stiffness]] (split & elastic path), track width & CoG / ride height / weight (the total).
+springs / ARBs [[roll-stiffness]] (split & elastic path), dampers [[damping]] (how fast the elastic
+path arrives), track width & CoG / ride height / weight (the total).
