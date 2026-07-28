@@ -25,9 +25,9 @@ export async function GET(request: Request) {
   const baseInclude = {
     track: { select: { id: true, name: true } },
     trackLayout: { select: { id: true, name: true } },
+    // Scalars are NOT listed here: `include` takes relations only, and Prisma throws on a scalar
+    // key. Every scalar on Run (tireStintId, tireAgeKnown, …) is returned by default anyway.
     tireType: { select: { id: true, displayName: true } },
-    tireStintId: true,
-    tireAgeKnown: true,
     event: { select: { id: true, name: true, trackId: true, startDate: true, endDate: true } },
     setupSnapshot: { select: { id: true, data: true } },
   } as const;
