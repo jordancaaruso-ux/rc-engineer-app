@@ -45,6 +45,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/uncommitted-guard.cjs"],
+            "statusMessage": "Checking for uncommitted work"
+          }
+        ]
+      }
     ]
   }
 }
