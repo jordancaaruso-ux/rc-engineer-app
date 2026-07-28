@@ -79,7 +79,7 @@ export const SETUP_MECHANISM_LABELS: SetupMechanismLabelMap = {
 };
 
 const KEY_MAP: Record<string, SetupMechanismMapping[]> = {
-  // Under lower arm shims: raise lowers RC on that corner per support-lower-inner.md
+  // Under lower arm shims: raise lowers RC on that corner per concepts/roll-center.md
   // Convention from KB: raising under_lower_arm_shims => raises RC AND adds support.
   under_lower_arm_shims_ff: [
     { mechanism: "front_rc_lower_arm", whenIncreasedEffect: "raises" },
@@ -101,7 +101,7 @@ const KEY_MAP: Record<string, SetupMechanismMapping[]> = {
     { mechanism: "rear_support", whenIncreasedEffect: "more" },
     { mechanism: "rear_anti_squat", whenIncreasedEffect: "less" },
   ],
-  // Upper inner shims: raising LOWERS RC on that corner (KB roll-centre.md).
+  // Upper inner shims: raising LOWERS RC on that corner (KB concepts/roll-center.md).
   upper_inner_shims_ff: [
     { mechanism: "front_rc_upper_link", whenIncreasedEffect: "lowers" },
     { mechanism: "front_support", whenIncreasedEffect: "less" },

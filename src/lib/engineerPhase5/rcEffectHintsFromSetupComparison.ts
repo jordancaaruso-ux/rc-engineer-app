@@ -2,7 +2,7 @@ import "server-only";
 
 /**
  * Deterministic roll-centre *qualitative* hints for setup compare rows.
- * Matches `content/vehicle-dynamics/roll-centre.md` + Engineer system rules.
+ * Matches `content/vehicle-dynamics/concepts/roll-center.md` + Engineer system rules.
  *
  * Convention: values are shim stack thickness (mm). `primary` and `compare` are the two runs'
  * values; change **compare → primary** means deltaMm = primaryMm − compareMm (positive = raised stack on primary).

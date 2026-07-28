@@ -81,7 +81,7 @@ export type ParameterEffectEntry = {
   parameterKey: string;
   /**
    * KB filename the entry was derived from, relative to `content/vehicle-dynamics/`
-   * (e.g. "camber-caster-toe.md"). Surfaces into the engineer reply as a citation.
+   * (e.g. "camber.md"). Used to FIND the backing prose — never printed to the driver.
    */
   kbSource: string;
   /** Anchor in the KB file (e.g. "#rear-toe"). The engineer cites `${kbSource}${kbSection}`. */
