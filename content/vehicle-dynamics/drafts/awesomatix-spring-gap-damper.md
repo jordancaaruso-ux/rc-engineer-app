@@ -4,7 +4,10 @@
 
 **Keys:** `spring_gap_front`, `spring_gap_rear` — Awesomatix-specific stiffness control. **Bigger gap = stiffer** (founder-confirmed). It is an **effective spring-rate adjustment**, not a preload or free-play setting.
 
-Because spring gap is a rate control, **all spring-rate reasoning applies**: read tendencies from **spring-rate.md** (stiffer = less roll/pitch at that end, faster load transfer, typically less mechanical grip at that end on lower grip; softer = the mirror). When comparing setups, treat a spring-gap change and a spring change as the same *family* of move — the sheet may carry both (`front_spring_rate_gf_mm`, `rear_spring_rate_gf_mm` alongside the gaps), so name **both** values when describing an end's stiffness.
+Because spring gap is a rate control, **all spring-rate reasoning applies**: read the mechanisms from
+[[spring-rate]] and its linked concepts — stiffer at an end means less roll there, load arriving
+faster, and a bigger share of that end's lateral load transfer; softer is the mirror. Those strands do
+not agree on an outcome, so compose them live rather than quoting a tendency. When comparing setups, treat a spring-gap change and a spring change as the same *family* of move — the sheet may carry both (`front_spring_rate_gf_mm`, `rear_spring_rate_gf_mm` alongside the gaps), so name **both** values when describing an end's stiffness.
 
 ## Damper percent (Awesomatix damping / pack)
 

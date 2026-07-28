@@ -7,13 +7,18 @@
 
 **Mechanism.** For a given CoG height, an axle's **lateral load transfer is inversely proportional to its track width**. Widening one end reduces how much load shifts from inner to outer tire at that end in a corner — the tire pair stays more evenly loaded, and since tires give more total grip when evenly loaded, the widened end gains **cornering grip**. Front/rear track split is therefore a **balance lever**, the same family as roll-stiffness split (springs/ARBs — see **spring-rate**, **arb**) but achieved through geometry instead of stiffness.
 
-## Handling tendencies
+## What the mechanism pushes
 
-- **Wider front** → **more front grip** through the corner: stronger mid-corner steering, more confidence holding a line. Often slightly **calmer initial response**, because the same steering input now has to move a wider footprint.
-- **Wider rear** → **more rear grip / stability**, particularly mid-corner to exit; the car gives up some rotation.
-- **Narrower** at an end is the mirror: that end gives up grip, gains a touch of reactiveness.
+Widening an end lowers that end's share of lateral load transfer, so its tyre pair carries load more
+evenly — and a pair sharing load makes more total grip than a pair with one tyre overloaded
+([[tyre-load-sensitivity]]). Narrowing does the mirror. That is the whole push, and it is the same
+family of lever as the roll-stiffness split ([[roll-stiffness]]), reached through geometry instead of
+stiffness.
 
-Direction is reliable; magnitude per millimetre is small — spacers are a **trim** lever, useful when springs/ARBs are already where you want them and the balance needs a nudge without changing platform stiffness.
+What that **nets out to** on the car is not stored here and should not be predicted: track width also
+moves scrub radius, camber at the contact patch, and the total roll moment, and the founder has not
+tested it on track. Magnitude per millimetre is small. Frame any track-width change as a test with
+something specific to feel for — never as an expected outcome.
 
 ## Secondary effects worth naming
 

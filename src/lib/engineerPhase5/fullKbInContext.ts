@@ -24,9 +24,13 @@ export type FullKbSystemBlock = {
 };
 
 const FULL_KB_HEADER = `VEHICLE DYNAMICS KB — FULL TEXT (canonical, hand-curated ground truth).
-This is the COMPLETE vehicle-dynamics knowledge base: every file, full prose. It is the corpus the instructions and context JSON call "vehicleDynamicsKb". Per-turn retrieved excerpts are retired — richEngineerContext.vehicleDynamicsKb and focusedRunPair.setupCompareKbSnippets carry only a pointer to this block, so wherever the instructions mention retrieved snippets or excerpts, read the relevant file below instead. Never claim a KB excerpt "didn't make retrieval" or that KB coverage is missing for a parameter documented below — everything is here. All KB rules apply to these files: cite filenames (e.g. \`damper-oil.md\`), never contradict them, preserve their hedges.
+This is the COMPLETE vehicle-dynamics knowledge base: every file, full prose. It is the corpus the instructions and context JSON call "vehicleDynamicsKb". Per-turn retrieved excerpts are retired — richEngineerContext.vehicleDynamicsKb and focusedRunPair.setupCompareKbSnippets carry only a pointer to this block, so wherever the instructions mention retrieved snippets or excerpts, read the relevant file below instead. Never claim a KB excerpt "didn't make retrieval" or that KB coverage is missing for a parameter documented below — everything is here. All KB rules apply to these files: never contradict them, preserve their hedges.
 
-PROVENANCE TIERS: files above the "AI-DRAFTED BASELINE FILES" divider are founder-approved ground truth — cite them plainly. Files below it (marked "AI DRAFT — unverified") are AI-researched baseline theory: use them, but cite as "draft \`file.md\`" with hedged wording ("general vehicle-dynamics theory — not yet verified for this KB"), never with the same authority as approved files, and if a draft and an approved file disagree, the approved file wins without exception.
+NEVER NAME THESE FILES TO THE DRIVER. Read them, reason from them, then speak in your own voice. No filenames, no \`.md\`, no "per the KB", no "according to". The driver does not know this corpus exists and naming it reads as machinery leaking through the answer. Grounding stays mandatory — showing your sources does not.
+
+THESE FILES STORE MECHANISMS, NOT OUTCOMES. They deliberately describe what a change does physically and stop short of saying what the car will then do, because the same change genuinely goes both ways on different days. Where two files push opposite ways on one knob, hold both and say what decides it — do not compose a single confident verdict out of primitives that disagree.
+
+PROVENANCE TIERS: files above the "AI-DRAFTED BASELINE FILES" divider are founder-approved ground truth — use them plainly. Files below it (marked "AI DRAFT — unverified") are AI-researched baseline theory: use them, but signal the lower confidence IN WORDS, never by naming the file — "this is general vehicle-dynamics theory, not something we've confirmed on your car". If a draft and an approved file disagree, the approved file wins without exception.
 
 `;
 
@@ -51,7 +55,7 @@ export const FULL_KB_POINTER_SNIPPET = {
   title: "Full KB in context — excerpts retired",
   sourcePath: "vehicle-dynamics/",
   excerpt:
-    "The complete vehicle-dynamics KB (every file, full prose) is in the first system message. Read parameter directions, hedges, and mechanism language directly from those files and cite filenames as usual.",
+    "The complete vehicle-dynamics KB (every file, full prose) is in the first system message. Read parameter directions, hedges, and mechanism language directly from those files — and never name a file to the driver.",
 } as const;
 
 function isRecord(v: unknown): v is Record<string, unknown> {
