@@ -6,6 +6,7 @@ import {
   buildPositionSplitFields,
   existingGroupTitles,
   groupTitleChoices,
+  sectionChoicesForSheet,
   sectionIdForGroupTitle,
   suggestGroupTitleForLabel,
   uniqueParameterKey,
@@ -461,4 +462,44 @@ test("a suggested group title lands the parameter in that group's section id", (
   if (!res.ok) return;
   assert.equal(res.field.sectionId, "shocks_springs");
   assert.equal(res.field.sectionTitle, "Shocks & springs");
+});
+
+test("a blank sheet's section dropdown is exactly the universal groups", () => {
+  assert.deepEqual(
+    sectionChoicesForSheet(schema()),
+    SETUP_SHEET_GROUPS.map((g) => ({ id: g.id, title: g.title }))
+  );
+});
+
+test("a sheet's own sections lead, universal groups fill in behind them", () => {
+  const s: SetupSheetModelSchema = {
+    version: 1,
+    label: "Test sheet",
+    structuredSections: [{ id: "front_end", title: "Front end", rows: [] }],
+    fields: [field({ key: "diff_oil", sectionId: "diffs", sectionTitle: "Diffs" })],
+  };
+  const choices = sectionChoicesForSheet(s);
+  assert.deepEqual(choices.slice(0, 2), [
+    { id: "front_end", title: "Front end" },
+    { id: "diffs", title: "Diffs" },
+  ]);
+  // Every universal group still reachable, none dropped.
+  for (const g of SETUP_SHEET_GROUPS) {
+    assert.ok(choices.some((c) => c.id === g.id), `${g.id} offered`);
+  }
+});
+
+test("a section that already uses a universal title is not offered twice", () => {
+  const s: SetupSheetModelSchema = {
+    version: 1,
+    label: "Test sheet",
+    // Same word, different id — offering both would split one group across two sections.
+    structuredSections: [{ id: "dt", title: "drivetrain", rows: [] }],
+    fields: [],
+  };
+  const choices = sectionChoicesForSheet(s);
+  assert.deepEqual(choices.filter((c) => c.title.toLowerCase() === "drivetrain"), [
+    { id: "dt", title: "drivetrain" },
+  ]);
+  assert.equal(choices.length, SETUP_SHEET_GROUPS.length);
 });

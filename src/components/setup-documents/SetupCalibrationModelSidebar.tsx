@@ -12,6 +12,7 @@ import {
   listModelParameters,
   modelMappingProgress,
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
+import { sectionChoicesForSheet } from "@/lib/setupSheetModels/newParameterDef";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -101,13 +102,10 @@ export function SetupCalibrationModelSidebar(props: {
     return [...m.entries()];
   }, [rows]);
 
-  const sections = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const f of schema.fields) {
-      if (!m.has(f.sectionId)) m.set(f.sectionId, f.sectionTitle || f.sectionId);
-    }
-    return [...m.entries()].map(([id, title]) => ({ id, title }));
-  }, [schema]);
+  // This sheet's own sections, then the universal groups. Built only from `schema.fields` before,
+  // so a brand-new chassis type offered an empty dropdown and every parameter silently landed in
+  // "General" — a section that is not one of the groups the sheet renders in.
+  const sections = useMemo(() => sectionChoicesForSheet(schema), [schema]);
 
   const progress = useMemo(
     () => modelMappingProgress(schema, formFieldMappings),

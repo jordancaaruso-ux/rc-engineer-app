@@ -75,6 +75,38 @@ export function groupTitleChoices(schema: Pick<SetupSheetModelSchema, "fields">)
 }
 
 /**
+ * The same vocabulary as {@link groupTitleChoices}, for the surfaces that pick a section by **id**
+ * rather than by typing a title: the layout canvas's add-parameter form and the calibration
+ * sidebar's "New parameter…".
+ *
+ * Order differs from `groupTitleChoices` on purpose. These forms sit in front of a sheet that is
+ * usually already built, and a parameter must be addable into the section the canvas is full of, so
+ * the sheet's own sections lead and the universal groups fill in behind them. On a brand-new
+ * chassis type there are no own sections, so the universal seven are simply what you get.
+ *
+ * Deduped by id *and* by title: a sheet that already has "Drivetrain" under some other id must not
+ * offer the word twice, or the driver splits one group across two sections without noticing.
+ */
+export function sectionChoicesForSheet(
+  schema: Pick<SetupSheetModelSchema, "fields" | "structuredSections">
+): Array<{ id: string; title: string }> {
+  const out: Array<{ id: string; title: string }> = [];
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+  const push = (id: string, title: string) => {
+    if (!id || seenIds.has(id) || seenTitles.has(title.trim().toLowerCase())) return;
+    seenIds.add(id);
+    seenTitles.add(title.trim().toLowerCase());
+    out.push({ id, title });
+  };
+
+  for (const sec of schema.structuredSections) push(sec.id, sec.title || sec.id);
+  for (const f of schema.fields) push(f.sectionId, f.sectionTitle || f.sectionId);
+  for (const g of SETUP_SHEET_GROUPS) push(g.id, g.title);
+  return out;
+}
+
+/**
  * The group a parameter's name implies, as a title from {@link groupTitleChoices}. Undefined when
  * nothing matches, so the caller leaves the driver's own choice alone rather than guessing.
  */

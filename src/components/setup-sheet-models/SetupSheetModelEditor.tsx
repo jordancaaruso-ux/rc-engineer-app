@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import {
-  CUSTOM_FIELD_SECTION_PRESETS,
-  suggestKeyFromPdfFieldName,
-} from "@/lib/setupCalibrations/customFieldCatalog";
+import { suggestKeyFromPdfFieldName } from "@/lib/setupCalibrations/customFieldCatalog";
+import { sectionChoicesForSheet } from "@/lib/setupSheetModels/newParameterDef";
+import { SETUP_SHEET_GROUPS } from "@/lib/setupSheetModels/setupSheetGroups";
 import {
   buildFieldDefFromKind,
   schemaKindFromField,
@@ -48,35 +47,13 @@ const KIND_OPTIONS: { value: SchemaParameterKind; label: string }[] = [
 ];
 
 /**
- * Sections offered when adding a parameter: the ones actually on *this* sheet first, then any
- * presets not already there.
+ * Sections offered when adding a parameter: this sheet's own first, then the universal groups.
  *
- * The old list filtered `CUSTOM_FIELD_SECTION_PRESETS` for six ids, two of which ("suspension",
- * "tyres_body") don't exist in it — so it silently offered four generic sections and none of the
- * sheet's own. A parameter could not be added into "Front end" even though the canvas was full of
- * them, so every new one landed in the wrong place and had to be dragged out.
+ * Was `CUSTOM_FIELD_SECTION_PRESETS` (Metadata, Document / header, Event & track, Electronics,
+ * Tuning (additional)…) — a separate, older vocabulary that shares only "Drivetrain" and "Other"
+ * with the groups a sheet actually renders in. Building a sheet here and building one box-first in
+ * the calibration editor produced two different taxonomies for the same car.
  */
-function sectionOptionsFor(schema: SetupSheetModelSchema): { id: string; title: string }[] {
-  const seen = new Set<string>();
-  const out: { id: string; title: string }[] = [];
-  for (const sec of schema.structuredSections) {
-    if (seen.has(sec.id)) continue;
-    seen.add(sec.id);
-    out.push({ id: sec.id, title: sec.title || sec.id });
-  }
-  for (const f of schema.fields) {
-    if (!f.sectionId || seen.has(f.sectionId)) continue;
-    seen.add(f.sectionId);
-    out.push({ id: f.sectionId, title: f.sectionTitle || f.sectionId });
-  }
-  for (const p of CUSTOM_FIELD_SECTION_PRESETS) {
-    if (seen.has(p.id)) continue;
-    seen.add(p.id);
-    out.push(p);
-  }
-  return out;
-}
-
 /** Sentinel option that reveals the inline "new section" input, as TireTypeCombobox does. */
 const NEW_SECTION_VALUE = "__new_section__";
 
@@ -166,10 +143,9 @@ export function SetupSheetModelEditor(props: {
   }, [schema.fields]);
 
   const tray = useMemo(() => unplacedFields(schema), [schema]);
-  const sectionOptions = useMemo(() => sectionOptionsFor(schema), [schema]);
+  const sectionOptions = useMemo(() => sectionChoicesForSheet(schema), [schema]);
   /** Default to the section last added into, else the first one on the sheet. */
-  const effectiveSectionId =
-    sectionId || sectionOptions[0]?.id || CUSTOM_FIELD_SECTION_PRESETS[0]!.id;
+  const effectiveSectionId = sectionId || sectionOptions[0]?.id || SETUP_SHEET_GROUPS[0]!.id;
 
   const applySchema = useCallback(
     (next: OpResult) => {
