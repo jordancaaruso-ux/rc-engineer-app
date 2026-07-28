@@ -1,6 +1,10 @@
 import { suggestKeyFromPdfFieldName } from "@/lib/setupCalibrations/customFieldCatalog";
 import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import { suggestUniversalParameterId } from "@/lib/setupSheetModels/matchUniversalParameter";
+import {
+  SETUP_SHEET_GROUPS,
+  groupForFieldKey,
+} from "@/lib/setupSheetModels/setupSheetGroups";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 /**
@@ -47,6 +51,39 @@ export function sectionIdForGroupTitle(
     .slice(0, 48);
   if (!slug) return "general";
   return /^[a-z]/.test(slug) ? slug : `s_${slug}`;
+}
+
+/**
+ * Group chips offered while building a sheet: the app's universal groups first, then anything this
+ * sheet already invented.
+ *
+ * A brand-new chassis type starts with zero fields, so "titles already on the sheet" was an empty
+ * row of chips — every group had to be typed, and a typo minted a private section that never lined
+ * up with the display groups. Offering the canonical set up front means a sheet is built into the
+ * same six-plus-catch-all vocabulary it will later be *rendered* in (`setupSheetGroups.ts`).
+ *
+ * The titles are load bearing: `sectionIdForGroupTitle` slugifies each one straight onto its
+ * `SetupSheetGroupId` ("Shocks & springs" -> `shocks_springs`), so the structural section id a
+ * parameter is stored under matches the display group it regroups into. `newParameterDef.test.ts`
+ * pins that.
+ */
+export function groupTitleChoices(schema: Pick<SetupSheetModelSchema, "fields">): string[] {
+  const canonical = SETUP_SHEET_GROUPS.map((g) => g.title);
+  const taken = new Set(canonical.map((t) => t.toLowerCase()));
+  const extras = existingGroupTitles(schema).filter((t) => !taken.has(t.toLowerCase()));
+  return [...canonical, ...extras];
+}
+
+/**
+ * The group a parameter's name implies, as a title from {@link groupTitleChoices}. Undefined when
+ * nothing matches, so the caller leaves the driver's own choice alone rather than guessing.
+ */
+export function suggestGroupTitleForLabel(displayLabel: string): string | undefined {
+  const label = displayLabel.trim();
+  if (!label) return undefined;
+  const id = groupForFieldKey(suggestKeyFromPdfFieldName(label), label);
+  if (!id) return undefined;
+  return SETUP_SHEET_GROUPS.find((g) => g.id === id)?.title;
 }
 
 /** Distinct group titles already used on this sheet, in first-seen order (chips in the name panel). */

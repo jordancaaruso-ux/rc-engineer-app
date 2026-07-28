@@ -5,9 +5,12 @@ import {
   buildNewParameterField,
   buildPositionSplitFields,
   existingGroupTitles,
+  groupTitleChoices,
   sectionIdForGroupTitle,
+  suggestGroupTitleForLabel,
   uniqueParameterKey,
 } from "@/lib/setupSheetModels/newParameterDef";
+import { SETUP_SHEET_GROUPS } from "@/lib/setupSheetModels/setupSheetGroups";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 function field(partial: Partial<SetupSheetModelFieldDef> & { key: string }): SetupSheetModelFieldDef {
@@ -405,4 +408,57 @@ test("a grouped split needs one option list per position, and 2 options in each"
   if (tooFew.ok) return;
   // The failing position is named — "needs at least 2 boxes" alone wouldn't say which row.
   assert.match(tooFew.error, /^Rear:/);
+});
+
+test("a brand-new chassis type already offers every universal group as a chip", () => {
+  const choices = groupTitleChoices(schema());
+  assert.deepEqual(choices, SETUP_SHEET_GROUPS.map((g) => g.title));
+});
+
+test("a sheet's own group names follow the universal ones, never duplicated", () => {
+  const choices = groupTitleChoices(
+    schema([
+      field({ key: "srs_front", sectionId: "srs", sectionTitle: "SRS" }),
+      // Same title as a universal group, differently cased — must not appear twice.
+      field({ key: "diff", sectionId: "dt", sectionTitle: "drivetrain" }),
+    ])
+  );
+  assert.deepEqual(choices.slice(0, SETUP_SHEET_GROUPS.length), SETUP_SHEET_GROUPS.map((g) => g.title));
+  assert.deepEqual(choices.slice(SETUP_SHEET_GROUPS.length), ["SRS"]);
+});
+
+/**
+ * Load bearing: a parameter is STORED under the section id slugified from its group title, and
+ * DISPLAYED under the group `setupSheetGroups` resolves. Building a sheet from these chips is only
+ * uniform if those two agree, so the slug of every universal title must equal its group id.
+ */
+test("every universal group title slugifies onto its own group id", () => {
+  for (const group of SETUP_SHEET_GROUPS) {
+    assert.equal(sectionIdForGroupTitle(group.title, schema()), group.id, group.title);
+  }
+});
+
+test("the group is suggested from the parameter's name, and left alone when nothing matches", () => {
+  assert.equal(suggestGroupTitleForLabel("Front spring"), "Shocks & springs");
+  assert.equal(suggestGroupTitleForLabel("PSS"), "Shocks & springs");
+  assert.equal(suggestGroupTitleForLabel("Camber"), "Suspension geometry");
+  assert.equal(suggestGroupTitleForLabel("Belt tension"), "Drivetrain");
+  assert.equal(suggestGroupTitleForLabel("Top deck screws"), "Chassis & flex");
+  assert.equal(suggestGroupTitleForLabel("Upper inner shims"), "Links & shims");
+  assert.equal(suggestGroupTitleForLabel("Bodyshell"), "Body, tyres & weight");
+  assert.equal(suggestGroupTitleForLabel("Notes"), "Other");
+  assert.equal(suggestGroupTitleForLabel("Zzz unknowable"), undefined);
+  assert.equal(suggestGroupTitleForLabel("   "), undefined);
+});
+
+test("a suggested group title lands the parameter in that group's section id", () => {
+  const title = suggestGroupTitleForLabel("Front spring")!;
+  const res = buildNewParameterField(
+    { displayLabel: "Front spring", groupTitle: title, kind: "text" },
+    schema()
+  );
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.equal(res.field.sectionId, "shocks_springs");
+  assert.equal(res.field.sectionTitle, "Shocks & springs");
 });

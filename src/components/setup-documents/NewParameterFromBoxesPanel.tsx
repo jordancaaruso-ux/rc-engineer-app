@@ -15,6 +15,7 @@ import {
 } from "@/lib/setupSheetModels/universalParameters";
 import {
   POSITION_LABELS,
+  suggestGroupTitleForLabel,
   type NewParameterInput,
   type NewParameterKind,
   type PositionSplit,
@@ -72,7 +73,7 @@ export function NewParameterFromBoxesPanel(props: {
   onOptionCountsChange: (counts: number[]) => void;
   /** Read for name suggestions — stems already on this sheet come first. */
   schema: Pick<SetupSheetModelSchema, "fields">;
-  /** Group names already used on this sheet — one-tap chips. */
+  /** Group names to offer as one-tap chips — the universal groups, plus this sheet's own. */
   groupTitles: string[];
   busy: boolean;
   error: string | null;
@@ -86,7 +87,8 @@ export function NewParameterFromBoxesPanel(props: {
   const positions = POSITION_LABELS[split];
 
   const [displayLabel, setDisplayLabel] = useState("");
-  const [groupTitle, setGroupTitle] = useState(groupTitles[0] ?? "");
+  const [groupTitle, setGroupTitle] = useState("");
+  const [groupTouched, setGroupTouched] = useState(false);
   const [valueKind, setValueKind] = useState<NewParameterKind>("number");
   const [groupKind, setGroupKind] = useState<NewParameterKind>("one_of_many");
   const [splitKind, setSplitKind] = useState<NewParameterKind>("number");
@@ -144,6 +146,18 @@ export function NewParameterFromBoxesPanel(props: {
     if (universalTouched) return;
     setUniversalId(suggestedUniversalId ?? null);
   }, [suggestedUniversalId, universalTouched]);
+
+  // Pre-select the group the name implies ("Front spring" -> Shocks & springs), until he picks a
+  // chip himself. A name that matches nothing leaves the field alone rather than guessing — the
+  // chips are right there, and a silently wrong group is worse than an unset one.
+  const suggestedGroupTitle = useMemo(
+    () => suggestGroupTitleForLabel(displayLabel),
+    [displayLabel]
+  );
+  useEffect(() => {
+    if (groupTouched || !suggestedGroupTitle) return;
+    setGroupTitle(suggestedGroupTitle);
+  }, [suggestedGroupTitle, groupTouched]);
 
   /** What a Front/Rear split will pool stats as — the ids are derived per generated label. */
   const splitUniversalLabels = useMemo(() => {
@@ -337,7 +351,10 @@ export function NewParameterFromBoxesPanel(props: {
         <input
           className="w-full rounded border border-border bg-card px-2 py-1.5 text-xs text-foreground"
           value={groupTitle}
-          onChange={(e) => setGroupTitle(e.target.value)}
+          onChange={(e) => {
+            setGroupTouched(true);
+            setGroupTitle(e.target.value);
+          }}
           placeholder="e.g. Front end"
         />
         {groupTitles.length > 0 ? (
@@ -352,7 +369,10 @@ export function NewParameterFromBoxesPanel(props: {
                     ? "border-accent/70 bg-accent/20 text-foreground"
                     : "border-border text-muted-foreground hover:bg-muted"
                 )}
-                onClick={() => setGroupTitle(t)}
+                onClick={() => {
+                  setGroupTouched(true);
+                  setGroupTitle(t);
+                }}
               >
                 {t}
               </button>

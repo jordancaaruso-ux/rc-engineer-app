@@ -60,7 +60,7 @@ import {
   POSITION_LABELS,
   buildNewParameterField,
   buildPositionSplitFields,
-  existingGroupTitles,
+  groupTitleChoices,
   type NewParameterInput as BoxParameterInput,
   type PositionSplit,
 } from "@/lib/setupSheetModels/newParameterDef";
@@ -1143,6 +1143,15 @@ export function SetupCalibrationEditorClient({
       const cleaned = removePdfWidgetFromMappings(prev, pdfFieldName, instanceIndex, row);
       return { ...cleaned, [canonicalKey.trim()]: payload };
     });
+    // Model-linked mode has no catalog editor panel, and nothing in its click flow ever clears
+    // `acroSelection` — leaving the box selected here painted it amber forever. Land the mapping
+    // and stop; the parameter sidebar is the only editor in that mode.
+    if (modelLinkedMode) {
+      setAcroSelection({ keys: [], activeKey: null });
+      setStatus(null);
+      return;
+    }
+
     const ak = acroSourceKey({ pdfFieldName, instanceIndex });
     setAcroSelection({ keys: [ak], activeKey: ak });
     setActiveSetupFieldKey(canonicalKey.trim());
@@ -3049,7 +3058,7 @@ export function SetupCalibrationEditorClient({
                   onSplitChange={changePositionSplit}
                   onOptionCountsChange={setPendingGridShape}
                   schema={setupSheetModelSchema}
-                  groupTitles={existingGroupTitles(setupSheetModelSchema)}
+                  groupTitles={groupTitleChoices(setupSheetModelSchema)}
                   busy={newParamBusy}
                   error={newParamError}
                   onRemoveBox={clearPendingSlot}
