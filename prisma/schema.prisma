@@ -64,6 +64,7 @@ model User {
   teamInvitesSent     TeamInvite[] @relation("TeamInvitesSent")
   aiUsageDaily    AiUsageDaily[]
   chassisTypeRequests ChassisTypeRequest[]
+  baselineSetupsCreated BaselineSetup[] @relation("BaselineSetupCreatedBy")
 }
 
 /**
@@ -342,17 +343,13 @@ model SetupSheetModel {
   schemaJson Json
   /// Confirmed/curated catalog entry (admin-managed). User-created models stay false until reviewed.
   isAuthorized Boolean @default(false)
-  /**
-   * Manufacturer kit setup for this chassis, same shape as `SetupSnapshot.data`. Admin-entered on
-   * catalog models only; drivers may start their first setup from it instead of an empty sheet.
-   */
-  kitSetupJson Json?
 
   /// Creator (attribution only; models are shared globally). Null for seeded catalog entries.
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   userId String?
 
   cars           Car[]
+  baselineSetups BaselineSetup[]
   setupDocuments SetupDocument[]
   calibrations   SetupSheetCalibration[]
   /** PDF calibration used for auto-pick and the car-page â€œEdit PDF calibrationâ€ link. */
@@ -361,6 +358,59 @@ model SetupSheetModel {
 
   @@unique([slug])
   @@index([userId, updatedAt])
+}
+
+/**
+ * Where an authored baseline came from.
+ *  KIT  — how the manufacturer says to build the car out of the box.
+ *  BASE — a manufacturer-released "base" sheet, usually written by one of their drivers.
+ *  PRO  — any other setup an admin publishes (team car, event-winning sheet).
+ */
+enum BaselineSetupKind {
+  KIT
+  BASE
+  PRO
+}
+
+/**
+ * A named, admin-authored setup published against a chassis type — global, visible to every driver,
+ * never owned by one. Drivers adopt one by copying it into their own car library
+ * (`SetupSnapshot.sourceBaseline`); the copy is frozen at copy time, so editing or deleting a
+ * baseline never rewrites anyone's saved setup.
+ *
+ * `data` is stored in `SetupSnapshot.data` shape (through `normalizeSetupSnapshotForStorage`) so
+ * every existing setup reader — sheet view, compare, the Engineer's spread — consumes it unchanged.
+ *
+ * These are authored sheets, not measured data: they must never reach a community aggregation.
+ * Nothing here feeds one, because both rebuilds iterate runs/documents and a baseline has neither.
+ */
+model BaselineSetup {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  setupSheetModel   SetupSheetModel @relation(fields: [setupSheetModelId], references: [id], onDelete: Cascade)
+  setupSheetModelId String
+
+  name  String
+  kind  BaselineSetupKind @default(PRO)
+  notes String?           @db.Text
+
+  /// Optional context tags, same vocabulary as the community buckets: asphalt | carpet.
+  surface String?
+  /// Optional context tag: low | medium | high.
+  gripLevel String?
+
+  /// Setup values, `SetupSnapshot.data` shape.
+  data Json
+
+  /// Publishing admin (attribution only; baselines are global). Null once that account is gone.
+  createdBy   User?   @relation("BaselineSetupCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+
+  copies SetupSnapshot[] @relation("SetupSnapshotSourceBaseline")
+
+  @@index([setupSheetModelId, kind])
 }
 
 /// Catalog slugs removed by an admin — global seed must not recreate them.
@@ -718,6 +768,13 @@ model SetupSnapshot {
   /** Keys that differed from baseSetupSnapshot after merge (audit). */
   setupDeltaJson Json?
 
+  /**
+   * The global baseline this was copied from, when it was ("Save a copy" on the car page).
+   * `SetNull` on purpose: the copy is the driver's own setup and outlives the baseline.
+   */
+  sourceBaseline   BaselineSetup? @relation("SetupSnapshotSourceBaseline", fields: [sourceBaselineId], references: [id], onDelete: SetNull)
+  sourceBaselineId String?
+
   /** Filled PDF from base template + calibration (same pipeline as runs); see `SETUP_PDF_RENDER_PIPELINE_VERSION`. */
   renderedSetupPdfPath          String?
   renderedSetupPdfGeneratedAt   DateTime?
@@ -730,6 +787,7 @@ model SetupSnapshot {
   @@index([carId])
   @@index([baseSetupSnapshotId])
   @@index([carId, isLibrary])
+  @@index([sourceBaselineId])
 }
 
 enum SetupDocumentSourceType {
@@ -1297,6 +1355,14 @@ model EngineerChatThread {
 
   primaryRunId String?
   compareRunId String?
+
+  /**
+   * Standing conversation focus (EngineerThreadFocusAnchorV1):
+   * {version, kind, id, compareRunId?, setupId?, pinned, label}. Pinned anchors are
+   * user-set and survive model refocusing; primaryRunId/compareRunId stay in sync
+   * for run anchors (legacy readers).
+   */
+  focusAnchorJson Json?
 
   messages EngineerChatMessage[]
 
