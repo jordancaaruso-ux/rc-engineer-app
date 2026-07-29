@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidateAfterActionItemMutation } from "@/lib/revalidateUser";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseActionItemListQuery, reorderUserActionItems } from "@/lib/actionItems";
 
@@ -8,8 +8,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json()) as { list?: string | null; orderedIds?: string[] };
   const listKind = parseActionItemListQuery(
@@ -20,13 +20,13 @@ export async function POST(request: Request) {
     : [];
 
   try {
-    await reorderUserActionItems({ userId: user.id, listKind, orderedIds });
+    await reorderUserActionItems({ userId: userId, listKind, orderedIds });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Reorder failed";
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  revalidateAfterActionItemMutation(user.id);
+  revalidateAfterActionItemMutation(userId);
 
   return NextResponse.json({ ok: true });
 }

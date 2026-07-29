@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import {
   canViewPeerRuns,
@@ -54,8 +54,8 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const runId = new URL(request.url).searchParams.get("runId")?.trim() ?? "";
   if (!runId) {
@@ -80,11 +80,11 @@ export async function GET(request: Request) {
   });
   if (!anchor) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const canView = await canViewPeerRuns(user.id, anchor.userId);
+  const canView = await canViewPeerRuns(userId, anchor.userId);
   if (!canView) {
     return NextResponse.json({ error: "Not allowed to view this run" }, { status: 403 });
   }
-  if (anchor.userId !== user.id && !isRunSharedWithTeam(anchor)) {
+  if (anchor.userId !== userId && !isRunSharedWithTeam(anchor)) {
     return NextResponse.json({ error: "Run is not shared with team" }, { status: 403 });
   }
 
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
   const byId = new Map<string, Awaited<ReturnType<typeof loadPickerRuns>>[number]>();
 
   if (anchor.carId) {
-    const teamOnlyPeer = await peerAccessIsTeamOnly(user.id, anchor.userId);
+    const teamOnlyPeer = await peerAccessIsTeamOnly(userId, anchor.userId);
     const onCar = await loadPickerRuns(
       { carId: anchor.carId, userId: anchor.userId },
       teamOnlyPeer
@@ -101,16 +101,16 @@ export async function GET(request: Request) {
   }
 
   if (scope) {
-    const viewerCarIds = await carIdsMatchingSetupSheetScopeForUser(user.id, scope);
+    const viewerCarIds = await carIdsMatchingSetupSheetScopeForUser(userId, scope);
     if (viewerCarIds.length > 0) {
       const mine = await loadPickerRuns({
-        userId: user.id,
+        userId: userId,
         carId: { in: viewerCarIds },
       });
       for (const r of mine) byId.set(r.id, r);
     }
-  } else if (anchor.userId === user.id && anchor.carId) {
-    const mine = await loadPickerRuns({ userId: user.id, carId: anchor.carId! });
+  } else if (anchor.userId === userId && anchor.carId) {
+    const mine = await loadPickerRuns({ userId: userId, carId: anchor.carId! });
     for (const r of mine) byId.set(r.id, r);
   }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { buildWorkerConfig } from "@/lib/videoAnalysis/exportWorkerConfig";
 
 type Params = { params: Promise<{ profileId: string }> };
@@ -10,12 +10,12 @@ export async function GET(_request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { profileId } = await params;
 
   const profile = await prisma.trackCameraProfile.findFirst({
-    where: { id: profileId, userId: user.id },
+    where: { id: profileId, userId: userId },
     include: {
       sectorLines: { orderBy: { sortOrder: "asc" } },
       track: { select: { id: true, name: true } },
@@ -34,8 +34,8 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { profileId } = await params;
 
   const body = (await request.json().catch(() => null)) as {
@@ -45,7 +45,7 @@ export async function PATCH(request: Request, { params }: Params) {
   } | null;
 
   const existing = await prisma.trackCameraProfile.findFirst({
-    where: { id: profileId, userId: user.id },
+    where: { id: profileId, userId: userId },
     select: { id: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -71,12 +71,12 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { profileId } = await params;
 
   const existing = await prisma.trackCameraProfile.findFirst({
-    where: { id: profileId, userId: user.id },
+    where: { id: profileId, userId: userId },
     select: { id: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });

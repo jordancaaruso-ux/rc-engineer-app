@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
 import { isCarValidTargetForSetupDocument } from "@/lib/carSetupScope";
@@ -12,12 +12,12 @@ export async function POST(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { setupData?: SetupSnapshotData; carId?: string | null };
 
   const doc = await prisma.setupDocument.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: { id: true, createdSetupId: true, carId: true, setupSheetTemplate: true },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -31,9 +31,9 @@ export async function POST(request: Request, ctx: Ctx) {
 
   let resolvedCarId: string | null = null;
   if (carId) {
-    const car = await prisma.car.findFirst({ where: { id: carId, userId: user.id }, select: { id: true } });
+    const car = await prisma.car.findFirst({ where: { id: carId, userId: userId }, select: { id: true } });
     if (!car) return NextResponse.json({ error: "Car not found" }, { status: 400 });
-    const allowed = await isCarValidTargetForSetupDocument(user.id, doc, carId);
+    const allowed = await isCarValidTargetForSetupDocument(userId, doc, carId);
     if (!allowed) {
       return NextResponse.json(
         { error: "That car's setup sheet type does not match this document." },
@@ -45,7 +45,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const setup = await prisma.setupSnapshot.create({
     data: {
-      userId: user.id,
+      userId: userId,
       carId: resolvedCarId,
       data: normalizeSetupSnapshotForStorage(body.setupData ?? {}) as object,
     },
@@ -53,7 +53,7 @@ export async function POST(request: Request, ctx: Ctx) {
   });
 
   const linked = await prisma.setupDocument.updateMany({
-    where: { id, userId: user.id, createdSetupId: null },
+    where: { id, userId: userId, createdSetupId: null },
     data: { createdSetupId: setup.id },
   });
   if (linked.count === 0) {

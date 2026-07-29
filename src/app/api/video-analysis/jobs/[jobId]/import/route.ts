@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import {
   parseVideoAnalysisResultV1,
   VIDEO_ANALYSIS_RESULT_VERSION,
@@ -13,12 +13,12 @@ export async function POST(request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { jobId } = await params;
 
   const job = await prisma.videoAnalysisJob.findFirst({
-    where: { id: jobId, userId: user.id },
+    where: { id: jobId, userId: userId },
     select: { id: true, profileId: true },
   });
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });

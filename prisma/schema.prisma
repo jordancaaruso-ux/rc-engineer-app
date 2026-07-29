@@ -1733,6 +1733,12 @@ model PerfSample {
   /// Up to 5 slowest queries this request: [{ m, o, ms }].
   slowest Json?
 
+  /// First request served by this process — the one that paid for the boot. Separates
+  /// "the query is slow" from "the lambda was cold", which server timings alone cannot.
+  coldStart Boolean @default(false)
+  /// Milliseconds since this process loaded, when the request started.
+  processAgeMs Float?
+
   userId   String?
   deployId String?
 

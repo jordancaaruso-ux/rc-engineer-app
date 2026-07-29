@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { assertTeamAdmin, assertUserInTeam } from "@/lib/teamAccess";
 import {
   canEditComment,
@@ -27,15 +27,15 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { teamId, commentId } = await ctx.params;
-  const comment = await loadComment(teamId, commentId, user.id);
+  const comment = await loadComment(teamId, commentId, userId);
   if (!comment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const isTeamAdmin = await assertTeamAdmin(teamId, user.id);
-  if (!canEditComment(comment, { userId: user.id, isTeamAdmin })) {
+  const isTeamAdmin = await assertTeamAdmin(teamId, userId);
+  if (!canEditComment(comment, { userId: userId, isTeamAdmin })) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -66,15 +66,15 @@ export async function DELETE(_request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { teamId, commentId } = await ctx.params;
-  const comment = await loadComment(teamId, commentId, user.id);
+  const comment = await loadComment(teamId, commentId, userId);
   if (!comment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const isTeamAdmin = await assertTeamAdmin(teamId, user.id);
-  const mode = resolveCommentDeleteMode(comment, { userId: user.id, isTeamAdmin });
+  const isTeamAdmin = await assertTeamAdmin(teamId, userId);
+  const mode = resolveCommentDeleteMode(comment, { userId: userId, isTeamAdmin });
   if (!mode) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   if (mode === "hard") {

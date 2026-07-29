@@ -98,6 +98,31 @@ export async function loadClientRollups(days: number): Promise<ClientRollup[]> {
   `;
 }
 
+export type ColdStartRollup = {
+  bucket: string;
+  samples: number;
+  p50: number;
+  p95: number;
+};
+
+/**
+ * Cold vs warm, side by side. This is the row that says whether a slow page is slow
+ * because of its queries or because the lambda had just booted.
+ */
+export async function loadColdStartRollup(days: number): Promise<ColdStartRollup[]> {
+  return prisma.$queryRaw<ColdStartRollup[]>`
+    SELECT
+      CASE WHEN "coldStart" THEN 'cold (first request of a process)' ELSE 'warm' END AS bucket,
+      count(*)::int AS samples,
+      percentile_cont(0.5)  WITHIN GROUP (ORDER BY "totalMs")::float8 AS p50,
+      percentile_cont(0.95) WITHIN GROUP (ORDER BY "totalMs")::float8 AS p95
+    FROM "PerfSample"
+    WHERE "createdAt" > now() - (${days}::int * interval '1 day')
+    GROUP BY 1
+    ORDER BY 1
+  `;
+}
+
 export type PerfCounts = { serverSamples: number; clientSamples: number };
 
 export async function loadPerfCounts(days: number): Promise<PerfCounts> {

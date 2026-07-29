@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { assertTeamAdmin, assertUserInTeam } from "@/lib/teamAccess";
 import { viewerMayAccessRun } from "@/lib/teams/teamRunAccess";
 import { loadTeamMemberDisplays } from "@/lib/teams/teamMemberDisplay";
@@ -41,22 +41,22 @@ export async function GET(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { teamId } = await ctx.params;
   const runId = new URL(request.url).searchParams.get("runId");
   if (!runId) return NextResponse.json({ error: "runId is required" }, { status: 400 });
 
-  const target = await resolveCommentTarget(teamId, runId, user.id);
+  const target = await resolveCommentTarget(teamId, runId, userId);
   if ("error" in target) return NextResponse.json({ error: target.error }, { status: 404 });
 
-  const viewerIsAdmin = await assertTeamAdmin(teamId, user.id);
-  const displays = await loadTeamMemberDisplays(target.memberIds, user.id);
+  const viewerIsAdmin = await assertTeamAdmin(teamId, userId);
+  const displays = await loadTeamMemberDisplays(target.memberIds, userId);
   const byRunId = await loadCommentsForRuns({
     teamId,
     runIds: [runId],
-    viewerId: user.id,
+    viewerId: userId,
     viewerIsAdmin,
     displays,
   });
@@ -69,8 +69,8 @@ export async function POST(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { teamId } = await ctx.params;
   const body = (await request.json().catch(() => null)) as {
@@ -85,7 +85,7 @@ export async function POST(request: Request, ctx: Ctx) {
   const validated = validateCommentBody(body?.body);
   if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 });
 
-  const target = await resolveCommentTarget(teamId, runId, user.id);
+  const target = await resolveCommentTarget(teamId, runId, userId);
   if ("error" in target) return NextResponse.json({ error: target.error }, { status: 404 });
 
   const parent = body?.parentId
@@ -107,14 +107,14 @@ export async function POST(request: Request, ctx: Ctx) {
     data: {
       teamId,
       runId,
-      authorUserId: user.id,
+      authorUserId: userId,
       parentId: resolvedParent.parentId,
       body: validated.body,
     },
     select: { id: true, createdAt: true, parentId: true },
   });
 
-  const displays = await loadTeamMemberDisplays(target.memberIds, user.id);
+  const displays = await loadTeamMemberDisplays(target.memberIds, userId);
   const team = await prisma.team.findFirst({ where: { id: teamId }, select: { name: true } });
 
   // Fire and forget: a push failure must never fail the comment.
@@ -123,16 +123,16 @@ export async function POST(request: Request, ctx: Ctx) {
     teamName: team?.name ?? "Your team",
     runId,
     commentId: created.id,
-    authorUserId: user.id,
-    authorLabel: displays.get(user.id)?.name ?? "A teammate",
+    authorUserId: userId,
+    authorLabel: displays.get(userId)?.name ?? "A teammate",
     body: validated.body,
   });
 
   return NextResponse.json({
     comment: {
       id: created.id,
-      authorUserId: user.id,
-      authorLabel: displays.get(user.id)?.label ?? "You",
+      authorUserId: userId,
+      authorLabel: displays.get(userId)?.label ?? "You",
       body: validated.body,
       createdAt: created.createdAt.toISOString(),
       editedAt: null,

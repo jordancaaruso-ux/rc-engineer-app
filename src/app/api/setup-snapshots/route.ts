@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 
@@ -28,14 +28,14 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const carId = new URL(request.url).searchParams.get("carId")?.trim();
   if (!carId) return NextResponse.json({ error: "carId is required" }, { status: 400 });
 
   const setups = await prisma.setupSnapshot.findMany({
-    where: { userId: user.id, carId, isLibrary: true },
+    where: { userId: userId, carId, isLibrary: true },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -63,8 +63,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: Record<string, unknown>;
   try {
@@ -80,13 +80,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!name) return NextResponse.json({ error: "A setup name is required" }, { status: 400 });
 
   // Ownership check: a library setup only ever hangs off the requester's own car.
-  const car = await prisma.car.findFirst({ where: { id: carId, userId: user.id }, select: { id: true } });
+  const car = await prisma.car.findFirst({ where: { id: carId, userId: userId }, select: { id: true } });
   if (!car) return NextResponse.json({ error: "Car not found" }, { status: 404 });
 
   const baseId = typeof body.baseSetupSnapshotId === "string" ? body.baseSetupSnapshotId.trim() : "";
   if (baseId) {
     const base = await prisma.setupSnapshot.findFirst({
-      where: { id: baseId, userId: user.id },
+      where: { id: baseId, userId: userId },
       select: { id: true },
     });
     if (!base) return NextResponse.json({ error: "Baseline setup not found" }, { status: 400 });
@@ -99,7 +99,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   let sourceData: unknown = body.data;
   if (fromId) {
     const source = await prisma.setupSnapshot.findFirst({
-      where: { id: fromId, userId: user.id },
+      where: { id: fromId, userId: userId },
       select: { data: true },
     });
     if (!source) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
@@ -108,7 +108,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const setup = await prisma.setupSnapshot.create({
     data: {
-      userId: user.id,
+      userId: userId,
       carId,
       name,
       isLibrary: true,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { assertTeamAdmin } from "@/lib/teamAccess";
 import { checkInviteRevoke } from "@/lib/teams/teamInviteRules";
 
@@ -21,8 +21,8 @@ export async function DELETE(_request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { teamId, inviteId } = await ctx.params;
 
   const invite = await prisma.teamInvite.findUnique({
@@ -33,7 +33,7 @@ export async function DELETE(_request: Request, ctx: Ctx) {
   const decision = checkInviteRevoke({
     invite: invite ? { teamId: invite.teamId, status: invite.status } : null,
     teamId,
-    viewerIsTeamAdmin: await assertTeamAdmin(teamId, user.id),
+    viewerIsTeamAdmin: await assertTeamAdmin(teamId, userId),
   });
   if (!decision.ok) {
     return NextResponse.json({ error: decision.error }, { status: decision.status });

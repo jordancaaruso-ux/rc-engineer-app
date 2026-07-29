@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +19,8 @@ const ALLOWED_PLATFORMS = new Set(["ios", "android"]);
  * token is re-pointed at this user rather than duplicated.
  */
 export async function POST(req: Request): Promise<Response> {
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: RegisterBody | null = null;
   try {
@@ -42,8 +42,8 @@ export async function POST(req: Request): Promise<Response> {
 
   await prisma.nativePushDevice.upsert({
     where: { token },
-    create: { userId: user.id, token, platform, deviceLabel },
-    update: { userId: user.id, platform, deviceLabel },
+    create: { userId: userId, token, platform, deviceLabel },
+    update: { userId: userId, platform, deviceLabel },
   });
 
   return NextResponse.json({ ok: true });

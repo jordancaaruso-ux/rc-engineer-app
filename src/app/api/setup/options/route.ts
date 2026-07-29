@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
@@ -16,14 +16,14 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const carId = searchParams.get("carId")?.trim() || null;
 
   const downloaded = await prisma.setupDocument.findMany({
     where: {
-      userId: user.id,
+      userId: userId,
       parseStatus: { in: ["PARSED", "PARTIAL"] },
     },
     orderBy: { createdAt: "desc" },
@@ -65,9 +65,9 @@ export async function GET(request: Request) {
     ];
   });
 
-  const currentTemplate = carId ? await canonicalSetupTemplateForUserCarId(user.id, carId) : null;
+  const currentTemplate = carId ? await canonicalSetupTemplateForUserCarId(userId, carId) : null;
   /** Unassigned setups apply to any car; typed documents match the car's canonical template. */
-  const scopeCarIds = carId ? await carIdsSharingSetupTemplate(user.id, carId) : null;
+  const scopeCarIds = carId ? await carIdsSharingSetupTemplate(userId, carId) : null;
   const scopeSet = scopeCarIds ? new Set(scopeCarIds) : null;
   const downloadedSetups =
     !carId || !scopeSet
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
   // library row is simply its own baseline.
   const librarySetups = carId
     ? await prisma.setupSnapshot.findMany({
-        where: { userId: user.id, carId, isLibrary: true },
+        where: { userId: userId, carId, isLibrary: true },
         orderBy: { createdAt: "desc" },
         take: 40,
         select: { id: true, name: true, createdAt: true, data: true },
@@ -114,6 +114,6 @@ export async function GET(request: Request) {
       ...downloadedSetups.map((d) => ({ ...d, kind: "document" as const })),
     ],
     // Upload only reads values on a calibrated chassis; the run form hides the prompt otherwise.
-    supportsSheetUpload: await carIdSupportsSheetUpload(user.id, carId),
+    supportsSheetUpload: await carIdSupportsSheetUpload(userId, carId),
   });
 }

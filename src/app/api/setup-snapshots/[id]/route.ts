@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 
@@ -28,8 +28,8 @@ export async function PATCH(request: Request, ctx: Ctx): Promise<NextResponse> {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
 
   let body: Record<string, unknown>;
@@ -39,7 +39,7 @@ export async function PATCH(request: Request, ctx: Ctx): Promise<NextResponse> {
     return NextResponse.json({ error: "Expected a JSON body" }, { status: 400 });
   }
 
-  const existing = await loadOwnedLibrarySetup(id, user.id);
+  const existing = await loadOwnedLibrarySetup(id, userId);
   if (!existing) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
 
   const patch: { name?: string; data?: ReturnType<typeof normalizeSetupSnapshotForStorage> } = {};
@@ -73,11 +73,11 @@ export async function DELETE(_request: Request, ctx: Ctx): Promise<NextResponse>
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
 
-  const existing = await loadOwnedLibrarySetup(id, user.id);
+  const existing = await loadOwnedLibrarySetup(id, userId);
   if (!existing) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
 
   // `Run.setupSnapshot` is a required relation, so deleting a snapshot a run points at would fail

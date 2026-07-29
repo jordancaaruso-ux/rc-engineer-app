@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import {
   sourceTypeFromMime,
@@ -17,14 +17,14 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const forExamplePdf = searchParams.get("forExamplePdf") === "1";
   const docs = await prisma.setupDocument.findMany({
     where: forExamplePdf
-      ? { userId: user.id, mimeType: "application/pdf" }
-      : { userId: user.id, setupImportBatchId: null },
+      ? { userId: userId, mimeType: "application/pdf" }
+      : { userId: userId, setupImportBatchId: null },
     orderBy: { createdAt: "desc" },
     take: forExamplePdf ? 100 : undefined,
     select: {
@@ -54,8 +54,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (dbg) console.log(`[setup-upload-timing] after auth ${(performance.now() - t0).toFixed(1)}ms`);
   const ct = request.headers.get("content-type") ?? "";
 
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const carResolved = await resolveOwnedCarId(user.id, carIdRaw);
+  const carResolved = await resolveOwnedCarId(userId, carIdRaw);
   if (!carResolved.ok) {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       ? setupSheetModelIdRaw.trim()
       : null;
   const carRow = await prisma.car.findFirst({
-    where: { id: carResolved.carId, userId: user.id },
+    where: { id: carResolved.carId, userId: userId },
     select: { setupSheetModelId: true, setupSheetTemplate: true },
   });
   if (!setupSheetModelId && carRow?.setupSheetModelId) {
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid setup sheet model" }, { status: 400 });
     }
   }
-  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carResolved.carId);
+  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(userId, carResolved.carId);
   if (!preStoredPath && (multipartFile?.size ?? 0) > SETUP_DOCUMENT_MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
   }
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
   const tDb = dbg ? performance.now() : 0;
   const created = await prisma.setupDocument.create({
     data: {
-      userId: user.id,
+      userId: userId,
       carId: carResolved.carId,
       setupSheetTemplate,
       setupSheetModelId,

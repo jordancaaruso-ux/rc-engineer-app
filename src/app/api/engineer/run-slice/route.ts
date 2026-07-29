@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { buildRunSliceV1 } from "@/lib/engineerPhase5/runSlice";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +9,11 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const slice = await buildRunSliceV1({
-    userId: user.id,
+    userId: userId,
     carId: searchParams.get("carId")?.trim() || null,
     trackId: searchParams.get("trackId")?.trim() || null,
     eventId: searchParams.get("eventId")?.trim() || null,

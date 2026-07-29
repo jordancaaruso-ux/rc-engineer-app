@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 
 type Params = { params: Promise<{ trackId: string }> };
 
@@ -9,8 +9,8 @@ export async function GET(_request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { trackId } = await params;
 
   const track = await prisma.track.findFirst({
@@ -20,7 +20,7 @@ export async function GET(_request: Request, { params }: Params) {
   if (!track) return NextResponse.json({ error: "Track not found" }, { status: 404 });
 
   const profiles = await prisma.trackCameraProfile.findMany({
-    where: { trackId, userId: user.id },
+    where: { trackId, userId: userId },
     orderBy: { updatedAt: "desc" },
     include: {
       sectorLines: { orderBy: { sortOrder: "asc" } },
@@ -34,8 +34,8 @@ export async function POST(request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { trackId } = await params;
 
   const track = await prisma.track.findFirst({
@@ -49,7 +49,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const profile = await prisma.trackCameraProfile.create({
     data: {
-      userId: user.id,
+      userId: userId,
       trackId,
       name,
       sectorLines: {

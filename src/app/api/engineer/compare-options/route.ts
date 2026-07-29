@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { buildEngineerCompareOptions } from "@/lib/engineerPhase5/engineerCompareOptions";
 
@@ -11,9 +11,9 @@ export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const timeZone = await getExplicitTimeZoneForRunFormatting();
-  const data = await buildEngineerCompareOptions(user.id, timeZone);
+  const data = await buildEngineerCompareOptions(userId, timeZone);
   return NextResponse.json(data);
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { storeVideoAnalysisReferenceFile } from "@/lib/videoAnalysis/storage";
 import { StorageConfigurationError } from "@/lib/setupDocuments/storage";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
@@ -12,12 +12,12 @@ export async function GET(_request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { profileId } = await params;
 
   const profile = await prisma.trackCameraProfile.findFirst({
-    where: { id: profileId, userId: user.id },
+    where: { id: profileId, userId: userId },
     select: { referenceImagePath: true },
   });
   if (!profile?.referenceImagePath) {
@@ -36,12 +36,12 @@ export async function POST(request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { profileId } = await params;
 
   const profile = await prisma.trackCameraProfile.findFirst({
-    where: { id: profileId, userId: user.id },
+    where: { id: profileId, userId: userId },
     select: { id: true },
   });
   if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });

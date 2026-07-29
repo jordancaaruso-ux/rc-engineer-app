@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
@@ -154,10 +154,10 @@ export async function GET(_request: Request, ctx: Ctx): Promise<NextResponse> {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const doc = await prisma.setupDocument.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: { storagePath: true, mimeType: true, sourceType: true },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });

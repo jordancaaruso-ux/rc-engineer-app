@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import {
   getSpeedhiveDriverNameForUser,
   getSpeedhiveDriverNameSetting,
@@ -37,17 +37,17 @@ export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return NextResponse.json(await readIdentity(user.id));
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  return NextResponse.json(await readIdentity(userId));
 }
 
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => null)) as {
     speedhiveDriverName?: string | null;
     speedhiveTransponderNumbers?: string | null;
@@ -55,11 +55,11 @@ export async function POST(request: Request) {
   } | null;
 
   if (typeof body?.speedhiveDriverName === "string" || body?.speedhiveDriverName === null) {
-    await setSpeedhiveDriverNameSetting(user.id, body.speedhiveDriverName);
+    await setSpeedhiveDriverNameSetting(userId, body.speedhiveDriverName);
   }
 
   if (typeof body?.speedhiveTransponderLoaner === "boolean") {
-    await setSpeedhiveTransponderLoanerSetting(user.id, body.speedhiveTransponderLoaner);
+    await setSpeedhiveTransponderLoanerSetting(userId, body.speedhiveTransponderLoaner);
   }
 
   if (
@@ -68,13 +68,13 @@ export async function POST(request: Request) {
   ) {
     const parsed = parseSpeedhiveTransponderNumbersSetting(body.speedhiveTransponderNumbers);
     await setSpeedhiveTransponderNumbersSetting(
-      user.id,
+      userId,
       parsed.length > 0 ? formatSpeedhiveTransponderNumbersForSetting(parsed) : null
     );
     // A real number supersedes "I'm on a club chip" — otherwise the flag would
     // sit there forever telling onboarding not to ask again.
-    if (parsed.length > 0) await setSpeedhiveTransponderLoanerSetting(user.id, false);
+    if (parsed.length > 0) await setSpeedhiveTransponderLoanerSetting(userId, false);
   }
 
-  return NextResponse.json(await readIdentity(user.id));
+  return NextResponse.json(await readIdentity(userId));
 }

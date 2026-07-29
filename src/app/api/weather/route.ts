@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { isValidLatitude, isValidLongitude } from "@/lib/location/coordinates";
 import { fetchRunConditionsFromOpenMeteo, WeatherFetchError } from "@/lib/weather/openMeteo";
 
@@ -11,8 +11,8 @@ import { fetchRunConditionsFromOpenMeteo, WeatherFetchError } from "@/lib/weathe
  * actual time); omitted = current weather. Returns normalized `RunConditions`.
  */
 export async function GET(request: Request) {
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
   const lat = Number(searchParams.get("lat"));

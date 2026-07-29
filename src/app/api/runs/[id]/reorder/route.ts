@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -42,8 +42,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
 
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
   const rid = typeof id === "string" ? id.trim() : "";
   if (!rid) {
@@ -73,7 +73,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   }
 
   const target = await prisma.run.findFirst({
-    where: { id: rid, userId: user.id },
+    where: { id: rid, userId: userId },
     select: { id: true },
   });
   if (!target) {
@@ -82,7 +82,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
 
   const neighbourIds = [beforeId, afterId].filter((v): v is string => !!v);
   const neighbours = await prisma.run.findMany({
-    where: { userId: user.id, id: { in: neighbourIds } },
+    where: { userId: userId, id: { in: neighbourIds } },
     select: { id: true, sortAt: true },
   });
   const before = beforeId ? neighbours.find((n) => n.id === beforeId) ?? null : null;

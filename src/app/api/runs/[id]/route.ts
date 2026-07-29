@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 
 /**
@@ -26,12 +26,12 @@ export async function DELETE(
     );
   }
 
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
 
   const existing = await prisma.run.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: { id: true, eventId: true },
   });
   if (!existing) {
@@ -40,7 +40,7 @@ export async function DELETE(
 
   await prisma.run.delete({ where: { id: existing.id } });
 
-  revalidateAfterRunMutation(user.id);
+  revalidateAfterRunMutation(userId);
 
   return NextResponse.json({ ok: true });
 }

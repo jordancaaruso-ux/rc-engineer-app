@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { canViewPeerRuns } from "@/lib/teammateRunAccess";
 import { setupSheetScopeFromCar } from "@/lib/setupCompare/setupSheetScope";
@@ -17,8 +17,8 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const runId = new URL(request.url).searchParams.get("runId")?.trim() ?? "";
   if (!runId) {
@@ -34,8 +34,8 @@ export async function GET(request: Request) {
   });
   if (!anchor) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (anchor.userId !== user.id) {
-    const canView = await canViewPeerRuns(user.id, anchor.userId);
+  if (anchor.userId !== userId) {
+    const canView = await canViewPeerRuns(userId, anchor.userId);
     if (!canView) {
       return NextResponse.json({ error: "Not allowed to view this run" }, { status: 403 });
     }
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
 
   const docs = await prisma.setupDocument.findMany({
     where: {
-      userId: user.id,
+      userId: userId,
       setupImportBatchId: null,
       parseStatus: { in: ["PARSED", "PARTIAL"] },
       ...scopeWhere,

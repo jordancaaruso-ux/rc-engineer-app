@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import {
   getOrComputeEngineerSummaryForRun,
@@ -15,8 +15,8 @@ export async function GET(req: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
   const sp = new URL(req.url).searchParams;
   const force = sp.get("force") === "1";
@@ -24,7 +24,7 @@ export async function GET(req: Request, ctx: Ctx) {
   const timeZone = await getExplicitTimeZoneForRunFormatting();
 
   if (compareRunId) {
-    const pair = await getOrComputeEngineerSummaryForRunPair(user.id, id, compareRunId, {
+    const pair = await getOrComputeEngineerSummaryForRunPair(userId, id, compareRunId, {
       timeZone,
     });
     if (!pair) {
@@ -39,7 +39,7 @@ export async function GET(req: Request, ctx: Ctx) {
     return NextResponse.json({ summary: pair.summary, cached: false, compareMode: true as const });
   }
 
-  const result = await getOrComputeEngineerSummaryForRun(user.id, id, { force, timeZone });
+  const result = await getOrComputeEngineerSummaryForRun(userId, id, { force, timeZone });
   if (!result) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }

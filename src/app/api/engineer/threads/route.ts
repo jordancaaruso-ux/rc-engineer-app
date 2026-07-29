@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { engineerThreadTitleFromContent } from "@/lib/engineerFeedback/threadTitle";
 
@@ -9,8 +9,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
 
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
   const limitRaw = Number(searchParams.get("limit") ?? "30");
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const cursor = searchParams.get("cursor")?.trim() || null;
 
   const rows = await prisma.engineerChatThread.findMany({
-    where: { userId: user.id },
+    where: { userId: userId },
     take: limit + 1,
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

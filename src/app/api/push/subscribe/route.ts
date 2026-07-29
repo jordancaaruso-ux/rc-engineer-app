@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +16,8 @@ type SubscribeBody = {
  * we re-point it to this user + refresh keys.
  */
 export async function POST(req: Request): Promise<Response> {
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: SubscribeBody | null = null;
   try {
@@ -36,14 +36,14 @@ export async function POST(req: Request): Promise<Response> {
   await prisma.pushSubscription.upsert({
     where: { endpoint: sub.endpoint },
     create: {
-      userId: user.id,
+      userId: userId,
       endpoint: sub.endpoint,
       p256dh: sub.p256dh,
       auth: sub.auth,
       userAgent,
     },
     update: {
-      userId: user.id,
+      userId: userId,
       p256dh: sub.p256dh,
       auth: sub.auth,
       userAgent,

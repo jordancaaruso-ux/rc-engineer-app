@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { SetupAggregationScopeType } from "@prisma/client";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -12,13 +12,13 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const carIdFilter = searchParams.get("carId")?.trim() || null;
 
   const cars = await prisma.car.findMany({
-    where: { userId: user.id },
+    where: { userId: userId },
     select: { id: true, name: true, chassis: true },
   });
   const carIds = cars.map((c) => c.id);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import {
   findLatestPrimaryRunIdForHints,
@@ -15,8 +15,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
 
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);
   const runId = url.searchParams.get("runId")?.trim() || null;
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
   let primaryId = runId;
   if (!primaryId) {
-    primaryId = await findLatestPrimaryRunIdForHints(user.id);
+    primaryId = await findLatestPrimaryRunIdForHints(userId);
   }
   if (!primaryId) {
     return NextResponse.json({ hint: null });
@@ -36,13 +36,13 @@ export async function GET(request: Request) {
   const timeZone = await getExplicitTimeZoneForRunFormatting();
 
   if (sync) {
-    const { hint } = await getOrComputeBetweenRunHint(user.id, primaryId, { timeZone });
+    const { hint } = await getOrComputeBetweenRunHint(userId, primaryId, { timeZone });
     return NextResponse.json({ hint });
   }
 
-  const peeked = await peekBetweenRunHint(user.id, primaryId, { timeZone });
+  const peeked = await peekBetweenRunHint(userId, primaryId, { timeZone });
   if (!peeked) {
-    void getOrComputeBetweenRunHint(user.id, primaryId, { timeZone }).catch(() => {});
+    void getOrComputeBetweenRunHint(userId, primaryId, { timeZone }).catch(() => {});
   }
   return NextResponse.json({ hint: peeked });
 }

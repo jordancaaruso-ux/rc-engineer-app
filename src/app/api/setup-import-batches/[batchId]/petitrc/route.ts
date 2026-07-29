@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
@@ -91,12 +91,12 @@ export async function POST(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { batchId } = await ctx.params;
 
   const batch = await prisma.setupImportBatch.findFirst({
-    where: { id: batchId, userId: user.id },
+    where: { id: batchId, userId: userId },
     select: { id: true },
   });
   if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
@@ -105,11 +105,11 @@ export async function POST(request: Request, ctx: Ctx) {
   const rawUrl = typeof body.url === "string" ? body.url.trim() : "";
   if (!rawUrl) return NextResponse.json({ error: "url is required" }, { status: 400 });
 
-  const carResolved = await resolveOwnedCarId(user.id, body.carId ?? null);
+  const carResolved = await resolveOwnedCarId(userId, body.carId ?? null);
   if (!carResolved.ok) {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
-  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carResolved.carId);
+  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(userId, carResolved.carId);
 
   const maxPdfs =
     typeof body.maxPdfs === "number" && Number.isFinite(body.maxPdfs) && body.maxPdfs > 0
@@ -130,7 +130,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const calCandidates = autoCalibration
     ? await buildCalibrationFingerprints({
-        userId: user.id,
+        userId: userId,
         restrictToNames: ALLOWED_CALIBRATION_NAMES,
       })
     : [];
@@ -142,7 +142,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const existing = await prisma.setupDocument.findMany({
     where: {
-      userId: user.id,
+      userId: userId,
       sourceSite: SOURCE_SITE,
       sourceUrl: { in: discovered.map((d) => d.url) },
     },
@@ -152,7 +152,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
   // Best-effort backfill: populate hashes for recent PDFs so we can dedupe against older imports
   // that predate `sourceUrl`.
-  await backfillUserPdfHashes({ userId: user.id, limit: 250 });
+  await backfillUserPdfHashes({ userId: userId, limit: 250 });
 
   const created: Array<{
     documentId: string;
@@ -172,7 +172,7 @@ export async function POST(request: Request, ctx: Ctx) {
     if (alreadyImported.has(item.url)) {
       if (reuseExistingIfNotEligible) {
         const ex = await prisma.setupDocument.findFirst({
-          where: { userId: user.id, sourceSite: SOURCE_SITE, sourceUrl: item.url },
+          where: { userId: userId, sourceSite: SOURCE_SITE, sourceUrl: item.url },
           select: {
             id: true,
             storagePath: true,
@@ -235,7 +235,7 @@ export async function POST(request: Request, ctx: Ctx) {
           reused.push({ documentId: ex.id, url: item.url, reason: `Reused existing doc (URL dedupe)${repickReason}` });
           if (autoProcess && processBudget > 0) {
             processBudget -= 1;
-            enqueueBackgroundProcess({ docId: ex.id, userId: user.id });
+            enqueueBackgroundProcess({ docId: ex.id, userId: userId });
             queuedForProcessing.push({ documentId: ex.id, reason: `autoProcess: reused(url)${repickReason}` });
           }
           continue;
@@ -254,7 +254,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
       const contentHash = sha256Hex(bytes);
       const dupByHash = await prisma.setupDocument.findFirst({
-        where: { userId: user.id, sourceContentSha256: contentHash },
+        where: { userId: userId, sourceContentSha256: contentHash },
         select: {
           id: true,
           eligibleForAggregationDataset: true,
@@ -303,7 +303,7 @@ export async function POST(request: Request, ctx: Ctx) {
           reused.push({ documentId: dupByHash.id, url: item.url, reason: `Reused existing doc (hash dedupe)${hashRepickReason}` });
           if (autoProcess && processBudget > 0) {
             processBudget -= 1;
-            enqueueBackgroundProcess({ docId: dupByHash.id, userId: user.id });
+            enqueueBackgroundProcess({ docId: dupByHash.id, userId: userId });
             queuedForProcessing.push({ documentId: dupByHash.id, reason: `autoProcess: reused(hash)${hashRepickReason}` });
           }
           continue;
@@ -350,7 +350,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
       const doc = await prisma.setupDocument.create({
         data: {
-          userId: user.id,
+          userId: userId,
           carId: carResolved.carId,
           setupSheetTemplate,
           setupImportBatchId: batch.id,
@@ -386,7 +386,7 @@ export async function POST(request: Request, ctx: Ctx) {
       });
       if (autoProcess && processBudget > 0) {
         processBudget -= 1;
-        enqueueBackgroundProcess({ docId: doc.id, userId: user.id });
+        enqueueBackgroundProcess({ docId: doc.id, userId: userId });
         queuedForProcessing.push({
           documentId: doc.id,
           reason: pickedCalibrationId

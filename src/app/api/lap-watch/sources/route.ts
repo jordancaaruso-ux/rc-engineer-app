@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { validateTimingHttpUrl } from "@/lib/lapImport/service";
 import {
@@ -24,14 +24,15 @@ export async function GET() {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   try {
-    const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!user?.id) {
-      return NextResponse.json({ error: "Missing user id", code: "missing_user" }, { status: 401 });
+    const userId = await getAuthenticatedApiUserId();
+    // A session without an id and a missing session are the same failure now that the id
+    // comes straight from the token, so the old second check has nothing left to catch.
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const rows = await prisma.watchedLapSource.findMany({
-      where: { userId: user.id },
+      where: { userId },
       orderBy: { updatedAt: "desc" },
       take: 50,
       select: {
@@ -83,8 +84,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => null)) as
     | { sourceUrl?: unknown; targetClass?: unknown; carId?: unknown }
     | null;
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
 
   const row = await prisma.watchedLapSource.create({
     data: {
-      userId: user.id,
+      userId: userId,
       sourceUrl: v.normalized,
       targetMode,
       targetClass: targetMode === "class" ? targetClass : null,

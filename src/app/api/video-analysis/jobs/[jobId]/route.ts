@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { parseVideoAnalysisResultV1 } from "@/lib/videoAnalysis/types";
 import { computeSectorMatrix } from "@/lib/videoAnalysis/sectorStats";
 import type { MotIdCorrection } from "@/lib/videoAnalysis/types";
@@ -21,12 +21,12 @@ export async function GET(_request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { jobId } = await params;
 
   const job = await prisma.videoAnalysisJob.findFirst({
-    where: { id: jobId, userId: user.id },
+    where: { id: jobId, userId: userId },
     include: {
       track: { select: { id: true, name: true } },
       profile: {
@@ -124,8 +124,8 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { jobId } = await params;
 
   const body = (await request.json().catch(() => null)) as {
@@ -139,7 +139,7 @@ export async function PATCH(request: Request, { params }: Params) {
   } | null;
 
   const existing = await prisma.videoAnalysisJob.findFirst({
-    where: { id: jobId, userId: user.id },
+    where: { id: jobId, userId: userId },
     select: { id: true, trackId: true },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -148,7 +148,7 @@ export async function PATCH(request: Request, { params }: Params) {
   // otherwise marks would be scored against another track's geometry.
   if (typeof body?.profileId === "string") {
     const profile = await prisma.trackCameraProfile.findFirst({
-      where: { id: body.profileId, userId: user.id, trackId: existing.trackId },
+      where: { id: body.profileId, userId: userId, trackId: existing.trackId },
       select: { id: true },
     });
     if (!profile) return NextResponse.json({ error: "Line set not found" }, { status: 404 });
@@ -156,7 +156,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   if (typeof body?.videoAssetId === "string") {
     const asset = await prisma.videoAsset.findFirst({
-      where: { id: body.videoAssetId, userId: user.id },
+      where: { id: body.videoAssetId, userId: userId },
       select: { id: true },
     });
     if (!asset) return NextResponse.json({ error: "Video not found" }, { status: 404 });

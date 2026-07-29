@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function GET() {
@@ -10,12 +10,12 @@ export async function GET() {
       { status: 500 }
     );
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const [cars, tracks] = await Promise.all([
     prisma.car.findMany({
-      where: { userId: user.id },
+      where: { userId: userId },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true }
     }),

@@ -17,6 +17,8 @@ function store(overrides: Partial<PerfStore> = {}): PerfStore {
     dbMs: 0,
     slowest: [],
     phases: {},
+    coldStart: false,
+    processAgeMs: 0,
     seeded: true,
     registered: false,
     flushed: false,

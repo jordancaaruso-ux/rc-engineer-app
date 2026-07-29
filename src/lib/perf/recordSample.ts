@@ -58,7 +58,7 @@ export async function flushPerfSample(
       .map(([label, ms]) => `${label}=${Math.round(ms)}`)
       .join(" ");
     console.log(
-      `[perf] ${store.kind} ${route} ${Math.round(totalMs)}ms db=${Math.round(store.dbMs)}ms q=${store.queryCount}${phases ? ` ${phases}` : ""}`
+      `[perf] ${store.kind} ${route} ${Math.round(totalMs)}ms db=${Math.round(store.dbMs)}ms q=${store.queryCount}${store.coldStart ? " COLD" : ""}${phases ? ` ${phases}` : ""}`
     );
   }
 
@@ -76,6 +76,8 @@ export async function flushPerfSample(
         queryCount: store.queryCount,
         phases: Object.keys(store.phases).length > 0 ? store.phases : undefined,
         slowest: store.slowest.length > 0 ? store.slowest : undefined,
+        coldStart: store.coldStart,
+        processAgeMs: store.processAgeMs,
         userId: options.userId ?? null,
         deployId: PERF_DEPLOY_ID,
       },

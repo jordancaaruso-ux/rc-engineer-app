@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { removeTrackFavourite, toggleTrackFavourite } from "@/lib/track-favourites";
 
 function revalidateFavouritePaths(trackId: string) {
@@ -22,13 +22,13 @@ export async function POST(
     );
   }
   const { trackId } = await context.params;
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const track = await prisma.track.findFirst({ where: { id: trackId }, select: { id: true } });
   if (!track) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
-  const result = await toggleTrackFavourite(user.id, trackId);
+  const result = await toggleTrackFavourite(userId, trackId);
   if ("error" in result) {
     if (process.env.NODE_ENV === "development") console.error("[favourite POST]", result.error);
     return NextResponse.json(
@@ -51,9 +51,9 @@ export async function DELETE(
     );
   }
   const { trackId } = await context.params;
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const result = await removeTrackFavourite(user.id, trackId);
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const result = await removeTrackFavourite(userId, trackId);
   if (!result.ok) {
     if (process.env.NODE_ENV === "development") console.error("[favourite DELETE]", result.error);
     return NextResponse.json(

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { loadTeamFeedModel } from "@/lib/teams/loadTeamFeed";
 
@@ -13,15 +13,15 @@ export async function GET(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { teamId } = await ctx.params;
   const url = new URL(request.url);
   const timeZone = await getExplicitTimeZoneForRunFormatting();
 
   const model = await loadTeamFeedModel({
-    viewerId: user.id,
+    viewerId: userId,
     teamId,
     timeZone,
     cursor: url.searchParams.get("cursor"),

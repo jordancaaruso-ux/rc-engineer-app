@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import {
   sourceTypeFromMime,
@@ -26,11 +26,11 @@ export async function POST(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { batchId } = await ctx.params;
   const batch = await prisma.setupImportBatch.findFirst({
-    where: { id: batchId, userId: user.id },
+    where: { id: batchId, userId: userId },
     select: { id: true },
   });
   if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
@@ -42,11 +42,11 @@ export async function POST(request: Request, ctx: Ctx) {
   const form = await request.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
 
-  const carResolved = await resolveOwnedCarId(user.id, form.get("carId"));
+  const carResolved = await resolveOwnedCarId(userId, form.get("carId"));
   if (!carResolved.ok) {
     return NextResponse.json({ error: carResolved.message }, { status: 400 });
   }
-  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(user.id, carResolved.carId);
+  const setupSheetTemplate = await canonicalSetupTemplateForUserCarId(userId, carResolved.carId);
 
   const files = form.getAll("files");
   const fileList = files.filter((f): f is File => f instanceof File);
@@ -78,7 +78,7 @@ export async function POST(request: Request, ctx: Ctx) {
     const sourceType = sourceTypeFromMime(PDF_MIME);
     const doc = await prisma.setupDocument.create({
       data: {
-        userId: user.id,
+        userId: userId,
         carId: carResolved.carId,
         setupSheetTemplate,
         setupImportBatchId: batch.id,

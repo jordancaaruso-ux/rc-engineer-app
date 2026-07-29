@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseSetupDocumentFile } from "@/lib/setupDocuments/parser";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
@@ -18,10 +18,10 @@ export async function POST(_: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const doc = await prisma.setupDocument.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: {
       id: true,
       storagePath: true,
@@ -39,7 +39,7 @@ export async function POST(_: Request, ctx: Ctx) {
   });
   const sourceType = sourceTypeFromMime(doc.mimeType || "application/pdf");
   const effective = await ensureSetupDocumentCalibrationProfileId({
-    userId: user.id,
+    userId: userId,
     setupDocumentId: doc.id,
   });
 
@@ -71,7 +71,7 @@ export async function POST(_: Request, ctx: Ctx) {
   const derivedStatuses = computeDetailedDerivedFieldStatuses(normalized, derivedDiagnostics);
 
   const updated = await prisma.setupDocument.updateMany({
-    where: { id: doc.id, userId: user.id },
+    where: { id: doc.id, userId: userId },
     data: {
       parserType: parsed.parserType,
       parseStatus: parsed.parseStatus,
@@ -99,7 +99,7 @@ export async function POST(_: Request, ctx: Ctx) {
   });
   if (updated.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const row = await prisma.setupDocument.findFirst({
-    where: { id: doc.id, userId: user.id },
+    where: { id: doc.id, userId: userId },
     select: { id: true, parseStatus: true, updatedAt: true },
   });
 

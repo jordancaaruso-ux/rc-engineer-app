@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
@@ -17,12 +17,12 @@ export async function GET(
     );
   }
 
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { carId } = await context.params;
 
   const car = await prisma.car.findFirst({
-    where: { id: carId, userId: user.id },
+    where: { id: carId, userId: userId },
     select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, createdAt: true },
   });
 
@@ -31,7 +31,7 @@ export async function GET(
   }
 
   const runCount = await prisma.run.count({
-    where: { userId: user.id, carId },
+    where: { userId: userId, carId },
   });
 
   return NextResponse.json({ car, runCount });
@@ -48,19 +48,19 @@ export async function DELETE(
     );
   }
 
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { carId } = await context.params;
 
   const deleted = await prisma.car.deleteMany({
-    where: { id: carId, userId: user.id },
+    where: { id: carId, userId: userId },
   });
 
   if (deleted.count === 0) {
     return NextResponse.json({ error: "Car not found" }, { status: 404 });
   }
 
-  revalidateAfterCarMutation(user.id);
+  revalidateAfterCarMutation(userId);
   return NextResponse.json({ ok: true });
 }
 
@@ -75,12 +75,12 @@ export async function PATCH(
     );
   }
 
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { carId } = await context.params;
 
   const existing = await prisma.car.findFirst({
-    where: { id: carId, userId: user.id },
+    where: { id: carId, userId: userId },
     select: { id: true },
   });
   if (!existing) {
@@ -132,7 +132,7 @@ export async function PATCH(
   }
   if (Object.keys(data).length === 0) {
     const car = await prisma.car.findFirst({
-      where: { id: carId, userId: user.id },
+      where: { id: carId, userId: userId },
       select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
     });
     return NextResponse.json({ car });
@@ -143,7 +143,7 @@ export async function PATCH(
     data,
     select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
   });
-  revalidateAfterCarMutation(user.id);
+  revalidateAfterCarMutation(userId);
   return NextResponse.json({ car });
 }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
 
 export async function POST(
@@ -13,8 +13,8 @@ export async function POST(
   }
 
   const { trackId } = await context.params;
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const track = await prisma.track.findFirst({
     where: communityTrackByIdWhere(trackId),
@@ -25,8 +25,8 @@ export async function POST(
   }
 
   await prisma.trackLocationRunPromptDismissal.upsert({
-    where: { userId_trackId: { userId: user.id, trackId } },
-    create: { userId: user.id, trackId },
+    where: { userId_trackId: { userId: userId, trackId } },
+    create: { userId: userId, trackId },
     update: { dismissedAt: new Date() },
   });
 

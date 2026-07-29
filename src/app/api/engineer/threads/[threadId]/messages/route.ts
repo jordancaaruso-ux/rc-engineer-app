@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { contextSnapshotFromMessageMetadata } from "@/lib/engineerFeedback/persistExchange";
 
@@ -13,15 +13,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
 
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { threadId } = await params;
   const id = threadId?.trim();
   if (!id) return NextResponse.json({ error: "threadId required" }, { status: 400 });
 
   const thread = await prisma.engineerChatThread.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: {
       id: true,
       updatedAt: true,

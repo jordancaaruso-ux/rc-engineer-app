@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import {
   getMylapsOAuthClientId,
   getMylapsOAuthClientSecret,
@@ -28,8 +28,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(settings);
   }
 
-  const user = await getAuthenticatedApiUser();
-  if (!user) {
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) {
     const login = new URL("/login", origin);
     login.searchParams.set("from", "/settings");
     return NextResponse.redirect(login);
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
         ? new Date(Date.now() + token.expires_in * 1000).toISOString()
         : null;
 
-    await saveMylapsConnection(user.id, {
+    await saveMylapsConnection(userId, {
       accountId,
       accessToken,
       refreshToken: token.refresh_token ?? null,

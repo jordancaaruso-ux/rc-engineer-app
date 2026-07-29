@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateAfterActionItemMutation } from "@/lib/revalidateUser";
 import type { ActionItemListKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeActionItemKey, parseActionItemListQuery } from "@/lib/actionItems";
 import { withPerfRoute } from "@/lib/perf/withPerfRoute";
@@ -18,12 +18,12 @@ export const GET = withPerfRoute("/api/action-items", async (request: Request) =
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const listKind = parseActionItemListQuery(searchParams.get("list"));
   const items = await prisma.actionItem.findMany({
-    where: { userId: user.id, isArchived: false, listKind },
+    where: { userId: userId, isArchived: false, listKind },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -46,8 +46,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json()) as { text?: string; listKind?: string };
   const listKind = bodyListKind(body);
   const text = typeof body.text === "string" ? body.text.trim() : "";
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   }
 
   const existing = await prisma.actionItem.findFirst({
-    where: { userId: user.id, listKind, normKey, isArchived: false },
+    where: { userId: userId, listKind, normKey, isArchived: false },
     select: { id: true },
   });
   if (existing) {
@@ -68,14 +68,14 @@ export async function POST(request: Request) {
   }
 
   const agg = await prisma.actionItem.aggregate({
-    where: { userId: user.id, listKind, isArchived: false },
+    where: { userId: userId, listKind, isArchived: false },
     _max: { sortOrder: true },
   });
   const nextOrder = (agg._max.sortOrder ?? -1) + 1;
 
   const item = await prisma.actionItem.create({
     data: {
-      userId: user.id,
+      userId: userId,
       text,
       normKey,
       listKind,
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     },
   });
 
-  revalidateAfterActionItemMutation(user.id);
+  revalidateAfterActionItemMutation(userId);
 
   return NextResponse.json({
     item: {

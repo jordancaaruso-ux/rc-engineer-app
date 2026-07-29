@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 /** Remove a device's subscription (user turned notifications off on this device). */
 export async function POST(req: Request): Promise<Response> {
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { endpoint?: string } | null = null;
   try {
@@ -22,7 +22,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   await prisma.pushSubscription
-    .deleteMany({ where: { userId: user.id, endpoint: body.endpoint } })
+    .deleteMany({ where: { userId: userId, endpoint: body.endpoint } })
     .catch(() => {});
 
   return NextResponse.json({ ok: true });

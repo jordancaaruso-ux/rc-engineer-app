@@ -21,6 +21,10 @@ export type PerfStore = {
   slowest: PerfQuery[];
   /** Named `perfSpan()` phases, summed if a label repeats. */
   phases: Record<string, number>;
+  /** First request served by this process — i.e. the request that paid for the boot. */
+  coldStart: boolean;
+  /** Milliseconds since this process loaded, at the moment the request started. */
+  processAgeMs: number;
   /** True once the store has been claimed by an entry point (see `currentPerfStore`). */
   seeded: boolean;
   /** True once an `after()` flush has been scheduled — guards double registration. */
@@ -35,7 +39,29 @@ const MAX_PHASES = 40;
 
 const als = new AsyncLocalStorage<PerfStore>();
 
+/*
+ * Cold-start detection.
+ *
+ * The dashboard renders in ~264ms server-side but the browser sees ~2.5s TTFB, and the
+ * ~2.3s gap is spent before the root layout ever runs — so nothing measured inside the
+ * render can explain it. These two fields attribute it: `coldStart` marks the first
+ * request a freshly booted process serves, and `processAgeMs` says how long that process
+ * had been alive. If slow requests cluster at a low process age, it is lambda boot, and
+ * no query change will touch it.
+ */
+const PROCESS_BOOT_AT = performance.now();
+let requestsServed = 0;
+
+export function claimRequestOrdinal(): { coldStart: boolean; processAgeMs: number } {
+  requestsServed += 1;
+  return {
+    coldStart: requestsServed === 1,
+    processAgeMs: performance.now() - PROCESS_BOOT_AT,
+  };
+}
+
 export function createPerfStore(kind: PerfStore["kind"]): PerfStore {
+  const { coldStart, processAgeMs } = claimRequestOrdinal();
   return {
     kind,
     route: null,
@@ -45,6 +71,8 @@ export function createPerfStore(kind: PerfStore["kind"]): PerfStore {
     dbMs: 0,
     slowest: [],
     phases: {},
+    coldStart,
+    processAgeMs,
     seeded: false,
     registered: false,
     flushed: false,

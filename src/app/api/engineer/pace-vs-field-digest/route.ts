@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { buildPaceVsFieldRunDigestForUser } from "@/lib/engineerPhase5/buildPaceVsFieldRunDigestForUser";
 import { prisma } from "@/lib/prisma";
 
@@ -15,8 +15,8 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);
   const scopeRaw = url.searchParams.get("scope")?.trim().toLowerCase() || "account";
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   if (scope === "car") {
     if (!carId && anchorRunId) {
       const anchor = await prisma.run.findFirst({
-        where: { id: anchorRunId, userId: user.id },
+        where: { id: anchorRunId, userId: userId },
         select: { carId: true },
       });
       carId = anchor?.carId ?? null;
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   }
 
   const digest = await buildPaceVsFieldRunDigestForUser({
-    userId: user.id,
+    userId: userId,
     scopeCarId: scope === "car" ? carId : null,
     anchorRunId,
   });

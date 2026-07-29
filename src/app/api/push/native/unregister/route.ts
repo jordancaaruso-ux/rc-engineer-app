@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +13,8 @@ export const dynamic = "force-dynamic";
  * stale or foreign token deletes nothing rather than affecting another user.
  */
 export async function POST(req: Request): Promise<Response> {
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { token?: string } | null = null;
   try {
@@ -27,7 +27,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
   await prisma.nativePushDevice
-    .deleteMany({ where: { userId: user.id, token } })
+    .deleteMany({ where: { userId: userId, token } })
     .catch(() => {});
 
   return NextResponse.json({ ok: true });

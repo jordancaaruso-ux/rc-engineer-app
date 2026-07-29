@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import {
@@ -24,8 +24,8 @@ export async function POST(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json().catch(() => ({}))) as { setupSheetModelId?: string };
   const modelId = body.setupSheetModelId?.trim();
@@ -34,7 +34,7 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   const doc = await prisma.setupDocument.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: { id: true, storagePath: true, mimeType: true },
   });
   if (!doc) return NextResponse.json({ error: "Setup document not found" }, { status: 404 });
@@ -63,7 +63,7 @@ export async function POST(request: Request, ctx: Ctx) {
   // Re-pick the calibration scoped to the chosen chassis, then apply + re-parse.
   const bytes = new Uint8Array(await readBytesFromStorageRef(doc.storagePath));
   const pick = await pickCalibrationByFingerprint({
-    userId: user.id,
+    userId: userId,
     bytes,
     debugPrefix: "resolveChassis",
     carSetupSheetModelId: model.id,
@@ -80,13 +80,13 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   await applyPostFingerprintPickLinks({
-    userId: user.id,
+    userId: userId,
     pickedCalibrationId: pick.pickedCalibrationId,
     carSetupSheetModelId: model.id,
   });
   const result = await applyCalibrationToSetupDocument({
     docId: doc.id,
-    userId: user.id,
+    userId: userId,
     calibrationId: pick.pickedCalibrationId,
   });
   if (!result.ok) {

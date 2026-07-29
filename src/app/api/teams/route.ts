@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { listTeamsForUser } from "@/lib/teamAccess";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +11,9 @@ export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const teams = await listTeamsForUser(user.id);
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const teams = await listTeamsForUser(userId);
   return NextResponse.json({ teams });
 }
 
@@ -22,8 +22,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { name?: string } | null;
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   if (!name) {
@@ -33,9 +33,9 @@ export async function POST(request: Request) {
   const team = await prisma.team.create({
     data: {
       name,
-      createdByUserId: user.id,
+      createdByUserId: userId,
       memberships: {
-        create: { userId: user.id, role: "admin" },
+        create: { userId: userId, role: "admin" },
       },
     },
     select: { id: true, name: true, createdAt: true },

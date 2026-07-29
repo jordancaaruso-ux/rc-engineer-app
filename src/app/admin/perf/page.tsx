@@ -11,6 +11,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { PERF_ENABLED } from "@/lib/perf/perfConfig";
 import {
   loadClientRollups,
+  loadColdStartRollup,
   loadPerfCounts,
   loadQueryRollups,
   loadRouteRollups,
@@ -48,11 +49,12 @@ export default async function AdminPerfPage({
   if (!isAuthAdminEmail(user.email)) notFound();
 
   const days = parseDaysParam((await searchParams).days);
-  const [routes, queries, client, counts] = await Promise.all([
+  const [routes, queries, client, counts, coldStart] = await Promise.all([
     loadRouteRollups(days),
     loadQueryRollups(days),
     loadClientRollups(days),
     loadPerfCounts(days),
+    loadColdStartRollup(days),
   ]);
 
   return (
@@ -71,6 +73,23 @@ export default async function AdminPerfPage({
           <span className="font-mono">PERF_INSTRUMENTATION=1</span> set, then come back.
         </CardPanel>
       ) : null}
+
+      <Section
+        eyebrow="Cold vs warm"
+        note="A big gap here means the wait is lambda boot, not your queries — no query change touches it"
+        empty={coldStart.length === 0}
+      >
+        <Table headers={["Process state", "n", "p50", "p95"]}>
+          {coldStart.map((row) => (
+            <tr key={row.bucket} className="border-t border-border/60">
+              <Cell className="text-[11px]">{row.bucket}</Cell>
+              <Num>{row.samples}</Num>
+              <Num>{ms(row.p50)}</Num>
+              <Num emphasis>{ms(row.p95)}</Num>
+            </tr>
+          ))}
+        </Table>
+      </Section>
 
       <Section
         eyebrow="Server routes by p95"

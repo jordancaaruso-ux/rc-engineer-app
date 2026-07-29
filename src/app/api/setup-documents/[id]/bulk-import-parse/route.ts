@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { applyCalibrationToSetupDocument } from "@/lib/setupDocuments/applyCalibrationToDocument";
 
@@ -14,8 +14,8 @@ export async function POST(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { calibrationId?: string };
 
   const calibrationId = body.calibrationId?.trim();
@@ -24,7 +24,7 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   const doc = await prisma.setupDocument.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: { id: true, setupImportBatchId: true },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -40,14 +40,14 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const result = await applyCalibrationToSetupDocument({
     docId: id,
-    userId: user.id,
+    userId: userId,
     calibrationId,
     parsedDataMerge: "replace",
   });
 
   if (!result.ok) {
     await prisma.setupDocument.updateMany({
-      where: { id: doc.id, userId: user.id },
+      where: { id: doc.id, userId: userId },
       data: {
         parseStatus: "FAILED",
         importStatus: "FAILED",
@@ -62,7 +62,7 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   await prisma.setupDocument.updateMany({
-    where: { id: doc.id, userId: user.id },
+    where: { id: doc.id, userId: userId },
     data: {
       importErrorMessage: null,
       importDatasetReviewStatus: "UNSET",

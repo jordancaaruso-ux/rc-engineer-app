@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildTireSelectionValue } from "@/lib/tires/tireSelectionValue";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { viewerMayAccessRun } from "@/lib/teams/teamRunAccess";
 import { formatRunSessionDisplay } from "@/lib/runSession";
@@ -42,8 +42,8 @@ export async function GET(_request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
   const run = await prisma.run.findFirst({
@@ -51,7 +51,7 @@ export async function GET(_request: Request, { params }: Params) {
     select: runSelectForPdfReview,
   });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await viewerMayAccessRun(user.id, run))) {
+  if (!(await viewerMayAccessRun(userId, run))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -64,7 +64,7 @@ export async function GET(_request: Request, { params }: Params) {
 
   return NextResponse.json({
     runId: run.id,
-    isOwner: run.userId === user.id,
+    isOwner: run.userId === userId,
     run: {
       id: run.id,
       createdAt: run.createdAt,
@@ -82,12 +82,12 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
   const run = await prisma.run.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: {
       id: true,
       carId: true,
@@ -135,7 +135,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const snapshot = await prisma.setupSnapshot.create({
     data: {
-      userId: user.id,
+      userId: userId,
       carId: run.carId,
       data: resolvedData as object,
       baseSetupSnapshotId: previousId,

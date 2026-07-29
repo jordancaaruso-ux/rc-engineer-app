@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import {
   getOrComputeDashboardSuggestion,
   peekDashboardSuggestion,
@@ -20,8 +20,8 @@ export const GET = withPerfRoute("/api/engineer/dashboard-suggestions", async (r
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
 
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);
   const runIdParam = url.searchParams.get("runId")?.trim() || null;
@@ -32,7 +32,7 @@ export const GET = withPerfRoute("/api/engineer/dashboard-suggestions", async (r
 
   let runId = runIdParam;
   if (!runId && latest) {
-    runId = await findLatestPrimaryRunIdForDashboardSuggestion(user.id);
+    runId = await findLatestPrimaryRunIdForDashboardSuggestion(userId);
   }
   if (!runId) {
     if (latest) {
@@ -43,11 +43,11 @@ export const GET = withPerfRoute("/api/engineer/dashboard-suggestions", async (r
 
   try {
     if (sync) {
-      const { suggestions, cached } = await getOrComputeDashboardSuggestion(user.id, runId);
+      const { suggestions, cached } = await getOrComputeDashboardSuggestion(userId, runId);
       return NextResponse.json({ suggestions, runId, cached });
     }
 
-    const peeked = await peekDashboardSuggestion(user.id, runId);
+    const peeked = await peekDashboardSuggestion(userId, runId);
     return NextResponse.json({ suggestions: peeked, runId, cached: peeked != null });
   } catch {
     return NextResponse.json({ error: "Failed to load suggestions" }, { status: 500 });

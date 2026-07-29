@@ -4,7 +4,7 @@ import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 import { Prisma } from "@prisma/client";
 import type { Prisma as PrismaTypes } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { buildLapSessionV1 } from "@/lib/lapSession/buildSession";
 import type { LapSourceKind } from "@/lib/lapSession/types";
@@ -781,10 +781,10 @@ export async function POST(request: Request) {
     );
   }
   try {
-    const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json()) as RunUpsertBody;
-    return await createOrUpdateRun({ userId: user.id, body, mode: "create" });
+    return await createOrUpdateRun({ userId: userId, body, mode: "create" });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to save run";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -799,10 +799,10 @@ export async function PUT(request: Request) {
     );
   }
   try {
-    const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json()) as RunUpsertBody;
-    return await createOrUpdateRun({ userId: user.id, body, mode: "update" });
+    return await createOrUpdateRun({ userId: userId, body, mode: "update" });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update run";
     return NextResponse.json({ error: message }, { status: 500 });

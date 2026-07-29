@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { loadRaceFieldForRun } from "@/lib/lapImport/raceFieldForRun";
 
@@ -16,10 +16,10 @@ export async function GET(_req: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
 
-  const field = await loadRaceFieldForRun(user.id, id);
+  const field = await loadRaceFieldForRun(userId, id);
   return NextResponse.json(field);
 }

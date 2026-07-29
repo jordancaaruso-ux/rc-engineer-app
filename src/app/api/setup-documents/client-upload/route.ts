@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import {
   SETUP_DOCUMENT_ALLOWED_MIME,
@@ -12,8 +12,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json()) as HandleUploadBody;
 
@@ -29,7 +29,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           allowedContentTypes: [...SETUP_DOCUMENT_ALLOWED_MIME],
           maximumSizeInBytes: SETUP_DOCUMENT_MAX_BYTES,
           addRandomSuffix: false,
-          tokenPayload: JSON.stringify({ userId: user.id }),
+          tokenPayload: JSON.stringify({ userId: userId }),
         };
       },
     });

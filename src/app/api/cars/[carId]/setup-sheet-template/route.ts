@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import type { SetupSheetTemplateView } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
@@ -17,18 +17,18 @@ export async function GET(request: Request, ctx: RouteCtx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { carId } = await ctx.params;
   const view = parseTemplateView(new URL(request.url).searchParams.get("view"));
 
   const car = await prisma.car.findFirst({
-    where: { id: carId, userId: user.id },
+    where: { id: carId, userId: userId },
     select: { setupSheetModelId: true, setupSheetTemplate: true },
   });
   if (!car) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { template, templateKey } = await getSetupSheetTemplateAndKeyForCar(user.id, car, view);
+  const { template, templateKey } = await getSetupSheetTemplateAndKeyForCar(userId, car, view);
   return NextResponse.json(
     { template, templateKey },
     { headers: { "Cache-Control": "no-store" } }

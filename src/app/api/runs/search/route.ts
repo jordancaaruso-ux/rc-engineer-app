@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { canViewPeerRuns, peerAccessIsTeamOnly } from "@/lib/teammateRunAccess";
@@ -17,8 +17,8 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
   const raw: Record<string, string> = {};
@@ -29,15 +29,15 @@ export async function GET(request: Request) {
   const forUserIdRaw = searchParams.get("forUserId")?.trim() || null;
   const take = Math.min(300, Math.max(1, Number(searchParams.get("take")) || 200));
 
-  let runOwnerId = user.id;
+  let runOwnerId = userId;
   let teamOnlyPeer = false;
-  if (forUserIdRaw && forUserIdRaw !== user.id) {
-    const ok = await canViewPeerRuns(user.id, forUserIdRaw);
+  if (forUserIdRaw && forUserIdRaw !== userId) {
+    const ok = await canViewPeerRuns(userId, forUserIdRaw);
     if (!ok) {
       return NextResponse.json({ error: "Not allowed to list this user’s runs" }, { status: 403 });
     }
     runOwnerId = forUserIdRaw;
-    teamOnlyPeer = await peerAccessIsTeamOnly(user.id, forUserIdRaw);
+    teamOnlyPeer = await peerAccessIsTeamOnly(userId, forUserIdRaw);
   }
 
   const baseWhere = {

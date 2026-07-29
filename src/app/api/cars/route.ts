@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { canViewPeerRuns } from "@/lib/teammateRunAccess";
 import { SETUP_SHEET_TEMPLATE_A800RR, canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
@@ -11,14 +11,14 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const forUserId = searchParams.get("forUserId")?.trim() || null;
 
-  const targetUserId = forUserId && forUserId !== user.id ? forUserId : user.id;
-  if (targetUserId !== user.id) {
-    const ok = await canViewPeerRuns(user.id, targetUserId);
+  const targetUserId = forUserId && forUserId !== userId ? forUserId : userId;
+  if (targetUserId !== userId) {
+    const ok = await canViewPeerRuns(userId, targetUserId);
     if (!ok) {
       return NextResponse.json({ error: "Not allowed to list this user’s cars" }, { status: 403 });
     }
@@ -40,8 +40,8 @@ export async function POST(request: Request) {
     );
   }
   try {
-    const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json()) as {
       name?: string;
       chassis?: string | null;
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
         notes: body.notes?.trim() || null,
         setupSheetTemplate,
         setupSheetModelId,
-        userId: user.id,
+        userId: userId,
       },
       select: {
         id: true,
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
         setupSheetModel: { select: { id: true, name: true } },
       },
     });
-    revalidateAfterCarMutation(user.id);
+    revalidateAfterCarMutation(userId);
     return NextResponse.json({ car }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create car";

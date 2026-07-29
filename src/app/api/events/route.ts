@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseEventDateYmd, eventDateToYmd } from "@/lib/eventDateParse";
 import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
@@ -22,8 +22,8 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const trackId = searchParams.get("trackId");
   const suggest = searchParams.get("suggest");
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
     const recentRun = await prisma.run.findFirst({
       where: {
-        userId: user.id,
+        userId: userId,
         trackId,
         createdAt: { gte: threeDaysAgo },
         eventId: { not: null },
@@ -51,13 +51,13 @@ export async function GET(request: Request) {
 
     if (recentRun?.event) {
       return NextResponse.json({
-        suggestedEvent: mapEventForUser(recentRun.event, user.id),
+        suggestedEvent: mapEventForUser(recentRun.event, userId),
       });
     }
     return NextResponse.json({ suggestedEvent: null });
   }
 
-  const events = await loadUserScopedEvents({ userId: user.id, take: 120 });
+  const events = await loadUserScopedEvents({ userId: userId, take: 120 });
 
   return NextResponse.json({ events });
 }
@@ -70,8 +70,8 @@ export async function POST(request: Request) {
     );
   }
   try {
-    const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json()) as {
       name?: string;
       trackId?: string | null;
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
       const existing = await findEventByTrackAndResultsUrl(trackId, resultsSourceUrl);
       if (existing) {
         await ensureEventParticipation({
-          userId: user.id,
+          userId: userId,
           eventId: existing.id,
           notes: body.notes,
           controlledTireLabel,
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
           {
             error: "An event with this LiveRC results URL already exists — joined your participation.",
             existingEventId: existing.id,
-            event: event ? mapEventForUser(event, user.id) : null,
+            event: event ? mapEventForUser(event, userId) : null,
           },
           { status: 409 }
         );
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
 
     const event = await prisma.event.create({
       data: {
-        userId: user.id,
+        userId: userId,
         name,
         trackId,
         trackNameSnapshot: track.name,
@@ -206,7 +206,7 @@ export async function POST(request: Request) {
     });
 
     await ensureEventParticipation({
-      userId: user.id,
+      userId: userId,
       eventId: event.id,
       notes: body.notes,
       controlledTireLabel,
@@ -220,7 +220,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(
-      { event: withParts ? mapEventForUser(withParts, user.id) : mapEventForUser(event, user.id) },
+      { event: withParts ? mapEventForUser(withParts, userId) : mapEventForUser(event, userId) },
       { status: 201 }
     );
   } catch (err) {

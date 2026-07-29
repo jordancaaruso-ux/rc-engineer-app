@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { fetchUrlText } from "@/lib/lapUrlParsers/fetchText";
 import {
   extractPracticeSessions,
@@ -122,8 +122,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as
     | {
@@ -168,13 +168,13 @@ export async function POST(request: Request) {
     }
     const [discovered, speedhiveIdentity] = await Promise.all([
       discoverTrackTimingSessions({
-        userId: user.id,
+        userId: userId,
         liveRcUrl: liveRcUrl || null,
         speedhiveUrl: speedhiveUrl || null,
         eventRaceClass,
         visibleSinceIso: todayStartIso || null,
       }),
-      speedhiveUrl ? hasSpeedhiveIdentityForUser(user.id) : Promise.resolve(false),
+      speedhiveUrl ? hasSpeedhiveIdentityForUser(userId) : Promise.resolve(false),
     ]);
     const hasDriverNameSetting = Boolean(
       (liveRcUrl && discovered.liveRcDriverName?.trim()) || (speedhiveUrl && speedhiveIdentity)
@@ -194,8 +194,8 @@ export async function POST(request: Request) {
     const discoveredCandidates: ScanDayUrlCandidateRow[] = discovered.unimportedCandidates.map(toCandidateRow);
     const olderCandidates: ScanDayUrlCandidateRow[] = discovered.olderUnimportedCandidates.map(toCandidateRow);
     const linkedCandidates =
-      runId && (await prisma.run.findFirst({ where: { id: runId, userId: user.id }, select: { id: true } }))
-        ? await linkedScanCandidatesForRun(user.id, runId)
+      runId && (await prisma.run.findFirst({ where: { id: runId, userId: userId }, select: { id: true } }))
+        ? await linkedScanCandidatesForRun(userId, runId)
         : [];
     const candidates = mergeLinkedScanCandidates(linkedCandidates, discoveredCandidates);
     return NextResponse.json({
@@ -236,7 +236,7 @@ export async function POST(request: Request) {
       eventRaceClass = ev?.raceClass?.trim() || null;
     }
     const discovered = await discoverMyRcmDaySessions({
-      userId: user.id,
+      userId: userId,
       url: dayUrl,
       eventRaceClass,
     });
@@ -302,7 +302,7 @@ export async function POST(request: Request) {
   }
 
   const indexKind: ScanDayUrlIndexKind = isPractice ? "practice" : "results";
-  const liveRcDriverName = await getLiveRcDriverNameSetting(user.id);
+  const liveRcDriverName = await getLiveRcDriverNameSetting(userId);
   const driverNorm = liveRcDriverName
     ? normalizeLiveRcDriverNameForMatch(liveRcDriverName)
     : "";
@@ -314,7 +314,7 @@ export async function POST(request: Request) {
     const urls = rows.map((r) => r.sessionUrl).filter(Boolean);
     const alreadyImported = urls.length
       ? await prisma.importedLapTimeSession.findMany({
-          where: { userId: user.id, sourceUrl: { in: urls } },
+          where: { userId: userId, sourceUrl: { in: urls } },
           select: { sourceUrl: true, linkedRunId: true },
         })
       : [];
@@ -351,7 +351,7 @@ export async function POST(request: Request) {
     const urls = raceRows.map((r) => r.sessionUrl).filter(Boolean);
     const alreadyImported = urls.length
       ? await prisma.importedLapTimeSession.findMany({
-          where: { userId: user.id, sourceUrl: { in: urls } },
+          where: { userId: userId, sourceUrl: { in: urls } },
           select: { sourceUrl: true, linkedRunId: true },
         })
       : [];

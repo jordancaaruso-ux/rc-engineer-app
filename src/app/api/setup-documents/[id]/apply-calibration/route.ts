@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { calibrationReadableByIdWhere } from "@/lib/setupCalibrations/calibrationAccess";
@@ -14,12 +14,12 @@ export async function POST(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { calibrationId?: string };
   // Explicit calibration selection path.
   const effective = await getEffectiveCalibrationProfileId({
-    userId: user.id,
+    userId: userId,
     explicitCalibrationId: body.calibrationId ?? null,
     context: `applyCalibration:doc:${id}`,
   });
@@ -34,7 +34,7 @@ export async function POST(request: Request, ctx: Ctx) {
   if (!calibration) return NextResponse.json({ error: "Calibration not found" }, { status: 404 });
 
   const doc = await prisma.setupDocument.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: userId },
     select: { id: true, sourceType: true, mimeType: true },
   });
   if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
@@ -84,7 +84,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const result = await applyCalibrationToSetupDocument({
     docId: id,
-    userId: user.id,
+    userId: userId,
     calibrationId: effective.calibrationId,
   });
   if (!result.ok) {

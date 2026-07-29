@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);
   const trackId = url.searchParams.get("trackId");
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
   const jobs = await prisma.videoAnalysisJob.findMany({
     where: {
-      userId: user.id,
+      userId: userId,
       ...(trackId ? { trackId } : {}),
       ...(runId ? { runId } : {}),
     },
@@ -45,8 +45,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const user = await getAuthenticatedApiUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as {
     trackId?: string;
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   }
 
   const profile = await prisma.trackCameraProfile.findFirst({
-    where: { id: body.profileId, userId: user.id, trackId: body.trackId },
+    where: { id: body.profileId, userId: userId, trackId: body.trackId },
     select: { id: true },
   });
   if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 
   const job = await prisma.videoAnalysisJob.create({
     data: {
-      userId: user.id,
+      userId: userId,
       trackId: body.trackId,
       profileId: body.profileId,
       videoAssetId: body.videoAssetId ?? null,

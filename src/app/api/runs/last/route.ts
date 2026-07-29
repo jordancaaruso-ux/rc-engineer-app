@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
 
@@ -11,8 +11,8 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getAuthenticatedApiUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const carId = searchParams.get("carId");
 
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "carId is required" }, { status: 400 });
   }
 
-  const scopeCarIds = await carIdsSharingSetupTemplate(user.id, carId);
+  const scopeCarIds = await carIdsSharingSetupTemplate(userId, carId);
 
   const baseInclude = {
     track: { select: { id: true, name: true } },
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   // run exists yet.
   const completedRun = await prisma.run.findFirst({
     where: {
-      userId: user.id,
+      userId: userId,
       carId: { in: scopeCarIds },
       loggingComplete: true,
     },
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   const lastRun =
     completedRun ??
     (await prisma.run.findFirst({
-      where: { userId: user.id, carId: { in: scopeCarIds } },
+      where: { userId: userId, carId: { in: scopeCarIds } },
       orderBy: { sortAt: "desc" },
       include: baseInclude,
     }));
