@@ -10,7 +10,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-import { parseChoiceChipsFromReply } from "@/lib/engineerPhase5/engineerChatMode";
+import { parseChoiceChipsFromReply } from "@/lib/engineerPhase5/engineerChoiceChips";
 
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
 
@@ -316,16 +316,8 @@ export function EngineerChatPanel({
 
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
-  /**
-   * Answer-mode selector retired 2026-07-28 — the server infers the contract from how
-   * recently the driver logged a run. What survives is the situational URL hint: a tap
-   * from the dashboard's "today" card (`?mode=quick`) genuinely knows the driver is at
-   * the track, which beats any inference. Forwarded per-request, never persisted, and
-   * never shown — it describes where the tap came from, not a preference.
-   */
-  const modeHintFromUrl = searchParams.get("mode")?.trim() || null;
-
-
+  // Mode system fully retired 2026-07-29 (one mode): the server reads raw situation
+  // facts from the run log instead, so the old `?mode=quick` URL hint is no longer sent.
 
   const messagesRef = useRef<ChatMessage[]>([]);
 
@@ -556,8 +548,6 @@ export function EngineerChatPanel({
           messages: apiMessages,
 
           stream: true,
-
-          ...(modeHintFromUrl ? { mode: modeHintFromUrl } : {}),
 
           ...(threadId ? { threadId } : {}),
 

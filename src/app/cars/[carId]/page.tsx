@@ -165,7 +165,6 @@ export default async function CarDetailPage(props: {
           <CarSetupsCard
             carId={car.id}
             label="Saved baselines"
-            hrefPrefix={`/cars/${car.id}/setups`}
             setups={librarySetups.map((s) => ({
               id: s.id,
               name: s.name,

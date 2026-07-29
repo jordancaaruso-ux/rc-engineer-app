@@ -4,7 +4,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getCachedDashboardHomeModel } from "@/lib/cachedReads";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { loadOnboardingView } from "@/lib/onboarding/server";
-import { loadSetupSheetPrompt } from "@/lib/setup/setupSheetPrompt";
+import { loadDashboardSetups } from "@/lib/setup/getDashboardSetups";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { CardPanel } from "@/components/ui/CardPanel";
 
@@ -36,10 +36,12 @@ export default async function DashboardPage(): Promise<ReactNode> {
   // A truly-empty account lands HERE, on the real dashboard: the welcome overlay
   // covers it once, then the "Get set up" card walks the real surfaces. Only a
   // car is required — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23).
-  const [model, onboarding, setupPrompt] = await Promise.all([
+  // Setups stay OUT of the cached model: that read is tagged `dashboardTag` with a 30s revalidate
+  // and setup edits don't bust it, so a change you just saved wouldn't show for half a minute.
+  const [model, onboarding, setups] = await Promise.all([
     getCachedDashboardHomeModel(user.id, displayTimeZone),
     loadOnboardingView(user.id),
-    loadSetupSheetPrompt(user.id),
+    loadDashboardSetups(user.id, displayTimeZone),
   ]);
 
   return (
@@ -47,7 +49,7 @@ export default async function DashboardPage(): Promise<ReactNode> {
       model={model}
       displayTimeZone={displayTimeZone}
       onboarding={onboarding}
-      setupPrompt={setupPrompt}
+      setups={setups}
     />
   );
 }

@@ -131,7 +131,7 @@ async function main() {
       const runId = resolveFixtureRunId(fixture, latest);
       process.stdout.write(`[${calls}] ${probe.id} @ ${fixture.label}… `);
       try {
-        const turn = await runEngineerChatTurn({ userId, question: probe.question, runId, mode: probe.mode });
+        const turn = await runEngineerChatTurn({ userId, question: probe.question, runId });
         answers.push({ fixture: fixture.label, answer: turn.reply, error: null });
         process.stdout.write(`${turn.reply.length} chars\n`);
       } catch (err) {

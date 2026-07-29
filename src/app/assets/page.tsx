@@ -6,9 +6,18 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
 import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
+import { CarSetupsCard, type CarLibrarySetup } from "@/components/setup/CarSetupsCard";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 
 /** Live "Mine" totals change on asset mutations — keep the hub fresh. */
 export const revalidate = 30;
+
+/**
+ * The full setup library, one card per car. The dashboard's Setups card only names the baseline
+ * each car is running, so this is where every saved setup lives — Garage owns the list.
+ */
+type GarageCarSetups = { carId: string; carName: string; setups: CarLibrarySetup[] };
 
 /** Calibrations are an admin-only surface — drop the link for everyone else. */
 function sectionsForUser(isAdmin: boolean): NavHubSection[] {
@@ -24,11 +33,13 @@ export default async function AssetsHubPage() {
   let isAdmin = false;
   /** Cars for the Create / Upload setup sheet flow; null hides the bar (no cars / DB hiccup). */
   let uploadCars: UploadSetupCar[] | null = null;
+  let carSetups: GarageCarSetups[] = [];
 
   if (hasDatabaseUrl()) {
     // requireCurrentUser may redirect — call it outside the try so the redirect
     // isn't swallowed; only the counts are best-effort.
     const user = await requireCurrentUser();
+    const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
     isAdmin = isAuthAdminEmail(user.email);
     try {
       const [cars, tireSets, carRows] = await Promise.all([
@@ -69,6 +80,32 @@ export default async function AssetsHubPage() {
             ),
           }))
         : null;
+
+      const librarySetups = carRows.length
+        ? await prisma.setupSnapshot.findMany({
+            where: { userId: user.id, carId: { in: carRows.map((c) => c.id) }, isLibrary: true },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              name: true,
+              createdAt: true,
+              carId: true,
+              _count: { select: { runs: true, derivedSnapshots: true } },
+            },
+          })
+        : [];
+      carSetups = carRows.map((c) => ({
+        carId: c.id,
+        carName: c.name,
+        setups: librarySetups
+          .filter((s) => s.carId === c.id)
+          .map((s) => ({
+            id: s.id,
+            name: s.name,
+            createdAtLabel: formatRunCreatedAtDateTime(s.createdAt, displayTimeZone),
+            usedInRuns: s._count.runs + s._count.derivedSnapshots,
+          })),
+      }));
     } catch {
       // Counts are decoration — a DB hiccup shouldn't blank the hub.
       counts = undefined;
@@ -89,6 +126,9 @@ export default async function AssetsHubPage() {
       <section className="page-body max-w-2xl flex flex-col gap-3">
         {uploadCars ? <UploadSetupSheetBar cars={uploadCars} /> : null}
         <AssetsHubClient sections={sectionsForUser(isAdmin)} counts={counts} />
+        {carSetups.map((c) => (
+          <CarSetupsCard key={c.carId} carId={c.carId} label={c.carName} setups={c.setups} />
+        ))}
       </section>
     </>
   );

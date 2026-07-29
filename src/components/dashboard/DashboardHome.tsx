@@ -3,14 +3,14 @@ import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel"
 import { DashboardDayVerdictCard } from "@/components/dashboard/DashboardDayVerdictCard";
 import { DashboardNextOutingCard } from "@/components/dashboard/DashboardNextOutingCard";
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
-import { DashboardSetupSheetCard } from "@/components/dashboard/DashboardSetupSheetCard";
+import { DashboardSetupsCard } from "@/components/dashboard/DashboardSetupsCard";
 import { DashboardGetSetUpCard } from "@/components/dashboard/DashboardGetSetUpCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
 import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
 import { PendingTeamInvitesCard } from "@/components/teams/PendingTeamInvitesCard";
 import type { OnboardingView } from "@/lib/onboarding/server";
 import { showGetSetUpCard } from "@/lib/onboarding/visibility";
-import type { SetupSheetPrompt } from "@/lib/setup/setupSheetPrompt";
+import type { DashboardSetups } from "@/lib/setup/dashboardSetups";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Reveal } from "@/components/ui/Reveal";
 
@@ -35,15 +35,15 @@ import { Reveal } from "@/components/ui/Reveal";
 export function DashboardHome({
   model,
   onboarding,
-  setupPrompt,
+  setups,
 }: {
   model: DashboardHomeModel;
   /** IANA zone from rc_tz cookie (UTC until cookie exists). */
   displayTimeZone?: string;
   /** Guided-intro view; every card in it derives and self-retires. */
   onboarding?: OnboardingView;
-  /** Set when they have a car but no setup at all; null once one exists. */
-  setupPrompt?: SetupSheetPrompt | null;
+  /** One row per car with the setup it's running; null only when they have no cars. */
+  setups?: DashboardSetups | null;
 }) {
   const {
     featuredEvent,
@@ -93,7 +93,7 @@ export function DashboardHome({
               hasCar={ob.hasCar}
               hasTimingIdentity={ob.hasTimingIdentity}
               hasSetup={ob.hasSetup}
-              setupCars={setupPrompt?.cars ?? []}
+              setupCars={setups?.cars ?? []}
             />
           </Reveal>
         ) : null}
@@ -110,12 +110,13 @@ export function DashboardHome({
           />
         </Reveal>
 
-        {/* Sits UNDER the run CTA on purpose: it's a standing ask, not today's
-            action. The Get-set-up card owns the setup ask while it's up, so this
-            only shows once that card is gone — one nag at a time. */}
-        {setupPrompt && !showGetSetUp ? (
+        {/* Sits UNDER the run CTA on purpose: logging still leads. Permanent from
+            here on (2026-07-29) — it's the door to the setup each car is running,
+            and its empty state carries the old "add a setup" ask. Suppressed only
+            while the Get-set-up card is up, which owns that ask — one at a time. */}
+        {setups && !showGetSetUp ? (
           <Reveal index={1}>
-            <DashboardSetupSheetCard prompt={setupPrompt} />
+            <DashboardSetupsCard setups={setups} />
           </Reveal>
         ) : null}
 

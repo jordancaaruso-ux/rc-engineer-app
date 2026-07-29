@@ -86,7 +86,9 @@ function InstrumentRow({
   );
 }
 
-const ENGINEER_TODAY_HREF = `/engineer?mode=quick&prompt=${encodeURIComponent(
+// No mode param (one-mode decision 2026-07-29): the server sees the run was logged
+// minutes ago via situationFacts, which is the same signal this card keyed off.
+const ENGINEER_TODAY_HREF = `/engineer?prompt=${encodeURIComponent(
   "Give me your read on today so far."
 )}`;
 

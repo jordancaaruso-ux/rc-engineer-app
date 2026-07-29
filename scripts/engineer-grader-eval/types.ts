@@ -183,6 +183,15 @@ export type Scenario = {
   /** Provenance of factory perturbations (variation only). */
   perturbation?: Array<{ op: string; params?: Record<string, unknown> }>;
   coherence?: CoherenceVerdict;
+  /**
+   * When true, the bench asks the question with NO runId and NO mode hint — the
+   * production path where a driver types into an un-anchored chat. The world is still
+   * fully seeded (latest-run context, history, spread all exist server-side); what is
+   * being tested is whether the pipeline finds and uses them without a focus run.
+   * Every pre-2026-07-29 eval passed a runId, which forces full context — so this flag
+   * marks the strata no instrument had ever measured.
+   */
+  unanchored?: true;
   /** Free tag used to stratify trust metrics (e.g. "close-call", "thin-context"). */
   difficultyTag?: string;
   /** Present only on planted-error pairs for the secondary catch-rate floor. */

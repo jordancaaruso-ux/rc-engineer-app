@@ -13,6 +13,10 @@ import { Eyebrow } from "@/components/ui/panel";
  * These are `SetupSnapshot.isLibrary` rows: they belong to the car, not to a run. Logging a run
  * picks one as its baseline and stores its own snapshot, so editing a library setup never rewrites
  * history.
+ *
+ * Rows open the grid editor directly (2026-07-29). They used to land on the read-only detail page,
+ * which put a second "Edit" tap between a driver and the one value they came to change — testers
+ * gave up and edited through Log Run instead, which writes a run snapshot, not the baseline.
  */
 
 export type CarLibrarySetup = {
@@ -26,14 +30,11 @@ export function CarSetupsCard({
   carId,
   setups,
   label = "Setups",
-  hrefPrefix,
 }: {
   carId: string;
   setups: CarLibrarySetup[];
   /** Section label — "Saved setups" when it sits beside sheets and run setups. */
   label?: string;
-  /** Row link base; defaults to the editor. `/setup/[carId]` sends rows to the read-only view. */
-  hrefPrefix?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -110,10 +111,7 @@ export function CarSetupsCard({
               key={s.id}
               className="flex items-center justify-between gap-3 border-b border-border/60 px-1 py-2.5 last:border-0"
             >
-              <Link
-                href={`${hrefPrefix ?? `/cars/${carId}/setups`}/${s.id}`}
-                className="min-w-0 flex-1"
-              >
+              <Link href={`/cars/${carId}/setups/${s.id}/edit`} className="min-w-0 flex-1">
                 <div className="truncate text-sm text-foreground">{s.name ?? "Untitled setup"}</div>
                 <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
                   {s.createdAtLabel}

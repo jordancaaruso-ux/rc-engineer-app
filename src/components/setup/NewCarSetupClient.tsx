@@ -6,14 +6,20 @@ import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { SetupFillFlow } from "@/components/setup/SetupFillFlow";
+import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 
 /**
- * Name it, choose a starting point, then run the sequential fill.
+ * Name it, choose a starting point, then fill it in.
  *
  * Kept as two explicit steps rather than dropping straight into the questions: the starting point
  * is the single biggest lever on how long the fill takes, and it can't be changed halfway through.
+ *
+ * The starting point also picks the surface (2026-07-29). A blank sheet gets the sequential
+ * one-question-at-a-time flow, which is the only way to fill 40-70 values you've never seen. A
+ * kit or previous setup gets the grid instead: you're changing a handful of values against a sheet
+ * that's already right, and stepping past 60 correct answers to reach them is the whole complaint.
  */
 
 type StartMode = "kit" | "last" | "empty";
@@ -68,9 +74,23 @@ export function NewCarSetupClient({
     }
   };
 
-  if (started) {
+  if (started && mode === "empty") {
     return (
       <SetupFillFlow
+        template={template}
+        initialValues={startValues}
+        subject={name.trim() || carName}
+        saving={saving}
+        error={error}
+        onSave={(values) => void save(values)}
+        onCancel={() => setStarted(false)}
+      />
+    );
+  }
+
+  if (started) {
+    return (
+      <NewSetupSheetFill
         template={template}
         initialValues={startValues}
         subject={name.trim() || carName}
@@ -151,9 +171,68 @@ export function NewCarSetupClient({
           className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
           onClick={() => setStarted(true)}
         >
-          Start filling
+          {mode === "empty" ? "Start filling" : "Open the sheet"}
         </button>
       </div>
     </SurfaceCard>
+  );
+}
+
+/**
+ * Whole sheet at once, for a setup that starts from values that are already mostly right. Same
+ * grid the editor uses, so there is one thing to learn — but this one isn't saved until you say so,
+ * because the setup doesn't exist yet.
+ */
+function NewSetupSheetFill({
+  template,
+  initialValues,
+  subject,
+  saving,
+  error,
+  onSave,
+  onCancel,
+}: {
+  template: SetupSheetTemplate;
+  initialValues: SetupSnapshotData;
+  subject: string;
+  saving: boolean;
+  error: string | null;
+  onSave: (values: SetupSnapshotData) => void;
+  onCancel: () => void;
+}) {
+  const [values, setValues] = useState<SetupSnapshotData>(initialValues);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <Eyebrow>{subject}</Eyebrow>
+        <button
+          type="button"
+          className="ui-caption text-muted-foreground underline"
+          onClick={onCancel}
+          disabled={saving}
+        >
+          Back
+        </button>
+      </div>
+
+      <SetupSheetView
+        value={values}
+        template={template}
+        enableFieldSearch
+        onChange={setValues}
+      />
+
+      {error ? <p className="ui-caption text-destructive">{error}</p> : null}
+
+      <button
+        type="button"
+        className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+        onClick={() => onSave(values)}
+        disabled={saving}
+      >
+        {saving ? "Saving…" : "Save setup"}
+      </button>
+    </div>
   );
 }

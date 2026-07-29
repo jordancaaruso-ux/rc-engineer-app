@@ -11,133 +11,59 @@ import {
 const tier = (lastUserMessage: string | undefined, runId = "", compareRunId = "") =>
   engineerChatContextTier({ lastUserMessage, runId, compareRunId });
 
+const deep = (lastUserMessage: string | undefined, runId = "", compareRunId = "") =>
+  engineerChatNeedsDeepContext({ lastUserMessage, runId, compareRunId });
+
 /**
- * The regression this whole 2026-07-28 rework exists to prevent. Each of these is a real
- * driver with a real problem who cannot name it in setup vocabulary. Under the old tier
- * they were routed to a cheap model on thin context, with a prompt that told it to ask
- * for a focused run — so the people who needed the Engineer most got a form back.
+ * The regression the 2026-07-28 rework prevented for MODEL choice and the 2026-07-29
+ * Phase 2 change prevents for CONTEXT depth. Each of these is a real driver with a real
+ * problem who cannot name it in setup vocabulary. Under the old gates they got a cheap
+ * model (fixed 07-28) on thin context (fixed 07-29) — the people who needed the
+ * Engineer most got the weakest answers, silently.
  */
-test("a driver who cannot name the problem still gets the full engineer path", () => {
+test("a driver who cannot name the problem gets the full path AND full context", () => {
   for (const msg of [
     "doesn't feel right",
     "I'm not happy with it",
     "where would you start?",
     "car is rubbish today",
-    "help",
     "what should I do next?",
+    "I'm struggling out there today.",
+    "It got worse as the day went on.",
+    "car felt weird today, thoughts?",
   ]) {
     assert.equal(tier(msg), "full", `expected full tier for: ${msg}`);
+    assert.equal(deep(msg), true, `expected deep context for: ${msg}`);
   }
 });
 
 test("only a recognised lap-history question with no run in focus takes the lookup path", () => {
   assert.equal(tier("what's my best lap at Kingston?"), "lookup");
+  assert.equal(deep("what's my best lap at Kingston?"), false);
   // Same question with a run focused: they are looking AT a run, so advice is on the table.
   assert.equal(tier("what's my best lap at Kingston?", "run1"), "full");
+  assert.equal(deep("what's my best lap at Kingston?", "run1"), true);
 });
 
-test("a situational hint never lands on the lookup prompt", () => {
-  assert.equal(
-    engineerChatContextTier({
-      lastUserMessage: "what's my best lap at Kingston?",
-      runId: "",
-      compareRunId: "",
-      mode: "quick",
-    }),
-    "full"
-  );
-});
-
-test("unrecognised input defaults to full, never to the cheap shape", () => {
+test("unrecognised input defaults to full + deep, never to a thin shape", () => {
   assert.equal(tier(undefined), "full");
   assert.equal(tier(""), "full");
   assert.equal(tier("asdfgh"), "full");
+  assert.equal(deep("hello"), true);
 });
 
-test("run id forces deep context", () => {
-  assert.equal(
-    engineerChatNeedsDeepContext({ lastUserMessage: "hi", runId: "r1", compareRunId: "" }),
-    true
-  );
+test("run id forces full tier regardless of message", () => {
+  assert.equal(deep("hi", "r1"), true);
+  assert.equal(tier("hi", "", "r2"), "full");
 });
 
-test("setup keywords trigger deep context", () => {
+test("setup and handling vocabulary is full tier (as everything is)", () => {
+  assert.equal(deep("should I add front camber?"), true);
   assert.equal(
-    engineerChatNeedsDeepContext({
-      lastUserMessage: "should I add front camber?",
-      runId: "",
-      compareRunId: "",
-    }),
+    deep("Car is pushing mid-corner on my last run. 10 minutes until the next one - what do I do?"),
     true
   );
-});
-
-test("short chit-chat stays light", () => {
-  assert.equal(
-    engineerChatNeedsDeepContext({ lastUserMessage: "hello", runId: "", compareRunId: "" }),
-    false
-  );
-});
-
-test("handling vocabulary triggers deep context (pushing / loose / corner)", () => {
-  assert.equal(
-    engineerChatNeedsDeepContext({
-      lastUserMessage: "Car is pushing mid-corner on my last run. 10 minutes until the next one - what do I do?",
-      runId: "",
-      compareRunId: "",
-    }),
-    true
-  );
-  assert.equal(
-    engineerChatNeedsDeepContext({
-      lastUserMessage: "the rear feels loose on exit",
-      runId: "",
-      compareRunId: "",
-    }),
-    true
-  );
-});
-
-test("quick and deep modes force deep context even without setup keywords", () => {
-  assert.equal(
-    engineerChatNeedsDeepContext({
-      lastUserMessage: "car felt weird today, thoughts?",
-      runId: "",
-      compareRunId: "",
-      mode: "quick",
-    }),
-    true
-  );
-  assert.equal(
-    engineerChatNeedsDeepContext({
-      lastUserMessage: "car felt weird today, thoughts?",
-      runId: "",
-      compareRunId: "",
-      mode: "deep",
-    }),
-    true
-  );
-  assert.equal(
-    engineerChatNeedsDeepContext({
-      lastUserMessage: "car felt weird today, thoughts?",
-      runId: "",
-      compareRunId: "",
-      mode: "normal",
-    }),
-    false
-  );
-});
-
-test("lap-history questions stay light even in quick mode", () => {
-  assert.equal(
-    engineerChatNeedsDeepContext({
-      lastUserMessage: "what's my best lap at Keilor?",
-      runId: "",
-      compareRunId: "",
-      mode: "quick",
-    }),
-    false
-  );
+  assert.equal(deep("the rear feels loose on exit"), true);
 });
 
 console.log("engineerChatContextTier.test.ts OK");

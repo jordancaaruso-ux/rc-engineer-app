@@ -1,6 +1,7 @@
 # Dashboard North Star — the adaptive home
 
-**Status:** Locked (founder interviews 2026-07-16 + v2 2026-07-19). **Owner:** Jordan.
+**Status:** Locked (founder interviews 2026-07-16 + v2 2026-07-19; Setups card added 2026-07-29).
+**Owner:** Jordan.
 
 This doc governs what the dashboard (`/`) shows and in what order. `PRODUCT_NORTH_STAR.md`
 ranks the pillars; `VISUAL_NORTH_STAR.md` owns how it looks. When a dashboard change is
@@ -22,6 +23,15 @@ Analysis owns history, charts, comparisons, tables — **and the run lists**: v2
 dashboard's run-by-run strip because it duplicated the top of Analysis. If a dashboard
 block starts growing a chart or a second screen of rows, it has crossed the line — move it.
 
+**One deliberate exception (2026-07-29): the Setups card, which never retires.** Every other
+card here is derived from today or self-deletes when its job is done. This one is permanent,
+because editing the setup between runs is a standing job and the Garage was not where anyone
+looked for it — a tester who wanted to change one value on a saved baseline did it through Log
+Run, which writes a run snapshot, not the baseline. It stays inside the boundary rule by being a
+verdict, not an index: **one row per car naming the setup that car is running**, height bounded
+by cars, not by setups. The full library of baselines lives in Garage. If this card ever grows
+into a scrolling list of every saved setup, it has become the run-strip mistake and must move.
+
 Interview context (2026-07-16): the old dashboard was static ("tells me nothing new") and
 mute ("no what-next guidance"). Of everything on it, only the Start-run CTA earned its
 place. v2 context (2026-07-19): Today-so-far "stepped on Analysis's toes" and the auto
@@ -41,7 +51,8 @@ Auto only — no manual toggle. (Revisit if the "reviewing at the track café" c
 ## Track-day stack (an instrument, not a table)
 
 1. **Start / Finish-run CTA** — unchanged, always #1.
-2. **Day verdict card** (`DashboardDayVerdictCard`, "three instruments" — variant A of the
+2. **Setups card** (`DashboardSetupsCard`) — see the boundary-rule exception above.
+3. **Day verdict card** (`DashboardDayVerdictCard`, "three instruments" — variant A of the
    2026-07-19 artifact board). **Computed only, no AI** (`src/lib/dashboardVerdict.ts`):
    - **Pace** — day trend across today's runs (avg-top-5 preferred, best-lap fallback;
      ±0.05 s reads as steady), which run was the best, and a per-run sparkline.
@@ -52,21 +63,38 @@ Auto only — no manual toggle. (Revisit if the "reviewing at the track café" c
    - Footer: **"✦ Ask the Engineer about today"** → chat in **quick mode** with a queued
      read-my-day prompt. This is the only Engineer entry on the card — always on demand.
    - Tapping the card anywhere else → Sessions with today expanded (the evidence).
-3. **Things to try** — the driver's experiment list, live on the page during a session.
-4. **Last 30 days card** — always last.
+4. **Things to try** — the driver's experiment list, live on the page during a session.
+5. **Last 30 days card** — always last.
+
+## The Setups card (both modes, position 2)
+
+One row per car: the car's name, and the baseline it's running. Tapping goes **straight to the
+grid editor** — no read-only page in between, which was the whole reason this exists.
+
+- **"Running" = the baseline the car's most recent run was built from**, falling back to its
+  newest saved baseline. A setup you typed but never ran isn't what the car is on.
+  (`src/lib/setup/dashboardSetups.ts` — pure, tested; DB reads in `getDashboardSetups.ts`.)
+- A car with no setup yet shows "No setup yet — build one" and opens the create flow.
+- **Empty state carries the old "add a setup" ask** — the `DashboardSetupSheetCard` nag was
+  absorbed into this card rather than left to coexist, so there is still exactly one setup
+  surface and no Ignore button (`ONBOARDING_NORTH_STAR.md`).
+- Suppressed only while the Get-set-up card is up — that card owns the ask while it lives.
+- Read **outside** the cached dashboard model: `getCachedDashboardHomeModel` has a 30s
+  revalidate that setup mutations don't bust, so a just-saved edit would look lost.
 
 ## Off-day stack (plan the next outing)
 
 1. **Start-run CTA.**
-2. **Next outing card** (`DashboardNextOutingCard`, "countdown hero" — variant D of the
+2. **Setups card** — same card, same position.
+3. **Next outing card** (`DashboardNextOutingCard`, "countdown hero" — variant D of the
    artifact board): event day-count + date, one **"last visit"** line (best lap · runs ·
    when — this line *is* what remains of the old digest), open to-dos chip, and the
    **Test plan** — the Things-to-try list living inside the card, editable in place.
    Countdown block taps through to the event.
    **No event booked → plan-only degrade:** same card, no countdown; the Test plan leads
    and the footer becomes "Book your next track day" (→ /events). The card always exists.
-3. **Things to do** — reminders list.
-4. **Last 30 days card** — always last.
+4. **Things to do** — reminders list.
+5. **Last 30 days card** — always last.
 
 ## Retired
 

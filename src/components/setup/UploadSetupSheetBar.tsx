@@ -55,8 +55,19 @@ function stageLabel(stage: UploadStage): string {
  * Car-first applies to PDFs too: the server 409-blocks (nothing created) when
  * the sheet fingerprints as a different chassis than the chosen car, and the
  * sheet shows a blocking "Change car / Use anyway" confirm.
+ *
+ * `trigger="link"` swaps the bar for a compact control so the dashboard's Setups
+ * card can offer "New setup" in its header without duplicating the car picker.
  */
-export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
+export function UploadSetupSheetBar({
+  cars,
+  trigger = "bar",
+  label = "Create / Upload setup sheet",
+}: {
+  cars: UploadSetupCar[];
+  trigger?: "bar" | "link";
+  label?: string;
+}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -216,23 +227,33 @@ export function UploadSetupSheetBar({ cars }: { cars: UploadSetupCar[] }) {
 
   return (
     <>
-      {/* Ghost bar: glass + hairline, yellow reserved for the icon/arrow (action accent only). */}
-      <button
-        type="button"
-        onClick={openSheet}
-        className="tap-active glass-card flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left"
-      >
-        <span
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
-          aria-hidden
+      {trigger === "link" ? (
+        <button
+          type="button"
+          onClick={openSheet}
+          className="tap-active rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
         >
-          <FileUp className="size-4" strokeWidth={2} />
-        </span>
-        <span className="min-w-0 flex-1 text-[14px] font-semibold tracking-tight text-foreground">
-          Create / Upload setup sheet
-        </span>
-        <ArrowRight className="size-4 shrink-0 text-primary" strokeWidth={2} aria-hidden />
-      </button>
+          {label}
+        </button>
+      ) : (
+        /* Ghost bar: glass + hairline, yellow reserved for the icon/arrow (action accent only). */
+        <button
+          type="button"
+          onClick={openSheet}
+          className="tap-active glass-card flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left"
+        >
+          <span
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
+            aria-hidden
+          >
+            <FileUp className="size-4" strokeWidth={2} />
+          </span>
+          <span className="min-w-0 flex-1 text-[14px] font-semibold tracking-tight text-foreground">
+            {label}
+          </span>
+          <ArrowRight className="size-4 shrink-0 text-primary" strokeWidth={2} aria-hidden />
+        </button>
+      )}
 
       {/* Hidden pickers live outside the sheet so the portal teardown can't cancel a chosen file. */}
       <input

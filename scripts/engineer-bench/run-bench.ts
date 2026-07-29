@@ -192,7 +192,6 @@ async function main() {
         userId,
         question: c.question,
         runId,
-        mode: c.mode,
       });
       const latencyMs = Date.now() - t0;
       const meta = buildEngineerResponseMetadata({

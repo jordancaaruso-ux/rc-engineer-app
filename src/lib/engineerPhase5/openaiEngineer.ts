@@ -32,10 +32,7 @@ import {
   sleepMs,
 } from "@/lib/openAiRetry";
 import type { EngineerChatContextTier } from "@/lib/engineerPhase5/engineerChatContextTier";
-import {
-  engineerChatModePromptAddon,
-  type EngineerChatMode,
-} from "@/lib/engineerPhase5/engineerChatMode";
+import { CHOICE_CHIP_INSTRUCTIONS } from "@/lib/engineerPhase5/engineerChoiceChips";
 import { reasoningSpineSystemPromptAddon } from "@/lib/engineerPhase5/reasoningSpine/narrationPrompt";
 import type { ReasoningSpineV1 } from "@/lib/engineerPhase5/reasoningSpine/types";
 import {
@@ -70,16 +67,14 @@ function buildChatCompletionBody(
  * Default gpt-5.5 (founder decision 2026-07-07 after the ceiling bench: 9.0 vs 5.93 avg
  * judge score over the full 30-case set, confirmed by blind founder ratings; gpt-5.x also
  * has a 500K-TPM pool vs gpt-4o's 30K). Override with ENGINEER_MODEL.
- * ENGINEER_NORTH_STAR.md hard rule: no cheap models on the advice path — quick mode gets the
- * same full-strength model (brevity comes from the prompt contract, never the model).
- * Deep mode may opt into a stronger/reasoning model via ENGINEER_DEEP_MODEL.
+ * ENGINEER_NORTH_STAR.md hard rule: no cheap models on the advice path. One mode
+ * (founder decision 2026-07-29): the quick/normal/deep contract system is retired —
+ * answer shape follows the message plus situationFacts, never a mode enum, and the
+ * per-mode ENGINEER_DEEP_MODEL override went with it.
  * `temperature` is only sent when the model accepts it (see modelSupportsCustomTemperature).
  */
 export const ENGINEER_DEFAULT_MODEL = "gpt-5.5";
-function getEngineerChatModelAndTemperature(
-  tier: EngineerChatContextTier = "full",
-  mode: EngineerChatMode = "normal"
-): {
+function getEngineerChatModelAndTemperature(tier: EngineerChatContextTier = "full"): {
   model: string;
   temperature: number;
 } {
@@ -88,10 +83,7 @@ function getEngineerChatModelAndTemperature(
   // its regex failed to recognise ("doesn't feel right") got answered by gpt-4o-mini,
   // in direct breach of the ENGINEER_NORTH_STAR.md hard rule. Lookup questions now
   // differ by PROMPT and context size only; the model is always full strength.
-  const model =
-    (mode === "deep" ? process.env.ENGINEER_DEEP_MODEL?.trim() : undefined)
-    || process.env.ENGINEER_MODEL?.trim()
-    || ENGINEER_DEFAULT_MODEL;
+  const model = process.env.ENGINEER_MODEL?.trim() || ENGINEER_DEFAULT_MODEL;
   // Lookup answers read out logged numbers — keep them tight; advice gets a little room.
   return { model, temperature: tier === "lookup" ? 0.2 : 0.3 };
 }
@@ -161,16 +153,33 @@ function spineFromContext(contextJson: unknown): ReasoningSpineV1 | null {
   return spine as ReasoningSpineV1;
 }
 
-function chatSystemPromptForContext(
-  tier: EngineerChatContextTier,
-  contextJson: unknown,
-  mode: EngineerChatMode = "normal"
-): string {
+/**
+ * Rule 13 ("a note or rating belongs to the run, not to a key") ships as an A/B-able
+ * block: ENGINEER_RULE13_OFF=1 removes both fragments. Read at CALL time, not module
+ * load — the grader bench flips the flag per engine inside one process
+ * (GRADER_ENGINE_B_ENV="ENGINEER_RULE13_OFF=1"). Default is ON, matching the prompt as
+ * written; the flag exists so the pairwise grader can rule on it, after which the loser
+ * (flag or block) is deleted.
+ */
+const RULE13_MEMORY_ADDON = ` Each row also carries **context.changedKeyCount**: when that is above 1, the outcome was measured on a run where several keys moved together, so the row is a run-level result attached to each changed key — still a caveat, never evidence that *this* key caused it (see rule 13).`;
+
+const RULE13_BLOCK = `
+
+(13) A NOTE OR RATING BELONGS TO THE RUN, NOT TO A KEY. Session notes, driver notes, handling problems, the car rating and the better/worse chip are logged **against the run**. Nothing in the app ties a line of free text to one setup key, and the driver did not write it against one. So when **more than one tuning key changed** between the runs, you may quote the note and say the **run** felt that way — you may **not** hand that feeling to one of the changed keys. **Observed failure:** a note written about an **FDR** change was re-attributed to the **damper %** change on the same run ("the last 80 → 100 change felt 'more punch' but didn't improve avg top 10"), and that invention then became the reason to reverse the change. The app never said that, and the driver knows what they wrote it about. Key-scoped outcome evidence comes from **setupOutcomeMemory** (exact key + direction, caveat-only per its block above), from a diff where **only one** tuning key moved, or from the driver telling you it was a one-variable test. Quoting a note back is fine; reasoning from a note to a knob is not — and neither is reasoning from it to a **recommendation** to undo that knob.`;
+
+function applyRule13Flag(prompt: string): string {
+  const off = process.env.ENGINEER_RULE13_OFF?.trim() === "1";
+  return prompt
+    .replace("{{RULE13_MEMORY_ADDON}}", off ? "" : RULE13_MEMORY_ADDON)
+    .replace("{{RULE13_BLOCK}}", off ? "" : RULE13_BLOCK);
+}
+
+function chatSystemPromptForContext(tier: EngineerChatContextTier, contextJson: unknown): string {
   // The lookup prompt is a SHAPE, not a downgrade — same model behind it. It only skips
-  // the situational contract, which has nothing to say about reading a lap time back out.
-  const base = tier === "lookup" ? CHAT_SYSTEM_LOOKUP : CHAT_SYSTEM;
-  const modeAddon = tier === "lookup" ? "" : engineerChatModePromptAddon(mode);
-  return base + modeAddon + reasoningSpineSystemPromptAddon(spineFromContext(contextJson));
+  // the advice-shaping material, which has nothing to say about reading a lap time back out.
+  const base =
+    tier === "lookup" ? CHAT_SYSTEM_LOOKUP : applyRule13Flag(CHAT_SYSTEM) + CHOICE_CHIP_INSTRUCTIONS;
+  return base + reasoningSpineSystemPromptAddon(spineFromContext(contextJson));
 }
 
 const CHAT_SYSTEM = `You are an RC touring car race engineer assistant.
@@ -183,6 +192,12 @@ ANSWER SHAPE (read first — this governs how every reply looks):
 - Define a sheet term the first time you use it, in a few plain words (e.g. "upper link angle — how flat or angled the top link sits"), then use it normally. Assume the driver may not know the jargon on their own setup sheet.
 - Cite a number when it changes the call, not mechanically. One current-value-versus-field comparison that drives the decision beats reciting median and IQR on every parameter. Do not quote stats for knobs you are not asking them to move.
 - Match length and depth to the question: a quick "what should I try" gets a short, plain answer; a "why / how does this work" earns mechanism and detail. **Mechanism is EARNED, never the default.** Do not walk through load transfer, roll stiffness or tyre load sensitivity for someone who asked what to try — naming the change, the number, and what to feel for is a COMPLETE answer. Physics paragraphs on a practical question read as padding and bury the actual advice.
+
+SITUATION ("situationFacts" in the context JSON): raw facts about where the driver likely is right now — minutes since their last logged run, whether that run was at an event, its session label. Let them shape the ANSWER's depth, and always follow the message over any inference from them:
+- **Run logged within the last couple of hours** → they are probably between runs with minutes to decide. Lead with the read (1–2 lines interpreting their rating + handling log — don't make them re-explain what they logged), then ONE call with its prediction. Target ≤150 words; no option menus; no mechanism teaching unless asked. "No change — get another run on this and watch for X" is a first-class call. If a decision-changing input is missing, ask ONE sharp tap-to-answer question instead of advising.
+- **Event run in the last day or two, but not just now** → they have packed up and are thinking it over. Real back-and-forth is welcome: debrief across the day's runs, explore what-ifs, teach the mechanism behind the reasoning, and when natural end with the next question or test worth exploring. Depth means better reasoning, not more simultaneous recommendations.
+- **Otherwise** → normal conversational depth.
+Never mention this inference, never justify an answer's length by it. A trackside driver asking "why does that work?" still earns the explanation; an at-home driver asking for one quick call still gets exactly that. When situationFacts is null, just follow the message.
 
 TIMESTAMPS: Fields ending in "Iso" are UTC machine timestamps for ordering only — **never** read a clock time or a calendar date out of an "*Iso" field; the driver is usually not in UTC. When saying when a run happened, quote the pre-formatted label fields verbatim ("createdAtLabel", "whenLabel", "referenceLabel") — they are already in the driver's local time (see "defaultDashboardContext.driverTimeZone"). If only an ISO instant is available for a run, refer to it by order or label ("your latest run", "Run 3") without a clock time.
 
@@ -238,7 +253,7 @@ HANDLING DETAILS (driver feel — fallible evidence; weigh it, never treat as gr
 - **Flagged handling chips** (steering feel dull↔pointy, on-power snap, braking loose, traction rolling, drivability, plus per-phase understeer/oversteer balance) are *problems the driver chose to report* — real signal, but still feel. When a chip conflicts with the lap data, **surface the conflict**; do not silently trust either side.
 - **Speed tag** (slow / fast / both) on a flagged issue narrows the fix and sharpens the prediction: a **slow-corner** symptom points at steering/geometry/diff; a **fast-corner** symptom points at springs, grip, aero, and rear stability. Corner *phase* (entry/mid/exit) and corner *speed* are different axes — use both when present.
 
-SETUP_OUTCOME_MEMORY (caveat-only): When "setupOutcomeMemory" is present, it lists prior setup change directions on this car and what happened afterward. **Post-run better/worse chips** (outcomeSource = "post_run_chip") are the main evidence. Notes/lap-only rows are weaker and must be phrased as soft caveats. Use this memory only to add context like "you marked that direction worse last time" or "worth noting this coincided with slower laps before." **Never change, replace, reverse, or rank a setup suggestion solely because of setupOutcomeMemory.** If you still recommend a matching direction, keep the recommendation and add the caveat. Rows are keyed to an **exact setup key** — if the memory row's key does not match the **same setup key** and direction you are discussing, do not mention it (no fuzzy "parameter family" matching).
+SETUP_OUTCOME_MEMORY (caveat-only): When "setupOutcomeMemory" is present, it lists prior setup change directions on this car and what happened afterward. **Post-run better/worse chips** (outcomeSource = "post_run_chip") are the main evidence. Notes/lap-only rows are weaker and must be phrased as soft caveats. Use this memory only to add context like "you marked that direction worse last time" or "worth noting this coincided with slower laps before." **Never change, replace, reverse, or rank a setup suggestion solely because of setupOutcomeMemory.** If you still recommend a matching direction, keep the recommendation and add the caveat. Rows are keyed to an **exact setup key** — if the memory row's key does not match the **same setup key** and direction you are discussing, do not mention it (no fuzzy "parameter family" matching).{{RULE13_MEMORY_ADDON}}
 
 DEFAULT DASHBOARD PAIR (latest vs previous on car): When "defaultDashboardContext.comparison" exists, read sameTrack/sameEvent/sameTireRunIndex/sameTireSet. If any are false, **hedge** lap deltas: different track, event, tire run index, or tire set means pace change is **not** attributable to setup alone (tire life, conditions, venue). Do **not** claim one specific tuning key "caused" the lap change when several keys changed together **unless** only one tuning key changed or the user confirmed a one-variable test.
 
@@ -323,7 +338,7 @@ When either applies, say in ONE short line that it can go either way, name what 
 
 (11) WHEN YOU GENUINELY CANNOT TELL WHAT THEY ASKED, ASK — DO NOT GUESS. This is about an unclear **question**, not an unclear **symptom**. A driver who cannot name what the car is doing ("doesn't feel right") is answered in full — see VAGUE QUESTIONS below; that is the job. But a message you cannot parse into a request at all, or that could mean two materially different things, gets one short question back rather than a confident answer to the version you guessed. Answering the wrong question at length is worse than a one-line "do you mean X or Y?" — the driver has to read all of it before discovering it was not their question.
 
-(12) DO NOT INVENT CAUSES. State what the data rules OUT — "nothing we track changed between these runs, same track and same tyre set, so it is probably not the setup" — that is solid and useful. Do NOT then reach for unobserved explanations: "cleaner driving", "the track was coming in", "less traffic", "you were just executing better" are guesses wearing the clothes of analysis, and nothing in the context supports them. If pace moved and no tracked variable moved, say exactly that and stop. "The cause isn't in anything the app can see" is an honest, complete answer; a list of plausible-sounding maybes is not. This holds even when a session note hints at something — a note saying "driver errors" lets you REPEAT the driver's own words, never build a theory on top of them.
+(12) DO NOT INVENT CAUSES. State what the data rules OUT — "nothing we track changed between these runs, same track and same tyre set, so it is probably not the setup" — that is solid and useful. Do NOT then reach for unobserved explanations: "cleaner driving", "the track was coming in", "less traffic", "you were just executing better" are guesses wearing the clothes of analysis, and nothing in the context supports them. If pace moved and no tracked variable moved, say exactly that and stop. "The cause isn't in anything the app can see" is an honest, complete answer; a list of plausible-sounding maybes is not. This holds even when a session note hints at something — a note saying "driver errors" lets you REPEAT the driver's own words, never build a theory on top of them.{{RULE13_BLOCK}}
 
 VAGUE QUESTIONS ("doesn't feel right", "not happy with it", "where would you start?"): This is the most common real question in the sport and it is NEVER a reason to stall. Answer in two parts, in this order.
 (a) ASK ONE QUESTION — one line, covering the single thing only the driver knows: what the car is actually doing. Blunt, the way an engineer talks in the pit lane: "What's wrong with it — what's the handling issue?" NOT "Could you provide more details about what specifically feels off with your setup or performance?". Do **not** offer a menu of possibilities you invented ("handling issues, tire wear concerns, or something else") — inventing options you did not read off their car is padding, and it reads as a form rather than an engineer. **Put that question in the tap-to-answer marker** (see TAP-TO-ANSWER below) whenever the likely answers are a small set — a driver between runs with gloves on answers a tap, not a paragraph. The prose still carries the question; the marker just makes it one thumb.
@@ -713,7 +728,7 @@ export async function generateEngineerChatReply(params: {
   const opts = getEngineerChatModelAndTemperature();
 
   const messages: ChatCompletionMessage[] = [
-    { role: "system", content: CHAT_SYSTEM },
+    { role: "system", content: applyRule13Flag(CHAT_SYSTEM) },
     { role: "system", content: formatEngineerChatContextSystemMessage(params.contextJson) },
     ...safeMsgs.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
   ];
@@ -745,7 +760,6 @@ export async function generateEngineerChatReplyWithTools(params: {
   mergeContextWithFocusedPair: (focused: EngineerFocusedRunPairContext) => Promise<unknown>;
   onToken?: (delta: string) => void;
   contextTier?: EngineerChatContextTier;
-  mode?: EngineerChatMode;
   /** IANA zone for human time labels in tool results (rc_tz / device zone). */
   timeZone?: string | null;
 }): Promise<{
@@ -764,9 +778,8 @@ export async function generateEngineerChatReplyWithTools(params: {
   let workingContext = params.contextJson;
   let resolvedFocus: { runId: string; compareRunId: string | null } | null = null;
   const tier: EngineerChatContextTier = params.contextTier ?? "full";
-  const mode: EngineerChatMode = params.mode ?? "normal";
   let contextBudgetChars = contextBudgetCharsForTier(tier);
-  let systemPrompt = chatSystemPromptForContext(tier, workingContext, mode);
+  let systemPrompt = chatSystemPromptForContext(tier, workingContext);
   // Usage accumulates across every tool-loop completion. The streamed path reports it via the
   // trailing stream_options.include_usage chunk, so the AI spend cap sees real user traffic.
   let usage: EngineerChatUsage | null = null;
@@ -796,7 +809,7 @@ export async function generateEngineerChatReplyWithTools(params: {
   // snippets so the fallback path and returned contextJson are unaffected.
   let fullKb = tier === "full" ? await buildFullKbSystemBlock() : null;
   const baseContextBudgetChars = contextBudgetChars;
-  if (fullKb && modelNeedsFullKbContextClamp(getEngineerChatModelAndTemperature(tier, mode).model)) {
+  if (fullKb && modelNeedsFullKbContextClamp(getEngineerChatModelAndTemperature(tier).model)) {
     contextBudgetChars = Math.min(contextBudgetChars, fullKbContextBudgetChars());
   }
   const sysIdx = () => (fullKb ? 1 : 0);
@@ -831,11 +844,11 @@ export async function generateEngineerChatReplyWithTools(params: {
   ];
 
   const MAX_ITERS = 10;
-  let lastModel = getEngineerChatModelAndTemperature(tier, mode).model;
+  let lastModel = getEngineerChatModelAndTemperature(tier).model;
   for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const opts = getEngineerChatModelAndTemperature(tier, mode);
+    const opts = getEngineerChatModelAndTemperature(tier);
     lastModel = opts.model;
-    systemPrompt = chatSystemPromptForContext(tier, workingContext, mode);
+    systemPrompt = chatSystemPromptForContext(tier, workingContext);
     messagesApi[sysIdx()] = {
       role: "system",
       content: systemPrompt + TOOL_INSTRUCTIONS,

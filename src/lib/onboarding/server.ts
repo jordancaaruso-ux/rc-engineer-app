@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getOnboardingState } from "@/lib/appSettings";
 import { getTimingIdentityForUser } from "@/lib/onboarding/timingIdentity";
 import { showWelcomeScreen } from "@/lib/onboarding/visibility";
-import { userHasAnySetup } from "@/lib/setup/setupSheetPrompt";
+import { userHasAnySetup } from "@/lib/setup/getDashboardSetups";
 
 /**
  * First-run readiness view — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23).

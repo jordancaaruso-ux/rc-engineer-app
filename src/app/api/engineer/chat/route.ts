@@ -8,12 +8,7 @@ import {
   buildMergeContextWithFocusedPair,
 } from "@/lib/engineerPhase5/engineerChatPipeline";
 import { generateEngineerChatReplyWithTools } from "@/lib/engineerPhase5/openaiEngineer";
-import { parseEngineerChatModeHint } from "@/lib/engineerPhase5/engineerChatMode";
 import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
-import {
-  tryAnswerComparisonQuery,
-  tryAnswerPlanningQuery,
-} from "@/lib/engineerPhase5/reasoningSpine/deterministicRoutes";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { persistEngineerChatExchange } from "@/lib/engineerFeedback/persistExchange";
@@ -55,6 +50,7 @@ type ChatRequestBody = {
   paceVsFieldRunDigestSubset?: unknown;
   stream?: unknown;
   threadId?: unknown;
+  /** Ignored — the quick/normal/deep mode system is retired (2026-07-29). Old clients may still send it. */
   mode?: unknown;
 };
 
@@ -140,9 +136,6 @@ export async function POST(request: Request) {
 
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
-    // `mode` is now a caller hint (dashboard "today" card), not a driver preference —
-    // null means the pipeline infers the situation from the run log.
-    const chatModeHint = parseEngineerChatModeHint(body?.mode);
     const useStream = body?.stream === true;
     const timeZone =
       typeof body?.timeZone === "string" && body.timeZone.trim() ? body.timeZone.trim() : "UTC";
@@ -200,104 +193,15 @@ export async function POST(request: Request) {
       });
     }
 
-    const comparisonAnswer = await tryAnswerComparisonQuery({
-      userId: user.id,
-      message: lastUserMsg,
-      timeZone,
-    });
-    if (comparisonAnswer) {
-      const feedback = await maybePersistEngineerReply({
-        userId: user.id,
-        userEmail: user.email,
-        body,
-        messages,
-        reply: comparisonAnswer.reply,
-        contextJson: null,
-        resolvedFocus: null,
-        runId,
-        compareRunId,
-        source: comparisonAnswer.source,
-      });
-      const payload = {
-        reply: comparisonAnswer.reply,
-        contextJson: null,
-        resolvedFocus: null,
-        source: comparisonAnswer.source,
-        feedback,
-      };
-      if (useStream) {
-        const encoder = new TextEncoder();
-        const stream = new ReadableStream({
-          start(controller) {
-            const send = (event: string, data: unknown) => {
-              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-            };
-            send("status", { phase: "done", source: comparisonAnswer.source });
-            send("done", payload);
-            controller.close();
-          },
-        });
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "text/event-stream; charset=utf-8",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-          },
-        });
-      }
-      return NextResponse.json(payload);
-    }
+    // Tire-comparison and planning questions used to short-circuit here to canned
+    // markdown reports with no LLM — "going to <track>" was enough to route a driver
+    // away from the Engineer entirely. Removed 2026-07-29 (Phase 2): those questions now
+    // get the real Engineer with full context; the same data still reaches it via
+    // conditionalSetupEmpirical and the compare_tires / tire_history_at_track tools.
+    // Lap history above stays deterministic — it is genuinely a database read.
 
-    const planningAnswer = await tryAnswerPlanningQuery({
-      userId: user.id,
-      message: lastUserMsg,
-      timeZone,
-    });
-    if (planningAnswer) {
-      const feedback = await maybePersistEngineerReply({
-        userId: user.id,
-        userEmail: user.email,
-        body,
-        messages,
-        reply: planningAnswer.reply,
-        contextJson: null,
-        resolvedFocus: null,
-        runId,
-        compareRunId,
-        source: planningAnswer.source,
-      });
-      const payload = {
-        reply: planningAnswer.reply,
-        contextJson: null,
-        resolvedFocus: null,
-        source: planningAnswer.source,
-        feedback,
-      };
-      if (useStream) {
-        const encoder = new TextEncoder();
-        const stream = new ReadableStream({
-          start(controller) {
-            const send = (event: string, data: unknown) => {
-              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-            };
-            send("status", { phase: "done", source: planningAnswer.source });
-            send("done", payload);
-            controller.close();
-          },
-        });
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "text/event-stream; charset=utf-8",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-          },
-        });
-      }
-      return NextResponse.json(payload);
-    }
-
-    // Budget check sits AFTER the deterministic routes above — those answer from the DB and cost
-    // nothing, so they must never burn a user's AI allowance.
+    // Budget check sits AFTER the deterministic route above — it answers from the DB and
+    // costs nothing, so it must never burn a user's AI allowance.
     const budget = await checkAiBudget({
       userId: user.id,
       userEmail: user.email,
@@ -341,14 +245,13 @@ export async function POST(request: Request) {
               messages,
               runId,
               compareRunId,
-              modeHint: chatModeHint,
               timeZone,
             });
             if ("error" in built) {
               send("error", { message: built.error ?? "Run not found" });
               return;
             }
-            const { contextJson, baseForMerge, lastUser, contextTier, mode } = built;
+            const { contextJson, baseForMerge, lastUser, contextTier } = built;
             const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
               userId: user.id,
               baseForMerge,
@@ -362,7 +265,6 @@ export async function POST(request: Request) {
               userId: user.id,
               mergeContextWithFocusedPair,
               contextTier,
-              mode,
               timeZone,
               onToken: (t) => send("token", { t }),
             });
@@ -414,13 +316,12 @@ export async function POST(request: Request) {
       messages,
       runId,
       compareRunId,
-      modeHint: chatModeHint,
       timeZone,
     });
     if ("error" in built) {
       return jsonError(404, built.error ?? "Run not found");
     }
-    const { contextJson, baseForMerge, lastUser, contextTier, mode } = built;
+    const { contextJson, baseForMerge, lastUser, contextTier } = built;
     const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
       userId: user.id,
       baseForMerge,
@@ -434,7 +335,6 @@ export async function POST(request: Request) {
       userId: user.id,
       mergeContextWithFocusedPair,
       contextTier,
-      mode,
       timeZone,
     });
 
