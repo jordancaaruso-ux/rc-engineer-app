@@ -62,6 +62,9 @@ const ANALYSIS_PREFIXES = [
   "/setup/comparison",
   "/videos/analysis",
   "/runs/history",
+  // Run view (`/runs/<id>`) lights Analysis. Longest-prefix scoring keeps `/runs/new` and
+  // `/runs/<id>/edit` on the Add-run tab (addRunMatchScore returns the full path length).
+  "/runs",
   "/analysis",
 ] as const;
 

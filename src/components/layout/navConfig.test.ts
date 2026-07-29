@@ -31,6 +31,8 @@ test("resolveActiveNavId still maps the core routes", () => {
   assert.equal(resolveActiveNavId("/runs/abc/edit"), "add-run");
   assert.equal(resolveActiveNavId("/analysis"), "analysis");
   assert.equal(resolveActiveNavId("/runs/history"), "analysis");
+  // The run view (`/runs/<id>`) is a viewing surface — Analysis, not Add-run.
+  assert.equal(resolveActiveNavId("/runs/abc"), "analysis");
   assert.equal(resolveActiveNavId("/engineer"), "engineer");
   assert.equal(resolveActiveNavId("/cars"), "assets");
 });
