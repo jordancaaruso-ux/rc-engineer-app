@@ -27,6 +27,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       updatedAt: true,
       primaryRunId: true,
       compareRunId: true,
+      focusAnchorJson: true,
       messages: {
         orderBy: { createdAt: "asc" },
         take: MAX_MESSAGES,
@@ -49,6 +50,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       updatedAt: thread.updatedAt.toISOString(),
       primaryRunId: thread.primaryRunId,
       compareRunId: thread.compareRunId,
+      focusAnchor: thread.focusAnchorJson ?? null,
     },
     messages: thread.messages.map((m) => {
       const role = m.role === "assistant" ? ("assistant" as const) : ("user" as const);

@@ -14,6 +14,8 @@ import { checkAiBudget, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { persistEngineerChatExchange } from "@/lib/engineerFeedback/persistExchange";
 import type { EngineerMessageContextSnapshot } from "@/lib/engineerFeedback/types";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
+import { parseChatAnchor, type EngineerChatAnchor } from "@/lib/engineerPhase5/engineerAnchor";
+import type { EngineerPinnedAnchorForModel } from "@/lib/engineerPhase5/openaiEngineer";
 
 const MAX_MESSAGE_CHARS = 4096;
 
@@ -41,6 +43,8 @@ type ChatRequestBody = {
   messages?: Array<{ role?: unknown; content?: unknown }>;
   runId?: unknown;
   compareRunId?: unknown;
+  /** Explicit anchor (EngineerChatAnchor). A pinned one is a hard subject; wins over runId/compareRunId. */
+  anchor?: unknown;
   includePatternDigest?: boolean;
   patternDigest?: unknown;
   includeRunCatalog?: boolean;
@@ -59,6 +63,19 @@ type EngineerChatFeedbackPayload = {
   ratingContext: EngineerMessageContextSnapshot;
 };
 
+function pinnedAnchorForModel(
+  anchor: EngineerChatAnchor | null,
+  anchorLabel: string | null
+): EngineerPinnedAnchorForModel | null {
+  if (!anchor?.pinned) return null;
+  return {
+    kind: anchor.kind,
+    label: anchorLabel,
+    primaryRunId: anchor.kind === "run" ? anchor.id : null,
+    compareRunId: anchor.kind === "run" ? anchor.compareRunId : null,
+  };
+}
+
 async function maybePersistEngineerReply(params: {
   userId: string;
   body: ChatRequestBody | null;
@@ -69,6 +86,8 @@ async function maybePersistEngineerReply(params: {
   runId: string;
   compareRunId: string;
   source?: string;
+  anchor?: EngineerChatAnchor | null;
+  anchorLabel?: string | null;
 }): Promise<EngineerChatFeedbackPayload | null> {
   const userQuestion = [...params.messages].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!userQuestion.trim() || !params.reply.trim()) return null;
@@ -84,6 +103,8 @@ async function maybePersistEngineerReply(params: {
       runId: params.runId,
       compareRunId: params.compareRunId,
       source: params.source,
+      anchor: params.anchor ?? null,
+      anchorLabel: params.anchorLabel ?? null,
     });
     // Gold-set auto-capture disconnected 2026-07-30 (founder call): the founder reviews
     // answers directly via in-app ratings + notes for now. The candidate lib, admin API
@@ -129,17 +150,22 @@ export async function POST(request: Request) {
 
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
+    const anchor = parseChatAnchor(body?.anchor);
     const useStream = body?.stream === true;
     const timeZone =
       typeof body?.timeZone === "string" && body.timeZone.trim() ? body.timeZone.trim() : "UTC";
 
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-    const lapHistoryAnswer = await tryAnswerLapHistoryQuery({
-      userId: user.id,
-      message: lastUserMsg,
-      messages,
-      timeZone,
-    });
+    // A pinned anchor skips the deterministic lap-history path entirely: that path knows
+    // nothing about anchors, and "these laps" must mean the pinned subject, not a track query.
+    const lapHistoryAnswer = anchor?.pinned
+      ? null
+      : await tryAnswerLapHistoryQuery({
+          userId: user.id,
+          message: lastUserMsg,
+          messages,
+          timeZone,
+        });
     if (lapHistoryAnswer) {
       const feedback = await maybePersistEngineerReply({
         userId: user.id,
@@ -151,6 +177,7 @@ export async function POST(request: Request) {
         runId,
         compareRunId,
         source: "lap_history",
+        anchor,
       });
       if (useStream) {
         const encoder = new TextEncoder();
@@ -250,6 +277,7 @@ export async function POST(request: Request) {
               messages,
               runId,
               compareRunId,
+              anchor,
               timeZone,
               onStage: (phase) => send("status", { phase }),
             });
@@ -257,7 +285,7 @@ export async function POST(request: Request) {
               send("error", { message: built.error ?? "Run not found" });
               return;
             }
-            const { contextJson, baseForMerge, lastUser, contextTier } = built;
+            const { contextJson, baseForMerge, lastUser, contextTier, anchorLabel } = built;
             const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
               userId: user.id,
               baseForMerge,
@@ -272,6 +300,7 @@ export async function POST(request: Request) {
               mergeContextWithFocusedPair,
               contextTier,
               timeZone,
+              pinnedAnchor: pinnedAnchorForModel(anchor, anchorLabel),
               onStatus: (phase) => send("status", { phase }),
               onToken: (t) => send("token", { t }),
             });
@@ -293,10 +322,13 @@ export async function POST(request: Request) {
               runId,
               compareRunId,
               source: "llm",
+              anchor,
+              anchorLabel,
             });
             send("done", {
               reply: out.reply,
               resolvedFocus: out.resolvedFocus,
+              anchor: anchor ? { ...anchor, label: anchorLabel } : null,
               feedback,
             });
           } catch (err) {
@@ -325,12 +357,13 @@ export async function POST(request: Request) {
       messages,
       runId,
       compareRunId,
+      anchor,
       timeZone,
     });
     if ("error" in built) {
       return jsonError(404, built.error ?? "Run not found");
     }
-    const { contextJson, baseForMerge, lastUser, contextTier } = built;
+    const { contextJson, baseForMerge, lastUser, contextTier, anchorLabel } = built;
     const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
       userId: user.id,
       baseForMerge,
@@ -345,6 +378,7 @@ export async function POST(request: Request) {
       mergeContextWithFocusedPair,
       contextTier,
       timeZone,
+      pinnedAnchor: pinnedAnchorForModel(anchor, anchorLabel),
     });
 
     await recordAiUsage({
@@ -366,12 +400,15 @@ export async function POST(request: Request) {
       runId,
       compareRunId,
       source: "llm",
+      anchor,
+      anchorLabel,
     });
 
     return NextResponse.json({
       contextJson: out.contextJson,
       reply: out.reply,
       resolvedFocus: out.resolvedFocus,
+      anchor: anchor ? { ...anchor, label: anchorLabel } : null,
       feedback,
     });
   } catch (err) {

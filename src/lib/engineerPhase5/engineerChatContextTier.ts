@@ -39,7 +39,13 @@ export function engineerChatContextTier(input: {
   lastUserMessage: string | undefined;
   runId: string;
   compareRunId: string;
+  /**
+   * A user-pinned anchor always takes the full path — a pinned setup or event carries no
+   * run id, and the lookup prompt knows nothing about anchors.
+   */
+  anchorPinned?: boolean;
 }): EngineerChatContextTier {
+  if (input.anchorPinned) return "full";
   if (input.runId.trim() || input.compareRunId.trim()) return "full";
   return engineerChatIsLapHistoryQuestion(input.lastUserMessage) ? "lookup" : "full";
 }
@@ -52,6 +58,7 @@ export function engineerChatNeedsDeepContext(input: {
   lastUserMessage: string | undefined;
   runId: string;
   compareRunId: string;
+  anchorPinned?: boolean;
 }): boolean {
   return engineerChatContextTier(input) === "full";
 }

@@ -66,4 +66,29 @@ test("setup and handling vocabulary is full tier (as everything is)", () => {
   assert.equal(deep("the rear feels loose on exit"), true);
 });
 
+test("a pinned anchor forces full tier even for a lap-history question", () => {
+  // "best lap at keilor" alone is the allow-listed lookup shape…
+  assert.equal(tier("what was my best lap at keilor?"), "lookup");
+  // …but a pinned setup/event anchor carries no run id, and the lookup prompt knows
+  // nothing about anchors — the pin must win.
+  assert.equal(
+    engineerChatContextTier({
+      lastUserMessage: "what was my best lap at keilor?",
+      runId: "",
+      compareRunId: "",
+      anchorPinned: true,
+    }),
+    "full"
+  );
+  assert.equal(
+    engineerChatNeedsDeepContext({
+      lastUserMessage: "what was my best lap at keilor?",
+      runId: "",
+      compareRunId: "",
+      anchorPinned: true,
+    }),
+    true
+  );
+});
+
 console.log("engineerChatContextTier.test.ts OK");

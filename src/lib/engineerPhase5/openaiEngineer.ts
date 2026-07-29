@@ -222,6 +222,10 @@ When resolvedRunScope.preferOverDefaultPair is true, treat "defaultDashboardCont
 **Meeting confirmation:** When resolvedRunScope.ambiguousMeetingScope is true (track/event name filter without explicit dates, and results span multiple calendar days or multiple event names), **start by asking one short clarifying question**: confirm which date range or which event they mean (cite a few run dates from the list). Do **not** assert "best changes across the meeting" until the user confirms—or use search_runs / apply_engineer_focus on a confirmed subset.
 **Whole-meeting competitor pace:** When resolvedRunScope.competitionRelativeRanking is non-null, gaps are computed **for runs in scope**. Each **rows[]** entry includes legacy gaps vs the session-best competitor (**gapBestToSessionBestSeconds**, **gapAvgTop5ToSessionBestAvg5Seconds**, **gapAvgTop10ToSessionBestAvg10Seconds**) and, when timing aggregates exist, **gapAvgTop10VsFieldMeanSeconds** / **gapAvgTop5VsFieldMeanSeconds** / **gapBestVsFieldMeanSeconds** (your time minus the **session field mean** for that metric; positive ⇒ slower than average). For **ranking runs in that list**, prefer **avg top 10 vs field mean** as the sort key (session context). Separately, on **engineerSummary** / **focusedRunPair**, the app’s **primary “faster/slower for you” read** is **lap deltas vs your reference run** in **lapOutcome** (avg top 10 → avg top 5 → best when meaningful)—treat field-mean gaps as **session strength** context, not the only pairwise story. Read **resolvedRunScope.competitionRelativeRanking.note**. Do **not** invent meeting-wide gaps absent this block.
 
+ANCHORED SAVED SETUP ("anchoredSavedSetup"): When present, the driver attached a **saved (library) setup** — it is the subject (or, when "focusedRunPair" is also present, the "would this sheet have helped?" comparison target). **values** is the full resolved sheet. **setupVsSpread** positions each parameter against the community band (same pooling caveats as richEngineerContext.setupVsSpread). **runsBasedOnIt** lists this driver's runs whose sheets were derived from this setup, with outcomes and **changedKeyCountVsThisSetup** (how far each run's sheet had drifted when it ran) — treat them as **this-driver evidence** of how the setup actually behaved, weighted by drift. **vsAnchoredRunDiff** (run+setup combo only) lists changed rows with **thisSetup** = the saved sheet and **anchoredRun** = the pinned run's sheet — read change direction as anchoredRun → thisSetup and never swap the columns. When "anchoredSavedSetup" is null this section does not apply.
+
+ANCHORED EVENT DIGEST ("anchoredEventDigest"): When present, the driver attached a **race meeting** — answer meeting-wide from this digest, not from the single latest run. **yourRuns** is chronological (one compact line per run: session, car, laps, best, avg top 5, tire, carRating, and **setupChangeSummary** = keys changed vs the previous run on the same car). **importedFieldStats** gives top-line session standings where timing was imported (**gapBestVsFieldMeanSeconds**: negative = faster than the session average). Deliberately compact — use search_runs or ask the driver to narrow to a run for per-run depth; when **truncated** is true say more runs existed than listed, and read **note** when present. When "anchoredEventDigest" is null this section does not apply.
+
 PATTERN DIGEST (opt-in only): If "patternDigest" is **absent** or null, normal chat is **not** in "trend series" mode—do not imply you have a chronological multi-session setup series. If "patternDigest" **is** present, it is a chronological series for one car (oldest→newest) with lap summaries and setup keys changed vs the previous run—use it for trend / "what changed across these sessions." For pairwise lap+setup, prefer "focusedRunPair" when available.
 
 PACE_VS_FIELD_RUN_DIGEST (opt-in only): If "paceVsFieldRunDigest" is **absent** or null, you do **not** have a pre-built account table of avg top 10 vs session field mean across runs. When **present**, it lists runs (newest scan first capped by the server) where **avg top 10 vs the arithmetic mean** across entrants in the **linked** imported timing session was **meaningful** (enough laps on your row). Each row includes **gapUserMinusFieldMeanSeconds** (**negative** = faster than that session average), **rankInField**, **sessionDriverCount**, and labels. **rows** are sorted **best vs field first** (most negative gap first). Read **scope** (account vs car), **omittedAfterCap**, and **truncatedScan** before summarizing—say when more runs existed than listed. Do **not** invent field gaps for runs not in **rows**. For follow-up "which setup correlated with best vs field", use **runId** from the digest and hedge (correlation not proof) unless the user opened setup for those runs in other context.
@@ -372,6 +376,32 @@ You have tools to find runs and focus the chat on specific runs:
 - apply_engineer_focus: after you pick run ids from search_runs (or catalog), call this so the next context includes full lap/setup compare and richEngineerContext re-anchors to the primary run. **To only re-anchor** spread/KB to a session they named (no pairwise compare), pass compare_run_id null. Rules: primary_run_id MUST always be the user's own run id (owner_scope mine). compare_run_id can be the user's or a peer's run id when you share a team (same track as primary for non-owner compare runs). If the user only asks about someone else's run, search with owner_scope teammate and answer from the search results; to compare, pick a primary run of the user on the same track when possible, then apply focus.
 
 Always use real run ids returned by search_runs or the catalog—never guess ids.${SPINE_TOOL_INSTRUCTIONS}`;
+
+/** User-pinned subject passed down from the chat route (hard subject, free evidence). */
+export type EngineerPinnedAnchorForModel = {
+  kind: "run" | "setup" | "event";
+  label: string | null;
+  primaryRunId: string | null;
+  compareRunId: string | null;
+};
+
+/**
+ * Tool instructions, conditioned on a user pin. The pin block lives here — in the
+ * per-turn-variable system message — never ahead of the byte-stable full-KB prefix,
+ * so prompt caching is unaffected.
+ */
+function toolInstructionsFor(pinned: EngineerPinnedAnchorForModel | null): string {
+  if (!pinned) return TOOL_INSTRUCTIONS;
+  const subject = pinned.label
+    ? `${pinned.kind} "${pinned.label}"`
+    : `the pinned ${pinned.kind} (see pinnedFocus in the context JSON)`;
+  return (
+    TOOL_INSTRUCTIONS +
+    `
+
+PINNED FOCUS — the driver has pinned this conversation to ${subject}. That is the subject of every answer; never change subject away from it. apply_engineer_focus may not move the primary off the pinned run${pinned.primaryRunId ? "" : " (there is no pinned run — do not call it at all)"}; search_runs and the other tools stay available to gather evidence and comparisons, but bring every answer back to the pinned subject. Do not announce or restate the pin — the UI already shows it; just answer about it.`
+  );
+}
 
 const LEGACY_TOOLS = [
   {
@@ -763,6 +793,8 @@ export async function generateEngineerChatReplyWithTools(params: {
   contextTier?: EngineerChatContextTier;
   /** IANA zone for human time labels in tool results (rc_tz / device zone). */
   timeZone?: string | null;
+  /** User-pinned subject: hard subject, free evidence — apply_engineer_focus can't move it. */
+  pinnedAnchor?: EngineerPinnedAnchorForModel | null;
 }): Promise<{
   reply: string;
   contextJson: unknown;
@@ -831,11 +863,14 @@ export async function generateEngineerChatReplyWithTools(params: {
     messagesApi[ctxIdx()] = { role: "system", content: contextSystemContent() };
   };
 
+  const pinnedAnchor = params.pinnedAnchor ?? null;
+  const toolInstructions = toolInstructionsFor(pinnedAnchor);
+
   const messagesApi: ChatCompletionMessage[] = [
     ...(fullKb ? [{ role: "system" as const, content: fullKb.content }] : []),
     {
       role: "system",
-      content: systemPrompt + TOOL_INSTRUCTIONS,
+      content: systemPrompt + toolInstructions,
     },
     {
       role: "system",
@@ -855,7 +890,7 @@ export async function generateEngineerChatReplyWithTools(params: {
     systemPrompt = chatSystemPromptForContext(tier, workingContext);
     messagesApi[sysIdx()] = {
       role: "system",
-      content: systemPrompt + TOOL_INSTRUCTIONS,
+      content: systemPrompt + toolInstructions,
     };
     messagesApi[ctxIdx()] = {
       role: "system",
@@ -932,6 +967,18 @@ export async function generateEngineerChatReplyWithTools(params: {
             typeof argsObj.compare_run_id === "string" && argsObj.compare_run_id.trim()
               ? argsObj.compare_run_id.trim()
               : null;
+          // Hard subject: a user pin owns the primary slot. Adding/changing a compare run
+          // against the pinned primary is evidence-gathering and stays allowed.
+          if (pinnedAnchor && primary !== pinnedAnchor.primaryRunId) {
+            messagesApi.push({
+              role: "tool",
+              tool_call_id: tc.id,
+              content: JSON.stringify({
+                error: `Focus is user-pinned${pinnedAnchor.label ? ` to ${pinnedAnchor.label}` : ""} — do not change subject; answer about the pinned ${pinnedAnchor.kind} instead (search_runs remains available for evidence).`,
+              }),
+            });
+            continue;
+          }
           params.onStatus?.("tool:apply_engineer_focus");
           const applied = await applyEngineerFocusTool(params.userId, primary, compare, params.timeZone);
           if (!applied.ok) {

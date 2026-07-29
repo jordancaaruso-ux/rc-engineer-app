@@ -97,7 +97,7 @@ export default async function CarSetupViewPage(props: {
   const document = setup.sourceDocuments[0] ?? null;
 
   const title = setup.isLibrary
-    ? (setup.name ?? "Untitled baseline")
+    ? (setup.name ?? "Untitled setup")
     : run
       ? `${run.event?.name ? `${run.event.name} · ` : ""}${formatRunSessionDisplay(run, {
           fallback: "Testing run",
@@ -131,6 +131,11 @@ export default async function CarSetupViewPage(props: {
           ) : (
             <SaveAsBaselineButton carId={car.id} setupId={setup.id} />
           )}
+          {setup.isLibrary ? (
+            <ButtonLink href={`/engineer?pin=setup:${setup.id}`} variant="outline">
+              Ask the Engineer
+            </ButtonLink>
+          ) : null}
           <a
             href={`/api/setup-snapshots/${encodeURIComponent(setup.id)}/setup-pdf`}
             target="_blank"

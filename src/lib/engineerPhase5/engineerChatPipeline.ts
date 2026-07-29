@@ -25,6 +25,19 @@ import {
   parsePaceVsFieldRunDigestPayload,
   parsePaceVsFieldRunDigestSubsetPayload,
 } from "@/lib/engineerPhase5/paceVsFieldRunDigestParse";
+import {
+  anchorToRunFocus,
+  resolveAnchorRunForRichContext,
+  type EngineerChatAnchor,
+} from "@/lib/engineerPhase5/engineerAnchor";
+import {
+  buildSavedSetupAnchorContext,
+  resolveSetupAnchorDerivedRunId,
+} from "@/lib/engineerPhase5/savedSetupAnchorContext";
+import {
+  buildEventAnchorDigest,
+  resolveEventAnchorDerivedRunId,
+} from "@/lib/engineerPhase5/eventAnchorDigest";
 import { perfSpan } from "@/lib/perfLog";
 
 export type EngineerChatPipelineBody = {
@@ -65,6 +78,8 @@ export type BuiltEngineerChatContext =
       lastUser: EngineerChatMessage | undefined;
       needsDeep: boolean;
       contextTier: "lookup" | "full";
+      /** Human label for the effective anchor (chip / persistence); null when unresolvable. */
+      anchorLabel: string | null;
     };
 
 export async function buildEngineerChatContext(params: {
@@ -73,6 +88,8 @@ export async function buildEngineerChatContext(params: {
   messages: EngineerChatMessage[];
   runId: string;
   compareRunId: string;
+  /** Explicit anchor from the chat request; wins over runId/compareRunId when present. */
+  anchor?: EngineerChatAnchor | null;
   /** IANA zone for human time labels in the context (rc_tz / device zone). */
   timeZone?: string | null;
   /**
@@ -83,26 +100,52 @@ export async function buildEngineerChatContext(params: {
   onStage?: (phase: string) => void;
 }): Promise<BuiltEngineerChatContext> {
   return perfSpan("buildEngineerChatContext", async () => {
-    const { userId, body, messages, runId, compareRunId, timeZone, onStage } = params;
+    const { userId, body, messages, timeZone, onStage } = params;
+    const anchor = params.anchor ?? null;
+    const { runId, compareRunId } = anchorToRunFocus(anchor, {
+      runId: params.runId,
+      compareRunId: params.compareRunId,
+    });
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const needsDeep = engineerChatNeedsDeepContext({
       lastUserMessage: lastUser?.content,
       runId,
       compareRunId,
+      anchorPinned: anchor?.pinned,
     });
     const contextTier = engineerChatContextTier({
       lastUserMessage: lastUser?.content,
       runId,
       compareRunId,
+      anchorPinned: anchor?.pinned,
     });
 
     onStage?.("context_runs");
 
-    const [basePacket, focusedRunPair] = await Promise.all([
+    // A setup reaches the Engineer either as the anchor itself (kind=setup) or riding
+    // along on a run pin ("would this sheet have helped here?" — anchor.setupId).
+    const setupAnchorId = anchor ? (anchor.kind === "setup" ? anchor.id : anchor.setupId) : null;
+
+    const [basePacket, focusedRunPair, anchoredSavedSetup, anchoredEventDigest] = await Promise.all([
       perfSpan("buildEngineerContextPacketV1", () => buildEngineerContextPacketV1(userId, timeZone)),
       runId
         ? perfSpan("buildFocusedRunPairContext", () =>
             buildFocusedRunPairContext(userId, runId, compareRunId || null, timeZone)
+          )
+        : Promise.resolve(null),
+      setupAnchorId
+        ? perfSpan("buildSavedSetupAnchorContext", () =>
+            buildSavedSetupAnchorContext({
+              userId,
+              setupId: setupAnchorId,
+              anchoredRunId: runId || null,
+              timeZone,
+            })
+          )
+        : Promise.resolve(null),
+      anchor?.kind === "event"
+        ? perfSpan("buildEventAnchorDigest", () =>
+            buildEventAnchorDigest({ userId, eventId: anchor.id, timeZone })
           )
         : Promise.resolve(null),
     ]);
@@ -110,8 +153,64 @@ export async function buildEngineerChatContext(params: {
     if (runId && !focusedRunPair) {
       return { error: "Run not found" };
     }
+    if (anchor?.kind === "setup" && !anchoredSavedSetup) {
+      return { error: "Setup not found" };
+    }
+    if (anchor?.kind === "event" && !anchoredEventDigest) {
+      return { error: "Event not found" };
+    }
 
-    const anchorForRichContext = runId || basePacket.latestRun?.id || null;
+    // A setup-only pin anchors rich context to its most related run (latest run based on
+    // it, else latest on its car); an event pin anchors to the latest own run at the meeting.
+    const anchorDerivedRunId =
+      anchor?.kind === "setup" && anchoredSavedSetup
+        ? await resolveSetupAnchorDerivedRunId({
+            userId,
+            setupId: anchoredSavedSetup.setupId,
+            carId: anchoredSavedSetup.carId,
+          })
+        : anchor?.kind === "event"
+          ? await resolveEventAnchorDerivedRunId({ userId, eventId: anchor.id })
+          : null;
+
+    const anchorForRichContext = resolveAnchorRunForRichContext({
+      anchor,
+      focusedRunId: runId,
+      anchorDerivedRunId,
+      latestRunId: basePacket.latestRun?.id ?? null,
+    });
+
+    const anchorLabel =
+      anchor?.kind === "event" && anchoredEventDigest
+        ? [anchoredEventDigest.name, anchoredEventDigest.trackName].filter(Boolean).join(" · ")
+        : anchor?.kind === "setup" && anchoredSavedSetup
+        ? [anchoredSavedSetup.name ?? "Saved setup", anchoredSavedSetup.carName]
+            .filter(Boolean)
+            .join(" · ")
+        : focusedRunPair
+          ? [
+              focusedRunPair.primary.whenLabel,
+              focusedRunPair.primary.sessionTypeLabel,
+              focusedRunPair.primary.carName,
+            ]
+              .filter(Boolean)
+              .join(" · ") || null
+          : null;
+
+    /**
+     * Names the user-pinned subject inside the context itself; survives
+     * apply_engineer_focus merges via baseForMerge.
+     */
+    const pinnedFocus = anchor?.pinned
+      ? {
+          kind: anchor.kind,
+          id: anchor.id,
+          compareRunId: anchor.compareRunId,
+          setupId: anchor.setupId,
+          label: anchorLabel,
+          pinned: true as const,
+        }
+      : null;
 
     if (lastUser && typeof lastUser.content === "string") onStage?.("context_kb");
 
@@ -210,6 +309,9 @@ export async function buildEngineerChatContext(params: {
 
     const contextJson: Record<string, unknown> = {
       contextTier,
+      pinnedFocus,
+      anchoredSavedSetup,
+      anchoredEventDigest,
       defaultDashboardContext: basePacket,
       engineerSummary,
       richEngineerContext,
@@ -233,6 +335,9 @@ export async function buildEngineerChatContext(params: {
 
     const baseForMerge: Record<string, unknown> = {
       contextTier,
+      pinnedFocus,
+      anchoredSavedSetup,
+      anchoredEventDigest,
       defaultDashboardContext: basePacket,
       resolvedRunScope: null,
       patternDigest,
@@ -255,6 +360,7 @@ export async function buildEngineerChatContext(params: {
       lastUser,
       needsDeep,
       contextTier,
+      anchorLabel,
     };
   });
 }

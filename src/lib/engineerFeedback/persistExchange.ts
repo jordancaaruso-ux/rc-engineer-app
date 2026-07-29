@@ -3,12 +3,18 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { buildEngineerResponseMetadata } from "@/lib/engineerFeedback/extractResponseMetadata";
 import type { EngineerMessageContextSnapshot, PersistedChatExchange } from "@/lib/engineerFeedback/types";
+import {
+  resolveThreadFocusForPersist,
+  type EngineerChatAnchor,
+  type EngineerThreadFocusAnchorV1,
+} from "@/lib/engineerPhase5/engineerAnchor";
 
 async function getOrCreateThread(params: {
   userId: string;
   threadId: string | null;
   primaryRunId: string | null;
   compareRunId: string | null;
+  focusAnchorJson: EngineerThreadFocusAnchorV1 | null;
 }): Promise<string> {
   if (params.threadId) {
     const existing = await prisma.engineerChatThread.findFirst({
@@ -21,6 +27,7 @@ async function getOrCreateThread(params: {
         data: {
           primaryRunId: params.primaryRunId,
           compareRunId: params.compareRunId,
+          focusAnchorJson: params.focusAnchorJson ?? undefined,
         },
       });
       return existing.id;
@@ -31,11 +38,13 @@ async function getOrCreateThread(params: {
       userId: params.userId,
       primaryRunId: params.primaryRunId,
       compareRunId: params.compareRunId,
+      focusAnchorJson: params.focusAnchorJson ?? undefined,
     },
     select: { id: true },
   });
   return created.id;
 }
+
 
 export async function persistEngineerChatExchange(params: {
   userId: string;
@@ -47,16 +56,23 @@ export async function persistEngineerChatExchange(params: {
   runId?: string;
   compareRunId?: string;
   source?: string;
+  /** Explicit anchor from the chat request; a pinned one beats resolvedFocus. */
+  anchor?: EngineerChatAnchor | null;
+  anchorLabel?: string | null;
 }): Promise<PersistedChatExchange> {
-  const ids = params.resolvedFocus ?? {
-    runId: params.runId?.trim() || null,
-    compareRunId: params.compareRunId?.trim() || null,
-  };
+  const focus = resolveThreadFocusForPersist({
+    anchor: params.anchor ?? null,
+    anchorLabel: params.anchorLabel,
+    resolvedFocus: params.resolvedFocus,
+    runId: params.runId,
+    compareRunId: params.compareRunId,
+  });
   const threadId = await getOrCreateThread({
     userId: params.userId,
     threadId: params.threadId,
-    primaryRunId: ids.runId,
-    compareRunId: ids.compareRunId,
+    primaryRunId: focus.primaryRunId,
+    compareRunId: focus.compareRunId,
+    focusAnchorJson: focus.focusAnchorJson,
   });
 
   const ratingContext = buildEngineerResponseMetadata({

@@ -247,6 +247,27 @@ const SLIM_PASSES: SlimPass[] = [
         };
       }
     }
+    // Anchor blocks are unknown to the older passes — cap their bulky arrays here or a
+    // context-too-large loop can never recover (slim passes skip keys they don't know).
+    if (isRecord(ctx.anchoredSavedSetup) && isRecord(ctx.anchoredSavedSetup.setupVsSpread)) {
+      const rows = ctx.anchoredSavedSetup.setupVsSpread.rows;
+      if (Array.isArray(rows) && rows.length > 22) {
+        ctx.anchoredSavedSetup = {
+          ...ctx.anchoredSavedSetup,
+          setupVsSpread: {
+            ...ctx.anchoredSavedSetup.setupVsSpread,
+            rows: rows.slice(0, 22),
+            truncated: true,
+          },
+        };
+      }
+    }
+    if (isRecord(ctx.anchoredEventDigest) && Array.isArray(ctx.anchoredEventDigest.yourRuns)) {
+      const runs = ctx.anchoredEventDigest.yourRuns;
+      if (runs.length > 12) {
+        ctx.anchoredEventDigest = { ...ctx.anchoredEventDigest, yourRuns: runs.slice(0, 12), truncated: true };
+      }
+    }
   },
   // Caveat-only memory goes before pairwise evidence: setupOutcomeMemory may never drive
   // or change a suggestion (prompt contract), while engineerSummary / spread rows carry
@@ -278,6 +299,26 @@ const SLIM_PASSES: SlimPass[] = [
                 ctx.richEngineerContext.importedSessionFieldStats.paceVsFieldMeanAnalysis,
             }
           : null,
+      };
+    }
+    // Deep cut for a pinned saved setup: keep identity, combo diff and run outcomes —
+    // the parts a pinned-setup answer cannot do without — drop the full sheet + bands.
+    if (isRecord(ctx.anchoredSavedSetup)) {
+      ctx.anchoredSavedSetup = {
+        ...ctx.anchoredSavedSetup,
+        values: [],
+        setupVsSpread: {
+          note: "Sheet values and spread rows omitted for the token budget — ask a parameter-specific question for detail.",
+          rows: [],
+          truncated: true,
+        },
+      };
+    }
+    if (isRecord(ctx.anchoredEventDigest)) {
+      ctx.anchoredEventDigest = {
+        ...ctx.anchoredEventDigest,
+        importedFieldStats: [],
+        truncated: true,
       };
     }
   },

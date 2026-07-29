@@ -12,15 +12,20 @@ import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 
 /**
  * Client shell for `/runs/[id]` — the same `RunDetailPanel` Sessions rendered, topped by the
- * action strip (founder picks 2026-07-29: instrument strip, fused to the first card, Engineer
- * segment wearing the full Add-run treatment — gradient face, `logrun-glow` aura, `logrun-fx`
- * hotspot, all shared with `LogRunFab`). The setup-sheet and lap-compare modals lived on the
- * Sessions *row*, not in the detail, so the strip is what keeps those affordances on the page.
+ * action strip. The setup-sheet and lap-compare modals lived on the Sessions *row*, not in the
+ * detail, so the strip is what keeps those affordances on the page.
+ *
+ * Split row (founder pick 2026-07-29, replacing the fused 3-segment strip): "Ask the Engineer"
+ * breaks out on the left, sized to its own words — it wears the full Add-run treatment (gradient
+ * face, `logrun-glow` aura, `logrun-fx` hotspot, all shared with `LogRunFab`) and is the one live
+ * control on the screen. Setup + Laptimes stay welded into one inert glass pair on the right, and
+ * the detail card floats free below with all four corners. 12.5px type and a 46px height (above
+ * the 44px touch floor) are what let both utility labels survive at 360px.
  */
 
 const UTILITY_SEGMENT_CLASS =
-  "tap-active flex min-h-12 items-center justify-center gap-2 border-l border-border px-2 " +
-  "text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-white/[0.03] hover:text-foreground";
+  "tap-active flex min-h-[46px] min-w-0 items-center justify-center gap-1.5 px-[11px] " +
+  "text-[12.5px] font-semibold text-muted-foreground transition-colors hover:bg-white/[0.03] hover:text-foreground";
 
 export function RunPageClient({
   run,
@@ -47,45 +52,46 @@ export function RunPageClient({
 
   return (
     <div className="space-y-3">
-      <div>
-        <div
-          role="group"
-          aria-label="Run actions"
-          className={cn(
-            "grid overflow-hidden rounded-t-xl border border-b-0 border-border bg-card",
-            allowRunMutations ? "grid-cols-[1.4fr_1fr_1fr]" : "grid-cols-2"
-          )}
-        >
+      <div className="space-y-2">
+        <div role="group" aria-label="Run actions" className="flex items-stretch justify-between gap-2">
           {allowRunMutations ? (
             <button
               type="button"
-              onClick={() => router.push(`/engineer?runId=${encodeURIComponent(run.id)}`)}
-              className="tap-active logrun-glow relative isolate flex min-h-12 items-center justify-center gap-2 bg-[linear-gradient(180deg,#ffdf3d_0%,#FFD60A_38%)] px-2 text-[13px] font-bold tracking-[-0.01em] text-primary-foreground shadow-[inset_0_1.5px_0_rgba(255,255,255,0.55),inset_0_-1px_0_rgba(0,0,0,0.18)]"
+              onClick={() => router.push(`/engineer?pin=run:${encodeURIComponent(run.id)}`)}
+              className="tap-active logrun-glow relative isolate flex min-h-[46px] shrink-0 items-center justify-center gap-[7px] rounded-xl bg-[linear-gradient(180deg,#ffdf3d_0%,#FFD60A_38%)] px-[13px] text-[12.5px] font-bold tracking-[-0.01em] text-primary-foreground shadow-[inset_0_1.5px_0_rgba(255,255,255,0.55),inset_0_-1px_0_rgba(0,0,0,0.18)]"
               title="Open the Engineer anchored to this run"
             >
               <span className="logrun-fx" aria-hidden />
               <Sparkle className="relative z-[2] h-4 w-4" fill="currentColor" aria-hidden />
-              <span className="relative z-[2]">Ask the Engineer</span>
+              <span className="relative z-[2] whitespace-nowrap">Ask the Engineer</span>
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setSetupOpen(true)}
-            className={cn(UTILITY_SEGMENT_CLASS, !allowRunMutations && "border-l-0")}
-            title="View setup sheet for this run; compare to another run from the modal"
+          {/* Setup + Laptimes read as one object — same glass as the card, single hairline between. */}
+          <div
+            className={cn(
+              "glass-card flex min-w-0 overflow-hidden rounded-xl border",
+              allowRunMutations ? "shrink" : "flex-1"
+            )}
           >
-            <SlidersHorizontal className="h-4 w-4" aria-hidden />
-            Setup
-          </button>
-          <button
-            type="button"
-            onClick={() => setLapsOpen(true)}
-            className={UTILITY_SEGMENT_CLASS}
-            title="Open lap column compare for this run"
-          >
-            <Timer className="h-4 w-4" aria-hidden />
-            Laps
-          </button>
+            <button
+              type="button"
+              onClick={() => setSetupOpen(true)}
+              className={cn(UTILITY_SEGMENT_CLASS, !allowRunMutations && "flex-1")}
+              title="View setup sheet for this run; compare to another run from the modal"
+            >
+              <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
+              Setup
+            </button>
+            <button
+              type="button"
+              onClick={() => setLapsOpen(true)}
+              className={cn(UTILITY_SEGMENT_CLASS, "border-l border-border", !allowRunMutations && "flex-1")}
+              title="Open lap column compare for this run"
+            >
+              <Timer className="h-4 w-4 shrink-0" aria-hidden />
+              Laptimes
+            </button>
+          </div>
         </div>
 
         <RunDetailPanel
@@ -95,7 +101,6 @@ export function RunPageClient({
           displayTimeZone={displayTimeZone}
           allowRunMutations={allowRunMutations}
           onDeleted={() => router.push("/runs/history")}
-          className="rounded-t-none"
         />
       </div>
 

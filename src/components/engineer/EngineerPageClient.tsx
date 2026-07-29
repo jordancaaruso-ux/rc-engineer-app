@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/engineer/EngineerChatPanel";
 import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
-import { PanelSubtitle } from "@/components/ui/panel";
 
 export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?: boolean }) {
   const searchParams = useSearchParams();
@@ -29,9 +28,6 @@ export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?
   return (
     <div className="max-w-4xl mx-auto w-full space-y-3">
       <SurfaceCard variant="panel" overflowHidden={false} contentClassName="p-0">
-        <div className="border-b border-border/80 px-4 py-3 md:px-5">
-          <PanelSubtitle>Uses your setups and recent runs.</PanelSubtitle>
-        </div>
         <EngineerChatPanel
           ratingsEnabled={ratingsEnabled}
           queuedPrompt={queuedPrompt}

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { EventLapSourcesPanel } from "@/components/events/EventLapSourcesPanel";
@@ -81,6 +82,12 @@ export default async function EventDetailPage(props: {
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
+          {runCount > 0 ? (
+            <ButtonLink href={`/engineer?pin=event:${event.id}`} variant="outline">
+              Ask the Engineer about this meeting
+            </ButtonLink>
+          ) : null}
+
           <EventMetaEditor
             eventId={event.id}
             initialName={event.name}

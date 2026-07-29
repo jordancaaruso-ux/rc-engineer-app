@@ -12,6 +12,25 @@ import { cn } from "@/lib/utils";
 
 import { parseChoiceChipsFromReply } from "@/lib/engineerPhase5/engineerChoiceChips";
 
+import {
+  formatAnchorParam,
+  parseAnchorParam,
+  parseThreadFocusAnchor,
+  type EngineerChatAnchor,
+} from "@/lib/engineerPhase5/engineerAnchor";
+
+import {
+  buildEventAnchorCandidate,
+  buildRunAnchorCandidate,
+  buildSetupAnchorCandidate,
+  mergeAndSortCandidates,
+  type AnchorCandidate,
+} from "@/lib/engineerPhase5/anchorCandidates";
+
+import { EngineerAnchorPicker } from "@/components/engineer/EngineerAnchorPicker";
+
+import { EngineerFocusChip } from "@/components/engineer/EngineerFocusChip";
+
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
 
 import { EngineerThinkingIndicator } from "@/components/engineer/EngineerThinkingIndicator";
@@ -107,6 +126,8 @@ async function readSseStream(
 
   resolvedFocus: { runId: string; compareRunId: string | null } | null;
 
+  anchorLabel: string | null;
+
   feedback: EngineerChatFeedback | null;
 
 }> {
@@ -122,6 +143,8 @@ async function readSseStream(
   let reply = "";
 
   let resolvedFocus: { runId: string; compareRunId: string | null } | null = null;
+
+  let anchorLabel: string | null = null;
 
   let feedback: EngineerChatFeedback | null = null;
 
@@ -181,6 +204,10 @@ async function readSseStream(
 
             : null;
 
+        const anchorEcho = data.anchor as { label?: unknown } | null | undefined;
+
+        anchorLabel = typeof anchorEcho?.label === "string" ? anchorEcho.label : null;
+
         if (data.feedback && typeof data.feedback === "object") {
 
           const fb = data.feedback as Record<string, unknown>;
@@ -219,7 +246,7 @@ async function readSseStream(
 
 
 
-  return { reply, resolvedFocus, feedback };
+  return { reply, resolvedFocus, anchorLabel, feedback };
 
 }
 
@@ -284,6 +311,30 @@ export function EngineerChatPanel({
 
   const threadIdFromUrl = searchParams.get("threadId")?.trim() || null;
 
+  // Pinned channel (`?pin=run:<id>` + optional `?pin2=run:<id>` compare). The legacy
+  // runId/compareRunId params stay the Auto channel so every existing deep link keeps
+  // working; a pin wins over them server-side.
+  const pinFromUrl = parseAnchorParam(searchParams.get("pin"));
+
+  const pin2FromUrl = parseAnchorParam(searchParams.get("pin2"));
+
+  // Run + saved setup combo ("would this sheet have helped here?") rides on a run pin.
+  const pinSetupFromUrl = parseAnchorParam(searchParams.get("pinSetup"));
+
+  const pinnedAnchor: EngineerChatAnchor | null = pinFromUrl
+    ? {
+        kind: pinFromUrl.kind,
+        id: pinFromUrl.id,
+        compareRunId:
+          pinFromUrl.kind === "run" && pin2FromUrl?.kind === "run" && pin2FromUrl.id !== pinFromUrl.id
+            ? pin2FromUrl.id
+            : null,
+        setupId:
+          pinFromUrl.kind === "run" && pinSetupFromUrl?.kind === "setup" ? pinSetupFromUrl.id : null,
+        pinned: true,
+      }
+    : null;
+
 
 
   const [chatBusy, setChatBusy] = useState(false);
@@ -309,6 +360,18 @@ export function EngineerChatPanel({
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
   const [historyExpanded, setHistoryExpanded] = useState(false);
+
+  const [candidates, setCandidates] = useState<AnchorCandidate[]>([]);
+
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
+
+  const [candidatesErr, setCandidatesErr] = useState<string | null>(null);
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Chip label for a pinned entity that isn't in the recent-candidates window —
+  // restored threads carry a frozen label, and the server echoes one per reply.
+  const [pinLabelFallback, setPinLabelFallback] = useState<string | null>(null);
 
   // Mode system fully retired 2026-07-29 (one mode): the Engineer answers the same way
   // in every situation, so the old `?mode=quick` URL hint is no longer sent.
@@ -361,6 +424,9 @@ export function EngineerChatPanel({
 
     if (!resolved?.runId) return;
 
+    // A user pin owns the chip — the model's evidence-gathering must not flip it.
+    if (searchParams.get("pin")) return;
+
     const sp = new URLSearchParams(searchParams.toString());
 
     sp.set("runId", resolved.runId);
@@ -372,6 +438,75 @@ export function EngineerChatPanel({
     router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
 
   }
+
+  const refreshCandidates = useCallback(async () => {
+    try {
+      const res = await fetch("/api/engineer/anchor-candidates");
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        runs?: Array<Parameters<typeof buildRunAnchorCandidate>[0]>;
+        setups?: Array<Parameters<typeof buildSetupAnchorCandidate>[0]>;
+        events?: Array<Parameters<typeof buildEventAnchorCandidate>[0]>;
+      };
+      if (!res.ok) throw new Error(data.error ?? `Failed to load runs (${res.status})`);
+      setCandidates(
+        mergeAndSortCandidates([
+          (Array.isArray(data.runs) ? data.runs : []).map(buildRunAnchorCandidate),
+          (Array.isArray(data.setups) ? data.setups : []).map(buildSetupAnchorCandidate),
+          (Array.isArray(data.events) ? data.events : []).map(buildEventAnchorCandidate),
+        ])
+      );
+      setCandidatesErr(null);
+    } catch (e) {
+      setCandidatesErr(e instanceof Error ? e.message : "Could not load recent runs");
+    } finally {
+      setCandidatesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCandidates();
+  }, [refreshCandidates]);
+
+  // Coming back from logging a run should surface the "new run logged — switch?"
+  // affordance without needing to send a message first.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshCandidates();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshCandidates]);
+
+  const candidateById = useCallback(
+    (kind: EngineerChatAnchor["kind"], id: string | null) =>
+      id ? candidates.find((c) => c.kind === kind && c.id === id) ?? null : null,
+    [candidates]
+  );
+
+  /** One URL write for the whole pin state; pinning supersedes the Auto params. */
+  const writePinParams = useCallback(
+    (
+      primary: { kind: EngineerChatAnchor["kind"]; id: string } | null,
+      compareRunId: string | null,
+      setupId: string | null = null
+    ) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      if (primary) {
+        sp.set("pin", formatAnchorParam(primary.kind, primary.id));
+        sp.delete("runId");
+        sp.delete("compareRunId");
+      } else {
+        sp.delete("pin");
+      }
+      if (primary && compareRunId) sp.set("pin2", formatAnchorParam("run", compareRunId));
+      else sp.delete("pin2");
+      if (primary?.kind === "run" && setupId) sp.set("pinSetup", formatAnchorParam("setup", setupId));
+      else sp.delete("pinSetup");
+      router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
 
 
@@ -427,6 +562,16 @@ export function EngineerChatPanel({
 
           error?: string;
 
+          thread?: {
+
+            primaryRunId?: string | null;
+
+            compareRunId?: string | null;
+
+            focusAnchor?: unknown;
+
+          };
+
           messages?: Array<{
 
             id?: string;
@@ -447,7 +592,40 @@ export function EngineerChatPanel({
 
         setThreadId(id);
 
-        syncThreadToUrl(id);
+        // Restore the thread's standing focus with the threadId in ONE url write —
+        // a pinned anchor comes back pinned; a plain run focus comes back as Auto.
+        {
+          const sp = new URLSearchParams(searchParams.toString());
+          sp.set("threadId", id);
+          const restored = parseThreadFocusAnchor(data.thread?.focusAnchor);
+          if (restored?.pinned) {
+            sp.set("pin", formatAnchorParam(restored.kind, restored.id));
+            if (restored.kind === "run" && restored.compareRunId) {
+              sp.set("pin2", formatAnchorParam("run", restored.compareRunId));
+            } else {
+              sp.delete("pin2");
+            }
+            if (restored.kind === "run" && restored.setupId) {
+              sp.set("pinSetup", formatAnchorParam("setup", restored.setupId));
+            } else {
+              sp.delete("pinSetup");
+            }
+            sp.delete("runId");
+            sp.delete("compareRunId");
+            setPinLabelFallback(restored.label);
+          } else {
+            sp.delete("pinSetup");
+            sp.delete("pin");
+            sp.delete("pin2");
+            const primaryRunId = data.thread?.primaryRunId ?? restored?.id ?? null;
+            if (primaryRunId) sp.set("runId", primaryRunId);
+            else sp.delete("runId");
+            const compareRunId = data.thread?.compareRunId ?? null;
+            if (compareRunId) sp.set("compareRunId", compareRunId);
+            else sp.delete("compareRunId");
+          }
+          router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+        }
 
         setMessages(mapped);
 
@@ -465,7 +643,7 @@ export function EngineerChatPanel({
 
     },
 
-    [syncThreadToUrl]
+    [pathname, router, searchParams]
 
   );
 
@@ -485,9 +663,23 @@ export function EngineerChatPanel({
 
     setInput("");
 
-    syncThreadToUrl(null);
+    setPinLabelFallback(null);
 
-  }, [syncThreadToUrl]);
+    setPickerOpen(false);
+
+    // Fresh conversation starts on Auto: latest run — drop the old focus entirely.
+    {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.delete("threadId");
+      sp.delete("pin");
+      sp.delete("pin2");
+      sp.delete("pinSetup");
+      sp.delete("runId");
+      sp.delete("compareRunId");
+      router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+    }
+
+  }, [pathname, router, searchParams]);
 
 
 
@@ -545,6 +737,8 @@ export function EngineerChatPanel({
 
           ...(threadId ? { threadId } : {}),
 
+          ...(pinnedAnchor ? { anchor: pinnedAnchor } : {}),
+
           ...(runIdFromUrl ? { runId: runIdFromUrl } : {}),
 
           ...(compareRunIdFromUrl ? { compareRunId: compareRunIdFromUrl } : {}),
@@ -600,7 +794,7 @@ export function EngineerChatPanel({
 
         };
 
-        const { reply, resolvedFocus, feedback } = await readSseStream(res, {
+        const { reply, resolvedFocus, anchorLabel, feedback } = await readSseStream(res, {
 
           onStatus: (phase) => {
 
@@ -658,6 +852,8 @@ export function EngineerChatPanel({
 
         applyResolvedFocus(resolvedFocus);
 
+        if (anchorLabel) setPinLabelFallback(anchorLabel);
+
         if (feedback?.threadId) {
 
           setThreadId(feedback.threadId);
@@ -712,6 +908,8 @@ export function EngineerChatPanel({
 
         resolvedFocus?: { runId: string; compareRunId: string | null } | null;
 
+        anchor?: { label?: string | null } | null;
+
         feedback?: EngineerChatFeedback | null;
 
       };
@@ -743,6 +941,8 @@ export function EngineerChatPanel({
       }
 
       applyResolvedFocus(data.resolvedFocus ?? null);
+
+      if (typeof data.anchor?.label === "string") setPinLabelFallback(data.anchor.label);
 
       if (data.feedback?.threadId) {
 
@@ -901,6 +1101,74 @@ export function EngineerChatPanel({
   const panelBusy = chatBusy || loadingThread;
 
   const showNewChat = Boolean(threadId || messages.length > 0);
+
+  // ── Focus chip state ─────────────────────────────────────────────────────────
+  const latestRunCandidate = candidates.find((c) => c.kind === "run") ?? null;
+  const pinnedPrimaryCandidate = pinnedAnchor
+    ? candidateById(pinnedAnchor.kind, pinnedAnchor.id)
+    : null;
+  const pinnedCompareCandidate = pinnedAnchor?.compareRunId
+    ? candidateById("run", pinnedAnchor.compareRunId)
+    : null;
+  const pinnedSetupCandidate = pinnedAnchor?.setupId
+    ? candidateById("setup", pinnedAnchor.setupId)
+    : null;
+  const pinnedChip = pinnedAnchor
+    ? {
+        label: [
+          pinnedPrimaryCandidate?.chipLabel ??
+            pinLabelFallback ??
+            ({ run: "Run", setup: "Saved setup", event: "Event" } as const)[pinnedAnchor.kind],
+          pinnedAnchor.setupId ? `+ ${pinnedSetupCandidate?.chipLabel ?? "saved setup"}` : null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        compareLabel: pinnedAnchor.compareRunId
+          ? pinnedCompareCandidate?.chipLabel ?? "earlier run"
+          : null,
+      }
+    : null;
+  const autoFocusCandidate = runIdFromUrl ? candidateById("run", runIdFromUrl) : latestRunCandidate;
+  const autoLabel = pinnedAnchor
+    ? null
+    : autoFocusCandidate?.chipLabel ?? (runIdFromUrl ? "Run in focus" : null);
+  // Auto never jumps to a newly logged run mid-thread — it holds and offers.
+  const switchOffer =
+    !pinnedAnchor &&
+    runIdFromUrl &&
+    latestRunCandidate &&
+    latestRunCandidate.id !== runIdFromUrl &&
+    (!autoFocusCandidate || latestRunCandidate.sortIso > autoFocusCandidate.sortIso)
+      ? { label: latestRunCandidate.chipLabel }
+      : null;
+
+  const pickPrimary = (c: AnchorCandidate) => {
+    setPinLabelFallback(c.chipLabel);
+    writePinParams({ kind: c.kind, id: c.id }, null);
+    setPickerOpen(false);
+  };
+  const pickCompare = (c: AnchorCandidate) => {
+    if (pinnedAnchor?.kind !== "run") return;
+    writePinParams({ kind: "run", id: pinnedAnchor.id }, c.id, pinnedAnchor.setupId);
+    setPickerOpen(false);
+  };
+  const pickSetupCombo = (c: AnchorCandidate) => {
+    if (pinnedAnchor?.kind !== "run" || c.kind !== "setup") return;
+    writePinParams({ kind: "run", id: pinnedAnchor.id }, pinnedAnchor.compareRunId, c.id);
+    setPickerOpen(false);
+  };
+  const clearPin = () => {
+    setPinLabelFallback(null);
+    writePinParams(null, null);
+  };
+  const switchAutoToLatest = () => {
+    if (!latestRunCandidate) return;
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("runId", latestRunCandidate.id);
+    sp.delete("compareRunId");
+    router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const canCollapseHistory = threads.length > HISTORY_COLLAPSED_COUNT;
 
@@ -1062,14 +1330,28 @@ export function EngineerChatPanel({
 
       <div className="p-3 space-y-2">
 
-        {messages.length === 0 ? (
+        <EngineerFocusChip
+          pinned={pinnedChip}
+          autoLabel={autoLabel}
+          switchOffer={switchOffer}
+          disabled={panelBusy}
+          onOpen={() => setPickerOpen((v) => !v)}
+          onClearPin={clearPin}
+          onSwitch={switchAutoToLatest}
+        />
 
-          <p className="text-[11px] text-muted-foreground leading-snug">
-
-            Ask about setup, handling, or laps.
-
-          </p>
-
+        {pickerOpen ? (
+          <EngineerAnchorPicker
+            candidates={candidates}
+            loading={candidatesLoading}
+            error={candidatesErr}
+            pinnedPrimaryRunId={pinnedAnchor?.kind === "run" ? pinnedAnchor.id : null}
+            disabled={panelBusy}
+            onPickPrimary={pickPrimary}
+            onPickCompare={pickCompare}
+            onPickSetupCombo={pickSetupCombo}
+            onClose={() => setPickerOpen(false)}
+          />
         ) : null}
 
         <div className="flex items-end gap-2">

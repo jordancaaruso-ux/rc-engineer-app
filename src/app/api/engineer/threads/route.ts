@@ -25,6 +25,9 @@ export async function GET(request: Request) {
     select: {
       id: true,
       updatedAt: true,
+      primaryRunId: true,
+      compareRunId: true,
+      focusAnchorJson: true,
       messages: {
         where: { role: "user" },
         orderBy: { createdAt: "asc" },
@@ -46,6 +49,9 @@ export async function GET(request: Request) {
         title: engineerThreadTitleFromContent(firstUser),
         preview: firstUser.replace(/\s+/g, " ").trim().slice(0, 120) || null,
         updatedAt: row.updatedAt.toISOString(),
+        primaryRunId: row.primaryRunId,
+        compareRunId: row.compareRunId,
+        focusAnchor: row.focusAnchorJson ?? null,
       };
     }),
     nextCursor,
