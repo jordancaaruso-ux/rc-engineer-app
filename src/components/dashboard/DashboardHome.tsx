@@ -53,6 +53,7 @@ export function DashboardHome({
     records,
     newPb,
     hasRunToday,
+    todayRunCount,
     todayDraftRunId,
     todayDraftSavedAt,
     todayContext,
@@ -65,6 +66,10 @@ export function DashboardHome({
     hasRunToday || Boolean(todayDraftRunId) || featuredEvent?.status === "active";
 
   const nextEvent = featuredEvent?.status === "next" ? featuredEvent : null;
+  // A meeting already under way keeps the outing card in track-day mode — it
+  // carries the Things-to-try list, so it replaces the bare panel rather than
+  // stacking a second copy of the same list (2026-07-29).
+  const activeEvent = featuredEvent?.status === "active" ? featuredEvent : null;
 
   // First-run readiness (docs/ONBOARDING_NORTH_STAR.md, reversal 2026-07-23).
   // Only a car is required; the card carries the payoff + advised timing/setup and
@@ -128,17 +133,27 @@ export function DashboardHome({
               </Reveal>
             ) : null}
 
-            {/* The driver's own experiment list, live during a session. */}
+            {/* The driver's own experiment list, live during a session — inside
+                the outing card when a meeting is running, on its own otherwise. */}
             <Reveal index={2}>
-              <CardPanel>
-                <ActionItemListPanel
-                  list="try"
-                  title="Things to try"
-                  addPlaceholder="Add an idea…"
-                  initialItems={thingsToTry}
-                  embedded
+              {activeEvent ? (
+                <DashboardNextOutingCard
+                  event={activeEvent}
+                  thingsToTry={thingsToTry}
+                  openTodoCount={thingsToDo.length}
+                  todayRunCount={todayRunCount}
                 />
-              </CardPanel>
+              ) : (
+                <CardPanel>
+                  <ActionItemListPanel
+                    list="try"
+                    title="Things to try"
+                    addPlaceholder="Add an idea…"
+                    initialItems={thingsToTry}
+                    embedded
+                  />
+                </CardPanel>
+              )}
             </Reveal>
           </>
         ) : (

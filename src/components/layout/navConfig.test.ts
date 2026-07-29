@@ -11,11 +11,21 @@ import {
   shouldShowLogRunFab,
 } from "@/components/layout/navConfig";
 
-test("mobile dock is five pure destinations, in order, without add-run or settings", () => {
+test("mobile dock is six pure destinations, in order, without add-run or settings", () => {
   assert.deepEqual(
     MOBILE_NAV.map((item) => item.id),
-    ["dashboard", "analysis", "engineer", "assets", "teams"]
+    ["dashboard", "analysis", "events", "engineer", "assets", "teams"]
   );
+});
+
+test("events own their tab — /events no longer lights Garage (2026-07-29)", () => {
+  assert.equal(resolveActiveNavId("/events"), "events");
+  assert.equal(resolveActiveNavId("/events/abc123"), "events");
+  // The Garage prefix list used to swallow /events; keep it out for good.
+  assert.notEqual(resolveActiveNavId("/events"), "assets");
+  const events = MOBILE_NAV.find((item) => item.id === "events");
+  assert.equal(events?.href, "/events");
+  assert.equal(events?.label, "Events");
 });
 
 test("the Garage tab lands on the cars list, not a hub (2026-07-29)", () => {

@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 /**
  * Mobile bottom chrome, one row (founder-locked 2026-07-14, artifact round 3
  * "F1 — divided cap"): a glass bar holding the Ideas utility cap behind a
- * hairline plus the five destinations, and the yellow Log-run circle floating
- * beside the bar at matched height. Static on scroll — nothing collapses.
+ * hairline plus the destinations in `MOBILE_NAV`, and the yellow Log-run circle
+ * floating beside the bar at matched height. Static on scroll — nothing collapses.
  * When `LogRunFab` is suppressed (create/edit flows) the bar stretches to fill
  * the row.
  *
@@ -23,6 +23,9 @@ import { cn } from "@/lib/utils";
 export const BottomNav = memo(function BottomNav() {
   const { activeId } = usePrimaryNav();
   const activeIndex = MOBILE_NAV.findIndex((item) => item.id === activeId);
+  // Grid + indicator geometry both come from the destination count so adding a
+  // tab can't leave the sliding indicator pointing at the wrong cell.
+  const cellCount = MOBILE_NAV.length;
 
   return (
     <nav
@@ -32,15 +35,21 @@ export const BottomNav = memo(function BottomNav() {
       <div className="pointer-events-auto mx-auto flex max-w-md items-center gap-2.5">
         <div className="relative flex h-14 min-w-0 flex-1 items-stretch overflow-hidden rounded-full border border-white/[0.06] bg-card/[0.32] bg-[linear-gradient(180deg,rgba(255,255,255,0.07),transparent_42%)] shadow-[0_22px_48px_-18px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_0_0.5px_rgba(255,255,255,0.06)] backdrop-blur-[40px] backdrop-saturate-[1.9]">
           <IdeasDockCap />
-          <div className="relative grid min-w-0 flex-1 grid-cols-5">
+          <div
+            className="relative grid min-w-0 flex-1"
+            style={{ gridTemplateColumns: `repeat(${cellCount}, minmax(0, 1fr))` }}
+          >
             {/* Sliding active-tab indicator — equal grid cells, so left is index-based. */}
             <span
               aria-hidden
               className={cn(
-                "absolute top-0 flex w-[calc(100%/5)] justify-center transition-[left,opacity] duration-200 ease-out",
+                "absolute top-0 flex justify-center transition-[left,opacity] duration-200 ease-out",
                 activeIndex < 0 && "opacity-0"
               )}
-              style={{ left: `calc(${Math.max(activeIndex, 0)} * 100% / 5)` }}
+              style={{
+                width: `calc(100% / ${cellCount})`,
+                left: `calc(${Math.max(activeIndex, 0)} * 100% / ${cellCount})`,
+              }}
             >
               <span className="h-0.5 w-7 rounded-full bg-primary shadow-[0_0_10px_1px_rgba(255,214,10,0.4)]" />
             </span>

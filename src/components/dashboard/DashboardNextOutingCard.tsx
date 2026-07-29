@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarPlus, ChevronRight } from "lucide-react";
+import { CalendarDays, CalendarPlus, ChevronRight } from "lucide-react";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { formatLap } from "@/lib/runLaps";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
@@ -17,55 +17,88 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard";
  *
  * No event on the calendar → the same card degrades to plan-only: the test
  * plan leads and the footer becomes the "book your next track day" nudge.
+ *
+ * A meeting that has STARTED keeps the same card (2026-07-29). It used to
+ * vanish the moment `featuredStatus` flipped to "active", which read as the app
+ * forgetting where you were — the countdown just becomes "Day 2 of 3" and the
+ * second line carries today's run count instead of the last visit.
  */
 export function DashboardNextOutingCard({
   event,
   thingsToTry,
   openTodoCount,
+  todayRunCount = 0,
 }: {
-  /** The upcoming event (featured status "next"); null when nothing is booked. */
+  /** The featured event ("next" before it starts, "active" while it runs); null when nothing is booked. */
   event: NonNullable<DashboardHomeModel["featuredEvent"]> | null;
   thingsToTry: DashboardHomeModel["thingsToTry"];
   openTodoCount: number;
+  /** Runs logged today — shown only while the meeting is running. */
+  todayRunCount?: number;
 }) {
   const days = event?.daysUntilStart ?? null;
+  const isActive = event?.status === "active";
+  const dayOfMeeting = event?.dayOfMeeting ?? null;
+  const totalDays = event?.totalDays ?? null;
+
+  // Once you've run at a meeting, the useful destination is the runs — not the
+  // event's dates and spec tire (founder call 2026-07-29). Run history already
+  // groups an event's runs as one "Race Meeting", so the filtered Sessions list
+  // is the meeting view. Before the first run there's nothing to see, so the
+  // event page stays the target.
+  const hasRuns = (event?.runCount ?? 0) > 0;
+  const heroHref = event
+    ? hasRuns
+      ? `/runs/history?eventId=${encodeURIComponent(event.id)}`
+      : `/events/${encodeURIComponent(event.id)}`
+    : "/events";
 
   return (
     <SurfaceCard variant="hero">
       {event ? (
         <>
           <div className="eyebrow-root mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="eyebrow-label">Next outing</span>
+            <span className="eyebrow-label">{isActive ? "At the track" : "Next outing"}</span>
             <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
               {[event.name, event.trackLabel].filter(Boolean).join(" · ")}
             </span>
-            {/* Events left the Garage hub (2026-07-29) — this card is now the way in. */}
-            <Link
-              href="/events"
-              prefetch
-              className="tap-active shrink-0 text-[12px] font-semibold text-muted-foreground transition hover:text-foreground"
-            >
-              All events
-            </Link>
           </div>
 
           <Link
-            href={`/events/${encodeURIComponent(event.id)}`}
+            href={heroHref}
             prefetch
-            aria-label="View event"
+            aria-label={hasRuns ? "View your sessions at this meeting" : "View event"}
             className="tap-active -mx-1.5 flex items-center gap-3.5 rounded-lg px-1.5 py-2.5 transition hover:bg-white/[0.03]"
           >
             <span className="flex items-baseline gap-1.5">
               <span className="text-[40px] font-bold leading-none tracking-tight tabular-nums text-foreground">
-                {days == null ? "—" : days === 0 ? "0" : days}
+                {isActive
+                  ? (dayOfMeeting ?? "—")
+                  : days == null
+                    ? "—"
+                    : days === 0
+                      ? "0"
+                      : days}
               </span>
               <span className="text-[12px] font-semibold text-muted-foreground">
-                {days === 0 ? "starts today" : days === 1 ? "day out" : "days out"}
+                {isActive
+                  ? totalDays && totalDays > 1
+                    ? `of ${totalDays} days`
+                    : "day at the track"
+                  : days === 0
+                    ? "starts today"
+                    : days === 1
+                      ? "day out"
+                      : "days out"}
               </span>
             </span>
             <span className="min-w-0 text-[12px] leading-relaxed text-muted-foreground">
               <span className="block">{event.dateLabel}</span>
-              {event.lastVisit ? (
+              {isActive ? (
+                <span className="block">
+                  {todayRunCount} {todayRunCount === 1 ? "run" : "runs"} logged today
+                </span>
+              ) : event.lastVisit ? (
                 <span className="block">
                   last visit: best{" "}
                   <span className="lap-figure text-foreground/80">
@@ -100,6 +133,21 @@ export function DashboardNextOutingCard({
               initialItems={thingsToTry}
               embedded
             />
+          </div>
+
+          {/* The way into the full list, at the foot of the card in every state
+              (founder call 2026-07-29) — it used to be a small header link that
+              only existed when something was booked. */}
+          <div className="mt-3 border-t border-border/70 pt-2.5">
+            <Link
+              href="/events"
+              prefetch
+              className="tap-active flex items-center gap-2 text-[13px] font-semibold text-muted-foreground transition hover:text-foreground"
+            >
+              <CalendarDays aria-hidden className="size-[15px]" strokeWidth={2.2} />
+              All events
+              <ChevronRight aria-hidden className="ml-auto size-4 text-faint" strokeWidth={2.2} />
+            </Link>
           </div>
         </>
       ) : (

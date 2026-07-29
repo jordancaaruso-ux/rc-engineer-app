@@ -267,6 +267,9 @@ export type DashboardHomeModel = {
     runCount: number;
     /** Calendar days until the event starts in the user's zone (0 = today); null unless status is "next". */
     daysUntilStart: number | null;
+    /** Which day of the meeting today is (1-based) and how many days it runs; null unless status is "active". */
+    dayOfMeeting: number | null;
+    totalDays: number | null;
     /** Most recent completed session day at the event's track — the "what you ran there last time" line. */
     lastVisit: null | {
       dateIso: string;
@@ -784,11 +787,31 @@ export async function loadDashboardHomeModel(
       // Days until the event starts (calendar days in the user's zone) — the
       // off-day prep card's countdown. Only meaningful for an upcoming event.
       let daysUntilStart: number | null = null;
-      if (featuredPick.featuredStatus === "next") {
+      // Where today sits inside a meeting that's already running ("Day 2 of 3").
+      // Only meaningful while it's active; both stay null otherwise.
+      let dayOfMeeting: number | null = null;
+      let totalDays: number | null = null;
+      if (featuredPick.featuredStatus === "next" || featuredPick.featuredStatus === "active") {
         const todayYmd = calendarYmdInTimeZone(new Date(), timeZone);
         const startYmd = calendarYmdInTimeZone(featuredEvent.startDate, timeZone);
-        const diffMs = Date.parse(startYmd) - Date.parse(todayYmd);
-        daysUntilStart = Number.isFinite(diffMs) ? Math.max(0, Math.round(diffMs / 86_400_000)) : null;
+        const endYmd = calendarYmdInTimeZone(featuredEvent.endDate, timeZone);
+        const daysBetween = (fromYmd: string, toYmd: string): number | null => {
+          const diffMs = Date.parse(toYmd) - Date.parse(fromYmd);
+          return Number.isFinite(diffMs) ? Math.round(diffMs / 86_400_000) : null;
+        };
+
+        if (featuredPick.featuredStatus === "next") {
+          const diff = daysBetween(todayYmd, startYmd);
+          daysUntilStart = diff == null ? null : Math.max(0, diff);
+        } else {
+          const elapsed = daysBetween(startYmd, todayYmd);
+          const span = daysBetween(startYmd, endYmd);
+          totalDays = span == null ? null : Math.max(1, span + 1);
+          dayOfMeeting =
+            elapsed == null
+              ? null
+              : Math.min(totalDays ?? Number.MAX_SAFE_INTEGER, Math.max(1, elapsed + 1));
+        }
       }
 
       const lastVisit = featuredEvent.trackId
@@ -805,6 +828,8 @@ export async function loadDashboardHomeModel(
         dateLabel: formatFeaturedEventDateLabel(featuredEvent, timeZone),
         runCount,
         daysUntilStart,
+        dayOfMeeting,
+        totalDays,
         lastVisit: lastVisit
           ? {
               dateIso: lastVisit.date.toISOString(),

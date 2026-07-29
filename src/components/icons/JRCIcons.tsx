@@ -33,6 +33,23 @@ export const IconAnalysis = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
+export const IconEvents = ({ size = 24, ...props }: IconProps) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
+    <g fill="currentColor">
+      <rect x="7.1" y="2.4" width="2" height="4.6" rx="1" />
+      <rect x="14.9" y="2.4" width="2" height="4.6" rx="1" />
+      <rect x="3" y="4.6" width="18" height="16.4" rx="2.8" />
+    </g>
+    <path
+      d="M3.7 9.9h16.6"
+      stroke="var(--jrc-icon-cutout, #141414)"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+    />
+    <rect x="7.2" y="13" width="4.1" height="3.7" rx="1.1" fill="var(--jrc-icon-cutout, #141414)" />
+  </svg>
+);
+
 export const IconEngineer = ({ size = 24, ...props }: IconProps) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
     <path

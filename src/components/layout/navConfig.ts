@@ -3,6 +3,7 @@ import {
   IconAnalysis,
   IconDashboard,
   IconEngineer,
+  IconEvents,
   IconGarage,
   IconSettings,
   IconTeams,
@@ -13,6 +14,7 @@ export type PrimaryNavId =
   | "dashboard"
   | "add-run"
   | "analysis"
+  | "events"
   | "assets"
   | "engineer"
   | "teams"
@@ -74,7 +76,6 @@ const ASSETS_PREFIXES = [
   "/setup-calibrations",
   "/setup/",
   "/setup",
-  "/events",
   "/tracks",
   "/tires",
   "/cars",
@@ -109,6 +110,7 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
     { id: "dashboard", score: pathname === "/" ? 1 : 0 },
     { id: "add-run", score: addRunMatchScore(pathname) },
     { id: "analysis", score: sectionMatchScore(pathname, ANALYSIS_PREFIXES) },
+    { id: "events", score: matchPrefixScore(pathname, "/events") },
     { id: "assets", score: sectionMatchScore(pathname, ASSETS_PREFIXES) },
     { id: "engineer", score: matchPrefixScore(pathname, "/engineer") },
     { id: "teams", score: matchPrefixScore(pathname, "/teams") },
@@ -135,6 +137,12 @@ const ADD_RUN: PrimaryNavItem = {
 };
 const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: IconAnalysis };
 /**
+ * Events got their own tab (founder call 2026-07-29). They had one door left after the Garage hub
+ * was deleted — the dashboard Next-outing card — and a meeting is neither an asset nor team data,
+ * so no existing tab fitted. Sits next to Analysis; `/events` no longer lights Garage.
+ */
+const EVENTS: PrimaryNavItem = { id: "events", href: "/events", label: "Events", icon: IconEvents };
+/**
  * Garage is the cars & setups list itself — there is no hub in between (founder call 2026-07-29).
  * The old `/assets` hub duplicated `/cars` and listed a "My tires" row that pointed at the shared
  * catalog; the catalogs now live under Settings and `/assets` + `/garage` redirect here.
@@ -144,17 +152,41 @@ const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "En
 const TEAMS: PrimaryNavItem = { id: "teams", href: "/teams", label: "Teams", icon: IconTeams };
 const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: IconSettings };
 
-export const PRIMARY_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ENGINEER, ASSETS, TEAMS, SETTINGS];
+export const PRIMARY_NAV: PrimaryNavItem[] = [
+  DASHBOARD,
+  ADD_RUN,
+  ANALYSIS,
+  EVENTS,
+  ENGINEER,
+  ASSETS,
+  TEAMS,
+  SETTINGS,
+];
 
 /** Desktop sidebar: full section list, natural top-to-bottom order. */
-export const DESKTOP_NAV: PrimaryNavItem[] = [DASHBOARD, ADD_RUN, ANALYSIS, ENGINEER, ASSETS, TEAMS, SETTINGS];
+export const DESKTOP_NAV: PrimaryNavItem[] = [
+  DASHBOARD,
+  ADD_RUN,
+  ANALYSIS,
+  EVENTS,
+  ENGINEER,
+  ASSETS,
+  TEAMS,
+  SETTINGS,
+];
 
 /**
- * Mobile bottom dock: five pure destinations. `Add run` is now a floating pill
- * FAB (`LogRunFab`) and `Settings` lives behind the account avatar
- * (`AccountMenu`), so neither sits in the dock. See `shouldShowLogRunFab`.
+ * Mobile bottom dock: six pure destinations. `Add run` is a circular FAB
+ * (`LogRunFab`) rendered beside the bar and `Settings` lives behind the account
+ * avatar (`AccountMenu`), so neither sits in the dock. See `shouldShowLogRunFab`.
+ *
+ * Six is a deliberate squeeze (2026-07-29): with the Ideas cap and the Log-run
+ * circle both kept, cells land at ~42.7px at 390px — 1.3px under the 44px tap
+ * guideline, tolerable only because the row is 56px tall. If it reads too tight
+ * on device, the levers in order of cost are: drop the Ideas cap (→51.3px), move
+ * the FAB above the bar (→53.7px, but `--mobile-tab-bar-height` goes 84→150px).
  */
-export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ENGINEER, ASSETS, TEAMS];
+export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, EVENTS, ENGINEER, ASSETS, TEAMS];
 
 export type NavHubIconKey =
   | "car"
@@ -211,8 +243,8 @@ export type NavHubSection = {
 /**
  * Shared reference data, listed under Settings (founder call 2026-07-29). None of it is "yours" —
  * you meet tires, tracks and additives in the run-form pickers, so these pages exist for browsing
- * and cleanup, not for the daily loop. Events deliberately aren't here: they're reached from the
- * dashboard's Next outing card, and move to a Competition surface later.
+ * and cleanup, not for the daily loop. Events deliberately aren't here — they have their own tab
+ * (see `EVENTS`), because a meeting is something you plan and review, not reference data.
  */
 export type CatalogLink = NavHubLink & { adminOnly?: boolean };
 
