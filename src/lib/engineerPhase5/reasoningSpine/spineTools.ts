@@ -68,6 +68,7 @@ export async function getParamSpreadTool(
       positionBand: r.positionBand,
       spreadSource: r.spreadSource,
       baseSetupRef: r.baseSetupRef,
+      baseSetupConditionValue: r.baseSetupConditionValue,
       communityGripLevel: r.communityGripLevel,
       spread: r.spread
         ? {
@@ -75,6 +76,9 @@ export async function getParamSpreadTool(
             mean: r.spread.mean,
             iqr: r.spread.iqr,
             sampleCount: r.spread.sampleCount,
+            // The published min/max IS the band on a base_setup row.
+            min: r.spread.min,
+            max: r.spread.max,
           }
         : null,
       gripTrendSignal: r.gripTrendSignal

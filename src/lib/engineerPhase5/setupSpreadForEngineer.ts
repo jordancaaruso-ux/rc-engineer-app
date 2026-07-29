@@ -37,12 +37,13 @@ import {
   type GripSpreadContrast,
 } from "@/lib/engineerPhase5/gripSpreadContrast";
 import {
-  baseSetupValueForKey,
+  baseSetupConditionValueForKey,
+  baseSetupValuesForKey,
   buildBaseSetupReference,
   type BaseSetupRef,
 } from "@/lib/setup/resolveBaseSetupForCar";
 import { getParameterStep } from "@/lib/setup/parameterStepSizes";
-import { synthesizeBaseSetupStats } from "@/lib/engineerPhase5/baseSetupBands";
+import { baseSetupStatsFromValues } from "@/lib/engineerPhase5/baseSetupBands";
 
 /** Base tuning rows plus six derived link-index keys. */
 const MAX_PARAMS = 52;
@@ -404,14 +405,21 @@ export type EngineerSetupSpreadRow = {
   valueType: SetupAggregationValueType;
   /**
    * Where numeric spread bands came from: community eligible uploads, your garage cars sharing the
-   * template, or — when neither exists — a window synthesized around this chassis' kit setup.
+   * template, or — when neither exists — the setups published against this chassis.
    */
   spreadSource: "community_eligible_uploads" | "your_garage" | "base_setup" | "none";
   /**
-   * Set only when `spreadSource` is `base_setup`: which base setup the window was built around.
-   * The bands are one point wide by construction (`sampleCount` 1), never a measured distribution.
+   * Set only when `spreadSource` is `base_setup`: which published baselines the bands came from,
+   * after the surface gate. `spread.sampleCount` counts authored sheets, never measured runs — one
+   * sheet means a step window drawn around it, more means the real range those sheets span.
    */
   baseSetupRef: BaseSetupRef | null;
+  /**
+   * Set only when `spreadSource` is `base_setup` and a published sheet matches this run's grip
+   * level: what that sheet runs for this parameter. The sheet written for these conditions is the
+   * recommendation anchor; the surrounding range only says how far out the driver currently is.
+   */
+  baseSetupConditionValue: { baselineName: string; value: number } | null;
   /** Which community grip bucket served this row (after fallback). Null when community wasn't used. */
   communityGripLevel: GripBucket | null;
   spread: null | {
@@ -513,23 +521,20 @@ export async function buildSetupSpreadForEngineer(params: {
     },
   });
   /**
-   * The chassis' KIT baseline — the neutral reference the bands are measured against. Pro and base
-   * sheets are start points for drivers, not references: they'd move the centre around per setup.
-   * One extra round trip, and only for cars that have a chassis type at all.
+   * Every baseline published against the chassis — the reference the bands are measured against.
+   * All kinds, not just KIT: a manufacturer publishing a spread of sheets across conditions has
+   * already stated the range it considers sane, and plenty of chassis have no kit sheet at all.
+   * Ordered kit-first (enum declaration order) so the names read sensibly to the Engineer.
+   * Narrowed to the run's surface below — one extra round trip, and only for cars that have a
+   * chassis type at all.
    */
-  const kitBaseline = carRow?.setupSheetModel
-    ? await prisma.baselineSetup.findFirst({
-        where: { setupSheetModelId: carRow.setupSheetModel.id, kind: "KIT" },
-        orderBy: { createdAt: "desc" },
-        select: { data: true },
+  const chassisBaselines = carRow?.setupSheetModel
+    ? await prisma.baselineSetup.findMany({
+        where: { setupSheetModelId: carRow.setupSheetModel.id },
+        orderBy: [{ kind: "asc" }, { createdAt: "asc" }],
+        select: { name: true, surface: true, gripLevel: true, data: true },
       })
-    : null;
-  const baseSetup = carRow?.setupSheetModel
-    ? buildBaseSetupReference({
-        kitSetupData: kitBaseline?.data ?? null,
-        modelName: carRow.setupSheetModel.name,
-      })
-    : null;
+    : [];
   const normalized = normalizeSetupData(params.setupSnapshotData as SetupSnapshotData | null);
   let setupSheetTemplate = canonicalSetupSheetTemplateId(carRow?.setupSheetTemplate ?? null);
   const inferredForCommunity =
@@ -567,6 +572,19 @@ export async function buildSetupSpreadForEngineer(params: {
   const trackSurface: "asphalt" | "carpet" | null =
     surfaceRaw === "asphalt" || surfaceRaw === "carpet" ? surfaceRaw : null;
   const gripLevel: GripBucket = runReadGripBucket(normalized as Record<string, SetupSnapshotData[string]>);
+
+  /**
+   * Built here rather than beside the query because it needs the run's surface and grip. Surface is
+   * a hard gate: a carpet sheet must never widen an asphalt band or vice versa.
+   */
+  const baseSetup = carRow?.setupSheetModel
+    ? buildBaseSetupReference({
+        baselines: chassisBaselines,
+        modelName: carRow.setupSheetModel.name,
+        runSurface: trackSurface,
+        runGripLevel: gripLevel,
+      })
+    : null;
 
   const communityFromSnapshotSurface = Boolean(setupSheetTemplate && trackSurface);
   const communityMergedSurfaces = Boolean(setupSheetTemplate && !trackSurface);
@@ -698,27 +716,35 @@ export async function buildSetupSpreadForEngineer(params: {
     const num = setupValueToNumber(cur);
 
     /**
-     * A window around this chassis' kit setup, used only where no aggregation reaches. Needs a
-     * numeric current value, a numeric base value, and a known step — any of those missing means no
-     * bands at all rather than a guessed width.
+     * Bands from the baselines published for this run's surface, used only where no aggregation
+     * reaches. Several sheets give a real range; a single one — the honest answer when a chassis has
+     * one sheet for that surface — falls back to a step window around it.
      */
-    const baseBands = ((): { stats: NumericStats; ref: BaseSetupRef } | null => {
+    const baseBands = ((): {
+      stats: NumericStats;
+      ref: BaseSetupRef;
+      conditionValue: { baselineName: string; value: number } | null;
+    } | null => {
       if (baseSetup == null || num == null) return null;
-      const centre = baseSetupValueForKey(baseSetup, key);
-      if (centre == null) return null;
-      const step = getParameterStep(key);
-      if (step == null) return null;
-      const synthesized = synthesizeBaseSetupStats(centre, step);
-      return synthesized ? { stats: synthesized, ref: baseSetup.ref } : null;
+      const values = baseSetupValuesForKey(baseSetup, key);
+      if (values.length === 0) return null;
+      const stats = baseSetupStatsFromValues(values, getParameterStep(key));
+      if (!stats) return null;
+      return {
+        stats,
+        ref: baseSetup.ref,
+        conditionValue: baseSetupConditionValueForKey(baseSetup, key),
+      };
     })();
 
-    const pushBaseSetupRow = (band: { stats: NumericStats; ref: BaseSetupRef }, value: number) => {
+    const pushBaseSetupRow = (band: NonNullable<typeof baseBands>, value: number) => {
       rows.push({
         parameterKey: key,
         currentDisplay,
         valueType: SetupAggregationValueType.NUMERIC,
         spreadSource: "base_setup",
         baseSetupRef: band.ref,
+        baseSetupConditionValue: band.conditionValue,
         communityGripLevel: null,
         spread: {
           sampleCount: band.stats.sampleCount,
@@ -733,7 +759,7 @@ export async function buildSetupSpreadForEngineer(params: {
           mean: band.stats.mean,
           iqr: band.stats.iqr,
           topValues: [],
-          distinctValueCount: 0,
+          distinctValueCount: band.stats.distinctValueCount,
         },
         gripTrend,
         gripTrendSignal,
@@ -756,6 +782,7 @@ export async function buildSetupSpreadForEngineer(params: {
         valueType: meta?.valueType ?? SetupAggregationValueType.NUMERIC,
         spreadSource,
         baseSetupRef: null,
+        baseSetupConditionValue: null,
         communityGripLevel,
         spread: null,
         gripTrend,
@@ -777,6 +804,7 @@ export async function buildSetupSpreadForEngineer(params: {
         valueType: SetupAggregationValueType.NUMERIC,
         spreadSource,
         baseSetupRef: null,
+        baseSetupConditionValue: null,
         communityGripLevel,
         spread: null,
         gripTrend,
@@ -792,6 +820,7 @@ export async function buildSetupSpreadForEngineer(params: {
       valueType: SetupAggregationValueType.NUMERIC,
       spreadSource,
       baseSetupRef: null,
+      baseSetupConditionValue: null,
       communityGripLevel,
       spread: {
         sampleCount: stats.sampleCount,

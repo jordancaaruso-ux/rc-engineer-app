@@ -29,6 +29,7 @@ function compactSpreadRow(row: unknown): unknown {
     currentDisplay: row.currentDisplay,
     spreadSource: row.spreadSource,
     baseSetupRef: row.baseSetupRef ?? null,
+    baseSetupConditionValue: row.baseSetupConditionValue ?? null,
     positionBand: row.positionBand,
     communityGripLevel: row.communityGripLevel,
     spread: spread
@@ -37,6 +38,10 @@ function compactSpreadRow(row: unknown): unknown {
           mean: spread.mean,
           iqr: spread.iqr,
           sampleCount: spread.sampleCount,
+          // The published min/max IS the band on a base_setup row — without them the Engineer can
+          // only see a centre and can't say how far outside the sheets a value sits.
+          min: spread.min,
+          max: spread.max,
         }
       : null,
     gripTrendSignal: gts
