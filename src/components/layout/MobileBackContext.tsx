@@ -49,8 +49,13 @@ export function useMobileBackHref(): string | null {
 
 /**
  * Register `href` as the active mobile back destination while mounted.
- * Returns whether a provider is present so callers (e.g. `PageBackLink`) can
- * decide to hand its role over to the fixed chrome only when one exists.
+ *
+ * Returns whether the chrome has actually *adopted* this href — not merely
+ * whether a provider exists. Registration happens in an effect, so the pill is
+ * still the JRC mark on the server render and up to hydration; a caller that
+ * hides itself on "a provider exists" hides one commit too early and leaves
+ * mobile with no back control at all until hydration. Keyed off `backHref`, the
+ * handover is one state change, so the header arrow and the pill swap together.
  */
 export function useRegisterMobileBack(href: string): boolean {
   const ctx = useContext(MobileBackContext);
@@ -59,5 +64,5 @@ export function useRegisterMobileBack(href: string): boolean {
     ctx.register(href);
     return () => ctx.unregister(href);
   }, [ctx, href]);
-  return ctx != null;
+  return ctx != null && ctx.backHref === href;
 }

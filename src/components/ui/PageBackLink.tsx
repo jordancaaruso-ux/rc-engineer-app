@@ -22,11 +22,13 @@ export function PageBackLink({
   // Publish this destination to the fixed mobile chrome so the top-left JRC pill
   // becomes the back button (only string hrefs — the chrome links to a plain URL).
   const hrefString = typeof href === "string" ? href : null;
-  const hasMobileChrome = useRegisterMobileBack(hrefString ?? "");
+  const chromeAdoptedBack = useRegisterMobileBack(hrefString ?? "");
 
-  // When the fixed chrome is showing this back control, the header copy would be
-  // a redundant second arrow on mobile — hide it there, keep it on desktop.
-  const hideOnMobile = hasMobileChrome && hrefString != null;
+  // Only once the chrome is *actually* showing this back control would the header
+  // copy be a redundant second arrow on mobile — hide it then, keep it on desktop.
+  // False on the server render (adoption happens in an effect), so this class is
+  // the same on both sides of hydration and can only ever change post-mount.
+  const hideOnMobile = chromeAdoptedBack && hrefString != null;
 
   return (
     <Link
