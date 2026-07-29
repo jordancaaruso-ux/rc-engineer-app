@@ -80,29 +80,102 @@
   --tune-glass-blur: 30px;
 }
 
-/* Dev background preview — `data-bg-preview` overrides page base only (see Settings). */
-html[data-bg-preview="butter-cream"] {
-  --background: #231f15;
-  --color-background: 35 31 21;
-  --page-top-theme: #231f15;
+/*
+ * ===== Background modes — Settings → Background =====
+ *
+ * `data-bg-preview` on <html> (written by BackgroundSection, applied pre-paint by
+ * `bgPreviewBootstrapScript()` in layout.tsx, localStorage-only so it never syncs
+ * or hits the DB) chooses what paints behind every page. No attribute = Black,
+ * the shipped default since 2026-07-27.
+ *
+ * A mode moves ONLY the four `.page-bg*` layers plus the overscroll fallback.
+ * Card, glass, border and text tokens are deliberately untouched, so switching
+ * compares backgrounds rather than whole themes. Add a mode = add a block here
+ * AND an entry in `src/lib/appThemePreview.ts` (a test asserts they agree).
+ *
+ * The four knobs, front→back: `--page-bg-vignette` · `--page-bg-scrim` ·
+ * `--page-bg-photo` · `--page-bg-wash` over `--page-bg-base`.
+ */
+:root {
+  --page-bg-base: #000;
+  --page-bg-wash: none;
+  --page-bg-photo: none;
+  --page-bg-scrim: none;
+  --page-bg-vignette: none;
+}
+
+/* Flat colour modes — base fill only, nothing layered over it. */
+html[data-bg-preview="black"] {
+  --page-bg-base: #000000;
+  --page-top-theme: #000000;
+}
+
+html[data-bg-preview="charcoal"] {
+  --page-bg-base: #121110;
+  --page-top-theme: #121110;
+}
+
+html[data-bg-preview="dark-grey"] {
+  --page-bg-base: #1c1d1f;
+  --page-top-theme: #1c1d1f;
 }
 
 html[data-bg-preview="cool-slate"] {
-  --background: #14161c;
-  --color-background: 20 22 28;
+  --page-bg-base: #14161c;
   --page-top-theme: #14161c;
 }
 
 html[data-bg-preview="ash-warm"] {
-  --background: #1b1a17;
-  --color-background: 27 26 23;
+  --page-bg-base: #1b1a17;
   --page-top-theme: #1b1a17;
 }
 
+html[data-bg-preview="butter-cream"] {
+  --page-bg-base: #231f15;
+  --page-top-theme: #231f15;
+}
+
 html[data-bg-preview="moss-tint"] {
-  --background: #131816;
-  --color-background: 19 24 22;
+  --page-bg-base: #131816;
   --page-top-theme: #131816;
+}
+
+/*
+ * Graphite wash — charcoal base plus the Technical v2 depth gradients (edge
+ * vignette, a yellow "lit-from-above" whisper, graphite lifts top + bottom, soft
+ * corner depth). Tuned subtle: richness in the gutters without fighting content.
+ */
+html[data-bg-preview="graphite"],
+html[data-bg-preview="photo"] {
+  --page-bg-base: #121110;
+  --page-top-theme: #121110;
+  --page-bg-wash:
+    radial-gradient(120% 120% at 50% 42%, transparent 52%, rgba(0, 0, 0, 0.32) 100%),
+    radial-gradient(150% 100% at 50% -10%, rgba(255, 214, 10, 0.13), transparent 62%),
+    radial-gradient(135% 95% at 50% -22%, rgba(58, 54, 50, 0.18), transparent 60%),
+    radial-gradient(130% 85% at 50% 120%, rgba(44, 42, 40, 0.22), transparent 72%),
+    radial-gradient(75% 62% at 6% 4%, rgba(68, 64, 60, 0.10), transparent 60%),
+    radial-gradient(95% 85% at 102% 104%, rgba(72, 68, 64, 0.14), transparent 64%),
+    radial-gradient(72% 62% at 100% 100%, rgba(255, 214, 10, 0.10), transparent 60%);
+}
+
+/*
+ * Track photo — the original TITC sunset wash (founder-tuned 2026-07-06:
+ * blur 12px · yellow 0 · dark 0.6). Blur/grade are BAKED into the JPEG (perf
+ * bake 2026-07-14), so there is no runtime `filter` and no blend group here —
+ * every `.glass-card` still composites over a flat backdrop. Dark + vignette
+ * stay in CSS because they're viewport-relative and can't be baked into a
+ * fixed-aspect image. Re-bake if the source photo changes: sharp(track-hero.jpg)
+ *   .blur(12).modulate({saturation:0.6,brightness:0.92}) → track-hero-baked.jpg
+ */
+html[data-bg-preview="photo"] {
+  --page-bg-photo: url("/brand/track-hero-baked.jpg") center / cover no-repeat;
+  --page-bg-scrim: rgb(var(--color-background) / var(--tune-bg-dark));
+  --page-bg-vignette: radial-gradient(
+    130% 120% at 50% 40%,
+    transparent 55%,
+    rgba(0, 0, 0, 0.45)
+  );
 }
 
 html {
@@ -141,11 +214,10 @@ body {
  * behind the Dynamic Island instead of leaving flat base color there.
  */
 /*
- * Technical v2 global wash — charcoal depth so large areas never read dead-flat.
- * Layered (front→back): edge vignette for framing, a yellow "lit-from-above" whisper,
- * neutral graphite lifts top + bottom, and soft corner depth. Tuned subtle so it
- * adds richness in gutters without fighting content (cards stay solid `bg-card`).
- * The stronger faded hero still lives on login / dashboard, layered above this.
+ * The four background layers (see `layout.tsx`). Full viewport height on iOS
+ * (`lvh` + `-webkit-fill-available`). What each one paints is owned entirely by
+ * the `--page-bg-*` knobs above, so the active background mode is one attribute
+ * on <html> and never a DOM change. All four default to `none` = flat base.
  */
 .page-bg {
   position: fixed;
@@ -158,65 +230,30 @@ body {
   min-height: -webkit-fill-available;
   z-index: 0;
   pointer-events: none;
-  background-color: rgb(var(--color-background));
-  background-image:
-    radial-gradient(120% 120% at 50% 42%, transparent 52%, rgba(0, 0, 0, 0.32) 100%),
-    radial-gradient(150% 100% at 50% -10%, rgba(255, 214, 10, 0.13), transparent 62%),
-    radial-gradient(135% 95% at 50% -22%, rgba(58, 54, 50, 0.18), transparent 60%),
-    radial-gradient(130% 85% at 50% 120%, rgba(44, 42, 40, 0.22), transparent 72%),
-    radial-gradient(75% 62% at 6% 4%, rgba(68, 64, 60, 0.10), transparent 60%),
-    radial-gradient(95% 85% at 102% 104%, rgba(72, 68, 64, 0.14), transparent 64%),
-    radial-gradient(72% 62% at 100% 100%, rgba(255, 214, 10, 0.10), transparent 60%);
+  background-color: var(--page-bg-base);
+  background-image: var(--page-bg-wash);
   background-repeat: no-repeat;
 }
 
-/*
- * TITC sunset scene — uniform blurred photo wash (founder-tuned 2026-07-06:
- * blur 12px · yellow 0 · dark 0.6). Fixed, same clarity everywhere. As of the
- * 2026-07-14 perf bake the blur/grade is pre-baked into the JPEG and the
- * blend-mode layers are gone (see below). The charcoal gradients on `.page-bg`
- * remain the fallback while the photo loads.
- */
+/* Photo wash — fixed, same clarity everywhere; `.page-bg`'s gradients show through
+   while the JPEG loads. */
 .page-bg-img {
   position: absolute;
   inset: 0;
-  /* BAKED WASH (perf): blur(12px) + saturate(0.6) + brightness(0.92) are baked
-     into the JPEG (via sharp), so there is NO runtime `filter` here. Combined with
-     removing the two `opacity:0` yellow blend layers and the soft-light grain,
-     `.page-bg` now has no mix-blend-mode and no filter anywhere — so every
-     `.glass-card` composites over a FLAT backdrop instead of re-blurring a live
-     6-layer blend group each scroll frame. Dark + vignette stay as CSS below
-     (viewport-relative — must not be baked into a fixed-aspect image).
-     To re-bake if the source photo changes: sharp(track-hero.jpg)
-       .blur(12).modulate({saturation:0.6,brightness:0.92}) → track-hero-baked.jpg */
-  background: url("/brand/track-hero-baked.jpg") center / cover no-repeat;
+  background: var(--page-bg-photo);
 }
 
 .page-bg-dark {
   position: absolute;
   inset: 0;
-  background: rgb(var(--color-background) / var(--tune-bg-dark));
+  background: var(--page-bg-scrim);
 }
 
 .page-bg-vig {
   position: absolute;
   inset: 0;
-  background: radial-gradient(130% 120% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.45));
+  background: var(--page-bg-vignette);
 }
-
-/* ===== TEMP TEST (2026-07-27): flat black background =====
-   Kills the photo wash, the charcoal gradients, the dark scrim and the vignette
-   so every page sits on pure black. Revert = delete this whole block. */
-.page-bg {
-  background-color: #000;
-  background-image: none;
-}
-.page-bg-img,
-.page-bg-dark,
-.page-bg-vig {
-  background: none;
-}
-/* ===== END TEMP TEST ===== */
 
 /*
  * Liquid-glass card surface (founder-tuned 2026-07-06: 0.6 card alpha ·

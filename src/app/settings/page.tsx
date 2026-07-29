@@ -12,6 +12,7 @@ import {
   parseSpeedhiveTransponderNumbersSetting,
 } from "@/lib/speedhive/speedhiveTransponder";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
+import { BackgroundSection } from "@/components/settings/BackgroundSection";
 import { ProfilePictureSection } from "@/components/settings/ProfilePictureSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { OnboardingResetSection } from "@/components/settings/OnboardingResetSection";
@@ -66,6 +67,7 @@ export default async function SettingsPage() {
           />
         </div>
         <SettingsNavSection />
+        <BackgroundSection />
         <NotificationsSection />
         <ProfilePictureSection
           initialImage={user.image}

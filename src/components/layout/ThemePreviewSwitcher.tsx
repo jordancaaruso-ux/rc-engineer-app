@@ -5,6 +5,7 @@ import { Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
 import {
+  BG_PREVIEW_DEFAULT_ID,
   BG_PREVIEW_OPTIONS,
   BG_PREVIEW_STORAGE_KEY,
   type BgPreviewId,
@@ -20,7 +21,7 @@ type ThemePreviewSwitcherProps = {
 /** Dev background preview — same storage as Settings → Background preview. */
 export function ThemePreviewSwitcher({ placement = "floating" }: ThemePreviewSwitcherProps) {
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState<BgPreviewId>("espresso");
+  const [active, setActive] = useState<BgPreviewId>(BG_PREVIEW_DEFAULT_ID);
   const mounted = useRef(false);
   const isSidebar = placement === "sidebar";
 
