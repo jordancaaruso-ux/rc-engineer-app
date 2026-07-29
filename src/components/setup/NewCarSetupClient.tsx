@@ -20,32 +20,62 @@ import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
  * one-question-at-a-time flow, which is the only way to fill 40-70 values you've never seen. A
  * kit or previous setup gets the grid instead: you're changing a handful of values against a sheet
  * that's already right, and stepping past 60 correct answers to reach them is the whole complaint.
+ *
+ * "Start from a previous setup" leads and carries a dropdown (founder call 2026-07-29). Adjusting
+ * the setup you're already on is the common case, it was previously locked to whichever row was
+ * newest, and a driver reaching for "the one from the club meeting" had no way to say so.
  */
 
-type StartMode = "kit" | "last" | "empty";
+type StartMode = "previous" | "kit" | "empty";
+
+export type PreviousSetupOption = {
+  id: string;
+  /** Baseline name, or the run/sheet it came from. */
+  label: string;
+  kind: "baseline" | "run" | "sheet";
+  dateLabel: string;
+  data: SetupSnapshotData;
+};
+
+const KIND_LABEL: Record<PreviousSetupOption["kind"], string> = {
+  baseline: "Saved",
+  run: "From a run",
+  sheet: "From a sheet",
+};
 
 export function NewCarSetupClient({
   carId,
   carName,
   template,
   kitSetup,
-  lastSetup,
+  previousSetups,
 }: {
   carId: string;
   carName: string;
   template: SetupSheetTemplate;
   kitSetup: SetupSnapshotData | null;
-  lastSetup: { id: string; name: string | null; data: SetupSnapshotData } | null;
+  /** This car's recent snapshots, newest first — baselines, run setups and imported sheets alike. */
+  previousSetups: PreviousSetupOption[];
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [mode, setMode] = useState<StartMode>(kitSetup ? "kit" : lastSetup ? "last" : "empty");
+  const [mode, setMode] = useState<StartMode>(
+    previousSetups.length > 0 ? "previous" : kitSetup ? "kit" : "empty"
+  );
+  const [previousId, setPreviousId] = useState<string>(previousSetups[0]?.id ?? "");
   const [started, setStarted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const selectedPrevious =
+    previousSetups.find((s) => s.id === previousId) ?? previousSetups[0] ?? null;
+
   const startValues: SetupSnapshotData =
-    mode === "kit" && kitSetup ? kitSetup : mode === "last" && lastSetup ? lastSetup.data : {};
+    mode === "kit" && kitSetup
+      ? kitSetup
+      : mode === "previous" && selectedPrevious
+        ? selectedPrevious.data
+        : {};
 
   const save = async (values: SetupSnapshotData) => {
     setSaving(true);
@@ -59,7 +89,9 @@ export function NewCarSetupClient({
           name: name.trim() || "Untitled setup",
           data: values,
           // Audit lineage only when this really started from an existing snapshot.
-          ...(mode === "last" && lastSetup ? { baseSetupSnapshotId: lastSetup.id } : {}),
+          ...(mode === "previous" && selectedPrevious
+            ? { baseSetupSnapshotId: selectedPrevious.id }
+            : {}),
         }),
       });
       if (!res.ok) {
@@ -104,20 +136,20 @@ export function NewCarSetupClient({
 
   const options: Array<{ mode: StartMode; title: string; detail: string; available: boolean }> = [
     {
+      mode: "previous",
+      title: "Start from a previous setup",
+      detail: selectedPrevious
+        ? "Copies an existing setup on this car — change only what you're trying."
+        : "This car has no setups or logged runs yet.",
+      available: previousSetups.length > 0,
+    },
+    {
       mode: "kit",
       title: "Start from the kit setup",
       detail: kitSetup
         ? "The manufacturer's baseline for this chassis — change only what's different."
         : "No kit setup has been entered for this chassis yet.",
       available: Boolean(kitSetup),
-    },
-    {
-      mode: "last",
-      title: "Start from your last setup",
-      detail: lastSetup
-        ? `Copies ${lastSetup.name ?? "the most recent setup"} on this car.`
-        : "You haven't saved a setup on this car yet.",
-      available: Boolean(lastSetup),
     },
     {
       mode: "empty",
@@ -147,22 +179,50 @@ export function NewCarSetupClient({
         <div className="space-y-2">
           <Eyebrow>Start from</Eyebrow>
           {options.map((opt) => (
-            <button
+            <div
               key={opt.mode}
-              type="button"
-              disabled={!opt.available}
-              onClick={() => setMode(opt.mode)}
               className={cn(
-                "block w-full rounded-lg border px-3 py-3 text-left transition",
+                "rounded-lg border transition",
                 mode === opt.mode && opt.available
                   ? "border-foreground/50 bg-muted"
                   : "border-border bg-secondary",
                 !opt.available && "opacity-50"
               )}
             >
-              <div className="text-sm text-foreground">{opt.title}</div>
-              <div className="ui-caption mt-0.5 text-muted-foreground">{opt.detail}</div>
-            </button>
+              <button
+                type="button"
+                disabled={!opt.available}
+                onClick={() => setMode(opt.mode)}
+                className="block w-full px-3 py-3 text-left"
+              >
+                <div className="text-sm text-foreground">{opt.title}</div>
+                <div className="ui-caption mt-0.5 text-muted-foreground">{opt.detail}</div>
+              </button>
+
+              {opt.mode === "previous" && opt.available && mode === "previous" ? (
+                <div className="px-3 pb-3">
+                  <label className="block">
+                    <span className="ui-label-meta text-muted-foreground">Which setup</span>
+                    <select
+                      value={selectedPrevious?.id ?? ""}
+                      onChange={(e) => setPreviousId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-foreground/40"
+                    >
+                      {previousSetups.map((s, i) => (
+                        <option key={s.id} value={s.id}>
+                          {`${i === 0 ? "Latest · " : ""}${s.label} · ${s.dateLabel}`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedPrevious ? (
+                    <p className="ui-caption mt-1.5 text-muted-foreground">
+                      {KIND_LABEL[selectedPrevious.kind]} · {selectedPrevious.dateLabel}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           ))}
         </div>
 

@@ -7,16 +7,27 @@ import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateForCar";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
+import { formatRunDateShort } from "@/lib/formatDate";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
+import { formatRunSessionDisplay } from "@/lib/runSession";
 import { NewCarSetupClient } from "@/components/setup/NewCarSetupClient";
 
 /**
- * Sequential first fill for a new library setup on a car.
+ * First fill for a new library setup on a car.
  *
- * The three starting points come from three different places, all optional:
- *  - kit setup     → `SetupSheetModel.kitSetupJson` (admin-entered, catalog models only)
- *  - last setup    → the car's most recent snapshot, library or run — whichever is newest
- *  - empty         → always available
+ * The three starting points, in the order a driver actually wants them (founder call 2026-07-29):
+ *  - previous setup → any of this car's recent snapshots, picked from a dropdown. Was a single
+ *                     "your last setup"; adjusting the one you're on is the common case, and it
+ *                     isn't always the newest row.
+ *  - kit setup      → `SetupSheetModel.kitSetupJson` (admin-entered, catalog models only)
+ *  - empty          → always available
  */
+
+/**
+ * How many previous setups the dropdown offers. Their values ship with the page so switching
+ * between them is instant; keep this modest — each carries a full sheet of values.
+ */
+const PREVIOUS_SETUPS_LIMIT = 12;
 export default async function NewCarSetupPage(props: {
   params: Promise<{ carId: string }>;
 }): Promise<ReactNode> {
@@ -60,10 +71,63 @@ export default async function NewCarSetupPage(props: {
     ? normalizeSetupData(model.kitSetupJson)
     : null;
 
-  const lastSnapshot = await prisma.setupSnapshot.findFirst({
+  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
+
+  // Baselines, run snapshots and sheet-created setups share one table, so a single read covers
+  // every "start from something I already have" case.
+  const previousSnapshots = await prisma.setupSnapshot.findMany({
     where: { userId: user.id, carId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, data: true },
+    take: PREVIOUS_SETUPS_LIMIT,
+    select: {
+      id: true,
+      name: true,
+      data: true,
+      isLibrary: true,
+      createdAt: true,
+      runs: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          sessionType: true,
+          meetingSessionType: true,
+          meetingSessionCode: true,
+          sessionLabel: true,
+          track: { select: { name: true } },
+          trackNameSnapshot: true,
+          event: { select: { name: true } },
+        },
+      },
+      sourceDocuments: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { originalFilename: true },
+      },
+    },
+  });
+
+  // Same three-way discrimination the read-only setup page uses for its title.
+  const previousSetups = previousSnapshots.map((s) => {
+    const run = s.runs[0] ?? null;
+    const document = s.sourceDocuments[0] ?? null;
+    const label = s.isLibrary
+      ? (s.name ?? "Untitled baseline")
+      : run
+        ? [
+            run.event?.name ?? null,
+            formatRunSessionDisplay(run, { fallback: "Testing run" }),
+            run.track?.name ?? run.trackNameSnapshot ?? null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : (document?.originalFilename.replace(/\.[a-z0-9]+$/i, "") ?? "Setup");
+    return {
+      id: s.id,
+      label,
+      kind: s.isLibrary ? ("baseline" as const) : run ? ("run" as const) : ("sheet" as const),
+      dateLabel: formatRunDateShort(s.createdAt, displayTimeZone),
+      data: normalizeSetupData(s.data),
+    };
   });
 
   return (
@@ -84,15 +148,7 @@ export default async function NewCarSetupPage(props: {
             carName={car.name}
             template={template}
             kitSetup={kitSetup}
-            lastSetup={
-              lastSnapshot
-                ? {
-                    id: lastSnapshot.id,
-                    name: lastSnapshot.name,
-                    data: normalizeSetupData(lastSnapshot.data),
-                  }
-                : null
-            }
+            previousSetups={previousSetups}
           />
         </div>
       </section>
