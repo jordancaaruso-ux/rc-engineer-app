@@ -32,7 +32,7 @@
     "test:between-hints": "npx tsx src/lib/engineerPhase5/betweenRunHints/betweenRunHints.test.ts",
     "test:engineering-read": "npx tsx src/lib/engineerPhase5/engineeringRead.test.ts",
     "test:quick-fix": "npx tsx src/lib/engineerPhase5/quickFix/quickFix.test.ts",
-    "test:chat-mode": "npx tsx src/lib/engineerPhase5/engineerChoiceChips.test.ts",
+    "test:chat-mode": "npx tsx src/lib/engineerPhase5/engineerChoiceChips.test.ts && npx tsx src/lib/engineerPhase5/engineerChatStatus.test.ts",
     "test:chat-tier": "npx tsx src/lib/engineerPhase5/engineerChatContextTier.test.ts && npx tsx src/lib/engineerPhase5/lapHistoryQuery.test.ts",
     "test:full-kb": "node --conditions=react-server --import tsx src/lib/engineerPhase5/fullKbInContext.test.ts",
     "test:intent": "node --conditions=react-server --import tsx src/lib/engineerPhase5/parameterEffects/intentFromMessage.test.ts",

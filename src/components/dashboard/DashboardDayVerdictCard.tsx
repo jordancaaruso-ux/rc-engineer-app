@@ -86,8 +86,8 @@ function InstrumentRow({
   );
 }
 
-// No mode param (one-mode decision 2026-07-29): the server sees the run was logged
-// minutes ago via situationFacts, which is the same signal this card keyed off.
+// No mode param (one-mode decision 2026-07-29): the Engineer answers the same way
+// everywhere — the prompt text itself says what this tap wants.
 const ENGINEER_TODAY_HREF = `/engineer?prompt=${encodeURIComponent(
   "Give me your read on today so far."
 )}`;

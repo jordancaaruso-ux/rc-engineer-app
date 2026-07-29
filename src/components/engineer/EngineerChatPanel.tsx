@@ -14,6 +14,8 @@ import { parseChoiceChipsFromReply } from "@/lib/engineerPhase5/engineerChoiceCh
 
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
 
+import { EngineerThinkingIndicator } from "@/components/engineer/EngineerThinkingIndicator";
+
 import { Button } from "@/components/ui/Button";
 
 import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
@@ -80,14 +82,6 @@ type EngineerChatFeedback = {
 export type EngineerQueuedChatPrompt = { id: number; text: string };
 
 
-
-const STATUS_LABEL: Record<string, string> = {
-
-  preparing: "Preparing context…",
-
-  thinking: "Thinking…",
-
-};
 
 // History starts collapsed to the most recent few conversations; the rest live
 // behind a "Show all" toggle so the panel doesn't scroll into a wall of threads.
@@ -316,8 +310,8 @@ export function EngineerChatPanel({
 
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
-  // Mode system fully retired 2026-07-29 (one mode): the server reads raw situation
-  // facts from the run log instead, so the old `?mode=quick` URL hint is no longer sent.
+  // Mode system fully retired 2026-07-29 (one mode): the Engineer answers the same way
+  // in every situation, so the old `?mode=quick` URL hint is no longer sent.
 
   const messagesRef = useRef<ChatMessage[]>([]);
 
@@ -567,6 +561,11 @@ export function EngineerChatPanel({
 
         let pendingTokens = "";
 
+        // Once the answer starts, the status line is done for this turn. A completion can
+        // stream a preamble and *then* call a tool, which restarts the status events — without
+        // this the spinner would pop back in underneath prose that's already on screen.
+        let sawToken = false;
+
         let flushRaf: number | null = null;
 
         const flushTokens = () => {
@@ -603,9 +602,17 @@ export function EngineerChatPanel({
 
         const { reply, resolvedFocus, feedback } = await readSseStream(res, {
 
-          onStatus: (phase) => setStatusPhase(phase),
+          onStatus: (phase) => {
+
+            if (!sawToken) setStatusPhase(phase);
+
+          },
 
           onToken: (token) => {
+
+            // Set here, not in the rAF flush, so a status frame arriving in the same task
+            // can't slip in ahead of the first token.
+            sawToken = true;
 
             pendingTokens += token;
 
@@ -891,8 +898,6 @@ export function EngineerChatPanel({
 
 
 
-  const statusLabel = statusPhase ? (STATUS_LABEL[statusPhase] ?? "Working…") : null;
-
   const panelBusy = chatBusy || loadingThread;
 
   const showNewChat = Boolean(threadId || messages.length > 0);
@@ -969,21 +974,15 @@ export function EngineerChatPanel({
 
                 <EngineerMarkdown>{displayContent}</EngineerMarkdown>
 
+              ) : m.role === "assistant" && chatBusy && idx === messages.length - 1 ? (
+
+                <EngineerThinkingIndicator statusPhase={statusPhase} />
+
               ) : (
 
                 <div className="whitespace-pre-wrap break-words">
 
-                  {displayContent ||
-
-                    (chatBusy && m.role === "assistant"
-
-                      ? statusLabel ?? "…"
-
-                      : m.role === "assistant"
-
-                        ? "—"
-
-                        : "")}
+                  {displayContent || (m.role === "assistant" ? "—" : "")}
 
                 </div>
 

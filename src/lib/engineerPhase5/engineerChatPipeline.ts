@@ -67,29 +67,6 @@ export type BuiltEngineerChatContext =
       contextTier: "lookup" | "full";
     };
 
-/**
- * Raw facts about where the driver likely is, given to the model as DATA (the
- * quick/normal/deep mode system is retired — one prompt reads these and follows the
- * message; see the SITUATION block in CHAT_SYSTEM).
- */
-function buildSituationFacts(latestRun: {
-  createdAtIso: string;
-  createdAtLabel: string;
-  sessionTypeLabel: string;
-  eventId: string | null;
-} | null): Record<string, unknown> | null {
-  if (!latestRun) return null;
-  const then = Date.parse(latestRun.createdAtIso);
-  const minutes =
-    Number.isFinite(then) && Date.now() >= then ? Math.round((Date.now() - then) / 60_000) : null;
-  return {
-    minutesSinceLastLoggedRun: minutes,
-    lastRunWasAtEvent: Boolean(latestRun.eventId),
-    lastRunSessionLabel: latestRun.sessionTypeLabel || null,
-    lastRunCreatedAtLabel: latestRun.createdAtLabel,
-  };
-}
-
 export async function buildEngineerChatContext(params: {
   userId: string;
   body: EngineerChatPipelineBody | null;
@@ -98,9 +75,15 @@ export async function buildEngineerChatContext(params: {
   compareRunId: string;
   /** IANA zone for human time labels in the context (rc_tz / device zone). */
   timeZone?: string | null;
+  /**
+   * Coarse progress ticks for the chat's SSE status line — optional, so non-streaming
+   * callers are unaffected. Each tick fires immediately before work that is genuinely
+   * about to be awaited; labels live in `engineerChatStatus.ts`.
+   */
+  onStage?: (phase: string) => void;
 }): Promise<BuiltEngineerChatContext> {
   return perfSpan("buildEngineerChatContext", async () => {
-    const { userId, body, messages, runId, compareRunId, timeZone } = params;
+    const { userId, body, messages, runId, compareRunId, timeZone, onStage } = params;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const needsDeep = engineerChatNeedsDeepContext({
       lastUserMessage: lastUser?.content,
@@ -112,6 +95,8 @@ export async function buildEngineerChatContext(params: {
       runId,
       compareRunId,
     });
+
+    onStage?.("context_runs");
 
     const [basePacket, focusedRunPair] = await Promise.all([
       perfSpan("buildEngineerContextPacketV1", () => buildEngineerContextPacketV1(userId, timeZone)),
@@ -128,7 +113,7 @@ export async function buildEngineerChatContext(params: {
 
     const anchorForRichContext = runId || basePacket.latestRun?.id || null;
 
-    const situationFacts = buildSituationFacts(basePacket.latestRun);
+    if (lastUser && typeof lastUser.content === "string") onStage?.("context_kb");
 
     const richEngineerContext =
       lastUser && typeof lastUser.content === "string"
@@ -160,6 +145,10 @@ export async function buildEngineerChatContext(params: {
 
     const brainCarId = richEngineerContext?.car?.id ?? focusedRunPair?.primary.carId ?? null;
     const brainAnchor = anchorForRichContext;
+
+    // Only when it's real work — without `needsDeep` every branch below resolves to null
+    // instantly and the status line would be claiming work that never happens.
+    if (needsDeep) onStage?.("context_history");
 
     const [summaryResult, tireLifePriors, setupOutcomeMemory, engineeringBrain, runCatalog] =
       await Promise.all([
@@ -221,7 +210,6 @@ export async function buildEngineerChatContext(params: {
 
     const contextJson: Record<string, unknown> = {
       contextTier,
-      situationFacts,
       defaultDashboardContext: basePacket,
       engineerSummary,
       richEngineerContext,
@@ -245,7 +233,6 @@ export async function buildEngineerChatContext(params: {
 
     const baseForMerge: Record<string, unknown> = {
       contextTier,
-      situationFacts,
       defaultDashboardContext: basePacket,
       resolvedRunScope: null,
       patternDigest,

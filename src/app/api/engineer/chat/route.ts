@@ -12,7 +12,6 @@ import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { persistEngineerChatExchange } from "@/lib/engineerFeedback/persistExchange";
-import { captureFounderGoldSetCandidate } from "@/lib/engineerFeedback/goldSetCandidate";
 import type { EngineerMessageContextSnapshot } from "@/lib/engineerFeedback/types";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
 
@@ -62,7 +61,6 @@ type EngineerChatFeedbackPayload = {
 
 async function maybePersistEngineerReply(params: {
   userId: string;
-  userEmail: string | null | undefined;
   body: ChatRequestBody | null;
   messages: EngineerChatMessage[];
   reply: string;
@@ -87,15 +85,10 @@ async function maybePersistEngineerReply(params: {
       compareRunId: params.compareRunId,
       source: params.source,
     });
-    try {
-      await captureFounderGoldSetCandidate({
-        userId: params.userId,
-        userEmail: params.userEmail,
-        exchange,
-      });
-    } catch (captureErr) {
-      console.error("[api/engineer/chat] gold-set capture failed", captureErr);
-    }
+    // Gold-set auto-capture disconnected 2026-07-30 (founder call): the founder reviews
+    // answers directly via in-app ratings + notes for now. The candidate lib, admin API
+    // routes, and eval scripts stay in the tree — re-adding captureFounderGoldSetCandidate
+    // here (and EngineerGoldSetAdminSection in settings) turns it all back on.
     return exchange;
   } catch (err) {
     console.error("[api/engineer/chat] persist exchange failed", err);
@@ -150,7 +143,6 @@ export async function POST(request: Request) {
     if (lapHistoryAnswer) {
       const feedback = await maybePersistEngineerReply({
         userId: user.id,
-        userEmail: user.email,
         body,
         messages,
         reply: lapHistoryAnswer.reply,
@@ -180,6 +172,9 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache, no-transform",
+            // Status frames are the whole point of this stream; a buffering proxy would
+            // collapse a 60s answer back into one static label.
+            "X-Accel-Buffering": "no",
             Connection: "keep-alive",
           },
         });
@@ -223,6 +218,9 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache, no-transform",
+            // Status frames are the whole point of this stream; a buffering proxy would
+            // collapse a 60s answer back into one static label.
+            "X-Accel-Buffering": "no",
             Connection: "keep-alive",
           },
         });
@@ -235,7 +233,14 @@ export async function POST(request: Request) {
       const stream = new ReadableStream({
         async start(controller) {
           const send = (event: string, data: unknown) => {
-            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+            try {
+              controller.enqueue(
+                encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+              );
+            } catch {
+              // Client went away mid-stream. Swallow it — otherwise the catch below tries to
+              // send an error frame down the same dead stream and throws out of start().
+            }
           };
           try {
             send("status", { phase: "preparing" });
@@ -246,6 +251,7 @@ export async function POST(request: Request) {
               runId,
               compareRunId,
               timeZone,
+              onStage: (phase) => send("status", { phase }),
             });
             if ("error" in built) {
               send("error", { message: built.error ?? "Run not found" });
@@ -266,6 +272,7 @@ export async function POST(request: Request) {
               mergeContextWithFocusedPair,
               contextTier,
               timeZone,
+              onStatus: (phase) => send("status", { phase }),
               onToken: (t) => send("token", { t }),
             });
             await recordAiUsage({
@@ -278,7 +285,6 @@ export async function POST(request: Request) {
             });
             const feedback = await maybePersistEngineerReply({
               userId: user.id,
-              userEmail: user.email,
               body,
               messages,
               reply: out.reply,
@@ -305,6 +311,9 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-cache, no-transform",
+          // Status frames are the whole point of this stream; a buffering proxy would
+          // collapse a 60s answer back into one static label.
+          "X-Accel-Buffering": "no",
           Connection: "keep-alive",
         },
       });
@@ -349,7 +358,6 @@ export async function POST(request: Request) {
 
     const feedback = await maybePersistEngineerReply({
       userId: user.id,
-      userEmail: user.email,
       body,
       messages,
       reply: out.reply,

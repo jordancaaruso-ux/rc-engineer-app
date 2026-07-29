@@ -69,8 +69,8 @@ function buildChatCompletionBody(
  * has a 500K-TPM pool vs gpt-4o's 30K). Override with ENGINEER_MODEL.
  * ENGINEER_NORTH_STAR.md hard rule: no cheap models on the advice path. One mode
  * (founder decision 2026-07-29): the quick/normal/deep contract system is retired —
- * answer shape follows the message plus situationFacts, never a mode enum, and the
- * per-mode ENGINEER_DEEP_MODEL override went with it.
+ * the Engineer answers the same way in every situation, depth driven by the message
+ * alone, and the per-mode ENGINEER_DEEP_MODEL override went with it.
  * `temperature` is only sent when the model accepts it (see modelSupportsCustomTemperature).
  */
 export const ENGINEER_DEFAULT_MODEL = "gpt-5.5";
@@ -191,13 +191,7 @@ ANSWER SHAPE (read first — this governs how every reply looks):
 - Use bold sparingly — a few key terms or numbers, not every noun. Walls of asterisks read as noise, not emphasis.
 - Define a sheet term the first time you use it, in a few plain words (e.g. "upper link angle — how flat or angled the top link sits"), then use it normally. Assume the driver may not know the jargon on their own setup sheet.
 - Cite a number when it changes the call, not mechanically. One current-value-versus-field comparison that drives the decision beats reciting median and IQR on every parameter. Do not quote stats for knobs you are not asking them to move.
-- Match length and depth to the question: a quick "what should I try" gets a short, plain answer; a "why / how does this work" earns mechanism and detail. **Mechanism is EARNED, never the default.** Do not walk through load transfer, roll stiffness or tyre load sensitivity for someone who asked what to try — naming the change, the number, and what to feel for is a COMPLETE answer. Physics paragraphs on a practical question read as padding and bury the actual advice.
-
-SITUATION ("situationFacts" in the context JSON): raw facts about where the driver likely is right now — minutes since their last logged run, whether that run was at an event, its session label. Let them shape the ANSWER's depth, and always follow the message over any inference from them:
-- **Run logged within the last couple of hours** → they are probably between runs with minutes to decide. Lead with the read (1–2 lines interpreting their rating + handling log — don't make them re-explain what they logged), then ONE call with its prediction. Target ≤150 words; no option menus; no mechanism teaching unless asked. "No change — get another run on this and watch for X" is a first-class call. If a decision-changing input is missing, ask ONE sharp tap-to-answer question instead of advising.
-- **Event run in the last day or two, but not just now** → they have packed up and are thinking it over. Real back-and-forth is welcome: debrief across the day's runs, explore what-ifs, teach the mechanism behind the reasoning, and when natural end with the next question or test worth exploring. Depth means better reasoning, not more simultaneous recommendations.
-- **Otherwise** → normal conversational depth.
-Never mention this inference, never justify an answer's length by it. A trackside driver asking "why does that work?" still earns the explanation; an at-home driver asking for one quick call still gets exactly that. When situationFacts is null, just follow the message.
+- Match length and depth to the question: a quick "what should I try" gets a short, plain answer; a "why / how does this work" earns mechanism and detail. **Mechanism is EARNED, never the default.** Do not walk through load transfer, roll stiffness or tyre load sensitivity for someone who asked what to try — naming the change, the number, and what to feel for is a COMPLETE answer. Physics paragraphs on a practical question read as padding and bury the actual advice. The MESSAGE is the only signal for depth — never guess the driver's situation (trackside, at home, race day) or shape the answer around such a guess.
 
 TIMESTAMPS: Fields ending in "Iso" are UTC machine timestamps for ordering only — **never** read a clock time or a calendar date out of an "*Iso" field; the driver is usually not in UTC. When saying when a run happened, quote the pre-formatted label fields verbatim ("createdAtLabel", "whenLabel", "referenceLabel") — they are already in the driver's local time (see "defaultDashboardContext.driverTimeZone"). If only an ISO instant is available for a run, refer to it by order or label ("your latest run", "Run 3") without a clock time.
 
@@ -759,6 +753,13 @@ export async function generateEngineerChatReplyWithTools(params: {
   userId: string;
   mergeContextWithFocusedPair: (focused: EngineerFocusedRunPairContext) => Promise<unknown>;
   onToken?: (delta: string) => void;
+  /**
+   * Coarse progress for the chat's SSE status line. Slugs are opaque here —
+   * `engineerChatStatus.ts` owns the human labels. Fires only for work that is genuinely
+   * about to be awaited, which matters most in the tool loop: token streaming is suppressed
+   * on any round that turns out to be a tool call, so without this the client sees nothing.
+   */
+  onStatus?: (phase: string) => void;
   contextTier?: EngineerChatContextTier;
   /** IANA zone for human time labels in tool results (rc_tz / device zone). */
   timeZone?: string | null;
@@ -846,6 +847,9 @@ export async function generateEngineerChatReplyWithTools(params: {
   const MAX_ITERS = 10;
   let lastModel = getEngineerChatModelAndTemperature(tier).model;
   for (let iter = 0; iter < MAX_ITERS; iter++) {
+    // Rounds after the first are the model re-reading tool output — otherwise the client
+    // sits on "thinking" for the whole loop with no sign anything moved.
+    if (iter > 0) params.onStatus?.("reviewing");
     const opts = getEngineerChatModelAndTemperature(tier);
     lastModel = opts.model;
     systemPrompt = chatSystemPromptForContext(tier, workingContext);
@@ -928,11 +932,14 @@ export async function generateEngineerChatReplyWithTools(params: {
             typeof argsObj.compare_run_id === "string" && argsObj.compare_run_id.trim()
               ? argsObj.compare_run_id.trim()
               : null;
+          params.onStatus?.("tool:apply_engineer_focus");
           const applied = await applyEngineerFocusTool(params.userId, primary, compare, params.timeZone);
           if (!applied.ok) {
             messagesApi.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: applied.error }) });
             continue;
           }
+          // A second full context build — the biggest stall in the loop, and invisible until now.
+          params.onStatus?.("focus_rebuild");
           workingContext = await params.mergeContextWithFocusedPair(applied.focusedRunPair);
           resolvedFocus = {
             runId: applied.focusedRunPair.primaryRunId,
@@ -954,6 +961,7 @@ export async function generateEngineerChatReplyWithTools(params: {
           continue;
         }
 
+        params.onStatus?.(`tool:${name}`);
         const toolContent = await executeSearchOrListTool(name, args, params.userId, params.timeZone);
         messagesApi.push({ role: "tool", tool_call_id: tc.id, content: toolContent });
       }
