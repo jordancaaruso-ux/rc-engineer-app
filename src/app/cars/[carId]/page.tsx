@@ -18,6 +18,14 @@ import { CarSetupsCard } from "@/components/setup/CarSetupsCard";
 import { CarCurrentSetupCard } from "@/components/setup/CarCurrentSetupCard";
 import { CarSetupHistory } from "@/components/setup/CarSetupHistory";
 import { getCarSetupHistory } from "@/lib/setup/getCarSetupHistory";
+import { CarBaselineSetupsCard } from "@/components/baselineSetups/CarBaselineSetupsCard";
+import {
+  BASELINE_KIND_LABEL,
+  baselineContextLabel,
+  sortBaselineSetups,
+  type BaselineSetupKindValue,
+} from "@/lib/baselineSetups/baselineSetupShape";
+import { normalizeSetupData } from "@/lib/runSetup";
 
 export default async function CarDetailPage(props: {
   params: Promise<{ carId: string }>;
@@ -113,10 +121,10 @@ export default async function CarDetailPage(props: {
   }
 
   /*
-   * Wave 3 — the two reads that genuinely needed `car` first. `setupHistory` wants the
-   * whole row; `modelRow` wants `setupSheetModelId`. Independent of each other.
+   * Wave 3 — the reads that genuinely needed `car` first. `setupHistory` wants the whole
+   * row; `modelRow` and the baselines want `setupSheetModelId`. Independent of each other.
    */
-  const [setupHistory, modelRow] = await Promise.all([
+  const [setupHistory, modelRow, baselineRows] = await Promise.all([
     // Everything this car has been set up with: newest run's setup, then the chassis
     // changes and uploaded sheets behind it.
     getCarSetupHistory({ userId: user.id, car, displayTimeZone }),
@@ -132,7 +140,34 @@ export default async function CarDetailPage(props: {
           },
         })
       : null,
+    // Baselines are global — published against the chassis type, never scoped by userId.
+    car.setupSheetModelId
+      ? prisma.baselineSetup.findMany({
+          where: { setupSheetModelId: car.setupSheetModelId },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            kind: true,
+            notes: true,
+            surface: true,
+            gripLevel: true,
+            data: true,
+          },
+        })
+      : [],
   ]);
+
+  const baselines = sortBaselineSetups(
+    baselineRows.map((b) => ({ ...b, kind: b.kind as BaselineSetupKindValue }))
+  ).map((b) => ({
+    id: b.id,
+    name: b.name,
+    kindLabel: BASELINE_KIND_LABEL[b.kind],
+    contextLabel: baselineContextLabel(b),
+    notes: b.notes,
+    valueCount: Object.keys(normalizeSetupData(b.data)).length,
+  }));
 
   const runsOnCarByTire = new Map<string, number>();
   /** Highest run count reached on this compound — a rough "how far you've taken it". */
@@ -181,7 +216,7 @@ export default async function CarDetailPage(props: {
 
           <CarSetupsCard
             carId={car.id}
-            label="Saved baselines"
+            label="Saved setups"
             setups={librarySetups.map((s) => ({
               id: s.id,
               name: s.name,
@@ -189,6 +224,10 @@ export default async function CarDetailPage(props: {
               usedInRuns: s._count.runs + s._count.derivedSnapshots,
             }))}
           />
+
+          {baselines.length > 0 ? (
+            <CarBaselineSetupsCard carId={car.id} baselines={baselines} />
+          ) : null}
 
           <CarSetupHistory
             entries={setupHistory.entries}

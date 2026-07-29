@@ -9,7 +9,7 @@ import type { CarSetupHistoryEntry } from "@/lib/setup/carSetupHistory";
 
 /**
  * Every setup this car has been through, newest first — the runs where the chassis actually
- * changed, and the sheets uploaded for it. Saved baselines sit in their own card above; the
+ * changed, and the sheets uploaded for it. Saved setups sit in their own card above; the
  * filter chips only appear once a car has both kinds, so a young car stays quiet.
  */
 

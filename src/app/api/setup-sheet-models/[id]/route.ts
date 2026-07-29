@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -16,7 +15,6 @@ import {
   suppressCatalogSlug,
 } from "@/lib/setupSheetModels/catalogSuppression";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
-import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 
 function normalizeSchema(schema: SetupSheetModelSchema | null): SetupSheetModelSchema | null {
   if (!schema) return null;
@@ -82,8 +80,6 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     schema?: unknown;
     defaultCalibrationId?: string | null;
     isAuthorized?: boolean;
-    /** Manufacturer kit setup (admin-only). `null` clears it. */
-    kitSetup?: unknown;
   };
   const isAdmin = isAuthAdminEmail(user.email);
 
@@ -101,24 +97,8 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     schemaJson?: object;
     defaultCalibrationId?: string | null;
     isAuthorized?: boolean;
-    // Prisma clears a nullable Json column with DbNull, not a bare null.
-    kitSetupJson?: Prisma.InputJsonValue | typeof Prisma.DbNull;
   } = {};
   if (body.name?.trim()) data.name = body.name.trim();
-  if ("kitSetup" in body) {
-    // The kit setup is quoted to every driver who starts a setup from it, so it is curated:
-    // admin-only, like the authorized flag.
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: "Only an admin can set a chassis type's kit setup." },
-        { status: 403 }
-      );
-    }
-    data.kitSetupJson =
-      body.kitSetup == null
-        ? Prisma.DbNull
-        : (normalizeSetupSnapshotForStorage(body.kitSetup) as Prisma.InputJsonValue);
-  }
   if (typeof body.isAuthorized === "boolean") {
     if (!isAdmin) {
       return NextResponse.json(

@@ -6,7 +6,14 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateForCar";
-import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
+import { normalizeSetupData } from "@/lib/runSetup";
+import {
+  BASELINE_KIND_LABEL,
+  baselineContextLabel,
+  sortBaselineSetups,
+  type BaselineSetupKindValue,
+} from "@/lib/baselineSetups/baselineSetupShape";
+import type { BaselineStartChoice } from "@/components/setup/NewCarSetupClient";
 import { formatRunDateShort } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
@@ -19,7 +26,8 @@ import { NewCarSetupClient } from "@/components/setup/NewCarSetupClient";
  *  - previous setup → any of this car's recent snapshots, picked from a dropdown. Was a single
  *                     "your last setup"; adjusting the one you're on is the common case, and it
  *                     isn't always the newest row.
- *  - kit setup      → `SetupSheetModel.kitSetupJson` (admin-entered, catalog models only)
+ *  - baseline       → any global `BaselineSetup` published against this car's chassis (kit first).
+ *                     Was kit-only; a pro sheet is just as good a place to start.
  *  - empty          → always available
  */
 
@@ -60,20 +68,27 @@ export default async function NewCarSetupPage(props: {
 
   const template = await getSetupSheetTemplateForCar(user.id, car, "setup");
 
-  // Setup sheet models are global — never scope this read by userId.
-  const model = car.setupSheetModelId
-    ? await prisma.setupSheetModel.findUnique({
-        where: { id: car.setupSheetModelId },
-        select: { kitSetupJson: true },
+  // Baselines are global — never scope this read by userId. Kit first, then base, then pro.
+  const baselineRows = car.setupSheetModelId
+    ? await prisma.baselineSetup.findMany({
+        where: { setupSheetModelId: car.setupSheetModelId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, name: true, kind: true, surface: true, gripLevel: true, data: true },
       })
-    : null;
-  const kitSetup: SetupSnapshotData | null = model?.kitSetupJson
-    ? normalizeSetupData(model.kitSetupJson)
-    : null;
+    : [];
+  const baselines: BaselineStartChoice[] = sortBaselineSetups(
+    baselineRows.map((b) => ({ ...b, kind: b.kind as BaselineSetupKindValue }))
+  ).map((b) => ({
+    id: b.id,
+    label: b.name,
+    kindLabel: BASELINE_KIND_LABEL[b.kind],
+    contextLabel: baselineContextLabel(b),
+    data: normalizeSetupData(b.data),
+  }));
 
   const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
 
-  // Baselines, run snapshots and sheet-created setups share one table, so a single read covers
+  // Saved setups, run snapshots and sheet-created setups share one table, so a single read covers
   // every "start from something I already have" case.
   const previousSnapshots = await prisma.setupSnapshot.findMany({
     where: { userId: user.id, carId },
@@ -111,7 +126,7 @@ export default async function NewCarSetupPage(props: {
     const run = s.runs[0] ?? null;
     const document = s.sourceDocuments[0] ?? null;
     const label = s.isLibrary
-      ? (s.name ?? "Untitled baseline")
+      ? (s.name ?? "Untitled setup")
       : run
         ? [
             run.event?.name ?? null,
@@ -124,7 +139,7 @@ export default async function NewCarSetupPage(props: {
     return {
       id: s.id,
       label,
-      kind: s.isLibrary ? ("baseline" as const) : run ? ("run" as const) : ("sheet" as const),
+      kind: s.isLibrary ? ("saved" as const) : run ? ("run" as const) : ("sheet" as const),
       dateLabel: formatRunDateShort(s.createdAt, displayTimeZone),
       data: normalizeSetupData(s.data),
     };
@@ -147,7 +162,7 @@ export default async function NewCarSetupPage(props: {
             carId={car.id}
             carName={car.name}
             template={template}
-            kitSetup={kitSetup}
+            baselines={baselines}
             previousSetups={previousSetups}
           />
         </div>

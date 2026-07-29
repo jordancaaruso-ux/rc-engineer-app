@@ -509,12 +509,24 @@ export async function buildSetupSpreadForEngineer(params: {
     where: { id: params.carId, userId: params.userId },
     select: {
       setupSheetTemplate: true,
-      setupSheetModel: { select: { name: true, kitSetupJson: true } },
+      setupSheetModel: { select: { id: true, name: true } },
     },
   });
+  /**
+   * The chassis' KIT baseline — the neutral reference the bands are measured against. Pro and base
+   * sheets are start points for drivers, not references: they'd move the centre around per setup.
+   * One extra round trip, and only for cars that have a chassis type at all.
+   */
+  const kitBaseline = carRow?.setupSheetModel
+    ? await prisma.baselineSetup.findFirst({
+        where: { setupSheetModelId: carRow.setupSheetModel.id, kind: "KIT" },
+        orderBy: { createdAt: "desc" },
+        select: { data: true },
+      })
+    : null;
   const baseSetup = carRow?.setupSheetModel
     ? buildBaseSetupReference({
-        kitSetupJson: carRow.setupSheetModel.kitSetupJson,
+        kitSetupData: kitBaseline?.data ?? null,
         modelName: carRow.setupSheetModel.name,
       })
     : null;

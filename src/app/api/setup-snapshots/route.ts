@@ -80,7 +80,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!name) return NextResponse.json({ error: "A setup name is required" }, { status: 400 });
 
   // Ownership check: a library setup only ever hangs off the requester's own car.
-  const car = await prisma.car.findFirst({ where: { id: carId, userId: userId }, select: { id: true } });
+  const car = await prisma.car.findFirst({
+    where: { id: carId, userId: userId },
+    select: { id: true, setupSheetModelId: true },
+  });
   if (!car) return NextResponse.json({ error: "Car not found" }, { status: 404 });
 
   const baseId = typeof body.baseSetupSnapshotId === "string" ? body.baseSetupSnapshotId.trim() : "";
@@ -106,6 +109,33 @@ export async function POST(request: Request): Promise<NextResponse> {
     sourceData = source.data;
   }
 
+  /**
+   * Adopting a global baseline. Copy, never reference: the driver owns these values from here on,
+   * so an admin editing or deleting the baseline can't rewrite their setup. The link is kept for
+   * the "from Kit setup" label only.
+   *
+   * Two callers, one field. "Save a copy" on the car page sends no `data`, so the baseline's values
+   * are read here. The New Setup flow sends the sheet the driver just edited — those win, and the
+   * baseline id records only where they started.
+   */
+  const fromBaselineId =
+    typeof body.fromBaselineId === "string" ? body.fromBaselineId.trim() : "";
+  if (fromBaselineId) {
+    // Baselines are global — not scoped by user, only by the chassis they were published against.
+    const baseline = await prisma.baselineSetup.findUnique({
+      where: { id: fromBaselineId },
+      select: { data: true, setupSheetModelId: true },
+    });
+    if (!baseline) return NextResponse.json({ error: "Baseline not found" }, { status: 404 });
+    if (baseline.setupSheetModelId !== car.setupSheetModelId) {
+      return NextResponse.json(
+        { error: "That baseline belongs to a different chassis type." },
+        { status: 400 }
+      );
+    }
+    if (body.data === undefined) sourceData = baseline.data;
+  }
+
   const setup = await prisma.setupSnapshot.create({
     data: {
       userId: userId,
@@ -114,6 +144,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       isLibrary: true,
       data: normalizeSetupSnapshotForStorage(sourceData),
       ...(baseId ? { baseSetupSnapshotId: baseId } : {}),
+      ...(fromBaselineId ? { sourceBaselineId: fromBaselineId } : {}),
     },
     select: { id: true, name: true, createdAt: true },
   });

@@ -3,7 +3,7 @@ import { chassisChangedKeys } from "@/lib/setup/runContextSetupKeys";
 
 /**
  * One car's setup history: the runs where the chassis actually changed, plus the sheets uploaded
- * for it. Saved baselines are deliberately absent — they get their own section on the car page.
+ * for it. Saved setups are deliberately absent — they get their own section on the car page.
  *
  * Two rules make this list readable (founder call 2026-07-22):
  *  - a run earns a row only when something outside `RUN_CONTEXT_SETUP_KEYS` changed, so picking

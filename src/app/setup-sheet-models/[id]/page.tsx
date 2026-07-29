@@ -10,6 +10,12 @@ import {
   normalizeCalibrationData,
 } from "@/lib/setupCalibrations/types";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { normalizeSetupData } from "@/lib/runSetup";
+import {
+  sortBaselineSetups,
+  type BaselineSetupKindValue,
+} from "@/lib/baselineSetups/baselineSetupShape";
+import { ChassisBaselineList } from "@/components/baselineSetups/ChassisBaselineList";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
 import { ButtonLink } from "@/components/ui/ButtonLink";
@@ -46,7 +52,6 @@ export default async function SetupSheetModelWorkbenchPage({
       slug: true,
       isAuthorized: true,
       schemaJson: true,
-      kitSetupJson: true,
       defaultCalibration: {
         select: {
           id: true,
@@ -62,8 +67,6 @@ export default async function SetupSheetModelWorkbenchPage({
   if (!model) notFound();
 
   const schema = parseSetupSheetModelSchema(model.schemaJson);
-  const hasKitSetup =
-    model.kitSetupJson != null && Object.keys(model.kitSetupJson as object).length > 0;
   const calibration = model.defaultCalibration;
   const calData = calibration ? normalizeCalibrationData(calibration.calibrationDataJson) : null;
   const counts = calData ? calibrationMappingCounts(calData) : null;
@@ -74,6 +77,26 @@ export default async function SetupSheetModelWorkbenchPage({
   const boxEditorHref = calibration?.exampleDocumentId
     ? `/setup-documents/${calibration.exampleDocumentId}/calibrate-image`
     : null;
+
+  // Baselines are global — read them for everyone; only the controls are admin-gated.
+  const baselines = sortBaselineSetups(
+    (
+      await prisma.baselineSetup.findMany({
+        where: { setupSheetModelId: model.id },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          kind: true,
+          notes: true,
+          surface: true,
+          gripLevel: true,
+          data: true,
+          _count: { select: { copies: true } },
+        },
+      })
+    ).map((b) => ({ ...b, kind: b.kind as BaselineSetupKindValue }))
+  );
 
   const recentDocs = await prisma.setupDocument.findMany({
     where: { setupSheetModelId: model.id },
@@ -188,20 +211,23 @@ export default async function SetupSheetModelWorkbenchPage({
             <ButtonLink href={`/setup-sheet-models/${model.id}/schema`} variant="outline">
               Arrange the setup sheet
             </ButtonLink>
-            {isAdmin ? (
-              <ButtonLink href={`/setup-sheet-models/${model.id}/kit-setup`} variant="outline">
-                {hasKitSetup ? "Edit kit setup" : "Enter kit setup"}
-              </ButtonLink>
-            ) : null}
           </div>
-          {isAdmin ? (
-            <p className="text-xs text-muted-foreground">
-              {hasKitSetup
-                ? "Drivers can start a new setup pre-filled at kit."
-                : "No kit setup yet — drivers start from empty or their own last setup."}
-            </p>
-          ) : null}
         </CardPanel>
+
+        <ChassisBaselineList
+          modelId={model.id}
+          isAdmin={isAdmin}
+          baselines={baselines.map((b) => ({
+            id: b.id,
+            name: b.name,
+            kind: b.kind as BaselineSetupKindValue,
+            notes: b.notes,
+            surface: b.surface,
+            gripLevel: b.gripLevel,
+            valueCount: Object.keys(normalizeSetupData(b.data)).length,
+            copyCount: b._count.copies,
+          }))}
+        />
 
         <CardPanel contentClassName="space-y-3">
           <Eyebrow>Test reads</Eyebrow>

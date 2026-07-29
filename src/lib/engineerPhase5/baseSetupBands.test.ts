@@ -81,13 +81,13 @@ test("step table resolves the specific prefix before the broader one", () => {
 });
 
 test("base reference is null when there is no kit setup to read", () => {
-  assert.equal(buildBaseSetupReference({ kitSetupJson: null, modelName: "X" }), null);
-  assert.equal(buildBaseSetupReference({ kitSetupJson: {}, modelName: "X" }), null);
+  assert.equal(buildBaseSetupReference({ kitSetupData: null, modelName: "X" }), null);
+  assert.equal(buildBaseSetupReference({ kitSetupData: {}, modelName: "X" }), null);
 });
 
 test("base values parse the same way a driver's own values do", () => {
   const base = buildBaseSetupReference({
-    kitSetupJson: {
+    kitSetupData: {
       camber_front: "-1.5",
       front_spring_rate_gf_mm: 30,
       ride_height_front: "5,5 mm", // European decimal comma, as OCR'd sheets produce
@@ -106,7 +106,7 @@ test("base values parse the same way a driver's own values do", () => {
 
 test("a categorical base value yields no centre, so no window", () => {
   const base = buildBaseSetupReference({
-    kitSetupJson: { chassis: "2.0mm carbon", camber_front: "-1.5" },
+    kitSetupData: { chassis: "2.0mm carbon", camber_front: "-1.5" },
     modelName: "X",
   })!;
   // Two independent guards, either one enough to suppress the band:
@@ -117,7 +117,7 @@ test("a categorical base value yields no centre, so no window", () => {
 
 test("derived geometry keys read from computed metrics, not raw data", () => {
   const base = buildBaseSetupReference({
-    kitSetupJson: { camber_front: "-1.5" },
+    kitSetupData: { camber_front: "-1.5" },
     modelName: "X",
   })!;
   // No platform pack matches this sparse data, so derived metrics are null — and null means no band.

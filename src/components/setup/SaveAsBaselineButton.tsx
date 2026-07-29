@@ -5,14 +5,17 @@ import { useState, useTransition } from "react";
 import { outlineButtonClassName } from "@/components/ui/ButtonLink";
 
 /**
- * Copy any setup — a run's, a sheet's — into a named baseline in the car's library. The server
- * reads the source snapshot's values, so the client only ever sends ids.
+ * Copy any setup — a run's, a sheet's — into a named setup in the car's library. The server reads
+ * the source snapshot's values, so the client only ever sends ids.
+ *
+ * "Baseline" now means an admin-published global sheet (`BaselineSetup`); these are the driver's
+ * own saved setups, so the copy says so.
  */
 export function SaveAsBaselineButton({
   carId,
   setupId,
   defaultName = "",
-  label = "Save as baseline",
+  label = "Save to my setups",
 }: {
   carId: string;
   setupId: string;
@@ -26,7 +29,7 @@ export function SaveAsBaselineButton({
   const [saved, setSaved] = useState(false);
 
   const save = async () => {
-    const entered = window.prompt("Name this baseline", defaultName);
+    const entered = window.prompt("Name this setup", defaultName);
     if (entered == null) return;
     const name = entered.trim();
     if (!name) return;
@@ -40,12 +43,12 @@ export function SaveAsBaselineButton({
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "Could not save this baseline.");
+        throw new Error(body.error ?? "Could not save this setup.");
       }
       setSaved(true);
       startTransition(() => router.refresh());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save this baseline.");
+      setError(e instanceof Error ? e.message : "Could not save this setup.");
     } finally {
       setBusy(false);
     }

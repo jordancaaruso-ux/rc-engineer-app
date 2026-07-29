@@ -423,8 +423,14 @@ shape: `displayName`, `modelCode` unique, `verifiedAt?`.
 
 **`SetupSheetModel`** — **the chassis type**. `name`, `slug` (unique, e.g. `mugen_mtc3`,
 `awesomatix_a800rr`), `schemaJson` (the parameter schema — see §4.9), `isAuthorized` (this model's
-version of "verified"; admin-curated), `kitSetupJson?` (the manufacturer's baseline setup),
-`defaultCalibrationId?`. Global, not user-owned — `userId` is creator attribution only.
+version of "verified"; admin-curated), `defaultCalibrationId?`. Global, not user-owned — `userId`
+is creator attribution only.
+
+**`BaselineSetup`** — a named, admin-published setup against a chassis type. `setupSheetModelId`,
+`name`, `kind` (`KIT` | `BASE` | `PRO`), `notes?`, `surface?`, `gripLevel?`, `data` (same shape as
+`SetupSnapshot.data`). Global and read-only to drivers; adopting one copies it into their own
+library (`SetupSnapshot.sourceBaselineId`), so admin edits never rewrite a saved setup. Replaced
+the single `SetupSheetModel.kitSetupJson` blob (2026-07-29).
 
 **`SetupSheetCatalogSuppression`** — `slug` PK. Catalog slugs an admin deleted, so the global seed
 does not recreate them.

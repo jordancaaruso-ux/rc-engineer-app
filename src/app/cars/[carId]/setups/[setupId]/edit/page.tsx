@@ -61,7 +61,7 @@ export default async function CarSetupEditPage(props: {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <PageBackLink href={`/cars/${car.id}`} />
           <div className="min-w-0">
-            <h1 className="page-title truncate">{setup.name ?? "Untitled baseline"}</h1>
+            <h1 className="page-title truncate">{setup.name ?? "Untitled setup"}</h1>
             <p className="page-subtitle truncate">{car.name}</p>
           </div>
         </div>

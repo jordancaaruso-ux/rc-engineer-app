@@ -17,23 +17,23 @@ export type BaseSetupReference = {
 };
 
 /**
- * Build the reference a car's position bands are measured against, from its setup-sheet model's
- * admin-entered kit setup (`SetupSheetModel.kitSetupJson`).
+ * Build the reference a car's position bands are measured against, from the KIT baseline published
+ * against its chassis type (`BaselineSetup` with `kind: KIT`).
  *
- * Pure on purpose — the caller supplies the already-loaded model row so this stays testable without
- * a database and adds no extra query. `kitSetupJson` is stored in `SetupSnapshot.data` shape, so
- * after `normalizeSetupData` its keys line up with the driver's own snapshot for free.
+ * Pure on purpose — the caller supplies the already-loaded values so this stays testable without a
+ * database. Baseline data is stored in `SetupSnapshot.data` shape, so after `normalizeSetupData`
+ * its keys line up with the driver's own snapshot for free.
  *
- * Returns null when the car has no model, the model has no kit setup, or the kit setup is empty.
- * That is the common case today and must stay cheap and silent: no bands, no warning, behaviour
- * exactly as it was before base setups existed.
+ * Returns null when the car has no model, the chassis has no KIT baseline, or that baseline is
+ * empty. That is the common case today and must stay cheap and silent: no bands, no warning,
+ * behaviour exactly as it was before base setups existed.
  */
 export function buildBaseSetupReference(params: {
-  kitSetupJson: unknown;
+  kitSetupData: unknown;
   modelName: string;
 }): BaseSetupReference | null {
-  if (params.kitSetupJson == null) return null;
-  const data = normalizeSetupData(params.kitSetupJson);
+  if (params.kitSetupData == null) return null;
+  const data = normalizeSetupData(params.kitSetupData);
   if (Object.keys(data).length === 0) return null;
   return {
     ref: { kind: "kit", modelName: params.modelName },
