@@ -172,6 +172,7 @@ export function RunDetailPanel({
   displayTimeZone,
   allowRunMutations = true,
   onDeleted,
+  className,
 }: {
   run: Run;
   pickerRuns: CompareRunShape[];
@@ -184,6 +185,8 @@ export function RunDetailPanel({
    * `/runs/[id]` navigates away — the page it was on no longer exists.
    */
   onDeleted?: () => void;
+  /** Outer card override — `/runs/[id]` squares the top corners to fuse with its action strip. */
+  className?: string;
 }) {
   const router = useRouter();
   const todayDraft = useTodayDraftRunOptional();
@@ -567,7 +570,7 @@ export function RunDetailPanel({
     ) : null;
 
   return (
-    <CardPanel contentClassName="space-y-3 text-sm min-w-0 w-full">
+    <CardPanel className={className} contentClassName="space-y-3 text-sm min-w-0 w-full">
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <Eyebrow>Session details</Eyebrow>
