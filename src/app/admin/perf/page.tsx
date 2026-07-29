@@ -9,18 +9,26 @@ import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { PERF_ENABLED } from "@/lib/perf/perfConfig";
+import type { PerfEnv } from "@/lib/perf/perfQueries";
 import {
   loadClientRollups,
   loadColdStartRollup,
+  loadEnvCounts,
   loadPerfCounts,
   loadQueryRollups,
   loadRouteRollups,
   parseDaysParam,
+  parseEnvParam,
 } from "@/lib/perf/perfQueries";
 
 export const dynamic = "force-dynamic";
 
 const WINDOWS = [1, 7, 30] as const;
+const ENVS: { key: PerfEnv; label: string }[] = [
+  { key: "vercel", label: "prod" },
+  { key: "local", label: "local" },
+  { key: "all", label: "both" },
+];
 
 /**
  * Performance ranking — what is actually slow, from real usage on Jordan's own devices.
@@ -33,11 +41,11 @@ const WINDOWS = [1, 7, 30] as const;
 export default async function AdminPerfPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string }>;
+  searchParams: Promise<{ days?: string; env?: string }>;
 }): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
-      <PerfShell days={7}>
+      <PerfShell days={7} env="vercel" envCounts={[]}>
         <CardPanel contentClassName="text-sm text-muted-foreground">
           Set DATABASE_URL in .env.
         </CardPanel>
@@ -48,17 +56,24 @@ export default async function AdminPerfPage({
   const user = await requireCurrentUser();
   if (!isAuthAdminEmail(user.email)) notFound();
 
-  const days = parseDaysParam((await searchParams).days);
-  const [routes, queries, client, counts, coldStart] = await Promise.all([
-    loadRouteRollups(days),
-    loadQueryRollups(days),
-    loadClientRollups(days),
-    loadPerfCounts(days),
-    loadColdStartRollup(days),
+  const sp = await searchParams;
+  const days = parseDaysParam(sp.days);
+  // Defaults to production. Local and prod share this database, and `next dev` compiles
+  // routes on demand — mixing them puts webpack time into the p95 and reads as a
+  // production problem that does not exist.
+  const env = parseEnvParam(sp.env);
+
+  const [routes, queries, client, counts, coldStart, envCounts] = await Promise.all([
+    loadRouteRollups(days, env),
+    loadQueryRollups(days, env),
+    loadClientRollups(days, env),
+    loadPerfCounts(days, env),
+    loadColdStartRollup(days, env),
+    loadEnvCounts(days),
   ]);
 
   return (
-    <PerfShell days={days}>
+    <PerfShell days={days} env={env} envCounts={envCounts}>
       {!PERF_ENABLED ? (
         <CardPanel contentClassName="text-sm text-muted-foreground">
           Instrumentation is <span className="font-mono">off</span> — set{" "}
@@ -158,7 +173,20 @@ export default async function AdminPerfPage({
   );
 }
 
-function PerfShell({ days, children }: { days: number; children: ReactNode }): ReactNode {
+function PerfShell({
+  days,
+  env,
+  envCounts,
+  children,
+}: {
+  days: number;
+  env: PerfEnv;
+  envCounts: { env: string; samples: number }[];
+  children: ReactNode;
+}): ReactNode {
+  const envLabel = env === "vercel" ? "Production" : env === "local" ? "Local dev" : "Both";
+  const tally = envCounts.map((c) => `${c.samples} ${c.env}`).join(" · ");
+
   return (
     <>
       <header className="page-header">
@@ -166,30 +194,62 @@ function PerfShell({ days, children }: { days: number; children: ReactNode }): R
           <PageBackLink href="/setup/admin" />
           <div className="min-w-0">
             <h1 className="page-title">Performance</h1>
-            <p className="page-subtitle">Last {days} day{days === 1 ? "" : "s"} of real usage.</p>
+            <p className="page-subtitle">
+              {envLabel} · last {days} day{days === 1 ? "" : "s"}.
+            </p>
           </div>
         </div>
       </header>
 
       <section className="page-body max-w-2xl space-y-4">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {WINDOWS.map((w) => (
-            <Link
-              key={w}
-              href={`/admin/perf?days=${w}`}
-              className={
-                w === days
-                  ? "rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] text-foreground"
-                  : "rounded-full border border-border/60 px-3 py-1 font-mono text-[11px] text-muted-foreground"
-              }
-            >
+            <Chip key={w} href={`/admin/perf?days=${w}&env=${env}`} active={w === days}>
               {w}d
-            </Link>
+            </Chip>
+          ))}
+          <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+          {ENVS.map((e) => (
+            <Chip
+              key={e.key}
+              href={`/admin/perf?days=${days}&env=${e.key}`}
+              active={e.key === env}
+            >
+              {e.label}
+            </Chip>
           ))}
         </div>
+        {tally ? (
+          <p className="-mt-2 font-mono text-[10px] text-muted-foreground">
+            in window: {tally}
+          </p>
+        ) : null}
         {children}
       </section>
     </>
+  );
+}
+
+function Chip({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: ReactNode;
+}): ReactNode {
+  return (
+    <Link
+      href={href}
+      className={
+        active
+          ? "rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] text-foreground"
+          : "rounded-full border border-border/60 px-3 py-1 font-mono text-[11px] text-muted-foreground"
+      }
+    >
+      {children}
+    </Link>
   );
 }
 

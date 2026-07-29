@@ -145,11 +145,13 @@ async function main(): Promise<void> {
   assert.equal(clientCount, 3, `duplicate beacon was not absorbed: ${clientCount} rows`);
 
   // --- The raw SQL behind /admin/perf actually runs -------------------------------------
+  // "all" so the rows this script just wrote are visible regardless of whether it ran
+  // with a deploy id set.
   const [routes, queries, client, counts] = await Promise.all([
-    loadRouteRollups(1),
-    loadQueryRollups(1),
-    loadClientRollups(1),
-    loadPerfCounts(1),
+    loadRouteRollups(1, "all"),
+    loadQueryRollups(1, "all"),
+    loadClientRollups(1, "all"),
+    loadPerfCounts(1, "all"),
   ]);
   const selfRoute = routes.find((r) => r.route === SELFTEST_ROUTE);
   assert.ok(selfRoute, "route rollup should include the selftest route");
