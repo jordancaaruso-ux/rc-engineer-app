@@ -69,6 +69,21 @@ export default async function SetupAdminPage(): Promise<ReactNode> {
       <section className="page-body max-w-2xl">
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
+            <Eyebrow>Performance</Eyebrow>
+            <Link
+              href="/admin/perf"
+              className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-muted"
+            >
+              Open
+            </Link>
+          </div>
+          <SurfaceCard variant="panel" contentClassName="px-4 py-3 text-xs text-muted-foreground">
+            Route and query timings from real usage, plus client vitals per device.
+          </SurfaceCard>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
             <Eyebrow>Setup calibrations</Eyebrow>
             <Link
               href="/setup-calibrations"

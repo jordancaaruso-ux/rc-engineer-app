@@ -6,10 +6,16 @@ import {
   peekDashboardSuggestion,
   findLatestPrimaryRunIdForDashboardSuggestion,
 } from "@/lib/engineerPhase5/dashboardSuggestions/getOrComputeDashboardSuggestion";
+import { withPerfRoute } from "@/lib/perf/withPerfRoute";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+/**
+ * Wrapped for `Server-Timing`: the dashboard and the Engineer strip both hit this on
+ * mount, and the peek-vs-sync split is exactly the kind of thing worth seeing in
+ * DevTools rather than inferring from a rollup.
+ */
+export const GET = withPerfRoute("/api/engineer/dashboard-suggestions", async (request: Request) => {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
@@ -46,4 +52,4 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json({ error: "Failed to load suggestions" }, { status: 500 });
   }
-}
+});

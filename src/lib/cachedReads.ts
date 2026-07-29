@@ -3,14 +3,24 @@ import { prisma } from "@/lib/prisma";
 import { loadDashboardHomeModel } from "@/lib/dashboardServer";
 import { loadAnalysisHomeModel } from "@/lib/analysis/loadAnalysisHomeModel";
 import { carsTag, dashboardTag, runsTag } from "@/lib/cacheTags";
+import { perfSpan } from "@/lib/perfLog";
+
+/*
+ * Each cached read is wrapped in a `perfSpan`. Queries inside `unstable_cache` run in a
+ * detached context the request-scoped perf store cannot see, and a cache *hit* runs no
+ * queries at all — so without these spans `/` and `/analysis` would look free and get
+ * mis-ranked. The phase duration makes the hit/miss split obvious: ~1ms is a hit.
+ */
 
 /** Cached dashboard payload — invalidated on run/action-item mutations. */
 export async function getCachedDashboardHomeModel(userId: string, timeZone: string) {
-  return unstable_cache(
-    async () => loadDashboardHomeModel(userId, timeZone),
-    [`dashboard-home-v2-${userId}-${timeZone}`],
-    { tags: [dashboardTag(userId)], revalidate: 30 }
-  )();
+  return perfSpan("cachedDashboardHome", () =>
+    unstable_cache(
+      async () => loadDashboardHomeModel(userId, timeZone),
+      [`dashboard-home-v2-${userId}-${timeZone}`],
+      { tags: [dashboardTag(userId)], revalidate: 30 }
+    )()
+  );
 }
 
 /**
@@ -21,11 +31,13 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
  * status drift, which isn't tag-invalidated.
  */
 export async function getCachedAnalysisHomeModel(userId: string, timeZone: string) {
-  return unstable_cache(
-    async () => loadAnalysisHomeModel(userId, timeZone),
-    [`analysis-home-v1-${userId}-${timeZone}`],
-    { tags: [runsTag(userId), dashboardTag(userId)], revalidate: 30 }
-  )();
+  return perfSpan("cachedAnalysisHome", () =>
+    unstable_cache(
+      async () => loadAnalysisHomeModel(userId, timeZone),
+      [`analysis-home-v1-${userId}-${timeZone}`],
+      { tags: [runsTag(userId), dashboardTag(userId)], revalidate: 30 }
+    )()
+  );
 }
 
 /**
@@ -38,34 +50,36 @@ export async function getCachedAnalysisHomeModel(userId: string, timeZone: strin
  * No Date fields are selected, so unstable_cache's JSON round trip is lossless here.
  */
 export async function getCachedCarManagerData(userId: string) {
-  return unstable_cache(
-    async () =>
-      Promise.all([
-        prisma.setupSheetModel.findMany({
-          orderBy: [{ isAuthorized: "desc" }, { name: "asc" }],
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            isAuthorized: true,
-            _count: { select: { cars: true, calibrations: true } },
-          },
-        }),
-        prisma.car.findMany({
-          where: { userId },
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            name: true,
-            chassis: true,
-            notes: true,
-            setupSheetTemplate: true,
-            setupSheetModelId: true,
-            setupSheetModel: { select: { id: true, name: true } },
-          },
-        }),
-      ]),
-    [`car-manager-v1-${userId}`],
-    { tags: [carsTag(userId)], revalidate: 30 }
-  )();
+  return perfSpan("cachedCarManager", () =>
+    unstable_cache(
+      async () =>
+        Promise.all([
+          prisma.setupSheetModel.findMany({
+            orderBy: [{ isAuthorized: "desc" }, { name: "asc" }],
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              isAuthorized: true,
+              _count: { select: { cars: true, calibrations: true } },
+            },
+          }),
+          prisma.car.findMany({
+            where: { userId },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              name: true,
+              chassis: true,
+              notes: true,
+              setupSheetTemplate: true,
+              setupSheetModelId: true,
+              setupSheetModel: { select: { id: true, name: true } },
+            },
+          }),
+        ]),
+      [`car-manager-v1-${userId}`],
+      { tags: [carsTag(userId)], revalidate: 30 }
+    )()
+  );
 }

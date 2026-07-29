@@ -1702,3 +1702,73 @@ model NativePushDevice {
 
   @@index([userId])
 }
+
+/// One row per instrumented server request (RSC page render or API route). Written
+/// fire-and-forget from `after()` so it never sits on the response path, and gated
+/// entirely by PERF_INSTRUMENTATION=1. Self-pruned past PERF_RETENTION_DAYS.
+///
+/// Deliberately NO relation to User: a loose `userId` string keeps the (already large)
+/// User model untouched and lets old rows bulk-delete with no cascade work.
+model PerfSample {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  /// "page" (RSC render) | "api" (route handler).
+  kind String
+  /// Normalized route key — `/runs/[id]`, `/api/cars/[id]`. Never a raw id, or
+  /// per-route aggregation would be meaningless.
+  route  String
+  method String?
+  status Int?
+
+  /// Server wall time in ms. For `page` this is measured when `after()` fires, i.e.
+  /// AFTER streaming completes — treat it as an upper bound, not TTFB.
+  totalMs    Float
+  /// Summed Prisma query time attributed to this request.
+  dbMs       Float @default(0)
+  queryCount Int   @default(0)
+
+  /// Named `perfSpan()` phases, e.g. {"loadDashboardHomeModel":180,"auth":22}.
+  phases Json?
+  /// Up to 5 slowest queries this request: [{ m, o, ms }].
+  slowest Json?
+
+  userId   String?
+  deployId String?
+
+  @@index([createdAt])
+  @@index([route, createdAt])
+}
+
+/// Client RUM — web vitals plus soft-navigation timing, beaconed from the browser and
+/// the Capacitor webview. This is the ground truth for "how slow did that page feel",
+/// because a page render cannot emit a Server-Timing header in App Router.
+model PerfClientMetric {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  /// "LCP" | "INP" | "TTFB" | "CLS" | "FCP" | "FID" | "soft-nav".
+  name  String
+  route String
+  value Float
+
+  rating         String?
+  navigationType String?
+  /// soft-nav only: the route navigated away from.
+  fromRoute String?
+
+  /// "ios-native" | "pwa" | "web" — only the client can report this truthfully; the
+  /// Capacitor webview's user agent is indistinguishable from mobile Safari.
+  platform String?
+
+  userId   String?
+  deployId String?
+
+  /// web-vitals metric id. Paired with `name` as the dedupe key so a retried beacon
+  /// or a StrictMode double-report cannot double-count.
+  metricId String?
+
+  @@unique([metricId, name])
+  @@index([createdAt])
+  @@index([name, route, createdAt])
+}

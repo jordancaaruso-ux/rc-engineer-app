@@ -3,13 +3,26 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireDatabaseUrl } from "@/lib/env";
+import { PERF_ENABLED } from "@/lib/perf/perfConfig";
+import { attachPerfRoute, beginApiPerf } from "@/lib/perf/beginPerf";
 import type { User } from "@prisma/client";
 
 /**
  * Authenticated user for Route Handlers — returns null with no redirect (use 401 JSON).
+ *
+ * Nearly every route handler awaits this, which makes it the one place worth opening a
+ * perf scope from: a single line here instruments the whole API surface. It is a plain
+ * boolean check when PERF_INSTRUMENTATION is off.
  */
 export async function getAuthenticatedApiUser(): Promise<User | null> {
+  // MUST stay the first statement, and MUST NOT be awaited. AsyncLocalStorage's
+  // `enterWith` only covers continuations created during the current synchronous
+  // execution — which, before this function's first `await`, still includes the calling
+  // route handler. Move it below an `await` and every route reports zero queries.
+  const perfStore = PERF_ENABLED ? beginApiPerf() : null;
+
   requireDatabaseUrl();
+  if (perfStore) await attachPerfRoute(perfStore);
   const session = await auth();
   const id = session?.user?.id;
   if (!id) return null;

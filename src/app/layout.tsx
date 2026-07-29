@@ -31,6 +31,14 @@ import { PWA_SPLASH_MARK_SVG } from "@/lib/pwa/splashMark";
 
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
+import { PERF_ENABLED } from "@/lib/perf/perfConfig";
+
+import { beginPagePerf } from "@/lib/perf/beginPerf";
+
+import { perfSpan } from "@/lib/perfLog";
+
+import { WebVitalsReporterMount } from "@/components/perf/WebVitalsReporterMount";
+
 
 
 /** UI sans — Sora for all body, nav, titles, and controls (display voice; JetBrains Mono is data). */
@@ -149,7 +157,11 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }): Promise<ReactNode> {
-  const session = await auth();
+  // Opens the render-scoped perf store before anything else awaits, so the whole page
+  // render is attributed. No-op unless PERF_INSTRUMENTATION=1.
+  if (PERF_ENABLED) await beginPagePerf();
+
+  const session = await perfSpan("auth", () => auth());
 
   return (
 
@@ -253,6 +265,8 @@ export default async function RootLayout({
             <PwaSplashDismiss />
 
             <ServiceWorkerRegistrar />
+
+            {PERF_ENABLED ? <WebVitalsReporterMount /> : null}
 
           </AuthSessionProvider>
 

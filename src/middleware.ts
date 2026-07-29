@@ -1,11 +1,28 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import authConfig from "@/auth.config";
 
 const { auth } = NextAuth(authConfig);
 
 /** Set DEBUG_ACCESS_GATE=1 to log auth middleware decisions (dev). */
 const debugGate = process.env.DEBUG_ACCESS_GATE === "1";
+
+/** Mirrors PERF_ENABLED — this file runs on edge, so it cannot import the node-only config. */
+const perfEnabled = process.env.PERF_INSTRUMENTATION === "1";
+
+/**
+ * Continue the request, stamping the path and method onto its headers so the Node
+ * runtime can identify its own route. App Router exposes no reliable built-in for
+ * this: `x-matched-path` is Vercel-only and `x-invoke-path` is dev-only.
+ */
+function proceed(req: NextRequest): NextResponse {
+  if (!perfEnabled) return NextResponse.next();
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-rc-perf-path", req.nextUrl.pathname);
+  requestHeaders.set("x-rc-perf-method", req.method);
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -49,7 +66,7 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return proceed(req);
 });
 
 export const config = {

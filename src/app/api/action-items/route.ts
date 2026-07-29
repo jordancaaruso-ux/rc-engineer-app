@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeActionItemKey, parseActionItemListQuery } from "@/lib/actionItems";
+import { withPerfRoute } from "@/lib/perf/withPerfRoute";
 
 function bodyListKind(body: { listKind?: string }): ActionItemListKind {
   const raw = typeof body.listKind === "string" ? body.listKind : "";
@@ -12,7 +13,8 @@ function bodyListKind(body: { listKind?: string }): ActionItemListKind {
   return "THINGS_TO_TRY";
 }
 
-export async function GET(request: Request) {
+/** Wrapped so this shell-level fetch reports `Server-Timing` straight into DevTools. */
+export const GET = withPerfRoute("/api/action-items", async (request: Request) => {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
       createdAt: i.createdAt.toISOString(),
     })),
   });
-}
+});
 
 export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
