@@ -318,14 +318,79 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       ? body.setupBaselineSnapshotId.trim()
       : null;
 
+  // Hoisted above the lookup wave below — pure string parsing off the body, no I/O.
+  const tireTypeId =
+    typeof body.tireTypeId === "string" && body.tireTypeId.trim() ? body.tireTypeId.trim() : null;
+  const additiveTypeId =
+    typeof body.additiveTypeId === "string" && body.additiveTypeId.trim()
+      ? body.additiveTypeId.trim()
+      : null;
+  const needsParticipationCheck =
+    loggingComplete && Boolean(body.eventId) && body.sessionType === "RACE_MEETING";
+
+  /*
+   * One wave instead of eight sequential round trips.
+   *
+   * Every lookup here is derived from `body` alone — baseline snapshot, PDF links, tire
+   * type, additive type, event participation, car, track — so none of them had a reason
+   * to queue behind the others. At ~16ms per round trip that was roughly 130ms of a run
+   * save spent purely waiting on the network.
+   *
+   * Validation still happens below in the original order, so which error a bad request
+   * gets back is unchanged; it just does its lookups concurrently before returning.
+   *
+   * The car row is read ONCE. It used to be fetched twice from the same table by the
+   * same key — once for the setup-sheet keys, once for the name.
+   */
+  const [baselineRow, pdfLinks, tireType, additiveType, participation, carRow, track] =
+    await Promise.all([
+      baselineId
+        ? prisma.setupSnapshot.findFirst({
+            where: { id: baselineId, userId: params.userId },
+            select: { data: true },
+          })
+        : null,
+      resolveSourcePdfLinksForNewRun(
+        params.userId,
+        baselineId,
+        typeof body.sourceSetupDocumentId === "string" && body.sourceSetupDocumentId.trim()
+          ? body.sourceSetupDocumentId.trim()
+          : null
+      ),
+      tireTypeId
+        ? prisma.tireType.findUnique({
+            where: { id: tireTypeId },
+            select: { id: true, displayName: true },
+          })
+        : null,
+      additiveTypeId
+        ? prisma.additiveType.findUnique({
+            where: { id: additiveTypeId },
+            select: { id: true, displayName: true },
+          })
+        : null,
+      needsParticipationCheck && body.eventId
+        ? prisma.eventParticipation.findUnique({
+            where: { userId_eventId: { userId: params.userId, eventId: body.eventId } },
+            select: { controlledAdditiveTypeId: true },
+          })
+        : null,
+      prisma.car.findFirst({
+        where: { id: carId, userId: params.userId },
+        select: { name: true, setupSheetModelId: true, setupSheetTemplate: true },
+      }),
+      body.trackId
+        ? prisma.track.findFirst({
+            where: communityTrackByIdWhere(body.trackId),
+            select: { name: true, latitude: true, longitude: true },
+          })
+        : null,
+    ]);
+
   let resolvedData: SetupSnapshotData;
   let setupDeltaJson: object | null = null;
 
   if (baselineId) {
-    const baselineRow = await prisma.setupSnapshot.findFirst({
-      where: { id: baselineId, userId: params.userId },
-      select: { data: true },
-    });
     if (!baselineRow) {
       return NextResponse.json({ error: "Baseline setup snapshot not found" }, { status: 400 });
     }
@@ -343,26 +408,10 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     resolvedData = normalizeSetupSnapshotForStorage(body.setupData ?? {});
   }
 
-  const pdfLinks = await resolveSourcePdfLinksForNewRun(
-    params.userId,
-    baselineId,
-    typeof body.sourceSetupDocumentId === "string" && body.sourceSetupDocumentId.trim()
-      ? body.sourceSetupDocumentId.trim()
-      : null
-  );
-
   // Tires are the compound plus how many runs are on them. `tireStintId` groups
   // runs sharing one life of rubber; a null one from the client means different
   // rubber went on, so mint a fresh stint here. Carrying one forward is what makes
   // "same tires as last run" cost the driver nothing.
-  const tireTypeId =
-    typeof body.tireTypeId === "string" && body.tireTypeId.trim() ? body.tireTypeId.trim() : null;
-  const tireType = tireTypeId
-    ? await prisma.tireType.findUnique({
-        where: { id: tireTypeId },
-        select: { id: true, displayName: true },
-      })
-    : null;
   if (tireTypeId && !tireType) {
     return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
   }
@@ -376,33 +425,15 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   // Run-context tires MUST be applied before persisting the snapshot; otherwise loaded
   // baseline / client setupData leaks stale tires into DB (overwrite ran after create).
 
-  const additiveTypeId =
-    typeof body.additiveTypeId === "string" && body.additiveTypeId.trim()
-      ? body.additiveTypeId.trim()
-      : null;
-  const additiveType = additiveTypeId
-    ? await prisma.additiveType.findUnique({
-        where: { id: additiveTypeId },
-        select: { id: true, displayName: true },
-      })
-    : null;
   if (additiveTypeId && !additiveType) {
     return NextResponse.json({ error: "Additive type not found" }, { status: 400 });
   }
 
-  if (loggingComplete && body.eventId && body.sessionType === "RACE_MEETING") {
-    const participation = await prisma.eventParticipation.findUnique({
-      where: {
-        userId_eventId: { userId: params.userId, eventId: body.eventId },
-      },
-      select: { controlledAdditiveTypeId: true },
-    });
-    if (participation?.controlledAdditiveTypeId && !additiveTypeId) {
-      return NextResponse.json(
-        { error: "This event requires an additive selection to complete the run." },
-        { status: 400 }
-      );
-    }
+  if (needsParticipationCheck && participation?.controlledAdditiveTypeId && !additiveTypeId) {
+    return NextResponse.json(
+      { error: "This event requires an additive selection to complete the run." },
+      { status: 400 }
+    );
   }
 
   // Tire-prep sequence is the source of truth; keep the legacy Int in sync as a
@@ -413,12 +444,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       ? derivedWarmerTimingMinutes(tirePrep)
       : parseWarmerTimingMinutes(body.warmerTimingMinutes);
 
-  const carForSheetKeys = await prisma.car.findFirst({
-    where: { id: carId, userId: params.userId },
-    select: { setupSheetModelId: true, setupSheetTemplate: true },
-  });
-  const sheetKeys = carForSheetKeys
-    ? await getSetupSheetFieldKeysForCarRow(params.userId, carForSheetKeys)
+  const sheetKeys = carRow
+    ? await getSetupSheetFieldKeysForCarRow(params.userId, carRow)
     : new Set<string>();
 
   resolvedData = normalizeSetupSnapshotForStorage(
@@ -452,20 +479,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     select: { id: true },
   });
 
-  const car = await prisma.car.findFirst({
-    where: { id: carId, userId: params.userId },
-    select: { name: true },
-  });
+  const car = carRow;
   if (!car) {
     return NextResponse.json({ error: "Car not found" }, { status: 400 });
   }
 
-  const track = body.trackId
-    ? await prisma.track.findFirst({
-        where: communityTrackByIdWhere(body.trackId),
-        select: { name: true, latitude: true, longitude: true },
-      })
-    : null;
   if (body.trackId && !track) {
     return NextResponse.json({ error: "Track not found" }, { status: 400 });
   }
