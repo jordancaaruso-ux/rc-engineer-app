@@ -6,6 +6,10 @@ import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 import { canonicalSetupTemplateForUserCarId, carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
 import { carIdSupportsSheetUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
+import {
+  setupDocumentBelongsToCar,
+  type PickerCarScope,
+} from "@/lib/setup/savedSetupPickerScope";
 
 function jsonObjectNonEmpty(v: unknown): v is Record<string, unknown> {
   return v != null && typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).length > 0;
@@ -21,10 +25,59 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const carId = searchParams.get("carId")?.trim() || null;
 
+  // Chassis identity of the selected car — resolved first so the document query can be
+  // narrowed in SQL (otherwise `take: 80` can drop this car's sheets behind other chassis).
+  const [carRow, currentTemplate, scopeCarIds] = carId
+    ? await Promise.all([
+        prisma.car.findFirst({
+          where: { id: carId, userId },
+          select: { setupSheetModelId: true },
+        }),
+        canonicalSetupTemplateForUserCarId(userId, carId),
+        carIdsSharingSetupTemplate(userId, carId),
+      ])
+    : [null, null, null];
+
+  const carScope: PickerCarScope | null = carId
+    ? {
+        setupSheetModelId: carRow?.setupSheetModelId ?? null,
+        setupSheetTemplate: currentTemplate,
+        siblingCarIds: new Set(scopeCarIds ?? [carId]),
+      }
+    : null;
+
+  const carIsTyped =
+    carScope != null &&
+    (carScope.setupSheetModelId != null || carScope.setupSheetTemplate != null);
+
+  /** Superset of what `setupDocumentBelongsToCar` accepts; exact precedence is applied below. */
+  const documentScopeWhere =
+    carScope && carIsTyped
+      ? {
+          OR: [
+            ...(carScope.setupSheetModelId
+              ? [{ setupSheetModelId: carScope.setupSheetModelId }]
+              : []),
+            ...(carScope.setupSheetTemplate
+              ? [
+                  {
+                    setupSheetTemplate: {
+                      equals: carScope.setupSheetTemplate,
+                      mode: "insensitive" as const,
+                    },
+                  },
+                ]
+              : []),
+            { carId: { in: [...carScope.siblingCarIds] } },
+          ],
+        }
+      : {};
+
   const downloaded = await prisma.setupDocument.findMany({
     where: {
       userId: userId,
       parseStatus: { in: ["PARSED", "PARTIAL"] },
+      ...documentScopeWhere,
     },
     orderBy: { createdAt: "desc" },
     take: 80,
@@ -36,6 +89,7 @@ export async function GET(request: Request) {
       parsedDataJson: true,
       carId: true,
       setupSheetTemplate: true,
+      setupSheetModelId: true,
       createdSetup: { select: { data: true, carId: true } },
     },
   });
@@ -60,27 +114,23 @@ export async function GET(request: Request) {
         setupData,
         carId: carFromSnap,
         documentSetupTemplate: d.setupSheetTemplate ?? null,
+        documentSetupSheetModelId: d.setupSheetModelId ?? null,
         baselineSetupSnapshotId: d.createdSetupId,
       },
     ];
   });
 
-  const currentTemplate = carId ? await canonicalSetupTemplateForUserCarId(userId, carId) : null;
-  /** Unassigned setups apply to any car; typed documents match the car's canonical template. */
-  const scopeCarIds = carId ? await carIdsSharingSetupTemplate(userId, carId) : null;
-  const scopeSet = scopeCarIds ? new Set(scopeCarIds) : null;
-  const downloadedSetups =
-    !carId || !scopeSet
-      ? mapped
-      : mapped.filter((d) => {
-          if (d.documentSetupTemplate) {
-            if (currentTemplate) {
-              return d.documentSetupTemplate === currentTemplate;
-            }
-            return false;
-          }
-          return d.carId == null || (d.carId != null && scopeSet.has(d.carId));
-        });
+  // A document only shows on cars of its own chassis type; see savedSetupPickerScope.
+  const downloadedSetups = mapped.filter((d) =>
+    setupDocumentBelongsToCar(
+      {
+        carId: d.carId,
+        setupSheetModelId: d.documentSetupSheetModelId,
+        setupSheetTemplate: d.documentSetupTemplate,
+      },
+      carScope
+    )
+  );
 
   // The car's setup library comes first: a setup the driver built and named is a better default
   // baseline than a document they once imported. Same option shape so the run form's existing
