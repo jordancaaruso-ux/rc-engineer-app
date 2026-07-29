@@ -16,6 +16,7 @@ import {
   snapshotDataHasKeys,
   type PerKeyState,
 } from "@/lib/setupAggregations/eligibleDocAggregationCore";
+import { iterateAggregationSourceDocs } from "@/lib/setupAggregations/iterateAggregationDocs";
 import { geometryDerivedScalarObservations } from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
 
 /** Car for bucketing: explicit id, else the user's only car (safe when unambiguous). */
@@ -163,48 +164,49 @@ export async function rebuildSetupAggregationsForUserCars(
     eligibleDocuments: 0,
   };
 
-  const [excludedPlaceholderCount, candidates] = await Promise.all([
-    exampleDocIds.size === 0
-      ? Promise.resolve(0)
-      : prisma.setupDocument.count({
-          where: { userId, id: { in: [...exampleDocIds] } },
-        }),
-    prisma.setupDocument.findMany({
-      where: {
-        userId,
-        id: { notIn: [...exampleDocIds] },
-      },
-      select: {
-        eligibleForAggregationDataset: true,
-        parseStatus: true,
-        parsedDataJson: true,
-        carId: true,
-        createdSetup: {
-          select: {
-            carId: true,
-            data: true,
-          },
+  // Same shape as the community rebuild: push the eligibility gates into the `where` so a
+  // skipped doc never costs a `parsedDataJson` fetch, and stream the rest instead of loading
+  // every parsed sheet at once. Bounded to one user here, but the per-doc payload is the same.
+  const notExampleWhere: Prisma.SetupDocumentWhereInput = {
+    userId,
+    id: { notIn: [...exampleDocIds] },
+  };
+  const includableWhere: Prisma.SetupDocumentWhereInput = {
+    ...notExampleWhere,
+    eligibleForAggregationDataset: true,
+    parseStatus: { in: ["PARSED", "PARTIAL"] },
+  };
+
+  const [excludedPlaceholderCount, notExampleCount, notEligibleCount, wrongParseStatusCount] =
+    await Promise.all([
+      exampleDocIds.size === 0
+        ? Promise.resolve(0)
+        : prisma.setupDocument.count({
+            where: { userId, id: { in: [...exampleDocIds] } },
+          }),
+      prisma.setupDocument.count({ where: notExampleWhere }),
+      prisma.setupDocument.count({
+        where: { ...notExampleWhere, eligibleForAggregationDataset: false },
+      }),
+      prisma.setupDocument.count({
+        where: {
+          ...notExampleWhere,
+          eligibleForAggregationDataset: true,
+          parseStatus: { notIn: ["PARSED", "PARTIAL"] },
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
 
   exclusionCounts.excludedPlaceholder = excludedPlaceholderCount;
-  exclusionCounts.totalUserDocuments = candidates.length + excludedPlaceholderCount;
+  exclusionCounts.totalUserDocuments = notExampleCount + excludedPlaceholderCount;
+  exclusionCounts.excludedNotEligible = notEligibleCount;
+  exclusionCounts.excludedParseStatus = wrongParseStatusCount;
 
   const byCar = new Map<string, Map<string, PerKeyState>>();
 
   let documentsIncluded = 0;
-  for (const doc of candidates) {
-    if (!doc.eligibleForAggregationDataset) {
-      exclusionCounts.excludedNotEligible += 1;
-      continue;
-    }
-    if (doc.parseStatus !== "PARSED" && doc.parseStatus !== "PARTIAL") {
-      exclusionCounts.excludedParseStatus += 1;
-      continue;
-    }
-
+  // Eligibility and parse-status gates live in `includableWhere` now.
+  for await (const doc of iterateAggregationSourceDocs(includableWhere)) {
     const data = resolveNormalizedAggregationData(doc.parsedDataJson, doc.createdSetup);
     if (!data) {
       exclusionCounts.excludedNoPayload += 1;

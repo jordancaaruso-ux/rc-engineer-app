@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
@@ -14,29 +15,60 @@ export async function GET(request: Request) {
   const trackId = url.searchParams.get("trackId");
   const runId = url.searchParams.get("runId");
 
+  const where = {
+    userId: userId,
+    ...(trackId ? { trackId } : {}),
+    ...(runId ? { runId } : {}),
+  };
+
+  // Deliberately a narrow `select`, not `include`: the job blobs (resultJson, manualJson,
+  // alignmentJson, idCorrectionsJson) are megabytes each and this list only needs to know
+  // *whether* they exist. The two id-only follow-ups below cost a few bytes and replace
+  // what used to pull every blob for 50 rows straight back out to the client.
   const jobs = await prisma.videoAnalysisJob.findMany({
-    where: {
-      userId: userId,
-      ...(trackId ? { trackId } : {}),
-      ...(runId ? { runId } : {}),
-    },
+    where,
     orderBy: { createdAt: "desc" },
     take: 50,
-    include: {
+    select: {
+      id: true,
+      createdAt: true,
+      updatedAt: true,
+      status: true,
+      analysisMode: true,
+      errorMessage: true,
+      videoAssetId: true,
+      trackId: true,
+      runId: true,
       track: { select: { id: true, name: true } },
       profile: { select: { id: true, name: true } },
       run: { select: { id: true, sessionLabel: true, trackNameSnapshot: true } },
     },
   });
 
+  const ids = jobs.map((j) => j.id);
+  const [withResult, withManual] = ids.length
+    ? await Promise.all([
+        prisma.videoAnalysisJob.findMany({
+          where: { id: { in: ids }, resultJson: { not: Prisma.DbNull } },
+          select: { id: true },
+        }),
+        prisma.videoAnalysisJob.findMany({
+          where: { id: { in: ids }, manualJson: { not: Prisma.DbNull } },
+          select: { id: true },
+        }),
+      ])
+    : [[], []];
+  const resultIds = new Set(withResult.map((r) => r.id));
+  const manualIds = new Set(withManual.map((r) => r.id));
+
   return NextResponse.json({
     jobs: jobs.map((j) => ({
       ...j,
       createdAt: j.createdAt.toISOString(),
       updatedAt: j.updatedAt.toISOString(),
-      hasResult: Boolean(j.resultJson),
+      hasResult: resultIds.has(j.id),
       analysisMode: j.analysisMode,
-      hasManual: Boolean(j.manualJson),
+      hasManual: manualIds.has(j.id),
     })),
   });
 }

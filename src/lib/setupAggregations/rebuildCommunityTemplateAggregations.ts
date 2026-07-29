@@ -9,6 +9,7 @@ import {
   resolveNormalizedAggregationData,
   type PerKeyState,
 } from "@/lib/setupAggregations/eligibleDocAggregationCore";
+import { iterateAggregationSourceDocs } from "@/lib/setupAggregations/iterateAggregationDocs";
 import { geometryDerivedScalarObservations } from "@/lib/setupAggregations/setupGeometryDerivedMetrics";
 import { GRIP_BUCKET_ANY, gripBucketsForDoc } from "@/lib/setupAggregations/gripBuckets";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
@@ -66,28 +67,46 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
     eligibleDocuments: 0,
   };
 
-  const candidates = await prisma.setupDocument.findMany({
-    where: {
-      id: { notIn: [...exampleDocIds] },
-    },
-    select: {
-      eligibleForAggregationDataset: true,
-      parseStatus: true,
-      parsedDataJson: true,
-      carId: true,
-      createdSetup: {
-        select: {
-          carId: true,
-          data: true,
-        },
+  // This is the one app-wide scan in the codebase: it walks *every* user's setup documents,
+  // so it grows with the whole corpus rather than with one account. Two rules keep it cheap:
+  //   1. The eligibility gates that used to run in JS now run in the `where` clause, so the
+  //      fat `parsedDataJson` blob is never fetched for a doc we were going to skip anyway.
+  //   2. The scan is cursor-paged, so peak memory and connection time stay flat as the
+  //      corpus grows instead of materializing every parsed sheet at once.
+  // The excluded-by-gate tallies below come from counts instead of from the loop.
+  const notExampleWhere: Prisma.SetupDocumentWhereInput = { id: { notIn: [...exampleDocIds] } };
+  const includableWhere: Prisma.SetupDocumentWhereInput = {
+    ...notExampleWhere,
+    eligibleForAggregationDataset: true,
+    parseStatus: { in: ["PARSED", "PARTIAL"] },
+  };
+
+  const [totalExamined, notEligibleCount, wrongParseStatusCount] = await Promise.all([
+    prisma.setupDocument.count({ where: notExampleWhere }),
+    prisma.setupDocument.count({
+      where: { ...notExampleWhere, eligibleForAggregationDataset: false },
+    }),
+    prisma.setupDocument.count({
+      where: {
+        ...notExampleWhere,
+        eligibleForAggregationDataset: true,
+        parseStatus: { notIn: ["PARSED", "PARTIAL"] },
       },
-    },
+    }),
+  ]);
+  exclusionCounts.totalDocumentsExamined = totalExamined;
+  exclusionCounts.excludedNotEligible = notEligibleCount;
+  exclusionCounts.excludedParseStatus = wrongParseStatusCount;
+
+  // Car-id prepass: ids only, no parsed payload. Only includable docs can reach the bucket
+  // loop, so narrowing this to the same filter cannot change which templates get resolved.
+  const carIdRows = await prisma.setupDocument.findMany({
+    where: includableWhere,
+    select: { carId: true, createdSetup: { select: { carId: true } } },
   });
 
-  exclusionCounts.totalDocumentsExamined = candidates.length;
-
   const carIdSet = new Set<string>();
-  for (const doc of candidates) {
+  for (const doc of carIdRows) {
     const cid = doc.createdSetup?.carId ?? doc.carId;
     if (cid) carIdSet.add(cid);
   }
@@ -126,16 +145,9 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
   const byTemplateSurfaceGrip = new Map<string, Map<string, PerKeyState>>();
   let documentsIncluded = 0;
 
-  for (const doc of candidates) {
-    if (!doc.eligibleForAggregationDataset) {
-      exclusionCounts.excludedNotEligible += 1;
-      continue;
-    }
-    if (doc.parseStatus !== "PARSED" && doc.parseStatus !== "PARTIAL") {
-      exclusionCounts.excludedParseStatus += 1;
-      continue;
-    }
-
+  // Eligibility and parse-status gates live in `includableWhere` now, so every doc that
+  // arrives here is one we intend to aggregate.
+  for await (const doc of iterateAggregationSourceDocs(includableWhere)) {
     const data = resolveNormalizedAggregationData(doc.parsedDataJson, doc.createdSetup);
     if (!data) {
       exclusionCounts.excludedNoPayload += 1;
