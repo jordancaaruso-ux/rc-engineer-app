@@ -1,4 +1,16 @@
 import type { ActionItemSourceType } from "@prisma/client";
+
+/**
+ * Action-item row as it comes back from Prisma (`createdAt` still a Date). Distinct from
+ * the exported `DashboardActionItemRow` below, which is the serialized client shape.
+ */
+type ActionItemDbRow = {
+  id: string;
+  createdAt: Date;
+  text: string;
+  sourceType: ActionItemSourceType;
+  sourceRunId: string | null;
+};
 import { prisma } from "@/lib/prisma";
 import type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 import { computeIncludedLapMetricsFromRun, getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
@@ -516,7 +528,45 @@ export async function loadDashboardHomeModel(
   // sources fresh for next features / pages.
   void syncRecentEventLapSources(userId).catch(() => {});
 
-  const [scopedEvents, recentRun, todaysRuns, priorRun, incompleteRunsRows, completedRunRows] = await Promise.all([
+  const actionItemSelect = {
+    id: true,
+    text: true,
+    sourceType: true,
+    createdAt: true,
+    sourceRunId: true,
+  } as const;
+
+  /*
+   * Action items depend on nothing but `userId`, so they ride in the wave below instead
+   * of costing their own round trip after it — a round trip is ~16ms whatever the query.
+   * The `catch` keeps the original behaviour: if either list fails, the dashboard renders
+   * with both empty rather than erroring.
+   */
+  const actionItemRowsPromise: Promise<[ActionItemDbRow[], ActionItemDbRow[]]> =
+    Promise.all([
+      prisma.actionItem.findMany({
+        where: { userId, isArchived: false, listKind: "THINGS_TO_TRY" },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        take: 120,
+        select: actionItemSelect,
+      }),
+      prisma.actionItem.findMany({
+        where: { userId, isArchived: false, listKind: "THINGS_TO_DO" },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        take: 120,
+        select: actionItemSelect,
+      }),
+    ]).catch(() => [[], []] as [ActionItemDbRow[], ActionItemDbRow[]]);
+
+  const [
+    scopedEvents,
+    recentRun,
+    todaysRuns,
+    priorRun,
+    incompleteRunsRows,
+    completedRunRows,
+    [thingsToTryRows, thingsToDoRows],
+  ] = await Promise.all([
     loadUserScopedEvents({ userId, take: 40 }),
     prisma.run.findFirst({
       where: {
@@ -591,6 +641,7 @@ export async function loadDashboardHomeModel(
         track: { select: { name: true } },
       },
     }),
+    actionItemRowsPromise,
   ]);
   const hasRunToday = todaysRuns.length > 0;
 
@@ -636,41 +687,6 @@ export async function loadDashboardHomeModel(
     lapSession: r.lapSession,
   }));
   const { records, newPb } = computeDashboardRecords(recordInputs, recentRun?.id ?? null);
-
-  const actionItemSelect = {
-    id: true,
-    text: true,
-    sourceType: true,
-    createdAt: true,
-    sourceRunId: true,
-  } as const;
-  let thingsToTryRows: Array<{
-    id: string;
-    createdAt: Date;
-    text: string;
-    sourceType: ActionItemSourceType;
-    sourceRunId: string | null;
-  }> = [];
-  let thingsToDoRows: typeof thingsToTryRows = [];
-  try {
-    [thingsToTryRows, thingsToDoRows] = await Promise.all([
-      prisma.actionItem.findMany({
-        where: { userId, isArchived: false, listKind: "THINGS_TO_TRY" },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        take: 120,
-        select: actionItemSelect,
-      }),
-      prisma.actionItem.findMany({
-        where: { userId, isArchived: false, listKind: "THINGS_TO_DO" },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        take: 120,
-        select: actionItemSelect,
-      }),
-    ]);
-  } catch {
-    thingsToTryRows = [];
-    thingsToDoRows = [];
-  }
 
   const featuredPick = pickFeaturedEvent(
     scopedEvents.map((event) => ({

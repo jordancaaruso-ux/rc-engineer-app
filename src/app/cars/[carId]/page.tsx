@@ -43,23 +43,58 @@ export default async function CarDetailPage(props: {
     );
   }
 
-  const user = await requireCurrentUser();
-  const { carId } = await props.params;
-  const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
+  /*
+   * Four waves, not ten sequential awaits. A round trip to the database costs ~16ms
+   * regardless of how trivial the query is, so the count that matters is how many of
+   * them happen in a row — this page used to spend ~130ms doing nothing but waiting.
+   *
+   * Only `car` genuinely gates anything: the run count, the library setups, and the
+   * tire rows need nothing but `user.id` and `carId`. They are issued alongside the
+   * car lookup and are wasted only when the id is bad, which is a typo, not a path.
+   */
+  const [user, { carId }, displayTimeZone] = await Promise.all([
+    requireCurrentUser(),
+    props.params,
+    getExplicitTimeZoneForRunFormatting(),
+  ]);
 
-  const car = await prisma.car.findFirst({
-    where: { id: carId, userId: user.id },
-    select: {
-      id: true,
-      name: true,
-      chassis: true,
-      notes: true,
-      setupSheetTemplate: true,
-      setupSheetModelId: true,
-      createdAt: true,
-      setupSheetModel: { select: { id: true, name: true, slug: true } },
-    },
-  });
+  const [car, runCount, librarySetups, tireRunRows] = await Promise.all([
+    prisma.car.findFirst({
+      where: { id: carId, userId: user.id },
+      select: {
+        id: true,
+        name: true,
+        chassis: true,
+        notes: true,
+        setupSheetTemplate: true,
+        setupSheetModelId: true,
+        createdAt: true,
+        setupSheetModel: { select: { id: true, name: true, slug: true } },
+      },
+    }),
+    prisma.run.count({ where: { userId: user.id, carId } }),
+    // The car's saved baselines. `isLibrary` keeps per-run snapshots out of this list —
+    // those are history and belong to the setup history below.
+    prisma.setupSnapshot.findMany({
+      where: { userId: user.id, carId, isLibrary: true },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        _count: { select: { runs: true, derivedSnapshots: true } },
+      },
+    }),
+    prisma.run.findMany({
+      where: { userId: user.id, carId, tireTypeId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        tireTypeId: true,
+        tireRunNumber: true,
+        tireType: { select: { displayName: true } },
+      },
+    }),
+  ]);
 
   if (!car) {
     return (
@@ -77,36 +112,28 @@ export default async function CarDetailPage(props: {
     );
   }
 
-  const runCount = await prisma.run.count({
-    where: { userId: user.id, carId },
-  });
+  /*
+   * Wave 3 — the two reads that genuinely needed `car` first. `setupHistory` wants the
+   * whole row; `modelRow` wants `setupSheetModelId`. Independent of each other.
+   */
+  const [setupHistory, modelRow] = await Promise.all([
+    // Everything this car has been set up with: newest run's setup, then the chassis
+    // changes and uploaded sheets behind it.
+    getCarSetupHistory({ userId: user.id, car, displayTimeZone }),
+    // Setup sheet models are global — never scope this read by userId.
+    car.setupSheetModelId
+      ? prisma.setupSheetModel.findUnique({
+          where: { id: car.setupSheetModelId },
+          select: {
+            defaultCalibrationId: true,
+            defaultCalibration: {
+              select: { id: true, name: true, exampleDocumentId: true },
+            },
+          },
+        })
+      : null,
+  ]);
 
-  // The car's saved baselines. `isLibrary` keeps per-run snapshots out of this list — those are
-  // history and belong to the setup history below.
-  const librarySetups = await prisma.setupSnapshot.findMany({
-    where: { userId: user.id, carId, isLibrary: true },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      createdAt: true,
-      _count: { select: { runs: true, derivedSnapshots: true } },
-    },
-  });
-
-  // Everything this car has been set up with: newest run's setup, then the chassis changes and
-  // uploaded sheets behind it.
-  const setupHistory = await getCarSetupHistory({
-    userId: user.id,
-    car,
-    displayTimeZone,
-  });
-
-  const tireRunRows = await prisma.run.findMany({
-    where: { userId: user.id, carId, tireTypeId: { not: null } },
-    orderBy: { createdAt: "desc" },
-    select: { tireTypeId: true, tireRunNumber: true, tireType: { select: { displayName: true } } },
-  });
   const runsOnCarByTire = new Map<string, number>();
   /** Highest run count reached on this compound — a rough "how far you've taken it". */
   const furthestRunByTire = new Map<string, number>();
@@ -121,18 +148,8 @@ export default async function CarDetailPage(props: {
   }
   tireSetsOnCar.sort((a, b) => a.label.localeCompare(b.label));
 
-  // Setup sheet models are global — never scope this read by userId.
-  const modelRow = car.setupSheetModelId
-    ? await prisma.setupSheetModel.findUnique({
-        where: { id: car.setupSheetModelId },
-        select: {
-          defaultCalibrationId: true,
-          defaultCalibration: {
-            select: { id: true, name: true, exampleDocumentId: true },
-          },
-        },
-      })
-    : null;
+  // Falls back to the most recently touched calibration only when the model has no
+  // default — one extra round trip, and only on that branch.
   const modelCalibration =
     modelRow?.defaultCalibration
     ?? (car.setupSheetModelId

@@ -68,6 +68,29 @@ export default async function NewRunPage({
   const labSetupPrefill =
     typeof sp.labSetup === "string" && sp.labSetup.length > 0 ? decodeLabFields(sp.labSetup) : null;
 
+  // Log-run wizard is the primary flow for a manual "new run" (founder 2026-07-16).
+  // Deep-link flows that only the classic single-page form renders — imported-lap
+  // attach, resume-draft, Roll Center lab export, focus=setup, import error — fall
+  // back to classic. `?wizard=0` (or NEXT_PUBLIC_LOGRUN_WIZARD=0) forces classic
+  // anywhere; `?wizard=1` forces the wizard even in those deep-link contexts.
+  //
+  // Decided here, above the fetch wave, because it is pure `searchParams` + env: doing
+  // it later meant the wizard path paid an extra serial round trip for today's drafts
+  // after every other query had already landed.
+  const wizardForced =
+    process.env.NEXT_PUBLIC_LOGRUN_WIZARD === "1" ||
+    (typeof sp.wizard === "string" && sp.wizard === "1");
+  const wizardDisabled =
+    process.env.NEXT_PUBLIC_LOGRUN_WIZARD === "0" ||
+    (typeof sp.wizard === "string" && sp.wizard === "0");
+  const classicOnlyContext =
+    importedLapTimeSessionIdRaw.length > 0 ||
+    resumeDraft ||
+    focusSection === "setup" ||
+    labSetupPrefill != null ||
+    importFailed;
+  const wizardEnabled = !wizardDisabled && (wizardForced || !classicOnlyContext);
+
   const [
     dashboardPrefill,
     incompleteRunsForImport,
@@ -82,7 +105,10 @@ export default async function NewRunPage({
     importedLapTimeSessionIdRaw.length > 0
       ? loadIncompleteRunsForImportChooser(user.id, initialEventId)
       : Promise.resolve([]),
-    resumeDraft ? loadTodaysIncompleteRuns(user.id, displayTimeZone) : Promise.resolve([]),
+    // One fetch for both consumers: the resume-draft banner and the wizard host.
+    resumeDraft || wizardEnabled
+      ? loadTodaysIncompleteRuns(user.id, displayTimeZone)
+      : Promise.resolve([]),
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -141,26 +167,8 @@ export default async function NewRunPage({
   const favouriteTracks = allTracks.filter((t) => favSet.has(t.id));
   const tracks = allTracks;
 
-  // Log-run wizard is the primary flow for a manual "new run" (founder 2026-07-16).
-  // Deep-link flows that only the classic single-page form renders — imported-lap
-  // attach, resume-draft, Roll Center lab export, focus=setup, import error — fall
-  // back to classic. `?wizard=0` (or NEXT_PUBLIC_LOGRUN_WIZARD=0) forces classic
-  // anywhere; `?wizard=1` forces the wizard even in those deep-link contexts.
-  const wizardForced =
-    process.env.NEXT_PUBLIC_LOGRUN_WIZARD === "1" ||
-    (typeof sp.wizard === "string" && sp.wizard === "1");
-  const wizardDisabled =
-    process.env.NEXT_PUBLIC_LOGRUN_WIZARD === "0" ||
-    (typeof sp.wizard === "string" && sp.wizard === "0");
-  const classicOnlyContext =
-    importedLapTimeSessionIdRaw.length > 0 ||
-    resumeDraft ||
-    focusSection === "setup" ||
-    labSetupPrefill != null ||
-    importFailed;
-  const wizardEnabled = !wizardDisabled && (wizardForced || !classicOnlyContext);
   if (wizardEnabled) {
-    const wizardDrafts = await loadTodaysIncompleteRuns(user.id, displayTimeZone);
+    const wizardDrafts = todaysDrafts;
     return (
       <>
         <header className="page-header">
