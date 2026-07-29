@@ -34,10 +34,12 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
     );
   }
 
-  const user = await requireCurrentUser();
-  const { teamId } = await params;
-  const { run: pinnedRunId } = await searchParams;
-  const timeZone = await getExplicitTimeZoneForRunFormatting();
+  const [user, { teamId }, { run: pinnedRunId }, timeZone] = await Promise.all([
+    requireCurrentUser(),
+    params,
+    searchParams,
+    getExplicitTimeZoneForRunFormatting(),
+  ]);
 
   const model = await loadTeamFeedModel({
     viewerId: user.id,

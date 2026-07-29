@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { assertUserInTeam, listTeamMemberUserIds } from "@/lib/teamAccess";
+import { listTeamMemberUserIds } from "@/lib/teamAccess";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import {
   buildFeedEntry,
@@ -181,13 +181,11 @@ export type LoadTeamFeedParams = {
  * Load one page of a team's delta feed.
  *
  * Returns `null` when the viewer is not in the team — callers must treat that as 404, never
- * as an empty feed. (`assertUserInTeam` returns a boolean rather than throwing, so this has
- * to be checked, not awaited and forgotten.)
+ * as an empty feed. The membership check returns rather than throwing, so it has to be
+ * checked, not awaited and forgotten.
  */
 export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<TeamFeedModel | null> {
   const { viewerId, teamId, timeZone } = params;
-
-  if (!(await assertUserInTeam(teamId, viewerId))) return null;
 
   const team = await prisma.team.findFirst({
     where: { id: teamId },
@@ -198,7 +196,15 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
   const memberIds = team.memberships.map((m) => m.userId);
   const viewerIsAdmin = team.memberships.some((m) => m.userId === viewerId && m.role === "admin");
 
-  const displays = await loadTeamMemberDisplays(memberIds, viewerId);
+  /*
+   * Membership is derived from the row above rather than asked for separately.
+   * `assertUserInTeam` is exactly a `teamMembership.findFirst` on (teamId, userId), and
+   * this query already selects that team's memberships — so the answer was arriving one
+   * round trip later anyway. Non-members still get null, which the page turns into a 404
+   * so team existence is never confirmed to an outsider. Unchanged behaviour, one query
+   * fewer, and the gate now sits above every read below it.
+   */
+  if (!memberIds.includes(viewerId)) return null;
 
   // Only runs the owner chose to share, and never half-logged drafts — a draft has no laps
   // and an unfinished setup, so it would render as a pace-less entry with a huge diff.
@@ -209,33 +215,41 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
   } as const;
 
   const cursor = decodeFeedCursor(params.cursor);
-  const pageRows = await fetchRunRows({
-    where: {
-      ...sharedRunFilter,
-      ...(cursor
-        ? {
-            OR: [
-              { sortAt: { lt: cursor.sortAt } },
-              { sortAt: cursor.sortAt, id: { lt: cursor.id } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: [{ sortAt: "desc" }, { id: "desc" }],
-    take: TEAM_FEED_PAGE_SIZE + 1,
-  });
+
+  /*
+   * One wave. Member displays, the feed page, the pinned run, and last-activity all need
+   * nothing but `memberIds`, yet each used to wait for the one before it. This route was
+   * the slowest soft-navigation in the app at 569ms p75, roughly six times every other
+   * route, and this chain is why.
+   */
+  const [displays, pageRows, pinnedRow, lastActivityByUserId] = await Promise.all([
+    loadTeamMemberDisplays(memberIds, viewerId),
+    fetchRunRows({
+      where: {
+        ...sharedRunFilter,
+        ...(cursor
+          ? {
+              OR: [
+                { sortAt: { lt: cursor.sortAt } },
+                { sortAt: cursor.sortAt, id: { lt: cursor.id } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ sortAt: "desc" }, { id: "desc" }],
+      take: TEAM_FEED_PAGE_SIZE + 1,
+    }),
+    params.pinnedRunId
+      ? fetchRunRows({
+          where: { ...sharedRunFilter, id: params.pinnedRunId },
+          take: 1,
+        }).then((rows) => rows[0] ?? null)
+      : Promise.resolve(null),
+    loadLastActivityByUser(memberIds),
+  ]);
 
   const hasMore = pageRows.length > TEAM_FEED_PAGE_SIZE;
   const pageRuns = hasMore ? pageRows.slice(0, TEAM_FEED_PAGE_SIZE) : pageRows;
-
-  const pinnedRow = params.pinnedRunId
-    ? (
-        await fetchRunRows({
-          where: { ...sharedRunFilter, id: params.pinnedRunId },
-          take: 1,
-        })
-      )[0] ?? null
-    : null;
 
   const focusRuns = pinnedRow && !pageRuns.some((r) => r.id === pinnedRow.id)
     ? [...pageRuns, pinnedRow]
@@ -244,8 +258,6 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
   const entriesByRunId = focusRuns.length
     ? await buildEntriesForRuns({ focusRuns, memberIds, sharedRunFilter, timeZone, displays, viewerId, teamId, viewerIsAdmin })
     : new Map<string, TeamFeedEntryView>();
-
-  const lastActivityByUserId = await loadLastActivityByUser(memberIds);
 
   const oldest = pageRuns[pageRuns.length - 1];
 
