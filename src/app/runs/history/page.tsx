@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -262,6 +263,10 @@ export default async function RunHistoryPage({
   const focusRunRaw = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;
   const focusRunParam =
     typeof focusRunRaw === "string" && focusRunRaw.trim() ? focusRunRaw.trim() : null;
+  // `?focusRun=` predates the run view: it expanded that run's row in place. The run view is
+  // now the one place a run is looked at (Option A, 2026-07-29), so the deep link — still in
+  // old push notifications and bookmarks — redirects there. Access is re-checked on the page.
+  if (focusRunParam) redirect(`/runs/${encodeURIComponent(focusRunParam)}`);
 
   let runs: RunInGroup[] = [];
   let totalRunCount = 0;
@@ -448,7 +453,7 @@ export default async function RunHistoryPage({
    */
   function renderRunsTable(
     tableRuns: RunInGroup[],
-    opts: { showMemberColumn: boolean; initialExpandedRunId: string | null }
+    opts: { showMemberColumn: boolean }
   ) {
     const showSessionColumn = tableRuns.some(
       (r) => formatRunSessionDisplay(r, { dayRunNumber: dayRunNumberByRunId[r.id] }) !== "—"
@@ -520,7 +525,6 @@ export default async function RunHistoryPage({
               showSessionColumn={showSessionColumn}
               dayRunNumberByRunId={dayRunNumberByRunId}
               matchReasonsById={matchReasonsById}
-              initialExpandedRunId={opts.initialExpandedRunId}
             />
           </tbody>
         </table>
@@ -660,7 +664,6 @@ export default async function RunHistoryPage({
                   </summary>
                   {renderRunsTable(driver.runs, {
                     showMemberColumn: false,
-                    initialExpandedRunId: driverHasFocus ? focusRunId : null,
                   })}
                 </details>
               );
@@ -670,7 +673,6 @@ export default async function RunHistoryPage({
               // Single-driver team group keeps the member column to attribute the
               // one driver; solo groups have no member column.
               showMemberColumn: teamMode,
-              initialExpandedRunId: groupHasFocus ? focusRunId : null,
             })
           )}
         </div>
@@ -747,7 +749,6 @@ export default async function RunHistoryPage({
                 showSessionColumn={showSessionColumn}
                 dayRunNumberByRunId={dayRunNumberByRunId}
                 matchReasonsById={matchReasonsById}
-                initialExpandedRunId={focusRunId}
               />
             </tbody>
           </table>

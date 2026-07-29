@@ -1047,8 +1047,9 @@ cardinal sin) 2. Generic/forum-tier advice 3. Laundry list 4. Over-hedging.
 ### D. Sessions / run history
 - `/runs/history` (`src/app/runs/history/page.tsx`, `RunHistoryTable.tsx` 1,346 lines,
   `SessionsFilterBar.tsx` 883 lines, `runHistoryFilters.ts` 845 lines).
-- **There is no `/runs/[id]` detail page** — run detail is an expanded row inside the history table.
-  Deep links use `/runs/history?focusRun=<id>` (backlog item FB-16, shipped).
+- **`/runs/[id]` is the run view** (2026-07-29, Option A): Sessions rows navigate there instead of
+  expanding; it renders the shared `RunDetailPanel` (extracted from the table). Old
+  `/runs/history?focusRun=<id>` deep links redirect to it server-side.
 - Team view via `?teamId=<id>`: shows members' runs with a Member column, reorder disabled, and
   Edit/Delete hidden on peer rows.
 - Drag-to-reorder writes `sortAt` via `POST /api/runs/[id]/reorder`.

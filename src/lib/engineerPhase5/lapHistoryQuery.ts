@@ -115,7 +115,7 @@ function formatRankedLapLine(
   const when = formatRunCreatedAtDateTime(resolveRunDisplayInstant(entry.run), timeZone);
   const session = formatRunSessionDisplay(entry.run);
   const car = entry.run.car?.name ?? entry.run.carNameSnapshot ?? "Car";
-  return `- **${label}:** ${formatLapSeconds(entry.lap)} (lap ${entry.lapNumber}) — ${when}, ${session}, ${car} ([view run](/runs/${entry.run.id}/edit))`;
+  return `- **${label}:** ${formatLapSeconds(entry.lap)} (lap ${entry.lapNumber}) — ${when}, ${session}, ${car} ([view run](/runs/${entry.run.id}))`;
 }
 
 /**
@@ -289,7 +289,7 @@ export async function tryAnswerLapHistoryQuery(input: {
       const session = formatRunSessionDisplay(bestAvg5Run);
       const car = bestAvg5Run.car?.name ?? bestAvg5Run.carNameSnapshot ?? "Car";
       lines.push(
-        `- **Best avg top 5:** ${formatLapSeconds(bestAvg5)} — ${when}, ${session}, ${car} ([view run](/runs/${bestAvg5Run.id}/edit))`
+        `- **Best avg top 5:** ${formatLapSeconds(bestAvg5)} — ${when}, ${session}, ${car} ([view run](/runs/${bestAvg5Run.id}))`
       );
     } else {
       lines.push("- **Best avg top 5:** need at least one included lap per run (5 laps for a meaningful avg).");

@@ -125,7 +125,7 @@ export function TeamFeedEntryCard({
 
         <div className="flex items-center justify-between gap-2 border-t border-border/60 px-4 py-2">
           <Link
-            href={`/runs/history?teamId=${encodeURIComponent(teamId)}&focusRun=${encodeURIComponent(entry.runId)}`}
+            href={`/runs/${encodeURIComponent(entry.runId)}`}
             className="type-timestamp text-accent underline underline-offset-2"
           >
             Open session

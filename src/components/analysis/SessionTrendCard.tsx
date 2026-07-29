@@ -432,7 +432,7 @@ function PaceTrendFace({
     if (Math.abs(event.clientX - down.x) > 8 || Math.abs(event.clientY - down.y) > 8) return;
     const run = carRuns[hoverIndex];
     if (down.sameIndex && run) {
-      router.push(`/runs/history?focusRun=${encodeURIComponent(run.id)}`);
+      router.push(`/runs/${encodeURIComponent(run.id)}`);
     }
   };
 
@@ -776,7 +776,7 @@ function SingleMetricTrendFace({
     if (Math.abs(event.clientX - down.x) > 8 || Math.abs(event.clientY - down.y) > 8) return;
     const run = carRuns[hoverIndex];
     if (down.sameIndex && run) {
-      router.push(`/runs/history?focusRun=${encodeURIComponent(run.id)}`);
+      router.push(`/runs/${encodeURIComponent(run.id)}`);
     }
   };
 

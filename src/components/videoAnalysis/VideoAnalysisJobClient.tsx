@@ -240,7 +240,7 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
             Save
           </button>
           {runIdInput && (
-            <Link href={`/runs/${runIdInput}/edit`} className="text-xs underline self-center">
+            <Link href={`/runs/${runIdInput}`} className="text-xs underline self-center">
               Open run
             </Link>
           )}

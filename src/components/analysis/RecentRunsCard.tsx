@@ -51,7 +51,7 @@ export function RecentRunsCard({ runs }: { runs: AnalysisRecentRun[] }) {
         {runs.map((run, index) => (
           <Link
             key={run.id}
-            href={`/runs/history?focusRun=${encodeURIComponent(run.id)}`}
+            href={`/runs/${encodeURIComponent(run.id)}`}
             className={cn(
               "tap-active group -mx-1.5 flex items-center gap-3 rounded-lg px-1.5 py-3 transition-colors hover:bg-white/[0.035]",
               index > 0 && "rounded-none border-t border-border"

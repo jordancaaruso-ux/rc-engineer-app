@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { Collapse } from "@/components/ui/Collapse";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunDateShort, formatRunDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
@@ -28,7 +27,7 @@ import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
 import { Timer, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
-import { RunDetailPanel, type Run } from "@/components/runs/RunDetailPanel";
+import { type Run } from "@/components/runs/RunDetailPanel";
 import {
   computeRunHistoryColSpan,
   RUN_HISTORY_ACTION_CELL_CLASS,
@@ -37,9 +36,6 @@ import {
   RunHistoryMobileColumns,
   RunHistoryMobileRowShell,
 } from "@/components/runs/runHistoryTableColumns";
-
-/** Keep in sync with the <Collapse> duration used for the run-detail row. */
-const RUN_DETAIL_COLLAPSE_MS = 300;
 
 function RunHistoryActionButtons({
   onSetup,
@@ -129,7 +125,6 @@ export function RunHistoryTable({
   userDisplayName,
   showComparePairColumn = false,
   enableReorder = false,
-  initialExpandedRunId = null,
   displayTimeZone,
   viewerUserId = null,
   memberDisplayByUserId,
@@ -155,8 +150,6 @@ export function RunHistoryTable({
    * reason about and avoids accidental reshuffles.
    */
   enableReorder?: boolean;
-  /** When set (e.g. `?focusRun=` deep link), start with this row expanded if it is in `runs`. */
-  initialExpandedRunId?: string | null;
   /** Current user; with `memberDisplayByUserId`, attributes rows and hides peer edit/delete. */
   viewerUserId?: string | null;
   /** `userId` → display label for team Sessions (`?teamId=`). */
@@ -169,10 +162,6 @@ export function RunHistoryTable({
   matchReasonsById?: Record<string, MatchReason[]>;
 }) {
   const router = useRouter();
-  const [expandedId, setExpandedId] = useState<string | null>(() => {
-    if (!initialExpandedRunId) return null;
-    return runs.some((r) => r.id === initialExpandedRunId) ? initialExpandedRunId : null;
-  });
   const [setupModalRunId, setSetupModalRunId] = useState<string | null>(null);
   const [lapModalRunId, setLapModalRunId] = useState<string | null>(null);
   /** Run whose inline tire-prep panel is open (toggled from the tire indicator). */
@@ -189,39 +178,9 @@ export function RunHistoryTable({
     setModalsPortalReady(true);
   }, []);
 
-  // The expanded row's detail is expensive (setup compare, laps, modals), so we
-  // only ever mount ONE of them. `mountedDetailId` tracks the row whose detail
-  // is in the DOM; it follows `expandedId` on open and lingers for the collapse
-  // animation (Collapse duration) on close before unmounting.
-  const [mountedDetailId, setMountedDetailId] = useState<string | null>(expandedId);
-  const detailUnmountTimerRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (detailUnmountTimerRef.current !== null) {
-      window.clearTimeout(detailUnmountTimerRef.current);
-      detailUnmountTimerRef.current = null;
-    }
-    if (expandedId) {
-      setMountedDetailId(expandedId);
-      return;
-    }
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setMountedDetailId(null);
-      return;
-    }
-    detailUnmountTimerRef.current = window.setTimeout(() => {
-      setMountedDetailId(null);
-      detailUnmountTimerRef.current = null;
-    }, RUN_DETAIL_COLLAPSE_MS);
-    return () => {
-      if (detailUnmountTimerRef.current !== null) {
-        window.clearTimeout(detailUnmountTimerRef.current);
-        detailUnmountTimerRef.current = null;
-      }
-    };
-  }, [expandedId]);
-
-  function toggleRow(runId: string) {
-    setExpandedId((prev) => (prev === runId ? null : runId));
+  /** Rows navigate to the run view — the one place a run is looked at (Option A, 2026-07-29). */
+  function openRun(runId: string) {
+    router.push(`/runs/${encodeURIComponent(runId)}`);
   }
 
   /** Newest-first across all loaded runs (crosses day/event group boundaries). */
@@ -318,13 +277,11 @@ export function RunHistoryTable({
         </tr>
       ) : null}
       {runs.map((run) => {
-        const isExpanded = expandedId === run.id;
         const runMatchReasons = matchReasonsById?.[run.id];
         const memberLabel =
           showMemberColumn && run.userId
             ? memberDisplayByUserId?.[run.userId] ?? "—"
             : null;
-        const allowRunMutations = !viewerUserId || !run.userId || run.userId === viewerUserId;
         const carDisplay = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
         const primaryLapRows = primaryLapRowsFromRun(run);
         const listLapDash = getIncludedLapDashboardMetrics(primaryLapRows);
@@ -403,22 +360,21 @@ export function RunHistoryTable({
                     }
                   : undefined
               }
-              onClick={() => toggleRow(run.id)}
+              onClick={() => openRun(run.id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  toggleRow(run.id);
+                  openRun(run.id);
                 }
               }}
               className={cn(
                 "border-b border-border/80 hover:bg-muted/50 cursor-pointer select-none",
                 // When the match-reason chips row follows, it carries the divider.
-                runMatchReasons && runMatchReasons.length > 0 && !isExpanded && "border-b-0",
+                runMatchReasons && runMatchReasons.length > 0 && "border-b-0",
                 isDragging && "opacity-50",
                 showDropAbove && "shadow-[inset_0_2px_0_0_var(--color-primary,#2563eb)]",
                 showDropBelow && "shadow-[inset_0_-2px_0_0_var(--color-primary,#2563eb)]"
               )}
-              aria-expanded={isExpanded}
             >
               <td colSpan={totalCols} className="md:hidden align-middle p-0">
                 <RunHistoryMobileRowShell>
@@ -577,30 +533,13 @@ export function RunHistoryTable({
                 </td>
               </tr>
             ) : null}
-            {runMatchReasons && runMatchReasons.length > 0 && !isExpanded ? (
+            {runMatchReasons && runMatchReasons.length > 0 ? (
               <tr className="border-b border-border/80">
                 <td colSpan={totalCols} className="px-2 pb-1.5 pt-0 md:px-3">
                   <MatchReasonChips reasons={runMatchReasons} />
                 </td>
               </tr>
             ) : null}
-            {run.id === mountedDetailId && (
-              <tr className={cn(isExpanded && "border-b border-border/80")}>
-                <td colSpan={totalCols} className="w-0 p-0 align-top">
-                  <Collapse open={isExpanded} durationMs={RUN_DETAIL_COLLAPSE_MS}>
-                    <div className="min-w-0 max-w-full overflow-x-hidden px-2 py-3 md:px-4 md:py-4">
-                      <RunDetailPanel
-                        run={run}
-                        pickerRuns={allRunsDescending}
-                        runListSource={runListSource}
-                        displayTimeZone={displayTimeZone}
-                        allowRunMutations={allowRunMutations}
-                      />
-                    </div>
-                  </Collapse>
-                </td>
-              </tr>
-            )}
           </React.Fragment>
         );
       })}

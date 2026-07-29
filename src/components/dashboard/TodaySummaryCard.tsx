@@ -138,7 +138,7 @@ function TodayBestPanel({
         <div className="mt-1 min-w-0 truncate text-[11px] text-foreground">
           {todayBestRunId ? (
             <Link
-              href={`/runs/history?focusRun=${encodeURIComponent(todayBestRunId)}`}
+              href={`/runs/${encodeURIComponent(todayBestRunId)}`}
               className="underline decoration-border underline-offset-2 hover:decoration-accent"
             >
               {todayBestRunLabel ?? "Open run"}
