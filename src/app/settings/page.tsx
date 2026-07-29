@@ -18,7 +18,6 @@ import { OnboardingResetSection } from "@/components/settings/OnboardingResetSec
 import { NotificationsSection } from "@/components/settings/NotificationsSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
 import { EngineerFeedbackAdminSection } from "@/components/settings/EngineerFeedbackAdminSection";
-import { EngineerGoldSetAdminSection } from "@/components/settings/EngineerGoldSetAdminSection";
 import { ManufacturerBaselineAdminSection } from "@/components/settings/ManufacturerBaselineAdminSection";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -79,7 +78,8 @@ export default async function SettingsPage() {
             <OnboardingResetSection />
             <AllowlistAdminSection />
             <ManufacturerBaselineAdminSection />
-            <EngineerGoldSetAdminSection />
+            {/* Gold-set admin section unplugged 2026-07-30 (founder call) — founder reviews
+                via in-app ratings + notes; component kept for easy revival. */}
             <EngineerFeedbackAdminSection />
           </>
         ) : null}
