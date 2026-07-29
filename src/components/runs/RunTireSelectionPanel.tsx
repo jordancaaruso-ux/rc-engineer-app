@@ -7,11 +7,15 @@ import { chipToggleClass } from "@/components/ui/chipToggle";
 import { Eyebrow } from "@/components/ui/panel";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import {
+  activeTireCountChip,
   deriveTireChoice,
   isDifferentTires,
   tireAgeReadout,
   tireCountLabel,
+  TIRE_COUNT_CHIPS,
+  TIRE_COUNT_STEPPER_FLOOR,
   type TireChoice,
+  type TireCountChip,
 } from "@/lib/tires/tireAgeReadout";
 import type { TireStintValue } from "@/lib/tires/tireStintValue";
 
@@ -21,11 +25,14 @@ import type { TireStintValue } from "@/lib/tires/tireStintValue";
  * only cares about runs 1-2-3; the club racer runs one set for two days and wants
  * a rough sense of tiredness around 10-14. Neither is asking which set they're on.
  *
- * So the driver answers one question in two steps — **same tires as last run, or
- * different?**, then **brand new or used?** — and only the used branch needs a
- * number. Nothing counts up on its own: the +1 is written on the control the
+ * So the driver answers one question — **same as the previous run, or a different
+ * set?** — and a different set drops straight onto the count row, where "New" is
+ * simply zero. Nothing counts up on its own: the +1 is written on the control the
  * driver taps, because a silent carry-over is invisible and a silent reset is the
  * bug the old `runsCompleted = 0` default caused.
+ *
+ * A car's first run has nothing to be the same as, so the carry row is dropped
+ * entirely and the panel is two taps: compound, then how many runs are on them.
  *
  * No numeral is shown for the state. "run 1" reads as an index, so a fresh set
  * says **New tires**; a carried set says how many runs are *on* them and promises
@@ -47,6 +54,19 @@ type Props = {
   preferredTireType?: { id: string; displayName: string } | null;
   value: TireStintValue;
   onChange: (next: TireStintValue) => void;
+  /**
+   * Has this car been run before? False drops the same-vs-different row — there
+   * is no previous run to carry, so asking is noise.
+   *
+   * `null` means the caller is still finding out (the per-car last-run fetch is
+   * in flight). The question rows wait rather than guess: picking a layout on an
+   * unloaded `false` renders the wrong question and then swaps it out from under
+   * the driver — and any tap made in that window is overwritten when the fetch
+   * lands. Undefined keeps the full question, for a caller that never knows.
+   */
+  hasPreviousRun?: boolean | null;
+  /** Ranks the compound list by what you run on cars of this car's discipline. */
+  carId?: string | null;
   /**
    * Changes identity when the form swaps to a different context (another car),
    * so an answer given for the old one isn't left standing over the new value.
@@ -71,6 +91,8 @@ export function RunTireSelectionPanel({
   preferredTireType,
   value,
   onChange,
+  hasPreviousRun = true,
+  carId,
   resetSignal,
   onUserTouched,
   onPrefillClear,
@@ -86,6 +108,9 @@ export function RunTireSelectionPanel({
   // tapping back after a mis-tap on "Different tires" restores it rather than
   // leaving the driver to re-enter a count the form already knew.
   const carriedRef = useRef<TireStintValue>(value);
+  // Mirrored in state because the carry row's visibility is a render decision and
+  // a ref read during render isn't one the renderer is allowed to trust.
+  const [carriedStint, setCarriedStint] = useState(value.stintId != null);
   // Our own last commit, so the sync effect below can ignore the echo of it.
   const committedKeyRef = useRef<string | null>(null);
 
@@ -98,6 +123,7 @@ export function RunTireSelectionPanel({
     if (committedKeyRef.current === incomingKey) return;
     committedKeyRef.current = null;
     carriedRef.current = value;
+    setCarriedStint(value.stintId != null);
     setChoice(deriveTireChoice(value));
     setEditing(false);
     // `value` is covered by `incomingKey`; listing it would re-run on every render.
@@ -107,6 +133,15 @@ export function RunTireSelectionPanel({
   const readout = tireAgeReadout(choice, value);
   const differentSelected = isDifferentTires(choice);
   const locked = Boolean(specTireType);
+  // A carried stint means there *is* something to be the same as, whatever the
+  // caller says — so a value that arrived carried keeps the row even while the
+  // caller is still working out whether the car has history.
+  const showCarryRow = hasPreviousRun === true || carriedStint;
+  // Which question to ask isn't known until the car's history is. Until then the
+  // rows stay off screen — the readout above still says "Not set yet", so the
+  // section is never silently blank.
+  const historyKnown = hasPreviousRun != null || carriedStint;
+  const activeCountChip = activeTireCountChip(choice, value);
 
   // A spec tire is mandated, so it wins outright; a preferred compound only fills a gap.
   useEffect(() => {
@@ -144,9 +179,9 @@ export function RunTireSelectionPanel({
   }, [commit, value.runsCompleted, value.stintId]);
 
   /**
-   * Different rubber, new-or-used not answered yet. Recorded as unknown age rather
-   * than guessed at, so a run saved without answering is honestly missing the
-   * count instead of inheriting the previous set's.
+   * Different rubber, count not answered yet. Recorded as unknown age rather than
+   * guessed at, so a run saved without answering is honestly missing the count
+   * instead of inheriting the previous set's.
    */
   const chooseDifferent = useCallback(() => {
     setChoice("different");
@@ -154,18 +189,29 @@ export function RunTireSelectionPanel({
     commit({ runsCompleted: 0, ageKnown: false, stintId: null });
   }, [commit]);
 
-  const chooseBrandNew = useCallback(() => {
-    setChoice("new");
-    setEditing(false);
-    commit({ runsCompleted: 0, ageKnown: true, stintId: null });
-  }, [commit]);
-
-  /** A used set always needs a number, so land straight on the stepper. */
-  const chooseUsed = useCallback(() => {
-    setChoice("used");
-    setEditing(true);
-    commit({ runsCompleted: 1, ageKnown: true, stintId: null });
-  }, [commit]);
+  /**
+   * One tap on the count row. Everything here means different rubber, so the
+   * stint is dropped and the server mints a fresh one on save.
+   */
+  const chooseCount = useCallback(
+    (chip: TireCountChip) => {
+      setChoice(chip.ageKnown && chip.runsCompleted === 0 ? "new" : "used");
+      if (chip.opensStepper) {
+        // Never walk an existing answer back down to 4 — 4+ opens the stepper at
+        // whatever the driver already had if that was higher.
+        setEditing(true);
+        commit({
+          runsCompleted: Math.max(TIRE_COUNT_STEPPER_FLOOR, value.runsCompleted),
+          ageKnown: true,
+          stintId: null,
+        });
+        return;
+      }
+      setEditing(false);
+      commit({ runsCompleted: chip.runsCompleted, ageKnown: chip.ageKnown, stintId: null });
+    },
+    [commit, value.runsCompleted]
+  );
 
   const nudge = useCallback(
     (delta: number) => {
@@ -198,6 +244,7 @@ export function RunTireSelectionPanel({
         ) : (
           <TireTypeCombobox
             value={tireTypeId}
+            carId={carId}
             onChange={(id) => onTireTypeChange(id, null)}
             onSelectedTypeChange={(opt) => {
               if (opt) onTireTypeChange(opt.id, opt.displayName);
@@ -209,61 +256,73 @@ export function RunTireSelectionPanel({
       </div>
 
       <div className="space-y-2">
-        <Eyebrow>Tires on the car</Eyebrow>
+        {historyKnown ? (
+          <Eyebrow>{showCarryRow ? "Tires on the car" : "Runs on these tires"}</Eyebrow>
+        ) : null}
 
-        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Tires on the car">
-          <button
-            type="button"
-            aria-pressed={choice === "same"}
-            onClick={chooseSame}
+        {historyKnown && showCarryRow ? (
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Tires on the car">
+            <button
+              type="button"
+              aria-pressed={choice === "same"}
+              onClick={chooseSame}
+              className={cn(
+                chipToggleClass(choice === "same"),
+                "flex flex-col items-start gap-px px-3 py-2 text-left text-[13px]",
+                choice === null && "border-dashed"
+              )}
+            >
+              <span>Same as previous run</span>
+              <span className="text-[10.5px] font-normal text-muted-foreground">+1 run</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={differentSelected}
+              onClick={chooseDifferent}
+              className={cn(
+                chipToggleClass(differentSelected),
+                "flex flex-col items-start gap-px px-3 py-2 text-left text-[13px]",
+                choice === null && "border-dashed"
+              )}
+            >
+              <span>Different set</span>
+              <span className="text-[10.5px] font-normal text-muted-foreground">
+                fresh or another used set
+              </span>
+            </button>
+          </div>
+        ) : null}
+
+        {/* The count row. Indented under "Different set" when it is that button's
+            follow-up; on a car with no history it is the whole question. */}
+        {historyKnown && (!showCarryRow || differentSelected) ? (
+          <div
             className={cn(
-              chipToggleClass(choice === "same"),
-              "flex flex-col items-start gap-px px-3 py-2 text-left text-[13px]",
-              choice === null && "border-dashed"
+              showCarryRow &&
+                "ml-[calc(50%+0.25rem)] max-[460px]:ml-0 border-l-2 border-foreground/20 pl-2.5 space-y-1.5"
             )}
           >
-            <span>Same tires</span>
-            <span className="text-[10.5px] font-normal text-muted-foreground">+1 run</span>
-          </button>
-          <button
-            type="button"
-            aria-pressed={differentSelected}
-            onClick={chooseDifferent}
-            className={cn(
-              chipToggleClass(differentSelected),
-              "flex flex-col items-start gap-px px-3 py-2 text-left text-[13px]",
-              choice === null && "border-dashed"
-            )}
-          >
-            <span>Different tires</span>
-            <span className="text-[10.5px] font-normal text-muted-foreground">new or used</span>
-          </button>
-        </div>
-
-        {/* Indented under the button that asked, so it reads as that button's
-            follow-up rather than a second, unrelated row of choices. */}
-        {differentSelected ? (
-          <div className="ml-[calc(50%+0.25rem)] max-[460px]:ml-0 border-l-2 border-foreground/20 pl-2.5 space-y-1.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Which set went on?
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                aria-pressed={choice === "new"}
-                onClick={chooseBrandNew}
-                className={cn(chipToggleClass(choice === "new"), "px-2.5 py-2 text-xs")}
-              >
-                Brand new
-              </button>
-              <button
-                type="button"
-                aria-pressed={choice === "used"}
-                onClick={chooseUsed}
-                className={cn(chipToggleClass(choice === "used"), "px-2.5 py-2 text-xs")}
-              >
-                Used set
-              </button>
+            {showCarryRow ? (
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Runs on them
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Runs on these tires">
+              {TIRE_COUNT_CHIPS.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  aria-pressed={activeCountChip === chip.key}
+                  onClick={() => chooseCount(chip)}
+                  className={cn(
+                    chipToggleClass(activeCountChip === chip.key),
+                    "px-3 py-2 text-xs",
+                    choice === null && "border-dashed"
+                  )}
+                >
+                  {chip.label}
+                </button>
+              ))}
             </div>
           </div>
         ) : null}
@@ -301,7 +360,7 @@ export function RunTireSelectionPanel({
             aria-label="Change how many runs are on these tires"
             onClick={() => {
               setEditing((v) => !v);
-              setChoice((c) => (c === null ? "same" : c));
+              setChoice((c) => (c !== null ? c : showCarryRow ? "same" : "new"));
             }}
           >
             <Pencil className="h-3 w-3" aria-hidden />
@@ -343,17 +402,21 @@ export function RunTireSelectionPanel({
               <span className="font-semibold text-foreground">run {value.runsCompleted + 1}</span>.
             </div>
 
-            <button
-              type="button"
-              className={cn(
-                chipToggleClass(!value.ageKnown),
-                "w-full px-3 py-2 text-left text-xs"
-              )}
-              aria-pressed={!value.ageKnown}
-              onClick={chooseUnsure}
-            >
-              Not sure how many
-            </button>
+            {/* Only when the count row isn't on screen — it carries its own
+                "Not sure" chip, and two of them read as two different answers. */}
+            {showCarryRow && !differentSelected ? (
+              <button
+                type="button"
+                className={cn(
+                  chipToggleClass(!value.ageKnown),
+                  "w-full px-3 py-2 text-left text-xs"
+                )}
+                aria-pressed={!value.ageKnown}
+                onClick={chooseUnsure}
+              >
+                Not sure how many
+              </button>
+            ) : null}
 
             {!value.ageKnown ? (
               <div className="text-[11px] leading-snug text-muted-foreground">

@@ -33,8 +33,8 @@ export const MAX_TIRE_PREP_STEPS = 3;
 /** Wheel markers for the per-step minute picker (fine low, coarse high). Any exact minute is allowed. */
 export const TIRE_PREP_MINUTE_MARKERS = [5, 10, 15, 20, 30, 40, 50, 60] as const;
 
-/** Warmer temperature wheel bounds (°C), optional. */
-export const TIRE_PREP_TEMP_MIN_C = 40;
+/** Warmer temperature slider bounds (°C) — founder-set 50–100 (2026-07-29). Storage accepts wider (see coerceTemp). */
+export const TIRE_PREP_TEMP_MIN_C = 50;
 export const TIRE_PREP_TEMP_MAX_C = 100;
 
 /**

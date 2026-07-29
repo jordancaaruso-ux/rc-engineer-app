@@ -4,10 +4,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  activeTireCountChip,
   deriveTireChoice,
   isDifferentTires,
   tireAgeReadout,
   tireCountLabel,
+  TIRE_COUNT_CHIPS,
 } from "@/lib/tires/tireAgeReadout";
 import type { TireStintValue } from "@/lib/tires/tireStintValue";
 
@@ -42,10 +44,10 @@ test("nothing answered yet asks instead of inventing run 1", () => {
 
 test("different-but-unanswered is its own state, not a guess", () => {
   const r = tireAgeReadout("different", v(0, false));
-  assert.equal(r.title, "Which set went on?");
+  assert.equal(r.title, "How many runs are on them?");
   assert.equal(r.unresolved, true);
   // ageKnown:false underneath must not leak "Age unknown" into the question.
-  assert.equal(r.sub, "Pick brand new or used above");
+  assert.equal(r.sub, "Tap a number above");
 });
 
 test("unknown age claims no count", () => {
@@ -67,6 +69,26 @@ test("both branches of the follow-up count as different tires", () => {
   assert.equal(isDifferentTires("used"), true);
   assert.equal(isDifferentTires("same"), false);
   assert.equal(isDifferentTires(null), false);
+});
+
+test("the count row offers new, 1-3, a stepper hand-off and an honest opt-out", () => {
+  assert.deepEqual(
+    TIRE_COUNT_CHIPS.map((c) => c.label),
+    ["New", "1", "2", "3", "4+", "Not sure"]
+  );
+  const unsure = TIRE_COUNT_CHIPS.find((c) => c.key === "unsure")!;
+  assert.equal(unsure.ageKnown, false, "'not sure' must never claim a known count");
+  assert.equal(TIRE_COUNT_CHIPS.find((c) => c.key === "more")!.opensStepper, true);
+});
+
+test("the lit chip follows the value, and nothing is lit before an answer", () => {
+  assert.equal(activeTireCountChip(null, v(0)), null, "unanswered lights nothing");
+  assert.equal(activeTireCountChip("different", v(0, false)), null, "mid-question lights nothing");
+  assert.equal(activeTireCountChip("same", v(2, true, "stint-1")), null, "carried: no row shown");
+  assert.equal(activeTireCountChip("new", v(0)), "new");
+  assert.equal(activeTireCountChip("used", v(2)), "2");
+  assert.equal(activeTireCountChip("used", v(9)), "more", "anything past 3 sits under 4+");
+  assert.equal(activeTireCountChip("used", v(0, false)), "unsure", "unknown age beats the count");
 });
 
 test("stepper label uses words so no numeral reads as an index", () => {

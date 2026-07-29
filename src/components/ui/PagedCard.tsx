@@ -191,7 +191,7 @@ export function PagedCard({
       if (e.pointerType === "mouse" && e.button !== 0) return;
       // Drags starting inside a text control belong to the control (cursor
       // placement / text selection), never to paging. `[data-no-swipe]` opts a
-      // horizontally-scrolling child out too (e.g. RulerPicker's tape track), so
+      // horizontally-dragged child out too (e.g. PrepSlider's rail), so
       // scrubbing it never flips the card to another face.
       if (
         e.target instanceof Element &&

@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { RulerPicker } from "@/components/ui/RulerPicker";
+import { PrepSlider } from "@/components/ui/PrepSlider";
 import { haptic } from "@/lib/haptics";
 import {
   AdditiveDropIcon,
@@ -39,25 +39,23 @@ type Props = {
   controlAdditive?: { id: string; displayName: string } | null;
 };
 
-/** Which ruler drawer is open: one per panel, keyed by row + which value. */
+/** Which slider drawer is open: one per panel, keyed by row + which value. */
 type OpenRuler = { row: number; kind: "min" | "temp" } | null;
 
-const MINUTES_RULER = {
-  min: 1,
-  max: 90,
+// Founder-approved ranges (slider artifacts 2026-07-29): the habitual band, not
+// the theoretical one. Values logged outside it (old 1–90 tape) still read
+// honestly — only the thumb clamps.
+const MINUTES_SLIDER = {
+  min: 5,
+  max: 45,
+  step: 1, // every minute reachable (founder, 2026-07-15)
   defaultValue: TIRE_PREP_DEFAULT_MINUTES,
-  // Linear through the whole scroll — every minute reachable, no magnet (founder, 2026-07-15).
-  snapStep: 1,
-  // Fine labels through the habitual low range, coarser above.
-  labelAt: (v: number) => (v <= 20 ? v % 5 === 0 : v % 10 === 0),
 };
-const TEMP_RULER = {
+const TEMP_SLIDER = {
   min: TIRE_PREP_TEMP_MIN_C,
   max: TIRE_PREP_TEMP_MAX_C,
+  step: 5, // 5° steps only — no 1° refinement needed for warmer temps
   defaultValue: TIRE_PREP_DEFAULT_TEMP_C,
-  // 5° steps only — no 1° refinement needed for warmer temps.
-  snapStep: 5,
-  labelAt: (v: number) => v % 10 === 0,
 };
 
 function ValueChip({
@@ -315,30 +313,31 @@ export function RunAdditiveTimingPanel({
                   </button>
                 </div>
                 {minOpen || tempOpen ? (
-                  <div className="border-t border-border bg-secondary">
+                  <div className="border-t border-border bg-secondary px-3 py-2">
                     {minOpen ? (
-                      <RulerPicker
+                      <PrepSlider
                         value={step.minutes}
                         onChange={(v) => updateStep(i, { minutes: v })}
-                        min={MINUTES_RULER.min}
-                        max={MINUTES_RULER.max}
-                        defaultValue={MINUTES_RULER.defaultValue}
-                        snapStep={MINUTES_RULER.snapStep}
-                        labelAt={MINUTES_RULER.labelAt}
+                        min={MINUTES_SLIDER.min}
+                        max={MINUTES_SLIDER.max}
+                        step={MINUTES_SLIDER.step}
+                        defaultValue={MINUTES_SLIDER.defaultValue}
+                        label="Application time"
                         unit="min"
-                        ariaLabel={`Minutes ruler, application ${i + 1}`}
+                        withStepper
+                        ariaLabel={`Minutes, application ${i + 1}`}
                       />
                     ) : (
-                      <RulerPicker
+                      <PrepSlider
                         value={step.temperatureC}
                         onChange={(v) => updateStep(i, { temperatureC: v })}
-                        min={TEMP_RULER.min}
-                        max={TEMP_RULER.max}
-                        defaultValue={TEMP_RULER.defaultValue}
-                        snapStep={TEMP_RULER.snapStep}
-                        labelAt={TEMP_RULER.labelAt}
+                        min={TEMP_SLIDER.min}
+                        max={TEMP_SLIDER.max}
+                        step={TEMP_SLIDER.step}
+                        defaultValue={TEMP_SLIDER.defaultValue}
+                        label="Warmer temp"
                         unit="°C"
-                        ariaLabel={`Warmer temperature ruler, application ${i + 1}`}
+                        ariaLabel={`Warmer temperature, application ${i + 1}`}
                       />
                     )}
                   </div>

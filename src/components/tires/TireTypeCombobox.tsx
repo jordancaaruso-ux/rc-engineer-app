@@ -28,6 +28,7 @@ export function TireTypeCombobox({
   disabled,
   className,
   allowInlineCreate = true,
+  carId,
 }: {
   value: string;
   onChange: (tireTypeId: string) => void;
@@ -39,6 +40,12 @@ export function TireTypeCombobox({
   className?: string;
   /** When false, hide inline create (e.g. Garage manages types separately). */
   allowInlineCreate?: boolean;
+  /**
+   * Car the run is for. "Recently used" then leads with what you run on cars of
+   * the same discipline — the compound on your other touring car is a far better
+   * guess for a new touring car than the last thing you bolted on a buggy.
+   */
+  carId?: string | null;
 }) {
   const [options, setOptions] = useState<TireTypeOption[]>([]);
   const [recentOptions, setRecentOptions] = useState<TireTypeOption[]>([]);
@@ -76,13 +83,16 @@ export function TireTypeCombobox({
 
   const loadRecent = useCallback(async () => {
     try {
-      const res = await fetch("/api/tire-types/recent", { cache: "no-store" });
+      const res = await fetch(
+        carId ? `/api/tire-types/recent?carId=${encodeURIComponent(carId)}` : "/api/tire-types/recent",
+        { cache: "no-store" }
+      );
       const data = (await res.json()) as { tireTypes?: TireTypeOption[] };
       setRecentOptions(data.tireTypes ?? []);
     } catch {
       setRecentOptions([]);
     }
-  }, []);
+  }, [carId]);
 
   useEffect(() => {
     void loadAll();

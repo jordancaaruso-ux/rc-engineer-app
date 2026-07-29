@@ -4873,6 +4873,13 @@ export function NewRunForm(props: {
               specTireType={specTireType}
               value={{ runsCompleted, ageKnown: tireAgeKnown, stintId: tireStintId }}
               onChange={applyTireStint}
+              carId={carId}
+              // No previous run on this car, nothing to be "the same" as — the
+              // panel drops the carry question and asks the count outright.
+              // `lastRun` is null both for "no history" and "not fetched yet", so
+              // it is only an answer once `replicateLoaded` says the per-car load
+              // finished; until then the panel is told we don't know.
+              hasPreviousRun={replicateLoaded ? lastRun != null : null}
               // Another car is another set of tires — an answer given for the old
               // one must not stand over the new car's value.
               resetSignal={carId}
