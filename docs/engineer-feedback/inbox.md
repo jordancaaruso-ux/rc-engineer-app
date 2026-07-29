@@ -1,8 +1,66 @@
 # Engineer feedback inbox
 
-Generated: 2026-07-22T12:18:06.648Z
+Generated: 2026-07-29T07:00:17.386Z
 
 Agent-readable rollup of founder (admin) 0–10 ratings. Canonical source is the database; regenerate via Settings → Export feedback or `npm run engineer:export-feedback`.
+
+## 2026-07-29T07:00:17.261Z — score 6/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cms5qi4de01ccvls4giswyglg` · **Thread:** `cms5qi4bg01c8vls4501ee8zh`
+- **KB sections:** [draft] Upstop (compression-travel limit) (vehicle-dynamics/drafts/upstop-compression-travel.md), [draft] Damper percent (Awesomatix damping / pack) (vehicle-dynamics/drafts/awesomatix-spring-gap-damper.md), [draft] Servo horn height (steering response) (vehicle-dynamics/drafts/servo-horn-steering-response.md), [draft] Motion ratio — mounting position and angle (vehicle-dynamics/drafts/shock-geometry.md)
+
+**Question:**
+
+how can i get the tire to work harder
+
+**Answer:**
+
+If you mean **make the tyre build more load/heat instead of feeling lazy**, I’d start with **front toe-out** — toe is the wheel pointing slightly outward/inward at ride height, and more toe makes the tyre run a small slip angle all the time, so it scrubs and works harder.
+
+**Try front toe from -1.2 to about -1.4** — assuming negative on your sheet is toe-out. You’re currently **-1.2**, and the low-grip A800RR community median is about **-1.0** from 36 setups, so this is a small move, not a huge drift.  
+**Expect:** tyre to come in a bit harder and the car to feel more awake on initial steering; if it just gets draggy, nervous, or loses speed down the straight, back it out.
+
+I would **not** add rear toe first: your rear toe is already **3.2 vs a 2.5 median**, so the rear tyre is already being asked to scrub quite hard.
+
+Second option, if the car feels too tied down rather than under-scrubbed: back off **damper %** slightly. You’re at **100 front / 100 rear**, while the low-grip median is around **60**, and the latest change to 100 didn’t really improve avg top 10.  
+**Try 100 → 80 both ends** as a check. **Expect:** the car to move into the tyre more and feel less “held”; if it loses the punch you liked and gets lazy, 100 was helping.
+
+So: **front toe-out first** if you want tyre energy; **damper % back to 80** if the issue is the car not leaning into the tyre.
+
+**Note:**
+
+I would probably consider ARB,. higher Roll center. the damping point is very subjective - not much evidence to back that. the front toe suggestion is okay, not amazing though
+
+---
+
+## 2026-07-29T06:32:48.340Z — score 8/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cms5pg6lv0007jj04cj7qq1m3` · **Thread:** `cms5pg6l80003jj04la58hpab`
+- **KB sections:** upper-link-geometry (vehicle-dynamics/upper-link-geometry.md), under-hub (vehicle-dynamics/under-hub.md), under-lower-arm (vehicle-dynamics/under-lower-arm.md), anti-dive-anti-squat (vehicle-dynamics/anti-dive-anti-squat.md)
+
+**Question:**
+
+how can i get more mid corner rotation
+
+**Answer:**
+
+If you mean it **pushes or won’t yaw once the car is settled mid-corner**, I’d start with **less rear toe-in**.
+
+1) **Rear toe-in — static angle of the rear wheels**: go **3.2 → 3.0°** if that’s your normal step. You’re currently **high** versus the low-grip A800RR asphalt pool: **3.2° vs 2.5° median**. More toe means more built-in slip/scrub; taking a little out should free the rear pair and let the car rotate more in the middle.  
+**Expect:** more yaw from apex to mid-exit; **if it gets nervous on power or won’t track straight**, you went too far or toe wasn’t the limiter.
+
+2) If that makes the rear too free, put toe back and try **front ARB — the bar linking the front wheels in roll**: **1.2 → 1.1**. You’re also above typical there: **1.2 vs 1.1 median**. Softening the front bar should give the front more mid-corner hold without changing heave ride.  
+**Expect:** more steering once loaded; **if it just rolls more and feels lazy without turning better**, it wasn’t the right lever.
+
+Do one at a time. I’d test rear toe first because it’s a clean rotation lever and you’re clearly on the high side already.
+
+**Note:**
+
+Very solid - I think its a bit odd to consider an arb change that results in a .2 split front to rear, pretty uncommon. dont necessarilty mean thats a valid reason not to do it, but i think its valid that the user would want to know its not that common
+
+---
 
 ## 2026-07-22T12:16:50.515Z — score 6/10
 
