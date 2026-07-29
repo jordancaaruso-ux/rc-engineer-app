@@ -57,7 +57,9 @@ export function DashboardSetupsCard({ setups }: { setups: DashboardSetups }) {
             <Link
               href={
                 car.current
-                  ? `/cars/${car.id}/setups/${car.current.id}/edit`
+                  ? // Run snapshots are immutable history, so the row opens the read-only sheet
+                    // (it offers Edit itself when the setup is a saved baseline).
+                    `/cars/${car.id}/setups/${car.current.id}`
                   : `/cars/${car.id}/setups/new`
               }
               className="tap-active flex items-center gap-3 px-1 py-2.5"
@@ -67,7 +69,7 @@ export function DashboardSetupsCard({ setups }: { setups: DashboardSetups }) {
                 <span className="block truncate font-mono text-[11px] tabular-nums text-muted-foreground">
                   {car.current
                     ? `${car.current.name} · ${car.current.dateLabel}`
-                    : "No setup yet — build one"}
+                    : "No runs yet — build a setup"}
                 </span>
               </span>
               <ChevronRight
