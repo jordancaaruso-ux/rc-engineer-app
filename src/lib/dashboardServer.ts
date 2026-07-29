@@ -31,7 +31,8 @@ import {
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { pickFeaturedEvent, todayBoundsInTimeZone } from "@/lib/eventActive";
 import { calendarYmdInTimeZone, formatFeaturedEventDateLabel, RUN_DATETIME_LOCALE } from "@/lib/formatDate";
-import { syncRecentEventLapSources } from "@/lib/eventLapDetection/syncEventLapSources";
+// NOTE: `syncRecentEventLapSources` is deliberately NOT imported at module scope —
+// see the dynamic import at its call site below.
 import { loadUserScopedEvents, userCanAccessEvent } from "@/lib/events/eventParticipation";
 import { resolveEventTrackLabel } from "@/lib/tracks/legacyTrackSnapshot";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
@@ -526,7 +527,24 @@ export async function loadDashboardHomeModel(
   // Fire-and-forget: LiveRC fetches + Prisma writes; can take 1–2s. Dashboard no
   // longer shows detected-session prompts, but background sync keeps event lap
   // sources fresh for next features / pages.
-  void syncRecentEventLapSources(userId).catch(() => {});
+  /*
+   * Imported lazily, not at module scope.
+   *
+   * This pulls the LiveRC scraping stack — cheerio, the parser registry, the HTML
+   * extractors — which measured at 42 of the 147 modules on the dashboard's server
+   * path, roughly a third of it, plus cheerio's own dependency tree. Every cold lambda
+   * was parsing an HTML scraper before it could render the dashboard, and cold requests
+   * measured p50 270ms / p95 5.2s against 27ms / 376ms warm.
+   *
+   * Nothing here is awaited — it is background freshness for lap sources — so deferring
+   * the import costs the response nothing and takes the whole subtree off the boot path.
+   */
+  void (async () => {
+    const { syncRecentEventLapSources } = await import(
+      "@/lib/eventLapDetection/syncEventLapSources"
+    );
+    await syncRecentEventLapSources(userId);
+  })().catch(() => {});
 
   const actionItemSelect = {
     id: true,
